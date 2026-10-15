@@ -1,7 +1,8 @@
 //! Interactive terminal dashboard rendered when the CLI runs with `--tui`.
 //!
 //! Layout, top to bottom:
-//! - **Title row**: clickable time ranges (`5m`–`12h` show a trailing window, `all` spans the
+//! - **Header**: Jetstreamer branding and a terminal hyperlink to `https://vaultic.win`.
+//! - **Range row**: clickable time ranges (`5m`–`12h` show a trailing window, `all` spans the
 //!   entire run and compresses as it grows; number keys `1`–`7` also select), with the run's
 //!   epoch and slot range right-aligned.
 //! - **TPS graph** over the selected range. TPS is a 5s rolling window sampled at 250ms. The
@@ -34,7 +35,7 @@
 //! captured log lines are replayed to stderr after the dashboard exits.
 
 use std::collections::VecDeque;
-use std::io::Stdout;
+use std::io::{Stdout, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -49,7 +50,7 @@ use jetstreamer_firehose::firehose::{OP_TIMEOUT, thread_activity};
 use jetstreamer_firehose::node_reader::TOTAL_BYTES_READ;
 use jetstreamer_plugin::metrics;
 use ratatui::Terminal;
-use ratatui::backend::CrosstermBackend;
+use ratatui::backend::{CrosstermBackend, IntoCrossterm};
 use ratatui::layout::Margin;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -75,6 +76,11 @@ const TPS_WINDOW: Duration = Duration::from_secs(5);
 const THREAD_TPS_INTERVAL: Duration = Duration::from_secs(1);
 const LOG_BUFFER_CAP: usize = 2000;
 const LOG_SCROLL_STEP: usize = 3;
+
+// Vaultic's ice-blue and aurora-violet accents.
+const ICE: Color = Color::Rgb(136, 221, 255);
+const AURORA: Color = Color::Rgb(181, 162, 238);
+const VAULTIC_HOST: &str = "vaultic.win";
 
 /// Selectable graph windows: label plus trailing seconds (`None` = entire run).
 const TIME_RANGES: [(&str, Option<u64>); 7] = [
@@ -423,6 +429,7 @@ struct UiState {
     needs_clear: bool,
     // Last-frame geometry for hit-testing.
     frame_area: Rect,
+    credit_link: Option<Rect>,
     chart_rect: Rect,
     progress_rect: Rect,
     middle_rect: Rect,
@@ -444,6 +451,7 @@ impl UiState {
             live_button: None,
             needs_clear: true,
             frame_area: Rect::default(),
+            credit_link: None,
             chart_rect: Rect::default(),
             progress_rect: Rect::default(),
             middle_rect: Rect::default(),
@@ -477,7 +485,7 @@ fn render_loop(stop: Arc<AtomicBool>) {
             last_heal = Instant::now();
         }
         sampler.maybe_sample();
-        let _ = terminal.draw(|frame| draw(frame, &sampler, &mut state));
+        let _ = render_frame(&mut terminal, &sampler, &mut state);
         // Wait out the frame interval inside the input poll so scrolling, clicks, and drags
         // are applied and redrawn the moment they arrive instead of at the render tick.
         let frame_deadline = Instant::now() + RENDER_INTERVAL;
@@ -489,7 +497,7 @@ fn render_loop(stop: Arc<AtomicBool>) {
             match crossterm::event::poll(remaining) {
                 Ok(true) => {
                     drain_input(&mut state);
-                    let _ = terminal.draw(|frame| draw(frame, &sampler, &mut state));
+                    let _ = render_frame(&mut terminal, &sampler, &mut state);
                 }
                 _ => break,
             }
@@ -497,6 +505,41 @@ fn render_loop(stop: Arc<AtomicBool>) {
     }
 
     restore_terminal(&mut terminal);
+}
+
+fn render_frame(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    sampler: &RateSampler,
+    state: &mut UiState,
+) -> std::io::Result<()> {
+    terminal.draw(|frame| draw(frame, sampler, state))?;
+    if let Some(area) = state.credit_link {
+        write_credit_link(terminal.backend_mut(), area)?;
+    }
+    Ok(())
+}
+
+/// Ratatui doesn't store hyperlinks in cells. Repaint just the domain with OSC 8 after
+/// each frame, keeping escape sequences out of its text layout and diff buffer. Terminals
+/// without hyperlink support still show the same styled text.
+fn write_credit_link(writer: &mut impl Write, area: Rect) -> std::io::Result<()> {
+    use crossterm::cursor::{MoveTo, RestorePosition, SavePosition};
+    use crossterm::style::{Attribute, Print, ResetColor, SetAttribute, SetForegroundColor};
+
+    execute!(
+        writer,
+        SavePosition,
+        MoveTo(area.x, area.y),
+        SetAttribute(Attribute::Reset),
+        SetForegroundColor(ICE.into_crossterm()),
+        SetAttribute(Attribute::Bold),
+        Print("\x1b]8;;https://vaultic.win\x1b\\"),
+        Print(VAULTIC_HOST),
+        Print("\x1b]8;;\x1b\\"),
+        SetAttribute(Attribute::Reset),
+        ResetColor,
+        RestorePosition
+    )
 }
 
 fn setup_terminal() -> std::io::Result<Terminal<CrosstermBackend<Stdout>>> {
@@ -677,43 +720,96 @@ fn drag_divider(state: &mut UiState, target: DragTarget, x: u16, y: u16) {
 
 fn draw(frame: &mut ratatui::Frame, sampler: &RateSampler, state: &mut UiState) {
     state.frame_area = frame.area();
-    let rows = Layout::default()
+    let [header, range, chart, progress, middle_area, logs] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Percentage(state.chart_pct),
             Constraint::Length(3),
             Constraint::Percentage(state.middle_pct),
             Constraint::Min(3),
         ])
-        .split(frame.area());
+        .areas(frame.area());
     // Size the thread grid to its content — one cell per thread dot, packed — and give the
     // system chart all remaining width.
-    let grid_rows = (rows[3].height as usize).saturating_sub(2).max(1);
+    let grid_rows = (middle_area.height as usize).saturating_sub(2).max(1);
     let thread_count = metrics::thread_count().max(1);
     let grid_width = (thread_count.div_ceil(grid_rows) + 2) as u16;
     let middle = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(grid_width.clamp(8, rows[3].width / 3)),
+            Constraint::Length(grid_width.clamp(8, middle_area.width / 3)),
             Constraint::Min(20),
             Constraint::Length(state.stats_width),
         ])
-        .split(rows[3]);
-    state.chart_rect = rows[1];
-    state.progress_rect = rows[2];
-    state.middle_rect = rows[3];
-    state.logs_rect = rows[4];
+        .split(middle_area);
+    state.chart_rect = chart;
+    state.progress_rect = progress;
+    state.middle_rect = middle_area;
+    state.logs_rect = logs;
     state.grid_rect = middle[0];
     state.system_rect = middle[1];
 
-    state.range_hitboxes = draw_range_selector(frame, rows[0], state.selected_range);
-    draw_tps_chart(frame, rows[1], sampler, state.selected_range);
-    draw_progress(frame, rows[2]);
+    state.credit_link = draw_header(frame, header);
+    state.range_hitboxes = draw_range_selector(frame, range, state.selected_range);
+    draw_tps_chart(frame, chart, sampler, state.selected_range);
+    draw_progress(frame, progress);
     draw_thread_grid(frame, middle[0]);
     draw_system_chart(frame, middle[1], sampler, state.selected_range);
     draw_stats(frame, middle[2], sampler);
-    draw_logs(frame, rows[4], state);
+    draw_logs(frame, logs, state);
+}
+
+fn draw_header(frame: &mut ratatui::Frame, area: Rect) -> Option<Rect> {
+    if area.is_empty() {
+        return None;
+    }
+    let title = Line::from(Span::styled(
+        " 🐻‍❄️ Jetstreamer",
+        Style::default().fg(ICE).add_modifier(Modifier::BOLD),
+    ));
+    let mut credit = Line::from(vec![
+        Span::styled(
+            "powered by ",
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        ),
+        Span::styled(
+            VAULTIC_HOST,
+            Style::default().fg(ICE).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" "),
+    ]);
+    // Drop the prefix on narrow terminals, then the credit if even the domain won't fit.
+    // Measure terminal cells rather than bytes: the bear is a joined emoji.
+    if title.width() + 1 + credit.width() > area.width as usize {
+        credit.spans.remove(0);
+    }
+    let show_credit = title.width() + 1 + credit.width() <= area.width as usize;
+    let title_width = if show_credit {
+        area.width - credit.width() as u16
+    } else {
+        area.width
+    };
+    frame.render_widget(title, Rect::new(area.x, area.y, title_width, 1));
+    if !show_credit {
+        return None;
+    }
+    let credit_area = Rect::new(
+        area.right() - credit.width() as u16,
+        area.y,
+        credit.width() as u16,
+        1,
+    );
+    frame.render_widget(credit, credit_area);
+    Some(Rect::new(
+        area.right() - 1 - VAULTIC_HOST.len() as u16,
+        area.y,
+        VAULTIC_HOST.len() as u16,
+        1,
+    ))
 }
 
 /// Full-width run progress gauge; the title carries the pace facts (ETA, slots, elapsed)
@@ -730,7 +826,7 @@ fn draw_progress(frame: &mut ratatui::Frame, area: Rect) {
     );
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(title))
-        .gauge_style(Style::default().fg(Color::Green).bg(Color::DarkGray))
+        .gauge_style(Style::default().fg(ICE).bg(Color::DarkGray))
         .ratio(ratio)
         .label(format!("{:.1}%", pulse.progress_pct));
     frame.render_widget(gauge, area);
@@ -749,10 +845,10 @@ fn draw_range_selector(
         let width = text.len() as u16;
         let style = if index == selected_range {
             Style::default()
-                .fg(Color::Cyan)
+                .fg(ICE)
                 .add_modifier(Modifier::BOLD | Modifier::REVERSED)
         } else {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(ICE)
         };
         spans.push(Span::styled(text, style));
         spans.push(Span::raw(" "));
@@ -801,7 +897,7 @@ fn draw_tps_chart(
     let dataset = Dataset::default()
         .marker(symbols::Marker::Braille)
         .graph_type(GraphType::Line)
-        .style(Style::default().fg(Color::Cyan))
+        .style(Style::default().fg(ICE))
         .data(&points);
     let start_label = if window_secs.is_some() {
         format!("-{}", human_duration(covered_secs))
@@ -809,11 +905,10 @@ fn draw_tps_chart(
         "start".to_string()
     };
     let chart = Chart::new(vec![dataset])
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" TPS ({label}) ")),
-        )
+        .block(Block::default().borders(Borders::ALL).title(Span::styled(
+            format!(" TPS ({label}) "),
+            Style::default().fg(ICE).add_modifier(Modifier::BOLD),
+        )))
         .x_axis(
             Axis::default()
                 .bounds([0.0, 1.0])
@@ -849,7 +944,7 @@ fn draw_tps_chart(
         frame.render_widget(
             Paragraph::new(Span::styled(
                 format!("{:>7}", human_count(current as u64)),
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(ICE),
             )),
             marker_area,
         );
@@ -869,7 +964,7 @@ fn draw_thread_grid(frame: &mut ratatui::Frame, area: Rect) {
         // clock would paint it red as if stalled.
         let (symbol, color) = if thread_activity::is_finished(thread_id) {
             done += 1;
-            ("✓", Color::Cyan)
+            ("✓", ICE)
         } else {
             match metrics::thread_idle_ms(thread_id) {
                 None => ("·", Color::DarkGray),
@@ -936,7 +1031,7 @@ fn draw_system_chart(
         Dataset::default()
             .marker(symbols::Marker::Braille)
             .graph_type(GraphType::Line)
-            .style(Style::default().fg(Color::Magenta))
+            .style(Style::default().fg(AURORA))
             .data(&cpu),
         Dataset::default()
             .marker(symbols::Marker::Braille)
@@ -953,10 +1048,7 @@ fn draw_system_chart(
     // built-in legend hides itself when it decides the area is too small.
     let title = Line::from(vec![
         Span::raw(" System "),
-        Span::styled(
-            format!("cpu {cpu_now:.0}%"),
-            Style::default().fg(Color::Magenta),
-        ),
+        Span::styled(format!("cpu {cpu_now:.0}%"), Style::default().fg(AURORA)),
         Span::raw(" | "),
         Span::styled(
             format!("mem {mem_now:.0}%"),

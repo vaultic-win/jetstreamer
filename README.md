@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/jetstreamer.svg)](https://crates.io/crates/jetstreamer)
 [![Docs.rs](https://docs.rs/jetstreamer/badge.svg)](https://docs.rs/jetstreamer)
-[![CI](https://github.com/anza-xyz/jetstreamer/actions/workflows/rust.yaml/badge.svg)](https://github.com/anza-xyz/jetstreamer/actions/workflows/rust.yaml)
+[![CI](https://github.com/vaultic-win/jetstreamer/actions/workflows/rust.yaml/badge.svg)](https://github.com/vaultic-win/jetstreamer/actions/workflows/rust.yaml)
 
 ## 🐻‍❄️ Jetstreamer has a new home
 
@@ -144,13 +144,15 @@ Add `--tui` to render a live terminal dashboard instead of plain log output:
 
 Pane dividers are mouse-draggable. Press `q`, `Esc`, or `Ctrl-C` for the same graceful
 shutdown as SIGINT; the final log lines are replayed to the terminal on exit.
+The top-right **vaultic.win** credit is a terminal hyperlink; use your terminal's link-opening
+gesture (usually Cmd-click or Ctrl-click).
 
 ### Throughput management
 
 The threaded firehose actively manages its connection fleet to cope with CDN throttling:
 threads launch through a health gate (pausing the ramp while any thread is stalled),
 failed threads restart with exponential backoff, persistently-slow connections are recycled
-(♻️) for fresh ones, and threads that finish their slot range steal work (🥷) — via a
+(🧊) for fresh ones, and threads that finish their slot range steal work (🐾) — via a
 message handshake in which the least-progressed thread hands over half of its remaining
 slots — so every connection stays busy to the end of the run. Tune with
 `JETSTREAMER_SPAWN_PENDING`, `JETSTREAMER_SPAWN_GRACE_SECS`, and `JETSTREAMER_RECYCLE_PCT`
