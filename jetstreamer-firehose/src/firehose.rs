@@ -1775,7 +1775,7 @@ where
                     slot_to_epoch(slot_range.end)
                 );
 
-                log::info!(target: &log_target, "🐻‍❄️ starting firehose...");
+                log::info!(target: &log_target, "❄️ starting firehose...");
 
                 // for each epoch
                 let mut current_slot: Option<u64> = None;
@@ -2491,7 +2491,7 @@ where
                                 slot_to_epoch(slot_range.end) + 1 - slot_to_epoch(slot_range.start),
                                 elapsed_pretty
                             );
-                            log::info!(target: &log_target, "🐻‍❄️ firehose thread completed its work.");
+                            log::info!(target: &log_target, "❄️ firehose thread completed its work.");
                             // On completion, report threads with non-zero error counts for
                             // visibility.
                             let summary: String = error_counts
@@ -2864,7 +2864,7 @@ where
     if shutdown_flag.load(Ordering::SeqCst) {
         log::info!(target: LOG_MODULE, "firehose shutdown complete; all threads exited cleanly.");
     } else {
-        log::info!(target: LOG_MODULE, "🐻‍❄️ firehose finished successfully.");
+        log::info!(target: LOG_MODULE, "❄️ firehose finished successfully.");
     }
     Ok(())
 }
@@ -2979,7 +2979,7 @@ pub fn firehose_geyser(
     for handle in handles {
         handle.join().unwrap();
     }
-    log::info!(target: LOG_MODULE, "🐻‍❄️ firehose finished successfully.");
+    log::info!(target: LOG_MODULE, "❄️ firehose finished successfully.");
     if let Some(block_meta_notifier) = block_meta_notifier_maybe.as_ref() {
         block_meta_notifier.notify_block_metadata(
             u64::MAX,
@@ -3034,7 +3034,7 @@ async fn firehose_geyser_thread(
                 slot_to_epoch(slot_range.end)
             );
 
-            log::info!(target: &log_target, "🐻‍❄️ starting firehose...");
+            log::info!(target: &log_target, "❄️ starting firehose...");
 
             // for each epoch
             let mut current_slot: Option<u64> = None;
@@ -3378,7 +3378,7 @@ async fn firehose_geyser_thread(
                                 - slot_to_epoch(initial_slot_range.start),
                             elapsed_pretty
                         );
-                        log::info!(target: &log_target, "🐻‍❄️ firehose thread completed its work.");
+                        log::info!(target: &log_target, "❄️ firehose thread completed its work.");
                         thread_activity::note_finished(thread_index.unwrap_or(0));
                         // On completion, report threads with non-zero error counts for
                         // visibility.

@@ -766,7 +766,7 @@ fn draw_header(frame: &mut ratatui::Frame, area: Rect) -> Option<Rect> {
         return None;
     }
     let title = Line::from(Span::styled(
-        " 🐻‍❄️ Jetstreamer",
+        " ❄️ Jetstreamer",
         Style::default().fg(ICE).add_modifier(Modifier::BOLD),
     ));
     let mut credit = Line::from(vec![
@@ -783,7 +783,7 @@ fn draw_header(frame: &mut ratatui::Frame, area: Rect) -> Option<Rect> {
         Span::raw(" "),
     ]);
     // Drop the prefix on narrow terminals, then the credit if even the domain won't fit.
-    // Measure terminal cells rather than bytes: the bear is a joined emoji.
+    // Measure terminal cells rather than UTF-8 bytes.
     if title.width() + 1 + credit.width() > area.width as usize {
         credit.spans.remove(0);
     }
