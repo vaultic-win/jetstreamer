@@ -20,8 +20,9 @@ https://github.com/rpcpool/yellowstone-faithful/tree/main/geyser-plugin-runner
 - `JETSTREAMER_FORCE_LEGACY_INDEX`: set to `1` to skip the per-epoch slot-ranges index
   (`{epoch}/epoch-{epoch}-slot-ranges.raw`, ~5 MB) and resolve slot offsets with the legacy
   compactindex pair (`slot-to-cid` + `cid-to-offset-and-size`) instead. The legacy indexes are
-  deprecated upstream; without this flag they are only used as an automatic fallback when a
-  mirror does not serve the slot-ranges file.
+  deprecated upstream; without this flag they are used as an automatic fallback when a mirror
+  does not serve the slot-ranges file or keeps returning HTTP 429/503 through the bounded retry
+  policy. Authentication errors and malformed slot-ranges data remain fatal.
 - `JETSTREAMER_ARCHIVE_BASE`: shortcut that applies to both CARs and indexes when the more
   specific knobs are unset.
 - `JETSTREAMER_S3_BUCKET`, `JETSTREAMER_S3_PREFIX`, `JETSTREAMER_S3_INDEX_PREFIX`,

@@ -1,0 +1,24 @@
+[package]
+name = "jetstreamer-horizon-observe"
+description = "Read-only invocation-bound Horizon replay resource sampler"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+
+[[bin]]
+name = "jetstreamer-horizon-status-estimate"
+path = "src/status_estimate.rs"
+
+[dependencies]
+anyhow.workspace = true
+libc.workspace = true
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true, features = ["std"] }
+sha2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
