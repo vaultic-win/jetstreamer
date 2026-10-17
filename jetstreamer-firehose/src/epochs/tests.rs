@@ -1,6 +1,6 @@
 use super::*;
 use serde_json::{Value, json};
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     net::TcpListener,
@@ -9,7 +9,7 @@ use tokio::{
 };
 
 struct Reply {
-    request_line: &'static str,
+    request_line: Cow<'static, str>,
     range: Option<String>,
     request_json: Option<Value>,
     status: &'static str,
@@ -18,9 +18,9 @@ struct Reply {
 }
 
 impl Reply {
-    fn head(request_line: &'static str, status: &'static str) -> Self {
+    fn head(request_line: impl Into<Cow<'static, str>>, status: &'static str) -> Self {
         Self {
-            request_line,
+            request_line: request_line.into(),
             range: None,
             request_json: None,
             status,
@@ -31,7 +31,7 @@ impl Reply {
 
     fn range(start: usize, end: usize, bytes: &[u8]) -> Self {
         Self {
-            request_line: "GET /archive/670/epoch-670.car HTTP/1.1",
+            request_line: "GET /archive/670/epoch-670.car HTTP/1.1".into(),
             range: Some(format!("bytes={start}-{end}")),
             request_json: None,
             status: "206 Partial Content",
@@ -42,7 +42,7 @@ impl Reply {
 
     fn rpc(response: Value) -> Self {
         Self {
-            request_line: "POST /archive/ HTTP/1.1",
+            request_line: "POST /archive/ HTTP/1.1".into(),
             range: None,
             request_json: Some(json!({
                 "jsonrpc": "2.0",
@@ -184,6 +184,97 @@ async fn test_epoch_exists() {
     assert!(epoch_exists_at(670, &client, &location).await);
     assert!(!epoch_exists_at(999999, &client, &location).await);
     assert!(!epoch_exists_at(670, &client, &location).await);
+    server.finish().await;
+}
+
+const FAST_RETRY: Duration = Duration::from_millis(1);
+
+fn head(epoch: u64, status: &'static str) -> Reply {
+    Reply::head(
+        format!("HEAD /archive/{epoch}/epoch-{epoch}.car HTTP/1.1"),
+        status,
+    )
+}
+
+#[tokio::test]
+async fn test_check_epoch_exists_separates_missing_from_failed() {
+    let server = TestServer::start(vec![
+        head(670, "200 OK"),
+        head(671, "404 Not Found"),
+        head(670, "429 Too Many Requests"),
+        head(670, "503 Service Unavailable"),
+    ])
+    .await;
+    let (client, location) = (client(), server.location());
+    assert!(
+        check_epoch_exists_at(670, &client, &location)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !check_epoch_exists_at(671, &client, &location)
+            .await
+            .unwrap()
+    );
+    assert!(
+        check_epoch_exists_at(670, &client, &location)
+            .await
+            .is_err()
+    );
+    assert!(
+        check_epoch_exists_at(670, &client, &location)
+            .await
+            .is_err()
+    );
+    server.finish().await;
+}
+
+#[tokio::test]
+async fn test_latest_epoch_walks_down_past_missing_epochs() {
+    let server = TestServer::start(vec![
+        head(672, "404 Not Found"),
+        head(671, "404 Not Found"),
+        head(670, "200 OK"),
+    ])
+    .await;
+    let epoch = latest_epoch_at(672, &client(), &server.location(), FAST_RETRY).await;
+    assert_eq!(epoch.unwrap(), 670);
+    server.finish().await;
+}
+
+#[tokio::test]
+async fn test_latest_epoch_retries_a_throttled_check() {
+    let server = TestServer::start(vec![
+        head(670, "429 Too Many Requests"),
+        head(670, "200 OK"),
+    ])
+    .await;
+    let epoch = latest_epoch_at(670, &client(), &server.location(), FAST_RETRY).await;
+    assert_eq!(epoch.unwrap(), 670);
+    server.finish().await;
+}
+
+#[tokio::test]
+async fn test_latest_epoch_does_not_walk_past_persistent_throttling() {
+    let server =
+        TestServer::start((0..5).map(|_| head(670, "429 Too Many Requests")).collect()).await;
+    let err = latest_epoch_at(670, &client(), &server.location(), FAST_RETRY)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("429"), "unexpected error: {err}");
+    server.finish().await;
+}
+
+#[tokio::test]
+async fn test_latest_epoch_stops_at_epoch_zero() {
+    let server = TestServer::start(vec![head(1, "404 Not Found"), head(0, "404 Not Found")]).await;
+    let err = latest_epoch_at(1, &client(), &server.location(), FAST_RETRY)
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("no Old Faithful epoch"),
+        "unexpected error: {err}"
+    );
     server.finish().await;
 }
 

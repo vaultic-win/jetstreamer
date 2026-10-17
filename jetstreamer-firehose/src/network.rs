@@ -1,9 +1,12 @@
 use reqwest::Client;
 
 use crate::{
-    SharedError,
-    epochs::{epoch_exists, epoch_to_slot_range},
+    SharedError, archive,
+    epochs::{epoch_to_slot_range, latest_epoch_at},
 };
+
+/// First retry delay when an epoch check fails; it doubles on each retry.
+const EPOCH_CHECK_RETRY_BASE: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Creates a new HTTP client with the Jetstreamer user agent header.
 ///
@@ -35,31 +38,36 @@ pub async fn current_epoch(client: &Client) -> Result<u64, SharedError> {
         .header("Content-Type", "application/json")
         .body(request_body)
         .send()
-        .await?;
+        .await?
+        .error_for_status()?;
     let text = response.text().await?;
-    let epoch_info: serde_json::Value = serde_json::from_str(&text).unwrap();
-    let epoch = epoch_info["result"]["epoch"].as_u64().unwrap();
-    Ok(epoch)
+    let epoch_info: serde_json::Value = serde_json::from_str(&text)?;
+    epoch_info["result"]["epoch"]
+        .as_u64()
+        .ok_or_else(|| "getEpochInfo response has no result.epoch".into())
 }
 
 /// Finds the most recent epoch with a compact archive hosted on Old Faithful.
 ///
 /// If `epoch` is `None`, the search starts from [`current_epoch`]. The returned
-/// tuple is `(epoch, first_slot, last_slot)`.
+/// tuple is `(epoch, first_slot, last_slot)`. Only a 404 moves the search to the previous
+/// epoch; a failed check (for example HTTP 429) is retried, then returned as an error.
 pub async fn latest_old_faithful_epoch(
     client: &Client,
     epoch: Option<u64>,
 ) -> Result<(u64, u64, u64), SharedError> {
-    let mut epoch = if let Some(epoch) = epoch {
+    let start = if let Some(epoch) = epoch {
         epoch
     } else {
         current_epoch(client).await?
     };
-    loop {
-        if epoch_exists(epoch, client).await {
-            let (start_slot, end_slot) = epoch_to_slot_range(epoch);
-            return Ok((epoch, start_slot, end_slot));
-        }
-        epoch -= 1;
-    }
+    let epoch = latest_epoch_at(
+        start,
+        client,
+        archive::car_location(),
+        EPOCH_CHECK_RETRY_BASE,
+    )
+    .await?;
+    let (start_slot, end_slot) = epoch_to_slot_range(epoch);
+    Ok((epoch, start_slot, end_slot))
 }
