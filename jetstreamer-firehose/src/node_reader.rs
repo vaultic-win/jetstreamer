@@ -4,6 +4,7 @@ use crate::epochs::{epoch_to_slot_range, slot_to_epoch};
 use crate::firehose::FirehoseError;
 use crate::index::{SlotOffsetIndexError, slot_to_range};
 use crate::node::{Node, NodeWithCid, NodesWithCids, parse_any_from_cbordata};
+use crate::pace::pace;
 use crate::utils;
 use cid::Cid;
 use once_cell::sync::Lazy;
@@ -18,9 +19,8 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 use tokio::time::sleep;
 
 const MAX_VARINT_LEN_64: usize = 10;
-const MIN_SEEK_SPACING_MS: u64 = 15;
-static SEEK_START_INSTANT: Lazy<Instant> = Lazy::new(Instant::now);
-static LAST_SEEK_HIT_TIME: AtomicU64 = AtomicU64::new(0);
+static REQUEST_START_INSTANT: Lazy<Instant> = Lazy::new(Instant::now);
+static LAST_REQUEST_TIME: AtomicU64 = AtomicU64::new(0);
 
 /// Total CAR section bytes read across all readers and threads since process start. Frontends
 /// (e.g. the TUI) sample this to derive an overall data rate.
@@ -176,7 +176,7 @@ pub struct NodeReader<R: AsyncRead + AsyncSeek + Len> {
     pub header: Vec<u8>,
     /// Number of Old Faithful items that have been read so far.
     pub item_index: u64,
-    /// Whether the next seek already holds the global seek-spacing permit.
+    /// Whether the next seek already holds the global request-spacing permit.
     seek_permit_primed: bool,
 }
 
@@ -219,12 +219,12 @@ impl<R: AsyncRead + Unpin + AsyncSeek + Len> NodeReader<R> {
         self.seek_to_slot_inner(slot).await
     }
 
-    /// Acquires the global seek-spacing permit ahead of a [`Self::seek_to_slot`] call, so the
+    /// Acquires the global request-spacing permit ahead of a [`Self::seek_to_slot`] call, so the
     /// cross-thread pacing wait (which can queue for many seconds when hundreds of threads
     /// seek at once) happens outside any timeout the caller wraps the seek in. The permit is
     /// consumed by the next seek; an unprimed seek acquires it itself.
     pub async fn prime_seek_permit(&mut self) {
-        wait_for_seek_hit_slot().await;
+        wait_for_request_slot().await;
         self.seek_permit_primed = true;
     }
 
@@ -310,7 +310,7 @@ impl<R: AsyncRead + Unpin + AsyncSeek + Len> NodeReader<R> {
 
     async fn seek_to_offset(&mut self, offset: u64) -> Result<(), FirehoseError> {
         if !std::mem::take(&mut self.seek_permit_primed) {
-            wait_for_seek_hit_slot().await;
+            wait_for_request_slot().await;
         }
         self.reader
             .seek(SeekFrom::Start(offset))
@@ -389,8 +389,8 @@ impl<R: AsyncRead + Unpin + AsyncSeek + Len> NodeReader<R> {
     }
 }
 
-fn seek_monotonic_millis() -> u64 {
-    let elapsed = SEEK_START_INSTANT.elapsed().as_millis();
+fn request_monotonic_millis() -> u64 {
+    let elapsed = REQUEST_START_INSTANT.elapsed().as_millis();
     if elapsed > u64::MAX as u128 {
         u64::MAX
     } else {
@@ -398,28 +398,28 @@ fn seek_monotonic_millis() -> u64 {
     }
 }
 
-async fn wait_for_seek_hit_slot() {
+/// Waits for the process-wide request-spacing permit. Every stream open and seek takes one, so
+/// reconnects happen at most once per [`crate::pace::Pace::request_spacing`].
+pub(crate) async fn wait_for_request_slot() {
+    let spacing_ms = pace().request_spacing().as_millis() as u64;
     loop {
-        let now_ms = seek_monotonic_millis();
-        let last_hit = LAST_SEEK_HIT_TIME.load(Ordering::Relaxed);
+        let now_ms = request_monotonic_millis();
+        let last_hit = LAST_REQUEST_TIME.load(Ordering::Relaxed);
         let since_last = now_ms.saturating_sub(last_hit);
-        if since_last < MIN_SEEK_SPACING_MS {
+        if since_last < spacing_ms {
             // Sleep out the remainder of the spacing window instead of spinning; with
             // hundreds of threads queued this otherwise burns CPU for the whole drain.
-            sleep(std::time::Duration::from_millis(
-                MIN_SEEK_SPACING_MS - since_last,
-            ))
-            .await;
+            sleep(std::time::Duration::from_millis(spacing_ms - since_last)).await;
             continue;
         }
-        if LAST_SEEK_HIT_TIME
+        if LAST_REQUEST_TIME
             .compare_exchange(last_hit, now_ms, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
         {
             return;
         }
         // Lost the race for this window; the winner's spacing interval starts now.
-        sleep(std::time::Duration::from_millis(MIN_SEEK_SPACING_MS)).await;
+        sleep(std::time::Duration::from_millis(spacing_ms)).await;
     }
 }
 
@@ -540,5 +540,17 @@ mod tests {
             error.downcast_ref::<io::Error>().unwrap().kind(),
             io::ErrorKind::Other,
         );
+    }
+
+    #[tokio::test]
+    async fn request_permits_are_spaced_by_the_pace() {
+        // Other tests can only take permits too, which adds wait time; the lower bound holds.
+        let spacing = pace().request_spacing();
+        wait_for_request_slot().await;
+        let start = Instant::now();
+        wait_for_request_slot().await;
+        wait_for_request_slot().await;
+        let tolerance = std::time::Duration::from_millis(2);
+        assert!(start.elapsed() + tolerance >= spacing * 2);
     }
 }

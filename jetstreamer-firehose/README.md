@@ -33,8 +33,10 @@ https://github.com/rpcpool/yellowstone-faithful/tree/main/geyser-plugin-runner
 - `JETSTREAMER_NETWORK_CAPACITY_MB` (default `1000`): assumed network throughput in megabytes
   per second when sizing the firehose thread pool. Increase or decrease to match your host's
   effective bandwidth.
-- `JETSTREAMER_SPAWN_PENDING` (default `24`): maximum not-yet-green threads in flight during
-  the health-gated thread ramp; `1` reproduces a strict one-at-a-time ramp.
+- `JETSTREAMER_TURBO` (default `false`): when truthy, runs at full speed instead of the polite
+  default. See `jetstreamer_firehose::pace`.
+- `JETSTREAMER_SPAWN_PENDING` (default `4`, `24` in turbo mode): maximum not-yet-green threads
+  in flight during the health-gated thread ramp; `1` reproduces a strict one-at-a-time ramp.
 - `JETSTREAMER_SPAWN_GRACE_SECS` (default `30`): how long the launch gate waits for sluggish
   (never stalled) threads before spawning anyway; `0` disables launch gating entirely.
 - `JETSTREAMER_RECYCLE_PCT` (default `50`): connection-recycle threshold as a percent of the
@@ -48,11 +50,15 @@ The threaded firehose actively manages its HTTP connection fleet to cope with CD
 
 - **Health-gated launch**: threads spawn one batch at a time, only while the running fleet is
   healthy; a stalled (red) thread freezes the ramp until it recovers.
-- **Exponential restart backoff**: failed threads wait 1s → 32s (reset on progress) before
-  reconnecting, so throttling events decay instead of amplifying into reconnect storms.
+- **Paced reconnects**: every stream open and seek waits for a process-wide permit, 250 ms
+  apart by default and 15 ms apart in turbo mode.
+- **Exponential restart backoff**: failed threads wait 2s → 120s by default and 1s → 32s in
+  turbo mode (reset on progress) before reconnecting, so throttling events decay instead of
+  amplifying into reconnect storms.
 - **Connection recycling** (♻️): threads running persistently below the fleet's demonstrated
   rate reconnect cleanly (no backoff, no error counting) to shed throughput-clamped
-  connections. Rotation is capped per sweep so a uniform clamp is probed gradually.
+  connections. Sweeps run every 2 min by default and every 15 s in turbo mode, and rotation is
+  capped per sweep so a uniform clamp is probed gradually.
 - **Work stealing** (🥷): a thread that finishes its slot range messages the least-progressed
   thread's steal inbox to request half of its remaining work; the victim answers at a
   quiescent point (between block batches) and computes the split from its own authoritative

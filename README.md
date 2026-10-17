@@ -84,6 +84,9 @@ cargo run --release -- 800 --with-plugin instruction-tracking
 
 # Point the runner at an external ClickHouse instance (overrides JETSTREAMER_CLICKHOUSE_DSN)
 cargo run --release -- 800 --clickhouse-dsn http://clickhouse.example.com:8123
+
+# Run at full speed for a benchmark, preferably against a private mirror
+cargo run --release -- 800 --turbo
 ```
 
 If `JETSTREAMER_THREADS` is omitted, Jetstreamer auto-sizes the worker pool using the same
@@ -147,12 +150,26 @@ shutdown as SIGINT; the final log lines are replayed to the terminal on exit.
 
 ### Throughput management
 
+The public Old Faithful archive is shared by everyone who streams from it, so Jetstreamer is
+polite by default. Add `--turbo` (or `JETSTREAMER_TURBO=1`) to run at full speed, for example
+for a benchmark or against your own mirror.
+
+| Setting | Polite (default) | `--turbo` |
+|---------|------------------|-----------|
+| Spacing between new connections (stream opens and seeks), process-wide | 250 ms | 15 ms |
+| Connection-recycle sweep (reconnects the slowest threads) | every 2 min | every 15 s |
+| Not-yet-green threads during the ramp (`JETSTREAMER_SPAWN_PENDING`) | `4` | `24` |
+| Restart backoff after a failure | 2 s, doubling to 120 s | 1 s, doubling to 32 s |
+
+The thread count is the same in both modes. An explicit `JETSTREAMER_SPAWN_PENDING`
+overrides the mode default.
+
 The threaded firehose actively manages its connection fleet to cope with CDN throttling:
 threads launch through a health gate (pausing the ramp while any thread is stalled),
 failed threads restart with exponential backoff, persistently-slow connections are recycled
-(♻️) for fresh ones, and threads that finish their slot range steal work (🥷) — via a
-message handshake in which the least-progressed thread hands over half of its remaining
-slots — so every connection stays busy to the end of the run. Tune with
+(♻️) for fresh ones, and threads that finish their slot range steal work (🥷)
+— via a message handshake in which the least-progressed thread hands over half of its
+remaining slots — so every connection stays busy to the end of the run. Tune with
 `JETSTREAMER_SPAWN_PENDING`, `JETSTREAMER_SPAWN_GRACE_SECS`, and `JETSTREAMER_RECYCLE_PCT`
 (see the crate docs for details).
 

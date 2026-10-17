@@ -66,6 +66,8 @@
 //!   instances that emit ClickHouse writes.
 //! - `JETSTREAMER_CLICKHOUSE_MODE` (default `auto`): controls ClickHouse integration. Accepted
 //!   values are `auto`, `remote`, `local`, and `off`.
+//! - `JETSTREAMER_TURBO` (default `false`): when truthy, runs at full speed instead of the polite
+//!   default. Same as `--turbo`. See [`firehose::pace`].
 //!
 //! Additional firehose-specific knobs such as `JETSTREAMER_COMPACT_INDEX_BASE_URL` and
 //! `JETSTREAMER_NETWORK` live in [`jetstreamer_firehose`](crate::firehose).
@@ -98,6 +100,7 @@
 //! | `JETSTREAMER_SEQUENTIAL` | `false` | Enables single-thread firehose processing with ripget-backed sequential streaming. |
 //! | `JETSTREAMER_REVERSE` | `false` | Streams epochs from highest to lowest. Implies `JETSTREAMER_SEQUENTIAL`. |
 //! | `JETSTREAMER_BUFFER_WINDOW` | `min(4 GiB, 15% available RAM)` | Total ripget hot/cold window size used only when `JETSTREAMER_SEQUENTIAL` is enabled. |
+//! | `JETSTREAMER_TURBO` | `false` | Runs at full speed instead of the polite default (same as `--turbo`). Use it for benchmarks and private mirrors. |
 //!
 //! Helper spawning only occurs when both the mode allows it (`auto`/`local`) **and** the DSN
 //! points to `localhost` or `127.0.0.1`.
@@ -110,7 +113,7 @@
 //! | `JETSTREAMER_FORCE_LEGACY_INDEX` | unset | Set to `1` to skip the slot-ranges index and resolve slot offsets using the deprecated legacy compactindex pair. |
 //! | `JETSTREAMER_NETWORK` | `mainnet` | Network suffix appended to cache namespaces and legacy index filenames (e.g., `testnet`). |
 //! | `JETSTREAMER_NETWORK_CAPACITY_MB` | `1000` | Assumed network throughput in megabytes per second used when auto-sizing firehose thread counts. |
-//! | `JETSTREAMER_SPAWN_PENDING` | `24` | Maximum not-yet-green threads in flight during the health-gated thread ramp; `1` reproduces a strict one-at-a-time ramp. |
+//! | `JETSTREAMER_SPAWN_PENDING` | `4` (`24` with `--turbo`) | Maximum not-yet-green threads in flight during the health-gated thread ramp; `1` reproduces a strict one-at-a-time ramp. |
 //! | `JETSTREAMER_SPAWN_GRACE_SECS` | `30` | How long the launch gate waits for sluggish (never stalled) threads before spawning anyway; `0` disables launch gating entirely. |
 //! | `JETSTREAMER_RECYCLE_PCT` | `50` | Connection-recycle threshold as a percent of the best observed p90 per-thread rate; threads persistently below it reconnect. `0` disables recycling. |
 //!
@@ -139,7 +142,12 @@ pub use jetstreamer_utils as utils;
 pub mod tui;
 
 use core::ops::Range;
-use jetstreamer_firehose::{epochs::slot_to_epoch, index::get_index_base_url};
+use jetstreamer_firehose::{
+    archive::car_location,
+    epochs::{BASE_URL, slot_to_epoch},
+    index::get_index_base_url,
+    pace::Pace,
+};
 use jetstreamer_plugin::{
     Plugin, PluginRunner, PluginRunnerError,
     plugins::{
@@ -242,6 +250,8 @@ fn parse_clickhouse_mode(value: &str) -> Option<ClickhouseMode> {
 ///   `auto` (default: enable output and spawn the helper only for local DSNs), `remote`
 ///   (enable output but never spawn the helper), `local` (always request the helper), and
 ///   `off` (disable ClickHouse entirely).
+/// - `JETSTREAMER_TURBO`: When true, runs at full speed instead of the polite default. See
+///   [`JetstreamerRunner::with_turbo`].
 ///
 /// ### Example
 ///
@@ -327,6 +337,13 @@ fn parse_clickhouse_mode(value: &str) -> Option<ClickhouseMode> {
 /// To achieve 2M TPS+, you will need a 20+ Gbps network connection and at least a 64 core CPU.
 /// On our benchmark hardware we currently have a 100 Gbps connection and 64 cores, which has
 /// led to a record of 2.7M TPS of the course of a 12 hour run using 255 threads.
+///
+/// ## Polite and turbo pace
+///
+/// By default the runner is polite to the shared Old Faithful archive: it spaces new
+/// connections 250 ms apart, recycles slow connections every 2 min, and backs off up to 120 s
+/// after a failure. Benchmarks such as the 2.7M TPS run use [`JetstreamerRunner::with_turbo`]
+/// (or `--turbo`), preferably against a private mirror. See [`firehose::pace::Pace`].
 pub struct JetstreamerRunner {
     log_level: String,
     plugins: Vec<Box<dyn Plugin>>,
@@ -355,6 +372,7 @@ impl Default for JetstreamerRunner {
                 builtin_plugins: Vec::new(),
                 clickhouse_dsn: None,
                 tui: false,
+                turbo: parse_env_bool(jetstreamer_firehose::pace::TURBO_ENV, false),
             },
         }
     }
@@ -411,6 +429,16 @@ impl JetstreamerRunner {
         if reverse {
             self.config.sequential = true;
         }
+        self
+    }
+
+    /// Runs at full speed ([`Pace::Turbo`]) instead of the polite default ([`Pace::Polite`]).
+    ///
+    /// Turbo spaces new connections 15 ms apart instead of 250 ms, recycles slow connections
+    /// every 15 s instead of every 2 min, and caps the restart backoff at 32 s instead of 120 s.
+    /// Use it for benchmarks and private mirrors, not for routine runs against the public archive.
+    pub const fn with_turbo(mut self, turbo: bool) -> Self {
+        self.config.turbo = turbo;
         self
     }
 
@@ -474,6 +502,14 @@ impl JetstreamerRunner {
             log::info!("slot index base url: {}", index_url);
         }
 
+        let pace = if self.config.turbo {
+            Pace::Turbo
+        } else {
+            Pace::Polite
+        };
+        jetstreamer_firehose::pace::set_pace(pace);
+        log_pace(pace);
+
         let threads = std::cmp::max(1, self.config.threads);
         let sequential = self.config.sequential;
         let reverse = self.config.reverse;
@@ -488,11 +524,12 @@ impl JetstreamerRunner {
         let worker_threads =
             std::cmp::max(1, threads.saturating_mul(WORKER_THREAD_MULTIPLIER)) + AUX_WORKER_THREADS;
         log::info!(
-            "processing slots [{}..{}) with {} configured threads on {} tokio workers (sequential={}, reverse={}, buffer_window_bytes={:?}, clickhouse_enabled={})",
+            "processing slots [{}..{}) with {} configured threads on {} tokio workers (pace={}, sequential={}, reverse={}, buffer_window_bytes={:?}, clickhouse_enabled={})",
             slot_range.start,
             slot_range.end,
             threads,
             worker_threads,
+            pace.name(),
             sequential,
             reverse,
             buffer_window_bytes,
@@ -651,6 +688,8 @@ pub struct Config {
     pub clickhouse_dsn: Option<String>,
     /// Whether to render the interactive terminal dashboard instead of log output.
     pub tui: bool,
+    /// Whether to run at full speed ([`Pace::Turbo`]) instead of the polite default.
+    pub turbo: bool,
 }
 
 /// Built-in plugins that can be toggled via CLI flags.
@@ -708,6 +747,7 @@ impl BuiltinPlugin {
 /// - `JETSTREAMER_SEQUENTIAL`: Enables single-thread sequential firehose mode when truthy.
 /// - `JETSTREAMER_REVERSE`: Enables reverse epoch iteration when truthy. Implies sequential mode.
 /// - `JETSTREAMER_BUFFER_WINDOW`: Optional ripget sequential window size (for example `4GiB`).
+/// - `JETSTREAMER_TURBO`: Runs at full speed instead of the polite default when truthy.
 ///
 /// CLI flags:
 /// - `--with-plugin <name>`: Adds one of the built-in plugins (`program-tracking`,
@@ -721,6 +761,8 @@ impl BuiltinPlugin {
 ///   `JETSTREAMER_CLICKHOUSE_DSN` env var and any prior `with_clickhouse_dsn` builder call).
 /// - `--tui`: Renders an interactive terminal dashboard (TPS graph, per-thread activity,
 ///   stats) instead of plain log output.
+/// - `--turbo`: Runs at full speed instead of the polite default. See
+///   [`JetstreamerRunner::with_turbo`].
 ///
 /// # Examples
 ///
@@ -782,6 +824,7 @@ where
     let mut buffer_window_cli: Option<String> = None;
     let mut clickhouse_dsn_cli: Option<String> = None;
     let mut tui_cli = false;
+    let mut turbo_cli = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--with-plugin" => {
@@ -824,6 +867,9 @@ where
             }
             "--tui" => {
                 tui_cli = true;
+            }
+            "--turbo" => {
+                turbo_cli = true;
             }
             _ if first_arg.is_none() => first_arg = Some(arg),
             other => return Err(format!("unrecognized argument '{other}'").into()),
@@ -917,6 +963,7 @@ where
         parse_env_bool("JETSTREAMER_REVERSE", false)
     };
     let sequential = reverse || sequential_cli || parse_env_bool("JETSTREAMER_SEQUENTIAL", false);
+    let turbo = turbo_cli || parse_env_bool(jetstreamer_firehose::pace::TURBO_ENV, false);
     let buffer_window_raw = if let Some(cli) = buffer_window_cli {
         Some(cli)
     } else {
@@ -945,6 +992,7 @@ where
         builtin_plugins,
         clickhouse_dsn: clickhouse_dsn_cli,
         tui: tui_cli,
+        turbo,
     }))
 }
 
@@ -979,6 +1027,21 @@ fn parse_env_bool(key: &str, default: bool) -> bool {
             }
         },
         Err(_) => default,
+    }
+}
+
+fn log_pace(pace: Pace) {
+    match pace {
+        Pace::Polite => log::info!(
+            "polite pace: new connections at least {:?} apart, connection recycling every {:?}; pass --turbo to run at full speed",
+            pace.request_spacing(),
+            pace.recycle_interval()
+        ),
+        Pace::Turbo if car_location().url().as_str().starts_with(BASE_URL) => log::warn!(
+            "turbo pace against the public archive at {}; use a private mirror for benchmarks",
+            BASE_URL
+        ),
+        Pace::Turbo => log::info!("turbo pace: running at full speed"),
     }
 }
 
@@ -1134,6 +1197,14 @@ mod tests {
             err.to_string().contains("cannot be combined"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn turbo_flag_selects_turbo() {
+        match parse_cli_args_from(args(&["950", "--turbo"])).expect("parsed") {
+            CliInvocation::Run(config) => assert!(config.turbo),
+            CliInvocation::ListPlugins => panic!("expected a run invocation"),
+        }
     }
 
     #[test]
