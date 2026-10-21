@@ -96,6 +96,23 @@ authenticates its exact systemd invocation and PID, retains a shared source
 lock, and enforces the reserve/runtime guard throughout reads. Use a bounded
 memory cgroup and a oneshot timeout longer than its six-hour internal bound.
 
+A distinct `jetstreamer-epoch140-private-prefix-audit-plan-v2` can bind an
+explicit integer `maximum_runtime_seconds` from 21,600 through 86,400 inclusive.
+It requires a `horizon-epoch140-prefix-audit-runtime-*.service` unit and a matching
+private result-directory basename (the unit name without `horizon-` or
+`.service`). The v1 profile still has its fixed six-hour bound and rejects this
+override, even when the supplied value is six hours. V2 does not change the selected source, slot
+range, checkpoint, write-cursor, semantic-digest, full-hash or provenance gates.
+It retains the same minimum disk floor and available-memory requirement.
+Runtime and reserve failures report distinct errors with the observed bound;
+the small result additionally records the plan schema and runtime allowance.
+Use a separately sealed package and exact-profile sandbox check before any new
+attempt, and set `TimeoutStartSec` above the plan's runtime allowance. A longer
+runtime is not permission to reduce the protected floor, restart an active audit,
+reuse an attempt directory, or retry after a reserve stop. Fresh admission and a
+credible complete-scan runtime budget remain required; no new scan is authorized
+by this profile alone.
+
 No input, archive, sidecar, existing manifest or remote object is modified.
 The small no-clobber result and its directory are individually fsynced.
 Failure preserves all previous evidence and has no automatic retry authority.
