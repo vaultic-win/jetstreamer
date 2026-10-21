@@ -29,3 +29,26 @@ absent. No new resource sample,healthy replay restart,archive/sidecar mutation,
 runtime promotion or retained-data retirement is authorized by preparation.
 The verifier may pass only its focused span;509epoch-end slots,restart/assembly,
 independent final/plugin gates and R2 readiness remain separate obligations.
+
+## October21 result and admission-tool incidents
+
+The actual private verifier `0def5bbe…` completed successfully and its independent
+receipt SHA-256 is `35b52ea28979dc8bc360afde41b1b71059a8451c801b71e65ebeac458c59f044`.
+It confirms the retained archive digest and focused slot range,not a complete
+epoch. No source data or archive/sidecar was changed.
+
+Launch capture initially rejected its own new live unit as unbound. The corrected
+preparer explicitly includes only that literal verifier alongside every old
+census name;all old producers are still reauthenticated. The later event ledger
+failed closed because the old private144 observer rejected any overlapping144
+diagnostic,including an independent verifier after clean producer termination.
+The correction permits only this exact verifier,requires the old owner's clean
+terminal properties plus authenticated PID1 start/deactivation,and preserves
+the old observation as history. A private-network root fixture exercises the
+real sealed plan,journal and manifest,and rejects active or foreign owners.
+
+No admission event was accepted. The verifier is now terminal,so do not restart
+it or retry the expired17:38admission spec. The genuine18:08normal cycle passed
+with the unchanged older reader/helper. Reconcile the successful audit as
+completed private history in a separately qualified normal-plan transition;
+do not fabricate a successful event ledger or a new live admission.

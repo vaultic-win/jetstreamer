@@ -135,7 +135,7 @@ pub(super) fn validate_current(
     manager_proof()?;
     Ok(())
 }
-fn terminal_shape(c: &Value) -> Result<()> {
+pub(super) fn terminal_shape(c: &Value) -> Result<()> {
     ensure!(
         c["Id"] == UNIT
             && c["LoadState"] == "loaded"
