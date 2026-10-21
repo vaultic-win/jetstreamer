@@ -18887,6 +18887,26 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    if let Some(epoch) = probe_args
+        .first()
+        .and_then(|arg| arg.strip_prefix("--failed-prefix220-artifact-probe="))
+    {
+        let epoch = epoch.parse::<u64>();
+        if probe_args.len() != 1 || !epoch.as_ref().is_ok_and(|e| (220..=222).contains(e)) {
+            eprintln!(
+                "--failed-prefix220-artifact-probe requires exactly one epoch220-222 and no other arguments"
+            );
+            exit(2);
+        }
+        match failed_prefix220::artifact_probe(epoch.expect("validated epoch")) {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("failed-prefix artifact probe failed: {error}");
+                exit(1);
+            }
+        }
+        return;
+    }
     if probe_args.first().map(String::as_str) == Some("--failed-prefix220-checkpoint-probe") {
         if probe_args.len() != 1 {
             eprintln!("--failed-prefix220-checkpoint-probe accepts no additional arguments");
