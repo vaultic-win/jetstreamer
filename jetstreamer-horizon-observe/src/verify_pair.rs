@@ -96,6 +96,13 @@ fn validate_plan(p: &Plan) -> Result<()> {
     Ok(())
 }
 
+fn verifier_size_limit(stage: Stage) -> u64 {
+    match stage {
+        Stage::Full => 128 * 1024 * 1024,
+        Stage::Plugin => 512 * 1024 * 1024,
+    }
+}
+
 fn batch_absent(directory: &Path) -> Result<()> {
     for name in [
         ".jetstreamer-archive-batch",
@@ -278,7 +285,10 @@ fn commit_receipt(path: &Path, bytes: &[u8]) -> Result<()> {
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root required");
     let args: Vec<_> = env::args().skip(1).collect();
-    ensure!(args.len() == 3, "usage: PLAN PLAN_SHA256 SELF_SHA256");
+    ensure!(
+        args.len() == 3 || (args.len() == 4 && args[3] == "--check-only"),
+        "usage: PLAN PLAN_SHA256 SELF_SHA256 [--check-only]"
+    );
     let self_path = fs::read_link("/proc/self/exe")?;
     evidence::bound_file(&self_path, &args[2], 64 * 1024 * 1024, true)?;
     let raw = evidence::bound_file(Path::new(&args[0]), &args[1], 65536, true)?;
@@ -291,14 +301,25 @@ fn run() -> Result<()> {
     evidence::bound_file(
         &p.verifier.path,
         &p.verifier.sha256,
-        128 * 1024 * 1024,
+        verifier_size_limit(p.stage),
         true,
-    )?;
+    )
+    .context("verifier executable binding/size gate")?;
     let archive = p.archive_directory.join(format!("epoch-{}.jet", p.epoch));
     let checksum = p
         .archive_directory
         .join(format!("epoch-{}.jet.sha256", p.epoch));
     let before_sidecar = sidecar(&checksum, p.epoch, &p.expected_archive_sha256)?;
+    if args.len() == 4 {
+        let f = open_stable(&archive)?;
+        let m = f.metadata()?;
+        recheck(&archive, &f, &m)?;
+        println!(
+            "{}",
+            serde_json::json!({"schema":"horizon-verify-pair-preflight-v1","epoch":p.epoch,"stage":p.stage.suffix(),"plan_sha256":args[1],"self_sha256":args[2],"verifier_sha256":p.verifier.sha256,"verifier_size_limit":verifier_size_limit(p.stage),"binary_binding_checked":true,"canonical_sidecar_checked":true,"archive_identity_checked":true,"full_archive_hash_proven":false,"verifier_commands_ran":false,"receipt_created":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false})
+        );
+        return Ok(());
+    }
     milestone(&p, "pre_verification_hash_started")?;
     let (before_hash, before_meta) = hash_archive(&archive)?;
     ensure!(
@@ -328,9 +349,10 @@ fn run() -> Result<()> {
     evidence::bound_file(
         &p.verifier.path,
         &p.verifier.sha256,
-        128 * 1024 * 1024,
+        verifier_size_limit(p.stage),
         true,
-    )?;
+    )
+    .context("verifier executable revalidation/size gate")?;
     evidence::bound_file(Path::new(&args[0]), &args[1], 65536, true)?;
     evidence::bound_file(&self_path, &args[2], 64 * 1024 * 1024, true)?;
     batch_absent(&p.archive_directory)?;
@@ -500,5 +522,12 @@ mod tests {
         assert!(validate_plan(&p).is_err());
         p.stage = Stage::Plugin;
         validate_plan(&p).unwrap();
+    }
+    #[test]
+    fn plugin_bound_covers_actual_large_pipeline_but_stays_finite() {
+        assert_eq!(verifier_size_limit(Stage::Full), 128 * 1024 * 1024);
+        assert_eq!(verifier_size_limit(Stage::Plugin), 512 * 1024 * 1024);
+        assert!(238472424 > verifier_size_limit(Stage::Full));
+        assert!(238472424 < verifier_size_limit(Stage::Plugin));
     }
 }
