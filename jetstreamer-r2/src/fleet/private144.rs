@@ -97,7 +97,12 @@ pub(super) fn observe(
         .collect();
     if !overlaps.is_empty() {
         ensure!(
-            overlaps.len() == 1 && prefix144::namespace(overlaps[0]),
+            overlaps.len() <= 2
+                && overlaps
+                    .iter()
+                    .all(|c| prefix144::namespace(c) || native144::namespace(c))
+                && overlaps.iter().filter(|c| prefix144::namespace(c)).count() <= 1
+                && overlaps.iter().filter(|c| native144::namespace(c)).count() <= 1,
             "private144 overlapping diagnostic is not its exact independent verifier"
         );
         // Preserve the old observation as terminal history, never as another
@@ -105,7 +110,9 @@ pub(super) fn observe(
         crate::inactive_status::private144_terminal_manager_proof(
             census.get(UNIT).context("private144 old owner absent")?,
         )?;
-        checked_diagnostic_launch(overlaps[0])?;
+        for claim in &overlaps {
+            checked_diagnostic_launch(claim)?;
+        }
     }
     ensure!(
         rows.len() == 1

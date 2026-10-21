@@ -4,6 +4,10 @@ pub(super) const WRITER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch144-prefix-fleet-reader-20261021-v3/jetstreamer-r2";
 pub(super) const WRITER_SHA: &str =
     "54e7d485b67964595a2326c7f7c3213b65a1bd4228cfe2b7cfaf6aec5f82dea7";
+pub(super) const DELIVERY_WRITER: &str =
+    "/usr/local/lib/jetstreamer/horizon-epoch198-skipped-tail-reader-20261021-v3/jetstreamer-r2";
+pub(super) const DELIVERY_WRITER_SHA: &str =
+    "992d06b9f4b76bd4beecfd9be9572f780131e0c57e1f5618aebaf9fb362dc398";
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -24,8 +28,10 @@ struct Spec {
 }
 pub(super) fn writer(p: &Plan) -> bool {
     (p.prefix144_audit.is_some() || p.completed144_prefix.is_some())
-        && p.tools.r2.path == Path::new(WRITER)
-        && p.tools.r2.sha256 == WRITER_SHA
+        && ((p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA)
+            || (p.epoch198_delivery.is_some()
+                && p.tools.r2.path == Path::new(DELIVERY_WRITER)
+                && p.tools.r2.sha256 == DELIVERY_WRITER_SHA))
 }
 pub(super) fn validate(p: &Plan) -> Result<()> {
     let Some(profile) = &p.prefix144_audit else {

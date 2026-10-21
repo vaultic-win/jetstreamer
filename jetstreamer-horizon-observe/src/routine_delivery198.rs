@@ -5,17 +5,17 @@ use super::*;
 const UNIT: &str = "jetstreamer-root-sweep-e198-readerfix-20261019-v1-r2-e198-198-lane-a-1.service";
 const INVOCATION: &str = "e5612ef00a5b4fcab04df2c13a6b35b0";
 const CONTROLLER: &str = "d64e3dccb7a54c8a9dc8160a5ca89e39";
-const WRITER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-delivery-proof-candidate-20261021-v1/jetstreamer-r2";
-const WRITER_SHA: &str = "c62906f10cbe64c8ea4ff7f4b773c73dd583ef4d3706f64642776d72439609fe";
+const WRITER: &str = prefix144::DELIVERY_WRITER;
+const WRITER_SHA: &str = prefix144::DELIVERY_WRITER_SHA;
 const PUBLISHER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-pipeline-receipts-candidate-20261021-v1/jetstreamer-r2";
 const PUBLISHER_SHA: &str = "c047afcd2d7a282bf394e29625aea1da7ca136d4aca7461e7ae2aaf54234e4c4";
 const STATUS: &str = "/home/sol/.jetstreamer-private/r2-status-receipts";
 const ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/private/destination-bfa4ff91eb1803c6a2d6240f014cc6508bb805e8bddd619ff64ab57cde1c5ed9/work/root-cohort-198-198/run-1165606-1792451794035486537/archives/epoch-198.jet";
-pub(super) const HANDOFF_WRITER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-controller-handoff-candidate-20261021-v1/jetstreamer-r2";
-pub(super) const HANDOFF_WRITER_SHA: &str =
-    "baa8472a68fee592eb1f124f8758d7a47b730ce40609bfdc0db3021034ec2194";
+pub(super) const HANDOFF_WRITER: &str = WRITER;
+pub(super) const HANDOFF_WRITER_SHA: &str = WRITER_SHA;
 const IMPORT_CONTROLLER: &str = "jetstreamer-epoch198-readerfix-singleton-20261019-v1-r2.service";
 const SOURCE_ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/output/epoch-198.jet";
+const IMPORTER: &str = "jetstreamer-root-import-e198-readerfix-20261019-v1-r2-e198-198-2.service";
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +29,8 @@ pub(super) struct Profile {
     controller_handoff: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     predecessor_proof: Option<Bound>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    delayed_recovery: bool,
 }
 
 pub(super) fn pending(p: &Plan) -> bool {
@@ -73,6 +75,75 @@ struct HandoffSpec {
     replay_launch_authorized: bool,
     archive_publication_authorized: bool,
     r2_archive_mutations: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sample_target_utc: Option<String>,
+}
+pub(super) fn recovery_interval(p: &Plan) -> Result<Option<u64>> {
+    if !p
+        .epoch198_delivery
+        .as_ref()
+        .is_some_and(|v| v.delayed_recovery)
+    {
+        return Ok(None);
+    }
+    ensure!(
+        is_101(p)?
+            && p.sample_target_utc == "2026-10-21T20:18:00Z"
+            && p.previous_observer.sha256
+                == "2eeb72a1f51220db978745c846c7b3bd9e2695a5bdb58c9969bfd0fe7fee5773"
+            && p.previous_observer.path
+                == Path::new(
+                    "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261021T193800Z.json"
+                ),
+        "198 delayed recovery has foreign predecessor/target"
+    );
+    Ok(Some(2400))
+}
+pub(super) fn consume_recovery(p: &mut Plan) -> Result<()> {
+    if p.epoch198_delivery
+        .as_ref()
+        .is_some_and(|v| v.delayed_recovery)
+    {
+        ensure!(
+            p.sample_target_utc == "2026-10-21T20:48:00Z"
+                && p.previous_observer
+                    .path
+                    .ends_with("sample-20261021T201800Z.json"),
+            "198 delayed recovery successor differs"
+        );
+        p.epoch198_delivery.as_mut().unwrap().delayed_recovery = false;
+    }
+    Ok(())
+}
+pub(super) fn retime(next: &mut Plan, config: &mut Value, spec: &Bound) -> Result<()> {
+    let spec: HandoffSpec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
+    let Some(target) = spec.sample_target_utc else {
+        return Ok(());
+    };
+    ensure!(
+        next.sample_target_utc == "2026-10-21T20:08:00Z"
+            && target == "2026-10-21T20:18:00Z"
+            && next.previous_observer.sha256
+                == "2eeb72a1f51220db978745c846c7b3bd9e2695a5bdb58c9969bfd0fe7fee5773",
+        "198 retime is not exact missed20:08 recovery"
+    );
+    let old = stamp(&next.sample_target_utc);
+    let new = stamp(&target);
+    for path in [
+        &mut next.observer,
+        &mut next.estimate_output,
+        &mut next.fleet_output,
+    ] {
+        *path = PathBuf::from(
+            path.to_str()
+                .context("198 recovery path")?
+                .replace(&old, &new),
+        );
+    }
+    next.sample_target_utc = target;
+    config["not_before_utc"] = json!(next.sample_target_utc);
+    config["output"] = json!(next.observer);
+    Ok(())
 }
 
 fn original_range(model: &Value) -> Result<Option<&Value>> {
@@ -246,10 +317,32 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
 
 fn validate_pending_evidence(e: &Value) -> Result<()> {
     let producer = &e["producer"];
+    let collected = producer["LoadState"] == "not-found";
+    if collected {
+        let manager = &e["producer_terminal_manager"];
+        let time = manager["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("198 manager time")?
+            .parse::<u64>()?;
+        let close = e["events"][3]["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("198 close time")?
+            .parse::<u64>()?;
+        ensure!(
+            manager["UNIT"] == UNIT
+                && manager["INVOCATION_ID"] == INVOCATION
+                && manager["_PID"] == "1"
+                && manager["_UID"] == "0"
+                && manager["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+                && manager["MESSAGE"] == format!("{UNIT}: Deactivated successfully.")
+                && close < time,
+            "198 collected producer lacks exact PID1 success"
+        );
+    }
     for (key, value) in [
         ("Id", UNIT),
-        ("InvocationID", INVOCATION),
-        ("LoadState", "loaded"),
+        ("InvocationID", if collected { "" } else { INVOCATION }),
+        ("LoadState", if collected { "not-found" } else { "loaded" }),
         ("MainPID", "0"),
         ("NRestarts", "0"),
         ("Result", "success"),
@@ -267,11 +360,42 @@ fn validate_pending_evidence(e: &Value) -> Result<()> {
     );
     let state = &e["controller_state"];
     let a = &state["assignments"]["lane-a"];
+    let actual_import = !e["importer"].is_null();
+    if actual_import {
+        let importer = &e["importer"];
+        for (key, value) in [
+            ("Id", IMPORTER),
+            ("InvocationID", "526647ab03104a1fb8f14303819d6cda"),
+            ("MainPID", "3182197"),
+            ("LoadState", "loaded"),
+            ("ActiveState", "active"),
+            ("SubState", "running"),
+            ("NRestarts", "0"),
+        ] {
+            ensure!(
+                importer[key] == value,
+                "198 actual importer proof differs:{key}"
+            );
+        }
+        ensure!(
+            importer["ExecStart"]
+                .as_str()
+                .is_some_and(|s| s.contains(" --recover-staged-cohort-only ")
+                    && s.contains(" --publish-through-epoch=198 ;"))
+                && e["source_receipt_sha256"]
+                    == "a1734902c86c333be889f3da731da662308b542fa2c72e2e63da566f941cd226",
+            "198 actual importer lacks committed source"
+        );
+    }
     ensure!(
         state["schema"] == "jetstreamer-adaptive-root-cohort-sweep-v3"
             && state["configuration_sha256"]
                 == "0929b892242b85f08cbe3d5828b6f4650c81c4730e5fd81f8dfe3e38f096aadd"
-            && state["import_owner"].is_null()
+            && (if actual_import {
+                state["import_owner"] == "lane-a"
+            } else {
+                state["import_owner"].is_null()
+            })
             && state["assignments"]
                 .as_object()
                 .is_some_and(|a| a.len() == 1)
@@ -281,10 +405,18 @@ fn validate_pending_evidence(e: &Value) -> Result<()> {
             && a["unit"] == UNIT
             && a["pid"] == 1165606
             && a["pid_start_time"] == 79845173
-            && matches!(a["phase"].as_str(), Some("producer" | "staged"))
+            && (if actual_import {
+                a["phase"] == "importing"
+            } else {
+                matches!(a["phase"].as_str(), Some("producer" | "staged"))
+            })
             && a["source_recovery"] != true
             && a["failure"].is_null()
-            && a["import_unit"].is_null()
+            && (if actual_import {
+                a["import_unit"] == IMPORTER
+            } else {
+                a["import_unit"].is_null()
+            })
             && e["controller_sha256"]
                 == "62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e"
             && e["controller_argv_sha256"]
@@ -440,7 +572,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
     if p.prefix144_audit.is_some() || p.completed144_prefix.is_some() {
-        return (prefix144::WRITER, prefix144::WRITER_SHA);
+        return (prefix144::DELIVERY_WRITER, prefix144::DELIVERY_WRITER_SHA);
     }
     if p.prefix157_audit.is_some() {
         return (prefix157::WRITER, prefix157::WRITER_SHA);
@@ -499,6 +631,14 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
 }
 
 fn apply_fleet(profile: &Profile, proof: &Value, fleet: &mut Value) -> Result<()> {
+    if !proof["terminal_evidence"]["importer"].is_null() {
+        let units = fleet["tracked_units"]
+            .as_array_mut()
+            .context("198 importer tracked census")?;
+        if !units.contains(&json!(IMPORTER)) {
+            units.push(json!(IMPORTER));
+        }
+    }
     let expected = claim(profile, proof);
     if fleet.get("pipeline_claims").is_none() {
         fleet["pipeline_claims"] = json!([]);
@@ -539,7 +679,9 @@ fn apply_fleet(profile: &Profile, proof: &Value, fleet: &mut Value) -> Result<()
         "198 handoff cannot weaken a failed/qualification gate"
     );
     gate["state"] = json!("post-replay-pipeline");
-    gate["next_action"] = json!(if profile.controller_handoff {
+    gate["next_action"] = json!(if !proof["terminal_evidence"]["importer"].is_null() {
+        "Preserve authenticated live importer526647 and owning controller, committed source receipt and original producer clock; dispatch independent full/current-plugin/upload/readback stages as canonical archive appears; no downstream allowance reset"
+    } else if profile.controller_handoff {
         "Preserve exact pending controller import and original producer clock; retain independent full/plugin/import/upload/readback gates and authenticate the actual importer when ownership moves"
     } else {
         "Preserve exact live producer finalization, original elapsed clock and independent full/plugin/import/upload/readback gates; authenticate actual controller/import handoff promptly when this owner exits"
@@ -619,6 +761,7 @@ pub(super) fn enable(
         controller_recovery: recovery,
         controller_handoff,
         predecessor_proof: None,
+        delayed_recovery: value.sample_target_utc.is_some(),
     });
     next.expected_epochs.retain(|e| *e != 198);
     next.tools.r2 = Bound {
@@ -990,7 +1133,25 @@ mod tests {
             controller_recovery: None,
             controller_handoff: false,
             predecessor_proof: None,
+            delayed_recovery: false,
         }
+    }
+    #[test]
+    fn delayed_recovery_is_exact_and_consumed_only_by_real_successor() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let mut profile = profile();
+        profile.delayed_recovery = true;
+        p.epoch198_delivery = Some(profile);
+        p.sample_target_utc = "2026-10-21T20:18:00Z".into();
+        p.previous_observer = Bound {path:"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261021T193800Z.json".into(),sha256:"2eeb72a1f51220db978745c846c7b3bd9e2695a5bdb58c9969bfd0fe7fee5773".into()};
+        assert_eq!(recovery_interval(&p).unwrap(), Some(2400));
+        assert!(consume_recovery(&mut p).is_err());
+        p.previous_observer.sha256 = "a".repeat(64);
+        assert!(recovery_interval(&p).is_err());
+        p.sample_target_utc = "2026-10-21T20:48:00Z".into();
+        p.previous_observer.path = "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261021T201800Z.json".into();
+        consume_recovery(&mut p).unwrap();
+        assert_eq!(recovery_interval(&p).unwrap(), None);
     }
     fn range() -> Value {
         json!({"range":"198","epochs":[198],"expected_producer_invocation_id":INVOCATION,
@@ -1056,6 +1217,61 @@ mod tests {
         e["jet_path"] = json!(SOURCE_ARCHIVE);
         e["jet_identity"] = json!({"length":123});
         p
+    }
+    #[test]
+    fn collected_pending_proof_requires_exact_ordered_manager_success() {
+        let mut p = pending_proof();
+        p["terminal_evidence"]["producer"]["LoadState"] = json!("not-found");
+        p["terminal_evidence"]["producer"]["InvocationID"] = json!("");
+        assert!(validate_proof(&p, 1800, true).is_err());
+        p["terminal_evidence"]["producer_terminal_manager"] = json!({"UNIT":UNIT,"INVOCATION_ID":INVOCATION,"_PID":"1","_UID":"0","MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{UNIT}: Deactivated successfully."),"__REALTIME_TIMESTAMP":"14000000"});
+        validate_proof(&p, 1800, true).unwrap();
+        for key in [
+            "UNIT",
+            "INVOCATION_ID",
+            "_PID",
+            "_UID",
+            "MESSAGE_ID",
+            "MESSAGE",
+            "__REALTIME_TIMESTAMP",
+        ] {
+            let mut bad = p.clone();
+            bad["terminal_evidence"]["producer_terminal_manager"][key] = json!("bad");
+            assert!(validate_proof(&bad, 1800, true).is_err(), "{key}");
+        }
+    }
+    #[test]
+    fn actual_import_proof_preserves_controller_owner_and_tracks_real_child() {
+        let mut p = pending_proof();
+        let e = &mut p["terminal_evidence"];
+        e["controller_state"]["import_owner"] = json!("lane-a");
+        e["controller_state"]["assignments"]["lane-a"]["phase"] = json!("importing");
+        e["controller_state"]["assignments"]["lane-a"]["import_unit"] = json!(IMPORTER);
+        e["importer"] = json!({"Id":IMPORTER,"InvocationID":"526647ab03104a1fb8f14303819d6cda","MainPID":"3182197","LoadState":"loaded","ActiveState":"active","SubState":"running","NRestarts":"0","ExecStart":"exact --recover-staged-cohort-only --publish-through-epoch=198 ;"});
+        e["source_receipt_sha256"] =
+            json!("a1734902c86c333be889f3da731da662308b542fa2c72e2e63da566f941cd226");
+        validate_proof(&p, 1800, true).unwrap();
+        for pointer in [
+            "/terminal_evidence/importer/InvocationID",
+            "/terminal_evidence/importer/ExecStart",
+            "/terminal_evidence/source_receipt_sha256",
+            "/terminal_evidence/controller_state/import_owner",
+        ] {
+            let mut bad = p.clone();
+            *bad.pointer_mut(pointer).unwrap() = json!("foreign");
+            assert!(validate_proof(&bad, 1800, true).is_err(), "{pointer}");
+        }
+        let mut profile = profile();
+        profile.controller_handoff = true;
+        let mut fleet =
+            json!({"tracked_units":[],"gates":{"198":{"state":"live-replay","evidence":[]}}});
+        apply_fleet(&profile, &p, &mut fleet).unwrap();
+        assert!(
+            fleet["tracked_units"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(IMPORTER))
+        );
     }
     #[test]
     fn pending_controller_proof_is_forward_clean_and_same_closed_source() {

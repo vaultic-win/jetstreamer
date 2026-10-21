@@ -122,6 +122,9 @@ fn evidence(binding: &Bound) -> Result<Value> {
 }
 
 pub(super) fn interval(p: &Plan) -> Result<u64> {
+    if let Some(interval) = delivery198::recovery_interval(p)? {
+        return Ok(interval);
+    }
     if p.runtime_handoff157.is_some() {
         return runtime157::interval(p);
     }

@@ -271,6 +271,7 @@ pub(super) fn prepare(
     let config = bound_json(&p.observer_config, true)?;
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
+    delivery198::consume_recovery(&mut next)?;
     let model = bound_json(&next.model_template, true)?;
     controller_recovery::consume(&mut next, &model)?;
     if enable_terminal157 {
@@ -407,6 +408,7 @@ pub(super) fn prepare(
             !enable_terminal157,
             "cannot combine separate handoff preparations"
         );
+        delivery198::retime(&mut next, &mut next_config, spec)?;
         delivery198::enable(&mut next, &mut next_config, &model, &completion, spec)?;
         delivery198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
         let effective =

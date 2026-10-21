@@ -3167,7 +3167,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 async fn main() -> Result<()> {
     if matches!(
         env::args().nth(1).as_deref(),
-        Some("admit-snapshot144" | "admit-clock144")
+        Some("admit-snapshot144" | "admit-clock144" | "admit-native144")
     ) {
         return fleet::admit_snapshot144();
     }

@@ -1,4 +1,4 @@
-//! Compressed-source-only admission. No replay, restore, cloud or service mutation.
+//! Exact source/native-only resource admission. No worker or service is launched.
 use super::*;
 use std::ffi::CString;
 
@@ -23,6 +23,113 @@ struct Spec {
     metadata: BoundFile,
     downloader: BoundFile,
     output: PathBuf,
+    #[serde(default)]
+    native: Option<Native>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Native {
+    inputs: BoundFile,
+    capability: BoundFile,
+    resource_proposal: BoundFile,
+}
+fn native_output(path: &Path) -> bool {
+    if path.parent()
+        != Some(Path::new(
+            "/var/lib/jetstreamer/horizon-epoch144-native-restore-20261021-v1",
+        ))
+    {
+        return false;
+    }
+    let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+        return false;
+    };
+    if name == "admission.json" {
+        return true;
+    }
+    let Some(stamp) = name
+        .strip_prefix("admission-")
+        .and_then(|s| s.strip_suffix(".json"))
+    else {
+        return false;
+    };
+    stamp.len() == 16
+        && stamp.is_ascii()
+        && stamp.as_bytes()[8] == b'T'
+        && stamp.as_bytes()[15] == b'Z'
+        && stamp[..8]
+            .bytes()
+            .chain(stamp[9..15].bytes())
+            .all(|b| b.is_ascii_digit())
+        && utc_seconds(&format!(
+            "{}-{}-{}T{}:{}:{}Z",
+            &stamp[..4],
+            &stamp[4..6],
+            &stamp[6..8],
+            &stamp[9..11],
+            &stamp[11..13],
+            &stamp[13..15]
+        ))
+        .is_ok()
+}
+fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
+    ensure!(
+        n.inputs.sha256 == "908cb628fc955f0ac66692d2742b34c1422b3ad06130b8fc8b28a94efaee682f"
+            && n.capability.sha256
+                == "a9a8fb188816640ceef322697c4e8c7a421606e7a4fe9a95a9847d79ab89305e"
+            && n.resource_proposal.sha256
+                == "ae18d37b9ed5a2eb38461e500ae75c0b6ea8e831a735afb764682e1566c64cda",
+        "foreign native144 input evidence"
+    );
+    let inputs = bound_json(&n.inputs)?;
+    let capability = bound_json(&n.capability)?;
+    let proposal = bound_json(&n.resource_proposal)?;
+    ensure!(
+        inputs["schema"] == "jetstreamer-epoch144-native-input-policy-v1"
+            && inputs["probe_sha256"] == probe.sha256
+            && inputs["minimum_free_bytes"] == PROTECTED + (40u64 << 30)
+            && capability["schema"] == "jetstreamer-epoch144-native-input-capability-v1"
+            && capability["input_policy_sha256"] == n.inputs.sha256
+            && capability["probe_sha256"] == probe.sha256
+            && capability["snapshot_sha256"]
+                == "f170976b2bc3f2d55dd0fbb5a415bfeae8d0903a0ad69334d8aa993b5cab35ae"
+            && capability["snapshot_bytes"] == SIZE
+            && capability["snapshot_device"] == 64512
+            && capability["snapshot_inode"] == 105578509
+            && capability["worker_spawned"] == false
+            && capability["native_bank_restored"] == false
+            && capability["snapshot_copied"] == false
+            && capability["private_source_permissions_changed"] == false
+            && capability["replay_launch_authorized"] == false
+            && proposal["conservative_proposal"]["native_incremental_peak_bytes"] == 40u64 << 30
+            && proposal["conservative_proposal"]["protected_existing_floor_bytes"] == PROTECTED
+            && proposal["native_restore_authorized"] == false,
+        "native144 capability/policy/resource mismatch"
+    );
+    let cap = unit("horizon-epoch144-native-input-capability-20261021-v1.service")?;
+    ensure!(
+        cap["InvocationID"] == capability["invocation_id"]
+            && cap["ActiveState"] == "active"
+            && cap["SubState"] == "exited"
+            && cap["MainPID"] == "0"
+            && cap["ExecMainStatus"] == "0"
+            && cap["Result"] == "success",
+        "native144 input capability not exact terminal success"
+    );
+    let snapshot = fs::symlink_metadata(
+        "/home/sol/.jetstreamer-private/epoch144-snapshot-source-20261021-v1/download/snapshot-62639490-59bAQjc2c1VqNWqGoCacp3tnyNyie3EYx4bjttvJhgeT.tar.zst",
+    )?;
+    ensure!(
+        snapshot.is_file()
+            && snapshot.uid() == 0
+            && snapshot.mode() & 0o222 == 0
+            && snapshot.nlink() == 1
+            && snapshot.dev() == 64512
+            && snapshot.ino() == 105578509
+            && snapshot.len() == SIZE,
+        "native144 retained source identity changed"
+    );
+    Ok(())
 }
 
 fn floor(value: &Value) -> Result<u64> {
@@ -64,8 +171,13 @@ fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) -> Result<(
         .as_object()
         .context("prior census")?;
     for row in previous["active"].as_array().context("active census")? {
-        for role in ["controller", "producer"] {
-            let owner = &row[role];
+        let owners = match (row.get("controller"), row.get("producer"), row.get("unit")) {
+            (Some(controller), Some(producer), None) => vec![controller, producer],
+            (None, Some(producer), None) => vec![producer],
+            (None, None, Some(owner)) => vec![owner],
+            _ => anyhow::bail!("unknown or ambiguous active owner shape"),
+        };
+        for owner in owners {
             let name = owner["Id"].as_str().context("active owner name")?;
             let live = current.get(name).context("missing active owner")?;
             ensure!(
@@ -88,8 +200,12 @@ fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) -> Result<(
             }
             ensure!(
                 live["NRestarts"] == "0"
-                    && live["ActiveState"] == "active"
-                    && live["MainPID"].as_str().is_some_and(|s| s != "0"),
+                    && ((live["ActiveState"] == "active" && live["SubState"] == "running")
+                        || (live["ActiveState"] == "activating" && live["SubState"] == "start"))
+                    && live["MainPID"]
+                        .as_str()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .is_some_and(|pid| pid > 0),
                 "owner not stable/live"
             );
         }
@@ -114,6 +230,7 @@ fn free_bytes() -> Result<u64> {
 pub(super) fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     let clock_only = args.get(1).is_some_and(|s| s == "admit-clock144");
+    let native_only = args.get(1).is_some_and(|s| s == "admit-native144");
     ensure!(
         args.len() == 7
             && args[3] == "--spec-sha256"
@@ -146,22 +263,32 @@ pub(super) fn run() -> Result<()> {
     let s: Spec = serde_json::from_value(bound_json(&spec_bound)?)?;
     ensure!(
         s.schema
-            == if clock_only {
+            == if native_only {
+                "jetstreamer-epoch144-native-admission-spec-v2"
+            } else if clock_only {
                 "jetstreamer-epoch144-clock-admission-spec-v1"
             } else {
                 "jetstreamer-epoch144-snapshot-admission-spec-v1"
             }
-            && s.output
-                == if clock_only {
-                    Path::new(
-                        "/var/lib/jetstreamer-horizon-epoch144-snapshot-clock-20261021-v1/admission.json",
-                    )
-                } else {
-                    Path::new(OUTPUT)
-                }
+            && if native_only {
+                native_output(&s.output)
+            } else {
+                s.output
+                    == if clock_only {
+                        Path::new(
+                            "/var/lib/jetstreamer-horizon-epoch144-snapshot-clock-20261021-v1/admission.json",
+                        )
+                    } else {
+                        Path::new(OUTPUT)
+                    }
+            }
             && s.floor.sha256 == FLOOR_SHA
             && s.protection.sha256 == PROTECTION_SHA,
         "snapshot admission scope/protection differs"
+    );
+    ensure!(
+        native_only == s.native.is_some(),
+        "native-only evidence in wrong144 admission mode"
     );
     let invocation = env::var("INVOCATION_ID").context("persistent invocation required")?;
     ensure!(
@@ -248,7 +375,9 @@ pub(super) fn run() -> Result<()> {
     );
     ensure!(
         s.downloader.path.file_name().and_then(|n| n.to_str())
-            == Some(if clock_only {
+            == Some(if native_only {
+                "jetstreamer-epoch144-native-restore-probe"
+            } else if clock_only {
                 "jetstreamer-epoch144-snapshot-clock"
             } else {
                 "jetstreamer-epoch144-snapshot-download"
@@ -266,7 +395,12 @@ pub(super) fn run() -> Result<()> {
             && hex_lower(&Sha256::digest(fs::read(&s.downloader.path)?)) == s.downloader.sha256,
         "unsafe downloader identity"
     );
-    let future = unit(if clock_only {
+    if let Some(n) = &s.native {
+        native_inputs(n, &s.downloader)?;
+    }
+    let future = unit(if native_only {
+        "horizon-qualify-144-native-restore-20261021-v1.service"
+    } else if clock_only {
         "horizon-epoch144-snapshot-clock-20261021-v1.service"
     } else {
         UNIT
@@ -283,16 +417,20 @@ pub(super) fn run() -> Result<()> {
         .collect();
     let before = census(&names, 101, 200)?;
     check_owners(&previous, &before)?;
-    let minimum = PROTECTED
-        .checked_add(SIZE + SLACK)
-        .context("budget overflow")?;
+    let peak = if native_only {
+        40u64 << 30
+    } else {
+        SIZE + SLACK
+    };
+    let memory_gib = if native_only { 192 } else { 129 };
+    let minimum = PROTECTED.checked_add(peak).context("budget overflow")?;
     ensure!(
         observer["filesystem"]["conservative_available_bytes"]
             .as_u64()
             .is_some_and(|n| n >= minimum)
             && observer["host_memory"]["conservative_available_kib"]
                 .as_u64()
-                .is_some_and(|n| n >= 129 * 1024 * 1024),
+                .is_some_and(|n| n >= memory_gib * 1024 * 1024),
         "snapshot does not fit sampled disk/memory envelope"
     );
     let available = free_bytes()?;
@@ -311,7 +449,7 @@ pub(super) fn run() -> Result<()> {
         .trim()
         .parse::<u64>()?;
     ensure!(
-        memory_available_kib >= 129 * 1024 * 1024 && vmas >= 4_194_304,
+        memory_available_kib >= memory_gib * 1024 * 1024 && vmas >= 4_194_304,
         "snapshot memory reserve or host VMA gate failed"
     );
     let after = census(&names, 101, 200)?;
@@ -319,14 +457,17 @@ pub(super) fn run() -> Result<()> {
     private157::immutable_receipt(
         &s.output,
         &json!({
-            "schema":if clock_only { "jetstreamer-epoch144-clock-admission-receipt-v1" } else { "jetstreamer-epoch144-snapshot-admission-receipt-v1" },"epoch":144,"admitted":true,
+            "schema":if native_only { "jetstreamer-epoch144-native-admission-receipt-v2" } else if clock_only { "jetstreamer-epoch144-clock-admission-receipt-v1" } else { "jetstreamer-epoch144-snapshot-admission-receipt-v1" },"epoch":144,"admitted":true,
             "recorded_unix_seconds":now,"invocation_id":invocation,"self_sha256":args[6],
             "spec":private157::binding(&spec_bound),"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),
-            "century_floor_bytes":floor_bytes,"protected_existing_floor_bytes":PROTECTED,"candidate_incremental_peak_bytes":SIZE+SLACK,
+            "century_floor_bytes":floor_bytes,"protected_existing_floor_bytes":PROTECTED,"candidate_incremental_peak_bytes":peak,
+            "input_policy_sha256":s.native.as_ref().map(|n|n.inputs.sha256.as_str()),"probe_sha256":if native_only {Some(s.downloader.sha256.as_str())} else {None},
+            "worker_sha256":if native_only {Some("2cca500106d274ebfbbc8c5bfa0e6e8343cd5e41003f9e82c93282800732d8c8")} else {None},
             "evidence":{"filesystem":"/home/sol","minimum_free_bytes":minimum,"available_bytes":available,
               "files":[private157::binding(&s.downloader),private157::binding(&s.metadata)],"unit_census":after,
               "memory_available_kib":memory_available_kib,"vm_max_map_count":vmas},
-            "new_resource_samples":0,"download_only":!clock_only,"clock_only":clock_only,"replay_launch_authorized":false,"native_restore_authorized":false,
+            "new_resource_samples":0,"download_only":!clock_only&&!native_only,"clock_only":clock_only,"restore_only":native_only,
+            "guard_and_fleet_launch_gates_required":native_only,"replay_launch_authorized":false,"native_restore_authorized":false,
             "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
         }),
     )?;
@@ -337,6 +478,16 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root read-only exact native144 capability/input/resource bindings; no admission or launch"]
+    fn root_native144_input_policy_gate_passes_without_a_worker() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        native_inputs(&Native {
+            inputs:BoundFile {path:"/usr/local/lib/jetstreamer/horizon-epoch144-native-probe-tools-20261021-v2/inputs.json".into(),sha256:"908cb628fc955f0ac66692d2742b34c1422b3ad06130b8fc8b28a94efaee682f".into()},
+            capability:BoundFile {path:"/home/sol/.jetstreamer-private/epoch144-native-input-capability-20261021-v1/inputs.json".into(),sha256:"a9a8fb188816640ceef322697c4e8c7a421606e7a4fe9a95a9847d79ab89305e".into()},
+            resource_proposal:BoundFile {path:"/usr/local/lib/jetstreamer/horizon-epoch144-native-probe-tools-20261021-v1/resource-proposal.json".into(),sha256:"ae18d37b9ed5a2eb38461e500ae75c0b6ea8e831a735afb764682e1566c64cda".into()},
+        },&BoundFile {path:"/usr/local/lib/jetstreamer/horizon-epoch144-native-probe-tools-20261021-v2/jetstreamer-epoch144-native-restore-probe".into(),sha256:"a5f8dea7cf4beed6385c1b13719fd72bee3573162c3b303282f65bd2693e7237".into()}).unwrap();
+    }
     fn floor_fixture() -> Value {
         json!({"schema":"jetstreamer-horizon-century-jet-floor-v1","century":{"first_epoch":200,"last_epoch":300},
             "samples":[{"epoch":201,"jet_size_bytes":11},{"epoch":202,"jet_size_bytes":10}],
@@ -382,5 +533,63 @@ mod tests {
         }
         current.clear();
         assert!(check_owners(&prior, &current).is_err());
+    }
+    #[test]
+    fn pipeline_and_standalone_owners_remain_fully_bound() {
+        for (state, substate) in [("active", "running"), ("activating", "start")] {
+            let owner = json!({"Id":"pipeline.service","InvocationID":"b".repeat(32),"MainPID":"456","ActiveState":state,"SubState":substate,"NRestarts":"0","ExecStart":"sealed pipeline"});
+            for row in [json!({"unit":owner}), json!({"producer":owner})] {
+                let prior = json!({"unit_census":{"pipeline.service":owner},"active":[row]});
+                let current = BTreeMap::from([("pipeline.service".into(), owner.clone())]);
+                check_owners(&prior, &current).unwrap();
+                for key in [
+                    "InvocationID",
+                    "MainPID",
+                    "ActiveState",
+                    "SubState",
+                    "NRestarts",
+                    "ExecStart",
+                ] {
+                    let mut changed = current.clone();
+                    changed.get_mut("pipeline.service").unwrap()[key] = json!("changed");
+                    assert!(check_owners(&prior, &changed).is_err(), "{key}");
+                }
+                assert!(check_owners(&prior, &BTreeMap::new()).is_err());
+                let mut unbound = prior.clone();
+                unbound["unit_census"] = json!({});
+                assert!(check_owners(&unbound, &current).is_err());
+            }
+        }
+    }
+    #[test]
+    fn unknown_or_ambiguous_owner_rows_fail_closed() {
+        for row in [
+            json!({}),
+            json!({"controller":{}}),
+            json!({"unit":{},"producer":{}}),
+            json!({"controller":{},"producer":{},"unit":{}}),
+        ] {
+            assert!(
+                check_owners(&json!({"unit_census":{},"active":[row]}), &BTreeMap::new()).is_err()
+            );
+        }
+    }
+}
+#[test]
+fn renewed_native_admission_is_unique_and_stays_in_exact_receipt_namespace() {
+    let root = "/var/lib/jetstreamer/horizon-epoch144-native-restore-20261021-v1";
+    assert!(native_output(&PathBuf::from(format!(
+        "{root}/admission.json"
+    ))));
+    assert!(native_output(&PathBuf::from(format!(
+        "{root}/admission-20261021T200800Z.json"
+    ))));
+    for p in [
+        format!("{root}/admission-20260230T200800Z.json"),
+        format!("{root}/other.json"),
+        format!("{root}/../admission-20261021T200800Z.json"),
+        "/tmp/admission.json".into(),
+    ] {
+        assert!(!native_output(Path::new(&p)), "{p}");
     }
 }

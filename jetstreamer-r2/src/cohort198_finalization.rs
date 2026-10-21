@@ -338,10 +338,23 @@ fn checkpoint(message: &str, slot: u64) -> Result<()> {
 }
 
 fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
+    // This exact epoch's final four slots are skipped. The producer freezes
+    // the last real Bank and separately records the decoded boundary coverage.
+    // Keep the canonical archive endpoint distinct from that Bank's slot.
+    let skipped_tail = records.iter().any(|r| {
+        r["MESSAGE"]
+            .as_str()
+            .is_some_and(|s| s.contains("historical checkpoint slot=85967995 "))
+    });
+    let terminal_bank_slot = if skipped_tail { 85_967_995 } else { 85_967_999 };
     let mut selected = Vec::new();
     for marker in [
         "historical checkpoint slot=85967282 ",
-        "historical checkpoint slot=85967999 ",
+        if skipped_tail {
+            "historical checkpoint slot=85967995 "
+        } else {
+            "historical checkpoint slot=85967999 "
+        },
         "snapshot verification complete",
         "horizon archive complete:",
     ] {
@@ -380,7 +393,40 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
         "198 finalization events out of order"
     );
     checkpoint(selected[0].1["MESSAGE"].as_str().unwrap(), 85_967_282)?;
-    checkpoint(selected[1].1["MESSAGE"].as_str().unwrap(), 85_967_999)?;
+    checkpoint(
+        selected[1].1["MESSAGE"].as_str().unwrap(),
+        terminal_bank_slot,
+    )?;
+    let decoded_tail = if skipped_tail {
+        ensure!(
+            !records.iter().any(|r| r["MESSAGE"]
+                .as_str()
+                .is_some_and(|s| s.contains("historical checkpoint slot=85967999 "))),
+            "198 ambiguous terminal Bank"
+        );
+        let matching: Vec<_> = records.iter().filter(|r| r["MESSAGE"].as_str().is_some_and(|s| s.ends_with("boundary block 85968000 parent 85967995 supplies decoded tail evidence through slot 85967999"))).collect();
+        ensure!(
+            matching.len() == 1,
+            "198 decoded skipped-tail evidence missing or duplicated"
+        );
+        let r = matching[0];
+        let time = r["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("198 tail timestamp")?
+            .parse::<u64>()?;
+        ensure!(
+            r["_SYSTEMD_INVOCATION_ID"] == INVOCATION
+                && r["_SYSTEMD_UNIT"] == UNIT
+                && r["_PID"] == PID
+                && r["_UID"] == "1001"
+                && selected[0].0 < time
+                && time < selected[1].0,
+            "198 skipped-tail identity/order differs"
+        );
+        Some(r)
+    } else {
+        None
+    };
     let archive = fields(
         selected[3].1["MESSAGE"].as_str().unwrap(),
         "horizon archive complete: ",
@@ -402,6 +448,7 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
         "unit":UNIT,"invocation_id":INVOCATION,"node_sha256":NODE_SHA,
         "manifest_sha256":MANIFEST_SHA,"terminal_slot":85967999,"trusted_root_slot":85967282,
         "events":selected.iter().map(|(_,r)|*r).collect::<Vec<_>>(),
+        "terminal_bank_slot":terminal_bank_slot,"decoded_tail_evidence":decoded_tail,
         "archive_close_bytes":integer(&archive,"bytes")?,"replay_terminal_observed":true,
         "independent_full_verification_passed":false,"publication_authorized":false,
         "replay_launch_authorized":false,"r2_mutations":false}),
@@ -417,7 +464,7 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
 pub(super) fn journal_events(sampled_seconds: u64) -> Result<Value> {
     let output = Command::new("/usr/bin/journalctl").args([
         &format!("_SYSTEMD_INVOCATION_ID={INVOCATION}"),&format!("_SYSTEMD_UNIT={UNIT}"),
-        "-g","historical checkpoint slot=85967282 |historical checkpoint slot=85967999 |snapshot verification complete|horizon archive complete:",
+        "-g","historical checkpoint slot=85967282 |historical checkpoint slot=85967999 |historical checkpoint slot=85967995 |boundary block 85968000 |snapshot verification complete|horizon archive complete:",
         "-n","32","--no-pager","-o","json",
     ]).output()?;
     ensure!(
@@ -573,6 +620,43 @@ mod tests {
                 .contains(&199)
         );
         assert!(super::super::cohort_finalization::handoff_scope(UNIT).is_err());
+    }
+    #[test]
+    fn exact_skipped_tail_requires_bound_decoded_coverage() {
+        let mut r = records();
+        r[1]["MESSAGE"] = json!(
+            r[1]["MESSAGE"]
+                .as_str()
+                .unwrap()
+                .replace("slot=85967999 ", "slot=85967995 ")
+                .replace("tick_height=5501952000", "tick_height=5501951744")
+        );
+        assert!(terminal_events(&r, 13).is_err());
+        let mut tail = r[0].clone();
+        tail["MESSAGE"] = json!(
+            "boundary block 85968000 parent 85967995 supplies decoded tail evidence through slot 85967999"
+        );
+        tail["__REALTIME_TIMESTAMP"] = json!("10500000");
+        r.push(tail.clone());
+        let p = terminal_events(&r, 13).unwrap();
+        assert_eq!(p["terminal_bank_slot"], 85967995);
+        assert_eq!(p["terminal_slot"], 85967999);
+        assert_eq!(p["events"].as_array().unwrap().len(), 4);
+        for (key, value) in [
+            ("_PID", "other"),
+            ("_SYSTEMD_INVOCATION_ID", "foreign"),
+            ("__REALTIME_TIMESTAMP", "12000000"),
+            (
+                "MESSAGE",
+                "boundary block 85968000 parent 85967994 supplies decoded tail evidence through slot 85967999",
+            ),
+        ] {
+            let mut bad = r.clone();
+            bad[4][key] = json!(value);
+            assert!(terminal_events(&bad, 13).is_err(), "{key}");
+        }
+        r.push(tail);
+        assert!(terminal_events(&r, 13).is_err());
     }
     #[test]
     fn replacement_restart_wrong_command_and_terminal_owner_fail() {
