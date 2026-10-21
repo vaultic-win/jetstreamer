@@ -253,6 +253,19 @@ async fn main() {
 
     let mut args = std::env::args().skip(1);
     let range = args.next().unwrap_or_else(|| usage());
+    if range == "--post-update-capacity-probe" {
+        if args.next().is_some() {
+            usage();
+        }
+        match jetstreamer_horizon::archive::capacity_probe::post_update_capacity_probe() {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("post-update capacity probe failed: {error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     if range == "--archive-capacity-probe" {
         if args.next().is_some() {
             usage();

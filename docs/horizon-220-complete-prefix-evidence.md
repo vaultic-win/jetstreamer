@@ -55,3 +55,16 @@ sealed package's exact unit member; it still hashes the real member, authenticat
 systemd's fragment path and invocation journal, and requires terminal success.
 No active service needs to be changed or restarted to collect its later result.
 The older fixed epoch-140 transient profile cannot use this runtime-link option.
+
+## Epoch-223 capacity repair qualification
+
+Each newly sealed `jetstreamer-node`, `verify_archive`, and `horizon_pipeline`
+accepts the standalone `--post-update-capacity-probe` flag. It exercises that
+executable's linked writer and reader in memory over the observed 16,385-record
+post-update shape at slot 96,540,992, including nonempty account data and ordered
+write versions. It separately proves rejection of record 32,769 and reports the
+unchanged independent 16 MiB post-update data limit. Additional arguments are
+rejected; no production archive, replay runtime, database or remote storage is
+opened. Preserve each exact executable digest and machine-readable result.
+This capability evidence does not replace the fresh admission, canonical-root,
+independent full-verification, current-plugin or R2 readback/sidecar gates.

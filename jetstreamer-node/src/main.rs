@@ -18885,6 +18885,21 @@ async fn run_epoch_range_supervisor_serial(
 
 #[tokio::main]
 async fn main() {
+    let probe_args: Vec<_> = env::args().skip(1).collect();
+    if probe_args.first().map(String::as_str) == Some("--post-update-capacity-probe") {
+        if probe_args.len() != 1 {
+            eprintln!("--post-update-capacity-probe accepts no additional arguments");
+            exit(2);
+        }
+        match jetstreamer_horizon::archive::capacity_probe::post_update_capacity_probe() {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("post-update capacity probe failed: {error}");
+                exit(1);
+            }
+        }
+        return;
+    }
     let shutdown = Arc::new(AtomicBool::new(false));
     let cursor = Arc::new(ReplayCursor::new());
     let restart_tracker = Arc::new(RestartTracker::new());

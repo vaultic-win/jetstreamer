@@ -1429,6 +1429,19 @@ fn run_ordered_chain(
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("--post-update-capacity-probe") {
+        if args.len() != 1 {
+            usage();
+        }
+        match jetstreamer_horizon::archive::capacity_probe::post_update_capacity_probe() {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("post-update capacity probe failed: {error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     if args.is_empty() {
         usage();
     }
