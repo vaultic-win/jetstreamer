@@ -1519,6 +1519,7 @@ fn main() {
                         args[6].as_str(),
                         "--prepare-next-delivery198"
                             | "--prepare-next-native198"
+                            | "--publish-native198-event"
                             | "--prepare-next-prefix157"
                             | "--prepare-next-prefix144"
                             | "--prepare-next-completed144"
@@ -1553,6 +1554,20 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--publish-native198-event")
+        {
+            return public198::native_event(
+                &plan,
+                &bound,
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                &args[5],
+            );
+        }
         if args
             .get(6)
             .is_some_and(|arg| arg == "--promote-partial2018")

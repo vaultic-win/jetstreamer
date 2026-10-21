@@ -26,7 +26,7 @@ fn utc_string(seconds: u64) -> Result<String> {
     ))
 }
 
-fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()> {
+pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()> {
     is_101(p)?;
     ensure!(
         c["schema"] == "jetstreamer-horizon-routine-cycle-completion-v1"

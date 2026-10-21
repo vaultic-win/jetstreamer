@@ -134,6 +134,86 @@ pub(super) fn enable_native(p: &mut Plan, spec: &Bound) -> Result<()> {
     claims(profile)?;
     Ok(())
 }
+
+/// A phase-handoff event reuses the current coordinated resource sample, never
+/// resamples or rewrites the canonical fleet/completion chain. Its complete
+/// private census is current service/remote evidence for this one status update.
+fn event_scope(
+    sample: &str,
+    plan_sha: &str,
+    spec_sha: &str,
+    writer: bool,
+    already_native: bool,
+) -> Result<()> {
+    ensure!(
+        writer
+            && !already_native
+            && sample == "2026-10-21T21:28:00Z"
+            && plan_sha == "fdb0c0185f0c73ebe5f4b70cca5e45fb8508afc506e9ec61424c1de5bfea654c"
+            && spec_sha == "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346",
+        "foreign native198 status event"
+    );
+    Ok(())
+}
+pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -> Result<()> {
+    ensure!(is_101(p)?, "foreign native198 campaign");
+    event_scope(
+        &p.sample_target_utc,
+        &pb.sha256,
+        &spec.sha256,
+        writer(p),
+        native(p),
+    )?;
+    let endpoint = env::var("HORIZON_S3_ENDPOINT").context("storage endpoint missing")?;
+    ensure!(
+        sha(endpoint.as_bytes()) == p.endpoint_sha256 && p.bucket == BUCKET,
+        "status event endpoint differs"
+    );
+    let invocation =
+        authenticate_named_service("horizon-native198-status-handoff-20261021-v1.service")?;
+    let cb = file(p.cycle_directory.join("completion.json"), false)?;
+    ensure!(
+        cb.sha256 == "8e26cd0f9975f2978a57baff0b1641e96f4c58eae3af45c4b3e43daaf6969fb4",
+        "accepted21:28 completion differs"
+    );
+    let completion = bound_json(&cb, false)?;
+    next_preparation::completion_bindings(p, pb, &completion)?;
+    let observer: Bound = serde_json::from_value(completion["observer"].clone())?;
+    let sample = bound_json(&observer, false)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let seconds = utc_seconds(&p.sample_target_utc)?;
+    ensure!(
+        sample["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && sample["recorded_at_utc"] == p.sample_target_utc
+            && now >= seconds
+            && now - seconds <= 1800,
+        "status event resource evidence expired"
+    );
+    let source: Bound = serde_json::from_value(completion["fleet_plan"].clone())?;
+    let mut fleet = bound_json(&source, true)?;
+    let mut event: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    enable_native(&mut event, spec)?;
+    derive_fleet(&event, &mut fleet)?;
+    event.cycle_directory = p.cycle_directory.join("native198-status-event-v1");
+    absent(&event.cycle_directory)?;
+    fs::create_dir(&event.cycle_directory)?;
+    fs::set_permissions(&event.cycle_directory, fs::Permissions::from_mode(0o700))?;
+    File::open(&p.cycle_directory)?.sync_all()?;
+    write_new(
+        &event.cycle_directory.join("intent.json"),
+        &json!({"schema":"horizon-native198-status-event-intent-v1","source_plan":pb,"source_completion":cb,"handoff":spec,"invocation_id":invocation,"self_sha256":self_sha,"coordinated_observer":observer,"new_resource_samples":0,"canonical_fleet_changed":false,"archive_mutations":false,"sidecar_mutations":false}),
+    )?;
+    let result = publish(&event, &fleet, &observer)?;
+    ensure!(
+        result["publication_skipped"] != true && !result["publication"].is_null(),
+        "native198 status event did not publish; preserve partial evidence"
+    );
+    write_new(
+        &event.cycle_directory.join("completion.json"),
+        &json!({"schema":"horizon-native198-status-event-completion-v1","source_plan":pb,"source_completion":cb,"handoff":spec,"invocation_id":invocation,"self_sha256":self_sha,"result":result,"new_resource_samples":0,"canonical_fleet_changed":false,"replay_status_updates":0,"archive_mutations":false,"sidecar_mutations":false,"r2_status_mutation":true}),
+    )?;
+    Ok(())
+}
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     let bytes = read_checked(&path, LIMIT, 0, immutable)?;
     Ok(Bound {
@@ -586,6 +666,18 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn phase_event_cannot_retarget_a_new_sample_plan_writer_or_repeated_handoff() {
+        let sample = "2026-10-21T21:28:00Z";
+        let plan = "fdb0c0185f0c73ebe5f4b70cca5e45fb8508afc506e9ec61424c1de5bfea654c";
+        let spec = "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346";
+        event_scope(sample, plan, spec, true, false).unwrap();
+        assert!(event_scope("2026-10-21T21:58:00Z", plan, spec, true, false).is_err());
+        assert!(event_scope(sample, "foreign", spec, true, false).is_err());
+        assert!(event_scope(sample, plan, "foreign", true, false).is_err());
+        assert!(event_scope(sample, plan, spec, false, false).is_err());
+        assert!(event_scope(sample, plan, spec, true, true).is_err());
+    }
     #[test]
     fn native_handoff_is_explicit_separate_and_rejects_authority_extensions() {
         let good = json!({"schema":"horizon-native198-verification-handoff-v1","launches":[],"publication_authorized":false,"r2_mutations":false});
