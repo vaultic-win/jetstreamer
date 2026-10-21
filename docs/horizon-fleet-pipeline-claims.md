@@ -27,6 +27,27 @@ records pipeline invocations in both `pipelines` and, when live, `active`.
 It intentionally does not make a replay status object's old ETA current merely
 because a delivery stage is now active.
 
+Epoch 198 on dev-samjohnson has a separate, exact native-verifier profile:
+`horizon-verify-canonical-pair-dev-samjohnson198-v1`. It cannot expand the
+201–300 `/home/ubuntu/horizon` profile. It pins the imported archive digest,
+compatible immutable binaries, private state paths, and a fresh coordinated v2
+resource receipt. Both bounded verifier services are admitted together with
+their combined memory allowance and protected older disk claims.
+
+The native full stage still performs both the complete structural scan and
+independent internal full-PoH scan. Neither creates an adjacent-boundary receipt;
+the authenticated skipped-tail/successor evidence and normal retirement gates
+remain separate. Each stage hashes the archive before and after verification,
+checks its canonical sidecar, and fsyncs its private receipt before mirroring
+only its epoch-198 gate receipt no-clobber into the existing delivery receipt
+directory. The sole uploader must explicitly qualify the new verifier/runner
+hashes before accepting these receipts.
+
+The routine helper's `--prepare-next-native198 SPEC --handoff-sha256 HEX`
+transition consumes both exact, invocation-bound native launch receipts while
+preserving original producer elapsed time and the original downstream deadline.
+It does not launch workers, reset the ETA allowance, or authorize R2 publication.
+
 The narrowly qualified `producer-finalization` phase covers only the exact
 sealed 216–219 v5 producer and its original invocation. It authenticates the
 immutable parent digest and requires the original user's journal events for

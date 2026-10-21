@@ -4,7 +4,7 @@
 mod evidence;
 use {
     anyhow::{Context, Result, ensure},
-    serde::Deserialize,
+    serde::{Deserialize, Serialize},
     sha2::{Digest, Sha256},
     std::{
         env,
@@ -39,7 +39,7 @@ impl Stage {
         }
     }
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
     path: PathBuf,
@@ -56,15 +56,22 @@ struct Plan {
     verifier: Bound,
     threads_per_command: usize,
     state_directory: PathBuf,
+    #[serde(default)]
+    admission_observer: Option<Bound>,
 }
 
 fn validate_plan(p: &Plan) -> Result<()> {
+    let local198 = p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1";
     ensure!(
-        p.schema == "horizon-verify-canonical-pair-plan-v1",
+        local198 || p.schema == "horizon-verify-canonical-pair-plan-v1",
         "wrong schema"
     );
     ensure!(
-        (201..=300).contains(&p.epoch),
+        if local198 {
+            p.epoch == 198
+        } else {
+            (201..=300).contains(&p.epoch)
+        },
         "epoch outside assigned campaign"
     );
     ensure!(
@@ -76,9 +83,50 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "invalid archive digest"
     );
     ensure!(
-        p.archive_directory == Path::new("/home/ubuntu/horizon"),
+        p.archive_directory
+            == Path::new(if local198 {
+                "/home/sol/horizon"
+            } else {
+                "/home/ubuntu/horizon"
+            }),
         "foreign archive directory"
     );
+    if local198 {
+        ensure!(
+            p.admission_observer.is_some(),
+            "epoch198 requires fresh coordinated admission evidence"
+        );
+        ensure!(
+            p.expected_archive_sha256
+                == "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb"
+                && p.threads_per_command <= 16
+                && p.state_directory
+                    == Path::new(
+                        "/var/lib/jetstreamer/horizon-epoch198-canonical-verification-20261021-v1"
+                    )
+                    .join(p.stage.suffix()),
+            "foreign epoch198 archive or state"
+        );
+        let (name, digest) = match p.stage {
+            Stage::Full => (
+                "verify_archive",
+                "5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574",
+            ),
+            Stage::Plugin => (
+                "horizon_pipeline",
+                "e20892a111f8e26c8e25561a939eaf171771789753059100510c936d92092137",
+            ),
+        };
+        ensure!(
+            p.verifier.path
+                == Path::new(
+                    "/usr/local/lib/jetstreamer/horizon-epoch198-compatible-verifiers-20261021-v1"
+                )
+                .join(name)
+                && p.verifier.sha256 == digest,
+            "epoch198 requires the qualified exact verifier"
+        );
+    }
     ensure!(
         p.state_directory.is_absolute()
             && !p.state_directory.starts_with(&p.archive_directory)
@@ -101,6 +149,156 @@ fn verifier_size_limit(stage: Stage) -> u64 {
         Stage::Full => 128 * 1024 * 1024,
         Stage::Plugin => 512 * 1024 * 1024,
     }
+}
+
+fn utc_seconds(value: &str) -> Result<u64> {
+    let input = std::ffi::CString::new(value)?;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    let end = unsafe { libc::strptime(input.as_ptr(), c"%Y-%m-%dT%H:%M:%SZ".as_ptr(), &mut tm) };
+    ensure!(
+        !end.is_null() && unsafe { *end } == 0,
+        "invalid observer clock"
+    );
+    let seconds = unsafe { libc::timegm(&mut tm) };
+    let canonical = format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday,
+        tm.tm_hour,
+        tm.tm_min,
+        tm.tm_sec
+    );
+    ensure!(
+        seconds >= 0 && canonical == value,
+        "noncanonical observer clock"
+    );
+    Ok(seconds as u64)
+}
+
+fn admission_value(v: &serde_json::Value, now: u64) -> Result<()> {
+    let time = utc_seconds(v["recorded_at_utc"].as_str().context("observer time")?)?;
+    ensure!(
+        v["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && time <= now
+            && now - time <= 900
+            && v["cadence"]["routine_minimum_interval_enforced"] == true
+            && v["filesystem"]["conservative_available_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= 4_740_696_923_590 + (32 << 20))
+            && v["host_memory"]["conservative_available_kib"]
+                .as_u64()
+                .is_some_and(|n| n >= 192 * 1024 * 1024),
+        "fresh observer does not admit the combined two64GiB verifier services plus64GiB reserve or protected disk claims"
+    );
+    let replays = v["replays"].as_array().context("admission replay census")?;
+    let expected = [
+        "1a7e8cde872b45f786979150d5639ab4",
+        "518ff0bf0bbb4413a155a63f95907163",
+        "f3ec98a134d544e78cb2083f502ed292",
+        "ea93199ed2fa470d99de248c2a10b246",
+    ];
+    ensure!(
+        replays.len() == expected.len()
+            && expected.iter().all(|iid| replays
+                .iter()
+                .filter(|r| r["producer_after"]["invocation_id"] == *iid)
+                .count()
+                == 1)
+            && replays
+                .iter()
+                .all(|r| r["invocation_binding_stable"] == true),
+        "protected replay claims differ from admitted fleet"
+    );
+    Ok(())
+}
+
+fn check_admission(p: &Plan) -> Result<()> {
+    let Some(bound) = &p.admission_observer else {
+        return Ok(());
+    };
+    ensure!(
+        p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1"
+            && bound.path.parent()
+                == Some(Path::new(
+                    "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1"
+                )),
+        "foreign admission observer"
+    );
+    let bytes = evidence::bound_file(&bound.path, &bound.sha256, 16 << 20, false)?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+    admission_value(
+        &value,
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+    )?;
+    for replay in value["replays"].as_array().context("admission replays")? {
+        for owner in ["controller_after", "producer_after"] {
+            let owner = &replay[owner];
+            let name = owner["unit"].as_str().context("admission unit")?;
+            let result = Command::new("/usr/bin/systemctl")
+                .args([
+                    "show",
+                    name,
+                    "--property=InvocationID,ActiveState,SubState,NRestarts",
+                ])
+                .output()?;
+            ensure!(result.status.success(), "cannot recheck admitted owner");
+            let output = std::str::from_utf8(&result.stdout)?;
+            for expected in [
+                format!(
+                    "InvocationID={}",
+                    owner["invocation_id"]
+                        .as_str()
+                        .context("owner invocation")?
+                ),
+                "ActiveState=active".into(),
+                "SubState=running".into(),
+                "NRestarts=0".into(),
+            ] {
+                ensure!(
+                    output.lines().any(|line| line == expected),
+                    "admitted owner changed before launch"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+// Executables are not JSON. Stream large plugin binaries without weakening the
+// independent, small plan/receipt limits or allocating their entire contents.
+fn verify_executable(p: &Plan) -> Result<()> {
+    let maximum = if p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
+        512 * 1024 * 1024
+    } else {
+        verifier_size_limit(p.stage)
+    };
+    let mut f = open_stable(&p.verifier.path)?;
+    let before = f.metadata()?;
+    ensure!(
+        before.uid() == 0 && before.len() <= maximum && before.mode() & 0o111 != 0,
+        "unsafe verifier identity or size"
+    );
+    let mut hash = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    let mut total = 0u64;
+    loop {
+        let count = f.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        total = total
+            .checked_add(count as u64)
+            .context("verifier length overflow")?;
+        ensure!(total <= before.len(), "verifier grew");
+        hash.update(&buffer[..count]);
+    }
+    recheck(&p.verifier.path, &f, &before)?;
+    ensure!(
+        total == before.len() && format!("{:x}", hash.finalize()) == p.verifier.sha256,
+        "verifier digest mismatch"
+    );
+    Ok(())
 }
 
 fn batch_absent(directory: &Path) -> Result<()> {
@@ -282,6 +480,119 @@ fn commit_receipt(path: &Path, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
+fn mirror_gate_receipt(directory: &Path, name: &str, bytes: &[u8], owner: u32) -> Result<()> {
+    ensure!(
+        directory.is_absolute() && directory.canonicalize()? == directory,
+        "noncanonical gate directory"
+    );
+    let m = fs::symlink_metadata(directory)?;
+    ensure!(
+        m.is_dir() && m.uid() == owner && m.mode() & 0o022 == 0,
+        "unsafe gate directory"
+    );
+    ensure!(
+        matches!(name, "epoch-198.full.ok" | "epoch-198.plugin.ok"),
+        "foreign gate receipt"
+    );
+    let path = directory.join(name);
+    if let Ok(existing) = fs::symlink_metadata(&path) {
+        let mut f = open_stable(&path)?;
+        ensure!(
+            existing.uid() == unsafe { libc::geteuid() } && existing.len() <= 4096,
+            "foreign existing gate receipt"
+        );
+        let mut old = Vec::new();
+        f.read_to_end(&mut old)?;
+        ensure!(old == bytes, "existing gate receipt differs");
+        f.sync_all()?;
+        File::open(directory)?.sync_all()?;
+        return Ok(());
+    }
+    let mut temp = tempfile::Builder::new()
+        .prefix(".native198-gate-")
+        .tempfile_in(directory)?;
+    temp.write_all(bytes)?;
+    temp.as_file()
+        .set_permissions(fs::Permissions::from_mode(0o444))?;
+    temp.as_file().sync_all()?;
+    temp.persist_noclobber(path).map_err(|e| e.error)?;
+    File::open(directory)?.sync_all()?;
+    Ok(())
+}
+
+fn record_local198_launch(p: &Plan, args: &[String], executable: &Path) -> Result<()> {
+    if p.schema != "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
+        return Ok(());
+    }
+    let phase = match p.stage {
+        Stage::Full => "full-verification",
+        Stage::Plugin => "plugin-verification",
+    };
+    let unit = format!(
+        "horizon-{}-verify-198-native-20261021-v1.service",
+        p.stage.suffix()
+    );
+    let result = Command::new("/usr/bin/systemctl").args(["show", &unit,
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,ExecStart,Type,Result,ControlGroup"])
+        .output()?;
+    ensure!(
+        result.status.success(),
+        "cannot capture verification service"
+    );
+    let mut state = serde_json::Map::new();
+    for line in std::str::from_utf8(&result.stdout)?.lines() {
+        let (key, value) = line.split_once('=').context("malformed unit property")?;
+        ensure!(
+            state.insert(key.into(), value.into()).is_none(),
+            "duplicate unit property"
+        );
+    }
+    let state = serde_json::Value::Object(state);
+    let invocation = env::var("INVOCATION_ID")?;
+    let expected = format!(
+        "{{ path={} ; argv[]={} {} {} {} ; ignore_errors=",
+        executable.display(),
+        executable.display(),
+        args[0],
+        args[1],
+        args[2]
+    );
+    ensure!(
+        state["Id"] == unit
+            && state["LoadState"] == "loaded"
+            && state["ActiveState"] == "active"
+            && state["SubState"] == "running"
+            && state["MainPID"]
+                .as_str()
+                .and_then(|s| s.parse::<u32>().ok())
+                == Some(std::process::id())
+            && state["NRestarts"] == "0"
+            && state["Type"] == "exec"
+            && state["InvocationID"] == invocation
+            && invocation.len() == 32
+            && invocation.bytes().all(|b| b.is_ascii_hexdigit())
+            && state["ExecStart"]
+                .as_str()
+                .is_some_and(|s| s.starts_with(&expected))
+            && state["ControlGroup"] == format!("/system.slice/{unit}"),
+        "verification service identity differs"
+    );
+    evidence::write_receipt(
+        &p.state_directory.join("launch.json"),
+        &serde_json::json!({
+            "schema":"horizon-epoch198-native-verification-launch-v1", "epoch":198,
+            "plan":{"path":args[0],"sha256":args[1]}, "runner_sha256":args[2],
+        "admission_observer":p.admission_observer,
+            "unit":state, "claim":{"epoch":198,"phase":phase,"unit":unit,
+            "invocation_id":invocation,"expected_exec_start":state["ExecStart"],
+            "evidence":[{"path":args[0],"sha256":args[1]}]},
+            "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+            "archive_hashing_started":false,"verification_complete":false,
+            "publication_authorized":false,"local_retirement_authorized":false,"r2_mutations":false
+        }),
+    )
+}
+
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root required");
     let args: Vec<_> = env::args().skip(1).collect();
@@ -298,13 +609,7 @@ fn run() -> Result<()> {
     let receipts = p.state_directory.join("receipts");
     private_directory(&receipts)?;
     batch_absent(&p.archive_directory)?;
-    evidence::bound_file(
-        &p.verifier.path,
-        &p.verifier.sha256,
-        verifier_size_limit(p.stage),
-        true,
-    )
-    .context("verifier executable binding/size gate")?;
+    verify_executable(&p)?;
     let archive = p.archive_directory.join(format!("epoch-{}.jet", p.epoch));
     let checksum = p
         .archive_directory
@@ -313,6 +618,9 @@ fn run() -> Result<()> {
     if args.len() == 4 {
         let f = open_stable(&archive)?;
         let m = f.metadata()?;
+        if p.epoch == 198 {
+            ensure!(m.len() == 99_381_250_591, "epoch198 archive length differs");
+        }
         recheck(&archive, &f, &m)?;
         println!(
             "{}",
@@ -320,6 +628,8 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    check_admission(&p)?;
+    record_local198_launch(&p, &args, &self_path)?;
     milestone(&p, "pre_verification_hash_started")?;
     let (before_hash, before_meta) = hash_archive(&archive)?;
     ensure!(
@@ -346,13 +656,7 @@ fn run() -> Result<()> {
         sidecar(&checksum, p.epoch, &p.expected_archive_sha256)? == before_sidecar,
         "sidecar changed"
     );
-    evidence::bound_file(
-        &p.verifier.path,
-        &p.verifier.sha256,
-        verifier_size_limit(p.stage),
-        true,
-    )
-    .context("verifier executable revalidation/size gate")?;
+    verify_executable(&p)?;
     evidence::bound_file(Path::new(&args[0]), &args[1], 65536, true)?;
     evidence::bound_file(&self_path, &args[2], 64 * 1024 * 1024, true)?;
     batch_absent(&p.archive_directory)?;
@@ -362,6 +666,22 @@ fn run() -> Result<()> {
         &output,
         format!("{} {} {}\n", after_hash, p.verifier.sha256, args[2]).as_bytes(),
     )?;
+    if p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
+        let directory = match p.stage {
+            Stage::Full => {
+                "/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts"
+            }
+            Stage::Plugin => {
+                "/home/sol/.jetstreamer-private/horizon-plugin-current-101-200-v2/receipts"
+            }
+        };
+        mirror_gate_receipt(
+            Path::new(directory),
+            &format!("epoch-198.{}.ok", p.stage.suffix()),
+            format!("{} {} {}\n", after_hash, p.verifier.sha256, args[2]).as_bytes(),
+            1001,
+        )?;
+    }
     milestone(&p, "receipt_durable")?;
     println!("{}", output.display());
     Ok(())
@@ -394,6 +714,7 @@ mod tests {
             },
             threads_per_command: 8,
             state_directory: "/private/state".into(),
+            admission_observer: None,
         }
     }
     #[test]
@@ -415,6 +736,47 @@ mod tests {
                 "8"
             ]
         );
+    }
+    #[test]
+    fn local198_admission_requires_fresh_bound_complete_fleet_and_combined_headroom() {
+        let mut value = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2",
+            "recorded_at_utc":"2026-10-21T21:28:00Z",
+            "cadence":{"routine_minimum_interval_enforced":true},
+            "filesystem":{"conservative_available_bytes":4_740_696_923_590u64 + (32u64 << 20)},
+            "host_memory":{"conservative_available_kib":192u64 * 1024 * 1024},
+            "replays":(["1a7e8cde872b45f786979150d5639ab4","518ff0bf0bbb4413a155a63f95907163","f3ec98a134d544e78cb2083f502ed292","ea93199ed2fa470d99de248c2a10b246"].map(|iid| json!({"producer_after":{"invocation_id":iid},"invocation_binding_stable":true})))});
+        let time = utc_seconds("2026-10-21T21:28:00Z").unwrap();
+        admission_value(&value, time).unwrap();
+        admission_value(&value, time + 900).unwrap();
+        assert!(admission_value(&value, time - 1).is_err());
+        assert!(admission_value(&value, time + 901).is_err());
+        for (pointer, bad) in [
+            (
+                "/filesystem/conservative_available_bytes",
+                json!(4_740_696_923_590u64 + (32u64 << 20) - 1),
+            ),
+            (
+                "/host_memory/conservative_available_kib",
+                json!(192u64 * 1024 * 1024 - 1),
+            ),
+            ("/cadence/routine_minimum_interval_enforced", json!(false)),
+            ("/replays/0/invocation_binding_stable", json!(false)),
+            ("/replays/0/producer_after/invocation_id", json!("changed")),
+        ] {
+            let mut bad_value = value.clone();
+            *bad_value.pointer_mut(pointer).unwrap() = bad;
+            assert!(admission_value(&bad_value, time).is_err(), "{pointer}");
+        }
+        value["replays"].as_array_mut().unwrap().pop();
+        assert!(admission_value(&value, time).is_err());
+        for clock in [
+            "2026-02-30T00:00:00Z",
+            "2026-10-21T24:00:00Z",
+            "2026-10-21T21:28:00Zextra",
+            "2026-1-21T21:28:00Z",
+        ] {
+            assert!(utc_seconds(clock).is_err(), "{clock}");
+        }
     }
     #[test]
     fn plugin_is_one_epoch_current_verify_only() {
@@ -442,6 +804,49 @@ mod tests {
             p.threads_per_command = n;
             assert!(validate_plan(&p).is_err());
         }
+    }
+    #[test]
+    fn local198_is_explicit_exact_and_keeps_both_full_scans() {
+        let mut p = plan(Stage::Full);
+        p.schema = "horizon-verify-canonical-pair-dev-samjohnson198-v1".into();
+        p.epoch = 198;
+        p.admission_observer = Some(Bound {
+            path: "/observer".into(),
+            sha256: "c".repeat(64),
+        });
+        p.archive_directory = "/home/sol/horizon".into();
+        p.expected_archive_sha256 =
+            "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb".into();
+        p.state_directory =
+            "/var/lib/jetstreamer/horizon-epoch198-canonical-verification-20261021-v1/full".into();
+        p.verifier = Bound {
+            path: "/usr/local/lib/jetstreamer/horizon-epoch198-compatible-verifiers-20261021-v1/verify_archive".into(),
+            sha256: "5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574".into(),
+        };
+        validate_plan(&p).unwrap();
+        let c = commands(&p);
+        assert_eq!(c.len(), 2);
+        assert_eq!(c[0], ["/home/sol/horizon/epoch-198.jet", "--threads", "8"]);
+        assert_eq!(
+            c[1],
+            [
+                "/home/sol/horizon/epoch-198.jet",
+                "--full",
+                "--internal-full",
+                "--threads",
+                "8"
+            ]
+        );
+        for epoch in [197, 199, 200, 201, 300] {
+            p.epoch = epoch;
+            assert!(validate_plan(&p).is_err());
+        }
+        p.epoch = 198;
+        p.schema = "horizon-verify-canonical-pair-plan-v1".into();
+        assert!(validate_plan(&p).is_err());
+        p.schema = "horizon-verify-canonical-pair-dev-samjohnson198-v1".into();
+        p.verifier.sha256 = "a".repeat(64);
+        assert!(validate_plan(&p).is_err());
     }
     #[test]
     fn strict_plan_rejects_skip_overwrite_and_retirement() {
@@ -512,6 +917,35 @@ mod tests {
         assert_eq!(fs::symlink_metadata(&p).unwrap().nlink(), 1);
         assert!(commit_receipt(&p, b"changed").is_err());
         assert_eq!(fs::read(&p).unwrap(), bytes);
+    }
+    #[test]
+    fn gate_mirror_preserves_existing_receipts_and_refuses_foreign_names() {
+        let d = tempfile::tempdir().unwrap();
+        fs::set_permissions(d.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let owner = unsafe { libc::geteuid() };
+        let bytes = b"archive verifier runner\n";
+        mirror_gate_receipt(d.path(), "epoch-198.full.ok", bytes, owner).unwrap();
+        mirror_gate_receipt(d.path(), "epoch-198.full.ok", bytes, owner).unwrap();
+        assert_eq!(
+            fs::symlink_metadata(d.path().join("epoch-198.full.ok"))
+                .unwrap()
+                .mode()
+                & 0o777,
+            0o444
+        );
+        assert!(mirror_gate_receipt(d.path(), "epoch-198.full.ok", b"changed", owner).is_err());
+        assert!(mirror_gate_receipt(d.path(), "epoch-199.full.ok", bytes, owner).is_err());
+        assert!(
+            mirror_gate_receipt(
+                d.path(),
+                "epoch-198.plugin.ok",
+                bytes,
+                owner.wrapping_add(1)
+            )
+            .is_err()
+        );
+        fs::set_permissions(d.path(), fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(mirror_gate_receipt(d.path(), "epoch-198.plugin.ok", bytes, owner).is_err());
     }
     #[test]
     fn stages_cannot_use_a_different_executable_name() {

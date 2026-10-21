@@ -260,7 +260,12 @@ pub(super) fn prepare(
     } else {
         None
     };
-    let delivery_spec = if prefix_spec.is_some() {
+    let native_spec = if mode == "--prepare-next-native198" {
+        handoff_spec
+    } else {
+        None
+    };
+    let delivery_spec = if prefix_spec.is_some() || native_spec.is_some() {
         None
     } else {
         handoff_spec
@@ -278,7 +283,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     if completion.get("public198_promotion").is_some() {
-        public198::consume(&mut next, &completion)?;
+        public198::consume(&mut next, &completion, &mut next_config)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
     } else {
         delivery198::consume_recovery(&mut next)?;
@@ -337,6 +342,11 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if let Some(spec) = native_spec {
+        public198::enable_native(&mut next, spec)?;
+        public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        public198::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
     if let Some(spec) = prefix_spec {
         ensure!(
             !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,

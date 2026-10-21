@@ -1,12 +1,14 @@
 //! Public198 verification ownership and honest promotion of the partial20:18 cycle.
 use super::*;
 pub(super) const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch198-public-watch-reader-20261021-v1/jetstreamer-r2";
+    "/usr/local/lib/jetstreamer/horizon-epoch198-public-watch-reader-20261021-v2/jetstreamer-r2";
 pub(super) const READER_SHA: &str =
-    "78f083f9c06d56350bc2938f74803a2e7ae618387e9a2b291345465cecb892c8";
+    "d00bb3eb69491065694d0a6679c30e2b759df133000cc7cafd0f480afc7aaea5";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T201800Z-delivery198-completed144-v1";
 const FULL: &str = "jetstreamer-horizon-audit-epochs182-200-v5.service";
 const PLUGIN: &str = "jetstreamer-horizon-plugin-receipt-watcher-shard-e-v5-fsync.service";
+const NATIVE_RUNNER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-native-verification-runner-20261021-v1/jetstreamer-horizon-verify-pair";
+const NATIVE_RUNNER_SHA: &str = "e225f8309d19af230cc189ab6e43296d37795693085299c269ab51af6991ab39";
 const ORIGIN: &str =
     "jetstreamer-root-sweep-e198-readerfix-20261019-v1-r2-e198-198-lane-a-1.service";
 const IID: &str = "e5612ef00a5b4fcab04df2c13a6b35b0";
@@ -17,6 +19,120 @@ pub(super) struct Profile {
     promotion: Bound,
     origin: Bound,
     claims: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    native_verification: Vec<Bound>,
+}
+
+pub(super) fn native(p: &Plan) -> bool {
+    p.public198_delivery
+        .as_ref()
+        .is_some_and(|p| !p.native_verification.is_empty())
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeSpec {
+    schema: String,
+    launches: Vec<Bound>,
+    publication_authorized: bool,
+    r2_mutations: bool,
+}
+
+fn claims(profile: &Profile) -> Result<Vec<Value>> {
+    if profile.native_verification.is_empty() {
+        return Ok(profile.claims.clone());
+    }
+    ensure!(
+        profile.native_verification.len() == 2,
+        "native198 must bind both stages"
+    );
+    let mut claims = Vec::new();
+    let mut phases = BTreeSet::new();
+    for b in &profile.native_verification {
+        let receipt = bound_json(b, false)?;
+        let claim = &receipt["claim"];
+        let (suffix, expected_phase) = match claim["phase"].as_str() {
+            Some("full-verification") => ("full", "full-verification"),
+            Some("plugin-verification") => ("plugin", "plugin-verification"),
+            _ => anyhow::bail!("foreign native198 phase"),
+        };
+        let unit = format!("horizon-{suffix}-verify-198-native-20261021-v1.service");
+        ensure!(
+            receipt["schema"] == "horizon-epoch198-native-verification-launch-v1"
+                && receipt["epoch"] == 198
+                && claim["epoch"] == 198
+                && claim["unit"] == unit
+                && receipt["unit"]["Id"] == unit
+                && receipt["unit"]["InvocationID"] == claim["invocation_id"]
+                && receipt["unit"]["ExecStart"] == claim["expected_exec_start"]
+                && receipt["unit"]["NRestarts"] == "0"
+                && receipt["unit"]["ActiveState"] == "active"
+                && receipt["unit"]["SubState"] == "running"
+                && receipt["unit"]["Type"] == "exec"
+                && receipt["runner_sha256"] == NATIVE_RUNNER_SHA
+                && receipt["verification_complete"] == false
+                && receipt["local_retirement_authorized"] == false
+                && receipt["publication_authorized"] == false
+                && receipt["r2_mutations"] == false
+                && phases.insert(expected_phase),
+            "invalid native198 launch proof"
+        );
+        let plan: Bound = serde_json::from_value(receipt["plan"].clone())?;
+        let value = bound_json(&plan, true)?;
+        let command = format!(
+            "{{ path={NATIVE_RUNNER} ; argv[]={NATIVE_RUNNER} {} {} {NATIVE_RUNNER_SHA} ; ignore_errors=",
+            plan.path.display(),
+            plan.sha256
+        );
+        ensure!(
+            value["schema"] == "horizon-verify-canonical-pair-dev-samjohnson198-v1"
+                && value["epoch"] == 198
+                && value["stage"] == suffix
+                && value["archive_directory"] == "/home/sol/horizon"
+                && value["expected_archive_sha256"]
+                    == "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb",
+            "native198 plan differs"
+        );
+        ensure!(
+            receipt["unit"]["ExecStart"]
+                .as_str()
+                .is_some_and(|s| s.starts_with(&command))
+                && receipt["admission_observer"] == value["admission_observer"],
+            "native198 executable or admission differs"
+        );
+        tool_ok(&Bound {
+            path: NATIVE_RUNNER.into(),
+            sha256: NATIVE_RUNNER_SHA.into(),
+        })?;
+        let mut claim = claim.clone();
+        claim["evidence"]
+            .as_array_mut()
+            .context("native198 evidence")?
+            .push(serde_json::to_value(b)?);
+        claims.push(claim);
+    }
+    Ok(claims)
+}
+
+pub(super) fn enable_native(p: &mut Plan, spec: &Bound) -> Result<()> {
+    let value: NativeSpec = serde_json::from_value(bound_json(spec, true)?)?;
+    ensure!(
+        value.schema == "horizon-native198-verification-handoff-v1"
+            && !value.publication_authorized
+            && !value.r2_mutations,
+        "foreign native198 handoff"
+    );
+    let profile = p
+        .public198_delivery
+        .as_mut()
+        .context("native198 requires prior public handoff")?;
+    ensure!(
+        profile.native_verification.is_empty(),
+        "native198 already migrated"
+    );
+    profile.native_verification = value.launches;
+    claims(profile)?;
+    Ok(())
 }
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     let bytes = read_checked(&path, LIMIT, 0, immutable)?;
@@ -33,11 +149,6 @@ fn import_proof() -> Result<()> {
         sha(&read_checked(Path::new(IMPORT), LIMIT, 1001, false)?)
             == "4a35dc14d303fd3c39e256d02346f9f675f67033103046e0c1b182d7c5db3ad7",
         "198 durable import receipt changed"
-    );
-    let m = fs::symlink_metadata("/home/sol/horizon/epoch-198.jet")?;
-    ensure!(
-        m.is_file() && m.nlink() == 1 && m.len() == 99381250591 && m.mode() & 0o222 == 0,
-        "198 imported archive changed"
     );
     Ok(())
 }
@@ -63,9 +174,7 @@ pub(super) fn promoted(p: &Plan, c: &Value) -> Result<bool> {
         p.cycle_directory == Path::new(ROOT)
             && bound.path == Path::new(ROOT).join("public198-promotion-v1/intent.json")
             && c["fleet_plan"]["path"]
-                == json!(
-                    Path::new(ROOT).join("public198-promotion-v1/template/sealed/fleet-plan.json")
-                )
+                == json!(Path::new(ROOT).join("delivery198-stage/sealed/fleet-plan.json"))
             && c["epoch198_delivery"].is_null(),
         "foreign partial198 promotion"
     );
@@ -80,21 +189,48 @@ pub(super) fn promoted(p: &Plan, c: &Value) -> Result<bool> {
     );
     Ok(true)
 }
-pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
+pub(super) fn consume(p: &mut Plan, c: &Value, config: &mut Value) -> Result<()> {
     let promotion: Bound = serde_json::from_value(c["public198_promotion"].clone())?;
     let value = bound_json(&promotion, false)?;
     p.public198_delivery = Some(Profile {
         promotion,
         origin: serde_json::from_value(value["origin"].clone())?,
         claims: serde_json::from_value(value["claims"].clone())?,
+        native_verification: Vec::new(),
     });
     p.epoch198_delivery = None;
     p.tools.r2 = Bound {
         path: READER.into(),
         sha256: READER_SHA.into(),
     };
+    ensure!(
+        p.sample_target_utc == "2026-10-21T20:48:00Z",
+        "198 initial public recovery target differs"
+    );
+    for path in [&mut p.observer, &mut p.estimate_output, &mut p.fleet_output] {
+        *path = PathBuf::from(
+            path.to_str()
+                .context("198 recovery path")?
+                .replace("20261021T204800Z", "20261021T205800Z"),
+        );
+    }
+    p.sample_target_utc = "2026-10-21T20:58:00Z".into();
+    config["not_before_utc"] = json!(p.sample_target_utc);
+    config["output"] = json!(p.observer);
+    p.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
     read(p.public198_delivery.as_ref().unwrap())?;
     Ok(())
+}
+pub(super) fn interval(p: &Plan) -> Result<Option<u64>> {
+    if p.public198_delivery.is_some() && p.sample_target_utc == "2026-10-21T20:58:00Z" {
+        ensure!(
+            p.previous_observer.sha256
+                == "a875e052381e1fdf0aee6e1e847649a0c99b808f77a27e20937e895a303f3e03",
+            "198 public recovery predecessor differs"
+        );
+        return Ok(Some(2400));
+    }
+    Ok(None)
 }
 pub(super) fn namespaces(p: &mut Plan, observer: &mut PathBuf, cycle: &mut PathBuf) -> Result<()> {
     let stamp = stamp(&p.sample_target_utc);
@@ -121,13 +257,22 @@ fn fold(fleet: &mut Value, profile: &Profile) -> Result<()> {
         .as_array_mut()
         .context("198 pipeline claims")?;
     rows.retain(|c| c["epoch"] != 198);
-    rows.extend(profile.claims.clone());
+    let claims = claims(profile)?;
+    rows.extend(claims.clone());
     for name in [FULL, PLUGIN] {
         let units = fleet["tracked_units"]
             .as_array_mut()
             .context("198 tracked watchers")?;
         if !units.contains(&json!(name)) {
             units.push(json!(name));
+        }
+    }
+    for claim in &claims {
+        let units = fleet["tracked_units"]
+            .as_array_mut()
+            .context("native198 tracked units")?;
+        if !units.contains(&claim["unit"]) {
+            units.push(claim["unit"].clone());
         }
     }
     fleet["gates"]["198"]["state"] = json!("post-replay-pipeline");
@@ -161,8 +306,13 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         "foreign198 promotion"
     );
     let invocation =
-        authenticate_named_service("horizon-public198-promote-partial2018-20261021-v1.service")?;
+        authenticate_named_service("horizon-public198-promote-partial2018-20261021-v3.service")?;
     import_proof()?;
+    let m = fs::symlink_metadata("/home/sol/horizon/epoch-198.jet")?;
+    ensure!(
+        m.is_file() && m.nlink() == 1 && m.len() == 99381250591 && m.mode() & 0o222 == 0,
+        "198 promotion archive changed"
+    );
     absent(&p.cycle_directory.join("completion.json"))?;
     ensure!(
         file(p.cycle_directory.join("failure.json"), false)?.sha256
@@ -224,46 +374,75 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         claims.push(json!({"epoch":198,"phase":phase,"unit":name,"invocation_id":iid,"expected_exec_start":std::str::from_utf8(&output.stdout)?.trim_end(),"evidence":[{"path":IMPORT,"sha256":"4a35dc14d303fd3c39e256d02346f9f675f67033103046e0c1b182d7c5db3ad7"},origin]}));
     }
     let root = p.cycle_directory.join("public198-promotion-v1");
-    absent(&root)?;
-    fs::create_dir(&root)?;
-    fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
-    File::open(&p.cycle_directory)?.sync_all()?;
-    let promotion = write_new(
-        &root.join("intent.json"),
-        &json!({"schema":"jetstreamer-public198-partial-promotion-v1","origin":origin,"claims":claims,"observer":observer,"failed_plan":pb,"new_resource_samples":0,"archive_mutations":false,"replay_launch_authorized":false,"stale198_status_repair_required":true}),
-    )?;
-    let profile = Profile {
-        promotion: promotion.clone(),
-        origin,
-        claims,
+    let intended = json!({"schema":"jetstreamer-public198-partial-promotion-v1","origin":origin,"claims":claims,"observer":observer,"failed_plan":pb,"new_resource_samples":0,"archive_mutations":false,"replay_launch_authorized":false,"stale198_status_repair_required":true});
+    let promotion = if root.exists() {
+        let existing = file(root.join("intent.json"), false)?;
+        ensure!(
+            bound_json(&existing, false)? == intended,
+            "198 promotion resume intent differs"
+        );
+        existing
+    } else {
+        fs::create_dir(&root)?;
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
+        File::open(&p.cycle_directory)?.sync_all()?;
+        write_new(&root.join("intent.json"), &intended)?
     };
-    let mut fleet = bound_json(
-        &file(p.cycle_directory.join("sealed/fleet-plan.json"), true)?,
+    // Promote the genuine in-window inventory byte-for-byte as history. Never
+    // run today's owners against an expired resource sample or backdate them.
+    let historical = file(
+        p.cycle_directory.join("delivery198-provisional-fleet.json"),
+        false,
+    )?;
+    let ledger = bound_json(&historical, false)?;
+    let result = bound_json(
+        &file(
+            p.cycle_directory.join("child-delivery198-fleet.json"),
+            false,
+        )?,
+        false,
+    )?;
+    ensure!(
+        result["success"] == true
+            && result["tool"]["sha256"]
+                == "992d06b9f4b76bd4beecfd9be9572f780131e0c57e1f5618aebaf9fb362dc398"
+            && ledger["sampled_at_utc"] == p.sample_target_utc
+            && ledger["observer_sha256"] == observer.sha256
+            && ledger["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| (1792613880..=1792615680).contains(&n))
+            && ledger["inventory"]["anomalies"] == 0,
+        "198 historical inventory lacks original in-window success"
+    );
+    let fleet_plan = file(
+        p.cycle_directory
+            .join("delivery198-stage/sealed/fleet-plan.json"),
         true,
     )?;
-    fold(&mut fleet, &profile)?;
-    let package = delivery198::seal_values(
-        p,
-        "public198-promotion-v1/template",
-        &[("fleet-plan.json", fleet)],
-    )?;
-    let fleet_plan = file(package.join("fleet-plan.json"), true)?;
-    let tool = Bound {
-        path: READER.into(),
-        sha256: READER_SHA.into(),
-    };
-    tool_ok(&tool)?;
+    ensure!(
+        ledger["plan_sha256"] == fleet_plan.sha256,
+        "198 historical fleet plan differs"
+    );
     latest_fleet_unchanged(p, &bound_json(&p.previous_fleet, false)?)?;
-    child(
-        &tool,
-        &[
-            "fleet-reconcile".into(),
-            fleet_plan.path.display().to_string(),
-            "--plan-sha256".into(),
-            fleet_plan.sha256.clone(),
-        ],
-        true,
-        &root.join("child-fleet.json"),
+    absent(&p.fleet_output)?;
+    let bytes = read_checked(&historical.path, LIMIT, 0, false)?;
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&p.fleet_output)?;
+    output.write_all(&bytes)?;
+    output.sync_all()?;
+    File::open(
+        p.fleet_output
+            .parent()
+            .context("198 canonical fleet parent")?,
+    )?
+    .sync_all()?;
+    write_new(
+        &root.join("historical-checkpoint.json"),
+        &json!({"source":historical,"canonical_output":p.fleet_output,"preserved_bytes_sha256":sha(&bytes),"sample_timestamp_preserved":true,"new_resource_samples":0,"current198_status_unpublished":true}),
     )?;
     let fleet = file(p.fleet_output.clone(), false)?;
     let ledger = bound_json(&fleet, false)?;
@@ -342,13 +521,24 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
         if check {
             args.push("--check-only".into());
         }
-        child(
+        let result = child(
             &p.tools.r2,
             &args,
             !check,
             &p.cycle_directory
                 .join(format!("child-public198-{name}.json")),
-        )?;
+        );
+        if let Err(error) = result {
+            let failed = file(
+                p.cycle_directory
+                    .join(format!("child-public198-{name}.json")),
+                false,
+            )?;
+            return Ok(
+                json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":failed,
+                "reason":format!("198 status stage needs prompt repair: {error:#}"),"archive_mutations":false}),
+            );
+        }
     }
     let digits: String = p
         .sample_target_utc
@@ -397,6 +587,25 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn native_handoff_is_explicit_separate_and_rejects_authority_extensions() {
+        let good = json!({"schema":"horizon-native198-verification-handoff-v1","launches":[],"publication_authorized":false,"r2_mutations":false});
+        assert!(serde_json::from_value::<NativeSpec>(good.clone()).is_ok());
+        let mut bad = good;
+        bad["replay_launch_authorized"] = json!(true);
+        assert!(serde_json::from_value::<NativeSpec>(bad).is_err());
+        let bound = Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        };
+        let profile = Profile {
+            promotion: bound.clone(),
+            origin: bound.clone(),
+            claims: vec![],
+            native_verification: vec![bound],
+        };
+        assert!(claims(&profile).is_err());
+    }
+    #[test]
     fn public_handoff_preserves_unrelated_claims_and_consensus_integers() {
         let bound = Bound {
             path: "/proof".into(),
@@ -409,6 +618,7 @@ mod tests {
                 json!({"epoch":198,"phase":"full-verification"}),
                 json!({"epoch":198,"phase":"plugin-verification"}),
             ],
+            native_verification: Vec::new(),
         };
         let mut fleet = json!({"pipeline_claims":[{"epoch":198,"phase":"controller-import-handoff"},{"epoch":160,"value":u64::MAX}],"tracked_units":[],"gates":{"198":{"evidence":[]},"144":{"value":u64::MAX}}});
         fold(&mut fleet, &profile).unwrap();

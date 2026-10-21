@@ -188,7 +188,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if p.public198_delivery.is_some() {
+    if public198::native(p) {
+        "native198-completed144-v1"
+    } else if p.public198_delivery.is_some() {
         "public198-completed144-v1"
     } else if p.completed144_prefix.is_some() && p.epoch198_delivery.is_some() {
         "delivery198-completed144-v1"
@@ -1516,6 +1518,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-native198"
                             | "--prepare-next-prefix157"
                             | "--prepare-next-prefix144"
                             | "--prepare-next-completed144"
@@ -1566,6 +1569,7 @@ fn main() {
             arg == "--prepare-next"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
+                || arg == "--prepare-next-native198"
                 || arg == "--prepare-next-private144"
                 || arg == "--prepare-package-recovery"
                 || arg == "--prepare-runtime157-pause"
