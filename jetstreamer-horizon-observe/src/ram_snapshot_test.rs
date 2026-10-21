@@ -1,4 +1,8 @@
 //! Exact v1.6.16 snapshot load/freeze tests, not an entry replay or publisher.
+#[cfg(feature = "epoch225-shrink-snapshot-tests")]
+mod ram_snapshot225;
+#[cfg(feature = "epoch225-shrink-snapshot-tests")]
+use ram_snapshot225::{validate_fleet, validate_observer, validate_plan};
 use {
     anyhow::{Context, Result, ensure},
     serde::Deserialize,
@@ -29,12 +33,33 @@ const FLOOR: u64 = 231_874_716_783;
 const STOP_MEMORY: u64 = 448 * GIB;
 // Reserve the complete diagnostic cap above the unchanged host stop reserve.
 const START_MEMORY: u64 = STOP_MEMORY + MEMORY_MAX;
-const RELEASED_225: bool = cfg!(feature = "ram-snapshot-eight-core-stopped225");
+const RELEASED_225: bool = cfg!(all(
+    feature = "ram-snapshot-eight-core-stopped225",
+    not(feature = "epoch225-shrink-snapshot-tests")
+));
 const CPU_CORES: u64 = if RELEASED_225 { 8 } else { 2 };
-const SNAPSHOT_SHA: &str = "348cba573c9e737e77c512d2c7ceda7bc81db61be6f4dc02838d168a10103043";
+const PROFILE225: bool = cfg!(feature = "epoch225-shrink-snapshot-tests");
+const SNAPSHOT_SHA: &str = if PROFILE225 {
+    "094d3b28c39403580fbac083cdad67cc008b255dd375d611217103750d0f412d"
+} else {
+    "348cba573c9e737e77c512d2c7ceda7bc81db61be6f4dc02838d168a10103043"
+};
+const SNAPSHOT_SIZE: u64 = if PROFILE225 {
+    10_177_204_112
+} else {
+    8_046_142_592
+};
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const TEST_SHA: &str = "bfa7aadf5be9d895747b379c18354ecc312e50ba895341a5e46a21a6a085fd64";
-const FILTER: &str = "_v1_6_16_boundary_snapshot";
+const TEST_SHA: &str = if PROFILE225 {
+    "18adc9c5708b67dfe12dc31a6438591ea6a152ab96929ab08477c3c3533c5bfe"
+} else {
+    "bfa7aadf5be9d895747b379c18354ecc312e50ba895341a5e46a21a6a085fd64"
+};
+const FILTER: &str = if PROFILE225 {
+    "_v1_6_25_boundary_snapshot"
+} else {
+    "_v1_6_16_boundary_snapshot"
+};
 const RESOURCE_FILES: [&str; 12] = [
     "cpu.stat",
     "cpu.max",
@@ -49,10 +74,17 @@ const RESOURCE_FILES: [&str; 12] = [
     "io.stat",
     "io.pressure",
 ];
-const TEST_NAMES: [&str; 2] = [
-    "runtime::tests::initializes_and_checkpoints_v1_6_16_boundary_snapshot: test",
-    "snapshot::tests::loads_and_verifies_v1_6_16_boundary_snapshot: test",
-];
+const TEST_NAMES: [&str; 2] = if PROFILE225 {
+    [
+        "runtime::tests::initializes_and_checkpoints_v1_6_25_boundary_snapshot: test",
+        "snapshot::tests::loads_and_verifies_v1_6_25_boundary_snapshot: test",
+    ]
+} else {
+    [
+        "runtime::tests::initializes_and_checkpoints_v1_6_16_boundary_snapshot: test",
+        "snapshot::tests::loads_and_verifies_v1_6_16_boundary_snapshot: test",
+    ]
+};
 static SIGNAL: AtomicI32 = AtomicI32::new(0);
 
 struct OwnedChild(Child, bool);
@@ -90,6 +122,12 @@ struct Plan {
 
 fn hex(b: &[u8]) -> String {
     b.iter().map(|n| format!("{n:02x}")).collect()
+}
+fn receipt_schema(kind: &str) -> String {
+    format!(
+        "jetstreamer-private-{}-ram-snapshot-{kind}-v1",
+        if PROFILE225 { "v1625" } else { "v1616" }
+    )
 }
 fn is_sha(s: &str) -> bool {
     s.len() == 64
@@ -176,6 +214,7 @@ fn write_new(dir: &Path, name: &str, value: &Value) -> Result<()> {
     File::open(dir)?.sync_all()?;
     Ok(())
 }
+#[cfg(not(feature = "epoch225-shrink-snapshot-tests"))]
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-private-v1616-ram-snapshot-test-plan-v1"
@@ -431,6 +470,7 @@ fn utc(s: &str) -> Result<u64> {
     );
     Ok(u64::try_from(n)?)
 }
+#[cfg(not(feature = "epoch225-shrink-snapshot-tests"))]
 fn validate_observer(v: &Value, now: u64) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -552,6 +592,7 @@ fn validate_reserves(tmpfs: u64, maximum: u64, floor: u64, stop: u64) -> Result<
     );
     Ok(())
 }
+#[cfg(not(feature = "epoch225-shrink-snapshot-tests"))]
 fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -> Result<()> {
     ensure!(
         f["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
@@ -623,7 +664,10 @@ fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -> Result<()
     Ok(())
 }
 
-#[cfg(feature = "ram-snapshot-eight-core-stopped225")]
+#[cfg(all(
+    feature = "ram-snapshot-eight-core-stopped225",
+    not(feature = "epoch225-shrink-snapshot-tests")
+))]
 fn validate_released_225(completion: &Value, launch: &Value) -> Result<()> {
     let id = "ac9aee3d47eb41e483a5e008ed43d030";
     ensure!(
@@ -649,7 +693,10 @@ fn validate_released_225(completion: &Value, launch: &Value) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "ram-snapshot-eight-core-stopped225")]
+#[cfg(all(
+    feature = "ram-snapshot-eight-core-stopped225",
+    not(feature = "epoch225-shrink-snapshot-tests")
+))]
 fn verify_released_225() -> Result<()> {
     let completion = Path::new(
         "/var/lib/jetstreamer/horizon-natural-root225-guard-receipts-v1/stop-completion.json",
@@ -763,13 +810,16 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
         "tmpfs floor admission failed"
     );
     credential_probe()?;
-    #[cfg(feature = "ram-snapshot-eight-core-stopped225")]
+    #[cfg(all(
+        feature = "ram-snapshot-eight-core-stopped225",
+        not(feature = "epoch225-shrink-snapshot-tests")
+    ))]
     verify_released_225()?;
     if p.mode == "capability" {
         write_new(
             &p.receipt_directory,
             "capability.json",
-            &json!({"schema":"jetstreamer-private-v1616-ram-snapshot-capability-v1","invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"tmpfs_bytes":TMPFS_SIZE,"available_bytes":available,"maximum_cgroup_memory_bytes":MEMORY_MAX,"worst_case_tmpfs_free_bytes":TMPFS_SIZE-MEMORY_MAX,"century_floor_bytes":FLOOR,"host_memory_sample_taken":false,"snapshot_tests_run":false,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+            &json!({"schema":receipt_schema("capability"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"tmpfs_bytes":TMPFS_SIZE,"available_bytes":available,"maximum_cgroup_memory_bytes":MEMORY_MAX,"worst_case_tmpfs_free_bytes":TMPFS_SIZE-MEMORY_MAX,"century_floor_bytes":FLOOR,"host_memory_sample_taken":false,"snapshot_tests_run":false,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         )?;
         return Ok(());
     }
@@ -786,9 +836,13 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
         host_memory()? >= START_MEMORY,
         "fresh memory admission failed"
     );
-    let test = immutable(&p.test_binary.path, &p.test_binary.sha256, 64 << 20)?;
-    let snapshot = immutable(&p.snapshot.path, &p.snapshot.sha256, 8_046_142_592)?;
-    ensure!(snapshot.len() == 8_046_142_592, "wrong snapshot size");
+    let test = immutable(
+        &p.test_binary.path,
+        &p.test_binary.sha256,
+        if PROFILE225 { 256 << 20 } else { 64 << 20 },
+    )?;
+    let snapshot = immutable(&p.snapshot.path, &p.snapshot.sha256, SNAPSHOT_SIZE)?;
+    ensure!(snapshot.len() == SNAPSHOT_SIZE, "wrong snapshot size");
     let genesis = immutable(&p.genesis.path, &p.genesis.sha256, 10 << 20)?;
     let mut list_command = Command::new(&p.test_binary.path);
     list_command
@@ -802,13 +856,18 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
         host_memory()? >= START_MEMORY,
         "post-hash memory admission failed"
     );
-    #[cfg(feature = "ram-snapshot-eight-core-stopped225")]
+    #[cfg(feature = "epoch225-shrink-snapshot-tests")]
+    validate_fleet(&fleet, &observer, &p.observer.sha256)?;
+    #[cfg(all(
+        feature = "ram-snapshot-eight-core-stopped225",
+        not(feature = "epoch225-shrink-snapshot-tests")
+    ))]
     verify_released_225()?;
     let resources_before = resource_snapshot(p)?;
     write_new(
         &p.receipt_directory,
         "intent.json",
-        &json!({"schema":"jetstreamer-private-v1616-ram-snapshot-intent-v1","invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"maximum_memory_bytes":MEMORY_MAX,"tmpfs_bytes":TMPFS_SIZE,"resources_before":resources_before,"entry_replay":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":receipt_schema("intent"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"maximum_memory_bytes":MEMORY_MAX,"tmpfs_bytes":TMPFS_SIZE,"resources_before":resources_before,"entry_replay":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     unsafe {
         libc::signal(libc::SIGTERM, signal as *const () as libc::sighandler_t);
@@ -823,7 +882,14 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
             .env("TMPDIR", "/tmp")
             .env("RUST_MIN_STACK", "134217728")
             .env("SOLANA_RAYON_THREADS", "16")
-            .env("JETSTREAMER_SNAPSHOT_86831488", &p.snapshot.path)
+            .env(
+                if PROFILE225 {
+                    "JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT"
+                } else {
+                    "JETSTREAMER_SNAPSHOT_86831488"
+                },
+                &p.snapshot.path,
+            )
             .env(
                 "JETSTREAMER_MAINNET_LEDGER",
                 p.genesis.path.parent().unwrap(),
@@ -893,7 +959,7 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
     write_new(
         &p.receipt_directory,
         "result.json",
-        &json!({"schema":"jetstreamer-private-v1616-ram-snapshot-result-v1","invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"elapsed_millis":started.elapsed().as_millis(),"child_exit_code":status.code(),"child_success":status.success(),"trip":trip,"resources_before":resources_before,"resources_after":resources_after.as_ref().ok(),"resource_capture_error":resources_after.as_ref().err().map(|e|format!("{e:#}")),"exact_ignored_test_count":2,"entry_replay":false,"full_peak_qualified":false,"runtime_promotion_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":receipt_schema("result"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"elapsed_millis":started.elapsed().as_millis(),"child_exit_code":status.code(),"child_success":status.success(),"trip":trip,"resources_before":resources_before,"resources_after":resources_after.as_ref().ok(),"resource_capture_error":resources_after.as_ref().err().map(|e|format!("{e:#}")),"exact_ignored_test_count":2,"entry_replay":false,"full_peak_qualified":false,"runtime_promotion_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     resources_after?;
     ensure!(
@@ -952,7 +1018,7 @@ fn main() {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "epoch225-shrink-snapshot-tests")))]
 mod tests {
     use super::*;
 

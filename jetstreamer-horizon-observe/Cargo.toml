@@ -13,6 +13,8 @@ keywords.workspace = true
 # Diagnostic CPU allocation released by the exact reserve-stopped epoch225.
 # Cannot run while that producer or another fleet claim is live.
 ram-snapshot-eight-core-stopped225 = []
+# Isolated selected-profile v1.6.25 snapshot tests; no entry replay or publication.
+epoch225-shrink-snapshot-tests = []
 # Dormant private same-input RAM comparison; no ordinary replay or publication.
 epoch203-ram-resource-supervisor = []
 epoch203-ram-shrink-candidate = ["epoch203-ram-resource-supervisor"]
