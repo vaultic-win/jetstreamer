@@ -1900,7 +1900,7 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if native_restore_140(claim) {
+            let phase = if native_restore_140(claim) || native144::namespace(claim) {
                 "native-restore-only"
             } else if claim
                 .unit
