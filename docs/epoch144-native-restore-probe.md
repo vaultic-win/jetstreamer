@@ -27,6 +27,18 @@ it or changing its original0700ancestor permissions. Use `PrivateMounts=yes`,
 read-only home/system/input bindings and no worker DAC capability. Such a bind
 does not remove the executing client's own mandatory private hash-bound copy.
 
+`jetstreamer-r2 admit-native144 SPEC --spec-sha256 HEX --self-sha256 HEX`
+is the separate resource gate. Its strict spec retains the existing observer,
+full fleet/plan,protection,floor and metadata bindings,and the `downloader`
+field names the exact native probe. A mandatory `native`object binds `inputs`,
+`capability` and `resource_proposal`. It requires the exact completed input
+capability and unchanged frozen source identity;recomputes the audited century
+floor;reauthenticates every older live owner through two complete censuses;and
+requires40GiBabove all retained claims,192GiBavailable memory including reserve,
+and the existing host VMA ceiling. Snapshot/clock modes cannot borrow this spec.
+The receipt binds the input-policy hash and explicitly leaves guard/fleet launch
+gates required. No `OnSuccess` trigger or worker is started by admission.
+
 The source tuple comes mechanically from the hash-bound original144segment
 manifest and independent focused-prefix pass. The separately verified snapshot
 and typed serialized-clock receipt must match that tuple before initialization.
