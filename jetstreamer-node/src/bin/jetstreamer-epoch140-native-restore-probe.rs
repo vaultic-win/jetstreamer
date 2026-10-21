@@ -2,7 +2,7 @@
 //! This is not a prefix manifest, continuation, archive producer or publication gate.
 #[allow(dead_code)]
 #[path = "../historical.rs"]
-mod historical;
+pub(crate) mod historical;
 
 use {
     anyhow::{Context, Result, ensure},
@@ -65,7 +65,7 @@ struct Plan {
     minimum_free_bytes: u64,
 }
 
-fn digest(s: &str) -> Result<[u8; 32]> {
+pub(crate) fn digest(s: &str) -> Result<[u8; 32]> {
     ensure!(
         s.len() == 64
             && s.bytes()
@@ -78,7 +78,7 @@ fn digest(s: &str) -> Result<[u8; 32]> {
     }
     Ok(result)
 }
-fn bound_bytes(path: &Path, expected: &str, maximum: u64) -> Result<Vec<u8>> {
+pub(crate) fn bound_bytes(path: &Path, expected: &str, maximum: u64) -> Result<Vec<u8>> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
         "noncanonical evidence path"
@@ -189,7 +189,7 @@ fn expectation(journal: &Value, clock: &Value) -> Result<SegmentCheckpointSummar
     })
 }
 
-fn compare(
+pub(crate) fn compare(
     expected: &SegmentCheckpointSummary,
     actual: &HistoricalCheckpoint,
     initialized_cursor: u64,
@@ -215,7 +215,7 @@ fn compare(
     Ok(())
 }
 
-fn private_directory(path: &Path) -> Result<()> {
+pub(crate) fn private_directory(path: &Path) -> Result<()> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
         "noncanonical private directory"
@@ -227,7 +227,7 @@ fn private_directory(path: &Path) -> Result<()> {
     );
     Ok(())
 }
-fn available(path: &Path) -> Result<(u64, u64)> {
+pub(crate) fn available(path: &Path) -> Result<(u64, u64)> {
     let path = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())?;
     let mut s = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     ensure!(
@@ -242,7 +242,7 @@ fn available(path: &Path) -> Result<(u64, u64)> {
         s.f_favail,
     ))
 }
-fn write_receipt(path: &Path, value: &Value) -> Result<()> {
+pub(crate) fn write_receipt(path: &Path, value: &Value) -> Result<()> {
     let parent = path.parent().context("missing receipt parent")?;
     private_directory(parent)?;
     let mut bytes = serde_json::to_vec_pretty(value)?;
