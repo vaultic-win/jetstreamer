@@ -210,3 +210,19 @@ commit is acknowledged, with fresh resource evidence. Upload need not wait for
 every epoch's verifier: each matching full/plugin pair unlocks only its own
 epoch. Keep automatic local retirement disabled until the separate boundary and
 owner-release gates are available.
+
+`jetstreamer-epoch220-import-estimate PLAN PLAN_SHA256 SELF_SHA256` supplies the
+live import phase's definite status estimates from the same fresh observer and
+accepted fleet ledger. It pins the exact importer invocation, three successful
+private eight-thread reader receipts and prior downstream model. The scheduling
+prior is the longest measured private reread plus an explicit 25% allowance for
+the normal importer's semantic/context collection, trusted-219 anchor and hash
+work. This overhead is a stated estimate assumption, not measured current speed.
+Subtract only the current import phase's authoritative D-Bus elapsed time, then
+add each epoch's retained full/plugin/upload/readback/sidecar allowance. All three
+claims must be live and consistent. Wrong owner, stale sample, expired import
+prior, missing evidence and overflow fail closed rather than clamping to zero.
+Seal read-only copies of the pinned reader receipts for this helper; do not
+change the original receipts' modes. Its output is private estimate evidence,
+not an R2 publisher or archive gate. Use the separately gated pipeline publisher
+with the original replay's authenticated clock and a sample after phase start.
