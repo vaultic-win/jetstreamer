@@ -161,7 +161,7 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         "foreign198 promotion"
     );
     let invocation =
-        authenticate_named_service("horizon-public198-promote-partial2018-20261021-v1.service")?;
+        authenticate_named_service("horizon-public198-promote-partial2018-20261021-v2.service")?;
     import_proof()?;
     absent(&p.cycle_directory.join("completion.json"))?;
     ensure!(
@@ -224,14 +224,20 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         claims.push(json!({"epoch":198,"phase":phase,"unit":name,"invocation_id":iid,"expected_exec_start":std::str::from_utf8(&output.stdout)?.trim_end(),"evidence":[{"path":IMPORT,"sha256":"4a35dc14d303fd3c39e256d02346f9f675f67033103046e0c1b182d7c5db3ad7"},origin]}));
     }
     let root = p.cycle_directory.join("public198-promotion-v1");
-    absent(&root)?;
-    fs::create_dir(&root)?;
-    fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
-    File::open(&p.cycle_directory)?.sync_all()?;
-    let promotion = write_new(
-        &root.join("intent.json"),
-        &json!({"schema":"jetstreamer-public198-partial-promotion-v1","origin":origin,"claims":claims,"observer":observer,"failed_plan":pb,"new_resource_samples":0,"archive_mutations":false,"replay_launch_authorized":false,"stale198_status_repair_required":true}),
-    )?;
+    let intended = json!({"schema":"jetstreamer-public198-partial-promotion-v1","origin":origin,"claims":claims,"observer":observer,"failed_plan":pb,"new_resource_samples":0,"archive_mutations":false,"replay_launch_authorized":false,"stale198_status_repair_required":true});
+    let promotion = if root.exists() {
+        let existing = file(root.join("intent.json"), false)?;
+        ensure!(
+            bound_json(&existing, false)? == intended,
+            "198 promotion resume intent differs"
+        );
+        existing
+    } else {
+        fs::create_dir(&root)?;
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
+        File::open(&p.cycle_directory)?.sync_all()?;
+        write_new(&root.join("intent.json"), &intended)?
+    };
     let profile = Profile {
         promotion: promotion.clone(),
         origin,
@@ -242,11 +248,20 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         true,
     )?;
     fold(&mut fleet, &profile)?;
-    let package = delivery198::seal_values(
-        p,
-        "public198-promotion-v1/template",
-        &[("fleet-plan.json", fleet)],
-    )?;
+    let package = if root.join("template/sealed").exists() {
+        let package = root.join("template/sealed");
+        ensure!(
+            bound_json(&file(package.join("fleet-plan.json"), true)?, true)? == fleet,
+            "198 promotion sealed template changed"
+        );
+        package
+    } else {
+        delivery198::seal_values(
+            p,
+            "public198-promotion-v1/template",
+            &[("fleet-plan.json", fleet)],
+        )?
+    };
     let fleet_plan = file(package.join("fleet-plan.json"), true)?;
     let tool = Bound {
         path: READER.into(),

@@ -922,7 +922,11 @@ pub(super) fn seal_values(p: &Plan, name: &str, values: &[(&str, Value)]) -> Res
             p.tools.sealer.sha256.clone(),
         ],
         false,
-        &p.cycle_directory.join(format!("child-{name}-sealer.json")),
+        &if name.contains('/') {
+            stage.join("child-sealer.json")
+        } else {
+            p.cycle_directory.join(format!("child-{name}-sealer.json"))
+        },
     )?;
     Ok(destination)
 }
