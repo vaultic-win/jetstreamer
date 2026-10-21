@@ -101,3 +101,30 @@ descriptor/path identity. It rechecks the collector receipt afterward. The JSON
 keeps this hash event explicitly separate from the earlier internal reread: it
 does not turn that receipt into a hash-bound normal full-verification receipt or
 authorize provenance admission, import, sidecars, publication or R2 mutation.
+
+## Exact retained-content provenance registry
+
+The audited archive recovery registry identifies only the following independently
+reread and separately hashed original files, not every output of their parent:
+
+| Epoch | Bytes | SHA-256 | Bootstrap kind / slot |
+| --- | ---: | --- | --- |
+| 220 | 135699623364 | `24518ca4b55e7e4c8612269fa9903836e83869daefb5c0c1efb76b91eebb56c7` | SnapshotArchive / 95039516 |
+| 221 | 137055363091 | `d772aa744d5b7973653326d4a3f04f1d4060776acff40df2b2cff57ccc1b26cd` | CarriedBank / 95471999 |
+| 222 | 133175903649 | `b3dc28fd206de162b47f90638348d414e7708c9f2b36873de10e4d62142f7a3a` | CarriedBank / 95903999 |
+
+The exact provenance includes original generation `9d8e964b8adbfb6c417590fddc87fc915d056a4e`,
+candidate v1.6.20 runtime, mainnet genesis, observed transaction metadata,
+canonical full-epoch range, original bootstrap accounts hash, and worker digest
+`f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c`.
+Worker resolution must name the original immutable
+`horizon-contiguous-220-223-current-9d8e964-v1` deployment, not a different path
+with similar bytes. The primary tuples and captured encoded provenance supply
+the snapshot/carried-bank distinction; changing that kind must reject.
+
+This registry is consulted only alongside the existing stable full semantic/PoH
+reread, exact file length/hash and worker checks. It does not promote the parent
+generation into generic compatibility or replace checkpoint/root gates. It does
+not authorize failed-prefix import, manufacture missing manifests, or permit
+publication of partial 223. Existing snapshot-only entries remain snapshot-only;
+the mutation tests exercise each entry's opposite bootstrap kind.
