@@ -5,15 +5,14 @@ use super::*;
 const UNIT: &str = "jetstreamer-root-sweep-e198-readerfix-20261019-v1-r2-e198-198-lane-a-1.service";
 const INVOCATION: &str = "e5612ef00a5b4fcab04df2c13a6b35b0";
 const CONTROLLER: &str = "d64e3dccb7a54c8a9dc8160a5ca89e39";
-const WRITER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-delivery-proof-candidate-20261021-v1/jetstreamer-r2";
-const WRITER_SHA: &str = "c62906f10cbe64c8ea4ff7f4b773c73dd583ef4d3706f64642776d72439609fe";
+const WRITER: &str = prefix144::DELIVERY_WRITER;
+const WRITER_SHA: &str = prefix144::DELIVERY_WRITER_SHA;
 const PUBLISHER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-pipeline-receipts-candidate-20261021-v1/jetstreamer-r2";
 const PUBLISHER_SHA: &str = "c047afcd2d7a282bf394e29625aea1da7ca136d4aca7461e7ae2aaf54234e4c4";
 const STATUS: &str = "/home/sol/.jetstreamer-private/r2-status-receipts";
 const ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/private/destination-bfa4ff91eb1803c6a2d6240f014cc6508bb805e8bddd619ff64ab57cde1c5ed9/work/root-cohort-198-198/run-1165606-1792451794035486537/archives/epoch-198.jet";
-pub(super) const HANDOFF_WRITER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-controller-handoff-candidate-20261021-v1/jetstreamer-r2";
-pub(super) const HANDOFF_WRITER_SHA: &str =
-    "baa8472a68fee592eb1f124f8758d7a47b730ce40609bfdc0db3021034ec2194";
+pub(super) const HANDOFF_WRITER: &str = WRITER;
+pub(super) const HANDOFF_WRITER_SHA: &str = WRITER_SHA;
 const IMPORT_CONTROLLER: &str = "jetstreamer-epoch198-readerfix-singleton-20261019-v1-r2.service";
 const SOURCE_ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/output/epoch-198.jet";
 
@@ -440,7 +439,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
     if p.prefix144_audit.is_some() || p.completed144_prefix.is_some() {
-        return (prefix144::WRITER, prefix144::WRITER_SHA);
+        return (prefix144::DELIVERY_WRITER, prefix144::DELIVERY_WRITER_SHA);
     }
     if p.prefix157_audit.is_some() {
         return (prefix157::WRITER, prefix157::WRITER_SHA);
