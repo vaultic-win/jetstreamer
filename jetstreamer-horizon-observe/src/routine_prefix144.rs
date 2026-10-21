@@ -1,9 +1,9 @@
 //! Fold one exact private144 reread event without changing replay/ETA semantics.
 use super::*;
 pub(super) const WRITER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch144-prefix-fleet-reader-20261021-v2/jetstreamer-r2";
+    "/usr/local/lib/jetstreamer/horizon-epoch144-prefix-fleet-reader-20261021-v3/jetstreamer-r2";
 pub(super) const WRITER_SHA: &str =
-    "72023469c013a641fe5ebfb8da5da6aa1cec957e816a1f06e9b288dd3871c395";
+    "54e7d485b67964595a2326c7f7c3213b65a1bd4228cfe2b7cfaf6aec5f82dea7";
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -23,7 +23,7 @@ struct Spec {
     r2_mutations: bool,
 }
 pub(super) fn writer(p: &Plan) -> bool {
-    p.prefix144_audit.is_some()
+    (p.prefix144_audit.is_some() || p.completed144_prefix.is_some())
         && p.tools.r2.path == Path::new(WRITER)
         && p.tools.r2.sha256 == WRITER_SHA
 }

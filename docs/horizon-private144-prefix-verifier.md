@@ -6,7 +6,7 @@ Preserve its109GBarchive and original manifest;do not copy/rename the archive,
 create a canonical sidecar,run the production plugin or claim a production ETA.
 
 `prepare-private-prefix144 SPEC --spec-sha256 HEX --self-sha256 HEX MODE`
-is a root,sealed,self-authenticating Rust preparer with four modes:
+is a root,sealed,self-authenticating Rust preparer with these modes:
 
 - `--admit`:bind the fresh v2 observer and accepted full fleet,recheck every
   old producer,keep the4,740,696,923,590byte protection and128GiBRAMreserve,
@@ -22,6 +22,14 @@ is a root,sealed,self-authenticating Rust preparer with four modes:
   The qualified routine helper uses `--prepare-next-prefix144` to consume the
   genuine predecessor and event head,preserve157history and all ETA formulae,
   clear the one-time admission marker and prepare a distinct namespace.
+- `--completed-proof`:after the actual verifier has exited successfully,bind
+  its exact retained invocation/command,immutable launch and independent pass
+  receipt. Write completed private history and a separately sealable routine
+  spec without refreshing admission,rehashing the archive or observing resources.
+  The qualified helper's `--prepare-next-completed144` consumes the genuine
+  completed normal predecessor,adds only terminal diagnostic history and repair
+  evidence,and keeps every producer,integer,ETA formula and admission marker
+  unchanged. It does not require or invent an accepted live-admission event.
 
 Qualify/seal both writer and helper before launch;cancel obsolete pending
 observer/metadata schedules before migration and check all canonical outputs
@@ -52,3 +60,9 @@ it or retry the expired17:38admission spec. The genuine18:08normal cycle passed
 with the unchanged older reader/helper. Reconcile the successful audit as
 completed private history in a separately qualified normal-plan transition;
 do not fabricate a successful event ledger or a new live admission.
+
+The completed-history fold is idempotent and separately names its namespace.
+It refuses a conflicting144claim,live-admission marker,newer repair action or
+production eligibility. The old action is hash-bound at preparation;unrelated
+gates and all old diagnostics remain intact. No existing producer or verifier is
+restarted,and completed verification is never relabeled full epoch readiness.
