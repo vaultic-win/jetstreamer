@@ -55,3 +55,15 @@ Source availability, a release build and sealing are preparation only; require
 real selected-profile snapshot tests, exact-package capability, fresh admission,
 fleet registration and the guard's first real sandbox fire before leaving a
 new run unattended.
+
+When reproducible build-cache space is needed, the read-only Rust
+`jetstreamer-horizon-dev-cache-check` also accepts the distinct plan schema
+`jetstreamer-horizon-selected225-dev-cache-check-plan-v1`. It selects only
+`.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug`, never its release
+sibling, snapshot inputs, deployed binaries or replay state. It retains the
+clean source revision, root Cargo.lock digest and tracked v1.6.25 Cargo.lock
+digest, rejects tracked cache members and archive/snapshot/sidecar files, and
+requires empty live-process and staged-unit reference scans. Its receipt does
+not authorize deletion: preserve a separate reviewed retirement intent, rerun
+the check immediately before Cargo's dev-profile cleanup, and retain completion
+evidence. Neither this cache profile nor cleanup relaxes any admission bound.
