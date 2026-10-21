@@ -17,6 +17,186 @@ const DESTINATION: &str =
     "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/output";
 const ROOT_HASH: &str = "BQvC7FcQTSguJkWHeLnpkVSFv32ZKRqUbgHKxVF97o3x";
 const SNAPSHOT: &str = "/usr/local/lib/jetstreamer/deploy-epoch198-readerfix-singleton-20261019-v1/snapshot-85535493-G6CxfFLUbddvo4Ew56wjEF6kasB1CVPB4rFqkFkTDwVW.tar.zst";
+const OBSERVATION_ROOT: &str = "/var/lib/jetstreamer/horizon-epoch198-delivery-observations-v1";
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ObservationPlan {
+    schema: String,
+    output: PathBuf,
+    not_before_unix_seconds: u64,
+    expires_unix_seconds: u64,
+    expected_unit: String,
+    expected_invocation_id: String,
+    expected_exec_start_sha256: String,
+    replay_launch_authorized: bool,
+    publication_authorized: bool,
+    r2_mutations: bool,
+}
+
+fn validate_observation_plan(p: &ObservationPlan) -> Result<()> {
+    ensure!(
+        p.schema == "jetstreamer-epoch198-delivery-observation-plan-v1"
+            && p.expected_unit == UNIT
+            && p.expected_invocation_id == INVOCATION
+            && is_lower_hex(&p.expected_exec_start_sha256, 64)
+            && !p.replay_launch_authorized
+            && !p.publication_authorized
+            && !p.r2_mutations,
+        "unqualified198 observation plan"
+    );
+    ensure!(
+        p.not_before_unix_seconds > 0
+            && p.expires_unix_seconds
+                .checked_sub(p.not_before_unix_seconds)
+                .is_some_and(|seconds| seconds > 0 && seconds <= 1800),
+        "198 observation window exceeds one control interval"
+    );
+    let name = p
+        .output
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("198 proof filename missing")?;
+    ensure!(
+        p.output.parent() == Some(Path::new(OBSERVATION_ROOT))
+            && name.starts_with("proof-")
+            && name.ends_with(".json")
+            && name.len() <= 96
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
+        "198 observation output outside exact private namespace"
+    );
+    Ok(())
+}
+
+fn write_observation(path: &Path, value: &Value) -> Result<()> {
+    resource_audit::private_directory(path.parent().context("198 proof parent missing")?)?;
+    let mut bytes = serde_json::to_vec_pretty(value)?;
+    bytes.push(b'\n');
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(path)?;
+    file.write_all(&bytes)?;
+    file.sync_all()?;
+    File::open(path.parent().unwrap())?.sync_all()?;
+    Ok(())
+}
+
+/// Event-driven evidence only. No resource scans, cadence consumption, R2,
+/// production status update or service mutation. Check-only claims no terminal.
+pub(super) fn run_observation() -> Result<()> {
+    let args: Vec<_> = env::args().collect();
+    ensure!(
+        (args.len() == 7 || (args.len() == 8 && args[7] == "--check-only"))
+            && args[3] == "--plan-sha256"
+            && args[5] == "--self-sha256",
+        "usage: jetstreamer-r2 observe-delivery-198 PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only]"
+    );
+    ensure!(
+        unsafe { libc::geteuid() } == 0,
+        "198 delivery observation requires root"
+    );
+    ensure!(
+        is_lower_hex(&args[4], 64) && is_lower_hex(&args[6], 64),
+        "invalid198 observation digest"
+    );
+    let executable = fs::read_link("/proc/self/exe")?;
+    let mut running = File::open("/proc/self/exe")?;
+    let running_meta = running.metadata()?;
+    ensure!(
+        running_meta.is_file()
+            && running_meta.uid() == 0
+            && running_meta.nlink() == 1
+            && running_meta.mode() & 0o222 == 0
+            && running_meta.len() <= 128 << 20
+            && regular_identity(&executable)? == identity(&running_meta),
+        "198 observer is not an immutable running executable"
+    );
+    let mut bytes = Vec::new();
+    (&mut running)
+        .take((128 << 20) + 1)
+        .read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() as u64 == running_meta.len()
+            && identity(&running.metadata()?) == identity(&running_meta)
+            && regular_identity(&executable)? == identity(&running_meta)
+            && hex_lower(&Sha256::digest(&bytes)) == args[6],
+        "198 running executable digest/identity differs"
+    );
+    let path = Path::new(&args[2]);
+    let meta = fs::symlink_metadata(path)?;
+    ensure!(
+        path.is_absolute()
+            && path.canonicalize()? == path
+            && meta.uid() == 0
+            && meta.is_file()
+            && meta.nlink() == 1
+            && meta.mode() & 0o222 == 0,
+        "unsafe198 observation plan"
+    );
+    let bytes = read_stable_bounded(path, 1 << 20, "198 observation plan")?;
+    ensure!(
+        hex_lower(&Sha256::digest(&bytes)) == args[4],
+        "198 observation plan digest differs"
+    );
+    let plan: ObservationPlan = serde_json::from_slice(&bytes)?;
+    validate_observation_plan(&plan)?;
+    resource_audit::private_directory(Path::new(OBSERVATION_ROOT))?;
+    ensure!(
+        !plan.output.try_exists()?,
+        "198 proof output already exists"
+    );
+    let before = fleet::unit(UNIT)?;
+    validate_owner(&before)?;
+    ensure!(
+        before["ExecStart"].as_str().is_some_and(
+            |s| hex_lower(&Sha256::digest(s.as_bytes())) == plan.expected_exec_start_sha256
+        ),
+        "198 planned exact command differs"
+    );
+    immutable_inputs()?;
+    if args.len() == 8 {
+        ensure!(
+            fleet::unit(UNIT)? == before,
+            "198 owner changed during preflight"
+        );
+        println!(
+            "198 delivery preflight passed; no terminal events, resource sample, proof write, R2 access or mutation"
+        );
+        return Ok(());
+    }
+    let sampled = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        (plan.not_before_unix_seconds..=plan.expires_unix_seconds).contains(&sampled),
+        "198 observation outside bound event window"
+    );
+    let proof = observe(&before, sampled)?;
+    let after = fleet::unit(UNIT)?;
+    ensure!(
+        after == before,
+        "198 finalization owner changed during evidence capture"
+    );
+    let completed = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        completed <= plan.expires_unix_seconds,
+        "198 observation exceeded event window"
+    );
+    write_observation(
+        &plan.output,
+        &serde_json::json!({
+        "schema":"jetstreamer-epoch198-delivery-observation-v1","plan":{"path":path,"sha256":args[4]},
+        "observer_sha256":args[6],"observed_unix_seconds":sampled,"completed_unix_seconds":completed,
+        "epoch":198,"phase":"producer-finalization","before":before,"after":after,"terminal_evidence":proof,
+        "resource_sample_taken":false,"cadence_consumed":false,"status_publication_authorized":false,
+        "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
+    )?;
+    println!("{}", plan.output.display());
+    Ok(())
+}
 
 fn validate_owner(current: &Value) -> Result<()> {
     for (key, value) in [
@@ -222,6 +402,90 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
 mod tests {
     use super::*;
     use serde_json::json;
+    fn plan() -> ObservationPlan {
+        ObservationPlan {
+            schema: "jetstreamer-epoch198-delivery-observation-plan-v1".into(),
+            output: Path::new(OBSERVATION_ROOT).join("proof-fixture.json"),
+            not_before_unix_seconds: 100,
+            expires_unix_seconds: 1900,
+            expected_unit: UNIT.into(),
+            expected_invocation_id: INVOCATION.into(),
+            expected_exec_start_sha256: "a".repeat(64),
+            replay_launch_authorized: false,
+            publication_authorized: false,
+            r2_mutations: false,
+        }
+    }
+    #[test]
+    fn observation_plan_is_bounded_exact_private_and_non_authorizing() {
+        validate_observation_plan(&plan()).unwrap();
+        for (start, end) in [(0, 100), (100, 100), (101, 100), (100, 1901), (u64::MAX, 0)] {
+            let mut p = plan();
+            p.not_before_unix_seconds = start;
+            p.expires_unix_seconds = end;
+            assert!(validate_observation_plan(&p).is_err());
+        }
+        for output in [
+            "/tmp/proof-fixture.json",
+            "/var/lib/jetstreamer/horizon-epoch198-delivery-observations-v1/sub/proof-fixture.json",
+            "/var/lib/jetstreamer/horizon-epoch198-delivery-observations-v1/epoch-198.jet",
+        ] {
+            let mut p = plan();
+            p.output = output.into();
+            assert!(validate_observation_plan(&p).is_err());
+        }
+        let mut p = plan();
+        p.publication_authorized = true;
+        assert!(validate_observation_plan(&p).is_err());
+        let mut p = plan();
+        p.r2_mutations = true;
+        assert!(validate_observation_plan(&p).is_err());
+        let mut p = plan();
+        p.replay_launch_authorized = true;
+        assert!(validate_observation_plan(&p).is_err());
+        let mut p = plan();
+        p.expected_invocation_id = "b".repeat(32);
+        assert!(validate_observation_plan(&p).is_err());
+    }
+
+    #[test]
+    fn observation_plan_rejects_unknown_or_missing_authority_fields() {
+        let value = json!({"schema":"jetstreamer-epoch198-delivery-observation-plan-v1",
+            "output":Path::new(OBSERVATION_ROOT).join("proof-fixture.json"),
+            "not_before_unix_seconds":100,"expires_unix_seconds":1900,
+            "expected_unit":UNIT,"expected_invocation_id":INVOCATION,"expected_exec_start_sha256":"a".repeat(64),
+            "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
+        let _: ObservationPlan = serde_json::from_value(value.clone()).unwrap();
+        for key in [
+            "publication_authorized",
+            "replay_launch_authorized",
+            "r2_mutations",
+        ] {
+            let mut bad = value.clone();
+            bad.as_object_mut().unwrap().remove(key);
+            assert!(serde_json::from_value::<ObservationPlan>(bad).is_err());
+        }
+        let mut bad = value;
+        bad["archive_upload_authorized"] = json!(true);
+        assert!(serde_json::from_value::<ObservationPlan>(bad).is_err());
+    }
+
+    #[test]
+    #[ignore = "requires sealed root fixture test; writes only private disposable /tmp fixture"]
+    fn proof_writer_is_private_durable_and_never_clobbers() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("fixture.json");
+        let value = json!({"fixture_only":true,"u64":u64::MAX,"publication_authorized":false});
+        write_observation(&path, &value).unwrap();
+        let before = fs::read(&path).unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+        assert_eq!(
+            serde_json::from_slice::<Value>(&before).unwrap()["u64"],
+            u64::MAX
+        );
+        assert!(write_observation(&path, &json!({"replacement":true})).is_err());
+        assert_eq!(fs::read(path).unwrap(), before);
+    }
     fn owner() -> Value {
         json!({"Id":UNIT,"LoadState":"loaded","ActiveState":"active","SubState":"running",
             "InvocationID":INVOCATION,"MainPID":PID,"NRestarts":"0",
