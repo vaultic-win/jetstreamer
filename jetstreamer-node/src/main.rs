@@ -11939,6 +11939,26 @@ async fn run_geyser_replay(
                         Some(historical_replay::HistoricalCheckpointSummary::try_from(
                             &checkpoint,
                         )?)
+                    } else if let Some(manifest) = bootstrap_handoff_manifest.as_ref() {
+                        // Snapshot account hashes alone do not establish a
+                        // native cross-runtime restart. Freeze this very worker
+                        // before its first entry and compare the complete
+                        // predecessor tuple without equating local cursors.
+                        let checkpoint =
+                            client.freeze_checkpoint(slot).map_err(|e| e.to_string())?;
+                        let actual =
+                            historical_replay::HistoricalCheckpointSummary::try_from(&checkpoint)?;
+                        validate_native_runtime_handoff_checkpoint(
+                            &manifest.terminal,
+                            &segment_checkpoint_summary(&actual),
+                        )?;
+                        info!(
+                            "verified native runtime handoff checkpoint at slot {slot} before accepting replay entries; bootstrap writes=0"
+                        );
+                        // Keep the normal snapshot constructor: it independently
+                        // consumes the bootstrap commitment and preserves every
+                        // future canonical root. This is never carried state.
+                        None
                     } else {
                         None
                     };
@@ -14430,6 +14450,28 @@ fn handoff_snapshot_matches_predecessor(
     manifest.source_runtime == predecessor.manifest.runtime
         && manifest.source_worker_executable_sha256 == predecessor.manifest.worker_executable_sha256
         && manifest.terminal == predecessor.manifest.terminal
+}
+
+fn validate_native_runtime_handoff_checkpoint(
+    expected: &SegmentCheckpointSummary,
+    actual: &SegmentCheckpointSummary,
+) -> Result<(), String> {
+    if expected.slot != actual.slot
+        || expected.bank_hash != actual.bank_hash
+        || expected.accounts_hash != actual.accounts_hash
+        || expected.last_blockhash != actual.last_blockhash
+        || expected.capitalization != actual.capitalization
+        || expected.transaction_count != actual.transaction_count
+        || expected.tick_height != actual.tick_height
+        || !expected.slot_complete
+        || !actual.slot_complete
+        || actual.write_count != 0
+    {
+        return Err("native runtime handoff checkpoint differs from the verified predecessor, is incomplete, or emitted bootstrap writes".into());
+    }
+    // Snapshot restoration creates an independent validator-local write cursor.
+    // Do not force its equality with the predecessor's cursor or drained writes.
+    Ok(())
 }
 
 fn validate_canonical_handoff_snapshot_with_expectation(
@@ -24196,6 +24238,49 @@ mod early_snapshot_tests {
                 .unwrap_err()
                 .contains("runtime segment 0")
         );
+    }
+
+    #[test]
+    fn native157_handoff_checks_full_consensus_tuple_but_not_local_cursor() {
+        let expected = SegmentCheckpointSummary {
+            slot: 68140176,
+            bank_hash: "649PT4VUyy3e9uHjsBKrJedSk8VW5YLhmMrXGdazPWb1".into(),
+            accounts_hash: "3TNSv7MXDB4GxhyRyHJcuBNeXaumYC8W8vu5WrwCXhhZ".into(),
+            last_blockhash: "FofVk6WLPqkgXGPQuTryL7wgxs9emSiTiPoczRb1NagB".into(),
+            capitalization: 490287533276355794,
+            transaction_count: 13041831150,
+            tick_height: 4360971328,
+            slot_complete: true,
+            write_count: 43,
+            next_write_version: 45611752025,
+        };
+        let mut actual = expected.clone();
+        actual.write_count = 0;
+        actual.next_write_version = u64::MAX;
+        validate_native_runtime_handoff_checkpoint(&expected, &actual).unwrap();
+        for field in [
+            "slot",
+            "bank_hash",
+            "accounts_hash",
+            "last_blockhash",
+            "capitalization",
+            "transaction_count",
+            "tick_height",
+            "slot_complete",
+            "write_count",
+        ] {
+            let mut bad = serde_json::to_value(&actual).unwrap();
+            bad[field] = match field {
+                "bank_hash" | "accounts_hash" | "last_blockhash" => serde_json::json!("wrong"),
+                "slot_complete" => serde_json::json!(false),
+                _ => serde_json::json!(1),
+            };
+            let bad = serde_json::from_value(bad).unwrap();
+            assert!(
+                validate_native_runtime_handoff_checkpoint(&expected, &bad).is_err(),
+                "accepted {field}"
+            );
+        }
     }
 
     #[test]
