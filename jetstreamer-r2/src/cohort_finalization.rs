@@ -31,6 +31,9 @@ pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
     Ok(216..=219)
 }
 pub(super) fn handoff_scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == super::cohort198_handoff::CONTROLLER {
+        return Ok(198..=198);
+    }
     ensure!(unit == CONTROLLER, "unqualified controller import handoff");
     Ok(216..=219)
 }
@@ -93,6 +96,9 @@ fn handoff_state(controller: &Value, producer: &Value, state: &Value) -> Result<
 }
 
 pub(super) fn observe_handoff(controller: &Value, sampled_seconds: u64) -> Result<Value> {
+    if controller["Id"] == super::cohort198_handoff::CONTROLLER {
+        return super::cohort198_handoff::observe(controller, sampled_seconds);
+    }
     let producer = super::fleet::unit(UNIT)?;
     let state_meta = fs::symlink_metadata(STATE)?;
     ensure!(

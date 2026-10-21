@@ -50,10 +50,16 @@ impl Binding {
         }
         if self.claim_phase == "controller-import-handoff" {
             ensure!(
-                self.unit == super::cohort_finalization::CONTROLLER
+                super::cohort198_handoff::binding_matches(
+                    &self.unit,
+                    &self.invocation_id,
+                    &self.origin_unit,
+                    &self.origin_invocation_id
+                ) || (self.unit == super::cohort_finalization::CONTROLLER
                     && self.invocation_id == super::cohort_finalization::CONTROLLER_INVOCATION
                     && self.origin_unit == super::cohort_finalization::UNIT
-                    && self.origin_invocation_id == super::cohort_finalization::PRODUCER_INVOCATION,
+                    && self.origin_invocation_id
+                        == super::cohort_finalization::PRODUCER_INVOCATION),
                 "controller handoff must retain the exact original producer clock"
             );
         }
@@ -697,6 +703,22 @@ mod tests {
         let mut wrong = r.clone();
         wrong["_PID"] = json!("123");
         assert!(start_millis(&[wrong], unit, inv).is_err());
+    }
+    #[test]
+    fn exact198controller_handoff_keeps_original_clock_and_scope() {
+        let mut b = binding();
+        b.unit = super::super::cohort198_handoff::CONTROLLER.into();
+        b.invocation_id = super::super::cohort198_handoff::CONTROLLER_INVOCATION.into();
+        b.origin_unit = super::super::cohort198_finalization::UNIT.into();
+        b.origin_invocation_id = "e5612ef00a5b4fcab04df2c13a6b35b0".into();
+        b.claim_phase = "controller-import-handoff".into();
+        b.validate(198, "publication").unwrap();
+        assert!(b.validate(199, "publication").is_err());
+        assert!(b.validate(216, "publication").is_err());
+        assert!(b.validate(198, "replay").is_err());
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        assert!(b.validate(198, "publication").is_err());
     }
     #[test]
     fn controller_handoff_keeps_original_producer_not_controller_start_clock() {

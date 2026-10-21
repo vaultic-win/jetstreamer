@@ -35,10 +35,21 @@ struct ObservationPlan {
 }
 
 fn validate_observation_plan(p: &ObservationPlan) -> Result<()> {
+    let handoff = p.schema == "jetstreamer-epoch198-controller-handoff-observation-plan-v1";
     ensure!(
-        p.schema == "jetstreamer-epoch198-delivery-observation-plan-v1"
-            && p.expected_unit == UNIT
-            && p.expected_invocation_id == INVOCATION
+        (handoff || p.schema == "jetstreamer-epoch198-delivery-observation-plan-v1")
+            && p.expected_unit
+                == if handoff {
+                    cohort198_handoff::CONTROLLER
+                } else {
+                    UNIT
+                }
+            && p.expected_invocation_id
+                == if handoff {
+                    cohort198_handoff::CONTROLLER_INVOCATION
+                } else {
+                    INVOCATION
+                }
             && is_lower_hex(&p.expected_exec_start_sha256, 64)
             && !p.replay_launch_authorized
             && !p.publication_authorized
@@ -94,7 +105,7 @@ pub(super) fn run_observation() -> Result<()> {
         (args.len() == 7 || (args.len() == 8 && args[7] == "--check-only"))
             && args[3] == "--plan-sha256"
             && args[5] == "--self-sha256",
-        "usage: jetstreamer-r2 observe-delivery-198 PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only]"
+        "usage: jetstreamer-r2 observe-delivery-198|observe-handoff-198 PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only]"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -145,13 +156,27 @@ pub(super) fn run_observation() -> Result<()> {
     );
     let plan: ObservationPlan = serde_json::from_slice(&bytes)?;
     validate_observation_plan(&plan)?;
+    let handoff = args[1] == "observe-handoff-198";
+    ensure!(
+        handoff == (plan.schema == "jetstreamer-epoch198-controller-handoff-observation-plan-v1"),
+        "198 observation command and plan phase differ"
+    );
     resource_audit::private_directory(Path::new(OBSERVATION_ROOT))?;
     ensure!(
         !plan.output.try_exists()?,
         "198 proof output already exists"
     );
-    let before = fleet::unit(UNIT)?;
-    validate_owner(&before)?;
+    let owner = if handoff {
+        cohort198_handoff::CONTROLLER
+    } else {
+        UNIT
+    };
+    let before = fleet::unit(owner)?;
+    if handoff {
+        cohort198_handoff::preflight(&before)?;
+    } else {
+        validate_owner(&before)?;
+    }
     ensure!(
         before["ExecStart"].as_str().is_some_and(
             |s| hex_lower(&Sha256::digest(s.as_bytes())) == plan.expected_exec_start_sha256
@@ -161,7 +186,7 @@ pub(super) fn run_observation() -> Result<()> {
     immutable_inputs()?;
     if args.len() == 8 {
         ensure!(
-            fleet::unit(UNIT)? == before,
+            fleet::unit(owner)? == before,
             "198 owner changed during preflight"
         );
         println!(
@@ -174,8 +199,12 @@ pub(super) fn run_observation() -> Result<()> {
         (plan.not_before_unix_seconds..=plan.expires_unix_seconds).contains(&sampled),
         "198 observation outside bound event window"
     );
-    let proof = observe(&before, sampled)?;
-    let after = fleet::unit(UNIT)?;
+    let proof = if handoff {
+        cohort198_handoff::observe(&before, sampled)?
+    } else {
+        observe(&before, sampled)?
+    };
+    let after = fleet::unit(owner)?;
     ensure!(
         after == before,
         "198 finalization owner changed during evidence capture"
@@ -188,9 +217,9 @@ pub(super) fn run_observation() -> Result<()> {
     write_observation(
         &plan.output,
         &serde_json::json!({
-        "schema":"jetstreamer-epoch198-delivery-observation-v1","plan":{"path":path,"sha256":args[4]},
+        "schema":if handoff { "jetstreamer-epoch198-controller-handoff-observation-v1" } else { "jetstreamer-epoch198-delivery-observation-v1" },"plan":{"path":path,"sha256":args[4]},
         "observer_sha256":args[6],"observed_unix_seconds":sampled,"completed_unix_seconds":completed,
-        "epoch":198,"phase":"producer-finalization","before":before,"after":after,"terminal_evidence":proof,
+        "epoch":198,"phase":if handoff { "controller-import-handoff" } else { "producer-finalization" },"before":before,"after":after,"terminal_evidence":proof,
         "resource_sample_taken":false,"cadence_consumed":false,"status_publication_authorized":false,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     )?;
@@ -222,7 +251,7 @@ fn validate_owner(current: &Value) -> Result<()> {
     Ok(())
 }
 
-fn immutable_inputs() -> Result<()> {
+pub(super) fn immutable_inputs() -> Result<()> {
     for (path, expected, limit) in [
         (NODE, NODE_SHA, 128 << 20),
         (MANIFEST, MANIFEST_SHA, 1 << 20),
@@ -382,6 +411,10 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
 pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
     validate_owner(current)?;
     immutable_inputs()?;
+    journal_events(sampled_seconds)
+}
+
+pub(super) fn journal_events(sampled_seconds: u64) -> Result<Value> {
     let output = Command::new("/usr/bin/journalctl").args([
         &format!("_SYSTEMD_INVOCATION_ID={INVOCATION}"),&format!("_SYSTEMD_UNIT={UNIT}"),
         "-g","historical checkpoint slot=85967282 |historical checkpoint slot=85967999 |snapshot verification complete|horizon archive complete:",
@@ -415,6 +448,17 @@ mod tests {
             publication_authorized: false,
             r2_mutations: false,
         }
+    }
+    #[test]
+    fn handoff_plan_cannot_borrow_the_producer_plan_or_clock() {
+        let mut p = plan();
+        p.schema = "jetstreamer-epoch198-controller-handoff-observation-plan-v1".into();
+        assert!(validate_observation_plan(&p).is_err());
+        p.expected_unit = cohort198_handoff::CONTROLLER.into();
+        p.expected_invocation_id = cohort198_handoff::CONTROLLER_INVOCATION.into();
+        validate_observation_plan(&p).unwrap();
+        p.schema = "jetstreamer-epoch198-delivery-observation-plan-v1".into();
+        assert!(validate_observation_plan(&p).is_err());
     }
     #[test]
     fn observation_plan_is_bounded_exact_private_and_non_authorizing() {

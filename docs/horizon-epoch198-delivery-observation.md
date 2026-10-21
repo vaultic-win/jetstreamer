@@ -81,3 +81,46 @@ requires CAP_FOWNER. The exact original producer invocation, directory owner,
 canonical path and owner-only mode remain mandatory. Other profiles retain the
 default root-owned directory policy; this is not an arbitrary foreign-directory
 override.
+
+## Exact pending-controller observation
+
+`observe-handoff-198` is a separate read-only command using
+`jetstreamer-epoch198-controller-handoff-observation-plan-v1` and the same strict
+plan fields,1800second bound, private output namespace, running-binary self-hash
+and no-clobber fsync protocol. It emits
+`jetstreamer-epoch198-controller-handoff-observation-v1` with phase
+`controller-import-handoff`; it cannot be invoked with a producer-finalization
+plan or vice versa. Check-only validates the exact active controller, immutable
+parent/manifest/controller script and sealed controller-recovery receipt. It
+reads no terminal events and claims no actual handoff.
+
+Actual observation accepts only controller02c5ac25/PID2939002 and the complete
+deployed argv digest, script62592209 and state configuration0929b892. The original
+e5612ef0producer must remain loaded with authoritative clean terminal success,
+exit0, zero restarts and no process. A collected/missing unit is not clean
+terminal proof for this profile. The state must retain exactly lane-a/198/attempt1
+and the original producer PID/start identity, phase `producer` or `staged`, no
+failure/source recovery, null import owner and no importer. The four unique
+canonical original-producer events remain mandatory.
+
+The exact closed source archive must now be the singly linked regular UID1001
+`lane-a/output/epoch-198.jet`, match the actual archive-close byte count, and
+retain its file identity/mtime/ctime through capture. Controller, producer and
+root-private state must also remain unchanged. A move, active importer, new
+owner, failure or state race rejects the proof rather than inventing an active
+stage. Source-body checks here are operational metadata evidence, not independent
+full/plugin qualification or publication. The output retains the original
+producer events, source archive identity, complete state, immutable digests and
+sealed recovery binding; its original start clock is never reset to controller
+restart time.
+
+The fleet and pipeline binding validators have a separate exact198 handoff
+allowlist;216–219 remain unchanged. All source and synthetic tests still need
+immutable sealing, actual-host preflight, and coordinated model/observer/fleet/
+status integration before any live phase adoption. In particular, the earlier
+routine198 helper that accepts only active producer-finalization proofs must
+not consume this new proof until its distinct schema, owner and archive-path
+transition are separately qualified. The actual serialized importer remains a
+different dynamically authenticated `local-publication` phase, never a guessed
+future invocation. No new replay, importer launch, archive mutation, sidecar,
+upload, status deletion or R2 mutation is authorized by this observation command.
