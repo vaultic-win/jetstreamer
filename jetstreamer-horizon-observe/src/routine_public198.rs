@@ -29,6 +29,96 @@ pub(super) fn native(p: &Plan) -> bool {
         .is_some_and(|p| !p.native_verification.is_empty())
 }
 
+pub(super) fn refreshed(p: &Plan) -> bool {
+    p.public198_delivery.as_ref().is_some_and(|p| {
+        p.native_verification.iter().any(|b| {
+            b.path
+                .starts_with("/var/lib/jetstreamer/horizon-epoch198-manager-refresh-20261021-v1")
+        })
+    })
+}
+
+fn manager_command_matches(old: &str, new: &str) -> bool {
+    old.split_once(" ; ignore_errors=")
+        .zip(new.split_once(" ; ignore_errors="))
+        .is_some_and(|(a, b)| a.0 == b.0 && a.1.starts_with("no ;") && b.1.starts_with("no ;"))
+}
+pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
+    ensure!(
+        is_101(p)?
+            && p.sample_target_utc == "2026-10-21T21:28:00Z"
+            && spec.sha256 == "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346",
+        "foreign native198 manager refresh"
+    );
+    authenticate_named_service("horizon-native198-manager-refresh-20261021-v1.service")?;
+    let mut copy: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    enable_native(&mut copy, spec)?;
+    let profile = copy
+        .public198_delivery
+        .as_ref()
+        .context("native198 refresh profile")?;
+    let root = Path::new("/var/lib/jetstreamer/horizon-epoch198-manager-refresh-20261021-v1");
+    absent(root)?;
+    fs::create_dir(root)?;
+    fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
+    File::open(root.parent().context("refresh parent")?)?.sync_all()?;
+    let mut launches = Vec::new();
+    for original in &profile.native_verification {
+        let mut value = bound_json(original, false)?;
+        let unit = value["claim"]["unit"].as_str().context("refresh unit")?;
+        let output = Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,ExecStart,Type,Result,ControlGroup"]).output()?;
+        ensure!(
+            output.status.success() && output.stdout.len() < 16384,
+            "cannot refresh native198 manager properties"
+        );
+        let mut fresh = serde_json::Map::new();
+        for line in std::str::from_utf8(&output.stdout)?.lines() {
+            let (key, value) = line.split_once('=').context("refresh property")?;
+            ensure!(
+                fresh.insert(key.into(), json!(value)).is_none(),
+                "duplicate refresh property"
+            );
+        }
+        let fresh = Value::Object(fresh);
+        for key in [
+            "Id",
+            "LoadState",
+            "ActiveState",
+            "SubState",
+            "MainPID",
+            "NRestarts",
+            "InvocationID",
+            "Type",
+            "Result",
+            "ControlGroup",
+        ] {
+            ensure!(
+                fresh[key] == value["unit"][key],
+                "native198 {key} changed, not command metadata refresh"
+            );
+        }
+        let old_command = value["unit"]["ExecStart"]
+            .as_str()
+            .context("old refresh command")?;
+        let new_command = fresh["ExecStart"].as_str().context("new refresh command")?;
+        ensure!(
+            manager_command_matches(old_command, new_command),
+            "native198 executable arguments or ignore-errors changed"
+        );
+        value["unit"] = fresh.clone();
+        value["claim"]["expected_exec_start"] = fresh["ExecStart"].clone();
+        value["manager_refresh"] = json!({"previous_launch":original,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"same_invocation_and_pid":true,"executable_arguments_unchanged":true,"new_launch":false});
+        let phase = value["claim"]["phase"].as_str().context("refresh phase")?;
+        launches.push(write_new(&root.join(format!("{phase}.json")), &value)?);
+    }
+    let bound = write_new(
+        &root.join("spec.json"),
+        &json!({"schema":"horizon-native198-verification-handoff-v1","launches":launches,"publication_authorized":false,"r2_mutations":false}),
+    )?;
+    println!("{} {}", bound.path.display(), bound.sha256);
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NativeSpec {
@@ -666,6 +756,25 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn manager_refresh_allows_only_reset_runtime_annotations_not_command_changes() {
+        let before = "{ path=/immutable/runner ; argv[]=/immutable/runner /plan sha selfsha ; ignore_errors=no ; start_time=[Wed] ; pid=123 ; code=(null) ; status=0/0 }";
+        let after = "{ path=/immutable/runner ; argv[]=/immutable/runner /plan sha selfsha ; ignore_errors=no ; start_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+        assert!(manager_command_matches(before, after));
+        assert!(!manager_command_matches(
+            before,
+            &after.replace("/plan sha", "/other sha")
+        ));
+        assert!(!manager_command_matches(
+            before,
+            &after.replace("selfsha", "changed")
+        ));
+        assert!(!manager_command_matches(
+            before,
+            &after.replace("ignore_errors=no", "ignore_errors=yes")
+        ));
+        assert!(!manager_command_matches(before, "unstructured"));
+    }
     #[test]
     fn phase_event_cannot_retarget_a_new_sample_plan_writer_or_repeated_handoff() {
         let sample = "2026-10-21T21:28:00Z";

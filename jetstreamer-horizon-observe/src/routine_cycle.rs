@@ -188,7 +188,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if public198::native(p) {
+    if public198::refreshed(p) {
+        "native198-refresh-completed144-v1"
+    } else if public198::native(p) {
         "native198-completed144-v1"
     } else if p.public198_delivery.is_some() {
         "public198-completed144-v1"
@@ -1520,6 +1522,7 @@ fn main() {
                         "--prepare-next-delivery198"
                             | "--prepare-next-native198"
                             | "--publish-native198-event"
+                            | "--refresh-native198-launches"
                             | "--prepare-next-prefix157"
                             | "--prepare-next-prefix144"
                             | "--prepare-next-completed144"
@@ -1554,6 +1557,18 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--refresh-native198-launches")
+        {
+            return public198::refresh_managers(
+                &plan,
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+            );
+        }
         if args
             .get(6)
             .is_some_and(|arg| arg == "--publish-native198-event")
