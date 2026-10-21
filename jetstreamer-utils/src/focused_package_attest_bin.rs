@@ -31,6 +31,12 @@ const MAX_PLAN_BYTES: u64 = 1024 * 1024;
 const MAX_JSON_BYTES: u64 = 4 * 1024 * 1024;
 const LEGACY_MINIMUM_FREE_BYTES: u64 = 4_700_000_000_000;
 const EPOCH_SLOTS: u64 = 432_000;
+const SHRINK225_PACKAGE: &str =
+    "/var/lib/jetstreamer/horizon-focused-225-complete-span-v1-6-25-shrink-budget-v1";
+
+fn shrink225_package(plan: &Plan) -> bool {
+    plan.epoch == 225 && plan.package == Path::new(SHRINK225_PACKAGE)
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -689,7 +695,11 @@ fn validate_text_receipt(bytes: &[u8], expected_archive_sha256: &str) -> Result<
     Ok(())
 }
 
-fn validate_receipt_path(path: &Path, epoch: u64) -> Result<()> {
+fn validate_receipt_path(path: &Path, epoch: u64, shrink225: bool) -> Result<()> {
+    ensure!(
+        !shrink225 || epoch == 225,
+        "foreign capped-shrink receipt profile"
+    );
     ensure!(
         path.parent()
             == Some(Path::new(
@@ -703,6 +713,8 @@ fn validate_receipt_path(path: &Path, epoch: u64) -> Result<()> {
         .context("invalid receipt name")?;
     let prefix = if epoch == 224 {
         "epoch224-complete-span-v1-6-25-immutable-package-01879c4-".to_string()
+    } else if shrink225 {
+        "epoch225-complete-span-v1-6-25-immutable-package-shrink-budget-".to_string()
     } else if epoch == 225 {
         "epoch225-complete-span-v1-6-25-immutable-package-63a2717-".to_string()
     } else {
@@ -873,7 +885,11 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         }
         _ => unreachable!(),
     }
-    let expected_package = canonical_package_path(plan.epoch);
+    let expected_package = if shrink225_package(plan) {
+        SHRINK225_PACKAGE.to_string()
+    } else {
+        canonical_package_path(plan.epoch)
+    };
     ensure!(
         plan.package.to_str() == Some(&expected_package),
         "non-canonical package path"
@@ -911,7 +927,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         plan.terminal_root_slot - plan.epoch_end_slot == plan.successor_tail_slots,
         "successor tail mismatch"
     );
-    validate_receipt_path(&plan.receipt, plan.epoch)?;
+    validate_receipt_path(&plan.receipt, plan.epoch, shrink225_package(plan))?;
     Ok(())
 }
 
@@ -1100,7 +1116,15 @@ fn validate_deployment_receipt(
     Ok(())
 }
 
-fn validate_epoch225_binaries(epoch: u64, members: &BTreeMap<String, FileIdentity>) -> Result<()> {
+fn validate_epoch225_binaries(
+    epoch: u64,
+    shrink225: bool,
+    members: &BTreeMap<String, FileIdentity>,
+) -> Result<()> {
+    ensure!(
+        !shrink225 || epoch == 225,
+        "foreign capped-shrink binary profile"
+    );
     if epoch != 225 {
         return Ok(());
     }
@@ -1111,7 +1135,11 @@ fn validate_epoch225_binaries(epoch: u64, members: &BTreeMap<String, FileIdentit
         ),
         (
             "jetstreamer-historical-worker-v1-6-25",
-            "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146",
+            if shrink225 {
+                "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd"
+            } else {
+                "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"
+            },
         ),
     ] {
         ensure!(
@@ -1628,7 +1656,7 @@ fn run() -> Result<()> {
     let deployment: DeploymentReceipt =
         read_json(&plan.package.join("deployment-seal-receipt.json"))?;
     validate_deployment_receipt(&plan, &deployment, &members)?;
-    validate_epoch225_binaries(plan.epoch, &members)?;
+    validate_epoch225_binaries(plan.epoch, shrink225_package(&plan), &members)?;
     let capability_evidence = validate_external_capability(&plan, &members)?;
     let manifest: Manifest = read_json(&plan.package.join("deployment-manifest.json"))?;
     validate_manifest(&plan, &manifest, capability_evidence.is_some())?;
@@ -1875,6 +1903,30 @@ mod tests {
     }
 
     #[test]
+    fn shrink225_package_is_separate_and_keeps_all_v3_scope_and_floor_gates() {
+        let mut plan = epoch225_plan();
+        plan.package = SHRINK225_PACKAGE.into();
+        assert!(shrink225_package(&plan));
+        assert!(validate_plan(&plan).is_err()); // Cannot borrow the old receipt.
+        plan.receipt = "/home/ubuntu/.jetstreamer-private/campaign-state/epoch225-complete-span-v1-6-25-immutable-package-shrink-budget-test.json".into();
+        validate_plan(&plan).unwrap();
+        plan.century_floor_evidence = None;
+        assert!(validate_plan(&plan).is_err());
+        plan.century_floor_evidence = Some("/sealed/century-floor.json".into());
+        plan.schema = PLAN_SCHEMA_V1.into();
+        assert!(validate_plan(&plan).is_err());
+        plan.schema = PLAN_SCHEMA_V3.into();
+        plan.terminal_root_slot = 97_631_459;
+        assert!(validate_plan(&plan).is_err());
+        plan.terminal_root_slot = 98_063_464;
+        plan.package = canonical_package_path(225).into();
+        assert!(!shrink225_package(&plan));
+        assert!(validate_plan(&plan).is_err()); // Legacy package cannot borrow new receipt.
+        plan.package = "/var/lib/jetstreamer/horizon-focused-225-other".into();
+        assert!(validate_plan(&plan).is_err());
+    }
+
+    #[test]
     fn epoch225_attestation_pins_complete_span_and_checkpoint_bytes() {
         let mut plan = epoch225_plan();
         validate_plan(&plan).unwrap();
@@ -1954,11 +2006,19 @@ mod tests {
                 identity("7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"),
             ),
         ]);
-        validate_epoch225_binaries(225, &members).unwrap();
+        validate_epoch225_binaries(225, false, &members).unwrap();
+        assert!(validate_epoch225_binaries(225, true, &members).is_err());
+        members
+            .get_mut("jetstreamer-historical-worker-v1-6-25")
+            .unwrap()
+            .sha256 = "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd".into();
+        validate_epoch225_binaries(225, true, &members).unwrap();
+        assert!(validate_epoch225_binaries(225, false, &members).is_err());
         members.get_mut("jetstreamer-node").unwrap().sha256 =
             "3915f57819e5822e7112ee1932dc47caf5e9812605ad56cc309976e4f681f242".into();
-        assert!(validate_epoch225_binaries(225, &members).is_err());
-        assert!(validate_epoch225_binaries(224, &members).is_ok());
+        assert!(validate_epoch225_binaries(225, true, &members).is_err());
+        assert!(validate_epoch225_binaries(224, true, &members).is_err());
+        assert!(validate_epoch225_binaries(224, false, &members).is_ok());
     }
 
     #[test]

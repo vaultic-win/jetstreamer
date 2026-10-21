@@ -693,8 +693,17 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         receipt["schema"] == "jetstreamer-private-epoch203-root-prefix-resource-launch-v1";
     let shrink_root_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-shrink-root-prefix-resource-launch-v1";
-    let natural_root_225 =
-        receipt["schema"] == "jetstreamer-private-epoch225-natural-root-resource-launch-v1";
+    let shrink_natural_root_225 =
+        receipt["schema"] == "jetstreamer-private-epoch225-shrink-natural-root-resource-launch-v1";
+    ensure!(
+        !claim
+            .unit
+            .starts_with("horizon-qualify-225-natural-root-resource-shrink-budget-")
+            || shrink_natural_root_225,
+        "shrink natural-root225 namespace requires its own launch schema"
+    );
+    let natural_root_225 = shrink_natural_root_225
+        || receipt["schema"] == "jetstreamer-private-epoch225-natural-root-resource-launch-v1";
     let private_verify_213 =
         receipt["schema"] == "jetstreamer-private-epoch213-verification-launch-v1";
     let private_verify_225 =
@@ -815,6 +824,17 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["publication_authorized"] == false
     } else if natural_root_225 {
         claim.epoch == 225
+            && (!shrink_natural_root_225
+                || (claim
+                    .unit
+                    .starts_with("horizon-qualify-225-natural-root-resource-shrink-budget-")
+                    && claim
+                        .scratch_path
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|s| {
+                            s.starts_with("qualification-225-v1625-natural-root-shrink-budget-")
+                        })))
             && claim
                 .unit
                 .starts_with("horizon-qualify-225-natural-root-resource-")
@@ -831,7 +851,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["snapshot_sha256"]
                 == "094d3b28c39403580fbac083cdad67cc008b255dd375d611217103750d0f412d"
             && receipt["worker_sha256"]
-                == "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"
+                == if shrink_natural_root_225 {
+                    "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd"
+                } else {
+                    "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"
+                }
             && receipt["node_sha256"]
                 == "945f36fe11824263258ad561dba106e377148b702f2c615522b171c4ba97ed3b"
             && receipt["runtime"] == "solana-v1.6.25"
@@ -2491,6 +2515,44 @@ mod tests {
                 "main_pid":123,"result":"success"}]}
         });
         validate_diagnostic_launch(&receipt, &claim).unwrap();
+        let mut shrink_claim = DiagnosticClaim {
+            epoch: 225,
+            unit: "horizon-qualify-225-natural-root-resource-shrink-budget-test.service".into(),
+            invocation_id: claim.invocation_id.clone(),
+            scratch_path: "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-test".into(),
+            launch_receipt: BoundFile { path: "/sealed/shrink-launch.json".into(), sha256: "b".repeat(64) },
+        };
+        let mut shrink = receipt.clone();
+        shrink["schema"] =
+            json!("jetstreamer-private-epoch225-shrink-natural-root-resource-launch-v1");
+        shrink["worker_sha256"] =
+            json!("2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd");
+        shrink["private_run_root"] = json!(shrink_claim.scratch_path);
+        shrink["evidence"]["units"][0]["unit"] = json!(shrink_claim.unit);
+        validate_diagnostic_launch(&shrink, &shrink_claim).unwrap();
+        assert_eq!(diagnostic_scope(&shrink_claim), 225..=226);
+        for (key, value) in [
+            ("schema", receipt["schema"].clone()),
+            ("worker_sha256", receipt["worker_sha256"].clone()),
+            ("node_sha256", json!("c".repeat(64))),
+            ("terminal_root_slot", json!(97631459)),
+            ("output_slot_count", json!(432000)),
+            ("required_checkpoints", json!([97199617, 98063464])),
+            ("private_verification_tail_slots", json!(0)),
+            ("natural_parent_completion_required", json!(false)),
+            ("runtime_promotion_authorized", json!(true)),
+            ("publication_authorized", json!(true)),
+        ] {
+            let mut bad = shrink.clone();
+            bad[key] = value;
+            assert!(
+                validate_diagnostic_launch(&bad, &shrink_claim).is_err(),
+                "shrink {key}"
+            );
+        }
+        shrink_claim.unit = claim.unit.clone();
+        shrink["evidence"]["units"][0]["unit"] = json!(shrink_claim.unit);
+        assert!(validate_diagnostic_launch(&shrink, &shrink_claim).is_err());
         for (key, value) in [
             (
                 "schema",
