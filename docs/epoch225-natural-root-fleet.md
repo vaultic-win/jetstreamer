@@ -119,3 +119,11 @@ worker `7cd48efc…`. Both require the unchanged full-span parent `945f36fe…`,
 snapshot/checkpoint bytes, complete sealed member census, distinct snapshot inode,
 century floor, and no preclaimed capability or launch authority. The bounded
 parent `3915f578…` remains ineligible for either full-span package.
+
+The no-replay capability probe derives the same exact capped-shrink profile from
+that fixed package path. It requires the new attestation receipt prefix, a fresh
+`qualification-225-v1625-package-capability-shrink-budget-vN` probe root, and
+`epoch225-complete-span-package-capability-shrink-budget-rust-` output receipt.
+It cannot borrow the original worker or the original probe/receipt namespaces.
+The deliberately missing snapshot gate must still follow complete-span CLI and
+runtime selection, with no replay markers, archive or segment manifest created.

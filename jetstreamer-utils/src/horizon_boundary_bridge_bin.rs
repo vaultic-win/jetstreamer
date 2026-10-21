@@ -353,6 +353,13 @@ fn parse_full_receipt(
     Ok((fields[1].to_owned(), fields[2].to_owned()))
 }
 
+fn full_receipt_owner_matches(receipt_uid: u32, artifact_uid: u32) -> bool {
+    // Native independent verifier services keep their receipts root-private.
+    // Root is already the trusted launcher/reader; do not copy or chown a valid
+    // receipt merely to make it look as though the archive owner produced it.
+    receipt_uid == artifact_uid || receipt_uid == 0
+}
+
 fn validate_archive(
     evidence: &ArchiveEvidence,
     epoch: u64,
@@ -395,7 +402,7 @@ fn validate_archive(
     let (receipt_bytes, full_receipt_identity) =
         read_regular(&evidence.full_receipt, MAX_EVIDENCE_BYTES)?;
     ensure!(
-        full_receipt_identity.uid == expected_uid,
+        full_receipt_owner_matches(full_receipt_identity.uid, expected_uid),
         "full receipt owner mismatch"
     );
     ensure!(
@@ -943,6 +950,15 @@ mod tests {
         );
         assert!(parse_sidecar(format!("{digest}  epoch-216.jet\n").as_bytes(), 215).is_err());
         assert!(parse_sidecar(format!("{digest} epoch-215.jet\n").as_bytes(), 215).is_err());
+    }
+
+    #[test]
+    fn root_private_full_receipts_do_not_require_archive_owner_impersonation() {
+        assert!(full_receipt_owner_matches(1000, 1000));
+        assert!(full_receipt_owner_matches(0, 1000));
+        assert!(full_receipt_owner_matches(0, 0));
+        assert!(!full_receipt_owner_matches(1001, 1000));
+        assert!(!full_receipt_owner_matches(1000, 0));
     }
 
     #[test]
