@@ -113,6 +113,7 @@ fn free_bytes() -> Result<u64> {
 
 pub(super) fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
+    let clock_only = args.get(1).is_some_and(|s| s == "admit-clock144");
     ensure!(
         args.len() == 7
             && args[3] == "--spec-sha256"
@@ -144,8 +145,20 @@ pub(super) fn run() -> Result<()> {
     );
     let s: Spec = serde_json::from_value(bound_json(&spec_bound)?)?;
     ensure!(
-        s.schema == "jetstreamer-epoch144-snapshot-admission-spec-v1"
-            && s.output == Path::new(OUTPUT)
+        s.schema
+            == if clock_only {
+                "jetstreamer-epoch144-clock-admission-spec-v1"
+            } else {
+                "jetstreamer-epoch144-snapshot-admission-spec-v1"
+            }
+            && s.output
+                == if clock_only {
+                    Path::new(
+                        "/var/lib/jetstreamer-horizon-epoch144-snapshot-clock-20261021-v1/admission.json",
+                    )
+                } else {
+                    Path::new(OUTPUT)
+                }
             && s.floor.sha256 == FLOOR_SHA
             && s.protection.sha256 == PROTECTION_SHA,
         "snapshot admission scope/protection differs"
@@ -235,7 +248,11 @@ pub(super) fn run() -> Result<()> {
     );
     ensure!(
         s.downloader.path.file_name().and_then(|n| n.to_str())
-            == Some("jetstreamer-epoch144-snapshot-download"),
+            == Some(if clock_only {
+                "jetstreamer-epoch144-snapshot-clock"
+            } else {
+                "jetstreamer-epoch144-snapshot-download"
+            }),
         "wrong downloader"
     );
     let dm = fs::symlink_metadata(&s.downloader.path)?;
@@ -249,7 +266,11 @@ pub(super) fn run() -> Result<()> {
             && hex_lower(&Sha256::digest(fs::read(&s.downloader.path)?)) == s.downloader.sha256,
         "unsafe downloader identity"
     );
-    let future = unit(UNIT)?;
+    let future = unit(if clock_only {
+        "horizon-epoch144-snapshot-clock-20261021-v1.service"
+    } else {
+        UNIT
+    })?;
     ensure!(
         future["ActiveState"] == "inactive" && future["MainPID"] == "0",
         "download already live or failed"
@@ -298,14 +319,14 @@ pub(super) fn run() -> Result<()> {
     private157::immutable_receipt(
         &s.output,
         &json!({
-            "schema":"jetstreamer-epoch144-snapshot-admission-receipt-v1","epoch":144,"admitted":true,
+            "schema":if clock_only { "jetstreamer-epoch144-clock-admission-receipt-v1" } else { "jetstreamer-epoch144-snapshot-admission-receipt-v1" },"epoch":144,"admitted":true,
             "recorded_unix_seconds":now,"invocation_id":invocation,"self_sha256":args[6],
             "spec":private157::binding(&spec_bound),"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),
             "century_floor_bytes":floor_bytes,"protected_existing_floor_bytes":PROTECTED,"candidate_incremental_peak_bytes":SIZE+SLACK,
             "evidence":{"filesystem":"/home/sol","minimum_free_bytes":minimum,"available_bytes":available,
               "files":[private157::binding(&s.downloader),private157::binding(&s.metadata)],"unit_census":after,
               "memory_available_kib":memory_available_kib,"vm_max_map_count":vmas},
-            "new_resource_samples":0,"download_only":true,"replay_launch_authorized":false,"native_restore_authorized":false,
+            "new_resource_samples":0,"download_only":!clock_only,"clock_only":clock_only,"replay_launch_authorized":false,"native_restore_authorized":false,
             "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
         }),
     )?;

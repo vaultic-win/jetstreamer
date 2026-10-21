@@ -1,4 +1,4 @@
-//! Fixed60911751 compressed snapshot census and typed serialized clock observation.
+//! Compile-time exact-input compressed census and typed serialized clock observation.
 //! No extraction, native Bank construction, replay, archive assembly or publication.
 use super::*;
 use serde::Serialize;
@@ -11,11 +11,37 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-const SLOT: u64 = 60_911_751;
-const INPUT: &str = "/home/sol/.jetstreamer-private/epoch140-snapshot-source-20261020-v1/download/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst";
-const INPUT_SIZE: u64 = 2_741_858_751;
-const INPUT_SHA: &str = "47d5911465901975e397c570e06ccf72296db7ecd3b3b1beda710cacd3e683a1";
-const PROTECTED_FREE: u64 = 5_153_080_892_870;
+#[cfg(all(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic"
+))]
+compile_error!("exact snapshot observation profiles are mutually exclusive");
+
+#[cfg(not(feature = "epoch144-snapshot-clock-diagnostic"))]
+mod profile {
+    pub const SLOT: u64 = 60_911_751;
+    pub const INPUT: &str = "/home/sol/.jetstreamer-private/epoch140-snapshot-source-20261020-v1/download/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst";
+    pub const INPUT_SIZE: u64 = 2_741_858_751;
+    pub const INPUT_SHA: &str = "47d5911465901975e397c570e06ccf72296db7ecd3b3b1beda710cacd3e683a1";
+    pub const INPUT_INODE: u64 = 105578537;
+    pub const PROTECTED_FREE: u64 = 5_153_080_892_870;
+    pub const SCHEMA: &str = "jetstreamer-epoch140-serialized-snapshot-clock-v1";
+    pub const GUARD_SCHEMA: &str =
+        "jetstreamer-epoch140-serialized-snapshot-clock-initial-guard-v1";
+}
+#[cfg(feature = "epoch144-snapshot-clock-diagnostic")]
+mod profile {
+    pub const SLOT: u64 = 62_639_490;
+    pub const INPUT: &str = "/home/sol/.jetstreamer-private/epoch144-snapshot-source-20261021-v1/download/snapshot-62639490-59bAQjc2c1VqNWqGoCacp3tnyNyie3EYx4bjttvJhgeT.tar.zst";
+    pub const INPUT_SIZE: u64 = 2_569_233_422;
+    pub const INPUT_SHA: &str = "f170976b2bc3f2d55dd0fbb5a415bfeae8d0903a0ad69334d8aa993b5cab35ae";
+    pub const INPUT_INODE: u64 = 105578509;
+    pub const PROTECTED_FREE: u64 = 4_740_696_923_590;
+    pub const SCHEMA: &str = "jetstreamer-epoch144-serialized-snapshot-clock-v1";
+    pub const GUARD_SCHEMA: &str =
+        "jetstreamer-epoch144-serialized-snapshot-clock-initial-guard-v1";
+}
+use self::profile::*;
 const MAX_SECONDS: u64 = 900;
 const LAYOUT_SHA: &str = "4baee9ce91616985b8872b6f77fc3358cce5ca44ef95a7d337d235598d7148db";
 const LAYOUT_BYTES: &[u8] =
@@ -307,7 +333,7 @@ pub fn run() -> Result<(), String> {
         || before.mode() & 0o222 != 0
         || before.len() != INPUT_SIZE
         || before.dev() != 64512
-        || before.ino() != 105578537
+        || before.ino() != INPUT_INODE
     {
         return Err("frozen exact snapshot identity mismatch".into());
     }
@@ -319,7 +345,7 @@ pub fn run() -> Result<(), String> {
     write_json(
         &initial,
         &serde_json::json!({
-            "schema":"jetstreamer-epoch140-serialized-snapshot-clock-initial-guard-v1",
+            "schema":GUARD_SCHEMA,
             "invocation_id":invocation,"self_sha256":exe_sha,"input":INPUT,
             "input_device":before.dev(),"input_inode":before.ino(),"minimum_free_bytes":floor,
             "available_bytes":initial_available,
@@ -352,7 +378,7 @@ pub fn run() -> Result<(), String> {
     }
     guard.check().map_err(|e| e.to_string())?;
     let receipt = serde_json::json!({
-        "schema":"jetstreamer-epoch140-serialized-snapshot-clock-v1",
+        "schema":SCHEMA,
         "input":INPUT,"input_sha256":INPUT_SHA,"input_bytes":length,
         "input_device":before.dev(),"input_inode":before.ino(),
         "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e|e.to_string())?.as_secs(),
@@ -410,6 +436,28 @@ mod tests {
         bank::Bank,
         snapshot_utils::{add_snapshot, SnapshotVersion},
     };
+
+    #[test]
+    fn exact_profile_preserves_frozen_input_scope() {
+        if cfg!(feature = "epoch144-snapshot-clock-diagnostic") {
+            assert_eq!(SLOT, 62_639_490);
+            assert_eq!(INPUT_SIZE, 2_569_233_422);
+            assert_eq!(INPUT_INODE, 105578509);
+            assert_eq!(
+                INPUT_SHA,
+                "f170976b2bc3f2d55dd0fbb5a415bfeae8d0903a0ad69334d8aa993b5cab35ae"
+            );
+            assert!(INPUT.contains("/epoch144-snapshot-source-20261021-v1/"));
+            assert_eq!(PROTECTED_FREE, 4_740_696_923_590);
+            assert_eq!(SCHEMA, "jetstreamer-epoch144-serialized-snapshot-clock-v1");
+        } else {
+            assert_eq!(SLOT, 60_911_751);
+            assert_eq!(INPUT_SIZE, 2_741_858_751);
+            assert_eq!(INPUT_INODE, 105578537);
+            assert_eq!(PROTECTED_FREE, 5_153_080_892_870);
+            assert_eq!(SCHEMA, "jetstreamer-epoch140-serialized-snapshot-clock-v1");
+        }
+    }
 
     #[test]
     fn complete_digest_vector_and_no_clobber_receipt_failure() {

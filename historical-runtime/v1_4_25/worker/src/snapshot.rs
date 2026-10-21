@@ -19,7 +19,10 @@ use tempfile::{Builder, TempDir};
 const SNAPSHOT_VERSION_1_2: &str = "1.2.0";
 
 // Separate offline binary only. This exposes no new worker protocol or replay route.
-#[cfg(feature = "epoch140-snapshot-clock-diagnostic")]
+#[cfg(any(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic"
+))]
 #[path = "snapshot_clock.rs"]
 pub mod private_clock;
 // The audited boundary snapshots contain 144,901 members at slot 51,407,922

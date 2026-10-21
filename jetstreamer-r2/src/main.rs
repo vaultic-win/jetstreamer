@@ -3165,7 +3165,10 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    if env::args().nth(1).as_deref() == Some("admit-snapshot144") {
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some("admit-snapshot144" | "admit-clock144")
+    ) {
         return fleet::admit_snapshot144();
     }
     if env::args().nth(1).as_deref() == Some("prepare-private-prefix144") {
