@@ -240,7 +240,11 @@ fn event_scope(
             && !already_native
             && sample == "2026-10-21T21:28:00Z"
             && plan_sha == "fdb0c0185f0c73ebe5f4b70cca5e45fb8508afc506e9ec61424c1de5bfea654c"
-            && spec_sha == "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346",
+            && matches!(
+                spec_sha,
+                "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346"
+                    | "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6"
+            ),
         "foreign native198 status event"
     );
     Ok(())
@@ -259,8 +263,13 @@ pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -
         sha(endpoint.as_bytes()) == p.endpoint_sha256 && p.bucket == BUCKET,
         "status event endpoint differs"
     );
-    let invocation =
-        authenticate_named_service("horizon-native198-status-handoff-20261021-v1.service")?;
+    let refreshed =
+        spec.sha256 == "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6";
+    let invocation = authenticate_named_service(if refreshed {
+        "horizon-native198-status-handoff-20261021-v2.service"
+    } else {
+        "horizon-native198-status-handoff-20261021-v1.service"
+    })?;
     let cb = file(p.cycle_directory.join("completion.json"), false)?;
     ensure!(
         cb.sha256 == "8e26cd0f9975f2978a57baff0b1641e96f4c58eae3af45c4b3e43daaf6969fb4",
@@ -284,7 +293,11 @@ pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -
     let mut event: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     enable_native(&mut event, spec)?;
     derive_fleet(&event, &mut fleet)?;
-    event.cycle_directory = p.cycle_directory.join("native198-status-event-v1");
+    event.cycle_directory = p.cycle_directory.join(if refreshed {
+        "native198-status-event-v2"
+    } else {
+        "native198-status-event-v1"
+    });
     absent(&event.cycle_directory)?;
     fs::create_dir(&event.cycle_directory)?;
     fs::set_permissions(&event.cycle_directory, fs::Permissions::from_mode(0o700))?;
@@ -781,6 +794,14 @@ mod tests {
         let plan = "fdb0c0185f0c73ebe5f4b70cca5e45fb8508afc506e9ec61424c1de5bfea654c";
         let spec = "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346";
         event_scope(sample, plan, spec, true, false).unwrap();
+        event_scope(
+            sample,
+            plan,
+            "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6",
+            true,
+            false,
+        )
+        .unwrap();
         assert!(event_scope("2026-10-21T21:58:00Z", plan, spec, true, false).is_err());
         assert!(event_scope(sample, "foreign", spec, true, false).is_err());
         assert!(event_scope(sample, plan, "foreign", true, false).is_err());
