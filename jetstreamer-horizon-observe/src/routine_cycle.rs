@@ -40,6 +40,8 @@ mod controller_recovery;
 #[path = "routine_runtime157.rs"]
 mod runtime157;
 
+#[path = "routine_prefix144.rs"]
+mod prefix144;
 #[path = "routine_prefix157.rs"]
 mod prefix157;
 
@@ -92,6 +94,8 @@ struct Plan {
     runtime_handoff157: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     prefix157_audit: Option<prefix157::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    prefix144_audit: Option<prefix144::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -174,7 +178,11 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if p.prefix157_audit.is_some() && p.epoch198_delivery.is_some() {
+    if p.prefix144_audit.is_some() && p.epoch198_delivery.is_some() {
+        "delivery198-prefix144-v1"
+    } else if p.prefix144_audit.is_some() {
+        "prefix144-v1"
+    } else if p.prefix157_audit.is_some() && p.epoch198_delivery.is_some() {
         "delivery198-prefix157-v1"
     } else if p.prefix157_audit.is_some() {
         "prefix157-v1"
@@ -541,7 +549,8 @@ fn validate_templates(
             && fleet["observer"]["path"].as_str() == p.previous_observer.path.to_str()
             && fleet["observer"]["sha256"] == p.previous_observer.sha256
             && (fleet["admission_transition_guard"].is_null()
-                || prefix157::transition_template(p, fleet)?),
+                || prefix157::transition_template(p, fleet)?
+                || prefix144::transition_template(p, fleet)?),
         "fleet template scope or transition mismatch"
     );
     ensure!(
@@ -577,6 +586,7 @@ fn validate_templates(
         epochs.remove(&157);
     }
     prefix157::validate(p)?;
+    prefix144::validate(p)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -993,6 +1003,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     delivery198::derive_fleet(p, &mut fleet)?;
     runtime157::derive_fleet(p, &mut fleet)?;
     prefix157::derive_fleet(p, &mut fleet)?;
+    prefix144::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1201,6 +1212,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     delivery198::derive_fleet(p, &mut fleet.clone())?;
     runtime157::derive_fleet(p, &mut fleet.clone())?;
     prefix157::derive_fleet(p, &mut fleet.clone())?;
+    prefix144::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1476,7 +1488,9 @@ fn main() {
                 || (args.len() == 10
                     && matches!(
                         args[6].as_str(),
-                        "--prepare-next-delivery198" | "--prepare-next-prefix157"
+                        "--prepare-next-delivery198"
+                            | "--prepare-next-prefix157"
+                            | "--prepare-next-prefix144"
                     )
                     && args[8] == "--handoff-sha256")
                 || (args.len() == 7
@@ -1514,6 +1528,7 @@ fn main() {
                 || arg == "--prepare-package-recovery"
                 || arg == "--prepare-runtime157-pause"
                 || arg == "--prepare-next-prefix157"
+                || arg == "--prepare-next-prefix144"
         }) {
             let spec = if args.len() == 10 {
                 Some(Bound {

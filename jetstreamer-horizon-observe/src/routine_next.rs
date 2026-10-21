@@ -246,7 +246,10 @@ pub(super) fn prepare(
     mode: &str,
     handoff_spec: Option<&Bound>,
 ) -> Result<()> {
-    let prefix_spec = if mode == "--prepare-next-prefix157" {
+    let prefix_spec = if matches!(
+        mode,
+        "--prepare-next-prefix157" | "--prepare-next-prefix144"
+    ) {
         handoff_spec
     } else {
         None
@@ -327,7 +330,11 @@ pub(super) fn prepare(
             !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,
             "prefix157 migration must be separate"
         );
-        prefix157::enable(&mut next, spec)?;
+        if mode == "--prepare-next-prefix144" {
+            prefix144::enable(&mut next, spec)?;
+        } else {
+            prefix157::enable(&mut next, spec)?;
+        }
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
         let current_template = bound_json(&next.fleet_template, true)?;
         let current_fleet = bound_json(&next.previous_fleet, false)?;

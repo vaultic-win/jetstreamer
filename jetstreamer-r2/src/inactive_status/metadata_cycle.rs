@@ -8,7 +8,9 @@ fn same_census(
     completion: &Value,
 ) -> Result<()> {
     ensure!(
-        name.starts_with("horizon-routine-cycle-101-200-") && name.ends_with("-v2.service"),
+        name.starts_with("horizon-routine-cycle-101-200-")
+            && (name.ends_with("-v2.service")
+                || name == "horizon-routine-cycle-101-200-20261021T173800Z-prefix157-v1.service"),
         "foreign metadata cycle namespace"
     );
     let before = &recorded[name];
@@ -64,17 +66,28 @@ pub(super) fn validate(
         .as_ref()
         .context("fleet changed; reconcile before cleanup")?;
     let c = bound_json(b)?;
+    let pinned157 = plan.epoch == 157
+        && plan.fleet.path
+            == Path::new(
+                "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261021T163800Z.json",
+            )
+        && b.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T163800Z-v2/completion.json",
+            )
+        && b.sha256 == "b1f3f3fc8b6e4e84ae5804d0c09110d78bf5e0a7c9693b7d6cdf249cfd146d86";
+    let pinned144 = plan.epoch == 144
+        && plan.fleet.path
+            == Path::new(
+                "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261021T173800Z.json",
+            )
+        && b.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T173800Z-prefix157-v1/completion.json",
+            )
+        && b.sha256 == "e5e208fc27ed7207fefe1300eaff8adeca7a5ee36187b9a236c42e58a2f5d8fb";
     ensure!(
-        plan.epoch == 157
-            && plan.fleet.path
-                == Path::new(
-                    "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261021T163800Z.json"
-                )
-            && b.path
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T163800Z-v2/completion.json"
-                )
-            && b.sha256 == "b1f3f3fc8b6e4e84ae5804d0c09110d78bf5e0a7c9693b7d6cdf249cfd146d86"
+        (pinned157 || pinned144)
             && c["schema"] == "jetstreamer-horizon-routine-cycle-completion-v1"
             && c["fleet"]["path"].as_str() == plan.fleet.path.to_str()
             && c["fleet"]["sha256"] == plan.fleet.sha256
@@ -159,6 +172,31 @@ mod tests {
                 "accepted{key}"
             );
         }
+        let mut bad = current;
+        bad.get_mut("producer.service").unwrap()["InvocationID"] = json!("f".repeat(32));
+        assert!(same_census(&recorded, &bad, name, &completion).is_err());
+    }
+    #[test]
+    fn exact_prefix157_cycle_may_normalize_only_its_own_terminal_row() {
+        let name = "horizon-routine-cycle-101-200-20261021T173800Z-prefix157-v1.service";
+        let before = json!({"Id":name,"InvocationID":"a".repeat(32),"Type":"oneshot","NRestarts":"0","ActiveState":"activating","SubState":"start","MainPID":"123","ExecStart":"sealed metadata command ; ignore_errors=no ; stop_time=[n/a]"});
+        let mut after = before.clone();
+        for (key, value) in [
+            ("ActiveState", "active"),
+            ("SubState", "exited"),
+            ("MainPID", "0"),
+            ("Result", "success"),
+            ("ExecMainStatus", "0"),
+        ] {
+            after[key] = json!(value);
+        }
+        let recorded = json!({name:before,"producer.service":{"InvocationID":"b".repeat(32)}});
+        let current: BTreeMap<String, Value> = serde_json::from_value(
+            json!({name:after,"producer.service":{"InvocationID":"b".repeat(32)}}),
+        )
+        .unwrap();
+        let completion = json!({"invocation_id":"a".repeat(32)});
+        same_census(&recorded, &current, name, &completion).unwrap();
         let mut bad = current;
         bad.get_mut("producer.service").unwrap()["InvocationID"] = json!("f".repeat(32));
         assert!(same_census(&recorded, &bad, name, &completion).is_err());

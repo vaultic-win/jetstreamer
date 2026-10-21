@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod prefix144;
 mod private144;
 mod private157;
 mod ram_auxiliary;
@@ -14,6 +15,9 @@ mod shrink_root203;
 
 pub(super) fn prepare_private_prefix157() -> Result<()> {
     private157::prepare()
+}
+pub(super) fn prepare_private_prefix144() -> Result<()> {
+    prefix144::prepare()
 }
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -437,6 +441,9 @@ fn validate_same_sample_admission(
     if private157::namespace(claim) {
         return private157::admission(previous, plan, claim, guard, guard_plan, now);
     }
+    if prefix144::namespace(claim) {
+        return prefix144::admission(previous, plan, claim, guard, guard_plan, now);
+    }
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
@@ -625,6 +632,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if prefix144::namespace(claim) || receipt["schema"] == prefix144::SCHEMA {
+        return prefix144::launch(receipt, claim);
+    }
     if private157::namespace(claim) || receipt["schema"] == private157::SCHEMA {
         return private157::launch(receipt, claim);
     }
@@ -1817,6 +1827,9 @@ pub(super) async fn run() -> Result<()> {
             if private157::namespace(claim) {
                 private157::live_limits()?;
             }
+            if prefix144::namespace(claim) {
+                prefix144::live_limits()?;
+            }
             ensure!(
                 current["InvocationID"] == claim.invocation_id && current["NRestarts"] == "0",
                 "diagnostic live invocation changed"
@@ -1824,6 +1837,7 @@ pub(super) async fn run() -> Result<()> {
             if private_225_verification(claim)
                 || native_restore_140(claim)
                 || private157::namespace(claim)
+                || prefix144::namespace(claim)
             {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -1863,6 +1877,7 @@ pub(super) async fn run() -> Result<()> {
                 .starts_with("horizon-qualify-213-private-verification-")
                 || private_225_verification(claim)
                 || private157::namespace(claim)
+                || prefix144::namespace(claim)
             {
                 "private-verification"
             } else {

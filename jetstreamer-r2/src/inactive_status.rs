@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 mod metadata_cycle;
 mod missing157;
+mod natural144;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -320,6 +321,10 @@ fn fresh_census(
     if missing157 {
         missing157::validate_current(&current, terminal_fleet, owners)?;
     }
+    let natural144 = natural144::recognized(terminal_fleet);
+    if natural144 {
+        natural144::validate_current(&current, terminal_fleet, owners)?;
+    }
     let reserve = reserve_owner_evidence(terminal_fleet, owners)?;
     if let Some(stop) = &reserve {
         stop.validate(
@@ -332,7 +337,7 @@ fn fresh_census(
         let value = current
             .get(name)
             .context("owner omitted from complete census")?;
-        if !preserved && !missing157 && reserve.is_none() {
+        if !preserved && !missing157 && !natural144 && reserve.is_none() {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
         }
         no_pending_owner_trigger(name, value["LoadState"] == "not-found")?;
@@ -480,7 +485,17 @@ pub(super) async fn run() -> Result<()> {
     no_local_delivery(&plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
-    let history_time = if missing157::recognized(&history) {
+    let history_time = if natural144::recognized(&history) {
+        ensure!(
+            plan.epoch == 144
+                && plan.terminal_fleet.path
+                    == Path::new(
+                        "/usr/local/lib/jetstreamer/horizon-epoch144-terminal-evidence-20261021-v1/terminal.json"
+                    ),
+            "foreign144 terminal evidence"
+        );
+        natural144::time(&history)?
+    } else if missing157::recognized(&history) {
         ensure!(
             plan.epoch == 157
                 && plan.terminal_fleet.path
@@ -548,6 +563,9 @@ pub(super) async fn run() -> Result<()> {
         intent["terminal_manager_journal"] = serde_json::to_value(
             status_inactive::cleared_controller_proof(&owners[0].0, &owners[0].1)?,
         )?;
+    }
+    if natural144::recognized(&history) {
+        intent["terminal_manager_journal"] = serde_json::to_value(natural144::manager_proof()?)?;
     }
     if let Some(binding) = &plan.metadata_completion {
         intent["metadata_completion"] = json!({"path":binding.path,"sha256":binding.sha256});

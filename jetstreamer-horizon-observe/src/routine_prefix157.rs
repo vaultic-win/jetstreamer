@@ -25,8 +25,8 @@ struct Spec {
 }
 pub(super) fn writer(p: &Plan) -> bool {
     p.prefix157_audit.is_some()
-        && p.tools.r2.path == Path::new(WRITER)
-        && p.tools.r2.sha256 == WRITER_SHA
+        && ((p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA)
+            || prefix144::writer(p))
 }
 pub(super) fn validate(p: &Plan) -> Result<()> {
     let Some(profile) = &p.prefix157_audit else {
