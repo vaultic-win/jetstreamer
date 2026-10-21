@@ -70,3 +70,14 @@ absence without reading terminal journal events, enforcing a future event
 window, writing a proof or consuming cadence. Its success explicitly does not
 establish finalization. Keep this as a dormant preparation until the event;
 preflight never authorizes running a finalization claim while replay continues.
+
+For this exact epoch198 origin only, a pipeline status plan may explicitly set
+`receipt_directory_uid: 1001` with
+`receipt_directory: /home/sol/.jetstreamer-private/r2-status-receipts`.
+That preserves the existing shared publication history used by the fleet and
+completion cleanup. The root writer still uses the common private-directory
+write preflight under DAC_OVERRIDE; it never chmods the user's directory or
+requires CAP_FOWNER. The exact original producer invocation, directory owner,
+canonical path and owner-only mode remain mandatory. Other profiles retain the
+default root-owned directory policy; this is not an arbitrary foreign-directory
+override.
