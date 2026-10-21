@@ -28,6 +28,12 @@ mod next_preparation;
 #[path = "routine_terminal.rs"]
 mod terminal_handoff;
 
+#[path = "routine_delivery198.rs"]
+mod delivery198;
+
+#[path = "routine_private144.rs"]
+mod private144;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -69,12 +75,16 @@ struct Plan {
     scope_101_200: Option<Scope101200>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     epoch157_terminal_handoff: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    epoch198_delivery: Option<delivery198::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Scope101200 {
     diagnostic_ranges: Vec<DiagnosticClaim>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    private144_observer: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     additional_tracked_units: Vec<String>,
 }
@@ -131,6 +141,14 @@ fn is_101(p: &Plan) -> Result<bool> {
                     );
                 }
             }
+            if scope.private144_observer {
+                ensure!(
+                    scope.diagnostic_ranges.len() == 1
+                        && scope.diagnostic_ranges[0].expected_producer_invocation_id
+                            == private144::INVOCATION,
+                    "private144 observer requires exact retained diagnostic owner"
+                );
+            }
             Ok(true)
         }
         _ => anyhow::bail!("routine schema/profile mismatch"),
@@ -140,11 +158,19 @@ fn is_101(p: &Plan) -> Result<bool> {
 fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
+fn generation_101(p: &Plan) -> &'static str {
+    if p.epoch198_delivery.is_some() {
+        "delivery198-v1"
+    } else {
+        "v2"
+    }
+}
 fn cycle_unit(p: &Plan) -> Result<String> {
     Ok(if is_101(p)? {
         format!(
-            "horizon-routine-cycle-101-200-{}-v2.service",
-            stamp(&p.sample_target_utc)
+            "horizon-routine-cycle-101-200-{}-{}.service",
+            stamp(&p.sample_target_utc),
+            generation_101(p)
         )
     } else {
         format!(
@@ -519,6 +545,13 @@ fn validate_templates(
             );
         }
     }
+    if p.epoch198_delivery.is_some() {
+        ensure!(
+            host101 && !p.expected_epochs.contains(&198),
+            "foreign198 delivery census"
+        );
+        epochs.remove(&198);
+    }
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -541,8 +574,11 @@ fn validate_templates(
         "estimate output parent differs"
     );
     let expected_cycle = if host101 {
-        Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
-            .join(format!("{}-v2", stamp(&p.sample_target_utc)))
+        Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2").join(format!(
+            "{}-{}",
+            stamp(&p.sample_target_utc),
+            generation_101(p)
+        ))
     } else {
         Path::new("/var/lib/jetstreamer/horizon-routine-cycles-v1")
             .join(format!("{}-v1", stamp(&p.sample_target_utc)))
@@ -610,7 +646,11 @@ fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> 
             == modeled.len()
                 + p.scope_101_200
                     .as_ref()
-                    .map_or(0, |s| s.diagnostic_ranges.len()),
+                    .map_or(0, |s| if s.private144_observer {
+                        0
+                    } else {
+                        s.diagnostic_ranges.len()
+                    }),
         "ordinary claim census changed"
     );
     for m in modeled {
@@ -655,6 +695,9 @@ fn validate_diagnostics(p: &Plan, model: &Value, value: &Value, observed: bool) 
     let Some(scope) = &p.scope_101_200 else {
         return Ok(());
     };
+    if scope.private144_observer {
+        return private144::validate(p, model, value, observed);
+    }
     for d in &scope.diagnostic_ranges {
         ensure!(
             !model["ranges"]
@@ -726,7 +769,11 @@ fn validate_observer_config(p: &Plan, model: &Value, config: &Value) -> Result<(
             == modeled.len()
                 + p.scope_101_200
                     .as_ref()
-                    .map_or(0, |s| s.diagnostic_ranges.len()),
+                    .map_or(0, |s| if s.private144_observer {
+                        0
+                    } else {
+                        s.diagnostic_ranges.len()
+                    }),
         "scheduled observer census changed"
     );
     for m in modeled {
@@ -918,6 +965,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
         }
     }
     apply_known_action_corrections(p, &mut fleet)?;
+    delivery198::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1106,6 +1154,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     let old_observer = bound_json(&p.previous_observer, false)?;
     validate_templates(p, &model, &fleet, &previous, &estimates, &old_observer)?;
     terminal_handoff::preflight(p, &model)?;
+    let model = private144::effective_model(p, &delivery198::effective_model(p, &model)?)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1119,6 +1168,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     // Validate the exact correction evidence during check-only as well; this
     // is an in-memory preview, not a new fleet receipt or resource poll.
     apply_known_action_corrections(p, &mut fleet.clone())?;
+    delivery198::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1327,6 +1377,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
                 sha256: sha(&bytes),
             });
         }
+        let pipeline = delivery198::publish(p, &model, &fleet, &observer)?;
         let parent = p.fleet_output.parent().context("fleet parent missing")?;
         if !parent.exists() {
             private_dir(parent.parent().context("fleet ancestor missing")?)?;
@@ -1363,7 +1414,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":plan_bound,"self_sha256":self_sha,
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
-            "inventory":ledger["inventory"],"replay_launch_authorized":false,"archive_mutations":false,
+            "inventory":ledger["inventory"],"epoch198_delivery":pipeline,"replay_launch_authorized":false,"archive_mutations":false,
             "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
@@ -1390,14 +1441,20 @@ fn main() {
         let args: Vec<_> = env::args().collect();
         ensure!(
             (args.len() == 6
+                || (args.len() == 10
+                    && args[6] == "--prepare-next-delivery198"
+                    && args[8] == "--handoff-sha256")
                 || (args.len() == 7
                     && matches!(
                         args[6].as_str(),
-                        "--check-only" | "--prepare-next" | "--prepare-next-terminal157"
+                        "--check-only"
+                            | "--prepare-next"
+                            | "--prepare-next-terminal157"
+                            | "--prepare-next-private144"
                     )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
-            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157]"
+            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
         );
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -1412,15 +1469,27 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
-        if args
-            .get(6)
-            .is_some_and(|arg| arg == "--prepare-next" || arg == "--prepare-next-terminal157")
-        {
+        if args.get(6).is_some_and(|arg| {
+            arg == "--prepare-next"
+                || arg == "--prepare-next-terminal157"
+                || arg == "--prepare-next-delivery198"
+                || arg == "--prepare-next-private144"
+        }) {
+            let spec = if args.len() == 10 {
+                Some(Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                })
+            } else {
+                None
+            };
             return next_preparation::prepare(
                 &plan,
                 &bound,
                 &args[5],
                 args[6] == "--prepare-next-terminal157",
+                spec.as_ref(),
+                args[6] == "--prepare-next-private144",
             );
         }
         execute(&plan, &bound, &args[5], args.len() == 7)
@@ -1813,6 +1882,7 @@ mod tests {
             fixture();
         p.schema = PLAN_SCHEMA_101.into();
         p.scope_101_200 = Some(Scope101200 {
+            private144_observer: false,
             additional_tracked_units: vec![
                 "horizon-routine101-root-sealer-probe-20261021-v2.service".into(),
             ],

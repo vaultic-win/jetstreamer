@@ -89,19 +89,24 @@ fn derive_next(
             &old_stamp[..8]
         ));
         let prepared_config = Path::new("/var/lib/jetstreamer").join(format!(
-            "horizon-next-observer-101-200-{old_stamp}-v2/observer.json"
+            "horizon-next-observer-101-200-{old_stamp}-{}/observer.json",
+            generation_101(p)
         ));
         ensure!(
             p.observer == Path::new(OBSERVERS_101).join(format!("sample-{old_stamp}.json"))
-                && (p.observer_config.path == legacy_config
+                && ((p.epoch198_delivery.is_none() && p.observer_config.path == legacy_config)
                     || p.observer_config.path == prepared_config),
             "101observer/config is outside its exact manual or prepared namespace"
         );
         (
-            Path::new("/var/lib/jetstreamer")
-                .join(format!("horizon-next-observer-101-200-{next_stamp}-v2")),
-            Path::new("/var/lib/jetstreamer")
-                .join(format!("horizon-routine-plan-101-200-{next_stamp}-v2")),
+            Path::new("/var/lib/jetstreamer").join(format!(
+                "horizon-next-observer-101-200-{next_stamp}-{}",
+                generation_101(p)
+            )),
+            Path::new("/var/lib/jetstreamer").join(format!(
+                "horizon-routine-plan-101-200-{next_stamp}-{}",
+                generation_101(p)
+            )),
             Path::new(OBSERVERS_101).join(format!("sample-{next_stamp}.json")),
         )
     } else {
@@ -164,7 +169,7 @@ fn derive_next(
     next.cycle_unit = cycle_unit(&next)?;
     next.cycle_directory = if host101 {
         Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
-            .join(format!("{next_stamp}-v2"))
+            .join(format!("{next_stamp}-{}", generation_101(&next)))
     } else {
         Path::new("/var/lib/jetstreamer/horizon-routine-cycles-v1").join(format!("{next_stamp}-v1"))
     };
@@ -204,7 +209,7 @@ fn validate_folded_scope(p: &Plan, fleet_plan: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn encoded(value: &Value) -> Result<Vec<u8>> {
+pub(super) fn encoded(value: &Value) -> Result<Vec<u8>> {
     let mut b = serde_json::to_vec_pretty(value)?;
     b.push(b'\n');
     Ok(b)
@@ -239,6 +244,8 @@ pub(super) fn prepare(
     pb: &Bound,
     self_sha: &str,
     enable_terminal157: bool,
+    delivery_spec: Option<&Bound>,
+    enable_private144: bool,
 ) -> Result<()> {
     // No new service/remote observations. Consume only root-private accepted
     // cycle artifacts; the later normal --check-only gate remains mandatory.
@@ -246,7 +253,7 @@ pub(super) fn prepare(
     let bytes = read_checked(&completion_path, LIMIT, 0, false)?;
     let completion: Value = serde_json::from_slice(&bytes)?;
     let config = bound_json(&p.observer_config, true)?;
-    let (mut next, next_config, observer_package, cycle_package) =
+    let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     let model = bound_json(&next.model_template, true)?;
     if enable_terminal157 {
@@ -260,7 +267,9 @@ pub(super) fn prepare(
     let estimates = bound_json(&next.previous_estimates, false)?;
     let observer = bound_json(&next.previous_observer, false)?;
     validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
-    validate_observer_config(&next, &model, &next_config)?;
+    let effective =
+        private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
+    validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     latest_fleet_unchanged(&next, &fleet)?;
     for tool in [&next.tools.sealer, &next.tools.estimator, &next.tools.r2] {
@@ -294,12 +303,37 @@ pub(super) fn prepare(
             "status receipt is not the accepted observation"
         );
     }
+    delivery198::validate_completed(p, &completion)?;
+    if enable_private144 {
+        ensure!(
+            !enable_terminal157 && delivery_spec.is_none(),
+            "separate diagnostic migration required"
+        );
+        private144::enable(&mut next, &mut next_config, &model)?;
+        let effective =
+            private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+    }
+    if let Some(spec) = delivery_spec {
+        ensure!(
+            !enable_terminal157,
+            "cannot combine separate handoff preparations"
+        );
+        delivery198::enable(&mut next, &mut next_config, &model, &completion, spec)?;
+        delivery198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        let effective =
+            private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        tool_ok(&next.tools.r2)?;
+        delivery198::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
     let host101 = is_101(p)?;
     let root = Path::new(if host101 { ROOT_101 } else { ROOT });
     let stage = root.join(format!(
-        "{}-v{}",
+        "{}-{}",
         stamp(&next.sample_target_utc),
-        if host101 { 2 } else { 1 }
+        if host101 { generation_101(&next) } else { "v1" }
     ));
     private_dir(root)?;
     absent(&stage)?;
@@ -385,6 +419,7 @@ mod tests {
         p.schema = PLAN_SCHEMA_101.into();
         p.sample_target_utc = "2026-10-21T08:38:00Z".into();
         p.scope_101_200 = Some(Scope101200 {
+            private144_observer: false,
             diagnostic_ranges: vec![DiagnosticClaim {
                 range: "144".into(),
                 controller_unit: "horizon-qualify-epoch144-loader-focus-20261016-v1.service".into(),
@@ -416,6 +451,24 @@ mod tests {
         config["not_before_utc"] = json!(p.sample_target_utc);
         config["output"] = json!(p.observer);
         (p, pb, c, config)
+    }
+
+    #[test]
+    fn successor_keeps_private144_mode_and_qualified_writer() {
+        let (mut p, pb, c, config) = fixture_101();
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.private144_observer = true;
+        scope.diagnostic_ranges[0].expected_controller_invocation_id =
+            private144::INVOCATION.into();
+        scope.diagnostic_ranges[0].expected_producer_invocation_id = private144::INVOCATION.into();
+        p.tools.r2 = Bound {
+            path: private144::WRITER.into(),
+            sha256: private144::WRITER_SHA.into(),
+        };
+        let (next, _, _, _) = derive_next(&p, &pb, &c, &config).unwrap();
+        assert!(next.scope_101_200.unwrap().private144_observer);
+        assert_eq!(next.tools.r2.path, Path::new(private144::WRITER));
+        assert_eq!(next.tools.r2.sha256, private144::WRITER_SHA);
     }
 
     #[test]
