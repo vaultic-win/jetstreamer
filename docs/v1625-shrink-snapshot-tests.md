@@ -2,11 +2,17 @@
 
 Build `jetstreamer-horizon-ram-snapshot-test` with the opt-in
 `epoch225-shrink-snapshot-tests` feature. The default v1.6.16 profile is unchanged.
-This profile pins the selected epoch225 test executable (`18adc9c5…`), snapshot
+This profile pins the selected epoch225 test executable (`2d878b5a…`), snapshot
 97199617 (`094d3b28…`, 10,177,204,112 bytes), and mainnet genesis (`133f7eae…`).
 It executes exactly the existing v1.6.25 load/verify and initialize/freeze ignored
 tests, sequentially, with a test-only 128-MiB stack and 16 Rayon threads. It never
 replays entries, generates an archive, promotes a runtime or authorizes publication.
+
+The first selected-fixture attempt with test digest `18adc9c5…` failed during
+tar extraction before native checkpoint verification, without memory/OOM/guard
+events. The new test digest adds only nested OS-error reporting and a regression;
+it does not relax extraction, hash or checkpoint checks. Preserve that failed
+attempt and use a separately sealed diagnostic generation to identify the cause.
 
 Use the existing RAM supervisor sandbox described in
 [the v1.6.16 test guide](v1616-ram-snapshot-tests.md): eight CPU cores, 112/128-GiB
