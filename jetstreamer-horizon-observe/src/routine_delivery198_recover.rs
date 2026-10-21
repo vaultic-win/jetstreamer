@@ -145,10 +145,52 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         &recovery.join("intent.json"),
         &json!({"schema":"jetstreamer-epoch198-metadata-recovery-intent-v1","plan":pb,"failure":failure,"failed_child":check,"observer":observer,"tool":tool,"invocation_id":invocation,"self_sha256":self_sha,"new_resource_samples":0,"replay_launch_authorized":false,"archive_mutations":false}),
     )?;
-    let pipeline_plan = file(
+    let old_pipeline_plan = file(
         root.join("delivery198-status/sealed/pipeline-plan.json"),
         true,
     )?;
+    // The old provisional census correctly saw the original metadata service
+    // running. Preserve it, and authenticate the actual failed->recovery
+    // transition in a fresh same-sample read-only fleet (not a resource poll).
+    let mut provisional_plan = bound_json(&fleet_plan, true)?;
+    provisional_plan["output"] = json!(recovery.join("provisional-fleet.json"));
+    let package = delivery198::seal_values(
+        p,
+        "metadata-recovery-v1/fleet",
+        &[("fleet-plan.json", provisional_plan)],
+    )?;
+    let provisional_plan = file(package.join("fleet-plan.json"), true)?;
+    child(
+        &tool,
+        &[
+            "fleet-reconcile".into(),
+            provisional_plan.path.display().to_string(),
+            "--plan-sha256".into(),
+            provisional_plan.sha256.clone(),
+        ],
+        true,
+        &recovery.join("child-provisional-fleet.json"),
+    )?;
+    let provisional = file(recovery.join("provisional-fleet.json"), false)?;
+    let ledger = bound_json(&provisional, false)?;
+    ensure!(
+        ledger["observer_sha256"] == observer.sha256
+            && ledger["sampled_at_utc"] == p.sample_target_utc
+            && ledger["inventory"]["anomalies"] == 0,
+        "198 recovery provisional fleet differs"
+    );
+    let mut pipeline_value = bound_json(&old_pipeline_plan, true)?;
+    pipeline_value["fleet"] = serde_json::to_value(&provisional)?;
+    pipeline_value["binding"]["fleet_path"] = json!(provisional.path);
+    pipeline_value["binding"]["fleet_sha256"] = json!(provisional.sha256);
+    pipeline_value["binding"]["model_path"] =
+        json!(recovery.join("status/sealed/pipeline-plan.json"));
+    let package = delivery198::seal_values(
+        p,
+        "metadata-recovery-v1/status",
+        &[("pipeline-plan.json", pipeline_value)],
+    )?;
+    let pipeline_plan = file(package.join("pipeline-plan.json"), true)?;
     for (name, check) in [("check", true), ("publish", false)] {
         let mut args = vec![
             "status-publish-pipeline".into(),
@@ -172,7 +214,6 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         ),
         false,
     )?;
-    let provisional = file(root.join("delivery198-provisional-fleet.json"), false)?;
     let pipeline = json!({"pipeline_plan":pipeline_plan,"provisional_fleet":provisional,"publication":publication});
     let mut completion = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":pb,"self_sha256":self_sha,"invocation_id":invocation,"sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model,"estimates":estimates,"fleet_plan":fleet_plan,"status_publications":statuses,"epoch198_delivery":pipeline,"recovery_intent":file(recovery.join("intent.json"),false)?,"new_resource_samples":0,"replay_launch_authorized":false,"archive_mutations":false,"sidecar_mutations":false,"deletions":false});
     delivery198::validate_completed(p, &completion)?;

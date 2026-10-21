@@ -897,7 +897,7 @@ pub(super) fn namespaces(
     Ok(())
 }
 
-fn seal_values(p: &Plan, name: &str, values: &[(&str, Value)]) -> Result<PathBuf> {
+pub(super) fn seal_values(p: &Plan, name: &str, values: &[(&str, Value)]) -> Result<PathBuf> {
     let stage = p.cycle_directory.join(name);
     fs::create_dir(&stage)?;
     fs::set_permissions(&stage, fs::Permissions::from_mode(0o700))?;
@@ -1093,12 +1093,32 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         return Ok(());
     }
     let d = &c["epoch198_delivery"];
+    let recovered = !c["recovery_intent"].is_null();
+    if recovered {
+        let intent: Bound = serde_json::from_value(c["recovery_intent"].clone())?;
+        ensure!(
+            intent.path == p.cycle_directory.join("metadata-recovery-v1/intent.json"),
+            "foreign198 recovery intent"
+        );
+        let value = bound_json(&intent, false)?;
+        ensure!(
+            value["schema"] == "jetstreamer-epoch198-metadata-recovery-intent-v1"
+                && value["plan"]["sha256"]
+                    == "5820b69150677bd27c3a2dc18d8d101332c556b3e3078bd37281d409ee7e4014"
+                && value["new_resource_samples"] == 0
+                && value["archive_mutations"] == false,
+            "198 recovery intent differs"
+        );
+    }
     let observer: Bound = serde_json::from_value(c["observer"].clone())?;
     let plan: Bound = serde_json::from_value(d["pipeline_plan"].clone())?;
     ensure!(
         plan.path
-            == p.cycle_directory
-                .join("delivery198-status/sealed/pipeline-plan.json"),
+            == p.cycle_directory.join(if recovered {
+                "metadata-recovery-v1/status/sealed/pipeline-plan.json"
+            } else {
+                "delivery198-status/sealed/pipeline-plan.json"
+            }),
         "foreign198 pipeline plan"
     );
     let value = bound_json(&plan, true)?;
@@ -1118,7 +1138,12 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     validate_publication(p, &observer, &plan, &r)?;
     let fleet: Bound = serde_json::from_value(d["provisional_fleet"].clone())?;
     ensure!(
-        fleet.path == p.cycle_directory.join("delivery198-provisional-fleet.json")
+        fleet.path
+            == p.cycle_directory.join(if recovered {
+                "metadata-recovery-v1/provisional-fleet.json"
+            } else {
+                "delivery198-provisional-fleet.json"
+            })
             && value["fleet"]["sha256"] == fleet.sha256
             && value["fleet"]["path"].as_str() == fleet.path.to_str(),
         "198 provisional fleet binding differs"
