@@ -5,9 +5,9 @@ pub(super) const WRITER: &str =
 pub(super) const WRITER_SHA: &str =
     "54e7d485b67964595a2326c7f7c3213b65a1bd4228cfe2b7cfaf6aec5f82dea7";
 pub(super) const DELIVERY_WRITER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch198-skipped-tail-reader-20261021-v2/jetstreamer-r2";
+    "/usr/local/lib/jetstreamer/horizon-epoch198-skipped-tail-reader-20261021-v3/jetstreamer-r2";
 pub(super) const DELIVERY_WRITER_SHA: &str =
-    "abbbdea627665333438dc4f6e16d7c47ed0fdd1c8d70db40bfd86c5f8cd1d0c4";
+    "992d06b9f4b76bd4beecfd9be9572f780131e0c57e1f5618aebaf9fb362dc398";
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
