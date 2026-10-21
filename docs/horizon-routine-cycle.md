@@ -153,6 +153,18 @@ the new optional field instead of silently ignoring it.
 
 ## Exact epoch198 delivery transition
 
+The October21 observed completion has four skipped terminal slots. Its last
+real Bank is85967995, while the canonical archive still covers through85967999.
+The skipped-tail reader requires the exact invocation-bound decoded boundary
+record (block85968000, parent85967995, coverage85967999), ordered between the
+trusted root and final Bank checkpoint. It preserves four primary phase events
+and records the decoded tail separately; neither a guessed terminal Bank nor a
+shortened archive is accepted. A naturally collected producer additionally
+requires PID1's exact successful-deactivation message and invocation, ordered
+after archive close, plus the unchanged pending controller/state/archive.
+`not-found` alone is never clean completion proof. These are observational
+handoff gates only, not independent archive/plugin or R2 verification.
+
 The optional `epoch198_delivery` profile is distinct from the epoch157 runtime
 terminal adjustment. `--prepare-next-delivery198 SPEC --handoff-sha256 HEX`
 consumes a genuine completed cycle and every old status receipt first, then

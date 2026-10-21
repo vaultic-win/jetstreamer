@@ -86,11 +86,46 @@ pub(super) fn preflight(current: &Value) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn pending_state(state: &Value, producer: &Value) -> Result<()> {
+    pending_state_with_manager(state, producer, None)
+}
+fn manager_terminal(record: &Value) -> Result<()> {
+    ensure!(
+        record["UNIT"] == cohort198_finalization::UNIT
+            && record["INVOCATION_ID"] == PRODUCER_INVOCATION
+            && record["_PID"] == "1"
+            && record["_UID"] == "0"
+            && record["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            && record["MESSAGE"]
+                == format!(
+                    "{}: Deactivated successfully.",
+                    cohort198_finalization::UNIT
+                )
+            && record["__REALTIME_TIMESTAMP"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .is_some_and(|n| n > 0),
+        "198 manager terminal proof differs"
+    );
+    Ok(())
+}
+fn pending_state_with_manager(
+    state: &Value,
+    producer: &Value,
+    manager: Option<&Value>,
+) -> Result<()> {
+    let collected = producer["LoadState"] == "not-found";
+    if collected {
+        manager_terminal(manager.context("198 collected producer needs PID1 proof")?)?;
+    }
     for (key, value) in [
         ("Id", cohort198_finalization::UNIT),
-        ("LoadState", "loaded"),
-        ("InvocationID", PRODUCER_INVOCATION),
+        ("LoadState", if collected { "not-found" } else { "loaded" }),
+        (
+            "InvocationID",
+            if collected { "" } else { PRODUCER_INVOCATION },
+        ),
         ("MainPID", "0"),
         ("NRestarts", "0"),
         ("Result", "success"),
@@ -148,8 +183,52 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
     let producer = fleet::unit(cohort198_finalization::UNIT)?;
     let bytes = state_bytes()?;
     let state: Value = serde_json::from_slice(&bytes)?;
-    pending_state(&state, &producer)?;
+    let manager = if producer["LoadState"] == "not-found" {
+        let output = std::process::Command::new("/usr/bin/journalctl")
+            .args([
+                &format!("UNIT={}", cohort198_finalization::UNIT),
+                &format!("INVOCATION_ID={PRODUCER_INVOCATION}"),
+                "-g",
+                "Deactivated successfully",
+                "-n",
+                "2",
+                "--no-pager",
+                "-o",
+                "json",
+            ])
+            .output()?;
+        ensure!(
+            output.status.success() && output.stdout.len() <= 65536,
+            "198 manager journal unreadable"
+        );
+        let records: Vec<Value> = std::str::from_utf8(&output.stdout)?
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<std::result::Result<_, _>>()?;
+        ensure!(
+            records.len() == 1,
+            "198 manager success missing or duplicated"
+        );
+        Some(records[0].clone())
+    } else {
+        None
+    };
+    pending_state_with_manager(&state, &producer, manager.as_ref())?;
     let mut events = cohort198_finalization::journal_events(sampled_seconds)?;
+    if let Some(manager) = &manager {
+        let time = manager["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()?;
+        let close = events["events"][3]["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("198 archive close time")?
+            .parse::<u64>()?;
+        ensure!(
+            close < time && time <= sampled_seconds * 1_000_000,
+            "198 manager success outside archive handoff interval"
+        );
+    }
     let path = Path::new(ARCHIVE);
     let m = fs::symlink_metadata(path)?;
     ensure!(
@@ -173,6 +252,7 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
     );
     events["schema"] = json!("jetstreamer-epoch198-controller-import-handoff-v1");
     events["producer"] = producer;
+    events["producer_terminal_manager"] = json!(manager);
     events["controller_state"] = state;
     events["controller_state_sha256"] = json!(hex_lower(&Sha256::digest(&bytes)));
     events["controller_sha256"] = json!(SCRIPT_SHA);
@@ -219,6 +299,31 @@ mod tests {
             let mut p = producer.clone();
             p[key] = value;
             assert!(pending_state(&state, &p).is_err(), "{key}");
+        }
+    }
+    #[test]
+    fn collected_owner_needs_exact_pid1_success_not_absence_alone() {
+        let (state, mut producer) = fixture();
+        producer["LoadState"] = json!("not-found");
+        producer["InvocationID"] = json!("");
+        assert!(pending_state(&state, &producer).is_err());
+        let manager = json!({"UNIT":cohort198_finalization::UNIT,"INVOCATION_ID":PRODUCER_INVOCATION,"_PID":"1","_UID":"0","MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{}: Deactivated successfully.",cohort198_finalization::UNIT),"__REALTIME_TIMESTAMP":"1792613007929541"});
+        pending_state_with_manager(&state, &producer, Some(&manager)).unwrap();
+        for key in [
+            "UNIT",
+            "INVOCATION_ID",
+            "_PID",
+            "_UID",
+            "MESSAGE_ID",
+            "MESSAGE",
+            "__REALTIME_TIMESTAMP",
+        ] {
+            let mut bad = manager.clone();
+            bad[key] = json!("wrong");
+            assert!(
+                pending_state_with_manager(&state, &producer, Some(&bad)).is_err(),
+                "{key}"
+            );
         }
     }
     #[test]
