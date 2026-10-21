@@ -469,7 +469,7 @@ pub(super) fn recover(
         return Err("wrong recovery schema".into());
     }
     let receipt_parent =
-        Path::new("/home/ubuntu/.jetstreamer-private/failed-prefix220-recovery-v1");
+        Path::new("/home/ubuntu/.jetstreamer-private/failed-prefix220-recovery-mountfix-v2");
     if input.recovery_receipt != receipt_parent.join("validation.json")
         || receipt_parent.canonicalize().map_err(|e| e.to_string())? != receipt_parent
     {
@@ -508,9 +508,17 @@ pub(super) fn recover(
             &destination.path().join(format!("epoch-{epoch}.jet")),
         )?;
     }
+    // The real publication's cross-directory rename/exchange capabilities must
+    // hold in THIS sandbox before spending the full rereads. Equal st_dev is
+    // insufficient when source/destination are separate bind mounts.
+    jetstreamer_node::archive_publish::preflight_archive_publication(
+        Path::new(ARCHIVES),
+        destination.path(),
+    )
+    .map_err(|e| format!("failed-prefix filesystem preflight: {e}"))?;
     if preflight_only {
         return Ok(
-            json!({"schema":"horizon-failed-prefix220-recovery-preflight-v1","epochs":[220,221,222],"plan_sha256":plan_sha,"self_sha256":self_sha,"original_owners_terminal":true,"source_state_unchanged":true,"no_replacement_producers":true,"shared_epoch_leases_acquired":true,"destination_namespace_absent":true,"full_validation_completed":false,"publication_authorized":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false}),
+            json!({"schema":"horizon-failed-prefix220-recovery-preflight-v1","epochs":[220,221,222],"plan_sha256":plan_sha,"self_sha256":self_sha,"original_owners_terminal":true,"source_state_unchanged":true,"no_replacement_producers":true,"shared_epoch_leases_acquired":true,"destination_namespace_absent":true,"cross_directory_rename_exchange_probe_passed":true,"private_probe_entries_created_and_removed":true,"full_validation_completed":false,"publication_authorized":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false}),
         );
     }
     let prior = trusted219_terminal()?;
