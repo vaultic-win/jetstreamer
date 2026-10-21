@@ -28,6 +28,10 @@ name = "jetstreamer-epoch223-bootstrap-estimate"
 path = "src/epoch223_bootstrap_estimate.rs"
 
 [[bin]]
+name = "jetstreamer-horizon-verify-pair"
+path = "src/verify_pair.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-routine-cycle"
 path = "src/routine_cycle.rs"
 
