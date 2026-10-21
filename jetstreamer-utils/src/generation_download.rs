@@ -94,6 +94,37 @@ fn validate_metadata_receipt(metadata: &Value) -> Result<()> {
     validate_object_metadata(&metadata["metadata"], &OBJECT)
 }
 
+fn validate_admission_receipt(admission: &Value, now: u64) -> Result<()> {
+    ensure!(
+        admission["admitted"] == true,
+        "admission receipt did not pass"
+    );
+    if EPOCH == 144 {
+        ensure!(
+            admission["schema"] == "jetstreamer-epoch144-snapshot-admission-receipt-v1"
+                && admission["epoch"] == 144
+                && admission["download_only"] == true
+                && admission["native_restore_authorized"] == false
+                && admission["replay_launch_authorized"] == false
+                && admission["publication_authorized"] == false
+                && admission["remote_mutations"] == false
+                && admission["r2_mutations"] == false
+                && admission["protected_existing_floor_bytes"] == 4_740_696_923_590u64
+                && admission["candidate_incremental_peak_bytes"] == SIZE + SLACK
+                && admission["recorded_unix_seconds"]
+                    .as_u64()
+                    .is_some_and(|n| n <= now && now - n <= 1800),
+            "wrong or stale snapshot-only144 admission authority"
+        );
+    } else {
+        ensure!(
+            admission["schema"] == "jetstreamer-historical-performance-admission-receipt-v1",
+            "wrong legacy admission authority"
+        );
+    }
+    Ok(())
+}
+
 fn validate_plan(plan: &Plan, executable: &Path, executable_sha256: &str) -> Result<()> {
     ensure!(plan.schema == PLAN_SCHEMA, "wrong plan schema");
     ensure!(
@@ -106,6 +137,12 @@ fn validate_plan(plan: &Plan, executable: &Path, executable_sha256: &str) -> Res
         plan.minimum_free_bytes >= 205_211_459_014,
         "stop floor below verified century floor"
     );
+    if EPOCH == 144 {
+        ensure!(
+            plan.minimum_free_bytes >= 4_740_696_923_590,
+            "144 transfer stop floor dropped older growth protection"
+        );
+    }
     for p in [
         &plan.output_receipt,
         &plan.stop_intent,
@@ -170,11 +207,10 @@ fn validate_plan(plan: &Plan, executable: &Path, executable_sha256: &str) -> Res
         4 * 1024 * 1024,
         false,
     )?)?;
-    ensure!(
-        admission["schema"] == "jetstreamer-historical-performance-admission-receipt-v1"
-            && admission["admitted"] == true,
-        "admission receipt did not pass"
-    );
+    validate_admission_receipt(
+        &admission,
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+    )?;
     let required = plan
         .minimum_free_bytes
         .checked_add(SIZE + SLACK)
@@ -631,6 +667,37 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn admission_authority_is_profile_specific_and144_is_fresh_download_only() {
+        let legacy = json!({"schema":"jetstreamer-historical-performance-admission-receipt-v1","admitted":true});
+        if EPOCH != 144 {
+            validate_admission_receipt(&legacy, 10000).unwrap();
+            return;
+        }
+        assert!(validate_admission_receipt(&legacy, 10000).is_err());
+        let good = json!({"schema":"jetstreamer-epoch144-snapshot-admission-receipt-v1","admitted":true,
+            "epoch":144,"download_only":true,"native_restore_authorized":false,"replay_launch_authorized":false,
+            "publication_authorized":false,"remote_mutations":false,"r2_mutations":false,
+            "protected_existing_floor_bytes":4740696923590u64,"candidate_incremental_peak_bytes":SIZE+SLACK,
+            "recorded_unix_seconds":9000});
+        validate_admission_receipt(&good, 10000).unwrap();
+        for (key, value) in [
+            ("epoch", json!(140)),
+            ("download_only", json!(false)),
+            ("native_restore_authorized", json!(true)),
+            ("replay_launch_authorized", json!(true)),
+            ("r2_mutations", json!(true)),
+            ("publication_authorized", json!(true)),
+            ("protected_existing_floor_bytes", json!(1)),
+            ("candidate_incremental_peak_bytes", json!(1)),
+            ("recorded_unix_seconds", json!(10001)),
+            ("recorded_unix_seconds", json!(1)),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = value;
+            assert!(validate_admission_receipt(&bad, 10000).is_err(), "{key}");
+        }
+    }
 
     #[test]
     fn metadata_receipt_cannot_borrow_another_object_or_profile_authority() {
