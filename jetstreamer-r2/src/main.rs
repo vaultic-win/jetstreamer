@@ -3171,6 +3171,9 @@ async fn main() -> Result<()> {
     ) {
         return fleet::admit_snapshot144();
     }
+    if env::args().nth(1).as_deref() == Some("prepare-native144") {
+        return fleet::prepare_native144();
+    }
     if env::args().nth(1).as_deref() == Some("prepare-private-prefix144") {
         return fleet::prepare_private_prefix144();
     }
