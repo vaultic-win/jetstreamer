@@ -918,20 +918,100 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     let value = bound_json(&plan, true)?;
     let publication: Bound = serde_json::from_value(d["publication"].clone())?;
     let r = bound_json(&publication, false)?;
+    validate_completed_status(&p.sample_target_utc, &plan, &value, &r, upload(p))
+}
+fn validate_completed_status(
+    sample: &str,
+    plan: &Bound,
+    value: &Value,
+    r: &Value,
+    upload_enabled: bool,
+) -> Result<()> {
+    let claim = value["binding"]["claim_phase"]
+        .as_str()
+        .context("198 status claim phase")?;
+    let phase = value["phase"].as_str().context("198 status phase")?;
+    ensure!(
+        match (claim, phase) {
+            ("full-verification" | "plugin-verification", "verification") => true,
+            ("upload-readback", "upload" | "readback") =>
+                upload_enabled
+                    && value["binding"]["unit"] == UPLOAD_UNIT
+                    && value["binding"]["invocation_id"] == "e4e455fbd455483282107652ca37b83d",
+            _ => false,
+        },
+        "198 completed status phase is not its qualified pipeline"
+    );
     ensure!(
         r["epoch"] == 198
             && r["authenticated_readback"] == true
-            && r["status"]["sampled_at_utc"] == p.sample_target_utc
-            && r["status"]["phase"] == "verification"
+            && r["status"]["sampled_at_utc"] == sample
+            && r["status"]["phase"] == phase
+            && r["pipeline_binding"]["claim_phase"] == claim
+            && r["pipeline_binding"]["unit"] == value["binding"]["unit"]
+            && r["pipeline_binding"]["invocation_id"] == value["binding"]["invocation_id"]
             && r["status"]["estimated_remaining_millis"] == value["estimated_remaining_millis"]
             && r["pipeline_binding"]["model_sha256"] == plan.sha256,
-        "198 verification status differs"
+        "198 completed status differs from exact pipeline plan"
     );
     Ok(())
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn successor_accepts_exact_upload_receipt_without_relabeling_it_verification() {
+        let plan = Bound {
+            path: "/plan".into(),
+            sha256: "a".repeat(64),
+        };
+        let sample = "2026-10-21T22:58:00Z";
+        let value = json!({"phase":"upload","estimated_remaining_millis":31240743,
+            "binding":{"claim_phase":"upload-readback","unit":UPLOAD_UNIT,"invocation_id":"e4e455fbd455483282107652ca37b83d"}});
+        let mut receipt = json!({"epoch":198,"authenticated_readback":true,
+            "status":{"phase":"upload","sampled_at_utc":sample,"estimated_remaining_millis":31240743},
+            "pipeline_binding":value["binding"]});
+        receipt["pipeline_binding"]["model_sha256"] = json!(plan.sha256);
+        validate_completed_status(sample, &plan, &value, &receipt, true).unwrap();
+        assert!(validate_completed_status(sample, &plan, &value, &receipt, false).is_err());
+        for (pointer, wrong) in [
+            ("/status/phase", json!("verification")),
+            ("/status/sampled_at_utc", json!("2026-10-21T22:28:00Z")),
+            ("/pipeline_binding/claim_phase", json!("full-verification")),
+            ("/pipeline_binding/unit", json!(FULL)),
+            ("/pipeline_binding/invocation_id", json!("b".repeat(32))),
+            ("/pipeline_binding/model_sha256", json!("b".repeat(64))),
+        ] {
+            let mut bad = receipt.clone();
+            *bad.pointer_mut(pointer).unwrap() = wrong;
+            assert!(
+                validate_completed_status(sample, &plan, &value, &bad, true).is_err(),
+                "{pointer}"
+            );
+        }
+        let mut bad = value.clone();
+        bad["binding"]["unit"] = json!(FULL);
+        assert!(validate_completed_status(sample, &plan, &bad, &receipt, true).is_err());
+        let mut old = value;
+        old["phase"] = json!("verification");
+        old["binding"]["claim_phase"] = json!("full-verification");
+        let mut old_receipt = receipt;
+        old_receipt["status"]["phase"] = json!("verification");
+        old_receipt["pipeline_binding"]["claim_phase"] = json!("full-verification");
+        validate_completed_status(sample, &plan, &old, &old_receipt, false).unwrap();
+    }
+    #[test]
+    #[ignore = "root exact accepted22:58 upload completion phase regression; no sampling/writes/remote access"]
+    fn root_accepted2258_upload_completion_is_a_valid_successor() {
+        let b=Bound {path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T225800Z-upload198-refresh-completed144-v1/cycle-plan.json".into(),sha256:"75f6667672e9a2817f1f7f31921594417a96c7ec7d3fc721682ec070ea8d2803".into()};
+        let p: Plan = serde_json::from_slice(&bound_bytes(&b, true).unwrap()).unwrap();
+        let c = bound_json(
+            &file(p.cycle_directory.join("completion.json"), false).unwrap(),
+            false,
+        )
+        .unwrap();
+        validate_completed(&p, &c).unwrap();
+    }
     #[test]
     fn progressive_writer_cannot_be_borrowed_without_exact_profile_and_binary() {
         let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
