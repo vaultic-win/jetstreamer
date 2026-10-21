@@ -244,8 +244,18 @@ pub(super) fn prepare(
     pb: &Bound,
     self_sha: &str,
     mode: &str,
-    delivery_spec: Option<&Bound>,
+    handoff_spec: Option<&Bound>,
 ) -> Result<()> {
+    let prefix_spec = if mode == "--prepare-next-prefix157" {
+        handoff_spec
+    } else {
+        None
+    };
+    let delivery_spec = if prefix_spec.is_some() {
+        None
+    } else {
+        handoff_spec
+    };
     let enable_terminal157 = mode == "--prepare-next-terminal157";
     let enable_private144 = mode == "--prepare-next-private144";
     let recover_controllers = mode == "--prepare-package-recovery";
@@ -277,7 +287,9 @@ pub(super) fn prepare(
     )?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
-    latest_fleet_unchanged(&next, &fleet)?;
+    if prefix_spec.is_none() {
+        latest_fleet_unchanged(&next, &fleet)?;
+    }
     for tool in [&next.tools.sealer, &next.tools.estimator, &next.tools.r2] {
         tool_ok(tool)?;
     }
@@ -310,6 +322,29 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if let Some(spec) = prefix_spec {
+        ensure!(
+            !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,
+            "prefix157 migration must be separate"
+        );
+        prefix157::enable(&mut next, spec)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        let current_template = bound_json(&next.fleet_template, true)?;
+        let current_fleet = bound_json(&next.previous_fleet, false)?;
+        validate_templates(
+            &next,
+            &model,
+            &current_template,
+            &current_fleet,
+            &estimates,
+            &observer,
+        )?;
+        latest_fleet_unchanged(&next, &current_fleet)?;
+        let effective =
+            private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        tool_ok(&next.tools.r2)?;
+    }
     if pause157 {
         ensure!(
             !recover_controllers
