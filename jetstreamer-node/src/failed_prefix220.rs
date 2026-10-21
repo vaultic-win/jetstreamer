@@ -182,6 +182,130 @@ pub(super) fn probe() -> Result<Value, String> {
     )
 }
 
+const ARCHIVES: &str = "/home/ubuntu/.jetstreamer-private/adaptive-220-223-current-9d8e964-v1/lane-a/private/destination-5af206ff1dc2bf937d80da0ea255ab459f3b370f67b1c83ed238da29f1de146e/work/root-cohort-220-223/run-2161856-1791998246210466037/archives";
+const READ_IIDS: [&str; 3] = [
+    "1536bf6f640d4df280f8bedf86a55094",
+    "d82f8375cc184e5283a1694c48009ac4",
+    "4a699212c24b43b488c87165ac4ba326",
+];
+const BYTES: [u64; 3] = [135699623364, 137055363091, 133175903649];
+const INODES: [u64; 3] = [2259411, 2259414, 2259426];
+fn full_receipt(receipt: &Value, epoch: u64, path: &Path) -> Result<(), String> {
+    let index = usize::try_from(epoch.checked_sub(220).ok_or("epoch below prefix")?)
+        .map_err(|e| e.to_string())?;
+    if index >= 3 {
+        return Err("epoch above complete prefix".into());
+    }
+    if receipt["schema"] != "horizon-private-full-verification-v1"
+        || receipt["status"] != "passed"
+        || receipt["epoch"] != epoch
+        || receipt["archive"]["path"].as_str() != path.to_str()
+        || receipt["archive"]["bytes"] != BYTES[index]
+        || receipt["archive"]["uid"] != 1000
+        || receipt["archive"]["gid"] != 1000
+        || receipt["archive"]["mode"] != "0440"
+        || receipt["unit"]["invocation_id"] != READ_IIDS[index]
+        || receipt["unit"]["name"]
+            != format!("horizon-independent-full-read-{epoch}-retained-prefix-v1.service")
+        || receipt["unit"]["result"] != "success"
+        || receipt["unit"]["exec_main_status"] != 0
+        || receipt["unit"]["restarts"] != 0
+        || receipt["command"]["full"] != true
+        || receipt["command"]["internal_full"] != true
+        || receipt["command"]["threads"] != 8
+        || receipt["verifier"]["sha256"]
+            != "8a3c45b958bf69e6d8463d2e215cbd0ff30ec2c251c4d20ae40193a6cecae9f3"
+        || receipt["collector_sha256"]
+            != "ed56154c58f939b0f461dd4afc31e88986f994407d12681120e446bed236fecd"
+        || receipt["publication_authorized"] != false
+        || [
+            "archive_mutations",
+            "sidecar_created",
+            "replay_launch_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ]
+        .iter()
+        .any(|key| receipt[*key] != false)
+    {
+        return Err("private reread receipt does not bind exact original reader/archive".into());
+    }
+    Ok(())
+}
+/// Measure the preserved immutable content only after its independent reread.
+/// This is a separate hash event, never an alias for a hash-bound full receipt.
+pub(super) fn artifact_probe(epoch: u64) -> Result<Value, String> {
+    use std::os::unix::fs::MetadataExt;
+    let index = usize::try_from(epoch.checked_sub(220).ok_or("epoch below prefix")?)
+        .map_err(|e| e.to_string())?;
+    if index >= 3 {
+        return Err("epoch above prefix".into());
+    }
+    let path = PathBuf::from(format!("{ARCHIVES}/epoch-{epoch}.jet"));
+    let receipt_path = PathBuf::from(format!(
+        "/var/lib/jetstreamer/horizon-retained220-222-full-results-v1/epoch-{epoch}.json"
+    ));
+    let (receipt_bytes, receipt_sha) = read_bound_recovery_file(&receipt_path, 1024 * 1024, true)?;
+    full_receipt(
+        &serde_json::from_slice(&receipt_bytes).map_err(|e| e.to_string())?,
+        epoch,
+        &path,
+    )?;
+    let file = jetstreamer_node::archive_checksum::open_regular_nofollow(&path)
+        .map_err(|e| e.to_string())?;
+    let before = file.metadata().map_err(|e| e.to_string())?;
+    let initial_identity = jetstreamer_node::archive_checksum::archive_file_identity(&file)
+        .map_err(|e| e.to_string())?;
+    if !before.is_file()
+        || before.dev() != 66305
+        || before.ino() != INODES[index]
+        || before.len() != BYTES[index]
+        || before.uid() != 1000
+        || before.gid() != 1000
+        || before.mode() & 0o777 != 0o440
+        || before.nlink() != 1
+    {
+        return Err("original archive identity changed".into());
+    }
+    let reader = jetstreamer_horizon::archive::ArchiveReader::open(std::io::BufReader::new(
+        file.try_clone().map_err(|e| e.to_string())?,
+    ))
+    .map_err(|e| e.to_string())?;
+    if reader.header().epoch != epoch
+        || reader.header().slot_start != epoch * 432000
+        || reader.header().slot_count != 432000
+    {
+        return Err("archive coverage changed".into());
+    }
+    let provenance = reader
+        .provenance()
+        .map_err(|e| e.to_string())?
+        .ok_or("missing provenance")?;
+    let encoded = jetstreamer_horizon::archive::encode_archive_provenance(&provenance)
+        .map_err(|e| e.to_string())?;
+    let measured = jetstreamer_node::archive_checksum::measure_open_archive(&file)
+        .map_err(|e| e.to_string())?;
+    if measured.identity != initial_identity
+        || !jetstreamer_node::archive_checksum::path_matches_archive_identity(
+            &path,
+            measured.identity,
+        )
+        .map_err(|e| e.to_string())?
+        || before.dev() != file.metadata().map_err(|e| e.to_string())?.dev()
+        || before.ino() != file.metadata().map_err(|e| e.to_string())?.ino()
+    {
+        return Err("archive changed while measuring".into());
+    }
+    let (again, again_sha) = read_bound_recovery_file(&receipt_path, 1024 * 1024, true)?;
+    if receipt_sha != again_sha || receipt_bytes != again {
+        return Err("private reread receipt changed".into());
+    }
+    let hex = jetstreamer_node::segment_manifest::sha256_hex_string;
+    Ok(
+        json!({"schema":"horizon-failed-prefix220-artifact-probe-v1","epoch":epoch,"archive":path,"device":before.dev(),"inode":before.ino(),"bytes":before.len(),"sha256":hex(&measured.sha256),"provenance_sha256":hex(&Sha256::digest(&encoded).into()),"provenance_encoded_base64":BASE64_STANDARD.encode(&encoded),"provenance_debug":format!("{provenance:?}"),"prior_internal_reread_receipt":receipt_path,"prior_internal_reread_receipt_sha256":hex(&receipt_sha),"hash_event_separate_from_internal_reread":true,"hash_bound_full_receipt_created":false,"archive_provenance_qualified":false,"archive_mutations":false,"sidecar_created":false,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,6 +418,29 @@ mod tests {
         plan.fingerprint = FINGERPRINT.into();
         plan.root_checkpoints[1].accounts_hash = Hash::new_from_array([9; 32]).to_string();
         assert!(gate(&value, &plan).is_err());
+    }
+    #[test]
+    fn artifact_measurement_requires_the_exact_successful_private_reader() {
+        let path = PathBuf::from(format!("{ARCHIVES}/epoch-220.jet"));
+        let value = json!({"schema":"horizon-private-full-verification-v1","status":"passed","epoch":220,"archive":{"path":path,"bytes":BYTES[0],"uid":1000,"gid":1000,"mode":"0440"},"unit":{"invocation_id":READ_IIDS[0],"name":"horizon-independent-full-read-220-retained-prefix-v1.service","result":"success","exec_main_status":0,"restarts":0},"command":{"full":true,"internal_full":true,"threads":8},"verifier":{"sha256":"8a3c45b958bf69e6d8463d2e215cbd0ff30ec2c251c4d20ae40193a6cecae9f3"},"collector_sha256":"ed56154c58f939b0f461dd4afc31e88986f994407d12681120e446bed236fecd","publication_authorized":false,"archive_mutations":false,"sidecar_created":false,"replay_launch_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        full_receipt(&value, 220, &path).unwrap();
+        for (key, new) in [
+            ("/unit/invocation_id", json!(READ_IIDS[1])),
+            ("/archive/bytes", json!(BYTES[0] - 1)),
+            ("/epoch", json!(223)),
+            ("/command/internal_full", json!(false)),
+            ("/unit/restarts", json!(1)),
+            ("/status", json!("failed")),
+            ("/publication_authorized", json!(true)),
+            ("/r2_mutations", json!(true)),
+        ] {
+            let mut wrong = value.clone();
+            *wrong.pointer_mut(key).unwrap() = new;
+            assert!(full_receipt(&wrong, 220, &path).is_err(), "{key}");
+        }
+        assert!(full_receipt(&value, 223, &path).is_err());
+        assert!(full_receipt(&value, 219, &path).is_err());
+        assert!(full_receipt(&value, 220, Path::new("/different.jet")).is_err());
     }
     #[test]
     #[ignore = "root-only exact incident evidence qualification; read-only"]

@@ -90,3 +90,14 @@ restart any producer, or touch R2. Independent rereads, exact content-bound
 provenance admission, reviewed failed-prefix import, and full/current-plugin
 delivery gates remain required. The partial 223 archive and original failed
 cohort state remain preserved.
+
+`--failed-prefix220-artifact-probe=N` (only 220, 221 or 222, no other arguments)
+is the subsequent read-only content-measurement stage. It requires the exact
+successful private reread collector receipt, original reader invocation, archive
+path/length/mode and non-authorizing flags. It opens only the fixed retained
+archive, requires its original device/inode/single-link identity, captures and
+encodes its actual provenance, and hashes the complete file under unchanged
+descriptor/path identity. It rechecks the collector receipt afterward. The JSON
+keeps this hash event explicitly separate from the earlier internal reread: it
+does not turn that receipt into a hash-bound normal full-verification receipt or
+authorize provenance admission, import, sidecars, publication or R2 mutation.
