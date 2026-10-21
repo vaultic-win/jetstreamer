@@ -6,10 +6,29 @@ const SCRATCH: &str =
     "/home/sol/.jetstreamer-private/epoch144-upgradeable-loader-focus-20261016-v1/scratch";
 
 fn classify(row: &Value, current: &Value, sample: &str) -> Result<Value> {
+    classify_owner(
+        row,
+        current,
+        sample,
+        UNIT,
+        IID,
+        SCRATCH,
+        "diagnostic-qualification",
+    )
+}
+fn classify_owner(
+    row: &Value,
+    current: &Value,
+    sample: &str,
+    unit: &str,
+    iid: &str,
+    scratch: &str,
+    phase: &str,
+) -> Result<Value> {
     ensure!(
-        row["producer_unit"] == UNIT
-            && row["expected_producer_invocation_id"] == IID
-            && row["scratch_path"] == SCRATCH,
+        row["producer_unit"] == unit
+            && row["expected_producer_invocation_id"] == iid
+            && row["scratch_path"] == scratch,
         "private144 observer envelope owner differs"
     );
     for field in [
@@ -34,7 +53,7 @@ fn classify(row: &Value, current: &Value, sample: &str) -> Result<Value> {
             ensure!(
                 row["error"].is_null()
                     && row["observation"]["range"] == "144"
-                    && row["observation"]["scratch_path"] == SCRATCH
+                    && row["observation"]["scratch_path"] == scratch
                     && row["observation"]["invocation_binding_stable"] == true,
                 "private144 observation unstable"
             );
@@ -42,7 +61,7 @@ fn classify(row: &Value, current: &Value, sample: &str) -> Result<Value> {
                 for point in ["before", "after"] {
                     let owner = &row["observation"][format!("{kind}_{point}")];
                     ensure!(
-                        owner["invocation_id"] == IID
+                        owner["invocation_id"] == iid
                             && owner["restarts"] == 0
                             && matches!(
                                 owner["active_state"].as_str(),
@@ -61,18 +80,17 @@ fn classify(row: &Value, current: &Value, sample: &str) -> Result<Value> {
     ) && current["SubState"] != "exited";
     if live {
         ensure!(
-            current["InvocationID"] == IID && current["NRestarts"] == "0",
+            current["InvocationID"] == iid && current["NRestarts"] == "0",
             "private144 live owner replaced or restarted"
         );
     }
-    Ok(
-        json!({"epoch":144,"phase":"diagnostic-qualification","producer":current,
-        "expected_invocation_id":IID,"scratch_path":SCRATCH,"live":live,
+    Ok(json!({"epoch":144,"phase":phase,"producer":current,
+        "expected_invocation_id":iid,"scratch_path":scratch,"live":live,
         "sampled_at_utc":sample,"resource_observation":row,
         "ordinary_replay_claim":false,"current_sidecar_eta_valid":false,
-        "terminal_outcome_requires_canary_receipt":true,"inactivity_or_cleanup_proven":false,
-        "publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false}),
-    )
+        "terminal_outcome_requires_canary_receipt":phase!="native-restore-only",
+        "terminal_outcome_requires_native_receipt":phase=="native-restore-only","inactivity_or_cleanup_proven":false,
+        "publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false}))
 }
 
 pub(super) fn observe(
@@ -131,6 +149,29 @@ pub(super) fn observe(
                 .any(|r| r["range"] == "144"),
         "private144 fleet scope, gate, tracking or overlapping owner differs"
     );
+    if rows[0]["producer_unit"] == native144::UNIT {
+        let claim = overlaps
+            .iter()
+            .find(|c| native144::namespace(c))
+            .context("native144 observer has no exact diagnostic claim")?;
+        ensure!(
+            rows[0]["expected_producer_invocation_id"] == claim.invocation_id
+                && rows[0]["scratch_path"].as_str() == claim.scratch_path.to_str(),
+            "native144 observer differs from bound launch"
+        );
+        let current = census
+            .get(native144::UNIT)
+            .context("native144 census missing")?;
+        return Ok(Some(classify_owner(
+            rows[0],
+            current,
+            sample,
+            native144::UNIT,
+            &claim.invocation_id,
+            claim.scratch_path.to_str().context("native144 scratch")?,
+            "native-restore-only",
+        )?));
+    }
     Ok(Some(classify(
         rows[0],
         census
@@ -143,6 +184,75 @@ pub(super) fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_observer_is_exact_diagnostic_history_not_a_live_eta_or_cleanup_proof() {
+        let iid = "b".repeat(32);
+        let scratch = "/native/scratch";
+        let mut r = row();
+        r["producer_unit"] = json!(native144::UNIT);
+        r["expected_producer_invocation_id"] = json!(iid);
+        r["scratch_path"] = json!(scratch);
+        let current =
+            json!({"ActiveState":"active","SubState":"exited","InvocationID":iid,"NRestarts":"0"});
+        let result = classify_owner(
+            &r,
+            &current,
+            "sample",
+            native144::UNIT,
+            &iid,
+            scratch,
+            "native-restore-only",
+        )
+        .unwrap();
+        assert_eq!(result["live"], false);
+        assert_eq!(result["current_sidecar_eta_valid"], false);
+        assert_eq!(result["terminal_outcome_requires_native_receipt"], true);
+        assert_eq!(result["inactivity_or_cleanup_proven"], false);
+        assert!(
+            classify(&r, &current, "sample").is_err(),
+            "native cannot masquerade as old producer"
+        );
+        for (key, value) in [
+            ("expected_producer_invocation_id", json!("c".repeat(32))),
+            ("scratch_path", json!("/foreign")),
+            ("publication_authorized", json!(true)),
+        ] {
+            let mut bad = r.clone();
+            bad[key] = value;
+            assert!(
+                classify_owner(
+                    &bad,
+                    &current,
+                    "sample",
+                    native144::UNIT,
+                    &iid,
+                    scratch,
+                    "native-restore-only"
+                )
+                .is_err()
+            );
+        }
+    }
+    #[test]
+    #[ignore = "root exact failed23:28native observer regression; no resource sampling, writes or network"]
+    fn actual_native_observer_requires_exact_bound_native_claim_and_preserves_old_owner_proof() {
+        let b=BoundFile {path:"/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T232800Z-native144-upload198-refresh-completed144-v1/public198-stage/sealed/fleet-plan.json".into(),sha256:"10424be36b3a6edab8520811f20dc586cb8716926654022b06df646261597421".into()};
+        let p: Plan = serde_json::from_value(bound_json(&b).unwrap()).unwrap();
+        let o = bound_json(&p.observer).unwrap();
+        let names = p.tracked_units.iter().cloned().collect();
+        let c = census(&names, 101, 200).unwrap();
+        let value = observe(&p, &o, &c, "2026-10-21T23:28:00Z")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            value["expected_invocation_id"],
+            "1219f5b93e0a40639db09f6996746243"
+        );
+        assert_eq!(value["live"], false);
+        let mut bad = p;
+        bad.diagnostics.retain(|c| !native144::namespace(c));
+        assert!(observe(&bad, &o, &c, "sample").is_err());
+    }
     #[test]
     #[ignore = "root-only exact retained144 verifier plan and real terminal manager journal; no remote access"]
     fn exact_completed_old144_can_coexist_only_with_its_private_verifier() {

@@ -5,8 +5,14 @@ use super::*;
 pub(super) const UNIT: &str = "horizon-qualify-144-native-restore-20261021-v1.service";
 const SCRATCH: &str = "/home/sol/.jetstreamer-private/epoch144-native-restore-20261021-v1/scratch";
 const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch144-native-fleet-reader-20261021-v2/jetstreamer-r2";
-const READER_SHA: &str = "991d81334e6cae4e945a2949a4a51d1c636914a580f2aaa42917d22c4ac3ed21";
+    "/usr/local/lib/jetstreamer/horizon-native144-observer-reader-20261021-v1/jetstreamer-r2";
+const READER_SHA: &str = "70931d7eba634d1d31b3809fa267a3f6b60fea47f357399d9af371c80b29c5cd";
+pub(super) fn reader() -> Bound {
+    Bound {
+        path: READER.into(),
+        sha256: READER_SHA.into(),
+    }
+}
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
@@ -342,12 +348,9 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
         event_plan: s.event_plan,
         invocation_id: iid,
     });
-    if !public198::upload_writer(next) {
-        next.tools.r2 = Bound {
-            path: READER.into(),
-            sha256: READER_SHA.into(),
-        };
-    }
+    // The native observer envelope requires this qualified superset reader;
+    // the older progressive reader understands claims but only the old owner envelope.
+    next.tools.r2 = reader();
     next.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
     validate(next)?;
     completed144::derive_fleet(next, &mut ep.clone())?;

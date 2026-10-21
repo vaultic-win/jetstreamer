@@ -48,6 +48,8 @@ mod runtime157;
 mod completed144;
 #[path = "routine_native144.rs"]
 mod native144;
+#[path = "routine_native144_recovery.rs"]
+mod native144_recovery;
 #[path = "routine_prefix144.rs"]
 mod prefix144;
 #[path = "routine_prefix157.rs"]
@@ -1556,6 +1558,8 @@ fn main() {
                             | "--prepare-next"
                             | "--prepare-next-upload198"
                             | "--publish-upload198-event"
+                            | "--recover-native144-observer"
+                            | "--check-native144-recovery"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
@@ -1578,6 +1582,16 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| {
+            a == "--recover-native144-observer" || a == "--check-native144-recovery"
+        }) {
+            return native144_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-native144-recovery",
+            );
+        }
         if args
             .get(6)
             .is_some_and(|a| a == "--publish-upload198-event")

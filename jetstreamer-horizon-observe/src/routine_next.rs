@@ -285,6 +285,7 @@ pub(super) fn prepare(
     let config = bound_json(&p.observer_config, true)?;
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
+    native144_recovery::consume(&mut next, &completion)?;
     if completion.get("public198_promotion").is_some() {
         public198::consume(&mut next, &completion, &mut next_config)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
