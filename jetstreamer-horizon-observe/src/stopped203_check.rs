@@ -128,7 +128,7 @@ fn source_bytes(spec: &str, expected: &str) -> Result<()> {
     );
     Ok(())
 }
-fn terminal() -> Result<Value> {
+pub(crate) fn terminal() -> Result<Value> {
     let names = "Id,Names,LoadState,ActiveState,SubState,MainPID,InvocationID,NRestarts,Restart,Result,ExecMainStatus,Triggers,TriggeredBy,FragmentPath,DropInPaths,ExecStart";
     let v = retained::properties(UNIT, names)?;
     for (k, w) in [
@@ -186,11 +186,16 @@ fn terminal() -> Result<Value> {
     );
     Ok(json!({"producer":v,"guard_timer":timer,"pending_owner_jobs":false}))
 }
-fn file_identity(m: &fs::Metadata) -> Value {
+pub(crate) fn file_identity(m: &fs::Metadata) -> Value {
     json!({"device":m.dev(),"inode":m.ino(),"bytes":m.len(),"uid":m.uid(),"gid":m.gid(),"mode":m.mode(),
         "links":m.nlink(),"mtime":[m.mtime(),m.mtime_nsec()],"ctime":[m.ctime(),m.ctime_nsec()]})
 }
-fn artifact(path: &Path, uid: u32, expected: Option<&str>, maximum: u64) -> Result<Value> {
+pub(crate) fn artifact(
+    path: &Path,
+    uid: u32,
+    expected: Option<&str>,
+    maximum: u64,
+) -> Result<Value> {
     ensure!(path.canonicalize()? == path, "artifact path not canonical");
     let (digest, m) = retained::hash_file(path, maximum)?;
     ensure!(
@@ -205,7 +210,7 @@ fn artifact(path: &Path, uid: u32, expected: Option<&str>, maximum: u64) -> Resu
     );
     Ok(json!({"path":path,"sha256":digest,"identity":file_identity(&m)}))
 }
-fn tree(path: &Path) -> Result<Value> {
+pub(crate) fn tree(path: &Path) -> Result<Value> {
     ensure!(path.canonicalize()? == path, "scratch path changed");
     let root = fs::symlink_metadata(path)?;
     ensure!(
