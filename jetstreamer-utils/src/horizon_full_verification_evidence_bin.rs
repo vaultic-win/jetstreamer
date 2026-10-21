@@ -77,6 +77,8 @@ struct UnitPlan {
     name: String,
     invocation_id: String,
     installed_file: Evidence,
+    #[serde(default)]
+    runtime_unit_link: Option<PathBuf>,
     threads: u64,
 }
 
@@ -440,6 +442,42 @@ fn parse_u64_field(fields: &BTreeMap<String, String>, name: &str) -> Result<u64,
         .map_err(|_| format!("systemctl {name} is not a u64"))
 }
 
+fn unit_fragment_path(plan: &Plan) -> Result<&Path, String> {
+    let Some(link) = plan.unit.runtime_unit_link.as_deref() else {
+        return Ok(&plan.unit.installed_file.path);
+    };
+    if link.parent() != Some(Path::new("/run/systemd/system"))
+        || link.file_name() != Some(OsStr::new(&plan.unit.name))
+        || plan.unit.installed_file.path.file_name() != link.file_name()
+        || plan.unit.installed_file.path.parent() != plan.verifier.path.parent()
+    {
+        return Err("runtime unit link escapes the exact sealed unit namespace".into());
+    }
+    let parent = fs::symlink_metadata(link.parent().unwrap())
+        .map_err(|error| format!("stat runtime unit parent: {error}"))?;
+    let metadata =
+        fs::symlink_metadata(link).map_err(|error| format!("stat runtime unit link: {error}"))?;
+    if !parent.is_dir()
+        || parent.uid() != 0
+        || parent.mode() & 0o022 != 0
+        || !metadata.file_type().is_symlink()
+        || metadata.uid() != 0
+        || metadata.nlink() != 1
+        || fs::read_link(link).map_err(|error| format!("read runtime unit link: {error}"))?
+            != plan.unit.installed_file.path
+        || plan
+            .unit
+            .installed_file
+            .path
+            .canonicalize()
+            .map_err(|error| format!("canonical sealed unit: {error}"))?
+            != plan.unit.installed_file.path
+    {
+        return Err("runtime unit link is not root-owned and bound to the sealed member".into());
+    }
+    Ok(link)
+}
+
 fn systemd_state(plan: &Plan) -> Result<SystemdState, String> {
     let output = Command::new("/usr/bin/systemctl")
         .args([
@@ -464,7 +502,7 @@ fn systemd_state(plan: &Plan) -> Result<SystemdState, String> {
         ));
     }
     let fields = parse_systemctl_show(&output.stdout)?;
-    let expected_fragment = plan.unit.installed_file.path.to_string_lossy();
+    let expected_fragment = unit_fragment_path(plan)?.to_string_lossy();
     let current_invocation_id = field(&fields, "InvocationID")?;
     if field(&fields, "LoadState")? != "loaded"
         || field(&fields, "ActiveState")? != "inactive"
@@ -859,6 +897,7 @@ fn run() -> Result<(), String> {
         &fs::symlink_metadata(&plan.archive.path)
             .map_err(|error| format!("restat archive: {error}"))?,
     );
+    unit_fragment_path(&plan)?;
     if archive_before != archive_after || sidecar.exists() {
         return Err("archive changed or a sidecar appeared during evidence collection".to_string());
     }
@@ -956,6 +995,43 @@ fn main() {
 mod tests {
     use super::*;
 
+    #[test]
+    fn normal_fragment_has_no_implicit_runtime_link_or_namespace_escape() {
+        let mut plan = test_plan();
+        assert_eq!(
+            unit_fragment_path(&plan).unwrap(),
+            plan.unit.installed_file.path
+        );
+        plan.unit.runtime_unit_link = Some("/tmp/example.service".into());
+        assert!(unit_fragment_path(&plan).is_err());
+        plan.unit.runtime_unit_link = Some("/run/systemd/system/other.service".into());
+        assert!(unit_fragment_path(&plan).is_err());
+    }
+
+    #[test]
+    #[ignore = "root-only read-only check of exact sealed retained-prefix runtime links"]
+    fn root_sealed_retained_prefix_runtime_links_bind_only_their_exact_members() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        for epoch in [220, 221, 222] {
+            let mut plan = test_plan();
+            plan.unit.name =
+                format!("horizon-independent-full-read-{epoch}-retained-prefix-v1.service");
+            plan.verifier.path =
+                "/var/lib/jetstreamer/horizon-retained220-222-full-prepared-v1/verify_archive"
+                    .into();
+            plan.unit.installed_file.path =
+                plan.verifier.path.parent().unwrap().join(&plan.unit.name);
+            plan.unit.runtime_unit_link =
+                Some(Path::new("/run/systemd/system").join(&plan.unit.name));
+            assert_eq!(
+                unit_fragment_path(&plan).unwrap(),
+                plan.unit.runtime_unit_link.as_deref().unwrap()
+            );
+            plan.unit.installed_file.path = plan.verifier.path.clone();
+            assert!(unit_fragment_path(&plan).is_err());
+        }
+    }
+
     fn test_plan() -> Plan {
         Plan {
             schema: PLAN_SCHEMA.to_string(),
@@ -978,6 +1054,7 @@ mod tests {
                     path: PathBuf::from("/etc/systemd/system/example.service"),
                     sha256: "11".repeat(32),
                 },
+                runtime_unit_link: None,
                 threads: 8,
             },
             deployment_seal_receipt: Evidence {

@@ -9,6 +9,7 @@ mod prefix144;
 mod private144;
 mod private157;
 mod ram_auxiliary;
+mod retained220;
 mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
@@ -632,6 +633,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if retained220::namespace(claim) || receipt["schema"] == retained220::SCHEMA {
+        return retained220::launch(receipt, claim);
+    }
     if prefix144::namespace(claim) || receipt["schema"] == prefix144::SCHEMA {
         return prefix144::launch(receipt, claim);
     }
@@ -1233,6 +1237,7 @@ pub(super) fn census(
             "horizon-upload-",
             "horizon-full-verify-",
             "horizon-plugin-verify-",
+            "horizon-independent-full-read-",
         ]
         .iter()
         .any(|prefix| {
@@ -1821,7 +1826,8 @@ pub(super) async fn run() -> Result<()> {
     }
     for claim in &plan.diagnostics {
         let current = &before[&claim.unit];
-        let is_active = current["ActiveState"] == "active" && current["SubState"] == "running";
+        let is_active = (current["ActiveState"] == "active" && current["SubState"] == "running")
+            || (retained220::namespace(claim) && retained220::live(current));
         if is_active {
             register_live_diagnostic_scope(&mut live_diagnostic_epochs, claim)?;
             if private157::namespace(claim) {
@@ -1829,6 +1835,9 @@ pub(super) async fn run() -> Result<()> {
             }
             if prefix144::namespace(claim) {
                 prefix144::live_limits()?;
+            }
+            if retained220::namespace(claim) {
+                retained220::validate_live(claim, current)?;
             }
             ensure!(
                 current["InvocationID"] == claim.invocation_id && current["NRestarts"] == "0",
@@ -1878,6 +1887,7 @@ pub(super) async fn run() -> Result<()> {
                 || private_225_verification(claim)
                 || private157::namespace(claim)
                 || prefix144::namespace(claim)
+                || retained220::namespace(claim)
             {
                 "private-verification"
             } else {
