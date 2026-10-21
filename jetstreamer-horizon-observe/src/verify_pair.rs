@@ -144,6 +144,13 @@ fn validate_plan(p: &Plan) -> Result<()> {
     Ok(())
 }
 
+fn verifier_size_limit(stage: Stage) -> u64 {
+    match stage {
+        Stage::Full => 128 * 1024 * 1024,
+        Stage::Plugin => 512 * 1024 * 1024,
+    }
+}
+
 fn utc_seconds(value: &str) -> Result<u64> {
     let input = std::ffi::CString::new(value)?;
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
@@ -264,7 +271,7 @@ fn verify_executable(p: &Plan) -> Result<()> {
     let maximum = if p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
         512 * 1024 * 1024
     } else {
-        128 * 1024 * 1024
+        verifier_size_limit(p.stage)
     };
     let mut f = open_stable(&p.verifier.path)?;
     let before = f.metadata()?;
@@ -609,15 +616,15 @@ fn run() -> Result<()> {
         .join(format!("epoch-{}.jet.sha256", p.epoch));
     let before_sidecar = sidecar(&checksum, p.epoch, &p.expected_archive_sha256)?;
     if args.len() == 4 {
-        let archive_file = open_stable(&archive)?;
+        let f = open_stable(&archive)?;
+        let m = f.metadata()?;
         if p.epoch == 198 {
-            ensure!(
-                archive_file.metadata()?.len() == 99_381_250_591,
-                "epoch198 archive length differs"
-            );
+            ensure!(m.len() == 99_381_250_591, "epoch198 archive length differs");
         }
+        recheck(&archive, &f, &m)?;
         println!(
-            "verification preflight passed; no archive hashing, verifier launch, receipt write or remote access"
+            "{}",
+            serde_json::json!({"schema":"horizon-verify-pair-preflight-v1","epoch":p.epoch,"stage":p.stage.suffix(),"plan_sha256":args[1],"self_sha256":args[2],"verifier_sha256":p.verifier.sha256,"verifier_size_limit":verifier_size_limit(p.stage),"binary_binding_checked":true,"canonical_sidecar_checked":true,"archive_identity_checked":true,"full_archive_hash_proven":false,"verifier_commands_ran":false,"receipt_created":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false})
         );
         return Ok(());
     }
@@ -949,5 +956,12 @@ mod tests {
         assert!(validate_plan(&p).is_err());
         p.stage = Stage::Plugin;
         validate_plan(&p).unwrap();
+    }
+    #[test]
+    fn plugin_bound_covers_actual_large_pipeline_but_stays_finite() {
+        assert_eq!(verifier_size_limit(Stage::Full), 128 * 1024 * 1024);
+        assert_eq!(verifier_size_limit(Stage::Plugin), 512 * 1024 * 1024);
+        assert!(238472424 > verifier_size_limit(Stage::Full));
+        assert!(238472424 < verifier_size_limit(Stage::Plugin));
     }
 }

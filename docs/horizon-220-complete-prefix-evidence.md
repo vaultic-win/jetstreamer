@@ -225,6 +225,16 @@ every epoch's verifier: each matching full/plugin pair unlocks only its own
 epoch. Keep automatic local retirement disabled until the separate boundary and
 owner-release gates are available.
 
+Run the exact sealed pair runner with `--check-only` before first dispatch. It
+checks immutable plan/self/verifier identities, the actual executable-size bound,
+private state, canonical sidecar and archive identity without hashing the archive,
+running verifiers or creating a receipt. The full decoder bound remains 128 MiB;
+the current statically linked plugin executable is 238,472,424 bytes, so its
+separately bounded admission is 512 MiB. This executable-file bound is unrelated
+to archive account-data or record-count limits, which remain unchanged. Preserve
+failed preflights/attempts and deploy a distinct corrected plugin runner; do not
+restart healthy full-verification jobs merely to update this plugin-only bound.
+
 `jetstreamer-epoch220-import-estimate PLAN PLAN_SHA256 SELF_SHA256` supplies the
 live import phase's definite status estimates from the same fresh observer and
 accepted fleet ledger. It pins the exact importer invocation, three successful
