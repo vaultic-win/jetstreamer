@@ -145,11 +145,19 @@ fn is_101(p: &Plan) -> Result<bool> {
 fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
+fn generation_101(p: &Plan) -> &'static str {
+    if p.epoch198_delivery.is_some() {
+        "delivery198-v1"
+    } else {
+        "v2"
+    }
+}
 fn cycle_unit(p: &Plan) -> Result<String> {
     Ok(if is_101(p)? {
         format!(
-            "horizon-routine-cycle-101-200-{}-v2.service",
-            stamp(&p.sample_target_utc)
+            "horizon-routine-cycle-101-200-{}-{}.service",
+            stamp(&p.sample_target_utc),
+            generation_101(p)
         )
     } else {
         format!(
@@ -553,8 +561,11 @@ fn validate_templates(
         "estimate output parent differs"
     );
     let expected_cycle = if host101 {
-        Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
-            .join(format!("{}-v2", stamp(&p.sample_target_utc)))
+        Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2").join(format!(
+            "{}-{}",
+            stamp(&p.sample_target_utc),
+            generation_101(p)
+        ))
     } else {
         Path::new("/var/lib/jetstreamer/horizon-routine-cycles-v1")
             .join(format!("{}-v1", stamp(&p.sample_target_utc)))

@@ -392,6 +392,32 @@ pub(super) fn enable(
     Ok(())
 }
 
+pub(super) fn namespaces(
+    next: &mut Plan,
+    observer_package: &mut PathBuf,
+    cycle_package: &mut PathBuf,
+) -> Result<()> {
+    ensure!(
+        is_101(next)? && next.epoch198_delivery.is_some(),
+        "198 namespace requires exact delivery profile"
+    );
+    let stamp = stamp(&next.sample_target_utc);
+    *observer_package = Path::new("/var/lib/jetstreamer").join(format!(
+        "horizon-next-observer-101-200-{stamp}-delivery198-v1"
+    ));
+    *cycle_package = Path::new("/var/lib/jetstreamer").join(format!(
+        "horizon-routine-plan-101-200-{stamp}-delivery198-v1"
+    ));
+    next.observer_config.path = observer_package.join("observer.json");
+    next.cycle_directory = Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
+        .join(format!("{stamp}-delivery198-v1"));
+    next.cycle_unit = cycle_unit(next)?;
+    if let Some(scope) = &mut next.scope_101_200 {
+        scope.additional_tracked_units = vec![next.cycle_unit.clone()];
+    }
+    Ok(())
+}
+
 fn seal_values(p: &Plan, name: &str, values: &[(&str, Value)]) -> Result<PathBuf> {
     let stage = p.cycle_directory.join(name);
     fs::create_dir(&stage)?;
@@ -775,6 +801,28 @@ mod tests {
         let provisional = p.cycle_directory.join("delivery198-provisional-fleet.json");
         assert_ne!(provisional.parent(), Some(Path::new(FLEET_ROOT_101)));
         assert_ne!(provisional, p.fleet_output);
+    }
+    #[test]
+    fn delivery_generation_does_not_clobber_already_prepared_routine_plan_or_unit() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let old_unit = p.cycle_unit.clone();
+        let old_directory = p.cycle_directory.clone();
+        p.epoch198_delivery = Some(profile());
+        let mut observer = PathBuf::from("/already-prepared/routine");
+        let mut cycle = observer.clone();
+        namespaces(&mut p, &mut observer, &mut cycle).unwrap();
+        assert_ne!(p.cycle_unit, old_unit);
+        assert_ne!(p.cycle_directory, old_directory);
+        assert!(p.cycle_unit.ends_with("-delivery198-v1.service"));
+        assert!(
+            observer.ends_with("horizon-next-observer-101-200-20261020T103442Z-delivery198-v1")
+        );
+        assert!(cycle.ends_with("horizon-routine-plan-101-200-20261020T103442Z-delivery198-v1"));
+        assert_eq!(p.observer_config.path, observer.join("observer.json"));
+        assert_eq!(
+            p.scope_101_200.unwrap().additional_tracked_units,
+            [p.cycle_unit]
+        );
     }
     #[test]
     fn pipeline_receipt_schema_matches_reviewed_r2_reader() {

@@ -89,19 +89,24 @@ fn derive_next(
             &old_stamp[..8]
         ));
         let prepared_config = Path::new("/var/lib/jetstreamer").join(format!(
-            "horizon-next-observer-101-200-{old_stamp}-v2/observer.json"
+            "horizon-next-observer-101-200-{old_stamp}-{}/observer.json",
+            generation_101(p)
         ));
         ensure!(
             p.observer == Path::new(OBSERVERS_101).join(format!("sample-{old_stamp}.json"))
-                && (p.observer_config.path == legacy_config
+                && ((p.epoch198_delivery.is_none() && p.observer_config.path == legacy_config)
                     || p.observer_config.path == prepared_config),
             "101observer/config is outside its exact manual or prepared namespace"
         );
         (
-            Path::new("/var/lib/jetstreamer")
-                .join(format!("horizon-next-observer-101-200-{next_stamp}-v2")),
-            Path::new("/var/lib/jetstreamer")
-                .join(format!("horizon-routine-plan-101-200-{next_stamp}-v2")),
+            Path::new("/var/lib/jetstreamer").join(format!(
+                "horizon-next-observer-101-200-{next_stamp}-{}",
+                generation_101(p)
+            )),
+            Path::new("/var/lib/jetstreamer").join(format!(
+                "horizon-routine-plan-101-200-{next_stamp}-{}",
+                generation_101(p)
+            )),
             Path::new(OBSERVERS_101).join(format!("sample-{next_stamp}.json")),
         )
     } else {
@@ -164,7 +169,7 @@ fn derive_next(
     next.cycle_unit = cycle_unit(&next)?;
     next.cycle_directory = if host101 {
         Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
-            .join(format!("{next_stamp}-v2"))
+            .join(format!("{next_stamp}-{}", generation_101(&next)))
     } else {
         Path::new("/var/lib/jetstreamer/horizon-routine-cycles-v1").join(format!("{next_stamp}-v1"))
     };
@@ -247,7 +252,7 @@ pub(super) fn prepare(
     let bytes = read_checked(&completion_path, LIMIT, 0, false)?;
     let completion: Value = serde_json::from_slice(&bytes)?;
     let config = bound_json(&p.observer_config, true)?;
-    let (mut next, mut next_config, observer_package, cycle_package) =
+    let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     let model = bound_json(&next.model_template, true)?;
     if enable_terminal157 {
@@ -303,6 +308,7 @@ pub(super) fn prepare(
             "cannot combine separate handoff preparations"
         );
         delivery198::enable(&mut next, &mut next_config, &model, &completion, spec)?;
+        delivery198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
         let effective = delivery198::effective_model(&next, &model)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         validate_observer_config(&next, &effective, &next_config)?;
@@ -312,9 +318,9 @@ pub(super) fn prepare(
     let host101 = is_101(p)?;
     let root = Path::new(if host101 { ROOT_101 } else { ROOT });
     let stage = root.join(format!(
-        "{}-v{}",
+        "{}-{}",
         stamp(&next.sample_target_utc),
-        if host101 { 2 } else { 1 }
+        if host101 { generation_101(&next) } else { "v1" }
     ));
     private_dir(root)?;
     absent(&stage)?;

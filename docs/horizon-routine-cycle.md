@@ -129,6 +129,18 @@ cycles remain pinned. This source support and synthetic regression fixtures do
 not claim an actual198 terminal event, authorize a handoff without its genuine
 proof, or replace normal archive/plugin/upload/sidecar gates.
 
+Delivery-enabled preparation uses separate `*-delivery198-v1` observer/plan,
+preparation-directory, cycle-directory and metadata-unit generations. It never
+clobbers a normal `*-v2` plan that was already prepared for the same timestamp.
+The original canonical observer output, estimate and final fleet names remain
+unique: cancel and authenticate the obsolete observer/metadata timers before
+arming the replacement, and require all those canonical outputs still absent.
+Preparation does not cancel timers itself. Capture the genuine finalization
+event promptly (a read-only journal subscription is not a resource polling loop),
+then prepare against the most recent genuine completed cycle with a future next
+deadline. A missed deadline or already-running observation requires explicit
+failure/handoff reconciliation, not a backdated proof or blind retry.
+
 A failed preflight writes nothing. A failure after the intent writes a private
 failure record and may leave some statuses freshly published; preserve every
 receipt and inspect the exact stage. There is no automatic retry or interval
