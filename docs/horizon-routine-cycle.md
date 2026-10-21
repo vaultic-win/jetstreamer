@@ -28,6 +28,17 @@ full fleet reconciliation and ordinary publication gates remain mandatory.
 An additional failure or missed deadline requires its own qualified recovery;
 this profile is not a general retry or interval override.
 
+The exact198 delivery helper additionally binds a changed controller origin to
+that immutable recovery receipt. It accepts `02c5ac25…` only when the genuine
+completed predecessor model carries the exact recovery path/hash and is sampled
+at or after15:08, and its authenticated replay status and observer bind that
+same new controller plus the unchanged original producer. The profile retains
+the recovery binding after198 leaves the rate-bearing model. Old immutable
+profiles without that binding still require `d64e3dcc…`; arbitrary owners or
+pre-adoption clocks are rejected. This source support does not claim a15:08
+completion,198terminal event or controller/import handoff, and does not alter
+the already-armed15:08 recovery cycle.
+
 ## Exact private144 observer isolation
 
 For the retained dev-samjohnson private144 diagnostic only,

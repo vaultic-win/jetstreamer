@@ -8,6 +8,49 @@ const BINDINGS: &str =
 const BINDINGS_SHA: &str = "b86c4d36b47ba1556ef47630eff12774ab980a30805e66999fd6947f84df1b47";
 const OLD: &str = "2026-10-21T14:08:00Z";
 const NEXT: &str = "2026-10-21T15:08:00Z";
+pub(super) const CONTROLLER198: &str = "02c5ac25b42f47c99776ba5b65b6f4a9";
+
+pub(super) fn epoch198_controller(binding: &Bound) -> Result<&'static str> {
+    let rows = evidence(binding)?;
+    let matches: Vec<_> = rows["bindings"]
+        .as_array()
+        .context("198recovery bindings")?
+        .iter()
+        .filter(|r| r["range"] == "198")
+        .collect();
+    ensure!(
+        matches.len() == 1
+            && matches[0]["controller_iid"] == CONTROLLER198
+            && matches[0]["producer_iid"] == "e5612ef00a5b4fcab04df2c13a6b35b0",
+        "198controller recovery cannot change original producer"
+    );
+    Ok(CONTROLLER198)
+}
+
+pub(super) fn epoch198_origin(model: &Value) -> Result<Option<Bound>> {
+    let rows = model["evidence"]
+        .as_array()
+        .context("198origin model evidence")?;
+    let matches: Vec<_> = rows
+        .iter()
+        .filter(|e| e["path"] == PROOF || e["sha256"] == PROOF_SHA)
+        .collect();
+    if matches.is_empty() {
+        return Ok(None);
+    }
+    ensure!(matches.len() == 1, "duplicate198controller recovery origin");
+    let binding: Bound = serde_json::from_value(matches[0].clone())?;
+    ensure!(
+        utc_seconds(
+            model["sample_target_utc"]
+                .as_str()
+                .context("origin model time")?
+        )? >= utc_seconds(NEXT)?,
+        "198controller origin predates accepted adoption"
+    );
+    epoch198_controller(&binding)?;
+    Ok(Some(binding))
+}
 
 fn evidence(binding: &Bound) -> Result<Value> {
     ensure!(
@@ -270,6 +313,39 @@ mod tests {
         let (mut model, bindings) = fixture();
         model["ranges"].as_array_mut().unwrap().pop();
         assert!(transform(&model, &bindings, true).is_err());
+    }
+    #[test]
+    fn changed198controller_cannot_borrow_a_missing_or_pre_adoption_origin() {
+        assert!(
+            epoch198_origin(&json!({"evidence":[],"sample_target_utc":NEXT}))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            epoch198_origin(
+                &json!({"evidence":[{"path":PROOF,"sha256":PROOF_SHA}],"sample_target_utc":OLD})
+            )
+            .is_err()
+        );
+        assert!(epoch198_origin(&json!({"evidence":[{"path":PROOF,"sha256":"f".repeat(64)}],"sample_target_utc":NEXT})).is_err());
+    }
+    #[test]
+    #[ignore = "requires root and exact immutable package-recovery evidence; no198 event or adoption claimed"]
+    fn exact198controller_binding_keeps_original_producer_and_legacy_origin() {
+        let binding = Bound {
+            path: PROOF.into(),
+            sha256: PROOF_SHA.into(),
+        };
+        assert_eq!(epoch198_controller(&binding).unwrap(), CONTROLLER198);
+        let model = json!({"evidence":[binding],"sample_target_utc":NEXT});
+        let accepted = epoch198_origin(&model).unwrap().unwrap();
+        assert_eq!(accepted.path, Path::new(PROOF));
+        assert_eq!(accepted.sha256, PROOF_SHA);
+        assert!(
+            epoch198_origin(&json!({"evidence":[],"sample_target_utc":OLD}))
+                .unwrap()
+                .is_none()
+        );
     }
     #[test]
     fn ordinary_plans_keep_the_hard_thirty_minute_interval() {
