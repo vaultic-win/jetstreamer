@@ -26,3 +26,20 @@ the bounded-diagnostic same-sample admission exception for delivery. The ledger
 records pipeline invocations in both `pipelines` and, when live, `active`.
 It intentionally does not make a replay status object's old ETA current merely
 because a delivery stage is now active.
+
+The narrowly qualified `producer-finalization` phase covers only the exact
+sealed 216–219 v5 producer and its original invocation. It authenticates the
+immutable parent digest and requires the original user's journal events for
+the final checkpoint, snapshot verification and archive close in that order,
+all no later than the coordinated sample. The ledger retains those events.
+It does not require a historical worker to remain alive after archive close,
+does not label the parent ordinary replay, and grants no independent full
+verification or publication evidence. Other producers need separate qualification.
+
+`controller-import-handoff` separately covers that exact cohort after clean
+producer success and committed private batch publication. It authenticates the
+unchanged controller/script, pending assignment with no import owner, source
+batch digest, terminal producer, and the original batch-commit journal event
+before the sample. It invalidates when the controller begins importing; an
+actual importer must then use its own exact `local-publication` claim. Neither
+handoff observation launches work or weakens any import or verification gate.

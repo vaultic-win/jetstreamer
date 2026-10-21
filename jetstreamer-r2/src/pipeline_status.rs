@@ -37,9 +37,26 @@ impl Binding {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
             | ("local-publication", "publication")
+            | ("producer-finalization", "finalization")
+            | ("controller-import-handoff", "publication")
             | ("upload-readback", "upload" | "readback") => (),
             _ => bail!("pipeline and status phases disagree"),
         };
+        if self.claim_phase == "producer-finalization" {
+            ensure!(
+                self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
+                "producer finalization must retain the original invocation clock"
+            );
+        }
+        if self.claim_phase == "controller-import-handoff" {
+            ensure!(
+                self.unit == super::cohort_finalization::CONTROLLER
+                    && self.invocation_id == super::cohort_finalization::CONTROLLER_INVOCATION
+                    && self.origin_unit == super::cohort_finalization::UNIT
+                    && self.origin_invocation_id == super::cohort_finalization::PRODUCER_INVOCATION,
+                "controller handoff must retain the exact original producer clock"
+            );
+        }
         ensure!(
             unit_name(&self.unit)
                 && fleet::pipeline_unit_range(&self.claim_phase, &self.unit)?.contains(&epoch)
@@ -185,9 +202,12 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["INVOCATION_ID"] == invocation
                 && r["_PID"] == "1"
                 && r["_UID"] == "0"
-                && r["MESSAGE"]
-                    .as_str()
-                    .is_some_and(|s| s.starts_with("Starting "))
+                && r["MESSAGE"].as_str().is_some_and(|s| {
+                    s.starts_with("Starting ")
+                        || (unit == super::cohort_finalization::CONTROLLER
+                            && invocation == super::cohort_finalization::CONTROLLER_INVOCATION
+                            && s.starts_with("Started "))
+                })
         })
         .collect();
     ensure!(
@@ -300,6 +320,8 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
                         | "plugin-verification"
                         | "local-publication"
                         | "upload-readback"
+                        | "producer-finalization"
+                        | "controller-import-handoff"
                 )
             )),
         "pipeline overlaps a replay or private qualification claim"
@@ -343,7 +365,9 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
                     "full-verification",
                     "plugin-verification",
                     "local-publication",
-                    "upload-readback"
+                    "upload-readback",
+                    "producer-finalization",
+                    "controller-import-handoff"
                 ]
                 .iter()
                 .any(|phase| fleet::pipeline_unit_range(phase, peer)
@@ -364,6 +388,26 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
         plan.binding.live_matches(&current[&plan.binding.unit]),
         "pipeline invocation or exact command is not live"
     );
+    if plan.binding.claim_phase == "producer-finalization" {
+        super::cohort_finalization::observe(
+            &current[&plan.binding.unit],
+            fleet::utc_seconds(
+                fleet["sampled_at_utc"]
+                    .as_str()
+                    .context("fleet sample missing")?,
+            )?,
+        )?;
+    }
+    if plan.binding.claim_phase == "controller-import-handoff" {
+        super::cohort_finalization::observe_handoff(
+            &current[&plan.binding.unit],
+            fleet::utc_seconds(
+                fleet["sampled_at_utc"]
+                    .as_str()
+                    .context("fleet sample missing")?,
+            )?,
+        )?;
+    }
     for (name, prior) in previous {
         if name != &plan.binding.unit && !peers.contains(name) {
             ensure!(
@@ -547,6 +591,77 @@ mod tests {
             fleet_path: "/fleet".into(),
             fleet_sha256: "d".repeat(64),
         }
+    }
+    #[test]
+    fn exact_simple_controller_uses_its_authenticated_started_manager_event() {
+        let unit = super::super::cohort_finalization::CONTROLLER;
+        let inv = super::super::cohort_finalization::CONTROLLER_INVOCATION;
+        let r = json!({"UNIT":unit,"INVOCATION_ID":inv,"_PID":"1","_UID":"0",
+            "MESSAGE":"Started controller.","__REALTIME_TIMESTAMP":"10000000"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&r), unit, inv).unwrap(),
+            10000
+        );
+        assert!(start_millis(std::slice::from_ref(&r), unit, "replacement").is_err());
+        let mut wrong = r.clone();
+        wrong["_PID"] = json!("123");
+        assert!(start_millis(&[wrong], unit, inv).is_err());
+    }
+    #[test]
+    fn controller_handoff_keeps_original_producer_not_controller_start_clock() {
+        let mut b = binding();
+        b.unit = super::super::cohort_finalization::CONTROLLER.into();
+        b.invocation_id = super::super::cohort_finalization::CONTROLLER_INVOCATION.into();
+        b.claim_phase = "controller-import-handoff".into();
+        b.origin_unit = super::super::cohort_finalization::UNIT.into();
+        b.origin_invocation_id = super::super::cohort_finalization::PRODUCER_INVOCATION.into();
+        b.validate(216, "publication").unwrap();
+        assert!(b.validate(220, "publication").is_err());
+        assert!(b.validate(216, "replay").is_err());
+        b.origin_unit = b.unit.clone();
+        assert!(b.validate(216, "publication").is_err());
+    }
+    #[test]
+    fn producer_finalization_has_exact_scope_phase_and_original_clock() {
+        let mut b = binding();
+        b.unit = super::super::cohort_finalization::UNIT.into();
+        b.claim_phase = "producer-finalization".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        b.validate(216, "finalization").unwrap();
+        b.validate(219, "finalization").unwrap();
+        assert!(b.validate(220, "finalization").is_err());
+        assert!(b.validate(216, "replay").is_err());
+        assert!(b.validate(216, "upload").is_err());
+        b.origin_invocation_id = "b".repeat(32);
+        assert!(b.validate(216, "finalization").is_err());
+    }
+    #[test]
+    fn completion_cleanup_can_read_new_finalization_receipts_without_replay_ids() {
+        let directory = Path::new("/private/receipts");
+        let mut r = super::super::tests::status_publication_receipt(216);
+        let mut b = binding();
+        b.unit = super::super::cohort_finalization::UNIT.into();
+        b.claim_phase = "producer-finalization".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        r.schema = PIPELINE_STATUS_RECEIPT_SCHEMA.into();
+        r.status.phase = "finalization".into();
+        r.controller_invocation_id.clear();
+        r.producer_invocation_id.clear();
+        r.pipeline_binding = Some(b);
+        let path = status_receipt_path(directory, &r.status);
+        assert_eq!(
+            validate_status_publication_receipt_bytes(
+                directory,
+                &path,
+                &serde_json::to_vec(&r).unwrap(),
+                "bucket",
+                216
+            )
+            .unwrap(),
+            r
+        );
     }
     #[test]
     fn pipeline_binding_is_not_a_replay_or_another_epoch() {
