@@ -22,6 +22,16 @@ use {
 };
 const REPO: &str = "/home/ubuntu/workspace/jetstreamer";
 const TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/debug";
+const SELECTED225_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug";
+fn cache_target(schema: &str) -> Result<&'static Path> {
+    match schema {
+        "jetstreamer-horizon-dev-cache-check-plan-v1" => Ok(Path::new(TARGET)),
+        "jetstreamer-horizon-selected225-dev-cache-check-plan-v1" => {
+            Ok(Path::new(SELECTED225_TARGET))
+        }
+        _ => anyhow::bail!("unsupported fixed cache profile"),
+    }
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Plan {
@@ -60,11 +70,10 @@ fn git(args: &[&str]) -> Result<Vec<u8>> {
 }
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
-        p.schema == "jetstreamer-horizon-dev-cache-check-plan-v1"
-            && hex(&p.source_commit, 40)
-            && hex(&p.cargo_lock_sha256, 64),
+        hex(&p.source_commit, 40) && hex(&p.cargo_lock_sha256, 64),
         "invalid cache-check plan"
     );
+    cache_target(&p.schema)?;
     ensure!(
         p.output.file_name().is_some_and(|s| s == "check.json")
             && p.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
@@ -341,13 +350,41 @@ pub fn run() -> Result<()> {
             && git(&["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
         "source revision is not preserved/clean"
     );
-    git(&["check-ignore", "target/debug"])?;
+    let target = cache_target(&p.schema)?;
+    let historical_lock_sha256 = if target == Path::new(TARGET) {
+        git(&["check-ignore", "target/debug"])?;
+        None
+    } else {
+        // This isolated historical target is untracked rather than ignored.
+        // Bind its exact fixed scope and retain the tracked legacy lockfile.
+        ensure!(
+            git(&[
+                "ls-files",
+                "--",
+                ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
+            ])?
+            .is_empty(),
+            "selected cache contains tracked source"
+        );
+        ensure!(
+            git(&["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"])?
+                == b"historical-runtime/v1_6_25/Cargo.lock\n",
+            "legacy lockfile is not preserved by source revision"
+        );
+        Some(
+            hash_file(
+                &Path::new(REPO).join("historical-runtime/v1_6_25/Cargo.lock"),
+                16 << 20,
+            )?
+            .0,
+        )
+    };
     let lock = Path::new(REPO).join("Cargo.lock");
     ensure!(
         hash_file(&lock, 16 << 20)?.0 == p.cargo_lock_sha256,
         "Cargo.lock differs"
     );
-    let tree = cache_tree(Path::new(TARGET))?;
+    let tree = cache_tree(target)?;
     let mut missing = Vec::new();
     let staged = staged_references(
         &[
@@ -355,17 +392,17 @@ pub fn run() -> Result<()> {
             Path::new("/run/systemd/transient"),
             Path::new("/home/ubuntu/.config/systemd/user"),
         ],
-        Path::new(TARGET),
+        target,
         &mut missing,
     )?;
-    let scan = process_references::scan(Path::new("/proc"), Path::new(TARGET))?;
+    let scan = process_references::scan(Path::new("/proc"), target)?;
     ensure!(
         staged.is_empty() && scan.references.is_empty(),
         "cache has live or staged references: {:?} {:?}",
         scan.references,
         staged
     );
-    let root = fs::symlink_metadata(TARGET)?;
+    let root = fs::symlink_metadata(target)?;
     ensure!(
         tree["device"] == root.dev() && tree["inode"] == root.ino(),
         "cache identity changed before receipt"
@@ -373,7 +410,7 @@ pub fn run() -> Result<()> {
     persist(
         &p.output,
         &json!({"schema":"jetstreamer-horizon-dev-cache-check-v1","self_sha256":a[5],"plan":{"path":pb.path,"sha256":pb.sha256},
-        "source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,"cache":tree,"process_scan":scan,"staged_unit_references":staged,"missing_inactive_unit_aliases":missing,
+        "source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,"cache_profile":p.schema,"historical_lock_sha256":historical_lock_sha256,"cache":tree,"process_scan":scan,"staged_unit_references":staged,"missing_inactive_unit_aliases":missing,
         "retirement_authorized":false,"archive_deletion_authorized":false,"replay_scratch_deletion_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     println!("{}", p.output.display());
@@ -455,6 +492,14 @@ mod tests {
             output: "/var/lib/jetstreamer/horizon-dev-cache-check-test/check.json".into(),
         };
         validate_plan(&p).unwrap();
+        assert_eq!(cache_target(&p.schema).unwrap(), Path::new(TARGET));
+        p.schema = "jetstreamer-horizon-selected225-dev-cache-check-plan-v1".into();
+        validate_plan(&p).unwrap();
+        assert_eq!(
+            cache_target(&p.schema).unwrap(),
+            Path::new(SELECTED225_TARGET)
+        );
+        assert!(cache_target("/home/ubuntu/horizon").is_err());
         p.output = "/home/ubuntu/horizon/check.json".into();
         assert!(validate_plan(&p).is_err());
         assert!(serde_json::from_value::<Plan>(json!({"schema":p.schema,"source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,"output":p.output,"target":"/"})).is_err());
