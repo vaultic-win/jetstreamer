@@ -345,6 +345,16 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if mode == "--prepare-next-upload198" {
+        ensure!(
+            handoff_spec.is_none(),
+            "upload198 is a separate exact migration"
+        );
+        public198::enable_upload(&mut next)?;
+        public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        public198::derive_fleet(&next, &mut fleet_plan.clone())?;
+        tool_ok(&next.tools.r2)?;
+    }
     if let Some(spec) = native_spec {
         public198::enable_native(&mut next, spec)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;

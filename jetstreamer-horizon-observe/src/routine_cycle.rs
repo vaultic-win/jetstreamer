@@ -196,8 +196,12 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if p.native144_restore.is_some() {
+    if p.native144_restore.is_some() && public198::upload(p) {
+        "native144-upload198-refresh-completed144-v1"
+    } else if p.native144_restore.is_some() {
         "native144-native198-refresh-completed144-v1"
+    } else if public198::upload(p) {
+        "upload198-refresh-completed144-v1"
     } else if public198::refreshed(p) {
         "native198-refresh-completed144-v1"
     } else if public198::native(p) {
@@ -1550,6 +1554,8 @@ fn main() {
                             | "--recover-delivery198"
                             | "--promote-partial2018"
                             | "--prepare-next"
+                            | "--prepare-next-upload198"
+                            | "--publish-upload198-event"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
@@ -1572,6 +1578,12 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--publish-upload198-event")
+        {
+            return public198::upload_event(&plan, &bound, &args[5]);
+        }
         if args
             .get(6)
             .is_some_and(|arg| arg == "--refresh-native198-launches")
@@ -1612,6 +1624,7 @@ fn main() {
         }
         if args.get(6).is_some_and(|arg| {
             arg == "--prepare-next"
+                || arg == "--prepare-next-upload198"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-native198"

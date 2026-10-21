@@ -37,8 +37,8 @@ pub(super) fn owner(p: &Plan, d: &DiagnosticClaim) -> bool {
 }
 pub(super) fn writer(p: &Plan) -> bool {
     p.native144_restore.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+            || public198::upload_writer(p))
 }
 fn read(profile: &Profile) -> Result<(Value, Value)> {
     let launch = bound_json(&profile.launch, true)?;
@@ -342,10 +342,12 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
         event_plan: s.event_plan,
         invocation_id: iid,
     });
-    next.tools.r2 = Bound {
-        path: READER.into(),
-        sha256: READER_SHA.into(),
-    };
+    if !public198::upload_writer(next) {
+        next.tools.r2 = Bound {
+            path: READER.into(),
+            sha256: READER_SHA.into(),
+        };
+    }
     next.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
     validate(next)?;
     completed144::derive_fleet(next, &mut ep.clone())?;
