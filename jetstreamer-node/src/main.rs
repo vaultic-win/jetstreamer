@@ -2,6 +2,7 @@ mod checkpoint_continuation;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
+mod failed_prefix220;
 
 #[cfg(all(
     feature = "epoch225-v1-6-25-qualification",
@@ -18886,6 +18887,20 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    if probe_args.first().map(String::as_str) == Some("--failed-prefix220-checkpoint-probe") {
+        if probe_args.len() != 1 {
+            eprintln!("--failed-prefix220-checkpoint-probe accepts no additional arguments");
+            exit(2);
+        }
+        match failed_prefix220::probe() {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("failed-prefix checkpoint probe failed: {error}");
+                exit(1);
+            }
+        }
+        return;
+    }
     if probe_args.first().map(String::as_str) == Some("--post-update-capacity-probe") {
         if probe_args.len() != 1 {
             eprintln!("--post-update-capacity-probe accepts no additional arguments");

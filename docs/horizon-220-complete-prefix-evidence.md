@@ -68,3 +68,25 @@ rejected; no production archive, replay runtime, database or remote storage is
 opened. Preserve each exact executable digest and machine-readable result.
 This capability evidence does not replace the fresh admission, canonical-root,
 independent full-verification, current-plugin or R2 readback/sidecar gates.
+
+## Failed-prefix checkpoint qualification
+
+`jetstreamer-node --failed-prefix220-checkpoint-probe` is a standalone read-only
+bridge from the exact primary-source receipt to the replanned 220–222 checkpoint
+scope. Both input paths and independently recorded SHA-256 values are compiled
+in. It rejects additional arguments before destination, lease, runtime launch,
+archive or network initialization. It uses ordinary runtime/strict manifest
+validation, parses all ten fields in each full checkpoint tuple, requires their
+exact original journal suffixes, and validates complete-slot tick heights.
+Every observed root must match its independently hash-bound planned root; all
+three terminals must be their canonical epoch ends. Carried-bank tuples are
+preserved exactly between members, with monotonic transaction/write cursors.
+
+The JSON explicitly marks the resulting checkpoint context as a candidate, not
+publication authority. It proves neither current archive bytes/provenance nor
+independent PoH anchors. A successful probe does not fabricate a segment manifest,
+change the existing whole-cohort recovery gate, import anything, create sidecars,
+restart any producer, or touch R2. Independent rereads, exact content-bound
+provenance admission, reviewed failed-prefix import, and full/current-plugin
+delivery gates remain required. The partial 223 archive and original failed
+cohort state remain preserved.
