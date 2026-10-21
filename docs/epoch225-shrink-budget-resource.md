@@ -31,3 +31,27 @@ not a full cold-epoch peak bound. Epoch 225 still needs natural completion at it
 canonical root, independent complete reread, current-plugin verification and
 normal publication/readback gates. Its epoch-226 diagnostic tail remains private
 and sidecar-free; no runtime registry or publication authority is granted here.
+
+## Separately pinned bounded measurement
+
+The opt-in `jetstreamer-utils/epoch225-shrink-budget-resource` feature builds
+`jetstreamer-epoch225-shrink-budget-resource`. It reuses the reviewed bounded
+runner without changing the default epoch225 profile or any live deployment.
+It pins capped-shrink qualification worker `2dcc9b84…` built from the v1.6.25
+workspace with `epoch225-v1-6-25-qualification`, and the existing diagnostic
+parent `3915f578…`. The worker's wider internal bound grants no wider execution:
+the runner retains target `97202500`, underlying root `97631459`, 256-GiB
+terminal scratch gate, 3,185,678,193,366-byte minimum free space, 16 Rayon
+threads, and one-hour maximum. The exact-parent/worker capability must still
+prove this combination before launch.
+
+Plans and results use distinct `jetstreamer-private-epoch225-shrink-budget-resource-`
+schemas. Units begin `horizon-qualify-225-bounded-resource-shrink-budget-`, and
+private roots begin `bounded-resource-225-shrink-budget-`. Preserve the same
+snapshot, genesis, checkpoint names, controlled-stop evidence and bounded-canary
+guard requirements. A passing bounded run cannot establish the full cold peak,
+canonical root, complete epoch225, epoch226 tail, plugin or publication gates.
+Source availability, a release build and sealing are preparation only; require
+real selected-profile snapshot tests, exact-package capability, fresh admission,
+fleet registration and the guard's first real sandbox fire before leaving a
+new run unattended.

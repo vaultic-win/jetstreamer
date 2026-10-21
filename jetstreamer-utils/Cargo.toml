@@ -13,6 +13,8 @@ documentation.workspace = true
 sst-capability-tests = ["dep:rocksdb"]
 # Pins the separate bounded epoch225 upstream-comparison worker, not an era.
 epoch225-v1-6-25-diagnostic = []
+# Separate capped-shrink epoch225 prefix measurement; no route promotion.
+epoch225-shrink-budget-resource = []
 # Private same-input epoch203 resource comparison; no runtime promotion.
 epoch203-single-thread-resource = []
 # Exact private comparison of the v1.6.16 upstream shrink-budget cap.
@@ -133,6 +135,11 @@ path = "src/horizon_standalone_guard_bin.rs"
 [[bin]]
 name = "jetstreamer-epoch225-bounded-resource"
 path = "src/epoch225_bounded_resource_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch225-shrink-budget-resource"
+path = "src/epoch225_shrink_budget_resource_bin.rs"
+required-features = ["epoch225-shrink-budget-resource"]
 
 [[bin]]
 name = "jetstreamer-epoch224-bounded-resource"
