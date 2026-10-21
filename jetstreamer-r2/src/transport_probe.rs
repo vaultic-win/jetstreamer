@@ -4,7 +4,8 @@ use std::{
     net::{SocketAddr, ToSocketAddrs},
     time::{Duration, Instant},
 };
-const LENGTH: usize = 1 << 20;
+const LENGTH: usize = 32 << 20;
+const OFFSET: u64 = 8 << 30;
 fn select_address(addresses: &[SocketAddr], ipv6: bool) -> Result<SocketAddr> {
     addresses
         .iter()
@@ -68,6 +69,7 @@ pub(super) async fn run() -> Result<()> {
         .read(true)
         .custom_flags(libc::O_NOFOLLOW)
         .open(path)?;
+    local.seek(SeekFrom::Start(OFFSET))?;
     local.read_exact(&mut expected)?;
     let config = r2_config_from_env()?;
     let endpoint = Url::parse(&config.endpoint)?;
@@ -93,11 +95,36 @@ pub(super) async fn run() -> Result<()> {
         "remote length differs from local archive"
     );
     let etag = head.e_tag().context("missing immutable ETag")?;
+    let range = format!("bytes={}-{}", OFFSET, OFFSET + LENGTH as u64 - 1);
+    let expected_range = format!(
+        "bytes {}-{}/{}",
+        OFFSET,
+        OFFSET + LENGTH as u64 - 1,
+        before.length
+    );
+    let sdk_started = Instant::now();
+    let sdk_attempt: Result<Value> = match tokio::time::timeout(Duration::from_secs(20), async {
+        let response = client.get_object().bucket(&config.bucket).key("epoch-217.jet")
+            .range(&range).if_match(etag).send().await.map_err(|_|anyhow!("SDK window request failed"))?;
+        ensure!(response.content_length() == Some(LENGTH as i64) && response.content_range() == Some(expected_range.as_str()), "SDK window response bounds differ");
+        let bytes = response.body.collect().await.map_err(|e|anyhow!(format!("{e:?}").replace(&config.access_key,"[redacted]").replace(&config.secret_key,"[redacted]")))?.into_bytes();
+        validate_prefix(&bytes,&expected)?;
+        Ok(serde_json::json!({"success":true,"bytes":bytes.len(),"sha256":format!("{:x}",Sha256::digest(&bytes))}))
+    }).await {
+        Ok(result) => result,
+        Err(_) => Err(anyhow!("SDK window reached 20-second timeout")),
+    };
+    let sdk_result = match sdk_attempt {
+        Ok(v) => v,
+        Err(e) => serde_json::json!({"success":false,"error":e.to_string()}),
+    };
+    let sdk =
+        serde_json::json!({"elapsed_millis":sdk_started.elapsed().as_millis(),"result":sdk_result});
     let signed = client
         .get_object()
         .bucket(&config.bucket)
         .key("epoch-217.jet")
-        .range("bytes=0-1048575")
+        .range(&range)
         .if_match(etag)
         .presigned(aws_sdk_s3::presigning::PresigningConfig::expires_in(
             Duration::from_secs(120),
@@ -114,7 +141,7 @@ pub(super) async fn run() -> Result<()> {
             for (key,value) in signed.headers() {request=request.header(key,value);}
             let response = request.send().await.map_err(|e|anyhow!(e.without_url().to_string()))?;
             ensure!(response.status()==reqwest::StatusCode::PARTIAL_CONTENT && response.content_length()==Some(LENGTH as u64), "GET probe returned wrong status or bounded length");
-            ensure!(response.headers().get("content-range").and_then(|h|h.to_str().ok()) == Some(format!("bytes 0-1048575/{}",before.length).as_str()), "GET probe Content-Range differs");
+            ensure!(response.headers().get("content-range").and_then(|h|h.to_str().ok()) == Some(expected_range.as_str()), "GET probe Content-Range differs");
             let bytes = response.bytes().await.map_err(|e|anyhow!(e.without_url().to_string()))?;
             validate_prefix(&bytes,&expected)?;
             Ok(serde_json::json!({"success":true,"bytes":bytes.len(),"sha256":format!("{:x}",Sha256::digest(&bytes))}))
@@ -130,7 +157,7 @@ pub(super) async fn run() -> Result<()> {
         regular_identity(path)? == before,
         "local source changed during probe"
     );
-    let report = serde_json::json!({"schema":"jetstreamer-private-epoch217-transport-probe-v1","epoch":217,"archive_length":before.length,"range_bytes":LENGTH,"results":results,"publication_authorized":false,"whole_object_verified":false,"archive_mutations":false,"sidecar_mutations":false,"r2_mutations":false,"service_mutations":false});
+    let report = serde_json::json!({"schema":"jetstreamer-private-epoch217-transport-probe-v2","epoch":217,"archive_length":before.length,"range_start":OFFSET,"range_bytes":LENGTH,"sdk":sdk,"results":results,"publication_authorized":false,"whole_object_verified":false,"archive_mutations":false,"sidecar_mutations":false,"r2_mutations":false,"service_mutations":false});
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
     serde_json::to_writer_pretty(temporary.as_file_mut(), &report)?;
     temporary.write_all(b"\n")?;
