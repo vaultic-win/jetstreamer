@@ -278,7 +278,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     if completion.get("public198_promotion").is_some() {
-        public198::consume(&mut next, &completion)?;
+        public198::consume(&mut next, &completion, &mut next_config)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
     } else {
         delivery198::consume_recovery(&mut next)?;

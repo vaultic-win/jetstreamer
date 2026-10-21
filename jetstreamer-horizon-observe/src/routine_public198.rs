@@ -1,9 +1,9 @@
 //! Public198 verification ownership and honest promotion of the partial20:18 cycle.
 use super::*;
 pub(super) const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch198-public-watch-reader-20261021-v1/jetstreamer-r2";
+    "/usr/local/lib/jetstreamer/horizon-epoch198-public-watch-reader-20261021-v2/jetstreamer-r2";
 pub(super) const READER_SHA: &str =
-    "78f083f9c06d56350bc2938f74803a2e7ae618387e9a2b291345465cecb892c8";
+    "d00bb3eb69491065694d0a6679c30e2b759df133000cc7cafd0f480afc7aaea5";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T201800Z-delivery198-completed144-v1";
 const FULL: &str = "jetstreamer-horizon-audit-epochs182-200-v5.service";
 const PLUGIN: &str = "jetstreamer-horizon-plugin-receipt-watcher-shard-e-v5-fsync.service";
@@ -34,11 +34,6 @@ fn import_proof() -> Result<()> {
             == "4a35dc14d303fd3c39e256d02346f9f675f67033103046e0c1b182d7c5db3ad7",
         "198 durable import receipt changed"
     );
-    let m = fs::symlink_metadata("/home/sol/horizon/epoch-198.jet")?;
-    ensure!(
-        m.is_file() && m.nlink() == 1 && m.len() == 99381250591 && m.mode() & 0o222 == 0,
-        "198 imported archive changed"
-    );
     Ok(())
 }
 fn read(profile: &Profile) -> Result<Value> {
@@ -63,9 +58,7 @@ pub(super) fn promoted(p: &Plan, c: &Value) -> Result<bool> {
         p.cycle_directory == Path::new(ROOT)
             && bound.path == Path::new(ROOT).join("public198-promotion-v1/intent.json")
             && c["fleet_plan"]["path"]
-                == json!(
-                    Path::new(ROOT).join("public198-promotion-v1/template/sealed/fleet-plan.json")
-                )
+                == json!(Path::new(ROOT).join("delivery198-stage/sealed/fleet-plan.json"))
             && c["epoch198_delivery"].is_null(),
         "foreign partial198 promotion"
     );
@@ -80,7 +73,7 @@ pub(super) fn promoted(p: &Plan, c: &Value) -> Result<bool> {
     );
     Ok(true)
 }
-pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
+pub(super) fn consume(p: &mut Plan, c: &Value, config: &mut Value) -> Result<()> {
     let promotion: Bound = serde_json::from_value(c["public198_promotion"].clone())?;
     let value = bound_json(&promotion, false)?;
     p.public198_delivery = Some(Profile {
@@ -93,8 +86,34 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
         path: READER.into(),
         sha256: READER_SHA.into(),
     };
+    ensure!(
+        p.sample_target_utc == "2026-10-21T20:48:00Z",
+        "198 initial public recovery target differs"
+    );
+    for path in [&mut p.observer, &mut p.estimate_output, &mut p.fleet_output] {
+        *path = PathBuf::from(
+            path.to_str()
+                .context("198 recovery path")?
+                .replace("20261021T204800Z", "20261021T205800Z"),
+        );
+    }
+    p.sample_target_utc = "2026-10-21T20:58:00Z".into();
+    config["not_before_utc"] = json!(p.sample_target_utc);
+    config["output"] = json!(p.observer);
+    p.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
     read(p.public198_delivery.as_ref().unwrap())?;
     Ok(())
+}
+pub(super) fn interval(p: &Plan) -> Result<Option<u64>> {
+    if p.public198_delivery.is_some() && p.sample_target_utc == "2026-10-21T20:58:00Z" {
+        ensure!(
+            p.previous_observer.sha256
+                == "a875e052381e1fdf0aee6e1e847649a0c99b808f77a27e20937e895a303f3e03",
+            "198 public recovery predecessor differs"
+        );
+        return Ok(Some(2400));
+    }
+    Ok(None)
 }
 pub(super) fn namespaces(p: &mut Plan, observer: &mut PathBuf, cycle: &mut PathBuf) -> Result<()> {
     let stamp = stamp(&p.sample_target_utc);
@@ -161,8 +180,13 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         "foreign198 promotion"
     );
     let invocation =
-        authenticate_named_service("horizon-public198-promote-partial2018-20261021-v2.service")?;
+        authenticate_named_service("horizon-public198-promote-partial2018-20261021-v3.service")?;
     import_proof()?;
+    let m = fs::symlink_metadata("/home/sol/horizon/epoch-198.jet")?;
+    ensure!(
+        m.is_file() && m.nlink() == 1 && m.len() == 99381250591 && m.mode() & 0o222 == 0,
+        "198 promotion archive changed"
+    );
     absent(&p.cycle_directory.join("completion.json"))?;
     ensure!(
         file(p.cycle_directory.join("failure.json"), false)?.sha256
@@ -238,47 +262,61 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
         File::open(&p.cycle_directory)?.sync_all()?;
         write_new(&root.join("intent.json"), &intended)?
     };
-    let profile = Profile {
-        promotion: promotion.clone(),
-        origin,
-        claims,
-    };
-    let mut fleet = bound_json(
-        &file(p.cycle_directory.join("sealed/fleet-plan.json"), true)?,
+    // Promote the genuine in-window inventory byte-for-byte as history. Never
+    // run today's owners against an expired resource sample or backdate them.
+    let historical = file(
+        p.cycle_directory.join("delivery198-provisional-fleet.json"),
+        false,
+    )?;
+    let ledger = bound_json(&historical, false)?;
+    let result = bound_json(
+        &file(
+            p.cycle_directory.join("child-delivery198-fleet.json"),
+            false,
+        )?,
+        false,
+    )?;
+    ensure!(
+        result["success"] == true
+            && result["tool"]["sha256"]
+                == "992d06b9f4b76bd4beecfd9be9572f780131e0c57e1f5618aebaf9fb362dc398"
+            && ledger["sampled_at_utc"] == p.sample_target_utc
+            && ledger["observer_sha256"] == observer.sha256
+            && ledger["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| (1792613880..=1792615680).contains(&n))
+            && ledger["inventory"]["anomalies"] == 0,
+        "198 historical inventory lacks original in-window success"
+    );
+    let fleet_plan = file(
+        p.cycle_directory
+            .join("delivery198-stage/sealed/fleet-plan.json"),
         true,
     )?;
-    fold(&mut fleet, &profile)?;
-    let package = if root.join("template/sealed").exists() {
-        let package = root.join("template/sealed");
-        ensure!(
-            bound_json(&file(package.join("fleet-plan.json"), true)?, true)? == fleet,
-            "198 promotion sealed template changed"
-        );
-        package
-    } else {
-        delivery198::seal_values(
-            p,
-            "public198-promotion-v1/template",
-            &[("fleet-plan.json", fleet)],
-        )?
-    };
-    let fleet_plan = file(package.join("fleet-plan.json"), true)?;
-    let tool = Bound {
-        path: READER.into(),
-        sha256: READER_SHA.into(),
-    };
-    tool_ok(&tool)?;
+    ensure!(
+        ledger["plan_sha256"] == fleet_plan.sha256,
+        "198 historical fleet plan differs"
+    );
     latest_fleet_unchanged(p, &bound_json(&p.previous_fleet, false)?)?;
-    child(
-        &tool,
-        &[
-            "fleet-reconcile".into(),
-            fleet_plan.path.display().to_string(),
-            "--plan-sha256".into(),
-            fleet_plan.sha256.clone(),
-        ],
-        true,
-        &root.join("child-fleet.json"),
+    absent(&p.fleet_output)?;
+    let bytes = read_checked(&historical.path, LIMIT, 0, false)?;
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&p.fleet_output)?;
+    output.write_all(&bytes)?;
+    output.sync_all()?;
+    File::open(
+        p.fleet_output
+            .parent()
+            .context("198 canonical fleet parent")?,
+    )?
+    .sync_all()?;
+    write_new(
+        &root.join("historical-checkpoint.json"),
+        &json!({"source":historical,"canonical_output":p.fleet_output,"preserved_bytes_sha256":sha(&bytes),"sample_timestamp_preserved":true,"new_resource_samples":0,"current198_status_unpublished":true}),
     )?;
     let fleet = file(p.fleet_output.clone(), false)?;
     let ledger = bound_json(&fleet, false)?;
@@ -357,13 +395,24 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
         if check {
             args.push("--check-only".into());
         }
-        child(
+        let result = child(
             &p.tools.r2,
             &args,
             !check,
             &p.cycle_directory
                 .join(format!("child-public198-{name}.json")),
-        )?;
+        );
+        if let Err(error) = result {
+            let failed = file(
+                p.cycle_directory
+                    .join(format!("child-public198-{name}.json")),
+                false,
+            )?;
+            return Ok(
+                json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":failed,
+                "reason":format!("198 status stage needs prompt repair: {error:#}"),"archive_mutations":false}),
+            );
+        }
     }
     let digits: String = p
         .sample_target_utc

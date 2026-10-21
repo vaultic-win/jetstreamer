@@ -73,11 +73,36 @@ fn immutable(path: &str, digest: &str) -> Result<()> {
         "198 watcher input is not immutable"
     );
     ensure!(
-        hex_lower(&Sha256::digest(read_stable_bounded(
-            Path::new(path),
-            128 << 20,
-            "198 watcher executable"
-        )?)) == digest,
+        m.len() <= 512 << 20,
+        "198 watcher executable exceeds binary bound"
+    );
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)?;
+    ensure!(
+        identity(&file.metadata()?) == identity(&m),
+        "198 watcher executable changed at open"
+    );
+    let mut hash = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    let mut total = 0u64;
+    loop {
+        let size = file.read(&mut buffer)?;
+        if size == 0 {
+            break;
+        }
+        total = total
+            .checked_add(size as u64)
+            .context("198 executable length overflow")?;
+        ensure!(total <= m.len(), "198 executable grew");
+        hash.update(&buffer[..size]);
+    }
+    ensure!(
+        total == m.len()
+            && identity(&file.metadata()?) == identity(&m)
+            && regular_identity(Path::new(path))? == identity(&m)
+            && hex_lower(&hash.finalize()) == digest,
         "198 watcher executable changed"
     );
     Ok(())
@@ -184,6 +209,20 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root read-only actual198 watcher child sandbox capability; no resources sampled or remote access"]
+    fn root_actual198_children_are_scoped_and_readable() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let mut active = 0;
+        for (phase, name) in [("full-verification", FULL), ("plugin-verification", PLUGIN)] {
+            let before = unit(name).unwrap();
+            if child_start(phase, &before).unwrap().is_some() {
+                active += 1;
+            }
+            assert_eq!(unit(name).unwrap(), before);
+        }
+        assert!(active > 0, "no active198 verifier child");
+    }
     #[test]
     fn a_live_watcher_or_other_epoch_is_not_actual198_work() {
         let worker = profile("full-verification", FULL).unwrap().4;
