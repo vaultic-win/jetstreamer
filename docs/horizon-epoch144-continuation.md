@@ -53,6 +53,19 @@ writer and evidence-backed full-path budget are still required. Do not invent
 an admission JSON or reuse the 40-GiB native-only receipt. The 8.2-GB native
 scratch measurement does not bound suffix, assembly or verification work.
 
+The R2 tool's `prepare-continuation144-protection` command prepares a separate
+accounting receipt for the completed epoch-198 reservation. It pins the original
+protection policy, audited century floor and original whole-object R2 receipt,
+requires a fresh accepted v2 observer/fleet pair, authenticates stable live owners
+and dormant epoch-198 owners, and revalidates the remote ready pair twice. Only
+the old 768-GiB epoch-198 future-growth claim is subtracted; all other claims,
+floor, margin and original slack remain. It does not sample resources, mutate
+R2, delete local files, change guards or authorize admission. Its `--check-only`
+mode reads bound evidence without service or remote observations or output.
+This accounting proposal must still be consumed by a reviewed full-path admission
+and launch generation; it does not lower the current runner's fixed protection
+threshold automatically.
+
 ## Gates that remain separate
 
 Source tests and native-only comparison do not establish a successful suffix or

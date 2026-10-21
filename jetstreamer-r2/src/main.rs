@@ -3165,6 +3165,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("prepare-continuation144-protection") {
+        return fleet::prepare_continuation144_protection().await;
+    }
     if matches!(
         env::args().nth(1).as_deref(),
         Some("admit-snapshot144" | "admit-clock144" | "admit-native144")

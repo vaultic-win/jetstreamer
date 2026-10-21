@@ -132,7 +132,7 @@ fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
     Ok(())
 }
 
-fn floor(value: &Value) -> Result<u64> {
+pub(super) fn floor(value: &Value) -> Result<u64> {
     ensure!(
         value["schema"] == "jetstreamer-horizon-century-jet-floor-v1"
             && value["century"]["first_epoch"] == 200
