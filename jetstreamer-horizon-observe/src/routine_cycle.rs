@@ -34,6 +34,9 @@ mod delivery198;
 #[path = "routine_private144.rs"]
 mod private144;
 
+#[path = "routine_recovery.rs"]
+mod controller_recovery;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -77,6 +80,8 @@ struct Plan {
     epoch157_terminal_handoff: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     epoch198_delivery: Option<delivery198::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    package_controller_recovery: Option<Bound>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -485,8 +490,8 @@ fn validate_templates(
         .as_str()
         .context("old observer time missing")?;
     ensure!(
-        target.checked_sub(utc_seconds(old_time)?) == Some(1800),
-        "routine target must advance exactly1800seconds"
+        target.checked_sub(utc_seconds(old_time)?) == Some(controller_recovery::interval(p)?),
+        "routine target must follow its qualified predecessor interval"
     );
     ensure!(
         old_observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -1154,7 +1159,10 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     let old_observer = bound_json(&p.previous_observer, false)?;
     validate_templates(p, &model, &fleet, &previous, &estimates, &old_observer)?;
     terminal_handoff::preflight(p, &model)?;
-    let model = private144::effective_model(p, &delivery198::effective_model(p, &model)?)?;
+    let model = private144::effective_model(
+        p,
+        &delivery198::effective_model(p, &controller_recovery::model(p, &model)?)?,
+    )?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1451,10 +1459,11 @@ fn main() {
                             | "--prepare-next"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
+                            | "--prepare-package-recovery"
                     )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
-            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
+            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-package-recovery|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
         );
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -1474,6 +1483,7 @@ fn main() {
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-private144"
+                || arg == "--prepare-package-recovery"
         }) {
             let spec = if args.len() == 10 {
                 Some(Bound {
@@ -1490,6 +1500,7 @@ fn main() {
                 args[6] == "--prepare-next-terminal157",
                 spec.as_ref(),
                 args[6] == "--prepare-next-private144",
+                args[6] == "--prepare-package-recovery",
             );
         }
         execute(&plan, &bound, &args[5], args.len() == 7)
