@@ -11,7 +11,7 @@ use {
     },
     baseline::{available, bound_bytes, compare, digest, private_directory, write_receipt},
     jetstreamer_node::segment_manifest::SegmentCheckpointSummary,
-    serde::Deserialize,
+    serde::{Deserialize, Serialize},
     serde_json::{Value, json},
     solana_hash::Hash,
     std::{
@@ -34,7 +34,7 @@ const PREFIX_PASS: &str = "35b52ea28979dc8bc360afde41b1b71059a8451c801b71e65ebea
 const CLOCK: &str = "ea9c16d375feac1a1ec0ed7304f7711e195ed0b0bd4f3ae4b1d6a100bfd11f11";
 const GENESIS: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 const ARCHIVE: &str = "917f700274c0ff0386cd8be2f27eb2ace9f3bc7dff38e1010d0c04bb79b8c273";
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
     path: PathBuf,
@@ -44,15 +44,45 @@ struct Bound {
 #[serde(deny_unknown_fields)]
 struct Plan {
     schema: String,
+    inputs: Bound,
+    admission_receipt: Bound,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct Inputs {
+    schema: String,
+    probe_sha256: String,
     worker: PathBuf,
     ledger_directory: PathBuf,
     prefix_manifest: Bound,
     prefix_validation: Bound,
     serialized_clock: Bound,
-    admission_receipt: Bound,
     scratch_directory: PathBuf,
     output: PathBuf,
     minimum_free_bytes: u64,
+}
+fn validate_admission(value: &Value, inputs: &Bound, self_sha: &str, now: u64) -> Result<()> {
+    ensure!(
+        value["schema"] == "jetstreamer-epoch144-native-admission-receipt-v2"
+            && value["admitted"] == true
+            && value["restore_only"] == true
+            && value["replay_launch_authorized"] == false
+            && value["publication_authorized"] == false
+            && value["remote_mutations"] == false
+            && value["r2_mutations"] == false
+            && value["input_policy_sha256"] == inputs.sha256
+            && value["probe_sha256"] == self_sha
+            && value["worker_sha256"] == WORKER
+            && value["protected_existing_floor_bytes"] == PROTECTED
+            && value["candidate_incremental_peak_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= PEAK)
+            && value["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| n <= now && now - n <= 900),
+        "no fresh exact144 native-only admission"
+    );
+    Ok(())
 }
 fn read(bound: &Bound, expected: &str) -> Result<Value> {
     ensure!(bound.sha256 == expected, "wrong144 bound evidence digest");
@@ -144,6 +174,103 @@ fn expectation(manifest: &Value, pass: &Value, clock: &Value) -> Result<SegmentC
     }
     Ok(expected)
 }
+fn source_checks(plan: &Inputs, self_sha: &str) -> Result<(SegmentCheckpointSummary, PathBuf)> {
+    ensure!(
+        plan.schema == "jetstreamer-epoch144-native-input-policy-v1"
+            && plan.probe_sha256 == self_sha
+            && plan.minimum_free_bytes >= PROTECTED + PEAK,
+        "wrong144 input policy"
+    );
+    let lm = fs::symlink_metadata(&plan.ledger_directory)?;
+    ensure!(
+        plan.ledger_directory.canonicalize()? == plan.ledger_directory
+            && lm.is_dir()
+            && lm.uid() == 0
+            && lm.mode() & 0o222 == 0
+            && !plan.ledger_directory.join("genesis.bin").try_exists()?,
+        "unsealed ledger/shadow genesis"
+    );
+    let snapshot = plan.ledger_directory.join(SNAPSHOT_NAME);
+    let sm = fs::symlink_metadata(&snapshot)?;
+    ensure!(
+        sm.is_file()
+            && sm.uid() == 0
+            && sm.mode() & 0o222 == 0
+            && sm.nlink() == 1
+            && sm.len() == 2569233422,
+        "wrong immutable144 compressed input"
+    );
+    bound_bytes(&plan.worker, WORKER, 256 << 20)?;
+    bound_bytes(
+        &plan.ledger_directory.join("genesis.tar.bz2"),
+        GENESIS,
+        10 << 20,
+    )?;
+    let manifest = read(&plan.prefix_manifest, MANIFEST)?;
+    let pass = read(&plan.prefix_validation, PREFIX_PASS)?;
+    let clock = read(&plan.serialized_clock, CLOCK)?;
+    Ok((expectation(&manifest, &pass, &clock)?, snapshot))
+}
+fn check_inputs(path: &Path, policy_sha: &str, self_sha: &str, receipt: &Path) -> Result<()> {
+    use {
+        jetstreamer_node::archive_checksum::{
+            archive_file_identity, open_regular_nofollow, path_matches_archive_identity,
+        },
+        sha2::{Digest, Sha256},
+        std::{io::Read, time::Instant},
+    };
+    ensure!(
+        unsafe { libc::geteuid() } == 1001,
+        "isolated input-reader UID1001 required"
+    );
+    bound_bytes(&fs::read_link("/proc/self/exe")?, self_sha, 256 << 20)?;
+    let plan: Inputs = serde_json::from_slice(&bound_bytes(path, policy_sha, 1 << 20)?)?;
+    let (expected, snapshot) = source_checks(&plan, self_sha)?;
+    let start = Instant::now();
+    let mut file = open_regular_nofollow(&snapshot)?;
+    let identity = archive_file_identity(&file)?;
+    let mut hash = Sha256::new();
+    let mut bytes = 0u64;
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        ensure!(
+            start.elapsed().as_secs() < 120
+                && available(Path::new("/home/sol"))?.0 >= PROTECTED + (1 << 20),
+            "input probe resource guard failed"
+        );
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hash.update(&buf[..n]);
+        bytes += n as u64;
+    }
+    ensure!(
+        bytes == 2569233422
+            && format!("{:x}", hash.finalize()) == SNAPSHOT
+            && archive_file_identity(&file)? == identity
+            && path_matches_archive_identity(&snapshot, identity)?,
+        "input hash/identity changed"
+    );
+    let iid = env::var("INVOCATION_ID")?;
+    ensure!(
+        iid.len() == 32
+            && iid
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "invalid capability invocation"
+    );
+    write_receipt(
+        receipt,
+        &json!({"schema":"jetstreamer-epoch144-native-input-capability-v1","invocation_id":iid,
+        "input_policy_sha256":policy_sha,"probe_sha256":self_sha,"worker_sha256":WORKER,"snapshot_sha256":SNAPSHOT,
+        "snapshot_device":file.metadata()?.dev(),"snapshot_inode":file.metadata()?.ino(),"snapshot_bytes":bytes,
+        "source_expected_terminal":expected,"private_source_permissions_changed":false,"snapshot_copied":false,
+        "native_bank_restored":false,"worker_spawned":false,"native_restore_authorized":false,
+        "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
+    )?;
+    Ok(())
+}
 fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 1001,
@@ -151,9 +278,19 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
     );
     let self_path = fs::read_link("/proc/self/exe")?;
     bound_bytes(&self_path, self_sha, 256 << 20)?;
-    let plan: Plan = serde_json::from_slice(&bound_bytes(path, plan_sha, 1 << 20)?)?;
+    let binding: Plan = serde_json::from_slice(&bound_bytes(path, plan_sha, 1 << 20)?)?;
     ensure!(
-        plan.schema == "jetstreamer-private-epoch144-native-restore-probe-plan-v1"
+        binding.schema == "jetstreamer-private-epoch144-native-restore-probe-plan-v2",
+        "wrong144 plan schema"
+    );
+    let plan: Inputs = serde_json::from_slice(&bound_bytes(
+        &binding.inputs.path,
+        &binding.inputs.sha256,
+        1 << 20,
+    )?)?;
+    ensure!(
+        plan.schema == "jetstreamer-epoch144-native-input-policy-v1"
+            && plan.probe_sha256 == self_sha
             && plan.minimum_free_bytes >= PROTECTED + PEAK,
         "wrong144 native scope/complete peak"
     );
@@ -187,60 +324,14 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
             && fs::read_dir(&plan.scratch_directory)?.next().is_none(),
         "attempt is not fresh/disjoint"
     );
-    let lm = fs::symlink_metadata(&plan.ledger_directory)?;
-    ensure!(
-        plan.ledger_directory.canonicalize()? == plan.ledger_directory
-            && lm.is_dir()
-            && lm.uid() == 0
-            && lm.mode() & 0o222 == 0
-            && !plan.ledger_directory.join("genesis.bin").try_exists()?,
-        "unsealed ledger/shadow genesis"
-    );
-    let snapshot = plan.ledger_directory.join(SNAPSHOT_NAME);
-    let sm = fs::symlink_metadata(&snapshot)?;
-    ensure!(
-        sm.is_file()
-            && sm.uid() == 0
-            && sm.mode() & 0o222 == 0
-            && sm.nlink() == 1
-            && sm.len() == 2569233422,
-        "wrong immutable144 compressed input"
-    );
-    bound_bytes(&plan.worker, WORKER, 256 << 20)?;
-    bound_bytes(
-        &plan.ledger_directory.join("genesis.tar.bz2"),
-        GENESIS,
-        10 << 20,
-    )?;
-    let manifest = read(&plan.prefix_manifest, MANIFEST)?;
-    let pass = read(&plan.prefix_validation, PREFIX_PASS)?;
-    let clock = read(&plan.serialized_clock, CLOCK)?;
-    let expected = expectation(&manifest, &pass, &clock)?;
+    let (expected, snapshot) = source_checks(&plan, self_sha)?;
     let admission: Value = serde_json::from_slice(&bound_bytes(
-        &plan.admission_receipt.path,
-        &plan.admission_receipt.sha256,
+        &binding.admission_receipt.path,
+        &binding.admission_receipt.sha256,
         4 << 20,
     )?)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    ensure!(
-        admission["schema"] == "jetstreamer-epoch144-native-admission-receipt-v1"
-            && admission["admitted"] == true
-            && admission["restore_only"] == true
-            && admission["replay_launch_authorized"] == false
-            && admission["publication_authorized"] == false
-            && admission["r2_mutations"] == false
-            && admission["plan_sha256"] == plan_sha
-            && admission["probe_sha256"] == self_sha
-            && admission["worker_sha256"] == WORKER
-            && admission["protected_existing_floor_bytes"] == PROTECTED
-            && admission["candidate_incremental_peak_bytes"]
-                .as_u64()
-                .is_some_and(|n| n >= PEAK)
-            && admission["recorded_unix_seconds"]
-                .as_u64()
-                .is_some_and(|n| n <= now && now - n <= 900),
-        "no fresh exact144 native-only admission"
-    );
+    validate_admission(&admission, &binding.inputs, self_sha, now)?;
     let device = fs::metadata("/home/sol")?.dev();
     ensure!(
         fs::metadata(&plan.scratch_directory)?.dev() == device
@@ -318,6 +409,7 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
         &plan.output,
         &json!({"schema":"jetstreamer-private-epoch144-native-restore-probe-v1","invocation_id":iid,
         "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"plan_sha256":plan_sha,"self_sha256":self_sha,
+        "input_policy_sha256":binding.inputs.sha256,"admission_receipt_sha256":binding.admission_receipt.sha256,
         "worker_sha256":WORKER,"snapshot_sha256":SNAPSHOT,"prefix_manifest_sha256":MANIFEST,"prefix_validation_sha256":PREFIX_PASS,
         "serialized_clock_sha256":CLOCK,"original_producer_cursor":expected.next_write_version,"native_result":outcome.ok(),"error":error,
         "passed":passed && after>=PROTECTED,"available_bytes_before":free,"available_bytes_after":after,"replay_entries_sent":0,
@@ -333,7 +425,14 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
 }
 fn main() {
     let a: Vec<_> = env::args().skip(1).collect();
-    let result = if a.len() == 5 && a[1] == "--plan-sha256" && a[3] == "--self-sha256" {
+    let result = if a.len() == 8
+        && a[0] == "--check-inputs-only"
+        && a[2] == "--policy-sha256"
+        && a[4] == "--self-sha256"
+        && a[6] == "--receipt"
+    {
+        check_inputs(Path::new(&a[1]), &a[3], &a[5], Path::new(&a[7]))
+    } else if a.len() == 5 && a[1] == "--plan-sha256" && a[3] == "--self-sha256" {
         execute(Path::new(&a[0]), &a[2], &a[4])
     } else {
         Err(anyhow::anyhow!(
@@ -349,6 +448,46 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn admission_binds_prior_input_policy_without_a_hash_cycle() {
+        use sha2::{Digest, Sha256};
+        let inputs = Bound {
+            path: "/sealed/inputs.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let tool = "b".repeat(64);
+        let admission = json!({"schema":"jetstreamer-epoch144-native-admission-receipt-v2","admitted":true,"restore_only":true,
+            "replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,
+            "input_policy_sha256":inputs.sha256,"probe_sha256":tool,"worker_sha256":WORKER,
+            "protected_existing_floor_bytes":PROTECTED,"candidate_incremental_peak_bytes":PEAK,"recorded_unix_seconds":100});
+        validate_admission(&admission, &inputs, &tool, 101).unwrap();
+        let receipt_sha = format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&admission).unwrap())
+        );
+        let final_plan = json!({"schema":"jetstreamer-private-epoch144-native-restore-probe-plan-v2","inputs":inputs,
+            "admission_receipt":{"path":"/receipt/admitted.json","sha256":receipt_sha}});
+        serde_json::from_value::<Plan>(final_plan).unwrap();
+        // Admission is created before the final plan and does not know its hash.
+        assert!(admission.get("plan_sha256").is_none());
+        for (key, value) in [
+            ("input_policy_sha256", json!("c".repeat(64))),
+            (
+                "schema",
+                json!("jetstreamer-epoch144-native-admission-receipt-v1"),
+            ),
+            ("recorded_unix_seconds", json!(102)),
+            ("replay_launch_authorized", json!(true)),
+            ("candidate_incremental_peak_bytes", json!(PEAK - 1)),
+        ] {
+            let mut bad = admission.clone();
+            bad[key] = value;
+            assert!(
+                validate_admission(&bad, &inputs, &tool, 101).is_err(),
+                "{key}"
+            );
+        }
+    }
     #[test]
     fn pre_shutdown_census_counts_only_regular_private_files() {
         let root = tempfile::tempdir().unwrap();

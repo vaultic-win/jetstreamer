@@ -7,6 +7,26 @@ probe's existing client,full native comparison and immutable-I/O helpers at
 crate visibility only;the140plan,source checks and execution behavior remain
 unchanged. Its own strict144plan cannot borrow the140admission or source profile.
 
+The executable plan uses schema
+`jetstreamer-private-epoch144-native-restore-probe-plan-v2`:it contains an
+`inputs`binding and an `admission_receipt`binding only. Seal the strict
+`jetstreamer-epoch144-native-input-policy-v1` first,then admit that policy and
+write a `jetstreamer-epoch144-native-admission-receipt-v2`,then seal the final
+plan. The receipt binds `input_policy_sha256`,not the final plan hash. This
+one-way order avoids a circular dependency on its own receipt hash. The earlier
+dormant5c46probe's V1layout was never launched and must not be selected.
+
+The standalone `--check-inputs-only POLICY --policy-sha256 HEX
+--self-sha256 HEX --receipt ABSOLUTE_NEW_RECEIPT` path authenticates the exact
+policy,worker/genesis/prefix/clock and full compressed snapshot under UID1001,
+but never spawns a worker. It guards free space on every compressed read and
+revalidates the input identity. The receipt explicitly denies native/replay
+authority. This can qualify a private systemd read-only bind of the original
+root-private frozen snapshot into a dedicated `/run` input view,without copying
+it or changing its original0700ancestor permissions. Use `PrivateMounts=yes`,
+read-only home/system/input bindings and no worker DAC capability. Such a bind
+does not remove the executing client's own mandatory private hash-bound copy.
+
 The source tuple comes mechanically from the hash-bound original144segment
 manifest and independent focused-prefix pass. The separately verified snapshot
 and typed serialized-clock receipt must match that tuple before initialization.
