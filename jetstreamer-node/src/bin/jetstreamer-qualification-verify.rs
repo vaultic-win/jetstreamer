@@ -1,5 +1,8 @@
 //! Read-only, fail-closed validation of a focused qualification artifact.
 
+#[path = "qualification_verify/prefix203.rs"]
+mod prefix203;
+
 use {
     jetstreamer_horizon::archive::{ArchiveReader, ExpectedConflictWrite, verify_conflict_slot},
     jetstreamer_node::{
@@ -308,8 +311,11 @@ fn root_prefix_203(arguments: &Arguments) -> bool {
         && arguments.expected_bootstrap_slot == 87_695_515
         && arguments.expected_terminal_slot == 88_127_580
         && arguments.expected_runtime_profile == "solana-v1.6.16"
-        && arguments.expected_worker_sha256
-            == "3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a"
+        && prefix203::worker_matches(
+            &arguments.private_root,
+            &arguments.archive,
+            &arguments.expected_worker_sha256,
+        )
 }
 
 fn complete_span_225(arguments: &Arguments) -> bool {
@@ -838,6 +844,49 @@ mod tests {
         changed[0] = "/private/epoch-204-prefix.jet".into();
         let args = parse_arguments(changed).unwrap();
         assert!(validate_archive_name(&args, &args.archive).is_err());
+    }
+
+    #[test]
+    fn capped_shrink_203_keeps_the_exact_prefix_scope_and_canonical_root_gates() {
+        let root = "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-203-f9fc5a0-v1";
+        let raw = vec![
+            format!("{root}/output/epoch-203-prefix.jet"),
+            format!("--private-root={root}"),
+            "--expected-epoch=203".into(),
+            "--expected-output-start-slot=87696000".into(),
+            "--expected-bootstrap-slot=87695515".into(),
+            "--expected-terminal-slot=88127580".into(),
+            "--expected-runtime-profile=solana-v1.6.16".into(),
+            "--expected-worker-sha256=4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc".into(),
+        ];
+        let args = parse_arguments(raw.clone()).unwrap();
+        assert!(root_prefix_203(&args));
+        validate_archive_name(&args, &args.archive).unwrap();
+        let hash = "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf";
+        let revision = "86c26f843276581509c3434acc2efbf4202c44e0";
+        validate_prefix_root_identity(&args, hash, revision).unwrap();
+        assert!(validate_prefix_root_identity(&args, "wrong-root", revision).is_err());
+        assert!(validate_prefix_root_identity(&args, hash, "wrong-revision").is_err());
+        for (key, value) in [
+            ("epoch", "204"),
+            ("output-start-slot", "87695516"),
+            ("bootstrap-slot", "87695514"),
+            ("terminal-slot", "88127999"),
+            ("runtime-profile", "solana-v1.6.25"),
+            ("worker-sha256", &"a".repeat(64)),
+        ] {
+            let mut changed = raw.clone();
+            *changed
+                .iter_mut()
+                .find(|s| s.starts_with(&format!("--expected-{key}=")))
+                .unwrap() = format!("--expected-{key}={value}");
+            let args = parse_arguments(changed).unwrap();
+            assert!(!root_prefix_203(&args), "{key}");
+            assert!(
+                validate_archive_name(&args, &args.archive).is_err(),
+                "{key}"
+            );
+        }
     }
 
     fn complete_span_225_arguments() -> Vec<String> {
