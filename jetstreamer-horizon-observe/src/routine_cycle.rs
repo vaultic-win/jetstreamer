@@ -30,6 +30,8 @@ mod terminal_handoff;
 
 #[path = "routine_delivery198.rs"]
 mod delivery198;
+#[path = "routine_delivery198_recover.rs"]
+mod delivery198_recover;
 
 #[path = "routine_private144.rs"]
 mod private144;
@@ -1124,9 +1126,12 @@ fn validate_service(
 
 fn authenticate_service(p: &Plan) -> Result<String> {
     ensure!(p.cycle_unit == cycle_unit(p)?, "routine unit name mismatch");
+    authenticate_named_service(&p.cycle_unit)
+}
+fn authenticate_named_service(unit: &str) -> Result<String> {
     let invocation = env::var("INVOCATION_ID")
         .context("actual cycle requires its bounded persistent oneshot")?;
-    let output=Command::new("/usr/bin/systemctl").args(["show",&p.cycle_unit,"--no-pager","--no-ask-password",
+    let output=Command::new("/usr/bin/systemctl").args(["show",unit,"--no-pager","--no-ask-password",
         "--property=Id,InvocationID,MainPID,NRestarts,Restart,KillMode,Delegate,ActiveState,Type,TimeoutStartUSec"]).output()?;
     ensure!(
         output.status.success() && output.stdout.len() < 16384,
@@ -1140,7 +1145,7 @@ fn authenticate_service(p: &Plan) -> Result<String> {
             "duplicate service property"
         );
     }
-    validate_service(&fields, &p.cycle_unit, &invocation, std::process::id())?;
+    validate_service(&fields, unit, &invocation, std::process::id())?;
     Ok(invocation)
 }
 
@@ -1509,6 +1514,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--recover-delivery198"
                             | "--prepare-next"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
@@ -1532,6 +1538,12 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--recover-delivery198")
+        {
+            return delivery198_recover::run(&plan, &bound, &args[5]);
+        }
         if args.get(6).is_some_and(|arg| {
             arg == "--prepare-next"
                 || arg == "--prepare-next-terminal157"

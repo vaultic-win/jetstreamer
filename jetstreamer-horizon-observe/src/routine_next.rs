@@ -219,7 +219,12 @@ fn seal_plan(stage: &Path, source: &str, destination: &Path, name: &str, digest:
         "members":[{"source":stage.join(source),"name":name,"sha256":digest,"mode":256}]})
 }
 
-fn validate_status(s: &Value, p: &Plan, observer: &Bound, estimate: &Value) -> Result<()> {
+pub(super) fn validate_status(
+    s: &Value,
+    p: &Plan,
+    observer: &Bound,
+    estimate: &Value,
+) -> Result<()> {
     ensure!(
         s["schema"] == "jetstreamer-horizon-r2-status-authenticated-publication-receipt-v1"
             && s["bucket"] == p.bucket

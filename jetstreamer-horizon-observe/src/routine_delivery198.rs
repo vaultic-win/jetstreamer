@@ -112,6 +112,10 @@ pub(super) fn consume_recovery(p: &mut Plan) -> Result<()> {
             "198 delayed recovery successor differs"
         );
         p.epoch198_delivery.as_mut().unwrap().delayed_recovery = false;
+        p.tools.r2 = Bound {
+            path: prefix144::RECOVERY_WRITER.into(),
+            sha256: prefix144::RECOVERY_WRITER_SHA.into(),
+        };
     }
     Ok(())
 }
@@ -572,6 +576,11 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
     if p.prefix144_audit.is_some() || p.completed144_prefix.is_some() {
+        if p.tools.r2.path == Path::new(prefix144::RECOVERY_WRITER)
+            && p.tools.r2.sha256 == prefix144::RECOVERY_WRITER_SHA
+        {
+            return (prefix144::RECOVERY_WRITER, prefix144::RECOVERY_WRITER_SHA);
+        }
         return (prefix144::DELIVERY_WRITER, prefix144::DELIVERY_WRITER_SHA);
     }
     if p.prefix157_audit.is_some() {
