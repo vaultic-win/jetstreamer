@@ -1178,15 +1178,19 @@ mod tests {
     #[test]
     #[ignore]
     fn loads_and_verifies_v1_6_25_boundary_snapshot() {
-        let path = std::env::var("JETSTREAMER_SNAPSHOT_93311535")
-            .expect("set JETSTREAMER_SNAPSHOT_93311535 to run this integration test");
+        let path = std::env::var("JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT")
+            .or_else(|_| std::env::var("JETSTREAMER_SNAPSHOT_93311535"))
+            .expect("set JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT to run this integration test");
         let ledger =
             std::env::var("JETSTREAMER_MAINNET_LEDGER").expect("set JETSTREAMER_MAINNET_LEDGER");
         let state_dir = private_state_dir(None).unwrap();
         let genesis = load_genesis(Path::new(&ledger), &state_dir).unwrap();
         let builtins = crate::runtime::mainnet_additional_builtins();
         let loaded = load_archive(Path::new(&path), &state_dir, &genesis, &builtins).unwrap();
-        assert_eq!(loaded.bank.slot(), 93_311_535);
+        assert_eq!(
+            loaded.bank.slot(),
+            crate::runtime::boundary_snapshot_test_slot()
+        );
         assert!(loaded.bank.verify_snapshot_bank());
     }
 
