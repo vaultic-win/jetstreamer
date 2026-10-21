@@ -3163,6 +3163,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("observe-delivery-198") {
+        return cohort198_finalization::run_observation();
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
     }

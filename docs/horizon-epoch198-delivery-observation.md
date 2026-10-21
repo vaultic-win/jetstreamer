@@ -36,3 +36,48 @@ Keep the current replay and its existing observer/timers unchanged during this
 preparation. A later deployment must consume genuine terminal events, not the
 synthetic unit-test fixtures, and must retain the normal30-minute resource
 cadence. A mixed or failed sample is not authority for an early retry.
+
+## Event evidence capture
+
+`jetstreamer-r2 observe-delivery-198 PLAN --plan-sha256 HEX --self-sha256 HEX`
+can capture the exact active finalization owner's events before preparing a
+coordinated handoff. It takes no resource sample, consumes no resource cadence,
+accesses no R2 endpoint, updates no status object and grants no handoff or
+publication authority. Do not run a second polling loop with this command.
+Use it only after a genuine completion/phase event or within the existing
+coordinated control cycle. An absent event is a failed gate, not permission to
+retry blindly or invent terminal evidence.
+
+The immutable root-owned plan schema is
+`jetstreamer-epoch198-delivery-observation-plan-v1`. It has `output`, positive
+integer `not_before_unix_seconds` and `expires_unix_seconds` bounding at most
+1,800seconds, exact `expected_unit`, `expected_invocation_id` and
+`expected_exec_start_sha256`, plus mandatory false `replay_launch_authorized`,
+`publication_authorized` and `r2_mutations` fields. Output must be a direct
+`proof-*.json` member of the precreated root-private directory
+`/var/lib/jetstreamer/horizon-epoch198-delivery-observations-v1`.
+
+The command authenticates its immutable running executable through
+`/proc/self/exe`, the separately bound plan digest and the unchanged before/after
+owner. It rehashes the exact parent/manifest and writes a private no-clobber,
+file-and-directory-fsynced receipt only after genuine terminal evidence passes
+the event window. The receipt retains the actual event timestamps and denies
+status publication, replay and archive publication. A later handoff must still
+check its freshness and reauthenticate ownership against the coordinated sample.
+
+`--check-only` validates the actual owner, immutable inputs, plan and output
+absence without reading terminal journal events, enforcing a future event
+window, writing a proof or consuming cadence. Its success explicitly does not
+establish finalization. Keep this as a dormant preparation until the event;
+preflight never authorizes running a finalization claim while replay continues.
+
+For this exact epoch198 origin only, a pipeline status plan may explicitly set
+`receipt_directory_uid: 1001` with
+`receipt_directory: /home/sol/.jetstreamer-private/r2-status-receipts`.
+That preserves the existing shared publication history used by the fleet and
+completion cleanup. The root writer still uses the common private-directory
+write preflight under DAC_OVERRIDE; it never chmods the user's directory or
+requires CAP_FOWNER. The exact original producer invocation, directory owner,
+canonical path and owner-only mode remain mandatory. Other profiles retain the
+default root-owned directory policy; this is not an arbitrary foreign-directory
+override.

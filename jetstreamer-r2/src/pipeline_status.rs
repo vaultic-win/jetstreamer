@@ -110,6 +110,41 @@ struct Plan {
     expected_jet_size_bytes: u64,
     peer_units: Vec<String>,
     receipt_directory: PathBuf,
+    #[serde(default)]
+    receipt_directory_uid: Option<u32>,
+}
+
+fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
+    let requested = plan.receipt_directory_uid.unwrap_or(0);
+    if requested != 0 {
+        ensure!(
+            requested == 1001
+                && plan.epoch == 198
+                && plan.binding.origin_unit == super::cohort198_finalization::UNIT
+                && plan.binding.origin_invocation_id == "e5612ef00a5b4fcab04df2c13a6b35b0"
+                && plan.receipt_directory
+                    == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
+            "foreign-owned pipeline receipt directory is not the exact198 profile"
+        );
+    }
+    Ok(requested)
+}
+
+fn validate_receipt_directory(plan: &Plan) -> Result<()> {
+    let requested = receipt_directory_owner(plan)?;
+    let meta = fs::symlink_metadata(&plan.receipt_directory)?;
+    ensure!(
+        plan.receipt_directory.is_absolute()
+            && plan.receipt_directory.canonicalize()? == plan.receipt_directory
+            && meta.is_dir()
+            && meta.uid() == requested
+            && meta.mode() & 0o077 == 0,
+        "pipeline status receipt directory owner/privacy differs"
+    );
+    // The common writer already supports a root writer under DAC_OVERRIDE in
+    // a private UID1001 directory, without chmod or CAP_FOWNER. Keep one
+    // shared receipt history for fleet classification and completion cleanup.
+    Ok(())
 }
 
 fn bound_bytes(bound: &Bound) -> Result<Vec<u8>> {
@@ -512,15 +547,7 @@ pub(super) async fn run() -> Result<()> {
     );
     let meta = fs::symlink_metadata(&plan.jet_path)?;
     ensure!(meta.nlink() == 1, "pipeline jet has multiple links");
-    let receipts = fs::symlink_metadata(&plan.receipt_directory)?;
-    ensure!(
-        plan.receipt_directory.is_absolute()
-            && plan.receipt_directory.canonicalize()? == plan.receipt_directory
-            && receipts.is_dir()
-            && receipts.uid() == 0
-            && receipts.mode() & 0o077 == 0,
-        "pipeline status receipt directory must be root-private"
-    );
+    validate_receipt_directory(&plan)?;
     let status = EpochStatus {
         epoch: plan.epoch,
         jet_size_bytes: identity.length,
@@ -578,6 +605,70 @@ pub(super) async fn run() -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+    fn directory_plan() -> Plan {
+        let mut b = binding();
+        b.unit = super::super::cohort198_finalization::UNIT.into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = "e5612ef00a5b4fcab04df2c13a6b35b0".into();
+        b.invocation_id = b.origin_invocation_id.clone();
+        b.claim_phase = "producer-finalization".into();
+        let bound = || Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        };
+        Plan {
+            schema: "jetstreamer-horizon-pipeline-status-plan-v1".into(),
+            epoch: 198,
+            phase: "finalization".into(),
+            binding: b,
+            observer: bound(),
+            fleet: bound(),
+            origin_launch: bound(),
+            estimate_evidence: vec![bound()],
+            estimate_basis: "fixture only".into(),
+            estimated_remaining_millis: 1000,
+            jet_path: "/private/epoch-198.jet".into(),
+            expected_jet_size_bytes: 1,
+            peer_units: vec![],
+            receipt_directory: "/home/sol/.jetstreamer-private/r2-status-receipts".into(),
+            receipt_directory_uid: Some(1001),
+        }
+    }
+    #[test]
+    fn foreign_directory_policy_is_exact198_only_and_defaults_to_root() {
+        let p = directory_plan();
+        assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
+        let mut bad = directory_plan();
+        bad.epoch = 199;
+        assert!(receipt_directory_owner(&bad).is_err());
+        let mut bad = directory_plan();
+        bad.receipt_directory_uid = Some(1000);
+        assert!(receipt_directory_owner(&bad).is_err());
+        let mut bad = directory_plan();
+        bad.binding.origin_invocation_id = "b".repeat(32);
+        assert!(receipt_directory_owner(&bad).is_err());
+        let mut bad = directory_plan();
+        bad.binding.origin_unit = super::super::cohort_finalization::UNIT.into();
+        assert!(receipt_directory_owner(&bad).is_err());
+        let mut bad = directory_plan();
+        bad.receipt_directory = "/other/receipts".into();
+        assert!(receipt_directory_owner(&bad).is_err());
+        let mut root = directory_plan();
+        root.receipt_directory_uid = None;
+        assert_eq!(receipt_directory_owner(&root).unwrap(), 0);
+    }
+    #[test]
+    #[ignore = "requires sealed root test under DAC_OVERRIDE-only sandbox and actual UID1001 receipt directory"]
+    fn actual198_receipt_directory_is_validated_without_chmod_or_fowner() {
+        let p = directory_plan();
+        let before = fs::symlink_metadata(&p.receipt_directory).unwrap();
+        validate_receipt_directory(&p).unwrap();
+        let after = fs::symlink_metadata(&p.receipt_directory).unwrap();
+        assert_eq!(
+            (before.uid(), before.gid(), before.mode(), before.ino()),
+            (after.uid(), after.gid(), after.mode(), after.ino())
+        );
+    }
     fn binding() -> Binding {
         Binding {
             unit: "horizon-upload-213-test.service".into(),
@@ -989,6 +1080,7 @@ mod tests {
             expected_jet_size_bytes: 3,
             peer_units: vec![],
             receipt_directory: "/receipts".into(),
+            receipt_directory_uid: None,
         };
         let observer = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":"2026-10-20T05:04:42Z"});
         let t = fleet::utc_seconds("2026-10-20T05:04:42Z").unwrap();
