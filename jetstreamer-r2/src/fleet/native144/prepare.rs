@@ -6,6 +6,9 @@ const LAUNCH: &str = "/var/lib/jetstreamer/horizon-epoch144-native-restore-20261
 const DESTINATION: &str = "/usr/local/lib/jetstreamer/horizon-native144-admission-plan-20261021-v1";
 const GUARD: &str = "/usr/local/lib/jetstreamer/horizon-standalone-guard-target-handoff-20261019-v2/jetstreamer-horizon-standalone-guard";
 const GUARD_SHA: &str = "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194";
+const GUARD_DESTINATION: &str =
+    "/usr/local/lib/jetstreamer/horizon-epoch144-native-guard-20261021-v1";
+const GUARD_RECEIPTS: &str = "/var/lib/jetstreamer/horizon-epoch144-native-guard-20261021-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
@@ -116,6 +119,21 @@ fn guard_sandbox(limits: &str) -> Result<()> {
     }
     Ok(())
 }
+fn guard_configuration(iid: &str) -> Result<Value> {
+    ensure!(
+        iid.len() == 32
+            && iid
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "native144 guard requires exact invocation"
+    );
+    Ok(
+        json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+        "unit":UNIT,"invocation_id":iid,"filesystem":"/home/sol",
+        "minimum_free_bytes":4740696923590u64,"worker_root":SCRATCH,
+        "maximum_worker_vmas":3500000,"receipt_directory":GUARD_RECEIPTS,"bounded_measurement":null}),
+    )
+}
 pub(super) fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
@@ -217,6 +235,26 @@ pub(super) fn run() -> Result<()> {
         ensure!(unit(UNIT)? == current, "native144 changed during capture");
         owners(&previous)?;
         immutable_receipt(Path::new(LAUNCH), &r)?;
+        // Emit the invocation-bound guard configuration in the same observed
+        // capture, avoiding a manual identity transcription while the short
+        // restore is starting. Deployment and actual sandbox first fire remain
+        // independent mandatory gates; this writes no service or timer.
+        let guard_source = Path::new(ROOT).join("guard-plan.json");
+        persist(
+            &guard_source,
+            &guard_configuration(
+                r["invocation_id"]
+                    .as_str()
+                    .context("native144 capture invocation")?,
+            )?,
+        )?;
+        let guard_binding = file_binding(&guard_source)?;
+        persist(
+            &Path::new(ROOT).join("guard-seal-plan.json"),
+            &json!({
+            "schema":"jetstreamer-sealed-deployment-plan-v1","destination":GUARD_DESTINATION,
+            "members":[{"source":guard_source,"name":"guard-plan.json","sha256":guard_binding["sha256"],"mode":256}]}),
+        )?;
         println!("{}", file_binding(Path::new(LAUNCH))?);
         return Ok(());
     }
@@ -308,6 +346,21 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn generated_guard_protects_older_claims_and_has_no_canary_or_replay_authority() {
+        let iid = "b".repeat(32);
+        let p = guard_configuration(&iid).unwrap();
+        assert_eq!(p["unit"], UNIT);
+        assert_eq!(p["invocation_id"], iid);
+        assert_eq!(p["worker_root"], SCRATCH);
+        assert_eq!(p["minimum_free_bytes"], 4740696923590u64);
+        assert_eq!(p["maximum_worker_vmas"], 3500000);
+        assert_eq!(p["receipt_directory"], GUARD_RECEIPTS);
+        assert!(p.get("bounded_canary").is_none());
+        assert!(p["bounded_measurement"].is_null());
+        assert!(guard_configuration("wrong").is_err());
+        assert!(guard_configuration(&"G".repeat(32)).is_err());
+    }
 
     fn bound(path: &str) -> BoundFile {
         BoundFile {
