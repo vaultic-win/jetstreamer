@@ -128,3 +128,46 @@ generation into generic compatibility or replace checkpoint/root gates. It does
 not authorize failed-prefix import, manufacture missing manifests, or permit
 publication of partial 223. Existing snapshot-only entries remain snapshot-only;
 the mutation tests exercise each entry's opposite bootstrap kind.
+
+## Distinct failed-prefix import
+
+`jetstreamer-node --failed-prefix220-recovery-preflight PLAN PLAN_SHA256 SELF_SHA256`
+qualifies the exact deployed node and strict incident plan without decoding,
+moving archives, creating sidecars or touching R2. The actual
+`--failed-prefix220-recover` form repeats every preflight gate, then runs the
+normal stable semantic/PoH and whole-file validation for all three archives,
+with three independent eight-thread readers. There is no skip-full input.
+
+The plan binds only schema `horizon-failed-prefix220-recovery-plan-v1`, paths
+`primary_evidence`, `planning_report` and `recovery_receipt`. The first two may
+be least-privilege immutable deployment copies, but their exact original SHA-256
+values remain compiled in. Do not loosen the original private evidence tree's
+permissions. The validation receipt must be
+`/home/ubuntu/.jetstreamer-private/failed-prefix220-recovery-v1/validation.json`.
+Execute as original UID 1000 with the default shared epoch leases, an owner-only
+receipt directory, and the exact original immutable v1.6.20 worker configured.
+
+Both original systemd owners must still match their pinned terminal identities
+before and after validation. Complete producer-manager and queued-job censuses
+reject unknown live/queued replacements; only the exact existing zero-restart
+203 and 223 invocations are admitted as disjoint live producers. The original
+failed run-state digest and scope are rechecked. Normal destination leases,
+absence checks and the transactional destination writer lock prevent conflicting
+publication. The original source inode, owner, mode, length, provenance and
+content hash must all match the audited entries.
+
+Epoch 219 is independently whole-file hashed against its known verified content
+identity, then its last bucket is decoded to bind its terminal block. Epoch 220's
+first parent and initial PoH anchor must match that terminal. The ordinary
+`validate_recovered_cohort_gate` additionally binds all three journal-derived
+checkpoint tuples and carried sibling anchors. Tests cover wrong first-parent,
+wrong anchor, untracked/restarted/replaced producers and attempts to add skip,
+scope, destination or cleanup fields to the plan.
+
+Only after every reread and checkpoint gate passes is a private durable validation
+receipt written and the normal no-overwrite transactional batch import invoked.
+Its normal committed publication receipt is returned. **Never clean the source
+run**: it still owns partial 223 and original failure evidence. Import success
+does not prove current-plugin or authenticated R2 completion; dispatch those
+ordinary per-epoch gates afterward. Preserve interrupted batch recovery state;
+do not blindly restart the importer.

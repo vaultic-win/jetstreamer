@@ -1,5 +1,5 @@
 //! Exact incident checkpoint qualification, separate from whole-cohort recovery.
-//! This module creates no archives/manifests/checksums and grants no import authority.
+//! Probes remain read-only. Recovery is a distinct full-validation/publication route.
 use super::*;
 use serde_json::{Value, json};
 
@@ -190,6 +190,393 @@ const READ_IIDS: [&str; 3] = [
 ];
 const BYTES: [u64; 3] = [135699623364, 137055363091, 133175903649];
 const INODES: [u64; 3] = [2259411, 2259414, 2259426];
+const SOURCE_STATE_SHA: &str = "7b74a2c7b752476c1c8d284f5f7b3fa15d43abce29c6b3f93075b568ca423274";
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecoveryPlan {
+    schema: String,
+    primary_evidence: PathBuf,
+    planning_report: PathBuf,
+    recovery_receipt: PathBuf,
+}
+
+fn admitted_live_producer(name: &str, fields: &BTreeMap<String, String>) -> bool {
+    let expected = match name {
+        "horizon-qualify-203-shrink-root-prefix-resource-f9fc5a0-v1.service" => {
+            "748ffa40e0a2408da0a10fc9e160cf0a"
+        }
+        "horizon-qualify-223-singleton-postcount-ad1d65a-v1.service" => {
+            "04ef9d97a36446d49b452d982cb0be46"
+        }
+        _ => return false,
+    };
+    fields.get("InvocationID").is_some_and(|s| s == expected)
+        && fields.get("NRestarts").is_some_and(|s| s == "0")
+        && fields.get("ActiveState").is_some_and(|s| s == "active")
+        && fields.get("SubState").is_some_and(|s| s == "running")
+}
+
+/// A complete producer-manager census, not just the original two owners.
+/// Unknown live or queued replacement producers block this incident import.
+fn no_replacement_producers() -> Result<(), String> {
+    let output = std::process::Command::new("/usr/bin/systemctl")
+        .args([
+            "list-units",
+            "--all",
+            "--type=service",
+            "--plain",
+            "--no-legend",
+            "--no-pager",
+            "--full",
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err("cannot census producer manager".into());
+    }
+    let text = std::str::from_utf8(&output.stdout).map_err(|e| e.to_string())?;
+    let prefixes = [
+        "horizon-qualify-",
+        "horizon-controller-",
+        "jetstreamer-root-sweep-",
+    ];
+    for line in text.lines().filter(|s| !s.trim().is_empty()) {
+        let columns: Vec<_> = line.split_whitespace().collect();
+        if columns.len() < 4 {
+            return Err("malformed producer manager census".into());
+        }
+        let name = columns[0];
+        let Some(prefix) = prefixes.iter().find(|p| name.starts_with(**p)) else {
+            continue;
+        };
+        if matches!(columns[2], "inactive" | "failed") {
+            continue;
+        }
+        let fields = systemd_recovery_fields(name, prefix)?;
+        if !admitted_live_producer(name, &fields) {
+            return Err(format!("unqualified live/replacement producer {name}"));
+        }
+    }
+    let jobs = std::process::Command::new("/usr/bin/systemctl")
+        .args([
+            "list-jobs",
+            "--plain",
+            "--no-legend",
+            "--no-pager",
+            "--full",
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !jobs.status.success() {
+        return Err("cannot census queued producers".into());
+    }
+    for line in std::str::from_utf8(&jobs.stdout)
+        .map_err(|e| e.to_string())?
+        .lines()
+        .filter(|s| !s.trim().is_empty())
+    {
+        let columns: Vec<_> = line.split_whitespace().collect();
+        if columns.len() != 4 {
+            return Err("malformed queued producer census".into());
+        }
+        if prefixes.iter().any(|p| columns[1].starts_with(p)) {
+            return Err(format!("queued replacement {}", columns[1]));
+        }
+    }
+    Ok(())
+}
+
+fn original_owners_terminal(primary: &Value) -> Result<(), String> {
+    for (key, name, prefix) in [
+        (
+            "producer",
+            "jetstreamer-root-sweep-horizon-220-223-current-v1-e220-223-lane-a-1.service",
+            "jetstreamer-root-sweep-",
+        ),
+        (
+            "controller",
+            "horizon-controller-220-223-current-v1.service",
+            "horizon-controller-",
+        ),
+    ] {
+        let actual = systemd_recovery_fields(name, prefix)?;
+        for field in [
+            "LoadState",
+            "ActiveState",
+            "SubState",
+            "Result",
+            "MainPID",
+            "InvocationID",
+            "NRestarts",
+            "ExecMainStatus",
+        ] {
+            if actual.get(field).map(String::as_str) != primary[key][field].as_str() {
+                return Err(format!("original {key} changed at {field}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn source_state_unchanged() -> Result<(), String> {
+    let path = Path::new(ARCHIVES)
+        .parent()
+        .ok_or("source run missing")?
+        .join(COHORT_RUN_STATE_FILE);
+    let (bytes, sha) = read_bound_recovery_file(&path, MAX_COHORT_RUN_STATE_BYTES, false)?;
+    if sha != parse_lower_sha256(SOURCE_STATE_SHA, "original state")? {
+        return Err("original failed source state changed".into());
+    }
+    let state: CohortRunState = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if state.schema != "jetstreamer-root-cohort-run-v1"
+        || state.status != "running-private"
+        || state.start_epoch != 220
+        || state.end_epoch != 223
+        || state.manifest_fingerprint
+            != "sha256:155907db8b743b54af2746d949893cad0c299cda3ad8900017420bc06ff9de42"
+    {
+        return Err("original failed source scope changed".into());
+    }
+    Ok(())
+}
+
+fn trusted219_terminal() -> Result<ArchiveBlockEvidence, String> {
+    let path = Path::new("/home/ubuntu/horizon/epoch-219.jet");
+    let file = jetstreamer_node::archive_checksum::open_regular_nofollow(path)
+        .map_err(|e| e.to_string())?;
+    let measured = jetstreamer_node::archive_checksum::measure_open_archive(&file)
+        .map_err(|e| e.to_string())?;
+    if measured.sha256
+        != parse_lower_sha256(
+            "44aa425194e6ccf8848075658aa54f89f0030d43f825e16a277f697f4c38b4fd",
+            "trusted219",
+        )?
+    {
+        return Err("trusted219 content changed".into());
+    }
+    let reader = jetstreamer_horizon::archive::ArchiveReader::open(std::io::BufReader::new(file))
+        .map_err(|e| e.to_string())?;
+    let count = reader.bucket_count();
+    if reader.header().epoch != 219 || count == 0 {
+        return Err("trusted219 header changed".into());
+    }
+    let tail = verify_archive_bucket_range(path, measured.identity, count - 1, count, None)?;
+    let terminal = tail
+        .chain
+        .terminal_block
+        .ok_or("trusted219 terminal missing")?;
+    if terminal.slot != 95039999
+        || terminal.blockhash.to_string() != "4MaWCL7a9CgF9XrNHgt9TA5cryFkW8P7S6aCdCU8cXRW"
+        || !jetstreamer_node::archive_checksum::path_matches_archive_identity(
+            path,
+            measured.identity,
+        )
+        .map_err(|e| e.to_string())?
+    {
+        return Err("trusted219 terminal/identity changed".into());
+    }
+    Ok(terminal)
+}
+
+fn bind_first_anchor(
+    first: &ArchiveChainEvidence,
+    prior: ArchiveBlockEvidence,
+) -> Result<(), String> {
+    let first_block = first.first_block.ok_or("epoch220 first block missing")?;
+    if first.initial_poh_anchor != Some(prior.blockhash)
+        || first_block.parent_slot != prior.slot
+        || first_block.parent_blockhash != prior.blockhash
+    {
+        return Err("epoch220 does not continue trusted219 terminal".into());
+    }
+    Ok(())
+}
+
+/// Separate incident-specific import. Never uses the SIGTERM/whole-cohort exception.
+/// Every archive passes normal full semantic/PoH validation and hashing again.
+pub(super) fn recover(
+    plan_path: &Path,
+    plan_sha: &str,
+    self_sha: &str,
+    preflight_only: bool,
+) -> Result<Value, String> {
+    use std::os::unix::fs::MetadataExt;
+    if effective_user_id() != 1000 || env::var_os(PRIVATE_RUN_ROOT_ENV).is_some() {
+        return Err(
+            "failed-prefix recovery requires original uid1000 and default shared epoch leases"
+                .into(),
+        );
+    }
+    let executable = fs::read_link("/proc/self/exe").map_err(|e| e.to_string())?;
+    if hash_bound_recovery_file(&executable)? != parse_lower_sha256(self_sha, "self SHA")? {
+        return Err("recovery executable differs".into());
+    }
+    if fs::symlink_metadata(plan_path)
+        .map_err(|e| e.to_string())?
+        .uid()
+        != 0
+    {
+        return Err("recovery plan must be root-owned".into());
+    }
+    let (bytes, sha) = read_bound_recovery_file(plan_path, 65536, true)?;
+    if sha != parse_lower_sha256(plan_sha, "plan SHA")? {
+        return Err("recovery plan differs".into());
+    }
+    let input: RecoveryPlan = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if input.schema != "horizon-failed-prefix220-recovery-plan-v1" {
+        return Err("wrong recovery schema".into());
+    }
+    let receipt_parent =
+        Path::new("/home/ubuntu/.jetstreamer-private/failed-prefix220-recovery-v1");
+    if input.recovery_receipt != receipt_parent.join("validation.json")
+        || receipt_parent.canonicalize().map_err(|e| e.to_string())? != receipt_parent
+    {
+        return Err("recovery receipt escaped exact private directory".into());
+    }
+    let receipt_meta = fs::symlink_metadata(receipt_parent).map_err(|e| e.to_string())?;
+    if !receipt_meta.is_dir() || receipt_meta.uid() != 1000 || receipt_meta.mode() & 0o077 != 0 {
+        return Err("recovery receipt directory is not caller-private".into());
+    }
+    let (primary_bytes, primary_sha) =
+        read_bound_recovery_file(&input.primary_evidence, 256 * 1024, true)?;
+    let (planning_bytes, planning_sha) =
+        read_bound_recovery_file(&input.planning_report, 16 * 1024 * 1024, true)?;
+    if primary_sha != parse_lower_sha256(PRIMARY_SHA, "primary SHA")?
+        || planning_sha != parse_lower_sha256(PLAN_SHA, "planning SHA")?
+    {
+        return Err("recovery inputs differ from exact audited incident".into());
+    }
+    let primary: Value = serde_json::from_slice(&primary_bytes).map_err(|e| e.to_string())?;
+    original_owners_terminal(&primary)?;
+    no_replacement_producers()?;
+    source_state_unchanged()?;
+    let selection = root_checkpoint_cohort_runtime(220, 222, true)?;
+    let plan = root_checkpoint_cohort_plan_from_report(
+        serde_json::from_slice(&planning_bytes).map_err(|e| e.to_string())?,
+        FINGERPRINT,
+        220,
+        222,
+        selection,
+    )?;
+    let gate = gate(&primary["extracted"], &plan)?;
+    let destination = BoundDestination::bind(Path::new("/home/ubuntu/horizon"))?;
+    let _leases = acquire_epoch_leases(destination.path(), 220, 222)?;
+    for epoch in 220..=222 {
+        require_recovery_destination_namespace_absent(
+            &destination.path().join(format!("epoch-{epoch}.jet")),
+        )?;
+    }
+    if preflight_only {
+        return Ok(
+            json!({"schema":"horizon-failed-prefix220-recovery-preflight-v1","epochs":[220,221,222],"plan_sha256":plan_sha,"self_sha256":self_sha,"original_owners_terminal":true,"source_state_unchanged":true,"no_replacement_producers":true,"shared_epoch_leases_acquired":true,"destination_namespace_absent":true,"full_validation_completed":false,"publication_authorized":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false}),
+        );
+    }
+    let prior = trusted219_terminal()?;
+    let mut recovered = std::thread::scope(|scope| {
+        let handles: Vec<_> = (220..=222)
+            .map(|epoch| {
+                let destination = &destination;
+                scope.spawn(move || -> Result<RecoveredCohortEpoch, String> {
+                    let source_archive = PathBuf::from(format!("{ARCHIVES}/epoch-{epoch}.jet"));
+                    let index = (epoch - 220) as usize;
+                    let meta = fs::symlink_metadata(&source_archive).map_err(|e| e.to_string())?;
+                    if !meta.is_file()
+                        || meta.uid() != 1000
+                        || meta.gid() != 1000
+                        || meta.nlink() != 1
+                        || meta.dev() != 66305
+                        || meta.ino() != INODES[index]
+                        || meta.len() != BYTES[index]
+                        || meta.mode() & 0o777 != 0o440
+                    {
+                        return Err(format!("epoch{epoch} original source identity changed"));
+                    }
+                    let mut archive_chain = ArchiveChainEvidence::default();
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(8)
+                        .build()
+                        .map_err(|e| e.to_string())?;
+                    let validated = pool
+                        .install(|| {
+                            validated_cohort_epoch_archive(
+                                &source_archive,
+                                epoch,
+                                true,
+                                None,
+                                Some(&mut archive_chain),
+                            )
+                        })?
+                        .ok_or_else(|| format!("epoch{epoch} incomplete"))?;
+                    let provenance = read_bound_cohort_provenance(&source_archive, validated)?;
+                    Ok(RecoveredCohortEpoch {
+                        epoch,
+                        source_archive,
+                        destination_archive: destination.path().join(format!("epoch-{epoch}.jet")),
+                        provenance,
+                        archive_chain,
+                        validated,
+                    })
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| {
+                h.join()
+                    .map_err(|_| "failed-prefix reader panicked".to_owned())?
+            })
+            .collect::<Result<Vec<_>, String>>()
+    })?;
+    recovered.sort_by_key(|a| a.epoch);
+    validate_recovered_cohort_gate(&plan, &recovered, &gate)?;
+    bind_first_anchor(&recovered[0].archive_chain, prior)?;
+    original_owners_terminal(&primary)?;
+    no_replacement_producers()?;
+    source_state_unchanged()?;
+    destination.revalidate()?;
+    for item in &recovered {
+        require_recovery_destination_namespace_absent(&item.destination_archive)?;
+    }
+    let members: Vec<_> = recovered.iter().map(|a|json!({"epoch":a.epoch,"path":a.source_archive,"sha256":jetstreamer_node::segment_manifest::sha256_hex_string(&a.validated.sha256)})).collect();
+    let receipt = json!({"schema":"horizon-failed-prefix220-recovery-validation-v1","plan":plan_path,"plan_sha256":plan_sha,"self_sha256":self_sha,"primary_evidence_sha256":PRIMARY_SHA,"planning_report_sha256":PLAN_SHA,"source_state_sha256":SOURCE_STATE_SHA,"epochs":[220,221,222],"validated_members":members,"root_checkpoint_gate":gate,"trusted219_terminal":prior.blockhash.to_string(),"complete_archive_reread_passed":true,"source_run_cleanup_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    let receipt_sha = write_or_validate_recovery_receipt(&input.recovery_receipt, &receipt)?;
+    let epochs = vec![220, 221, 222];
+    let fingerprint = manifest_fingerprint_digest(FINGERPRINT)?;
+    let context =
+        cohort_publication::encode_root_checkpoint_gate_context(fingerprint, &epochs, &gate)?;
+    let items: Vec<_> = recovered
+        .iter()
+        .map(|a| jetstreamer_node::archive_publish::ArchiveBatchItem {
+            epoch: a.epoch,
+            staged_archive: a.source_archive.clone(),
+            destination_archive: a.destination_archive.clone(),
+            evidence: a.validated,
+        })
+        .collect();
+    let expected: Vec<_> = recovered
+        .iter()
+        .map(|a| cohort_publication::ExpectedCohortArchive {
+            epoch: a.epoch,
+            destination_archive: &a.destination_archive,
+            sha256: a.validated.sha256,
+        })
+        .collect();
+    let receipts = cohort_batch_receipt_directory(&destination)?;
+    let publication=jetstreamer_node::archive_publish::publish_verified_archive_batch_if_absent_with_context_and_lock_timeout(fingerprint,&epochs,&items,&context,COHORT_IMPORT_WRITER_LOCK_TIMEOUT).map_err(|e|format!("failed-prefix publication (state={:?}, recovery={:?}): {e}",e.commit_state(),e.recovery_directory()))?;
+    let completed = cohort_publication::finish_root_checkpoint_publication(
+        destination.publication_binding(),
+        &receipts,
+        fingerprint,
+        &expected,
+        &publication,
+        &gate,
+    )?;
+    // The failed source run contains preserved partial223 and is NEVER cleaned here.
+    Ok(
+        json!({"schema":"horizon-failed-prefix220-recovery-completed-v1","epochs":epochs,"recovery_receipt":input.recovery_receipt,"recovery_receipt_sha256":jetstreamer_node::segment_manifest::sha256_hex_string(&receipt_sha),"publication_receipt":completed.receipt_path,"publication_transaction_id":jetstreamer_node::segment_manifest::sha256_hex_string(&completed.transaction_id),"archive_count":completed.archive_count,"source_run_preserved":true,"partial223_preserved":true,"r2_ready_pair_proven":false,"remote_mutations":false,"r2_mutations":false}),
+    )
+}
 fn full_receipt(receipt: &Value, epoch: u64, path: &Path) -> Result<(), String> {
     let index = usize::try_from(epoch.checked_sub(220).ok_or("epoch below prefix")?)
         .map_err(|e| e.to_string())?;
@@ -309,6 +696,80 @@ pub(super) fn artifact_probe(epoch: u64) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn trusted_prior_must_bind_initial_anchor_and_first_parent() {
+        let prior = ArchiveBlockEvidence {
+            slot: 95039999,
+            parent_slot: 95039998,
+            parent_blockhash: Hash::new_unique(),
+            blockhash: Hash::new_unique(),
+        };
+        let first = ArchiveBlockEvidence {
+            slot: 95040000,
+            parent_slot: prior.slot,
+            parent_blockhash: prior.blockhash,
+            blockhash: Hash::new_unique(),
+        };
+        let chain = ArchiveChainEvidence {
+            initial_poh_anchor: Some(prior.blockhash),
+            first_block: Some(first),
+            terminal_block: None,
+        };
+        bind_first_anchor(&chain, prior).unwrap();
+        let mut bad = chain;
+        bad.initial_poh_anchor = Some(Hash::new_unique());
+        assert!(bind_first_anchor(&bad, prior).is_err());
+        let mut bad = chain;
+        bad.first_block.as_mut().unwrap().parent_slot -= 1;
+        assert!(bind_first_anchor(&bad, prior).is_err());
+        let mut bad = chain;
+        bad.first_block.as_mut().unwrap().parent_blockhash = Hash::new_unique();
+        assert!(bind_first_anchor(&bad, prior).is_err());
+        assert!(bind_first_anchor(&ArchiveChainEvidence::default(), prior).is_err());
+    }
+    #[test]
+    fn producer_census_rejects_unknown_restarted_or_replaced_owners() {
+        let name = "horizon-qualify-223-singleton-postcount-ad1d65a-v1.service";
+        let mut fields = BTreeMap::from([
+            (
+                "InvocationID".into(),
+                "04ef9d97a36446d49b452d982cb0be46".into(),
+            ),
+            ("NRestarts".into(), "0".into()),
+            ("ActiveState".into(), "active".into()),
+            ("SubState".into(), "running".into()),
+        ]);
+        assert!(admitted_live_producer(name, &fields));
+        assert!(!admitted_live_producer(
+            "horizon-qualify-221-replacement.service",
+            &fields
+        ));
+        fields.insert("NRestarts".into(), "1".into());
+        assert!(!admitted_live_producer(name, &fields));
+        fields.insert("NRestarts".into(), "0".into());
+        fields.insert("InvocationID".into(), "changed".into());
+        assert!(!admitted_live_producer(name, &fields));
+    }
+    #[test]
+    fn failed_prefix_recovery_plan_cannot_grow_scope_or_skip_validation() {
+        let plan = json!({"schema":"horizon-failed-prefix220-recovery-plan-v1","primary_evidence":"/a","planning_report":"/b","recovery_receipt":"/c"});
+        assert!(serde_json::from_value::<RecoveryPlan>(plan.clone()).is_ok());
+        for key in [
+            "epochs",
+            "skip_full",
+            "source_run",
+            "destination",
+            "delete_source",
+            "publish_through_epoch",
+        ] {
+            let mut bad = plan.clone();
+            bad[key] = json!(true);
+            assert!(
+                serde_json::from_value::<RecoveryPlan>(bad).is_err(),
+                "{key}"
+            );
+        }
+    }
     fn observed(slot: u64) -> Value {
         let summary = UnreceiptedCheckpointSummary {
             slot,

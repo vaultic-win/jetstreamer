@@ -18964,6 +18964,28 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    if matches!(
+        probe_args.first().map(String::as_str),
+        Some("--failed-prefix220-recover" | "--failed-prefix220-recovery-preflight")
+    ) {
+        if probe_args.len() != 4 {
+            eprintln!("--failed-prefix220-recover PLAN PLAN_SHA256 SELF_SHA256");
+            exit(2);
+        }
+        match failed_prefix220::recover(
+            Path::new(&probe_args[1]),
+            &probe_args[2],
+            &probe_args[3],
+            probe_args[0] == "--failed-prefix220-recovery-preflight",
+        ) {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("failed-prefix recovery failed: {error}");
+                exit(1);
+            }
+        }
+        return;
+    }
     if let Some(epoch) = probe_args
         .first()
         .and_then(|arg| arg.strip_prefix("--failed-prefix220-artifact-probe="))
