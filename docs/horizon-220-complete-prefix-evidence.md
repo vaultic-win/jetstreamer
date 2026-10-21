@@ -36,3 +36,22 @@ authenticated R2 delivery gates. The whole-cohort unreceipted recovery command
 requires a different terminal/guard history and must not be used for this failure.
 Preserve the original prefix and partial 223; never fabricate missing manifests,
 truncate updates, or replay 220–222 merely to recover 223.
+
+## Independent private rereads
+
+The sealed `horizon-retained220-222-full-prepared-v1` package runs three disjoint
+`horizon-independent-full-read-N-retained-prefix-v1.service` oneshots. Their exact
+invocations, eight-thread read-only commands, retained input paths, admission and
+launch receipts are tracked as `private-verification` diagnostics by the fleet.
+An activating/start oneshot with a positive PID is live work, not a failed or
+absent producer. This registration grants no ordinary replay, current sidecar
+ETA, recovery import, status cleanup, canonical checksum, or publication authority.
+The original failed epoch repair records remain open until verified R2 pairs exist.
+
+For terminal receipt collection, bind the sealed unit member as `installed_file`
+and the exact root-owned `/run/systemd/system/UNIT.service` symlink as the optional
+`unit.runtime_unit_link`. The collector requires that link to target the same
+sealed package's exact unit member; it still hashes the real member, authenticates
+systemd's fragment path and invocation journal, and requires terminal success.
+No active service needs to be changed or restarted to collect its later result.
+The older fixed epoch-140 transient profile cannot use this runtime-link option.

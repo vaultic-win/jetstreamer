@@ -472,6 +472,7 @@ fn validate_profile(plan: &Plan) -> Result<Mode, String> {
         .ok_or("requires explicit transient profile")?;
     let expected_fragment = PathBuf::from(format!("/run/systemd/transient/{}", mode.unit()));
     if plan.epoch != 140
+        || plan.unit.runtime_unit_link.is_some()
         || plan.unit.name != mode.unit()
         || plan.unit.invocation_id != mode.invocation()
         || plan.unit.threads != 8
