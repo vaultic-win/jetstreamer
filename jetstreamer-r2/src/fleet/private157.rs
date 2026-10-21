@@ -503,14 +503,8 @@ pub(super) fn prepare() -> Result<()> {
     if !units.contains(&json!(UNIT)) {
         units.push(json!(UNIT));
     }
+    reconcile_blocked_gate(&mut plan, &previous)?;
     let gate = &mut plan["gates"]["157"];
-    ensure!(
-        matches!(
-            gate["state"].as_str(),
-            Some("blocked-qualification" | "failed-needs-repair")
-        ),
-        "157gate not blocked"
-    );
     gate["state"] = json!("blocked-qualification");
     gate["next_action"] = json!(
         "Complete private independent retained-prefix reread under exact157 verifier; preserve source and snapshot. Full epoch, native v1.5.8 restart, remaining suffix/assembly and publication are not yet qualified."
@@ -543,6 +537,41 @@ pub(super) fn prepare() -> Result<()> {
         "{}",
         json!({"plan":b,"seal_plan":file_binding(&seal_path)?,"resource_samples":0,"service_mutations":false,"r2_mutations":false})
     );
+    Ok(())
+}
+fn reconcile_blocked_gate(plan: &mut Value, previous: &Value) -> Result<()> {
+    ensure!(
+        previous["epochs"]
+            .as_array()
+            .context("157prior epochs")?
+            .iter()
+            .filter(|e| e["epoch"] == 157
+                && matches!(
+                    e["state"].as_str(),
+                    Some("blocked-qualification" | "failed-needs-repair")
+                ))
+            .count()
+            == 1
+            && previous["runtime_handoff157"]["live"] == false
+            && previous["runtime_handoff157"]["ordinary_replay_restored"] == false
+            && previous["runtime_handoff157"]["evidence"] == plan["runtime_handoff157"]
+            && plan["runtime_handoff157"]["sha256"]
+                == "7551fdeafd0c5773dfb52a1b0df8b867f09e1dc1b2939569568bf5ede99789c2"
+            && matches!(
+                plan["gates"]["157"]["state"].as_str(),
+                Some(
+                    "not-yet-staged"
+                        | "staged-admissible"
+                        | "blocked-qualification"
+                        | "failed-needs-repair"
+                )
+            ),
+        "157computed inactive repair is not bound to the original paused owner"
+    );
+    // Templates describe base gates; the complete reader derives live/terminal
+    // ownership separately. Fold the accepted computed repair, never the old
+    // template's not-yet-staged placeholder, into this private verifier gate.
+    plan["gates"]["157"]["state"] = json!("blocked-qualification");
     Ok(())
 }
 #[cfg(test)]
@@ -620,5 +649,20 @@ mod tests {
         o["filesystem"]["conservative_available_bytes"] = json!(4740696923590u64 + (1 << 20));
         o["host_memory"]["conservative_available_kib"] = json!((128 + 8) * 1024 * 1024u64 - 1);
         assert!(resources(&o).is_err());
+    }
+    #[test]
+    fn accepted_computed_failure_can_replace_only_its_bound_placeholder_gate() {
+        let proof = json!({"path":"/pause.json","sha256":"7551fdeafd0c5773dfb52a1b0df8b867f09e1dc1b2939569568bf5ede99789c2"});
+        let mut plan = json!({"runtime_handoff157":proof,"gates":{"157":{"state":"not-yet-staged"},"140":{"keep":u64::MAX}}});
+        let previous = json!({"epochs":[{"epoch":157,"state":"blocked-qualification"}],"runtime_handoff157":{"live":false,"ordinary_replay_restored":false,"evidence":proof}});
+        reconcile_blocked_gate(&mut plan, &previous).unwrap();
+        assert_eq!(plan["gates"]["157"]["state"], "blocked-qualification");
+        assert_eq!(plan["gates"]["140"]["keep"], u64::MAX);
+        let mut bad = previous.clone();
+        bad["runtime_handoff157"]["live"] = json!(true);
+        assert!(reconcile_blocked_gate(&mut plan, &bad).is_err());
+        let mut bad = previous;
+        bad["epochs"][0]["state"] = json!("remote-ready");
+        assert!(reconcile_blocked_gate(&mut plan, &bad).is_err());
     }
 }
