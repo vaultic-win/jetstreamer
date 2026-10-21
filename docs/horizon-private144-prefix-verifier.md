@@ -66,3 +66,24 @@ It refuses a conflicting144claim,live-admission marker,newer repair action or
 production eligibility. The old action is hash-bound at preparation;unrelated
 gates and all old diagnostics remain intact. No existing producer or verifier is
 restarted,and completed verification is never relabeled full epoch readiness.
+
+## Restart-source metadata
+
+`jetstreamer-epoch144-snapshot-metadata` uses the existing bounded read-only
+generation-metadata engine with a separate compile-time profile for slot62639490,
+generation1634786788446253,size2569233422,CRC32C`K4VB8A==` and
+MD5`9XLFNdvEJOFXo9YPOsNBOA==`. These match the original sealed manifest.
+It requires a sealed root-owned plan with schema
+`jetstreamer-epoch144-snapshot-metadata-plan-v1`,the current gcloud executable
+SHA-256 and an exact no-clobber private output path. Invocation is
+`--plan PATH --plan-sha256 HEX --self-sha256 HEX` under persistent systemd.
+The engine drops the CLI to uid1001/gid1003,uses the interactive
+`/home/sol/.config/gcloud`,and authenticates exact generation,size and hashes.
+Keep that config writable for SDK token refresh without changing live lanes.
+
+Its receipt proves only source metadata availability,not downloaded bytes,native
+checkpoint state,capacity admission,continuation,assembly or publication. The
+existing epoch213 continuation is build-bound and must not be reused for144.
+Snapshot acquisition requires its own qualified downloader and fresh disk gate;
+native restore must use the exact unchanged v1.4.25 worker and compare the full
+verified prefix terminal tuple before any suffix entries are accepted.
