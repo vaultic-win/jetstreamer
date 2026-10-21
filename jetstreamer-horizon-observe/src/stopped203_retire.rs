@@ -337,7 +337,7 @@ fn gates(
     }
     let owner = check::terminal()?;
     ensure!(
-        owner == old["owner"],
+        same_terminal_owner(&owner, &old["owner"]),
         "original failed owner or stopped guard changed"
     );
     let (roles, mut allowed) = owners(p, pb, program, self_sha, execute)?;
@@ -370,6 +370,28 @@ fn gates(
         json!({"owner":owner,"lifecycle":roles,"allowed_fragments":allowed,"process_scan":refs,
         "staged_references":staged,"missing_aliases":missing}),
     )
+}
+
+fn same_terminal_owner(current: &Value, original: &Value) -> bool {
+    // systemd daemon-reload legitimately clears historical ExecStart timing,
+    // pid and wait-status annotations. They are not the terminal service's
+    // InvocationID/Result/ExecMainStatus. Pin the entire executable/argv and
+    // ignore-errors clause, all other owner fields, and the fragment separately.
+    let mut a = current.clone();
+    let mut b = original.clone();
+    for v in [&mut a, &mut b] {
+        let Some(command) = v["producer"]["ExecStart"].as_str() else {
+            return false;
+        };
+        let Some((prefix, _)) = command.split_once(" ; start_time=") else {
+            return false;
+        };
+        if !prefix.ends_with(" ; ignore_errors=no") {
+            return false;
+        }
+        v["producer"]["ExecStart"] = json!(prefix);
+    }
+    a == b
 }
 
 fn stable_gates(a: &Value, b: &Value) -> bool {
@@ -483,6 +505,30 @@ mod tests {
         b = a.clone();
         b["process_scan"]["references"] = json!(["consumer"]);
         assert!(!stable_gates(&a, &b));
+    }
+    #[test]
+    fn daemon_reload_annotations_do_not_replace_terminal_owner_or_command() {
+        let old = json!({"producer":{"InvocationID":"original","Result":"exit-code","ExecMainStatus":"1",
+            "ExecStart":"{ path=/sealed/bin ; argv[]=/sealed/bin /sealed/plan --hash fixed ; ignore_errors=no ; start_time=[Tue] ; stop_time=[Wed] ; pid=123 ; code=exited ; status=1 }"}});
+        let mut now = old.clone();
+        now["producer"]["ExecStart"] = json!(
+            "{ path=/sealed/bin ; argv[]=/sealed/bin /sealed/plan --hash fixed ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+        );
+        assert!(same_terminal_owner(&now, &old));
+        for (key, value) in [
+            ("InvocationID", json!("replacement")),
+            ("ExecMainStatus", json!("0")),
+            (
+                "ExecStart",
+                json!(
+                    "{ path=/sealed/bin ; argv[]=/sealed/bin /foreign/plan --hash fixed ; ignore_errors=no ; start_time=[n/a] ; }"
+                ),
+            ),
+        ] {
+            let mut bad = now.clone();
+            bad["producer"][key] = value;
+            assert!(!same_terminal_owner(&bad, &old));
+        }
     }
     #[test]
     fn interrupted_intent_cannot_change_any_scope_or_authority_binding() {
