@@ -246,20 +246,28 @@ fn transaction_decode_reuse_truncated_record_inner() {
 
 #[test]
 fn historical_epoch_boundary_pre_updates_cover_epoch_201_reward_burst() {
-    epoch_201_pre_update_count_roundtrip(70_318);
+    pre_update_count_roundtrip(201, 86_832_000, 70_318);
 }
 
 #[test]
 fn private_epoch_201_audit_pre_update_count_roundtrips() {
     // Exact count rejected by the retained plugin's 65,536-record decoder.
-    epoch_201_pre_update_count_roundtrip(71_524);
+    pre_update_count_roundtrip(201, 86_832_000, 71_524);
 }
 
-fn epoch_201_pre_update_count_roundtrip(observed_pre_updates: usize) {
+#[test]
+fn epoch_198_verifier_rejected_pre_update_count_roundtrips() {
+    // Both retained verifiers rejected this count at their old 65,536-record
+    // limit. The error calls it "bytes", but this is the record-count bound.
+    // Use a synthetic epoch-start slot; the old error did not report its slot.
+    pre_update_count_roundtrip(198, 85_536_000, 65_772);
+}
+
+fn pre_update_count_roundtrip(epoch: u64, slot: u64, observed_pre_updates: usize) {
     let mut writer = ArchiveWriter::new(
         Vec::new(),
-        201,
-        86_832_000,
+        epoch,
+        slot,
         1,
         ArchiveWriterConfig {
             compression: Compression::None,
@@ -267,7 +275,7 @@ fn epoch_201_pre_update_count_roundtrip(observed_pre_updates: usize) {
         },
     )
     .unwrap();
-    writer.begin_slot(86_832_000).unwrap();
+    writer.begin_slot(slot).unwrap();
     for write_version in 0..observed_pre_updates as u64 {
         writer
             .write_orphan_update(&AccountUpdateView {
@@ -282,7 +290,7 @@ fn epoch_201_pre_update_count_roundtrip(observed_pre_updates: usize) {
             .unwrap();
     }
     let mut meta = BlockMeta::new_boxed();
-    meta.slot = 86_832_000;
+    meta.slot = slot;
     writer.end_slot(&meta, &[]).unwrap();
     let (archive, _) = writer.finish().unwrap();
 
