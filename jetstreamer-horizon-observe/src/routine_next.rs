@@ -254,7 +254,10 @@ pub(super) fn prepare(
 ) -> Result<()> {
     let prefix_spec = if matches!(
         mode,
-        "--prepare-next-prefix157" | "--prepare-next-prefix144" | "--prepare-next-completed144"
+        "--prepare-next-prefix157"
+            | "--prepare-next-prefix144"
+            | "--prepare-next-completed144"
+            | "--prepare-next-native144"
     ) {
         handoff_spec
     } else {
@@ -342,6 +345,16 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if mode == "--prepare-next-upload198" {
+        ensure!(
+            handoff_spec.is_none(),
+            "upload198 is a separate exact migration"
+        );
+        public198::enable_upload(&mut next)?;
+        public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        public198::derive_fleet(&next, &mut fleet_plan.clone())?;
+        tool_ok(&next.tools.r2)?;
+    }
     if let Some(spec) = native_spec {
         public198::enable_native(&mut next, spec)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
@@ -352,7 +365,9 @@ pub(super) fn prepare(
             !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,
             "prefix157 migration must be separate"
         );
-        if mode == "--prepare-next-completed144" {
+        if mode == "--prepare-next-native144" {
+            native144::enable(&mut next, &mut next_config, spec)?;
+        } else if mode == "--prepare-next-completed144" {
             completed144::enable(&mut next, spec)?;
         } else if mode == "--prepare-next-prefix144" {
             prefix144::enable(&mut next, spec)?;

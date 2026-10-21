@@ -23,6 +23,9 @@ pub(super) fn prepare_private_prefix157() -> Result<()> {
 pub(super) fn prepare_private_prefix144() -> Result<()> {
     prefix144::prepare()
 }
+pub(super) fn prepare_native144() -> Result<()> {
+    native144::prepare()
+}
 pub(super) fn admit_snapshot144() -> Result<()> {
     snapshot144::run()
 }

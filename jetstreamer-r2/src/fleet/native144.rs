@@ -1,5 +1,9 @@
 //! Exact bounded144 native comparison; never replay, sidecar or publication.
 use super::*;
+mod prepare;
+pub(super) fn prepare() -> Result<()> {
+    prepare::run()
+}
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch144-native-restore-launch-v2";
 pub(super) const UNIT: &str = "horizon-qualify-144-native-restore-20261021-v1.service";
 const PROBE: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-native-probe-tools-20261021-v2/jetstreamer-epoch144-native-restore-probe";

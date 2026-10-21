@@ -3,6 +3,8 @@ use super::*;
 pub(crate) const FULL: &str = "jetstreamer-horizon-audit-epochs182-200-v5.service";
 pub(crate) const PLUGIN: &str =
     "jetstreamer-horizon-plugin-receipt-watcher-shard-e-v5-fsync.service";
+pub(crate) const UPLOAD: &str =
+    "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service";
 const ARCHIVE: &str = "/home/sol/horizon/epoch-198.jet";
 fn profile(
     phase: &str,
@@ -15,6 +17,13 @@ fn profile(
     &'static str,
 )> {
     match (phase, unit) {
+        ("upload-readback", UPLOAD) => Some((
+            "e4e455fbd455483282107652ca37b83d",
+            "3283422",
+            "/usr/local/lib/jetstreamer/horizon-epoch198-uploader-transition-20261021-v1/upload-progressive.zsh",
+            "a0b1fba9a9e456532da9a73e121fd0b4eb7c3e7bc0c8923393b6b3d611419150",
+            "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2",
+        )),
         ("full-verification", FULL) => Some((
             "4dc3b0631e2646cca4302e6ee8807479",
             "199904",
@@ -37,12 +46,30 @@ pub(crate) fn namespace(phase: &str, unit: &str) -> bool {
 }
 fn child_matches(phase: &str, executable: &str, argv: &[&str], worker: &str) -> bool {
     if executable == "/usr/bin/sha256sum" {
-        return argv.len() == 3 && argv[1] == "--" && argv[2] == ARCHIVE;
+        return phase != "upload-readback"
+            && argv.len() == 3
+            && argv[1] == "--"
+            && argv[2] == ARCHIVE;
     }
     if executable != worker {
         return false;
     }
     match phase {
+        "upload-readback" => {
+            argv == [
+                worker,
+                "sync",
+                "/home/sol/horizon",
+                "--epochs",
+                "198-198",
+                "--receipt-directory",
+                "/home/sol/.jetstreamer-private/r2-receipts",
+                "--legacy-part-size-mib",
+                "5",
+                "--concurrency",
+                "4",
+            ]
+        }
         "full-verification" => {
             argv == [
                 worker,
@@ -126,10 +153,15 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
     immutable(script, script_sha)?;
     immutable(
         worker,
-        if phase == "full-verification" {
-            "1ca95efa1b02e45a24409c1431a177c75712177406ccd4220fd26068788b1319"
-        } else {
-            "831151d939a51690fedff391a792055e06efadd7ebb83fd46732feddbd07d394"
+        match phase {
+            "full-verification" => {
+                "1ca95efa1b02e45a24409c1431a177c75712177406ccd4220fd26068788b1319"
+            }
+            "plugin-verification" => {
+                "831151d939a51690fedff391a792055e06efadd7ebb83fd46732feddbd07d394"
+            }
+            "upload-readback" => "7b21414c1c105cefb18f5bf3ca8bb96759c14c529ea42232a70835bdc864b990",
+            _ => anyhow::bail!("foreign198 stage"),
         },
     )?;
     let group = format!("/system.slice/{name}");
@@ -201,7 +233,7 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
         }
     }
     ensure!(
-        starts.len() <= 2,
+        starts.len() <= if phase == "upload-readback" { 1 } else { 2 },
         "198 watcher has ambiguous concurrent children"
     );
     Ok(starts.into_iter().min())
@@ -209,6 +241,51 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root read-only exact progressive198 child proof; no network, sampling or writes"]
+    fn root_actual198_progressive_upload_child_is_readable() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let before = unit(UPLOAD).unwrap();
+        assert!(child_start("upload-readback", &before).unwrap().is_some());
+        assert_eq!(unit(UPLOAD).unwrap(), before);
+    }
+    #[test]
+    fn progressive_upload_requires_exact198_child_not_coordinator_or_other_epoch() {
+        let worker = profile("upload-readback", UPLOAD).unwrap().4;
+        let argv = [
+            worker,
+            "sync",
+            "/home/sol/horizon",
+            "--epochs",
+            "198-198",
+            "--receipt-directory",
+            "/home/sol/.jetstreamer-private/r2-receipts",
+            "--legacy-part-size-mib",
+            "5",
+            "--concurrency",
+            "4",
+        ];
+        assert!(child_matches("upload-readback", worker, &argv, worker));
+        for index in [1, 2, 4, 6, 8, 10] {
+            let mut bad = argv;
+            bad[index] = "other";
+            assert!(!child_matches("upload-readback", worker, &bad, worker));
+        }
+        assert!(!child_matches(
+            "upload-readback",
+            "/usr/bin/zsh",
+            &argv,
+            worker
+        ));
+        assert!(!child_matches(
+            "upload-readback",
+            "/usr/bin/sha256sum",
+            &["sha256sum", "--", ARCHIVE],
+            worker
+        ));
+        assert!(!namespace("upload-readback", FULL));
+        assert!(!namespace("full-verification", UPLOAD));
+    }
     #[test]
     #[ignore = "root read-only actual198 watcher child sandbox capability; no resources sampled or remote access"]
     fn root_actual198_children_are_scoped_and_readable() {

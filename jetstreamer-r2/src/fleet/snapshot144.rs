@@ -166,7 +166,7 @@ fn floor(value: &Value) -> Result<u64> {
     Ok(result)
 }
 
-fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+pub(super) fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     let old = previous["unit_census"]
         .as_object()
         .context("prior census")?;

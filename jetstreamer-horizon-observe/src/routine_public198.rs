@@ -4,6 +4,10 @@ pub(super) const READER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch198-public-watch-reader-20261021-v2/jetstreamer-r2";
 pub(super) const READER_SHA: &str =
     "d00bb3eb69491065694d0a6679c30e2b759df133000cc7cafd0f480afc7aaea5";
+const UPLOAD_READER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-progressive-watch-reader-20261021-v1/jetstreamer-r2";
+const UPLOAD_READER_SHA: &str = "48699f87596d93f319476d2af0c0b90e14a7ca672ed5a326c7af1a4f25ebae85";
+const UPLOAD_UNIT: &str = "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service";
+const UPLOAD_WRAPPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-uploader-transition-20261021-v1/upload-progressive.zsh";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T201800Z-delivery198-completed144-v1";
 const FULL: &str = "jetstreamer-horizon-audit-epochs182-200-v5.service";
 const PLUGIN: &str = "jetstreamer-horizon-plugin-receipt-watcher-shard-e-v5-fsync.service";
@@ -21,6 +25,13 @@ pub(super) struct Profile {
     claims: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     native_verification: Vec<Bound>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    progressive_upload: bool,
+}
+pub(super) fn upload(p: &Plan) -> bool {
+    p.public198_delivery
+        .as_ref()
+        .is_some_and(|p| p.progressive_upload)
 }
 
 pub(super) fn native(p: &Plan) -> bool {
@@ -129,6 +140,10 @@ struct NativeSpec {
 }
 
 fn claims(profile: &Profile) -> Result<Vec<Value>> {
+    ensure!(
+        !profile.progressive_upload || profile.native_verification.len() == 2,
+        "progressive198 requires both native verification histories"
+    );
     if profile.native_verification.is_empty() {
         return Ok(profile.claims.clone());
     }
@@ -201,7 +216,121 @@ fn claims(profile: &Profile) -> Result<Vec<Value>> {
             .push(serde_json::to_value(b)?);
         claims.push(claim);
     }
+    if profile.progressive_upload {
+        claims.push(upload_claim()?);
+    }
     Ok(claims)
+}
+fn upload_claim() -> Result<Value> {
+    let proof = Bound {path:"/usr/local/lib/jetstreamer/horizon-epoch198-uploader-transition-20261021-v1/transition.json".into(),sha256:"024b23f765a26f17c252df2bf0281cd3439aae046ee7a545227bd0ded98f4794".into()};
+    let value = bound_json(&proof, true)?;
+    ensure!(
+        value["schema"] == "horizon-epoch198-sole-uploader-receipt-transition-v1"
+            && value["unit"] == UPLOAD_UNIT
+            && value["new_wrapper_sha256"]
+                == "a0b1fba9a9e456532da9a73e121fd0b4eb7c3e7bc0c8923393b6b3d611419150"
+            && value["publication_gate_weakened"] == false,
+        "progressive198 transition proof differs"
+    );
+    Ok(
+        json!({"epoch":198,"phase":"upload-readback","unit":UPLOAD_UNIT,
+        "invocation_id":"e4e455fbd455483282107652ca37b83d",
+        "expected_exec_start":format!("{{ path={UPLOAD_WRAPPER} ; argv[]={UPLOAD_WRAPPER} ; ignore_errors=no ; start_time=[Wed 2026-10-21 21:40:05 UTC] ; stop_time=[n/a] ; pid=3283422 ; code=(null) ; status=0/0 }}"),
+        "evidence":[proof]}),
+    )
+}
+pub(super) fn enable_upload(p: &mut Plan) -> Result<()> {
+    ensure!(
+        is_101(p)? && native(p) && refreshed(p) && !upload(p),
+        "foreign progressive198 migration"
+    );
+    let profile = p.public198_delivery.as_mut().context("public198 profile")?;
+    profile.progressive_upload = true;
+    claims(profile)?;
+    p.tools.r2 = Bound {
+        path: UPLOAD_READER.into(),
+        sha256: UPLOAD_READER_SHA.into(),
+    };
+    Ok(())
+}
+
+/// One exact phase-handoff publication from the genuine22:28 sample. It neither
+/// resamples resources nor changes the canonical fleet/completion predecessor.
+pub(super) fn upload_event(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
+    ensure!(
+        is_101(p)?
+            && native(p)
+            && refreshed(p)
+            && !upload(p)
+            && p.sample_target_utc == "2026-10-21T22:28:00Z"
+            && pb.sha256 == "edfb8a1d48ea2b407f507dbb683051c393259d2410e8d40cb9c0f41cb5737e9d",
+        "foreign progressive198 status event"
+    );
+    let endpoint = env::var("HORIZON_S3_ENDPOINT").context("storage endpoint missing")?;
+    ensure!(
+        sha(endpoint.as_bytes()) == p.endpoint_sha256 && p.bucket == BUCKET,
+        "progressive198 event endpoint differs"
+    );
+    let invocation =
+        authenticate_named_service("horizon-progressive198-status-handoff-20261021-v1.service")?;
+    let cb = file(p.cycle_directory.join("completion.json"), false)?;
+    ensure!(
+        cb.sha256 == "e9da9593602ade6ff16e72cb9122bcdafc5424d8ceb3886a2b3c02a0f098a805",
+        "progressive198 accepted completion differs"
+    );
+    let completion = bound_json(&cb, false)?;
+    next_preparation::completion_bindings(p, pb, &completion)?;
+    let observer: Bound = serde_json::from_value(completion["observer"].clone())?;
+    let sample = bound_json(&observer, false)?;
+    let seconds = utc_seconds(&p.sample_target_utc)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        sample["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && sample["recorded_at_utc"] == p.sample_target_utc
+            && seconds <= now
+            && now - seconds <= 1800,
+        "progressive198 resource sample expired"
+    );
+    let source: Bound = serde_json::from_value(completion["fleet_plan"].clone())?;
+    let mut fleet = bound_json(&source, true)?;
+    let mut event: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    // A newer admission/cycle invalidates this one event; absence of a newer
+    // canonical fleet is checked without changing that canonical chain.
+    event.previous_fleet = serde_json::from_value(completion["fleet"].clone())?;
+    latest_fleet_unchanged(&event, &bound_json(&event.previous_fleet, false)?)?;
+    event.previous_fleet = p.previous_fleet.clone();
+    enable_upload(&mut event)?;
+    tool_ok(&event.tools.r2)?;
+    derive_fleet(&event, &mut fleet)?;
+    event.cycle_directory = p
+        .cycle_directory
+        .join("progressive-upload198-status-event-v1");
+    absent(&event.cycle_directory)?;
+    fs::create_dir(&event.cycle_directory)?;
+    fs::set_permissions(&event.cycle_directory, fs::Permissions::from_mode(0o700))?;
+    File::open(&p.cycle_directory)?.sync_all()?;
+    write_new(
+        &event.cycle_directory.join("intent.json"),
+        &json!({
+        "schema":"horizon-progressive198-status-event-intent-v1","source_plan":pb,
+        "source_completion":cb,"invocation_id":invocation,"self_sha256":self_sha,
+        "coordinated_observer":observer,"new_resource_samples":0,"canonical_fleet_changed":false,
+        "archive_mutations":false,"sidecar_mutations":false}),
+    )?;
+    let result = publish(&event, &fleet, &observer)?;
+    ensure!(
+        result["publication_skipped"] != true && !result["publication"].is_null(),
+        "progressive198 status event did not publish; preserve partial evidence"
+    );
+    write_new(
+        &event.cycle_directory.join("completion.json"),
+        &json!({
+        "schema":"horizon-progressive198-status-event-completion-v1","source_plan":pb,
+        "source_completion":cb,"invocation_id":invocation,"self_sha256":self_sha,
+        "result":result,"new_resource_samples":0,"canonical_fleet_changed":false,
+        "replay_status_updates":0,"archive_mutations":false,"sidecar_mutations":false,"r2_status_mutation":true}),
+    )?;
+    Ok(())
 }
 
 pub(super) fn enable_native(p: &mut Plan, spec: &Bound) -> Result<()> {
@@ -346,7 +475,14 @@ fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     })
 }
 pub(super) fn writer(p: &Plan) -> bool {
-    p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA
+    (p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+        || native144::writer(p)
+        || upload_writer(p)
+}
+pub(super) fn upload_writer(p: &Plan) -> bool {
+    upload(p)
+        && p.tools.r2.path == Path::new(UPLOAD_READER)
+        && p.tools.r2.sha256 == UPLOAD_READER_SHA
 }
 fn import_proof() -> Result<()> {
     ensure!(
@@ -401,6 +537,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value, config: &mut Value) -> Result<()>
         origin: serde_json::from_value(value["origin"].clone())?,
         claims: serde_json::from_value(value["claims"].clone())?,
         native_verification: Vec::new(),
+        progressive_upload: false,
     });
     p.epoch198_delivery = None;
     p.tools.r2 = Bound {
@@ -692,7 +829,7 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
             e["epoch"] == 198
                 && matches!(
                     e["phase"].as_str(),
-                    Some("full-verification" | "plugin-verification")
+                    Some("full-verification" | "plugin-verification" | "upload-readback")
                 )
         });
     let Some(owner) = owner else {
@@ -711,7 +848,12 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
         .checked_sub(sample)
         .context("198 original downstream allowance overdue")?;
     ensure!(remaining > 0, "198 allowance overdue");
-    let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":198,"phase":"verification","binding":{"unit":unit["Id"],"invocation_id":unit["InvocationID"],"expected_exec_start":unit["ExecStart"],"claim_phase":owner["phase"],"origin_unit":ORIGIN,"origin_invocation_id":IID,"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},"observer":observer,"fleet":provisional,"origin_launch":profile.origin,"estimate_evidence":[profile.promotion],"estimate_basis":"Actual198 verifier child, original producer clock, original archive close plus43200seconds through sidecar; no allowance reset","estimated_remaining_millis":remaining,"jet_path":"/home/sol/horizon/epoch-198.jet","expected_jet_size_bytes":99381250591u64,"peer_units":[],"receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
+    let phase = if owner["phase"] == "upload-readback" {
+        "upload"
+    } else {
+        "verification"
+    };
+    let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":198,"phase":phase,"binding":{"unit":unit["Id"],"invocation_id":unit["InvocationID"],"expected_exec_start":unit["ExecStart"],"claim_phase":owner["phase"],"origin_unit":ORIGIN,"origin_invocation_id":IID,"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},"observer":observer,"fleet":provisional,"origin_launch":profile.origin,"estimate_evidence":[profile.promotion],"estimate_basis":"Actual198 verifier or exact progressive upload/readback child, original producer clock, original archive close plus43200seconds through sidecar; no allowance reset","estimated_remaining_millis":remaining,"jet_path":"/home/sol/horizon/epoch-198.jet","expected_jet_size_bytes":99381250591u64,"peer_units":[],"receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
     let package =
         delivery198::seal_values(p, "public198-status", &[("pipeline-plan.json", value)])?;
     let plan = file(package.join("pipeline-plan.json"), true)?;
@@ -791,6 +933,88 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn progressive_writer_cannot_be_borrowed_without_exact_profile_and_binary() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let b = Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        };
+        p.public198_delivery = Some(Profile {
+            promotion: b.clone(),
+            origin: b,
+            claims: vec![],
+            native_verification: vec![],
+            progressive_upload: false,
+        });
+        p.tools.r2 = Bound {
+            path: UPLOAD_READER.into(),
+            sha256: UPLOAD_READER_SHA.into(),
+        };
+        assert!(!upload_writer(&p));
+        p.public198_delivery.as_mut().unwrap().progressive_upload = true;
+        assert!(upload_writer(&p));
+        assert!(
+            claims(p.public198_delivery.as_ref().unwrap()).is_err(),
+            "requires both verification histories"
+        );
+        p.tools.r2.sha256 = "f".repeat(64);
+        assert!(!upload_writer(&p));
+    }
+    #[test]
+    #[ignore = "root exact accepted22:28 host profile migration, no resource sample or remote access"]
+    fn root_progressive_profile_preserves_native_histories_and_other_gates() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let b=Bound {path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T222800Z-native198-refresh-completed144-v1/cycle-plan.json".into(),sha256:"edfb8a1d48ea2b407f507dbb683051c393259d2410e8d40cb9c0f41cb5737e9d".into()};
+        let mut p: Plan = serde_json::from_slice(&bound_bytes(&b, true).unwrap()).unwrap();
+        let completion = bound_json(
+            &file(p.cycle_directory.join("completion.json"), false).unwrap(),
+            false,
+        )
+        .unwrap();
+        let source: Bound = serde_json::from_value(completion["fleet_plan"].clone()).unwrap();
+        let mut fleet = bound_json(&source, true).unwrap();
+        let before = fleet.clone();
+        let profile = serde_json::to_value(&p.public198_delivery).unwrap();
+        enable_upload(&mut p).unwrap();
+        tool_ok(&p.tools.r2).unwrap();
+        derive_fleet(&p, &mut fleet).unwrap();
+        assert_eq!(
+            serde_json::to_value(&p.public198_delivery).unwrap()["native_verification"],
+            profile["native_verification"]
+        );
+        for key in [
+            "diagnostics",
+            "admission_transition_guard",
+            "runtime_handoff157",
+        ] {
+            assert_eq!(fleet[key], before[key], "{key}");
+        }
+        for epoch in ["140", "144", "157", "160"] {
+            assert_eq!(fleet["gates"][epoch], before["gates"][epoch]);
+        }
+        assert_eq!(
+            fleet["pipeline_claims"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|c| c["epoch"] == 198)
+                .count(),
+            3
+        );
+        let new = fleet["pipeline_claims"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["phase"] == "upload-readback")
+            .unwrap();
+        assert_eq!(new["unit"], UPLOAD_UNIT);
+        assert_eq!(new["invocation_id"], "e4e455fbd455483282107652ca37b83d");
+        assert!(
+            enable_upload(&mut p).is_err(),
+            "must not replace a newer profile"
+        );
+    }
+    #[test]
     fn handoff_event_waits_for_genuine_post_launch_sample_before_any_remote_stage() {
         assert!(event_phase_clock(1_792_618_274, 1_792_618_080).is_err());
         event_phase_clock(1_792_618_274, 1_792_619_880).unwrap();
@@ -851,6 +1075,7 @@ mod tests {
             origin: bound.clone(),
             claims: vec![],
             native_verification: vec![bound],
+            progressive_upload: false,
         };
         assert!(claims(&profile).is_err());
     }
@@ -868,6 +1093,7 @@ mod tests {
                 json!({"epoch":198,"phase":"plugin-verification"}),
             ],
             native_verification: Vec::new(),
+            progressive_upload: false,
         };
         let mut fleet = json!({"pipeline_claims":[{"epoch":198,"phase":"controller-import-handoff"},{"epoch":160,"value":u64::MAX}],"tracked_units":[],"gates":{"198":{"evidence":[]},"144":{"value":u64::MAX}}});
         fold(&mut fleet, &profile).unwrap();
