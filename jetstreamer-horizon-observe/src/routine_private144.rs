@@ -18,10 +18,11 @@ fn enabled(p: &Plan) -> bool {
 
 pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     is_101(p)?;
-    let mut model = model.clone();
+    let mut model = runtime157::effective_model(p, model)?;
     if enabled(p) {
         ensure!(
-            p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA,
+            (p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA)
+                || (p.runtime_handoff157.is_some() && runtime157::writer(p)),
             "private144 requires its qualified fleet/status writer"
         );
         ensure!(

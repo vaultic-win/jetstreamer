@@ -67,7 +67,7 @@ fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()> {
     Ok(())
 }
 
-fn derive_next(
+pub(super) fn derive_next(
     p: &Plan,
     pb: &Bound,
     c: &Value,
@@ -243,11 +243,13 @@ pub(super) fn prepare(
     p: &Plan,
     pb: &Bound,
     self_sha: &str,
-    enable_terminal157: bool,
+    mode: &str,
     delivery_spec: Option<&Bound>,
-    enable_private144: bool,
-    recover_controllers: bool,
 ) -> Result<()> {
+    let enable_terminal157 = mode == "--prepare-next-terminal157";
+    let enable_private144 = mode == "--prepare-next-private144";
+    let recover_controllers = mode == "--prepare-package-recovery";
+    let pause157 = mode == "--prepare-runtime157-pause";
     // No new service/remote observations. Consume only root-private accepted
     // cycle artifacts; the later normal --check-only gate remains mandatory.
     let completion_path = p.cycle_directory.join("completion.json");
@@ -306,6 +308,26 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if pause157 {
+        ensure!(
+            !recover_controllers
+                && !enable_terminal157
+                && !enable_private144
+                && delivery_spec.is_none(),
+            "157pause requires separate transition"
+        );
+        runtime157::enable(
+            &mut next,
+            &mut next_config,
+            &mut observer_package,
+            &mut cycle_package,
+            &model,
+        )?;
+        let effective = private144::effective_model(&next, &model)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        tool_ok(&next.tools.r2)?;
+    }
     if recover_controllers {
         ensure!(
             !enable_terminal157 && !enable_private144 && delivery_spec.is_none(),

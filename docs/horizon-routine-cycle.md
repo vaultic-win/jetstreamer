@@ -218,3 +218,23 @@ normal reconciliation paths, without another resource poll, blind overwrite,
 archive deletion or healthy replay restart. Do not rerun an occupied cycle
 directory. The agent must inspect both successful fleet transitions and failed
 units; a completion record is not proof that an epoch became ready.
+
+## Epoch 157 runtime-segment verification pause
+
+The exact `--prepare-runtime157-pause` transition consumes the genuine accepted
+2026-10-21 15:08 cycle and skips the failed 15:38 observation without fabricating
+a receipt. Its 16:08 recovery has an actual 3,600-second predecessor interval;
+ordinary successors retain the 1,800-second minimum.
+
+The pinned pause evidence preserves the original 157 model, runtime manifest,
+snapshot and segment metadata, producer clock, 115,823 queued replay slots and
+43,200-second downstream allowance. It temporarily excludes only 157 from the
+rate-bearing observer/model/status publications, never from the full campaign
+census. The fleet reader independently binds the original controller and producer
+and reports segment verification, unmodeled resumed replay, or unresolved handoff.
+Its old status remains stale, not a current ETA or inactivity/deletion proof.
+
+This profile grants no replay restart, admission, publication or retirement.
+Restoring 157 requires a separately qualified model/config transition and fresh
+actual resumed-worker evidence; the pause cannot invent rates or silently restore
+the old terminal or erase queued work. Independent verification remains mandatory.
