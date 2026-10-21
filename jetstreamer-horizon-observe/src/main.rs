@@ -303,7 +303,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     );
     parse_utc(&config.not_before_utc).context("invalid configured not-before timestamp")?;
     ensure!(
-        !config.replays.is_empty(),
+        !config.replays.is_empty() || !config.diagnostic_replays.is_empty(),
         "at least one replay is required"
     );
     ensure!(config.output.is_absolute(), "output path must be absolute");
@@ -2029,6 +2029,23 @@ mod tests {
         }
         assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
         assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn config_only_preflight_accepts_diagnostic_only_fleet_without_promoting_it() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("config.json");
+        let mut config = preflight_fixture(temp.path());
+        config["diagnostic_replays"] = config["replays"].clone();
+        config["replays"] = serde_json::json!([]);
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let report = dispatch(&path, true).unwrap().unwrap();
+        assert_eq!(report["ordinary_replay_count"], 0);
+        assert_eq!(report["configuration_validated"], true);
+        assert_eq!(report["resource_observation_performed"], false);
+        assert_eq!(report["replay_launch_authorized"], false);
+        assert_eq!(report["publication_authorized"], false);
+        assert!(!temp.path().join("sample.json").exists());
     }
 
     #[test]
