@@ -324,7 +324,7 @@ mod tests {
     }
     #[test]
     fn exact_profile_and_test_census() {
-        assert_eq!(CPU_CORES, 2);
+        assert_eq!(CPU_CORES, 8);
         assert_eq!(SNAPSHOT_SIZE, 10_177_204_112);
         validate_test_list(&format!(
             "{}\n{}\n2 tests, 0 benchmarks\n",

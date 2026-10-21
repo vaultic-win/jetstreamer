@@ -9,13 +9,16 @@ tests, sequentially, with a test-only 128-MiB stack and 16 Rayon threads. It nev
 replays entries, generates an archive, promotes a runtime or authorizes publication.
 
 Use the existing RAM supervisor sandbox described in
-[the v1.6.16 test guide](v1616-ram-snapshot-tests.md): two CPU cores, 112/128-GiB
+[the v1.6.16 test guide](v1616-ram-snapshot-tests.md): eight CPU cores, 112/128-GiB
 memory limits, zero swap, 512-GiB private tmpfs, minimal four capabilities with
 an unprivileged child, no network, and only the exact receipt directory writable.
 The complete 128-GiB diagnostic cap is reserved above the unchanged 448-GiB host
 stop reserve. Maximum child runtime is 1,800 seconds. A 15-second guard can stop
 only the diagnostic child group. Kernel counters and actual child outcome are
 captured before cgroup teardown. Failure is not snapshot qualification.
+Eight cores follow the earlier snapshot-test comparison: the two-core run reached
+the initialization checkpoint but exhausted its shared time limit. This is a new
+diagnostic allocation, not a change to any live producer or its guard.
 
 Plans use `jetstreamer-private-v1625-ram-snapshot-test-plan-v1`, unit namespace
 `horizon-v1625-snapshot-test-*.service`, and receipt directories named

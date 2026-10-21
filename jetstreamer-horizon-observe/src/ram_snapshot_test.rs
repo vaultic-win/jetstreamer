@@ -37,7 +37,7 @@ const RELEASED_225: bool = cfg!(all(
     feature = "ram-snapshot-eight-core-stopped225",
     not(feature = "epoch225-shrink-snapshot-tests")
 ));
-const CPU_CORES: u64 = if RELEASED_225 { 8 } else { 2 };
+const CPU_CORES: u64 = if RELEASED_225 || PROFILE225 { 8 } else { 2 };
 const PROFILE225: bool = cfg!(feature = "epoch225-shrink-snapshot-tests");
 const SNAPSHOT_SHA: &str = if PROFILE225 {
     "094d3b28c39403580fbac083cdad67cc008b255dd375d611217103750d0f412d"
