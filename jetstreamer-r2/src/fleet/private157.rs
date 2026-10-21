@@ -15,7 +15,10 @@ pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
     c.epoch == 157 && c.unit == UNIT
 }
 pub(super) fn live_limits() -> Result<()> {
-    let out=ProcessCommand::new("/usr/bin/systemctl").args(["show",UNIT,"--no-pager","--property=Type,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,User,UMask"]).output()?;
+    live_limits_for(UNIT, ROOT)
+}
+pub(super) fn live_limits_for(unit: &str, root: &str) -> Result<()> {
+    let out=ProcessCommand::new("/usr/bin/systemctl").args(["show",unit,"--no-pager","--property=Type,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,User,UMask"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 16384,
         "157verifier sandbox unreadable"
@@ -25,9 +28,13 @@ pub(super) fn live_limits() -> Result<()> {
         let (k, v) = line.split_once('=').context("157limit field")?;
         ensure!(limits.insert(k, v).is_none(), "duplicate157limit");
     }
-    validate_limits(&limits)
+    validate_limits_for(&limits, root)
 }
+#[cfg(test)]
 fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
+    validate_limits_for(l, ROOT)
+}
+fn validate_limits_for(l: &BTreeMap<&str, &str>, root: &str) -> Result<()> {
     for (k, v) in [
         ("Type", "exec"),
         ("Restart", "no"),
@@ -42,7 +49,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
         ("ProtectHome", "read-only"),
         ("PrivateNetwork", "yes"),
         ("NoNewPrivileges", "yes"),
-        ("ReadWritePaths", ROOT),
+        ("ReadWritePaths", root),
         ("User", "root"),
         ("UMask", "0077"),
     ] {
@@ -184,7 +191,7 @@ pub(super) fn admission(
     }
     Ok(())
 }
-fn resources(observer: &Value) -> Result<()> {
+pub(super) fn resources(observer: &Value) -> Result<()> {
     let protected = 4_740_696_923_590u64;
     ensure!(
         observer["filesystem"]["conservative_available_bytes"]
@@ -308,7 +315,7 @@ fn admit(value: Value) -> Result<()> {
     println!("{}", file_binding(&s.output)?);
     Ok(())
 }
-fn immutable_receipt(path: &Path, value: &Value) -> Result<()> {
+pub(super) fn immutable_receipt(path: &Path, value: &Value) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let parent = validate_output_destination(path)?;
     let mut t = tempfile::NamedTempFile::new_in(parent)?;
@@ -388,10 +395,10 @@ fn capture_launch(value: Value) -> Result<()> {
     Ok(())
 }
 const SCHEMA_FLEET: &str = "jetstreamer-horizon-campaign-fleet-v1";
-fn binding(b: &BoundFile) -> Value {
+pub(super) fn binding(b: &BoundFile) -> Value {
     json!({"path":b.path,"sha256":b.sha256})
 }
-fn file_binding(path: &Path) -> Result<Value> {
+pub(super) fn file_binding(path: &Path) -> Result<Value> {
     Ok(
         json!({"path":path,"sha256":hex_lower(&Sha256::digest(read_stable_bounded(path,16<<20,"prefix157 prepared file")?))}),
     )

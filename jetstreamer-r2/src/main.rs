@@ -3165,6 +3165,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("prepare-private-prefix144") {
+        return fleet::prepare_private_prefix144();
+    }
     if env::args().nth(1).as_deref() == Some("prepare-private-prefix157") {
         return fleet::prepare_private_prefix157();
     }
