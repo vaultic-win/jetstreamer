@@ -171,3 +171,58 @@ run**: it still owns partial 223 and original failure evidence. Import success
 does not prove current-plugin or authenticated R2 completion; dispatch those
 ordinary per-epoch gates afterward. Preserve interrupted batch recovery state;
 do not blindly restart the importer.
+
+## Native independently gated delivery
+
+`jetstreamer-horizon-verify-pair PLAN PLAN_SHA256 SELF_SHA256` produces one normal
+per-epoch full or plugin receipt in a separate root-private state tree. Its
+strict, immutable plan fixes one epoch in 201–300, the canonical archive
+directory, expected archive digest, stage, exact immutable verifier and thread
+count. It cannot publish archives, create canonical sidecars, delete local work,
+touch R2, admit partial epochs or include private 301.
+
+The full stage runs both the ordinary singleton ordered scan and independent
+`--full --internal-full` verification, concurrently with the same bounded thread
+count per command. **Both must succeed before the full receipt exists.** The
+plugin stage runs only the current pipeline's singleton `--verify-only` command.
+Both stages hash the whole immutable archive before and after verification,
+require exact canonical sidecar bytes, stable descriptor/path identity and an
+acknowledged archive-batch namespace, and rehash their executable, verifier and
+plan before writing a receipt. Milestone journal records time the hashes,
+verification and receipt fsync separately. Nonzero child exit fails closed.
+
+Receipts retain the ordinary three-field format: archive SHA-256, verifier
+SHA-256, receipt-producer SHA-256. The legacy uploader option named
+`--*-verifier-script-sha256` therefore binds the **native pair runner binary** for
+these new states, not an old shell script. Bind its exact digest in the audited
+upload wrapper. Per-epoch full/plugin receipts remain separate gates; recovery's
+internal reread, local sidecar or another epoch's receipt never substitutes for
+either one. Exact identical receipt recovery fsyncs both file and directory;
+changed receipts are rejected without clobbering them.
+
+For recovered 220–222, stage six independent plans/services and one Rust
+progressive uploader scoped only to 220–222. Do not revive the old 220–223
+watchers with an older decoder. Capability-probe the actual deployed full and
+plugin executables' post-update count bound first. Audit all hash bindings and
+the exact `state/receipts` directories before arming upload. Start the new
+verification and uploader only after the independently evidenced local import
+commit is acknowledged, with fresh resource evidence. Upload need not wait for
+every epoch's verifier: each matching full/plugin pair unlocks only its own
+epoch. Keep automatic local retirement disabled until the separate boundary and
+owner-release gates are available.
+
+`jetstreamer-epoch220-import-estimate PLAN PLAN_SHA256 SELF_SHA256` supplies the
+live import phase's definite status estimates from the same fresh observer and
+accepted fleet ledger. It pins the exact importer invocation, three successful
+private eight-thread reader receipts and prior downstream model. The scheduling
+prior is the longest measured private reread plus an explicit 25% allowance for
+the normal importer's semantic/context collection, trusted-219 anchor and hash
+work. This overhead is a stated estimate assumption, not measured current speed.
+Subtract only the current import phase's authoritative D-Bus elapsed time, then
+add each epoch's retained full/plugin/upload/readback/sidecar allowance. All three
+claims must be live and consistent. Wrong owner, stale sample, expired import
+prior, missing evidence and overflow fail closed rather than clamping to zero.
+Seal read-only copies of the pinned reader receipts for this helper; do not
+change the original receipts' modes. Its output is private estimate evidence,
+not an R2 publisher or archive gate. Use the separately gated pipeline publisher
+with the original replay's authenticated clock and a sample after phase start.
