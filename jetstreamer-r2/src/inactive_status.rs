@@ -3,6 +3,7 @@ use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
+mod metadata_cycle;
 mod missing157;
 
 #[derive(Deserialize)]
@@ -29,6 +30,8 @@ struct Plan {
     authenticated_other_host_handoffs: Vec<Value>,
     #[serde(default)]
     prior_intent: Option<Bound>,
+    #[serde(default)]
+    metadata_completion: Option<Bound>,
 }
 
 fn bound_json(bound: &Bound) -> Result<Value> {
@@ -293,6 +296,7 @@ pub(super) fn no_pending_owner_trigger(name: &str, collected: bool) -> Result<()
 }
 
 fn fresh_census(
+    plan: &Plan,
     fleet: &Value,
     terminal_fleet: &Value,
     owners: &[(String, String)],
@@ -306,10 +310,7 @@ fn fresh_census(
         fleet["first_epoch"].as_u64().context("range missing")?,
         fleet["last_epoch"].as_u64().context("range missing")?,
     )?;
-    ensure!(
-        serde_json::to_value(&current)? == fleet["unit_census"],
-        "fleet changed; reconcile before cleanup"
-    );
+    metadata_cycle::validate(plan, fleet, &current)?;
     let preserved =
         terminal_fleet["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1";
     if preserved {
@@ -524,7 +525,7 @@ pub(super) async fn run() -> Result<()> {
         "terminal evidence predates status publication or is future-dated"
     );
     let owners = owner_units(&publication)?;
-    let before = fresh_census(&fleet, &history, &owners)?;
+    let before = fresh_census(&plan, &fleet, &history, &owners)?;
     if let Some(stop) = reserve_owner_evidence(&history, &owners)? {
         ensure!(stop.epoch == plan.epoch, "reserve stop epoch differs");
         stop.validate(&before, publication.verified_unix_seconds, now)?;
@@ -548,6 +549,9 @@ pub(super) async fn run() -> Result<()> {
             status_inactive::cleared_controller_proof(&owners[0].0, &owners[0].1)?,
         )?;
     }
+    if let Some(binding) = &plan.metadata_completion {
+        intent["metadata_completion"] = json!({"path":binding.path,"sha256":binding.sha256});
+    }
     if let Some(prior) = &plan.prior_intent {
         validate_recovery_intent(&bound_json(prior)?, &intent)?;
     }
@@ -568,7 +572,7 @@ pub(super) async fn run() -> Result<()> {
         }
         if args.len() == 6 {
             ensure!(
-                fresh_census(&fleet, &history, &owners)? == before,
+                fresh_census(&plan, &fleet, &history, &owners)? == before,
                 "census changed during preflight"
             );
             println!(
@@ -592,7 +596,7 @@ pub(super) async fn run() -> Result<()> {
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
     )?;
     ensure!(
-        fresh_census(&fleet, &history, &owners)? == before,
+        fresh_census(&plan, &fleet, &history, &owners)? == before,
         "census changed before cleanup"
     );
     no_local_delivery(&plan)?;
@@ -610,7 +614,7 @@ pub(super) async fn run() -> Result<()> {
         "status remains or a new owner published; reconcile"
     );
     ensure!(
-        fresh_census(&fleet, &history, &owners)? == before,
+        fresh_census(&plan, &fleet, &history, &owners)? == before,
         "claim appeared after cleanup; repair live status through gated publisher"
     );
     no_local_delivery(&plan)?;
@@ -719,6 +723,7 @@ mod tests {
             exclusive_local_epoch_ownership: true,
             authenticated_other_host_handoffs: vec![],
             prior_intent: None,
+            metadata_completion: None,
         };
         let fleet = json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":201,"last_epoch":300,
             "sampled_at_utc":"2026-10-20T04:04:42Z","recorded_unix_seconds":1792469100u64,
