@@ -7,6 +7,8 @@ pub(super) const READER_SHA: &str =
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T201800Z-delivery198-completed144-v1";
 const FULL: &str = "jetstreamer-horizon-audit-epochs182-200-v5.service";
 const PLUGIN: &str = "jetstreamer-horizon-plugin-receipt-watcher-shard-e-v5-fsync.service";
+const NATIVE_RUNNER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-native-verification-runner-20261021-v1/jetstreamer-horizon-verify-pair";
+const NATIVE_RUNNER_SHA: &str = "e225f8309d19af230cc189ab6e43296d37795693085299c269ab51af6991ab39";
 const ORIGIN: &str =
     "jetstreamer-root-sweep-e198-readerfix-20261019-v1-r2-e198-198-lane-a-1.service";
 const IID: &str = "e5612ef00a5b4fcab04df2c13a6b35b0";
@@ -17,6 +19,120 @@ pub(super) struct Profile {
     promotion: Bound,
     origin: Bound,
     claims: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    native_verification: Vec<Bound>,
+}
+
+pub(super) fn native(p: &Plan) -> bool {
+    p.public198_delivery
+        .as_ref()
+        .is_some_and(|p| !p.native_verification.is_empty())
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeSpec {
+    schema: String,
+    launches: Vec<Bound>,
+    publication_authorized: bool,
+    r2_mutations: bool,
+}
+
+fn claims(profile: &Profile) -> Result<Vec<Value>> {
+    if profile.native_verification.is_empty() {
+        return Ok(profile.claims.clone());
+    }
+    ensure!(
+        profile.native_verification.len() == 2,
+        "native198 must bind both stages"
+    );
+    let mut claims = Vec::new();
+    let mut phases = BTreeSet::new();
+    for b in &profile.native_verification {
+        let receipt = bound_json(b, false)?;
+        let claim = &receipt["claim"];
+        let (suffix, expected_phase) = match claim["phase"].as_str() {
+            Some("full-verification") => ("full", "full-verification"),
+            Some("plugin-verification") => ("plugin", "plugin-verification"),
+            _ => anyhow::bail!("foreign native198 phase"),
+        };
+        let unit = format!("horizon-{suffix}-verify-198-native-20261021-v1.service");
+        ensure!(
+            receipt["schema"] == "horizon-epoch198-native-verification-launch-v1"
+                && receipt["epoch"] == 198
+                && claim["epoch"] == 198
+                && claim["unit"] == unit
+                && receipt["unit"]["Id"] == unit
+                && receipt["unit"]["InvocationID"] == claim["invocation_id"]
+                && receipt["unit"]["ExecStart"] == claim["expected_exec_start"]
+                && receipt["unit"]["NRestarts"] == "0"
+                && receipt["unit"]["ActiveState"] == "active"
+                && receipt["unit"]["SubState"] == "running"
+                && receipt["unit"]["Type"] == "exec"
+                && receipt["runner_sha256"] == NATIVE_RUNNER_SHA
+                && receipt["verification_complete"] == false
+                && receipt["local_retirement_authorized"] == false
+                && receipt["publication_authorized"] == false
+                && receipt["r2_mutations"] == false
+                && phases.insert(expected_phase),
+            "invalid native198 launch proof"
+        );
+        let plan: Bound = serde_json::from_value(receipt["plan"].clone())?;
+        let value = bound_json(&plan, true)?;
+        let command = format!(
+            "{{ path={NATIVE_RUNNER} ; argv[]={NATIVE_RUNNER} {} {} {NATIVE_RUNNER_SHA} ; ignore_errors=",
+            plan.path.display(),
+            plan.sha256
+        );
+        ensure!(
+            value["schema"] == "horizon-verify-canonical-pair-dev-samjohnson198-v1"
+                && value["epoch"] == 198
+                && value["stage"] == suffix
+                && value["archive_directory"] == "/home/sol/horizon"
+                && value["expected_archive_sha256"]
+                    == "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb",
+            "native198 plan differs"
+        );
+        ensure!(
+            receipt["unit"]["ExecStart"]
+                .as_str()
+                .is_some_and(|s| s.starts_with(&command))
+                && receipt["admission_observer"] == value["admission_observer"],
+            "native198 executable or admission differs"
+        );
+        tool_ok(&Bound {
+            path: NATIVE_RUNNER.into(),
+            sha256: NATIVE_RUNNER_SHA.into(),
+        })?;
+        let mut claim = claim.clone();
+        claim["evidence"]
+            .as_array_mut()
+            .context("native198 evidence")?
+            .push(serde_json::to_value(b)?);
+        claims.push(claim);
+    }
+    Ok(claims)
+}
+
+pub(super) fn enable_native(p: &mut Plan, spec: &Bound) -> Result<()> {
+    let value: NativeSpec = serde_json::from_value(bound_json(spec, true)?)?;
+    ensure!(
+        value.schema == "horizon-native198-verification-handoff-v1"
+            && !value.publication_authorized
+            && !value.r2_mutations,
+        "foreign native198 handoff"
+    );
+    let profile = p
+        .public198_delivery
+        .as_mut()
+        .context("native198 requires prior public handoff")?;
+    ensure!(
+        profile.native_verification.is_empty(),
+        "native198 already migrated"
+    );
+    profile.native_verification = value.launches;
+    claims(profile)?;
+    Ok(())
 }
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     let bytes = read_checked(&path, LIMIT, 0, immutable)?;
@@ -80,6 +196,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value, config: &mut Value) -> Result<()>
         promotion,
         origin: serde_json::from_value(value["origin"].clone())?,
         claims: serde_json::from_value(value["claims"].clone())?,
+        native_verification: Vec::new(),
     });
     p.epoch198_delivery = None;
     p.tools.r2 = Bound {
@@ -140,13 +257,22 @@ fn fold(fleet: &mut Value, profile: &Profile) -> Result<()> {
         .as_array_mut()
         .context("198 pipeline claims")?;
     rows.retain(|c| c["epoch"] != 198);
-    rows.extend(profile.claims.clone());
+    let claims = claims(profile)?;
+    rows.extend(claims.clone());
     for name in [FULL, PLUGIN] {
         let units = fleet["tracked_units"]
             .as_array_mut()
             .context("198 tracked watchers")?;
         if !units.contains(&json!(name)) {
             units.push(json!(name));
+        }
+    }
+    for claim in &claims {
+        let units = fleet["tracked_units"]
+            .as_array_mut()
+            .context("native198 tracked units")?;
+        if !units.contains(&claim["unit"]) {
+            units.push(claim["unit"].clone());
         }
     }
     fleet["gates"]["198"]["state"] = json!("post-replay-pipeline");
@@ -461,6 +587,25 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn native_handoff_is_explicit_separate_and_rejects_authority_extensions() {
+        let good = json!({"schema":"horizon-native198-verification-handoff-v1","launches":[],"publication_authorized":false,"r2_mutations":false});
+        assert!(serde_json::from_value::<NativeSpec>(good.clone()).is_ok());
+        let mut bad = good;
+        bad["replay_launch_authorized"] = json!(true);
+        assert!(serde_json::from_value::<NativeSpec>(bad).is_err());
+        let bound = Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        };
+        let profile = Profile {
+            promotion: bound.clone(),
+            origin: bound.clone(),
+            claims: vec![],
+            native_verification: vec![bound],
+        };
+        assert!(claims(&profile).is_err());
+    }
+    #[test]
     fn public_handoff_preserves_unrelated_claims_and_consensus_integers() {
         let bound = Bound {
             path: "/proof".into(),
@@ -473,6 +618,7 @@ mod tests {
                 json!({"epoch":198,"phase":"full-verification"}),
                 json!({"epoch":198,"phase":"plugin-verification"}),
             ],
+            native_verification: Vec::new(),
         };
         let mut fleet = json!({"pipeline_claims":[{"epoch":198,"phase":"controller-import-handoff"},{"epoch":160,"value":u64::MAX}],"tracked_units":[],"gates":{"198":{"evidence":[]},"144":{"value":u64::MAX}}});
         fold(&mut fleet, &profile).unwrap();
