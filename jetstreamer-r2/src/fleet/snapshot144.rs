@@ -33,6 +33,45 @@ struct Native {
     capability: BoundFile,
     resource_proposal: BoundFile,
 }
+fn native_output(path: &Path) -> bool {
+    if path.parent()
+        != Some(Path::new(
+            "/var/lib/jetstreamer/horizon-epoch144-native-restore-20261021-v1",
+        ))
+    {
+        return false;
+    }
+    let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+        return false;
+    };
+    if name == "admission.json" {
+        return true;
+    }
+    let Some(stamp) = name
+        .strip_prefix("admission-")
+        .and_then(|s| s.strip_suffix(".json"))
+    else {
+        return false;
+    };
+    stamp.len() == 16
+        && stamp.is_ascii()
+        && stamp.as_bytes()[8] == b'T'
+        && stamp.as_bytes()[15] == b'Z'
+        && stamp[..8]
+            .bytes()
+            .chain(stamp[9..15].bytes())
+            .all(|b| b.is_ascii_digit())
+        && utc_seconds(&format!(
+            "{}-{}-{}T{}:{}:{}Z",
+            &stamp[..4],
+            &stamp[4..6],
+            &stamp[6..8],
+            &stamp[9..11],
+            &stamp[11..13],
+            &stamp[13..15]
+        ))
+        .is_ok()
+}
 fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
     ensure!(
         n.inputs.sha256 == "908cb628fc955f0ac66692d2742b34c1422b3ad06130b8fc8b28a94efaee682f"
@@ -132,8 +171,13 @@ fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) -> Result<(
         .as_object()
         .context("prior census")?;
     for row in previous["active"].as_array().context("active census")? {
-        for role in ["controller", "producer"] {
-            let owner = &row[role];
+        let owners = match (row.get("controller"), row.get("producer"), row.get("unit")) {
+            (Some(controller), Some(producer), None) => vec![controller, producer],
+            (None, Some(producer), None) => vec![producer],
+            (None, None, Some(owner)) => vec![owner],
+            _ => anyhow::bail!("unknown or ambiguous active owner shape"),
+        };
+        for owner in owners {
             let name = owner["Id"].as_str().context("active owner name")?;
             let live = current.get(name).context("missing active owner")?;
             ensure!(
@@ -156,8 +200,12 @@ fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) -> Result<(
             }
             ensure!(
                 live["NRestarts"] == "0"
-                    && live["ActiveState"] == "active"
-                    && live["MainPID"].as_str().is_some_and(|s| s != "0"),
+                    && ((live["ActiveState"] == "active" && live["SubState"] == "running")
+                        || (live["ActiveState"] == "activating" && live["SubState"] == "start"))
+                    && live["MainPID"]
+                        .as_str()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .is_some_and(|pid| pid > 0),
                 "owner not stable/live"
             );
         }
@@ -222,18 +270,18 @@ pub(super) fn run() -> Result<()> {
             } else {
                 "jetstreamer-epoch144-snapshot-admission-spec-v1"
             }
-            && s.output
-                == if native_only {
-                    Path::new(
-                        "/var/lib/jetstreamer/horizon-epoch144-native-restore-20261021-v1/admission.json",
-                    )
-                } else if clock_only {
-                    Path::new(
-                        "/var/lib/jetstreamer-horizon-epoch144-snapshot-clock-20261021-v1/admission.json",
-                    )
-                } else {
-                    Path::new(OUTPUT)
-                }
+            && if native_only {
+                native_output(&s.output)
+            } else {
+                s.output
+                    == if clock_only {
+                        Path::new(
+                            "/var/lib/jetstreamer-horizon-epoch144-snapshot-clock-20261021-v1/admission.json",
+                        )
+                    } else {
+                        Path::new(OUTPUT)
+                    }
+            }
             && s.floor.sha256 == FLOOR_SHA
             && s.protection.sha256 == PROTECTION_SHA,
         "snapshot admission scope/protection differs"
@@ -485,5 +533,63 @@ mod tests {
         }
         current.clear();
         assert!(check_owners(&prior, &current).is_err());
+    }
+    #[test]
+    fn pipeline_and_standalone_owners_remain_fully_bound() {
+        for (state, substate) in [("active", "running"), ("activating", "start")] {
+            let owner = json!({"Id":"pipeline.service","InvocationID":"b".repeat(32),"MainPID":"456","ActiveState":state,"SubState":substate,"NRestarts":"0","ExecStart":"sealed pipeline"});
+            for row in [json!({"unit":owner}), json!({"producer":owner})] {
+                let prior = json!({"unit_census":{"pipeline.service":owner},"active":[row]});
+                let current = BTreeMap::from([("pipeline.service".into(), owner.clone())]);
+                check_owners(&prior, &current).unwrap();
+                for key in [
+                    "InvocationID",
+                    "MainPID",
+                    "ActiveState",
+                    "SubState",
+                    "NRestarts",
+                    "ExecStart",
+                ] {
+                    let mut changed = current.clone();
+                    changed.get_mut("pipeline.service").unwrap()[key] = json!("changed");
+                    assert!(check_owners(&prior, &changed).is_err(), "{key}");
+                }
+                assert!(check_owners(&prior, &BTreeMap::new()).is_err());
+                let mut unbound = prior.clone();
+                unbound["unit_census"] = json!({});
+                assert!(check_owners(&unbound, &current).is_err());
+            }
+        }
+    }
+    #[test]
+    fn unknown_or_ambiguous_owner_rows_fail_closed() {
+        for row in [
+            json!({}),
+            json!({"controller":{}}),
+            json!({"unit":{},"producer":{}}),
+            json!({"controller":{},"producer":{},"unit":{}}),
+        ] {
+            assert!(
+                check_owners(&json!({"unit_census":{},"active":[row]}), &BTreeMap::new()).is_err()
+            );
+        }
+    }
+}
+#[test]
+fn renewed_native_admission_is_unique_and_stays_in_exact_receipt_namespace() {
+    let root = "/var/lib/jetstreamer/horizon-epoch144-native-restore-20261021-v1";
+    assert!(native_output(&PathBuf::from(format!(
+        "{root}/admission.json"
+    ))));
+    assert!(native_output(&PathBuf::from(format!(
+        "{root}/admission-20261021T200800Z.json"
+    ))));
+    for p in [
+        format!("{root}/admission-20260230T200800Z.json"),
+        format!("{root}/other.json"),
+        format!("{root}/../admission-20261021T200800Z.json"),
+        "/tmp/admission.json".into(),
+    ] {
+        assert!(!native_output(Path::new(&p)), "{p}");
     }
 }

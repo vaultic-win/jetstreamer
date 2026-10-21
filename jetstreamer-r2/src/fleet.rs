@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod native144;
 mod prefix144;
 mod private144;
 mod private157;
@@ -457,6 +458,9 @@ fn validate_same_sample_admission(
             // Admission still requires its real one-worker sandboxed first fire.
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
+        144 if native144::namespace(claim) => {
+            "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
+        }
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -526,7 +530,7 @@ fn validate_same_sample_admission(
             && guard
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
-            && if native_restore_140(claim) {
+            && if native_restore_140(claim) || native144::namespace(claim) {
                 // The pinned eca guard predates bounded-canary fields.
                 guard.get("canary_target_error").is_none()
                     && guard["bounded_measurement"] == false
@@ -574,7 +578,14 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if native_restore_140(claim) {
+    if native144::namespace(claim) {
+        plan.get("bounded_canary").is_none()
+            && plan.get("bounded_measurement").is_none_or(Value::is_null)
+            && plan["filesystem"] == "/home/sol"
+            && plan["minimum_free_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= 4_740_696_923_590)
+    } else if native_restore_140(claim) {
         plan.get("bounded_canary").is_none()
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
             && plan["filesystem"] == "/home/sol"
@@ -637,6 +648,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if native144::namespace(claim) || receipt["schema"] == native144::SCHEMA {
+        return native144::launch(receipt, claim);
+    }
     if retained220::namespace(claim) || receipt["schema"] == retained220::SCHEMA {
         return retained220::launch(receipt, claim);
     }
@@ -1839,6 +1853,9 @@ pub(super) async fn run() -> Result<()> {
             }
             if prefix144::namespace(claim) {
                 prefix144::live_limits()?;
+            }
+            if native144::namespace(claim) {
+                native144::validate_live(claim, current)?;
             }
             if retained220::namespace(claim) {
                 retained220::validate_live(claim, current)?;
