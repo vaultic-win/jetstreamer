@@ -45,7 +45,9 @@ matching complete 201–300 fleet ledger. The profile admits only the exact exis
 canonical-root203 invocation `748ffa40e0a2408da0a10fc9e160cf0a`, and 216–219 delivery
 invocations. It rejects duplicate, foreign, inactive or restarted active claims,
 revalidates all active unit commands/identities before and after input hashing,
-and preserves the six-sample century floor. A fleet change requires new admission;
+and preserves the seven-sample century floor after epoch216 completed:
+`ceil(2 * 824601229550 / 7) = 235600351300` bytes. The legacy profile's six-sample
+floor is unchanged. A fleet change requires new admission;
 do not falsify or rewrite the ledger to pass this gate. Inputs must remain singly
 linked, root-owned and immutable. The larger selected-profile debug test binary
 has a separate 256-MiB input bound; the legacy profile retains its 64-MiB bound.

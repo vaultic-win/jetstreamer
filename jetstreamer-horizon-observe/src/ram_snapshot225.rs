@@ -194,7 +194,7 @@ pub(super) fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -
             .iter()
             .filter_map(|e| e["epoch"].as_u64())
             .collect::<Vec<_>>()
-            == [201, 202, 206, 213, 214, 215],
+            == [201, 202, 206, 213, 214, 215, 216],
         "century samples changed"
     );
     let sum = ready
@@ -202,7 +202,7 @@ pub(super) fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -
         .try_fold(0u64, |s, e| s.checked_add(e["archive_length"].as_u64()?))
         .context("size overflow")?;
     ensure!(
-        sum == 695_624_150_347 && (2 * sum).div_ceil(6) == FLOOR,
+        sum == 824_601_229_550 && (2 * sum).div_ceil(7) == FLOOR,
         "century floor changed"
     );
     for u in validate_active(f)? {

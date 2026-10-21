@@ -29,7 +29,12 @@ const GIB: u64 = 1 << 30;
 const MEMORY_MAX: u64 = 128 * GIB;
 const MEMORY_HIGH: u64 = 112 * GIB;
 const TMPFS_SIZE: u64 = 512 * GIB;
-const FLOOR: u64 = 231_874_716_783;
+const FLOOR: u64 = if PROFILE225 {
+    // Seven verified campaign samples after epoch216's sidecar commit.
+    235_600_351_300
+} else {
+    231_874_716_783
+};
 const STOP_MEMORY: u64 = 448 * GIB;
 // Reserve the complete diagnostic cap above the unchanged host stop reserve.
 const START_MEMORY: u64 = STOP_MEMORY + MEMORY_MAX;
