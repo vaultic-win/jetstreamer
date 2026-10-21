@@ -29,6 +29,96 @@ pub(super) fn native(p: &Plan) -> bool {
         .is_some_and(|p| !p.native_verification.is_empty())
 }
 
+pub(super) fn refreshed(p: &Plan) -> bool {
+    p.public198_delivery.as_ref().is_some_and(|p| {
+        p.native_verification.iter().any(|b| {
+            b.path
+                .starts_with("/var/lib/jetstreamer/horizon-epoch198-manager-refresh-20261021-v1")
+        })
+    })
+}
+
+fn manager_command_matches(old: &str, new: &str) -> bool {
+    old.split_once(" ; ignore_errors=")
+        .zip(new.split_once(" ; ignore_errors="))
+        .is_some_and(|(a, b)| a.0 == b.0 && a.1.starts_with("no ;") && b.1.starts_with("no ;"))
+}
+pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
+    ensure!(
+        is_101(p)?
+            && p.sample_target_utc == "2026-10-21T21:28:00Z"
+            && spec.sha256 == "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346",
+        "foreign native198 manager refresh"
+    );
+    authenticate_named_service("horizon-native198-manager-refresh-20261021-v1.service")?;
+    let mut copy: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    enable_native(&mut copy, spec)?;
+    let profile = copy
+        .public198_delivery
+        .as_ref()
+        .context("native198 refresh profile")?;
+    let root = Path::new("/var/lib/jetstreamer/horizon-epoch198-manager-refresh-20261021-v1");
+    absent(root)?;
+    fs::create_dir(root)?;
+    fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
+    File::open(root.parent().context("refresh parent")?)?.sync_all()?;
+    let mut launches = Vec::new();
+    for original in &profile.native_verification {
+        let mut value = bound_json(original, false)?;
+        let unit = value["claim"]["unit"].as_str().context("refresh unit")?;
+        let output = Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,ExecStart,Type,Result,ControlGroup"]).output()?;
+        ensure!(
+            output.status.success() && output.stdout.len() < 16384,
+            "cannot refresh native198 manager properties"
+        );
+        let mut fresh = serde_json::Map::new();
+        for line in std::str::from_utf8(&output.stdout)?.lines() {
+            let (key, value) = line.split_once('=').context("refresh property")?;
+            ensure!(
+                fresh.insert(key.into(), json!(value)).is_none(),
+                "duplicate refresh property"
+            );
+        }
+        let fresh = Value::Object(fresh);
+        for key in [
+            "Id",
+            "LoadState",
+            "ActiveState",
+            "SubState",
+            "MainPID",
+            "NRestarts",
+            "InvocationID",
+            "Type",
+            "Result",
+            "ControlGroup",
+        ] {
+            ensure!(
+                fresh[key] == value["unit"][key],
+                "native198 {key} changed, not command metadata refresh"
+            );
+        }
+        let old_command = value["unit"]["ExecStart"]
+            .as_str()
+            .context("old refresh command")?;
+        let new_command = fresh["ExecStart"].as_str().context("new refresh command")?;
+        ensure!(
+            manager_command_matches(old_command, new_command),
+            "native198 executable arguments or ignore-errors changed"
+        );
+        value["unit"] = fresh.clone();
+        value["claim"]["expected_exec_start"] = fresh["ExecStart"].clone();
+        value["manager_refresh"] = json!({"previous_launch":original,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"same_invocation_and_pid":true,"executable_arguments_unchanged":true,"new_launch":false});
+        let phase = value["claim"]["phase"].as_str().context("refresh phase")?;
+        launches.push(write_new(&root.join(format!("{phase}.json")), &value)?);
+    }
+    let bound = write_new(
+        &root.join("spec.json"),
+        &json!({"schema":"horizon-native198-verification-handoff-v1","launches":launches,"publication_authorized":false,"r2_mutations":false}),
+    )?;
+    println!("{} {}", bound.path.display(), bound.sha256);
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NativeSpec {
@@ -132,6 +222,120 @@ pub(super) fn enable_native(p: &mut Plan, spec: &Bound) -> Result<()> {
     );
     profile.native_verification = value.launches;
     claims(profile)?;
+    Ok(())
+}
+
+/// A phase-handoff event reuses the current coordinated resource sample, never
+/// resamples or rewrites the canonical fleet/completion chain. Its complete
+/// private census is current service/remote evidence for this one status update.
+fn event_scope(
+    sample: &str,
+    plan_sha: &str,
+    spec_sha: &str,
+    writer: bool,
+    already_native: bool,
+) -> Result<()> {
+    ensure!(
+        writer
+            && !already_native
+            && sample == "2026-10-21T21:28:00Z"
+            && plan_sha == "fdb0c0185f0c73ebe5f4b70cca5e45fb8508afc506e9ec61424c1de5bfea654c"
+            && matches!(
+                spec_sha,
+                "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346"
+                    | "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6"
+            ),
+        "foreign native198 status event"
+    );
+    Ok(())
+}
+fn event_phase_clock(launched: u64, sampled: u64) -> Result<()> {
+    ensure!(
+        launched <= sampled,
+        "replacement phase postdates coordinated sample; wait for next genuine sample, never backdate status"
+    );
+    Ok(())
+}
+pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -> Result<()> {
+    ensure!(is_101(p)?, "foreign native198 campaign");
+    event_scope(
+        &p.sample_target_utc,
+        &pb.sha256,
+        &spec.sha256,
+        writer(p),
+        native(p),
+    )?;
+    let endpoint = env::var("HORIZON_S3_ENDPOINT").context("storage endpoint missing")?;
+    ensure!(
+        sha(endpoint.as_bytes()) == p.endpoint_sha256 && p.bucket == BUCKET,
+        "status event endpoint differs"
+    );
+    let refreshed =
+        spec.sha256 == "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6";
+    let invocation = authenticate_named_service(if refreshed {
+        "horizon-native198-status-handoff-20261021-v2.service"
+    } else {
+        "horizon-native198-status-handoff-20261021-v1.service"
+    })?;
+    let cb = file(p.cycle_directory.join("completion.json"), false)?;
+    ensure!(
+        cb.sha256 == "8e26cd0f9975f2978a57baff0b1641e96f4c58eae3af45c4b3e43daaf6969fb4",
+        "accepted21:28 completion differs"
+    );
+    let completion = bound_json(&cb, false)?;
+    next_preparation::completion_bindings(p, pb, &completion)?;
+    let observer: Bound = serde_json::from_value(completion["observer"].clone())?;
+    let sample = bound_json(&observer, false)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let seconds = utc_seconds(&p.sample_target_utc)?;
+    ensure!(
+        sample["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && sample["recorded_at_utc"] == p.sample_target_utc
+            && now >= seconds
+            && now - seconds <= 1800,
+        "status event resource evidence expired"
+    );
+    let source: Bound = serde_json::from_value(completion["fleet_plan"].clone())?;
+    let mut fleet = bound_json(&source, true)?;
+    let mut event: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    enable_native(&mut event, spec)?;
+    for launch in &event
+        .public198_delivery
+        .as_ref()
+        .context("event profile")?
+        .native_verification
+    {
+        let proof = bound_json(launch, false)?;
+        event_phase_clock(
+            proof["recorded_unix_seconds"]
+                .as_u64()
+                .context("launch clock")?,
+            seconds,
+        )?;
+    }
+    derive_fleet(&event, &mut fleet)?;
+    event.cycle_directory = p.cycle_directory.join(if refreshed {
+        "native198-status-event-v2"
+    } else {
+        "native198-status-event-v1"
+    });
+    absent(&event.cycle_directory)?;
+    fs::create_dir(&event.cycle_directory)?;
+    fs::set_permissions(&event.cycle_directory, fs::Permissions::from_mode(0o700))?;
+    File::open(&p.cycle_directory)?.sync_all()?;
+    write_new(
+        &event.cycle_directory.join("intent.json"),
+        &json!({"schema":"horizon-native198-status-event-intent-v1","source_plan":pb,"source_completion":cb,"handoff":spec,"invocation_id":invocation,"self_sha256":self_sha,"coordinated_observer":observer,"new_resource_samples":0,"canonical_fleet_changed":false,"archive_mutations":false,"sidecar_mutations":false}),
+    )?;
+    let result = publish(&event, &fleet, &observer)?;
+    ensure!(
+        result["publication_skipped"] != true && !result["publication"].is_null(),
+        "native198 status event did not publish; preserve partial evidence"
+    );
+    write_new(
+        &event.cycle_directory.join("completion.json"),
+        &json!({"schema":"horizon-native198-status-event-completion-v1","source_plan":pb,"source_completion":cb,"handoff":spec,"invocation_id":invocation,"self_sha256":self_sha,"result":result,"new_resource_samples":0,"canonical_fleet_changed":false,"replay_status_updates":0,"archive_mutations":false,"sidecar_mutations":false,"r2_status_mutation":true}),
+    )?;
     Ok(())
 }
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
@@ -586,6 +790,51 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn handoff_event_waits_for_genuine_post_launch_sample_before_any_remote_stage() {
+        assert!(event_phase_clock(1_792_618_274, 1_792_618_080).is_err());
+        event_phase_clock(1_792_618_274, 1_792_619_880).unwrap();
+        assert!(event_phase_clock(u64::MAX, 1_792_619_880).is_err());
+    }
+    #[test]
+    fn manager_refresh_allows_only_reset_runtime_annotations_not_command_changes() {
+        let before = "{ path=/immutable/runner ; argv[]=/immutable/runner /plan sha selfsha ; ignore_errors=no ; start_time=[Wed] ; pid=123 ; code=(null) ; status=0/0 }";
+        let after = "{ path=/immutable/runner ; argv[]=/immutable/runner /plan sha selfsha ; ignore_errors=no ; start_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+        assert!(manager_command_matches(before, after));
+        assert!(!manager_command_matches(
+            before,
+            &after.replace("/plan sha", "/other sha")
+        ));
+        assert!(!manager_command_matches(
+            before,
+            &after.replace("selfsha", "changed")
+        ));
+        assert!(!manager_command_matches(
+            before,
+            &after.replace("ignore_errors=no", "ignore_errors=yes")
+        ));
+        assert!(!manager_command_matches(before, "unstructured"));
+    }
+    #[test]
+    fn phase_event_cannot_retarget_a_new_sample_plan_writer_or_repeated_handoff() {
+        let sample = "2026-10-21T21:28:00Z";
+        let plan = "fdb0c0185f0c73ebe5f4b70cca5e45fb8508afc506e9ec61424c1de5bfea654c";
+        let spec = "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346";
+        event_scope(sample, plan, spec, true, false).unwrap();
+        event_scope(
+            sample,
+            plan,
+            "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6",
+            true,
+            false,
+        )
+        .unwrap();
+        assert!(event_scope("2026-10-21T21:58:00Z", plan, spec, true, false).is_err());
+        assert!(event_scope(sample, "foreign", spec, true, false).is_err());
+        assert!(event_scope(sample, plan, "foreign", true, false).is_err());
+        assert!(event_scope(sample, plan, spec, false, false).is_err());
+        assert!(event_scope(sample, plan, spec, true, true).is_err());
+    }
     #[test]
     fn native_handoff_is_explicit_separate_and_rejects_authority_extensions() {
         let good = json!({"schema":"horizon-native198-verification-handoff-v1","launches":[],"publication_authorized":false,"r2_mutations":false});
