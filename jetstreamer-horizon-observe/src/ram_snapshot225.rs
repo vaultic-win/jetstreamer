@@ -290,6 +290,10 @@ mod tests {
             ("/unit", json!("foreign.service")),
             ("/test_binary/sha256", json!("c".repeat(64))),
             (
+                "/test_binary/sha256",
+                json!("2d878b5ad5e007c07d7a3a53a54c7b481f279ab9aac9a08907949db73dc2a2de"),
+            ),
+            (
                 "/snapshot/path",
                 json!("/sealed/snapshot-86831488-other.tar.zst"),
             ),

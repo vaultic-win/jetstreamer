@@ -2,7 +2,7 @@
 
 Build `jetstreamer-horizon-ram-snapshot-test` with the opt-in
 `epoch225-shrink-snapshot-tests` feature. The default v1.6.16 profile is unchanged.
-This profile pins the selected epoch225 test executable (`2d878b5a…`), snapshot
+This profile pins the selected epoch225 release test executable (`207c0d2d…`), snapshot
 97199617 (`094d3b28…`, 10,177,204,112 bytes), and mainnet genesis (`133f7eae…`).
 It executes exactly the existing v1.6.25 load/verify and initialize/freeze ignored
 tests, sequentially, with a test-only 128-MiB stack and 16 Rayon threads. It never
@@ -21,6 +21,23 @@ requires `TemporaryFileSystem=/tmp:rw,size=512G,nr_inodes=1048576,nosuid,nodev,m
 and independently checks the mounted filesystem's exact inode limit. Keep the
 filesystem byte size and cgroup limits unchanged; the default v1.6.16 mount
 options and inode policy remain unchanged.
+
+With that inode correction, the debug test executable `2d878b5a…` reached the
+30-minute runtime bound during the first initialization/checkpoint test. Its
+captured peak was 96,739,713,024 bytes, with zero memory-high/max/OOM events and
+zero memory-pressure time; no canonical mismatch was reported. Preserve its
+result and stop intent. The next executable uses the same selected qualification
+feature and pinned Rust 1.51.0, built with `cargo test --workspace --release
+--locked --offline --features epoch225-v1-6-25-qualification`. The release suite
+passed 16 protocol, 57 worker and one stdio tests; the two real fixture tests
+remain ignored until the bounded supervisor explicitly runs them.
+
+This changes optimization, not the required fixture, Bank/accounts-hash or
+checkpoint checks. The snapshot loader's `verify_snapshot_bank`, its Bank hash
+and capitalization verification, and both explicit integration-test assertions
+remain unconditional in release mode. Keep eight cores, the 128-GiB cap,
+1,048,576-inode private tmpfs and the 1,800-second child limit unchanged. A release
+build or a passing small suite is not a real snapshot-test pass.
 
 Use the existing RAM supervisor sandbox described in
 [the v1.6.16 test guide](v1616-ram-snapshot-tests.md): eight CPU cores, 112/128-GiB
