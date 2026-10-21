@@ -701,6 +701,16 @@ mod tests {
                     .iter()
                     .all(|s| s.starts_with("jetstreamer-epoch140-snapshot-"))
             );
+        } else if EPOCH == 144 {
+            assert_eq!(GENERATION, "1634786788446253");
+            assert_eq!(SIZE, 2_569_233_422);
+            assert_eq!(CRC, "K4VB8A==");
+            assert_eq!(MD5, "9XLFNdvEJOFXo9YPOsNBOA==");
+            assert!(
+                schemas
+                    .iter()
+                    .all(|s| s.starts_with("jetstreamer-epoch144-snapshot-"))
+            );
         } else {
             assert_eq!(EPOCH, 141);
             assert_eq!(GENERATION, "1634789748052739");

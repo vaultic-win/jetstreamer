@@ -248,7 +248,7 @@ pub(super) fn prepare(
 ) -> Result<()> {
     let prefix_spec = if matches!(
         mode,
-        "--prepare-next-prefix157" | "--prepare-next-prefix144"
+        "--prepare-next-prefix157" | "--prepare-next-prefix144" | "--prepare-next-completed144"
     ) {
         handoff_spec
     } else {
@@ -290,7 +290,7 @@ pub(super) fn prepare(
     )?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
-    if prefix_spec.is_none() {
+    if prefix_spec.is_none() || mode == "--prepare-next-completed144" {
         latest_fleet_unchanged(&next, &fleet)?;
     }
     for tool in [&next.tools.sealer, &next.tools.estimator, &next.tools.r2] {
@@ -330,7 +330,9 @@ pub(super) fn prepare(
             !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,
             "prefix157 migration must be separate"
         );
-        if mode == "--prepare-next-prefix144" {
+        if mode == "--prepare-next-completed144" {
+            completed144::enable(&mut next, spec)?;
+        } else if mode == "--prepare-next-prefix144" {
             prefix144::enable(&mut next, spec)?;
         } else {
             prefix157::enable(&mut next, spec)?;

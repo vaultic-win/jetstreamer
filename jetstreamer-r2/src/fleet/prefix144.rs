@@ -1,6 +1,7 @@
 //! One exact private144 independent reread. Never a full epoch or replay claim.
 use super::*;
 use private157::{binding, file_binding, immutable_receipt};
+mod completed;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch144-prefix-verification-launch-v1";
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch144-retained-prefix-audit-20261021-v1";
@@ -229,7 +230,7 @@ pub(super) fn prepare() -> Result<()> {
             && unsafe { libc::geteuid() } == 0
             && matches!(
                 args[7].as_str(),
-                "--admit" | "--launch" | "--fleet" | "--routine-spec"
+                "--admit" | "--launch" | "--fleet" | "--routine-spec" | "--completed-proof"
             ),
         "usage: prepare-private-prefix144 SPEC --spec-sha256 HEX --self-sha256 HEX MODE"
     );
@@ -353,6 +354,9 @@ pub(super) fn prepare() -> Result<()> {
     let r = bound_json(lb)?;
     let c = claim(&r, lb)?;
     launch(&r, &c)?;
+    if args[7] == "--completed-proof" {
+        return completed::capture(&s, lb, &r, &c);
+    }
     let plan_path = s.destination.join("fleet-plan.json");
     if args[7] == "--routine-spec" {
         let event_binding: BoundFile = serde_json::from_value(file_binding(&s.output)?)?;

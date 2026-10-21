@@ -40,6 +40,8 @@ mod controller_recovery;
 #[path = "routine_runtime157.rs"]
 mod runtime157;
 
+#[path = "routine_completed144.rs"]
+mod completed144;
 #[path = "routine_prefix144.rs"]
 mod prefix144;
 #[path = "routine_prefix157.rs"]
@@ -96,6 +98,8 @@ struct Plan {
     prefix157_audit: Option<prefix157::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     prefix144_audit: Option<prefix144::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    completed144_prefix: Option<completed144::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -178,7 +182,11 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if p.prefix144_audit.is_some() && p.epoch198_delivery.is_some() {
+    if p.completed144_prefix.is_some() && p.epoch198_delivery.is_some() {
+        "delivery198-completed144-v1"
+    } else if p.completed144_prefix.is_some() {
+        "completed144-v1"
+    } else if p.prefix144_audit.is_some() && p.epoch198_delivery.is_some() {
         "delivery198-prefix144-v1"
     } else if p.prefix144_audit.is_some() {
         "prefix144-v1"
@@ -587,6 +595,7 @@ fn validate_templates(
     }
     prefix157::validate(p)?;
     prefix144::validate(p)?;
+    completed144::validate(p)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1004,6 +1013,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     runtime157::derive_fleet(p, &mut fleet)?;
     prefix157::derive_fleet(p, &mut fleet)?;
     prefix144::derive_fleet(p, &mut fleet)?;
+    completed144::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1213,6 +1223,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     runtime157::derive_fleet(p, &mut fleet.clone())?;
     prefix157::derive_fleet(p, &mut fleet.clone())?;
     prefix144::derive_fleet(p, &mut fleet.clone())?;
+    completed144::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1491,6 +1502,7 @@ fn main() {
                         "--prepare-next-delivery198"
                             | "--prepare-next-prefix157"
                             | "--prepare-next-prefix144"
+                            | "--prepare-next-completed144"
                     )
                     && args[8] == "--handoff-sha256")
                 || (args.len() == 7
@@ -1529,6 +1541,7 @@ fn main() {
                 || arg == "--prepare-runtime157-pause"
                 || arg == "--prepare-next-prefix157"
                 || arg == "--prepare-next-prefix144"
+                || arg == "--prepare-next-completed144"
         }) {
             let spec = if args.len() == 10 {
                 Some(Bound {

@@ -105,6 +105,14 @@ name = "jetstreamer-epoch140-snapshot-metadata"
 path = "src/epoch140_snapshot_metadata_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch144-snapshot-metadata"
+path = "src/epoch144_snapshot_metadata_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch144-snapshot-download"
+path = "src/epoch144_snapshot_download_bin.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-boundary-bridge"
 path = "src/horizon_boundary_bridge_bin.rs"
 

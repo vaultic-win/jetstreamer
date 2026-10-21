@@ -6,7 +6,7 @@ Preserve its109GBarchive and original manifest;do not copy/rename the archive,
 create a canonical sidecar,run the production plugin or claim a production ETA.
 
 `prepare-private-prefix144 SPEC --spec-sha256 HEX --self-sha256 HEX MODE`
-is a root,sealed,self-authenticating Rust preparer with four modes:
+is a root,sealed,self-authenticating Rust preparer with these modes:
 
 - `--admit`:bind the fresh v2 observer and accepted full fleet,recheck every
   old producer,keep the4,740,696,923,590byte protection and128GiBRAMreserve,
@@ -22,6 +22,14 @@ is a root,sealed,self-authenticating Rust preparer with four modes:
   The qualified routine helper uses `--prepare-next-prefix144` to consume the
   genuine predecessor and event head,preserve157history and all ETA formulae,
   clear the one-time admission marker and prepare a distinct namespace.
+- `--completed-proof`:after the actual verifier has exited successfully,bind
+  its exact retained invocation/command,immutable launch and independent pass
+  receipt. Write completed private history and a separately sealable routine
+  spec without refreshing admission,rehashing the archive or observing resources.
+  The qualified helper's `--prepare-next-completed144` consumes the genuine
+  completed normal predecessor,adds only terminal diagnostic history and repair
+  evidence,and keeps every producer,integer,ETA formula and admission marker
+  unchanged. It does not require or invent an accepted live-admission event.
 
 Qualify/seal both writer and helper before launch;cancel obsolete pending
 observer/metadata schedules before migration and check all canonical outputs
@@ -52,3 +60,38 @@ it or retry the expired17:38admission spec. The genuine18:08normal cycle passed
 with the unchanged older reader/helper. Reconcile the successful audit as
 completed private history in a separately qualified normal-plan transition;
 do not fabricate a successful event ledger or a new live admission.
+
+The completed-history fold is idempotent and separately names its namespace.
+It refuses a conflicting144claim,live-admission marker,newer repair action or
+production eligibility. The old action is hash-bound at preparation;unrelated
+gates and all old diagnostics remain intact. No existing producer or verifier is
+restarted,and completed verification is never relabeled full epoch readiness.
+
+## Restart-source metadata
+
+`jetstreamer-epoch144-snapshot-metadata` uses the existing bounded read-only
+generation-metadata engine with a separate compile-time profile for slot62639490,
+generation1634786788446253,size2569233422,CRC32C`K4VB8A==` and
+MD5`9XLFNdvEJOFXo9YPOsNBOA==`. These match the original sealed manifest.
+It requires a sealed root-owned plan with schema
+`jetstreamer-epoch144-snapshot-metadata-plan-v1`,the current gcloud executable
+SHA-256 and an exact no-clobber private output path. Invocation is
+`--plan PATH --plan-sha256 HEX --self-sha256 HEX` under persistent systemd.
+The engine drops the CLI to uid1001/gid1003,uses the interactive
+`/home/sol/.config/gcloud`,and authenticates exact generation,size and hashes.
+Keep that config writable for SDK token refresh without changing live lanes.
+
+Its receipt proves only source metadata availability,not downloaded bytes,native
+checkpoint state,capacity admission,continuation,assembly or publication. The
+existing epoch213 continuation is build-bound and must not be reused for144.
+The separate `jetstreamer-epoch144-snapshot-download` profile reuses the reviewed
+generation download engine without changing its production behavior. It binds
+the metadata and fresh admission receipts,the exact executable and filesystem,
+and the complete compressed size plus slack above all older growth/floor claims.
+Its owned SDK process group remains protected by the internal disk/time/size
+guard through transfer and independent CRC32C/MD5/SHA-256 checks. It emits only
+private,no-clobber snapshot/receipt evidence and cannot restore or replay.
+The profile regression rejects borrowing another epoch's metadata authority.
+Snapshot acquisition requires its own qualified deployment and fresh disk gate;
+native restore must use the exact unchanged v1.4.25 worker and compare the full
+verified prefix terminal tuple before any suffix entries are accepted.

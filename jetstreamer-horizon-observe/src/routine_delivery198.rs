@@ -439,7 +439,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 }
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
-    if p.prefix144_audit.is_some() {
+    if p.prefix144_audit.is_some() || p.completed144_prefix.is_some() {
         return (prefix144::WRITER, prefix144::WRITER_SHA);
     }
     if p.prefix157_audit.is_some() {
