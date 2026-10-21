@@ -245,10 +245,32 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
 
 fn validate_pending_evidence(e: &Value) -> Result<()> {
     let producer = &e["producer"];
+    let collected = producer["LoadState"] == "not-found";
+    if collected {
+        let manager = &e["producer_terminal_manager"];
+        let time = manager["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("198 manager time")?
+            .parse::<u64>()?;
+        let close = e["events"][3]["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("198 close time")?
+            .parse::<u64>()?;
+        ensure!(
+            manager["UNIT"] == UNIT
+                && manager["INVOCATION_ID"] == INVOCATION
+                && manager["_PID"] == "1"
+                && manager["_UID"] == "0"
+                && manager["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+                && manager["MESSAGE"] == format!("{UNIT}: Deactivated successfully.")
+                && close < time,
+            "198 collected producer lacks exact PID1 success"
+        );
+    }
     for (key, value) in [
         ("Id", UNIT),
-        ("InvocationID", INVOCATION),
-        ("LoadState", "loaded"),
+        ("InvocationID", if collected { "" } else { INVOCATION }),
+        ("LoadState", if collected { "not-found" } else { "loaded" }),
         ("MainPID", "0"),
         ("NRestarts", "0"),
         ("Result", "success"),
@@ -1055,6 +1077,28 @@ mod tests {
         e["jet_path"] = json!(SOURCE_ARCHIVE);
         e["jet_identity"] = json!({"length":123});
         p
+    }
+    #[test]
+    fn collected_pending_proof_requires_exact_ordered_manager_success() {
+        let mut p = pending_proof();
+        p["terminal_evidence"]["producer"]["LoadState"] = json!("not-found");
+        p["terminal_evidence"]["producer"]["InvocationID"] = json!("");
+        assert!(validate_proof(&p, 1800, true).is_err());
+        p["terminal_evidence"]["producer_terminal_manager"] = json!({"UNIT":UNIT,"INVOCATION_ID":INVOCATION,"_PID":"1","_UID":"0","MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{UNIT}: Deactivated successfully."),"__REALTIME_TIMESTAMP":"14000000"});
+        validate_proof(&p, 1800, true).unwrap();
+        for key in [
+            "UNIT",
+            "INVOCATION_ID",
+            "_PID",
+            "_UID",
+            "MESSAGE_ID",
+            "MESSAGE",
+            "__REALTIME_TIMESTAMP",
+        ] {
+            let mut bad = p.clone();
+            bad["terminal_evidence"]["producer_terminal_manager"][key] = json!("bad");
+            assert!(validate_proof(&bad, 1800, true).is_err(), "{key}");
+        }
     }
     #[test]
     fn pending_controller_proof_is_forward_clean_and_same_closed_source() {
