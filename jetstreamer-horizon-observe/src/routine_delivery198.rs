@@ -172,8 +172,8 @@ fn read_profile(p: &Plan, model: &Value) -> Result<Option<Value>> {
     ensure!(
         is_101(p)?
             && !p.expected_epochs.contains(&198)
-            && p.tools.r2.path == Path::new(PUBLISHER)
-            && p.tools.r2.sha256 == PUBLISHER_SHA
+            && p.tools.r2.path == Path::new(publisher(p).0)
+            && p.tools.r2.sha256 == publisher(p).1
             && profile.proof.path.parent()
                 == Some(Path::new(
                     "/var/lib/jetstreamer/horizon-epoch198-delivery-observations-v1"
@@ -247,6 +247,17 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
         return Ok(model.clone());
     }
     apply_model(model, p.epoch198_delivery.as_ref().unwrap())
+}
+
+fn publisher(p: &Plan) -> (&'static str, &'static str) {
+    if p.scope_101_200
+        .as_ref()
+        .is_some_and(|s| s.private144_observer)
+    {
+        (private144::WRITER, private144::WRITER_SHA)
+    } else {
+        (PUBLISHER, PUBLISHER_SHA)
+    }
 }
 
 fn apply_model(model: &Value, profile: &Profile) -> Result<Value> {
@@ -376,8 +387,8 @@ pub(super) fn enable(
     });
     next.expected_epochs.retain(|e| *e != 198);
     next.tools.r2 = Bound {
-        path: PUBLISHER.into(),
-        sha256: PUBLISHER_SHA.into(),
+        path: publisher(next).0.into(),
+        sha256: publisher(next).1.into(),
     };
     read_profile(next, model)?;
     let rows = config["replays"]
@@ -823,6 +834,13 @@ mod tests {
             p.scope_101_200.unwrap().additional_tracked_units,
             [p.cycle_unit]
         );
+    }
+    #[test]
+    fn delivery_preserves_the_explicit_private144_fleet_writer() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        assert_eq!(publisher(&p), (PUBLISHER, PUBLISHER_SHA));
+        p.scope_101_200.as_mut().unwrap().private144_observer = true;
+        assert_eq!(publisher(&p), (private144::WRITER, private144::WRITER_SHA));
     }
     #[test]
     fn pipeline_receipt_schema_matches_reviewed_r2_reader() {

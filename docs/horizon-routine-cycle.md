@@ -1,5 +1,35 @@
 # Bounded routine metadata cycle
 
+## Exact private144 observer isolation
+
+For the retained dev-samjohnson private144 diagnostic only,
+`--prepare-next-private144` moves the exact original observation configuration
+from `replays` to `diagnostic_replays`, and sets the explicit
+`scope_101_200.private144_observer` mode. This consumes genuine predecessor
+completion/status bindings before preparing the successor. It preserves the
+original owner, scratch, append-log identity and every other claim, integer,
+formula, runtime handoff, repair gate and fleet diagnostic. It neither stops
+the job nor deletes its status. The new mode requires a separately qualified
+observer that implements the diagnostic envelope; the old append-log-only
+observer must not be used for this configuration.
+The helper also pins the separately qualified private144 fleet/status writer:
+its fleet output keeps the actual live144 diagnostic in the active list when
+resource evidence is unavailable, with the complete before/after unit census.
+Terminal or missing ownership is retained as unresolved diagnostic history,
+not cleanup evidence. The exact198 delivery profile retains this writer when
+private144 isolation is enabled; it must not revert to an older reader.
+
+The derived ETA model removes only144 from its ordinary observer census;
+there is still no144 production ETA. A missing worker or terminal diagnostic
+is recorded as explicitly unavailable, never inferred complete, inactive or
+safe to delete. An observed diagnostic still requires its exact stable owner.
+The independent full fleet census retains the actual diagnostic identity and
+open repair. Diagnostic failure cannot suppress healthy production samples;
+ordinary replay failures still fail closed. Successors preserve this mode.
+Seal, test and preflight both actual observer and cycle packages before arming
+the next normal1800-second sample. No resource polling, replay restart,
+publication or cleanup authority is granted by this migration.
+
 `jetstreamer-horizon-routine-cycle` consumes one already-completed, pinned v2
 routine observation. It does not sample resources, launch or stop replay, admit
 capacity, upload archives/sidecars, delete objects, or schedule another cycle.

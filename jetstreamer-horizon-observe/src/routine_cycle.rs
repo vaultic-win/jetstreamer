@@ -31,6 +31,9 @@ mod terminal_handoff;
 #[path = "routine_delivery198.rs"]
 mod delivery198;
 
+#[path = "routine_private144.rs"]
+mod private144;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -80,6 +83,8 @@ struct Plan {
 #[serde(deny_unknown_fields)]
 struct Scope101200 {
     diagnostic_ranges: Vec<DiagnosticClaim>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    private144_observer: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     additional_tracked_units: Vec<String>,
 }
@@ -135,6 +140,14 @@ fn is_101(p: &Plan) -> Result<bool> {
                         "invalid diagnostic invocation"
                     );
                 }
+            }
+            if scope.private144_observer {
+                ensure!(
+                    scope.diagnostic_ranges.len() == 1
+                        && scope.diagnostic_ranges[0].expected_producer_invocation_id
+                            == private144::INVOCATION,
+                    "private144 observer requires exact retained diagnostic owner"
+                );
             }
             Ok(true)
         }
@@ -633,7 +646,11 @@ fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> 
             == modeled.len()
                 + p.scope_101_200
                     .as_ref()
-                    .map_or(0, |s| s.diagnostic_ranges.len()),
+                    .map_or(0, |s| if s.private144_observer {
+                        0
+                    } else {
+                        s.diagnostic_ranges.len()
+                    }),
         "ordinary claim census changed"
     );
     for m in modeled {
@@ -678,6 +695,9 @@ fn validate_diagnostics(p: &Plan, model: &Value, value: &Value, observed: bool) 
     let Some(scope) = &p.scope_101_200 else {
         return Ok(());
     };
+    if scope.private144_observer {
+        return private144::validate(p, model, value, observed);
+    }
     for d in &scope.diagnostic_ranges {
         ensure!(
             !model["ranges"]
@@ -749,7 +769,11 @@ fn validate_observer_config(p: &Plan, model: &Value, config: &Value) -> Result<(
             == modeled.len()
                 + p.scope_101_200
                     .as_ref()
-                    .map_or(0, |s| s.diagnostic_ranges.len()),
+                    .map_or(0, |s| if s.private144_observer {
+                        0
+                    } else {
+                        s.diagnostic_ranges.len()
+                    }),
         "scheduled observer census changed"
     );
     for m in modeled {
@@ -1130,7 +1154,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     let old_observer = bound_json(&p.previous_observer, false)?;
     validate_templates(p, &model, &fleet, &previous, &estimates, &old_observer)?;
     terminal_handoff::preflight(p, &model)?;
-    let model = delivery198::effective_model(p, &model)?;
+    let model = private144::effective_model(p, &delivery198::effective_model(p, &model)?)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1423,11 +1447,14 @@ fn main() {
                 || (args.len() == 7
                     && matches!(
                         args[6].as_str(),
-                        "--check-only" | "--prepare-next" | "--prepare-next-terminal157"
+                        "--check-only"
+                            | "--prepare-next"
+                            | "--prepare-next-terminal157"
+                            | "--prepare-next-private144"
                     )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
-            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
+            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
         );
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -1446,6 +1473,7 @@ fn main() {
             arg == "--prepare-next"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
+                || arg == "--prepare-next-private144"
         }) {
             let spec = if args.len() == 10 {
                 Some(Bound {
@@ -1461,6 +1489,7 @@ fn main() {
                 &args[5],
                 args[6] == "--prepare-next-terminal157",
                 spec.as_ref(),
+                args[6] == "--prepare-next-private144",
             );
         }
         execute(&plan, &bound, &args[5], args.len() == 7)
@@ -1853,6 +1882,7 @@ mod tests {
             fixture();
         p.schema = PLAN_SCHEMA_101.into();
         p.scope_101_200 = Some(Scope101200 {
+            private144_observer: false,
             additional_tracked_units: vec![
                 "horizon-routine101-root-sealer-probe-20261021-v2.service".into(),
             ],

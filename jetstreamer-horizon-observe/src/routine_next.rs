@@ -245,6 +245,7 @@ pub(super) fn prepare(
     self_sha: &str,
     enable_terminal157: bool,
     delivery_spec: Option<&Bound>,
+    enable_private144: bool,
 ) -> Result<()> {
     // No new service/remote observations. Consume only root-private accepted
     // cycle artifacts; the later normal --check-only gate remains mandatory.
@@ -266,7 +267,8 @@ pub(super) fn prepare(
     let estimates = bound_json(&next.previous_estimates, false)?;
     let observer = bound_json(&next.previous_observer, false)?;
     validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
-    let effective = delivery198::effective_model(&next, &model)?;
+    let effective =
+        private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     latest_fleet_unchanged(&next, &fleet)?;
@@ -302,6 +304,16 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if enable_private144 {
+        ensure!(
+            !enable_terminal157 && delivery_spec.is_none(),
+            "separate diagnostic migration required"
+        );
+        private144::enable(&mut next, &mut next_config, &model)?;
+        let effective =
+            private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+    }
     if let Some(spec) = delivery_spec {
         ensure!(
             !enable_terminal157,
@@ -309,7 +321,8 @@ pub(super) fn prepare(
         );
         delivery198::enable(&mut next, &mut next_config, &model, &completion, spec)?;
         delivery198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
-        let effective = delivery198::effective_model(&next, &model)?;
+        let effective =
+            private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         validate_observer_config(&next, &effective, &next_config)?;
         tool_ok(&next.tools.r2)?;
@@ -406,6 +419,7 @@ mod tests {
         p.schema = PLAN_SCHEMA_101.into();
         p.sample_target_utc = "2026-10-21T08:38:00Z".into();
         p.scope_101_200 = Some(Scope101200 {
+            private144_observer: false,
             diagnostic_ranges: vec![DiagnosticClaim {
                 range: "144".into(),
                 controller_unit: "horizon-qualify-epoch144-loader-focus-20261016-v1.service".into(),
@@ -437,6 +451,24 @@ mod tests {
         config["not_before_utc"] = json!(p.sample_target_utc);
         config["output"] = json!(p.observer);
         (p, pb, c, config)
+    }
+
+    #[test]
+    fn successor_keeps_private144_mode_and_qualified_writer() {
+        let (mut p, pb, c, config) = fixture_101();
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.private144_observer = true;
+        scope.diagnostic_ranges[0].expected_controller_invocation_id =
+            private144::INVOCATION.into();
+        scope.diagnostic_ranges[0].expected_producer_invocation_id = private144::INVOCATION.into();
+        p.tools.r2 = Bound {
+            path: private144::WRITER.into(),
+            sha256: private144::WRITER_SHA.into(),
+        };
+        let (next, _, _, _) = derive_next(&p, &pb, &c, &config).unwrap();
+        assert!(next.scope_101_200.unwrap().private144_observer);
+        assert_eq!(next.tools.r2.path, Path::new(private144::WRITER));
+        assert_eq!(next.tools.r2.sha256, private144::WRITER_SHA);
     }
 
     #[test]

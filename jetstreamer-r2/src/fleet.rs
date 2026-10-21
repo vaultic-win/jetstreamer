@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod private144;
 mod ram_auxiliary;
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -1722,6 +1723,12 @@ pub(super) async fn run() -> Result<()> {
     let mut entries = Vec::new();
     let mut active = Vec::new();
     let mut diagnostics = Vec::new();
+    let private144 = private144::observe(&plan, &observer, &before, sample)?;
+    if let Some(entry) = &private144
+        && entry["live"] == true
+    {
+        active.push(entry.clone());
+    }
     let mut live_diagnostic_epochs = BTreeSet::new();
     let mut pipelines = Vec::new();
     let mut live_pipeline_stages = BTreeSet::new();
@@ -1951,6 +1958,9 @@ pub(super) async fn run() -> Result<()> {
     receipt["pipelines"] = json!(pipelines);
     receipt["terminal_replays"] = json!(terminal_replays);
     receipt["auxiliary_diagnostics"] = json!(auxiliary_diagnostics);
+    if let Some(entry) = private144 {
+        receipt["observer_diagnostics"] = json!([entry]);
+    }
     persist(&plan.output, &receipt)?;
     println!("{}", plan.output.display());
     Ok(())
