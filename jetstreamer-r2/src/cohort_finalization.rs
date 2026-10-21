@@ -24,6 +24,9 @@ const BATCH_SHA: &str = "84edb7b4c90f8a78d218d3992b28831ea8279b51f1cfe3af9acbaea
 const COMMIT: &str = "root-checkpoint cohort 216-219 published 4 archive(s) with checksums in transaction 2958b2841e8e4c0307c2478e81ffe63254355da59ed0e782d09b48eb4d744d54; receipt ";
 
 pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == super::cohort198_finalization::UNIT {
+        return Ok(198..=198);
+    }
     ensure!(unit == UNIT, "unqualified producer-finalization owner");
     Ok(216..=219)
 }
@@ -212,6 +215,9 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
 }
 
 pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
+    if current["Id"] == super::cohort198_finalization::UNIT {
+        return super::cohort198_finalization::observe(current, sampled_seconds);
+    }
     validate_owner(current)?;
     immutable_node()?;
     journal_events(sampled_seconds, false)
