@@ -183,6 +183,9 @@ pub(super) fn pipeline_unit_range(
     phase: &str,
     unit: &str,
 ) -> Result<std::ops::RangeInclusive<u64>> {
+    if phase == "producer-finalization" {
+        return super::cohort_finalization::scope(unit);
+    }
     ensure!(
         unit.len() <= 255
             && unit
@@ -1722,7 +1725,13 @@ pub(super) async fn run() -> Result<()> {
     for claim in &plan.pipeline_claims {
         let current = &before[&claim.unit];
         let is_active = pipeline_live(claim, current)?;
+        let finalization = if is_active && claim.phase == "producer-finalization" {
+            super::cohort_finalization::observe(current, sample_seconds)?
+        } else {
+            Value::Null
+        };
         let entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
+            "finalization_evidence":finalization,
             "live":is_active,"expected_invocation_id":claim.invocation_id,
             "evidence":claim.evidence.iter().map(|e|json!({"path":e.path,"sha256":e.sha256})).collect::<Vec<_>>(),
             "sampled_at_utc":sample,"ordinary_replay_claim":false,

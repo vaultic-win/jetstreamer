@@ -44,6 +44,16 @@ Use this path within the existing 30-minute observation cycle, not as another
 poll loop. A completion or authenticated handoff is a lifecycle event; an old
 ETA is never evidence that a delivery stage remains live.
 
+For the exact sealed 216–219 legacy producer, the separately qualified
+`producer-finalization` claim maps to status phase `finalization`. The origin
+unit/invocation must remain the same producer. Both fleet reconciliation and
+status census authenticate the final checkpoint/verification/archive-close
+journal events and parent digest. This is an estimate through import and all
+remaining independent verification, upload and readback, not replay progress
+or a ready archive assertion. Update phase-capable status readers and completion
+cleanup binaries through their normal immutable deployment handoff before
+publishing this new phase; do not leave an old reader rejecting its receipts.
+
 Fleet status classification distinguishes live receipt ownership from an actual
 production claim. A private qualification may still own an old status receipt,
 but that does not make its production countdown valid. `owner_binding_matches`

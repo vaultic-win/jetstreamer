@@ -37,9 +37,16 @@ impl Binding {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
             | ("local-publication", "publication")
+            | ("producer-finalization", "finalization")
             | ("upload-readback", "upload" | "readback") => (),
             _ => bail!("pipeline and status phases disagree"),
         };
+        if self.claim_phase == "producer-finalization" {
+            ensure!(
+                self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
+                "producer finalization must retain the original invocation clock"
+            );
+        }
         ensure!(
             unit_name(&self.unit)
                 && fleet::pipeline_unit_range(&self.claim_phase, &self.unit)?.contains(&epoch)
@@ -300,6 +307,7 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
                         | "plugin-verification"
                         | "local-publication"
                         | "upload-readback"
+                        | "producer-finalization"
                 )
             )),
         "pipeline overlaps a replay or private qualification claim"
@@ -343,7 +351,8 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
                     "full-verification",
                     "plugin-verification",
                     "local-publication",
-                    "upload-readback"
+                    "upload-readback",
+                    "producer-finalization"
                 ]
                 .iter()
                 .any(|phase| fleet::pipeline_unit_range(phase, peer)
@@ -364,6 +373,16 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
         plan.binding.live_matches(&current[&plan.binding.unit]),
         "pipeline invocation or exact command is not live"
     );
+    if plan.binding.claim_phase == "producer-finalization" {
+        super::cohort_finalization::observe(
+            &current[&plan.binding.unit],
+            fleet::utc_seconds(
+                fleet["sampled_at_utc"]
+                    .as_str()
+                    .context("fleet sample missing")?,
+            )?,
+        )?;
+    }
     for (name, prior) in previous {
         if name != &plan.binding.unit && !peers.contains(name) {
             ensure!(
@@ -547,6 +566,48 @@ mod tests {
             fleet_path: "/fleet".into(),
             fleet_sha256: "d".repeat(64),
         }
+    }
+    #[test]
+    fn producer_finalization_has_exact_scope_phase_and_original_clock() {
+        let mut b = binding();
+        b.unit = super::super::cohort_finalization::UNIT.into();
+        b.claim_phase = "producer-finalization".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        b.validate(216, "finalization").unwrap();
+        b.validate(219, "finalization").unwrap();
+        assert!(b.validate(220, "finalization").is_err());
+        assert!(b.validate(216, "replay").is_err());
+        assert!(b.validate(216, "upload").is_err());
+        b.origin_invocation_id = "b".repeat(32);
+        assert!(b.validate(216, "finalization").is_err());
+    }
+    #[test]
+    fn completion_cleanup_can_read_new_finalization_receipts_without_replay_ids() {
+        let directory = Path::new("/private/receipts");
+        let mut r = super::super::tests::status_publication_receipt(216);
+        let mut b = binding();
+        b.unit = super::super::cohort_finalization::UNIT.into();
+        b.claim_phase = "producer-finalization".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        r.schema = PIPELINE_STATUS_RECEIPT_SCHEMA.into();
+        r.status.phase = "finalization".into();
+        r.controller_invocation_id.clear();
+        r.producer_invocation_id.clear();
+        r.pipeline_binding = Some(b);
+        let path = status_receipt_path(directory, &r.status);
+        assert_eq!(
+            validate_status_publication_receipt_bytes(
+                directory,
+                &path,
+                &serde_json::to_vec(&r).unwrap(),
+                "bucket",
+                216
+            )
+            .unwrap(),
+            r
+        );
     }
     #[test]
     fn pipeline_binding_is_not_a_replay_or_another_epoch() {

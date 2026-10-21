@@ -61,6 +61,7 @@ const PIPELINE_STATUS_RECEIPT_SCHEMA: &str =
 const STATUS_DELETION_RECEIPT_SCHEMA: &str =
     "jetstreamer-horizon-r2-status-authenticated-deletion-receipt-v1";
 
+mod cohort_finalization;
 mod fleet;
 mod inactive_status;
 mod pipeline_status;
@@ -1485,7 +1486,7 @@ fn validate_epoch_status(status: &EpochStatus, expected_epoch: u64) -> Result<()
     ensure!(
         matches!(
             status.phase.as_str(),
-            "replay" | "verification" | "publication" | "upload" | "readback"
+            "replay" | "verification" | "publication" | "upload" | "readback" | "finalization"
         ),
         "status object phase is invalid"
     );
