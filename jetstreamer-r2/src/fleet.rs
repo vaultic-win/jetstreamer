@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod ram_auxiliary;
+mod shrink_root203;
 
 #[derive(Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -628,6 +629,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         receipt["schema"] == "jetstreamer-private-epoch224-bounded-resource-launch-v1";
     let root_prefix_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-root-prefix-resource-launch-v1";
+    let shrink_root_203 =
+        receipt["schema"] == "jetstreamer-private-epoch203-shrink-root-prefix-resource-launch-v1";
     let natural_root_225 =
         receipt["schema"] == "jetstreamer-private-epoch225-natural-root-resource-launch-v1";
     let private_verify_213 =
@@ -644,6 +647,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
+            || shrink_root_203
             || natural_root_225
             || private_verify_213
             || private_verify_225
@@ -786,6 +790,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["runtime_promotion_authorized"] == false
             && receipt["canonical_sidecar_authorized"] == false
             && receipt["publication_authorized"] == false
+    } else if shrink_root_203 {
+        shrink_root203::launch_matches(claim, receipt)
     } else if root_prefix_203 {
         claim.epoch == 203
             && claim
@@ -1780,6 +1786,13 @@ pub(super) async fn run() -> Result<()> {
                 ensure!(
                     current["ExecStart"] == launch["expected_exec_start"],
                     "private diagnostic live command changed"
+                );
+            }
+            if shrink_root203::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    shrink_root203::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
+                    "shrink-root diagnostic live command changed"
                 );
             }
             ensure!(
