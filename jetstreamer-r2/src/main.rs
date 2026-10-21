@@ -62,6 +62,7 @@ const STATUS_DELETION_RECEIPT_SCHEMA: &str =
     "jetstreamer-horizon-r2-status-authenticated-deletion-receipt-v1";
 
 mod cohort198_finalization;
+mod cohort198_handoff;
 mod cohort_finalization;
 mod fleet;
 mod inactive_status;
@@ -3163,7 +3164,10 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    if env::args().nth(1).as_deref() == Some("observe-delivery-198") {
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some("observe-delivery-198" | "observe-handoff-198")
+    ) {
         return cohort198_finalization::run_observation();
     }
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
