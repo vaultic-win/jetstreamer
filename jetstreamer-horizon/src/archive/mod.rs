@@ -147,6 +147,7 @@
 //! updates) without ever seeking backward, which is suitable for HTTP range
 //! readers as well as local files.
 mod bucket;
+pub mod capacity_probe;
 mod conflict;
 mod format;
 mod merge;
