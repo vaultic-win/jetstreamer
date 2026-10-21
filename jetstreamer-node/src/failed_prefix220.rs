@@ -217,6 +217,46 @@ fn admitted_live_producer(name: &str, fields: &BTreeMap<String, String>) -> bool
         && fields.get("SubState").is_some_and(|s| s == "running")
 }
 
+fn completed_restore213_shape(name: &str, fields: &BTreeMap<String, String>) -> bool {
+    name == "horizon-qualify-213-native-restore-probe-4be930c-v2.service"
+        && [
+            ("LoadState", "loaded"),
+            ("ActiveState", "active"),
+            ("SubState", "exited"),
+            ("InvocationID", "608650028a454c6ea9181e5607f3bd30"),
+            ("MainPID", "0"),
+            ("NRestarts", "0"),
+            ("Result", "success"),
+            ("ExecMainStatus", "0"),
+        ]
+        .iter()
+        .all(|(key, value)| fields.get(*key).is_some_and(|s| s == value))
+}
+
+fn completed_restore213_quiescent(
+    name: &str,
+    fields: &BTreeMap<String, String>,
+) -> Result<bool, String> {
+    if !completed_restore213_shape(name, fields) {
+        return Ok(false);
+    }
+    // Exact old RemainAfterExit oneshot: success/exited is not a live producer.
+    // Still prove no residual cgroup process and stable manager identity.
+    let path = PathBuf::from("/sys/fs/cgroup/system.slice")
+        .join(name)
+        .join("cgroup.procs");
+    match fs::read_to_string(&path) {
+        Ok(procs) if procs.trim().is_empty() => (),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+        _ => return Err("completed213 probe still has processes or unreadable cgroup".into()),
+    }
+    let after = systemd_recovery_fields(name, "horizon-qualify-")?;
+    if after != *fields {
+        return Err("completed213 probe changed during quiescence check".into());
+    }
+    Ok(true)
+}
+
 /// A complete producer-manager census, not just the original two owners.
 /// Unknown live or queued replacement producers block this incident import.
 fn no_replacement_producers() -> Result<(), String> {
@@ -254,7 +294,8 @@ fn no_replacement_producers() -> Result<(), String> {
             continue;
         }
         let fields = systemd_recovery_fields(name, prefix)?;
-        if !admitted_live_producer(name, &fields) {
+        if !admitted_live_producer(name, &fields) && !completed_restore213_quiescent(name, &fields)?
+        {
             return Err(format!("unqualified live/replacement producer {name}"));
         }
     }
@@ -749,6 +790,40 @@ mod tests {
         fields.insert("NRestarts".into(), "0".into());
         fields.insert("InvocationID".into(), "changed".into());
         assert!(!admitted_live_producer(name, &fields));
+    }
+    #[test]
+    fn completed_restore_is_not_a_generic_active_exited_exception() {
+        let name = "horizon-qualify-213-native-restore-probe-4be930c-v2.service";
+        let fields = BTreeMap::from([
+            ("LoadState".into(), "loaded".into()),
+            ("ActiveState".into(), "active".into()),
+            ("SubState".into(), "exited".into()),
+            (
+                "InvocationID".into(),
+                "608650028a454c6ea9181e5607f3bd30".into(),
+            ),
+            ("MainPID".into(), "0".into()),
+            ("NRestarts".into(), "0".into()),
+            ("Result".into(), "success".into()),
+            ("ExecMainStatus".into(), "0".into()),
+        ]);
+        assert!(completed_restore213_shape(name, &fields));
+        assert!(!completed_restore213_shape(
+            "horizon-qualify-221-foreign.service",
+            &fields
+        ));
+        for key in [
+            "InvocationID",
+            "MainPID",
+            "NRestarts",
+            "SubState",
+            "Result",
+            "ExecMainStatus",
+        ] {
+            let mut bad = fields.clone();
+            bad.insert(key.into(), "different".into());
+            assert!(!completed_restore213_shape(name, &bad), "{key}");
+        }
     }
     #[test]
     fn failed_prefix_recovery_plan_cannot_grow_scope_or_skip_validation() {
