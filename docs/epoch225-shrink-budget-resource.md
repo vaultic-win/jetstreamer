@@ -77,3 +77,10 @@ It fsyncs the cache parent and writes a private completion receipt. The ordinary
 root debug-cache schema cannot request retirement. A failed or interrupted
 retirement remains fail-closed for explicit review; never treat a check receipt
 as completion or silently replace an occupied intent/check.
+
+For evidence gathering only, `jetstreamer-horizon-release-cache-check-plan-v1`
+selects the fixed root `target/release` build cache. It binds the clean source
+and lockfile, checks both absolute and relative staged-unit references, and
+retains the same complete process-reference and archive-exclusion checks.
+This profile rejects `retirement`; a successful release-cache check is not
+permission to remove it or any deployed binary.

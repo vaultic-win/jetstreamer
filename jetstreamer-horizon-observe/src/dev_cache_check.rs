@@ -22,10 +22,12 @@ use {
 };
 const REPO: &str = "/home/ubuntu/workspace/jetstreamer";
 const TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/debug";
+const RELEASE_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/release";
 const SELECTED225_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug";
 fn cache_target(schema: &str) -> Result<&'static Path> {
     match schema {
         "jetstreamer-horizon-dev-cache-check-plan-v1" => Ok(Path::new(TARGET)),
+        "jetstreamer-horizon-release-cache-check-plan-v1" => Ok(Path::new(RELEASE_TARGET)),
         "jetstreamer-horizon-selected225-dev-cache-check-plan-v1" => {
             Ok(Path::new(SELECTED225_TARGET))
         }
@@ -304,10 +306,14 @@ fn staged_references_inner(
                     &bytes,
                     target.as_os_str().as_bytes(),
                     true,
-                ) || (dev_cache_literal
-                    && bytes
-                        .windows(b"target/debug".len())
-                        .any(|s| s == b"target/debug")))
+                ) || (dev_cache_literal && {
+                    let relative: &[u8] = if target == Path::new(RELEASE_TARGET) {
+                        b"target/release"
+                    } else {
+                        b"target/debug"
+                    };
+                    bytes.windows(relative.len()).any(|s| s == relative)
+                }))
             {
                 refs.push(canonical.display().to_string());
             }
@@ -387,34 +393,42 @@ pub fn run() -> Result<()> {
         "source revision is not preserved/clean"
     );
     let target = cache_target(&p.schema)?;
-    let historical_lock_sha256 = if target == Path::new(TARGET) {
-        git(&["check-ignore", "target/debug"])?;
-        None
-    } else {
-        // This isolated historical target is untracked rather than ignored.
-        // Bind its exact fixed scope and retain the tracked legacy lockfile.
-        ensure!(
+    let historical_lock_sha256 =
+        if target == Path::new(TARGET) || target == Path::new(RELEASE_TARGET) {
             git(&[
-                "ls-files",
-                "--",
-                ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
-            ])?
-            .is_empty(),
-            "selected cache contains tracked source"
-        );
-        ensure!(
-            git(&["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"])?
-                == b"historical-runtime/v1_6_25/Cargo.lock\n",
-            "legacy lockfile is not preserved by source revision"
-        );
-        Some(
-            hash_file(
-                &Path::new(REPO).join("historical-runtime/v1_6_25/Cargo.lock"),
-                16 << 20,
-            )?
-            .0,
-        )
-    };
+                "check-ignore",
+                if target == Path::new(TARGET) {
+                    "target/debug"
+                } else {
+                    "target/release"
+                },
+            ])?;
+            None
+        } else {
+            // This isolated historical target is untracked rather than ignored.
+            // Bind its exact fixed scope and retain the tracked legacy lockfile.
+            ensure!(
+                git(&[
+                    "ls-files",
+                    "--",
+                    ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
+                ])?
+                .is_empty(),
+                "selected cache contains tracked source"
+            );
+            ensure!(
+                git(&["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"])?
+                    == b"historical-runtime/v1_6_25/Cargo.lock\n",
+                "legacy lockfile is not preserved by source revision"
+            );
+            Some(
+                hash_file(
+                    &Path::new(REPO).join("historical-runtime/v1_6_25/Cargo.lock"),
+                    16 << 20,
+                )?
+                .0,
+            )
+        };
     let lock = Path::new(REPO).join("Cargo.lock");
     ensure!(
         hash_file(&lock, 16 << 20)?.0 == p.cargo_lock_sha256,
@@ -546,6 +560,27 @@ mod tests {
             1
         );
     }
+
+    #[test]
+    fn release_profile_censuses_relative_commands_without_selecting_debug() {
+        let t = tempfile::tempdir().unwrap();
+        fs::write(
+            t.path().join("release.service"),
+            b"ExecStart=target/release/tool\n",
+        )
+        .unwrap();
+        assert_eq!(
+            staged_references(&[t.path()], Path::new(RELEASE_TARGET), &mut Vec::new())
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            staged_references(&[t.path()], Path::new(TARGET), &mut Vec::new())
+                .unwrap()
+                .is_empty()
+        );
+    }
     #[test]
     fn plan_cannot_select_any_deletion_target_or_nonprivate_output() {
         let mut p = Plan {
@@ -563,6 +598,9 @@ mod tests {
                 sha256: "c".repeat(64),
             },
         });
+        assert!(validate_plan(&p).is_err());
+        p.schema = "jetstreamer-horizon-release-cache-check-plan-v1".into();
+        assert_eq!(cache_target(&p.schema).unwrap(), Path::new(RELEASE_TARGET));
         assert!(validate_plan(&p).is_err());
         p.schema = "jetstreamer-horizon-selected225-dev-cache-check-plan-v1".into();
         validate_plan(&p).unwrap();
