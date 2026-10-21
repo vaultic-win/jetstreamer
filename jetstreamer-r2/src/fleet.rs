@@ -625,6 +625,10 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let bounded_v1625 = receipt["schema"] == "jetstreamer-private-epoch225-v1625-bounded-launch-v1";
     let shrink_budget_225 =
         receipt["schema"] == "jetstreamer-private-epoch225-shrink-budget-resource-launch-v1";
+    ensure!(
+        !shrink_budget225::namespace(claim) || shrink_budget_225,
+        "shrink-budget225 namespace cannot borrow another diagnostic schema"
+    );
     let bounded_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
     let shrink_budget_203 =

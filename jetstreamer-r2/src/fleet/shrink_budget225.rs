@@ -103,6 +103,11 @@ mod tests {
             bad[key] = value;
             assert!(validate_diagnostic_launch(&bad, &c).is_err(), "{key}");
         }
+        let mut baseline_alias = r.clone();
+        baseline_alias["schema"] = json!("jetstreamer-private-epoch225-bounded-resource-launch-v1");
+        baseline_alias["worker_sha256"] =
+            json!("f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c");
+        assert!(validate_diagnostic_launch(&baseline_alias, &c).is_err());
         assert!(same_command(
             &r["expected_exec_start"],
             &json!(format!(
