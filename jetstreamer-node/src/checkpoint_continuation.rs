@@ -44,9 +44,9 @@ const PRIVATE_ROOT: &str = "/home/ubuntu/.jetstreamer-private";
 
 #[derive(Clone, Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
-struct Evidence {
-    path: PathBuf,
-    sha256: String,
+pub(super) struct Evidence {
+    pub(super) path: PathBuf,
+    pub(super) sha256: String,
 }
 
 #[derive(Deserialize, serde::Serialize)]
@@ -73,11 +73,66 @@ pub(crate) struct ValidatedPrefix {
     snapshot: PathBuf,
 }
 
-fn require(ok: bool, message: &str) -> Result<(), String> {
+/// Private proof implementations are constructible only by their exact,
+/// independently validated epoch-specific diagnostic runners.
+pub(crate) trait RestartProof: Sync {
+    fn snapshot_sha256(&self) -> [u8; 32];
+    fn snapshot_size(&self) -> u64;
+    fn covers_trusted_root(&self, epoch: u64, bootstrap: u64, start: u64, end: u64) -> bool;
+    fn validate_invocation(
+        &self,
+        epoch: u64,
+        bootstrap: &ReplayBootstrap,
+        qualification: Option<QualificationPlan>,
+        carried: bool,
+        audited: bool,
+        retain: bool,
+    ) -> Result<(), String>;
+    fn verify_native_checkpoint(
+        &self,
+        actual: &historical::HistoricalCheckpoint,
+        worker: [u8; 32],
+        initialized_cursor: u64,
+        ticks_per_slot: u64,
+    ) -> Result<(), String>;
+}
+impl RestartProof for ValidatedPrefix {
+    fn snapshot_sha256(&self) -> [u8; 32] {
+        ValidatedPrefix::snapshot_sha256(self)
+    }
+    fn snapshot_size(&self) -> u64 {
+        ValidatedPrefix::snapshot_size(self)
+    }
+    fn covers_trusted_root(&self, e: u64, b: u64, s: u64, n: u64) -> bool {
+        ValidatedPrefix::covers_trusted_root(self, e, b, s, n)
+    }
+    fn validate_invocation(
+        &self,
+        e: u64,
+        b: &ReplayBootstrap,
+        q: Option<QualificationPlan>,
+        c: bool,
+        a: bool,
+        r: bool,
+    ) -> Result<(), String> {
+        ValidatedPrefix::validate_invocation(self, e, b, q, c, a, r)
+    }
+    fn verify_native_checkpoint(
+        &self,
+        a: &historical::HistoricalCheckpoint,
+        w: [u8; 32],
+        _: u64,
+        _: u64,
+    ) -> Result<(), String> {
+        ValidatedPrefix::verify_native_checkpoint(self, a, w)
+    }
+}
+
+pub(super) fn require(ok: bool, message: &str) -> Result<(), String> {
     if ok { Ok(()) } else { Err(message.into()) }
 }
 
-fn sha(value: &str) -> Result<[u8; 32], String> {
+pub(super) fn sha(value: &str) -> Result<[u8; 32], String> {
     require(
         value.len() == 64
             && value
@@ -92,7 +147,7 @@ fn sha(value: &str) -> Result<[u8; 32], String> {
     Ok(result)
 }
 
-fn sealed_bytes(evidence: &Evidence, max: u64) -> Result<Vec<u8>, String> {
+pub(super) fn sealed_bytes(evidence: &Evidence, max: u64) -> Result<Vec<u8>, String> {
     require(
         evidence.path.is_absolute()
             && fs::canonicalize(&evidence.path).map_err(|e| e.to_string())? == evidence.path,
@@ -221,7 +276,7 @@ fn validate_plan(plan: &Plan, destination: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn checkpoint_matches(
+pub(super) fn checkpoint_matches(
     expected: &SegmentCheckpointSummary,
     actual: &SegmentCheckpointSummary,
 ) -> Result<(), String> {
@@ -312,7 +367,7 @@ impl ValidatedPrefix {
     }
 }
 
-fn available_bytes(path: &Path) -> Result<u64, String> {
+pub(super) fn available_bytes(path: &Path) -> Result<u64, String> {
     let path = std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(|e| e.to_string())?;
     let mut value = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     if unsafe { libc::statvfs(path.as_ptr(), value.as_mut_ptr()) } != 0 {
@@ -325,7 +380,7 @@ fn available_bytes(path: &Path) -> Result<u64, String> {
         .ok_or("free-space arithmetic overflow".into())
 }
 
-fn authenticate_service(unit: &str) -> Result<String, String> {
+pub(super) fn authenticate_service(unit: &str) -> Result<String, String> {
     let invocation = env::var("INVOCATION_ID")
         .map_err(|_| "continuation must run in its persistent systemd service")?;
     require(
@@ -370,7 +425,7 @@ fn validate_service_identity(text: &str, invocation: &str, pid: u32) -> Result<(
     Ok(())
 }
 
-fn require_retained_input(path: &Path, expected_size: u64) -> Result<(), String> {
+pub(super) fn require_retained_input(path: &Path, expected_size: u64) -> Result<(), String> {
     require(
         path.is_absolute() && fs::canonicalize(path).map_err(|e| e.to_string())? == path,
         "retained archive path must be canonical",
@@ -386,13 +441,13 @@ fn require_retained_input(path: &Path, expected_size: u64) -> Result<(), String>
     )
 }
 
-fn create_private_dir(path: &Path) -> Result<(), String> {
+pub(super) fn create_private_dir(path: &Path) -> Result<(), String> {
     fs::create_dir(path)
         .and_then(|_| fs::set_permissions(path, fs::Permissions::from_mode(0o700)))
         .map_err(|e| format!("cannot create private directory {}: {e}", path.display()))
 }
 
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(super) fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -408,7 +463,7 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-fn require_no_checksum(path: &Path) -> Result<(), String> {
+pub(super) fn require_no_checksum(path: &Path) -> Result<(), String> {
     let sidecar = jetstreamer_node::archive_checksum::archive_checksum_path(path)
         .map_err(|e| e.to_string())?;
     require(
@@ -417,7 +472,7 @@ fn require_no_checksum(path: &Path) -> Result<(), String> {
     )
 }
 
-fn runtime_checkpoint(
+pub(super) fn runtime_checkpoint(
     summary: &SegmentCheckpointSummary,
 ) -> Result<RuntimeStateCheckpoint, String> {
     Ok(RuntimeStateCheckpoint {
@@ -544,6 +599,23 @@ fn assemble(
     output: &Path,
 ) -> Result<JsonValue, String> {
     let provenance = build_provenance(prefix, suffix)?;
+    assemble_sources(
+        prefix_path,
+        prefix,
+        suffix_path,
+        suffix,
+        output,
+        &provenance,
+    )
+}
+pub(super) fn assemble_sources(
+    prefix_path: &Path,
+    prefix: &HistoricalSegmentManifest,
+    suffix_path: &Path,
+    suffix: &HistoricalSegmentManifest,
+    output: &Path,
+    provenance: &ArchiveProvenanceV4,
+) -> Result<JsonValue, String> {
     let mut sources = Vec::new();
     let mut identities = Vec::new();
     for (path, manifest) in [(prefix_path, prefix), (suffix_path, suffix)] {
@@ -573,7 +645,7 @@ fn assemble(
         sources,
         sink,
         ArchiveWriterConfig::default(),
-        &provenance,
+        provenance,
     )
     .map_err(|e| e.to_string())?;
     sink.sync_all().map_err(|e| e.to_string())?;

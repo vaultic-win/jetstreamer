@@ -795,6 +795,12 @@ The result has no canonical sidecar and grants no publication, retirement, or R2
 Independent final verification, current-plugin validation, initial adjacent-boundary evidence,
 and a reviewed V4 admission path remain required before normal publication gates can open.
 
+The separately build-bound [epoch-144 continuation](docs/horizon-epoch144-continuation.md)
+uses `epoch144-checkpoint-continuation-diagnostic`, the exact validated prefix through
+62,639,490 and the remaining 509 slots. It requires a fresh complete-path admission;
+the successful native-only comparison and its 40-GiB budget are not launch authority.
+It preserves both runtime generations and independent cursors in private V4 output.
+
 The final sealed root cohort replays epochs 298-301 in a private lane. A fresh campaign manifest
 must bind `--last-epoch=301 --publish-through-epoch=300`; after all four archives and the epoch-301
 root gate pass, its importer may transactionally publish only epochs 298-300. Epoch 301 remains

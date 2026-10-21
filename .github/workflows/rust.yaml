@@ -40,6 +40,14 @@ jobs:
             scope: "-p jetstreamer-node"
             flags: "--features epoch213-checkpoint-continuation-diagnostic"
             examples: false
+          - name: node-epoch144-continuation
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch144-checkpoint-continuation-diagnostic"
+            examples: false
+          - name: node-epoch144-native-restore
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch144-native-restore-diagnostic"
+            examples: false
           - name: node-epoch224-account-delta
             scope: "-p jetstreamer-node"
             flags: "--features epoch224-account-delta-diagnostic"

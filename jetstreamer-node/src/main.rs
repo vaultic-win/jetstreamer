@@ -1,8 +1,22 @@
 mod checkpoint_continuation;
+mod checkpoint_continuation144;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
 mod failed_prefix220;
+
+#[cfg(all(
+    feature = "epoch144-checkpoint-continuation-diagnostic",
+    any(
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("epoch144 continuation cannot combine unrelated diagnostic modes");
 
 #[cfg(all(
     feature = "epoch225-v1-6-25-qualification",
@@ -11548,8 +11562,8 @@ async fn run_geyser_replay(
     // qualification child obtains this from its sealed environment.
     handoff_export_directory: Option<&Path>,
     retain_runtime_state: bool,
-    // Only the build-bound private epoch213 runner can supply this proof.
-    checkpoint_restart: Option<&checkpoint_continuation::ValidatedPrefix>,
+    // Only exact independently validated private epoch144/213 runners construct these proofs.
+    checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
 ) -> Result<ReplayRunResult, String> {
     if let Some(prefix) = checkpoint_restart {
         prefix.validate_invocation(
@@ -12011,9 +12025,16 @@ async fn run_geyser_replay(
                     .map_err(|err| format!("historical worker startup failed: {err}"))?;
                     let slot = client.initialized().slot;
                     let restored_checkpoint = if let Some(prefix) = checkpoint_restart {
+                        let initialized_cursor = client.initialized().next_write_version;
+                        let ticks_per_slot = client.initialized().ticks_per_slot;
                         let checkpoint =
                             client.freeze_checkpoint(slot).map_err(|e| e.to_string())?;
-                        prefix.verify_native_checkpoint(&checkpoint, client.executable_sha256())?;
+                        prefix.verify_native_checkpoint(
+                            &checkpoint,
+                            client.executable_sha256(),
+                            initialized_cursor,
+                            ticks_per_slot,
+                        )?;
                         Some(historical_replay::HistoricalCheckpointSummary::try_from(
                             &checkpoint,
                         )?)
@@ -19276,8 +19297,10 @@ async fn main() {
 
     // A continuation build never reaches ordinary replay, recovery, or any
     // public destination/sidecar setup. A default build rejects its new flags.
-    if cfg!(feature = "epoch213-checkpoint-continuation-diagnostic")
-        || continuation_plan.is_some()
+    if cfg!(any(
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic"
+    )) || continuation_plan.is_some()
         || continuation_plan_sha256.is_some()
     {
         let forbidden = horizon_output.is_some()
@@ -19304,14 +19327,25 @@ async fn main() {
                 feature = "epoch225-v1-6-25-diagnostic",
                 feature = "epoch225-v1-6-25-qualification"
             ));
-        if let Err(error) = checkpoint_continuation::validate_cli(
-            cfg!(feature = "epoch213-checkpoint-continuation-diagnostic"),
-            (start_epoch, end_epoch),
-            explicit_verify,
-            verify_option_count,
-            explicit_destination,
-            forbidden,
-        ) {
+        let validation = if cfg!(feature = "epoch144-checkpoint-continuation-diagnostic") {
+            checkpoint_continuation144::validate_cli(
+                (start_epoch, end_epoch),
+                explicit_verify,
+                verify_option_count,
+                explicit_destination,
+                forbidden,
+            )
+        } else {
+            checkpoint_continuation::validate_cli(
+                cfg!(feature = "epoch213-checkpoint-continuation-diagnostic"),
+                (start_epoch, end_epoch),
+                explicit_verify,
+                verify_option_count,
+                explicit_destination,
+                forbidden,
+            )
+        };
+        if let Err(error) = validation {
             eprintln!("error: {error}");
             exit(2);
         }
@@ -19319,10 +19353,14 @@ async fn main() {
             eprintln!("private continuation requires both plan and SHA-256 options");
             exit(2);
         };
-        if let Err(error) =
+        let result = if cfg!(feature = "epoch144-checkpoint-continuation-diagnostic") {
+            checkpoint_continuation144::run(plan, hash, dest_dir, shutdown, cursor, restart_tracker)
+                .await
+        } else {
             checkpoint_continuation::run(plan, hash, dest_dir, shutdown, cursor, restart_tracker)
                 .await
-        {
+        };
+        if let Err(error) = result {
             eprintln!("private checkpoint continuation failed: {error}");
             exit(1);
         }

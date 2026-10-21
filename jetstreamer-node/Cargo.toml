@@ -16,6 +16,8 @@ epoch144-native-restore-diagnostic = ["dep:chrono"]
 # Private epoch213 prefix/checkpoint continuation. Never creates a canonical
 # checksum or enables ordinary archive reuse/publication.
 epoch213-checkpoint-continuation-diagnostic = []
+# Exact private epoch144 prefix/native-checkpoint continuation, never publication.
+epoch144-checkpoint-continuation-diagnostic = []
 # Build-bound, non-production epoch-224 diagnostic. It compares the historical
 # worker's transaction-attributed lamport writes with canonical source metadata
 # and records the exact freeze-time writes at the first divergent boundary.
