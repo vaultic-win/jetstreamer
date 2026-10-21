@@ -637,6 +637,39 @@ mod tests {
         assert!(b.validate(216, "finalization").is_err());
     }
     #[test]
+    fn epoch198_finalization_keeps_singleton_scope_and_original_clock() {
+        let mut b = binding();
+        b.unit = super::super::cohort198_finalization::UNIT.into();
+        b.claim_phase = "producer-finalization".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        b.validate(198, "finalization").unwrap();
+        for epoch in [197, 199, 216, 219] {
+            assert!(b.validate(epoch, "finalization").is_err());
+        }
+        for phase in ["replay", "publication", "upload"] {
+            assert!(b.validate(198, phase).is_err());
+        }
+        let directory = Path::new("/private/receipts");
+        let mut receipt = super::super::tests::status_publication_receipt(198);
+        receipt.schema = PIPELINE_STATUS_RECEIPT_SCHEMA.into();
+        receipt.status.phase = "finalization".into();
+        receipt.controller_invocation_id.clear();
+        receipt.producer_invocation_id.clear();
+        receipt.pipeline_binding = Some(b.clone());
+        let path = status_receipt_path(directory, &receipt.status);
+        validate_status_publication_receipt_bytes(
+            directory,
+            &path,
+            &serde_json::to_vec(&receipt).unwrap(),
+            "bucket",
+            198,
+        )
+        .unwrap();
+        b.origin_invocation_id = "b".repeat(32);
+        assert!(b.validate(198, "finalization").is_err());
+    }
+    #[test]
     fn completion_cleanup_can_read_new_finalization_receipts_without_replay_ids() {
         let directory = Path::new("/private/receipts");
         let mut r = super::super::tests::status_publication_receipt(216);

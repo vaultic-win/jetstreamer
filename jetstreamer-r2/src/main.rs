@@ -61,6 +61,7 @@ const PIPELINE_STATUS_RECEIPT_SCHEMA: &str =
 const STATUS_DELETION_RECEIPT_SCHEMA: &str =
     "jetstreamer-horizon-r2-status-authenticated-deletion-receipt-v1";
 
+mod cohort198_finalization;
 mod cohort_finalization;
 mod fleet;
 mod inactive_status;
