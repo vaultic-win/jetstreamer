@@ -7,6 +7,7 @@ const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod private144;
 mod ram_auxiliary;
+mod shrink_budget225;
 mod shrink_root203;
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -622,6 +623,12 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let bounded_resource =
         receipt["schema"] == "jetstreamer-private-epoch225-bounded-resource-launch-v1";
     let bounded_v1625 = receipt["schema"] == "jetstreamer-private-epoch225-v1625-bounded-launch-v1";
+    let shrink_budget_225 =
+        receipt["schema"] == "jetstreamer-private-epoch225-shrink-budget-resource-launch-v1";
+    ensure!(
+        !shrink_budget225::namespace(claim) || shrink_budget_225,
+        "shrink-budget225 namespace cannot borrow another diagnostic schema"
+    );
     let bounded_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
     let shrink_budget_203 =
@@ -644,6 +651,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || bootstrap_resource
             || bounded_resource
             || bounded_v1625
+            || shrink_budget_225
             || bounded_203
             || shrink_budget_203
             || bounded_224
@@ -896,6 +904,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["runtime_promotion_authorized"] == false
             && receipt["canonical_sidecar_authorized"] == false
             && receipt["publication_authorized"] == false
+    } else if shrink_budget_225 {
+        shrink_budget225::launch_matches(claim, receipt)
     } else if bounded_resource || bounded_v1625 {
         claim.epoch == 225
             && claim
@@ -1803,6 +1813,16 @@ pub(super) async fn run() -> Result<()> {
                         &launch["expected_exec_start"]
                     ),
                     "shrink-root diagnostic live command changed"
+                );
+            }
+            if shrink_budget225::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    shrink_budget225::same_command(
+                        &current["ExecStart"],
+                        &launch["expected_exec_start"]
+                    ),
+                    "shrink-budget225 diagnostic live command changed"
                 );
             }
             ensure!(

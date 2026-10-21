@@ -14,6 +14,14 @@ events. The new test digest adds only nested OS-error reporting and a regression
 it does not relax extraction, hash or checkpoint checks. Preserve that failed
 attempt and use a separately sealed diagnostic generation to identify the cause.
 
+The nested error identified inode exhaustion, not a byte or memory limit: the
+512-GiB tmpfs exposed 409,600 inodes, while the snapshot contains 416,712 tar
+members and extraction failed at member 409,596. Only this epoch225 profile now
+requires `TemporaryFileSystem=/tmp:rw,size=512G,nr_inodes=1048576,nosuid,nodev,mode=1777`
+and independently checks the mounted filesystem's exact inode limit. Keep the
+filesystem byte size and cgroup limits unchanged; the default v1.6.16 mount
+options and inode policy remain unchanged.
+
 Use the existing RAM supervisor sandbox described in
 [the v1.6.16 test guide](v1616-ram-snapshot-tests.md): eight CPU cores, 112/128-GiB
 memory limits, zero swap, 512-GiB private tmpfs, minimal four capabilities with
@@ -33,10 +41,13 @@ mode proves the sandbox and credential drop but does not run the tests.
 
 Test mode additionally requires a fresh, hash-bound routine v2 observation and
 matching complete 201–300 fleet ledger. The profile admits only the exact existing
-220–223 replay/controller, bounded203 shrink diagnostic, and 216–219 delivery
+220–223 replay/controller, bounded203 shrink diagnostic or the separately sealed
+canonical-root203 invocation `748ffa40e0a2408da0a10fc9e160cf0a`, and 216–219 delivery
 invocations. It rejects duplicate, foreign, inactive or restarted active claims,
 revalidates all active unit commands/identities before and after input hashing,
-and preserves the six-sample century floor. A fleet change requires new admission;
+and preserves the seven-sample century floor after epoch216 completed:
+`ceil(2 * 824601229550 / 7) = 235600351300` bytes. The legacy profile's six-sample
+floor is unchanged. A fleet change requires new admission;
 do not falsify or rewrite the ledger to pass this gate. Inputs must remain singly
 linked, root-owned and immutable. The larger selected-profile debug test binary
 has a separate 256-MiB input bound; the legacy profile retains its 64-MiB bound.
