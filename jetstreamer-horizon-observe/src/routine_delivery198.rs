@@ -18,6 +18,8 @@ pub(super) struct Profile {
     proof: Bound,
     origin_publication: Bound,
     origin_observer: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    controller_recovery: Option<Bound>,
 }
 
 #[derive(Deserialize)]
@@ -46,11 +48,19 @@ fn original_range(model: &Value) -> Result<Option<&Value>> {
     Ok(found.first().copied())
 }
 
-fn validate_range(r: &Value) -> Result<()> {
+fn profile_controller(profile: &Profile) -> Result<&'static str> {
+    match &profile.controller_recovery {
+        Some(binding) => controller_recovery::epoch198_controller(binding),
+        None => Ok(CONTROLLER),
+    }
+}
+
+fn validate_range(r: &Value, controller: &str) -> Result<()> {
     ensure!(
-        r["epochs"] == json!([198])
+        matches!(controller, CONTROLLER | controller_recovery::CONTROLLER198)
+            && r["epochs"] == json!([198])
             && r["expected_producer_invocation_id"] == INVOCATION
-            && r["expected_controller_invocation_id"] == CONTROLLER
+            && r["expected_controller_invocation_id"] == controller
             && r["terminal_slot"] == 85_967_999u64
             && r["epoch_additional_replay_slots"] == json!({"198":0})
             && r["epoch_downstream_allowance_seconds"] == json!({"198":43200})
@@ -185,9 +195,10 @@ fn read_profile(p: &Plan, model: &Value) -> Result<Option<Value>> {
         sha256: WRITER_SHA.into(),
     })?;
     let proof = bound_json(&profile.proof, false)?;
+    let controller = profile_controller(profile)?;
     let range = original_range(model)?;
     if let Some(r) = range {
-        validate_range(r)?;
+        validate_range(r, controller)?;
     }
     validate_proof(&proof, utc_seconds(&p.sample_target_utc)?, range.is_some())?;
     let archive = fs::symlink_metadata(ARCHIVE)?;
@@ -213,7 +224,13 @@ fn read_profile(p: &Plan, model: &Value) -> Result<Option<Value>> {
             && origin["status"]["phase"] == "replay"
             && origin["authenticated_readback"] == true
             && origin["producer_invocation_id"] == INVOCATION
-            && origin["controller_invocation_id"] == CONTROLLER
+            && origin["controller_invocation_id"] == controller
+            && (profile.controller_recovery.is_none()
+                || utc_seconds(
+                    origin["status"]["sampled_at_utc"]
+                        .as_str()
+                        .context("198 origin sample time")?
+                )? >= utc_seconds("2026-10-21T15:08:00Z")?)
             && origin["observer_receipt"].as_str() == profile.origin_observer.path.to_str()
             && origin["observer_receipt_sha256"] == profile.origin_observer.sha256
             && origin["pipeline_binding"].is_null(),
@@ -234,7 +251,7 @@ fn read_profile(p: &Plan, model: &Value) -> Result<Option<Value>> {
                 && r["invocation_binding_stable"] == true
                 && r["producer_after"]["invocation_id"] == INVOCATION
                 && r["producer_after"]["unit"] == UNIT
-                && r["controller_after"]["invocation_id"] == CONTROLLER)
+                && r["controller_after"]["invocation_id"] == controller)
             .count()
             == 1,
         "198 origin is not authenticated original replay"
@@ -262,7 +279,7 @@ fn publisher(p: &Plan) -> (&'static str, &'static str) {
 
 fn apply_model(model: &Value, profile: &Profile) -> Result<Value> {
     if let Some(r) = original_range(model)? {
-        validate_range(r)?;
+        validate_range(r, profile_controller(profile)?)?;
     }
     let mut next = model.clone();
     next["ranges"]
@@ -368,7 +385,15 @@ pub(super) fn enable(
             == 1,
         "198 prior fleet is not a live replay; reconcile actual completion/phase instead"
     );
-    validate_range(original_range(model)?.context("198 predecessor range missing")?)?;
+    let recovery = controller_recovery::epoch198_origin(model)?;
+    let controller = match &recovery {
+        Some(binding) => controller_recovery::epoch198_controller(binding)?,
+        None => CONTROLLER,
+    };
+    validate_range(
+        original_range(model)?.context("198 predecessor range missing")?,
+        controller,
+    )?;
     let bindings = completion["status_publications"]
         .as_array()
         .context("198 prior status list")?;
@@ -384,6 +409,7 @@ pub(super) fn enable(
         proof,
         origin_publication: origins.remove(0),
         origin_observer: next.previous_observer.clone(),
+        controller_recovery: recovery,
     });
     next.expected_epochs.retain(|e| *e != 198);
     next.tools.r2 = Bound {
@@ -664,6 +690,7 @@ mod tests {
             proof: b("proof"),
             origin_publication: b("origin"),
             origin_observer: b("observer"),
+            controller_recovery: None,
         }
     }
     fn range() -> Value {
@@ -671,6 +698,18 @@ mod tests {
             "expected_controller_invocation_id":CONTROLLER,"terminal_slot":85967999,
             "epoch_additional_replay_slots":{"198":0},"epoch_downstream_allowance_seconds":{"198":43200},
             "archive_directory":Path::new(ARCHIVE).parent().unwrap(),"formula":{"198":"genuine old replay formula"}})
+    }
+    #[test]
+    fn new_controller_is_not_a_legacy_alias_or_a_replacement_producer() {
+        let legacy = profile();
+        let mut r = range();
+        validate_range(&r, profile_controller(&legacy).unwrap()).unwrap();
+        r["expected_controller_invocation_id"] = json!(controller_recovery::CONTROLLER198);
+        assert!(validate_range(&r, profile_controller(&legacy).unwrap()).is_err());
+        validate_range(&r, controller_recovery::CONTROLLER198).unwrap();
+        r["expected_producer_invocation_id"] = json!("f".repeat(32));
+        assert!(validate_range(&r, controller_recovery::CONTROLLER198).is_err());
+        assert!(validate_range(&range(), "arbitrary-controller").is_err());
     }
     fn proof() -> Value {
         let owner = json!({"Id":UNIT,"InvocationID":INVOCATION,"MainPID":"1165606","NRestarts":"0",

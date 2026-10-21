@@ -246,6 +246,7 @@ pub(super) fn prepare(
     enable_terminal157: bool,
     delivery_spec: Option<&Bound>,
     enable_private144: bool,
+    recover_controllers: bool,
 ) -> Result<()> {
     // No new service/remote observations. Consume only root-private accepted
     // cycle artifacts; the later normal --check-only gate remains mandatory.
@@ -256,6 +257,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     let model = bound_json(&next.model_template, true)?;
+    controller_recovery::consume(&mut next, &model)?;
     if enable_terminal157 {
         terminal_handoff::enable(&mut next, &model)?;
     }
@@ -304,6 +306,24 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if recover_controllers {
+        ensure!(
+            !enable_terminal157 && !enable_private144 && delivery_spec.is_none(),
+            "package recovery is a separate qualified transition"
+        );
+        controller_recovery::enable(
+            &mut next,
+            &mut next_config,
+            &mut observer_package,
+            &mut cycle_package,
+            &model,
+        )?;
+        let effective =
+            private144::effective_model(&next, &controller_recovery::model(&next, &model)?)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        tool_ok(&next.tools.r2)?;
+    }
     if enable_private144 {
         ensure!(
             !enable_terminal157 && delivery_spec.is_none(),
@@ -451,6 +471,67 @@ mod tests {
         config["not_before_utc"] = json!(p.sample_target_utc);
         config["output"] = json!(p.observer);
         (p, pb, c, config)
+    }
+
+    #[test]
+    #[ignore = "requires root and exact accepted14:08/failed14:38/rebound guard host evidence; no sampling or writes"]
+    fn host_package_recovery_preserves_genuine_history_and_producer_clocks() {
+        let pb = Bound {
+            path: "/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T140800Z-v2/cycle-plan.json".into(),
+            sha256: "ea3f3e30094deabefbcd8a95385f95b34cb57f3c580c16caf8a6a87baecc62e4".into(),
+        };
+        let p: Plan = serde_json::from_slice(&bound_bytes(&pb, true).unwrap()).unwrap();
+        let c: Value = serde_json::from_slice(
+            &read_checked(&p.cycle_directory.join("completion.json"), LIMIT, 0, false).unwrap(),
+        )
+        .unwrap();
+        let config = bound_json(&p.observer_config, true).unwrap();
+        let (mut next, mut config, mut observer_package, mut cycle_package) =
+            derive_next(&p, &pb, &c, &config).unwrap();
+        let model = bound_json(&next.model_template, true).unwrap();
+        let old_model = model.clone();
+        let old_previous = serde_json::to_value(&next.previous_observer).unwrap();
+        controller_recovery::enable(
+            &mut next,
+            &mut config,
+            &mut observer_package,
+            &mut cycle_package,
+            &model,
+        )
+        .unwrap();
+        let effective =
+            private144::effective_model(&next, &controller_recovery::model(&next, &model).unwrap())
+                .unwrap();
+        let fleet = bound_json(&next.fleet_template, true).unwrap();
+        let previous = bound_json(&next.previous_fleet, false).unwrap();
+        let estimates = bound_json(&next.previous_estimates, false).unwrap();
+        let old_observer = bound_json(&next.previous_observer, false).unwrap();
+        validate_templates(&next, &model, &fleet, &previous, &estimates, &old_observer).unwrap();
+        validate_observer_config(&next, &effective, &config).unwrap();
+        assert_eq!(model, old_model);
+        assert_eq!(
+            serde_json::to_value(&next.previous_observer).unwrap(),
+            old_previous
+        );
+        assert_eq!(next.sample_target_utc, "2026-10-21T15:08:00Z");
+        assert!(next.epoch157_terminal_handoff.is_some());
+        assert_eq!(controller_recovery::interval(&next).unwrap(), 3600);
+        for (old, new) in model["ranges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(effective["ranges"].as_array().unwrap())
+        {
+            assert_eq!(
+                old["expected_producer_invocation_id"],
+                new["expected_producer_invocation_id"]
+            );
+            assert_eq!(old["terminal_slot"], new["terminal_slot"]);
+            assert_eq!(
+                old["epoch_downstream_allowance_seconds"],
+                new["epoch_downstream_allowance_seconds"]
+            );
+        }
     }
 
     #[test]

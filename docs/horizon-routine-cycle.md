@@ -1,5 +1,44 @@
 # Bounded routine metadata cycle
 
+## Exact October21 controller/package recovery
+
+The dev-samjohnson controllers were externally restarted at14:13:53 while their
+six producers retained the original invocations. The14:38 observer and metadata
+cycle failed closed; no14:38 sample or status refresh exists. Guard rebinding
+retains every original floor, VMA limit and producer, with six independently
+verified sandboxed first fires. No replay was restarted.
+
+`--prepare-package-recovery` is a separately pinned one-time recovery from the
+genuine accepted14:08 cycle to15:08. It accepts only the exact immutable recovery
+and first-fire receipts. It records the real3600-second predecessor gap rather
+than fabricating a missed sample, and replaces only the six old controller IDs
+with those in the sealed incident. Every producer ID, original elapsed clock,
+formula, queued slot, allowance, archive path and predecessor hash is retained.
+The same transition isolates the already-private144 observer as described below.
+It performs no service/resource/R2 observations, stops, launches or mutations.
+
+The resulting cycle has an explicit `package_controller_recovery` binding.
+Only its exact15:08 target and14:08 predecessor permit the3600-second gap; all
+ordinary cycles still require1800seconds. The live observer independently
+requires stable exact new owners and the original producers, and the estimator
+derives original producer elapsed time from systemd, never controller start.
+The successor drops the one-time recovery only after genuine15:08 completion
+and a bound model carrying all six adopted controller IDs. Preflight/sealing,
+full fleet reconciliation and ordinary publication gates remain mandatory.
+An additional failure or missed deadline requires its own qualified recovery;
+this profile is not a general retry or interval override.
+
+The exact198 delivery helper additionally binds a changed controller origin to
+that immutable recovery receipt. It accepts `02c5ac25…` only when the genuine
+completed predecessor model carries the exact recovery path/hash and is sampled
+at or after15:08, and its authenticated replay status and observer bind that
+same new controller plus the unchanged original producer. The profile retains
+the recovery binding after198 leaves the rate-bearing model. Old immutable
+profiles without that binding still require `d64e3dcc…`; arbitrary owners or
+pre-adoption clocks are rejected. This source support does not claim a15:08
+completion,198terminal event or controller/import handoff, and does not alter
+the already-armed15:08 recovery cycle.
+
 ## Exact private144 observer isolation
 
 For the retained dev-samjohnson private144 diagnostic only,

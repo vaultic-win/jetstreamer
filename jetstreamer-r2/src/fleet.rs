@@ -1798,7 +1798,10 @@ pub(super) async fn run() -> Result<()> {
             if shrink_root203::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
-                    shrink_root203::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
+                    shrink_root203::same_command(
+                        &current["ExecStart"],
+                        &launch["expected_exec_start"]
+                    ),
                     "shrink-root diagnostic live command changed"
                 );
             }
