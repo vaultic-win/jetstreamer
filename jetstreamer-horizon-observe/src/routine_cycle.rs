@@ -46,6 +46,8 @@ mod runtime157;
 
 #[path = "routine_completed144.rs"]
 mod completed144;
+#[path = "routine_native144.rs"]
+mod native144;
 #[path = "routine_prefix144.rs"]
 mod prefix144;
 #[path = "routine_prefix157.rs"]
@@ -106,6 +108,8 @@ struct Plan {
     prefix144_audit: Option<prefix144::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     completed144_prefix: Option<completed144::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native144_restore: Option<native144::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -151,8 +155,10 @@ fn is_101(p: &Plan) -> Result<bool> {
             for d in &scope.diagnostic_ranges {
                 ensure!(
                     d.range == "144"
-                        && d.controller_unit
+                        && (d.controller_unit
                             == "horizon-qualify-epoch144-loader-focus-20261016-v1.service"
+                            && p.native144_restore.is_none()
+                            || native144::owner(p, d))
                         && d.producer_unit == d.controller_unit
                         && d.expected_controller_invocation_id == d.expected_producer_invocation_id,
                     "unsupported private diagnostic owner/scope"
@@ -173,8 +179,10 @@ fn is_101(p: &Plan) -> Result<bool> {
             if scope.private144_observer {
                 ensure!(
                     scope.diagnostic_ranges.len() == 1
-                        && scope.diagnostic_ranges[0].expected_producer_invocation_id
-                            == private144::INVOCATION,
+                        && (scope.diagnostic_ranges[0].expected_producer_invocation_id
+                            == private144::INVOCATION
+                            && p.native144_restore.is_none()
+                            || native144::owner(p, &scope.diagnostic_ranges[0])),
                     "private144 observer requires exact retained diagnostic owner"
                 );
             }
@@ -188,7 +196,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if public198::refreshed(p) {
+    if p.native144_restore.is_some() {
+        "native144-native198-refresh-completed144-v1"
+    } else if public198::refreshed(p) {
         "native198-refresh-completed144-v1"
     } else if public198::native(p) {
         "native198-completed144-v1"
@@ -570,7 +580,8 @@ fn validate_templates(
             && fleet["observer"]["sha256"] == p.previous_observer.sha256
             && (fleet["admission_transition_guard"].is_null()
                 || prefix157::transition_template(p, fleet)?
-                || prefix144::transition_template(p, fleet)?),
+                || prefix144::transition_template(p, fleet)?
+                || native144::transition_template(p, fleet)?),
         "fleet template scope or transition mismatch"
     );
     ensure!(
@@ -608,6 +619,7 @@ fn validate_templates(
     prefix157::validate(p)?;
     prefix144::validate(p)?;
     completed144::validate(p)?;
+    native144::validate(p)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1027,6 +1039,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     prefix157::derive_fleet(p, &mut fleet)?;
     prefix144::derive_fleet(p, &mut fleet)?;
     completed144::derive_fleet(p, &mut fleet)?;
+    native144::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1240,6 +1253,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     prefix157::derive_fleet(p, &mut fleet.clone())?;
     prefix144::derive_fleet(p, &mut fleet.clone())?;
     completed144::derive_fleet(p, &mut fleet.clone())?;
+    native144::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1521,6 +1535,7 @@ fn main() {
                         args[6].as_str(),
                         "--prepare-next-delivery198"
                             | "--prepare-next-native198"
+                            | "--prepare-next-native144"
                             | "--publish-native198-event"
                             | "--refresh-native198-launches"
                             | "--prepare-next-prefix157"
@@ -1600,6 +1615,7 @@ fn main() {
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-native198"
+                || arg == "--prepare-next-native144"
                 || arg == "--prepare-next-private144"
                 || arg == "--prepare-package-recovery"
                 || arg == "--prepare-runtime157-pause"

@@ -116,15 +116,20 @@ fn fold(
     proof: &Bound,
     validation: &Bound,
     prior_action_sha: &str,
+    native: Option<&(Value, Value)>,
 ) -> Result<()> {
     ensure!(
-        f["admission_transition_guard"].is_null(),
+        f["admission_transition_guard"].is_null()
+            || native.is_some_and(|(_, guard)| f["admission_transition_guard"] == *guard),
         "completed144 cannot create/consume a live admission"
     );
     let rows = f["diagnostics"]
         .as_array_mut()
         .context("completed144 diagnostic history")?;
-    let found: Vec<_> = rows.iter().filter(|d| d["epoch"] == 144).collect();
+    let found: Vec<_> = rows
+        .iter()
+        .filter(|d| d["epoch"] == 144 && !native.is_some_and(|(claim, _)| *d == claim))
+        .collect();
     ensure!(
         found.is_empty() || (found.len() == 1 && found[0] == claim),
         "completed144 would replace another claim"
@@ -169,12 +174,14 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     validate(p)?;
     let (lb, vb, proof) = read(profile)?;
     let launch = bound_json(&lb, true)?;
+    let native = native144::completed_transition(p)?;
     fold(
         f,
         &json!({"epoch":144,"unit":UNIT,"invocation_id":IID,"scratch_path":launch["private_run_root"],"launch_receipt":lb}),
         &profile.proof,
         &vb,
         &profile.prior_action_sha256,
+        native.as_ref(),
     )?;
     ensure!(
         proof["prior_admission_event_accepted"] == false,
@@ -218,6 +225,39 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn completed_prefix_coexists_only_with_exact_bound_native_diagnostic() {
+        let b = Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        };
+        let claim = json!({"epoch":144,"unit":UNIT,"invocation_id":IID});
+        let native = json!({"epoch":144,"unit":native144::UNIT,"invocation_id":"b".repeat(32)});
+        let guard = json!({"path":"/real-guard","sha256":"c".repeat(64)});
+        let pair = (native.clone(), guard.clone());
+        let mut f = json!({"admission_transition_guard":guard,"diagnostics":[claim,native,{"epoch":157,"counter":u64::MAX}],
+            "tracked_units":[UNIT],"gates":{"144":{"state":"blocked-qualification","next_action":ACTION,"evidence":[]}}});
+        let before = f.clone();
+        fold(&mut f, &claim, &b, &b, &sha(b"old"), Some(&pair)).unwrap();
+        assert_eq!(f["diagnostics"], before["diagnostics"]);
+        assert_eq!(
+            f["admission_transition_guard"],
+            before["admission_transition_guard"]
+        );
+        assert!(fold(&mut f.clone(), &claim, &b, &b, &sha(b"old"), None).is_err());
+        for key in ["owner", "guard", "action"] {
+            let mut bad = f.clone();
+            match key {
+                "owner" => bad["diagnostics"][1]["invocation_id"] = json!("wrong"),
+                "guard" => bad["admission_transition_guard"] = json!({"other":true}),
+                _ => bad["gates"]["144"]["next_action"] = json!("newer action"),
+            };
+            assert!(
+                fold(&mut bad, &claim, &b, &b, &sha(b"old"), Some(&pair)).is_err(),
+                "{key}"
+            );
+        }
+    }
+    #[test]
     fn completed_history_never_admits_replay_or_replaces_newer_action_or_claim() {
         let b = Bound {
             path: "/proof".into(),
@@ -226,12 +266,12 @@ mod tests {
         let claim = json!({"epoch":144,"unit":UNIT,"invocation_id":IID});
         let mut f = json!({"admission_transition_guard":null,"diagnostics":[{"epoch":157,"integer":u64::MAX}],"tracked_units":["old.service"],"gates":{"144":{"state":"blocked-qualification","next_action":"old","evidence":[]},"140":{"integer":u64::MAX}}});
         let old = f.clone();
-        fold(&mut f, &claim, &b, &b, &sha(b"old")).unwrap();
+        fold(&mut f, &claim, &b, &b, &sha(b"old"), None).unwrap();
         assert_eq!(f["gates"]["140"], old["gates"]["140"]);
         assert_eq!(f["diagnostics"][0], old["diagnostics"][0]);
         assert!(f["admission_transition_guard"].is_null());
         let once = f.clone();
-        fold(&mut f, &claim, &b, &b, &sha(b"old")).unwrap();
+        fold(&mut f, &claim, &b, &b, &sha(b"old"), None).unwrap();
         assert_eq!(f, once);
         for mutation in ["action", "claim", "admission"] {
             let mut bad = f.clone();
@@ -240,7 +280,7 @@ mod tests {
                 "claim" => bad["diagnostics"][1]["invocation_id"] = json!("replacement"),
                 _ => bad["admission_transition_guard"] = json!({"live":true}),
             };
-            assert!(fold(&mut bad, &claim, &b, &b, &sha(b"old")).is_err());
+            assert!(fold(&mut bad, &claim, &b, &b, &sha(b"old"), None).is_err());
         }
     }
 }

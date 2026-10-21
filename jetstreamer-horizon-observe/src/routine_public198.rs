@@ -346,7 +346,8 @@ fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     })
 }
 pub(super) fn writer(p: &Plan) -> bool {
-    p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA
+    (p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+        || native144::writer(p)
 }
 fn import_proof() -> Result<()> {
     ensure!(
