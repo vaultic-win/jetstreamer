@@ -7,6 +7,7 @@ const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod private144;
 mod ram_auxiliary;
+mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
 
@@ -364,6 +365,8 @@ struct Plan {
     epoch203_ram_auxiliary: Option<ram_auxiliary::Claim>,
     #[serde(default)]
     pipeline_claims: Vec<PipelineClaim>,
+    #[serde(default)]
+    runtime_handoff157: Option<BoundFile>,
     // One event-driven bounded admission may update the active list using the
     // same observer. This is not authority for another resource observation.
     #[serde(default)]
@@ -1739,6 +1742,12 @@ pub(super) async fn run() -> Result<()> {
     let mut entries = Vec::new();
     let mut active = Vec::new();
     let mut diagnostics = Vec::new();
+    let runtime157 = runtime157::observe(&plan, &observer, &before, sample)?;
+    if let Some(entry) = &runtime157
+        && entry["live"] == true
+    {
+        active.push(entry.clone());
+    }
     let private144 = private144::observe(&plan, &observer, &before, sample)?;
     if let Some(entry) = &private144
         && entry["live"] == true
@@ -1871,6 +1880,17 @@ pub(super) async fn run() -> Result<()> {
         let gate = &plan.gates[&epoch];
         let mut state = gate.state.as_str();
         let mut next = gate.next_action.as_str();
+        if epoch == 157
+            && let Some(entry) = &runtime157
+            && entry["ordinary_replay_restored"] != true
+        {
+            state = if entry["live"] == true {
+                "live-replay"
+            } else {
+                "blocked-qualification"
+            };
+            next = "Preserve original157 producer, queued successor replay and independent runtime-segment verification; ETA unavailable until a qualified rate-bearing replay observation is restored. Review actual terminal/ownership changes, never restart from a missing worker.";
+        }
         if diagnostics.iter().any(|claim| {
             claim["live"] == true
                 && claim["scope_first_epoch"]
@@ -1994,6 +2014,9 @@ pub(super) async fn run() -> Result<()> {
     receipt["pipelines"] = json!(pipelines);
     receipt["terminal_replays"] = json!(terminal_replays);
     receipt["auxiliary_diagnostics"] = json!(auxiliary_diagnostics);
+    if let Some(entry) = runtime157 {
+        receipt["runtime_handoff157"] = entry;
+    }
     if let Some(entry) = private144 {
         receipt["observer_diagnostics"] = json!([entry]);
     }

@@ -37,6 +37,9 @@ mod private144;
 #[path = "routine_recovery.rs"]
 mod controller_recovery;
 
+#[path = "routine_runtime157.rs"]
+mod runtime157;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -82,6 +85,8 @@ struct Plan {
     epoch198_delivery: Option<delivery198::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     package_controller_recovery: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    runtime_handoff157: Option<Bound>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -557,6 +562,10 @@ fn validate_templates(
         );
         epochs.remove(&198);
     }
+    if p.runtime_handoff157.is_some() {
+        runtime157::validate(p)?;
+        epochs.remove(&157);
+    }
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -971,6 +980,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     }
     apply_known_action_corrections(p, &mut fleet)?;
     delivery198::derive_fleet(p, &mut fleet)?;
+    runtime157::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1177,6 +1187,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     // is an in-memory preview, not a new fleet receipt or resource poll.
     apply_known_action_corrections(p, &mut fleet.clone())?;
     delivery198::derive_fleet(p, &mut fleet.clone())?;
+    runtime157::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1460,6 +1471,7 @@ fn main() {
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
+                            | "--prepare-runtime157-pause"
                     )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
@@ -1484,6 +1496,7 @@ fn main() {
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-private144"
                 || arg == "--prepare-package-recovery"
+                || arg == "--prepare-runtime157-pause"
         }) {
             let spec = if args.len() == 10 {
                 Some(Bound {
@@ -1493,15 +1506,7 @@ fn main() {
             } else {
                 None
             };
-            return next_preparation::prepare(
-                &plan,
-                &bound,
-                &args[5],
-                args[6] == "--prepare-next-terminal157",
-                spec.as_ref(),
-                args[6] == "--prepare-next-private144",
-                args[6] == "--prepare-package-recovery",
-            );
+            return next_preparation::prepare(&plan, &bound, &args[5], &args[6], spec.as_ref());
         }
         execute(&plan, &bound, &args[5], args.len() == 7)
     })();
