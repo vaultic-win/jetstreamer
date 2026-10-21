@@ -84,6 +84,14 @@ Keep that config writable for SDK token refresh without changing live lanes.
 Its receipt proves only source metadata availability,not downloaded bytes,native
 checkpoint state,capacity admission,continuation,assembly or publication. The
 existing epoch213 continuation is build-bound and must not be reused for144.
-Snapshot acquisition requires its own qualified downloader and fresh disk gate;
+The separate `jetstreamer-epoch144-snapshot-download` profile reuses the reviewed
+generation download engine without changing its production behavior. It binds
+the metadata and fresh admission receipts,the exact executable and filesystem,
+and the complete compressed size plus slack above all older growth/floor claims.
+Its owned SDK process group remains protected by the internal disk/time/size
+guard through transfer and independent CRC32C/MD5/SHA-256 checks. It emits only
+private,no-clobber snapshot/receipt evidence and cannot restore or replay.
+The profile regression rejects borrowing another epoch's metadata authority.
+Snapshot acquisition requires its own qualified deployment and fresh disk gate;
 native restore must use the exact unchanged v1.4.25 worker and compare the full
 verified prefix terminal tuple before any suffix entries are accepted.
