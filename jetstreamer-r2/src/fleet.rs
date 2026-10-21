@@ -6,10 +6,15 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod private144;
+mod private157;
 mod ram_auxiliary;
 mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
+
+pub(super) fn prepare_private_prefix157() -> Result<()> {
+    private157::prepare()
+}
 
 #[derive(Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -429,6 +434,9 @@ fn validate_same_sample_admission(
         .collect();
     ensure!(added.len() == 1, "admission has no unique added unit");
     let claim = added[0];
+    if private157::namespace(claim) {
+        return private157::admission(previous, plan, claim, guard, guard_plan, now);
+    }
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
@@ -617,6 +625,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if private157::namespace(claim) || receipt["schema"] == private157::SCHEMA {
+        return private157::launch(receipt, claim);
+    }
     let native_restore =
         receipt["schema"] == "jetstreamer-private-epoch140-native-restore-launch-v1";
     let continuation =
@@ -1803,11 +1814,17 @@ pub(super) async fn run() -> Result<()> {
         let is_active = current["ActiveState"] == "active" && current["SubState"] == "running";
         if is_active {
             register_live_diagnostic_scope(&mut live_diagnostic_epochs, claim)?;
+            if private157::namespace(claim) {
+                private157::live_limits()?;
+            }
             ensure!(
                 current["InvocationID"] == claim.invocation_id && current["NRestarts"] == "0",
                 "diagnostic live invocation changed"
             );
-            if private_225_verification(claim) || native_restore_140(claim) {
+            if private_225_verification(claim)
+                || native_restore_140(claim)
+                || private157::namespace(claim)
+            {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     current["ExecStart"] == launch["expected_exec_start"],
@@ -1845,6 +1862,7 @@ pub(super) async fn run() -> Result<()> {
                 .unit
                 .starts_with("horizon-qualify-213-private-verification-")
                 || private_225_verification(claim)
+                || private157::namespace(claim)
             {
                 "private-verification"
             } else {

@@ -439,6 +439,9 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 }
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
+    if p.prefix157_audit.is_some() {
+        return (prefix157::WRITER, prefix157::WRITER_SHA);
+    }
     if p.runtime_handoff157.is_some() {
         return (runtime157::WRITER, runtime157::WRITER_SHA);
     }
@@ -722,14 +725,16 @@ pub(super) fn namespaces(
     );
     let stamp = stamp(&next.sample_target_utc);
     *observer_package = Path::new("/var/lib/jetstreamer").join(format!(
-        "horizon-next-observer-101-200-{stamp}-delivery198-v1"
+        "horizon-next-observer-101-200-{stamp}-{}",
+        generation_101(next)
     ));
     *cycle_package = Path::new("/var/lib/jetstreamer").join(format!(
-        "horizon-routine-plan-101-200-{stamp}-delivery198-v1"
+        "horizon-routine-plan-101-200-{stamp}-{}",
+        generation_101(next)
     ));
     next.observer_config.path = observer_package.join("observer.json");
     next.cycle_directory = Path::new("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
-        .join(format!("{stamp}-delivery198-v1"));
+        .join(format!("{stamp}-{}", generation_101(next)));
     next.cycle_unit = cycle_unit(next)?;
     if let Some(scope) = &mut next.scope_101_200 {
         scope.additional_tracked_units = vec![next.cycle_unit.clone()];

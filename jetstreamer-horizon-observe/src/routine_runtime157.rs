@@ -9,7 +9,8 @@ pub(super) const WRITER_SHA: &str =
 const OLD: &str = "2026-10-21T15:08:00Z";
 const NEXT: &str = "2026-10-21T16:08:00Z";
 pub(super) fn writer(p: &Plan) -> bool {
-    p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA
+    (p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA)
+        || prefix157::writer(p)
 }
 pub(super) fn validate(p: &Plan) -> Result<Value> {
     let b = p.runtime_handoff157.as_ref().context("157pause missing")?;
