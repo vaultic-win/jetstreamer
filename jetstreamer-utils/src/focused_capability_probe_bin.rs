@@ -26,6 +26,20 @@ const MAX_LOG_BYTES: usize = 16 * 1024 * 1024;
 const EPOCH_SLOTS: u64 = 432_000;
 const MIN_SNAPSHOT_SLOT: u64 = 86_831_488;
 const MAX_SLOT_EXCLUSIVE: u64 = 92_448_000;
+const SHRINK225_PACKAGE: &str =
+    "/var/lib/jetstreamer/horizon-focused-225-complete-span-v1-6-25-shrink-budget-v1";
+
+fn shrink225_package(plan: &Plan) -> bool {
+    plan.epoch == 225 && plan.package == Path::new(SHRINK225_PACKAGE)
+}
+
+fn epoch225_revision(plan: &Plan) -> &'static str {
+    if shrink225_package(plan) {
+        "shrink-budget"
+    } else {
+        "63a2717"
+    }
+}
 
 fn worker_member(plan: &Plan) -> &'static str {
     if matches!(plan.epoch, 224 | 225) {
@@ -778,7 +792,11 @@ fn validate_plan(plan: &Plan) -> Result<()> {
                 && plan.node_sha256
                     == "945f36fe11824263258ad561dba106e377148b702f2c615522b171c4ba97ed3b"
                 && plan.worker_sha256
-                    == "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146",
+                    == if shrink225_package(plan) {
+                        "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd"
+                    } else {
+                        "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"
+                    },
             "epoch 225 exact complete-span runtime or checkpoint binding mismatch"
         );
     }
@@ -796,7 +814,10 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     let expected_package = if plan.epoch == 224 {
         "/var/lib/jetstreamer/horizon-focused-224-complete-span-v1-6-25-01879c4-v1".to_string()
     } else if plan.epoch == 225 {
-        "/var/lib/jetstreamer/horizon-focused-225-complete-span-v1-6-25-63a2717-v1".to_string()
+        format!(
+            "/var/lib/jetstreamer/horizon-focused-225-complete-span-v1-6-25-{}-v1",
+            epoch225_revision(plan)
+        )
     } else {
         format!(
             "/var/lib/jetstreamer/horizon-focused-{}-complete-span-store8-ca2e38b-v1",
@@ -812,7 +833,10 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         &if plan.epoch == 224 {
             "epoch224-complete-span-v1-6-25-immutable-package-01879c4-".to_string()
         } else if plan.epoch == 225 {
-            "epoch225-complete-span-v1-6-25-immutable-package-63a2717-".to_string()
+            format!(
+                "epoch225-complete-span-v1-6-25-immutable-package-{}-",
+                epoch225_revision(plan)
+            )
         } else {
             format!(
                 "epoch{}-complete-span-store8-immutable-package-ca2e38b-",
@@ -828,7 +852,8 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         )
     } else if plan.epoch == 225 {
         format!(
-            "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-package-capability-63a2717-v{}",
+            "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-package-capability-{}-v{}",
+            epoch225_revision(plan),
             plan.probe_attempt
         )
     } else {
@@ -846,7 +871,10 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         &if plan.epoch == 224 {
             "epoch224-complete-span-package-capability-01879c4-rust-".to_string()
         } else if plan.epoch == 225 {
-            "epoch225-complete-span-package-capability-63a2717-rust-".to_string()
+            format!(
+                "epoch225-complete-span-package-capability-{}-rust-",
+                epoch225_revision(plan)
+            )
         } else {
             format!(
                 "epoch{}-complete-span-package-capability-ca2e38b-rust-",
@@ -1310,6 +1338,24 @@ mod tests {
         let markers = expected_log_markers(&current, &missing).join("\n");
         assert!(markers.contains("solana-v1.6.25 (Candidate) from slots 97200000..98063465"));
         validate_output(&current, &missing, &output(&markers, 1)).unwrap();
+        current.package = SHRINK225_PACKAGE.into();
+        current.package_receipt = "/home/ubuntu/.jetstreamer-private/campaign-state/epoch225-complete-span-v1-6-25-immutable-package-shrink-budget-test.json".into();
+        current.worker_sha256 =
+            "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd".into();
+        current.probe_root = format!("/home/ubuntu/.jetstreamer-private/qualification-225-v1625-package-capability-shrink-budget-v{}", current.probe_attempt).into();
+        current.receipt = "/home/ubuntu/.jetstreamer-private/campaign-state/epoch225-complete-span-package-capability-shrink-budget-rust-test.json".into();
+        validate_plan(&current).unwrap();
+        current.worker_sha256 =
+            "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146".into();
+        assert!(validate_plan(&current).is_err());
+        current.worker_sha256 =
+            "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd".into();
+        current.package_receipt = "/home/ubuntu/.jetstreamer-private/campaign-state/epoch225-complete-span-v1-6-25-immutable-package-63a2717-test.json".into();
+        assert!(validate_plan(&current).is_err());
+        current.package_receipt = "/home/ubuntu/.jetstreamer-private/campaign-state/epoch225-complete-span-v1-6-25-immutable-package-shrink-budget-test.json".into();
+        current.probe_root = format!("/home/ubuntu/.jetstreamer-private/qualification-225-v1625-package-capability-63a2717-v{}", current.probe_attempt).into();
+        assert!(validate_plan(&current).is_err());
+        current.probe_root = format!("/home/ubuntu/.jetstreamer-private/qualification-225-v1625-package-capability-shrink-budget-v{}", current.probe_attempt).into();
         current.terminal_slot = 97_631_459;
         assert!(validate_plan(&current).is_err());
         current.terminal_slot = 98_063_464;
