@@ -204,7 +204,7 @@ fn validate_folded_scope(p: &Plan, fleet_plan: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn encoded(value: &Value) -> Result<Vec<u8>> {
+pub(super) fn encoded(value: &Value) -> Result<Vec<u8>> {
     let mut b = serde_json::to_vec_pretty(value)?;
     b.push(b'\n');
     Ok(b)
@@ -239,6 +239,7 @@ pub(super) fn prepare(
     pb: &Bound,
     self_sha: &str,
     enable_terminal157: bool,
+    delivery_spec: Option<&Bound>,
 ) -> Result<()> {
     // No new service/remote observations. Consume only root-private accepted
     // cycle artifacts; the later normal --check-only gate remains mandatory.
@@ -246,7 +247,7 @@ pub(super) fn prepare(
     let bytes = read_checked(&completion_path, LIMIT, 0, false)?;
     let completion: Value = serde_json::from_slice(&bytes)?;
     let config = bound_json(&p.observer_config, true)?;
-    let (mut next, next_config, observer_package, cycle_package) =
+    let (mut next, mut next_config, observer_package, cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     let model = bound_json(&next.model_template, true)?;
     if enable_terminal157 {
@@ -260,7 +261,8 @@ pub(super) fn prepare(
     let estimates = bound_json(&next.previous_estimates, false)?;
     let observer = bound_json(&next.previous_observer, false)?;
     validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
-    validate_observer_config(&next, &model, &next_config)?;
+    let effective = delivery198::effective_model(&next, &model)?;
+    validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     latest_fleet_unchanged(&next, &fleet)?;
     for tool in [&next.tools.sealer, &next.tools.estimator, &next.tools.r2] {
@@ -293,6 +295,19 @@ pub(super) fn prepare(
                 && s["observer_receipt_sha256"] == next.previous_observer.sha256,
             "status receipt is not the accepted observation"
         );
+    }
+    delivery198::validate_completed(p, &completion)?;
+    if let Some(spec) = delivery_spec {
+        ensure!(
+            !enable_terminal157,
+            "cannot combine separate handoff preparations"
+        );
+        delivery198::enable(&mut next, &mut next_config, &model, &completion, spec)?;
+        let effective = delivery198::effective_model(&next, &model)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        tool_ok(&next.tools.r2)?;
+        delivery198::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     let host101 = is_101(p)?;
     let root = Path::new(if host101 { ROOT_101 } else { ROOT });
