@@ -54,6 +54,15 @@ or a ready archive assertion. Update phase-capable status readers and completion
 cleanup binaries through their normal immutable deployment handoff before
 publishing this new phase; do not leave an old reader rejecting its receipts.
 
+The same exact cohort has a `controller-import-handoff`/`publication` binding
+after its parent cleanly succeeds but before the controller launches its
+serialized importer. It pins the original controller/script, pending state,
+completed producer, exact committed batch receipt and pre-sample terminal
+events. Starting an import, changing the assignment, a failed producer or a
+replacement controller invalidates it. Its elapsed clock remains the original
+producer's, not the controller's. This observation never wakes, restarts or
+launches the controller or claims that the public import has finished.
+
 Fleet status classification distinguishes live receipt ownership from an actual
 production claim. A private qualification may still own an old status receipt,
 but that does not make its production countdown valid. `owner_binding_matches`

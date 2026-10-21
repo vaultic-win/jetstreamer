@@ -186,6 +186,9 @@ pub(super) fn pipeline_unit_range(
     if phase == "producer-finalization" {
         return super::cohort_finalization::scope(unit);
     }
+    if phase == "controller-import-handoff" {
+        return super::cohort_finalization::handoff_scope(unit);
+    }
     ensure!(
         unit.len() <= 255
             && unit
@@ -1727,6 +1730,8 @@ pub(super) async fn run() -> Result<()> {
         let is_active = pipeline_live(claim, current)?;
         let finalization = if is_active && claim.phase == "producer-finalization" {
             super::cohort_finalization::observe(current, sample_seconds)?
+        } else if is_active && claim.phase == "controller-import-handoff" {
+            super::cohort_finalization::observe_handoff(current, sample_seconds)?
         } else {
             Value::Null
         };

@@ -38,6 +38,7 @@ impl Binding {
             ("full-verification" | "plugin-verification", "verification")
             | ("local-publication", "publication")
             | ("producer-finalization", "finalization")
+            | ("controller-import-handoff", "publication")
             | ("upload-readback", "upload" | "readback") => (),
             _ => bail!("pipeline and status phases disagree"),
         };
@@ -45,6 +46,15 @@ impl Binding {
             ensure!(
                 self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
                 "producer finalization must retain the original invocation clock"
+            );
+        }
+        if self.claim_phase == "controller-import-handoff" {
+            ensure!(
+                self.unit == super::cohort_finalization::CONTROLLER
+                    && self.invocation_id == super::cohort_finalization::CONTROLLER_INVOCATION
+                    && self.origin_unit == super::cohort_finalization::UNIT
+                    && self.origin_invocation_id == super::cohort_finalization::PRODUCER_INVOCATION,
+                "controller handoff must retain the exact original producer clock"
             );
         }
         ensure!(
@@ -192,9 +202,12 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["INVOCATION_ID"] == invocation
                 && r["_PID"] == "1"
                 && r["_UID"] == "0"
-                && r["MESSAGE"]
-                    .as_str()
-                    .is_some_and(|s| s.starts_with("Starting "))
+                && r["MESSAGE"].as_str().is_some_and(|s| {
+                    s.starts_with("Starting ")
+                        || (unit == super::cohort_finalization::CONTROLLER
+                            && invocation == super::cohort_finalization::CONTROLLER_INVOCATION
+                            && s.starts_with("Started "))
+                })
         })
         .collect();
     ensure!(
@@ -308,6 +321,7 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
                         | "local-publication"
                         | "upload-readback"
                         | "producer-finalization"
+                        | "controller-import-handoff"
                 )
             )),
         "pipeline overlaps a replay or private qualification claim"
@@ -352,7 +366,8 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
                     "plugin-verification",
                     "local-publication",
                     "upload-readback",
-                    "producer-finalization"
+                    "producer-finalization",
+                    "controller-import-handoff"
                 ]
                 .iter()
                 .any(|phase| fleet::pipeline_unit_range(phase, peer)
@@ -375,6 +390,16 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
     );
     if plan.binding.claim_phase == "producer-finalization" {
         super::cohort_finalization::observe(
+            &current[&plan.binding.unit],
+            fleet::utc_seconds(
+                fleet["sampled_at_utc"]
+                    .as_str()
+                    .context("fleet sample missing")?,
+            )?,
+        )?;
+    }
+    if plan.binding.claim_phase == "controller-import-handoff" {
+        super::cohort_finalization::observe_handoff(
             &current[&plan.binding.unit],
             fleet::utc_seconds(
                 fleet["sampled_at_utc"]
@@ -566,6 +591,35 @@ mod tests {
             fleet_path: "/fleet".into(),
             fleet_sha256: "d".repeat(64),
         }
+    }
+    #[test]
+    fn exact_simple_controller_uses_its_authenticated_started_manager_event() {
+        let unit = super::super::cohort_finalization::CONTROLLER;
+        let inv = super::super::cohort_finalization::CONTROLLER_INVOCATION;
+        let r = json!({"UNIT":unit,"INVOCATION_ID":inv,"_PID":"1","_UID":"0",
+            "MESSAGE":"Started controller.","__REALTIME_TIMESTAMP":"10000000"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&r), unit, inv).unwrap(),
+            10000
+        );
+        assert!(start_millis(std::slice::from_ref(&r), unit, "replacement").is_err());
+        let mut wrong = r.clone();
+        wrong["_PID"] = json!("123");
+        assert!(start_millis(&[wrong], unit, inv).is_err());
+    }
+    #[test]
+    fn controller_handoff_keeps_original_producer_not_controller_start_clock() {
+        let mut b = binding();
+        b.unit = super::super::cohort_finalization::CONTROLLER.into();
+        b.invocation_id = super::super::cohort_finalization::CONTROLLER_INVOCATION.into();
+        b.claim_phase = "controller-import-handoff".into();
+        b.origin_unit = super::super::cohort_finalization::UNIT.into();
+        b.origin_invocation_id = super::super::cohort_finalization::PRODUCER_INVOCATION.into();
+        b.validate(216, "publication").unwrap();
+        assert!(b.validate(220, "publication").is_err());
+        assert!(b.validate(216, "replay").is_err());
+        b.origin_unit = b.unit.clone();
+        assert!(b.validate(216, "publication").is_err());
     }
     #[test]
     fn producer_finalization_has_exact_scope_phase_and_original_clock() {
