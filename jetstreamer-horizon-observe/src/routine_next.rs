@@ -271,8 +271,10 @@ pub(super) fn prepare(
     let estimates = bound_json(&next.previous_estimates, false)?;
     let observer = bound_json(&next.previous_observer, false)?;
     validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
-    let effective =
-        private144::effective_model(&next, &delivery198::effective_model(&next, &model)?)?;
+    let effective = private144::effective_model(
+        &next,
+        &delivery198::preparation_model(&next, &model, delivery_spec)?,
+    )?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     latest_fleet_unchanged(&next, &fleet)?;
