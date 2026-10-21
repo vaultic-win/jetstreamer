@@ -95,3 +95,17 @@ The profile regression rejects borrowing another epoch's metadata authority.
 Snapshot acquisition requires its own qualified deployment and fresh disk gate;
 native restore must use the exact unchanged v1.4.25 worker and compare the full
 verified prefix terminal tuple before any suffix entries are accepted.
+
+`jetstreamer-r2 admit-snapshot144 SPEC --spec-sha256 HEX --self-sha256 HEX`
+is a separate root,sealed Rust admission path for compressed acquisition only.
+It binds a fresh accepted v2 observer/full fleet,the exact fleet plan,metadata,
+downloader and retained protection proof. It recomputes the sealed audited century
+floor and binds its independent full/plugin/ready-pair proofs,then protects all
+4,740,696,923,590older-growth/floor bytes plus the complete compressed object and
+64MiBslack. Two live censuses reject new,changed,restarted or disappeared owners;
+fresh actual free bytes,memory reserve and host VMA checks remain mandatory.
+The private no-clobber receipt uses
+`jetstreamer-epoch144-snapshot-admission-receipt-v1`,not borrowed legacy admission.
+The144downloader rejects that receipt if stale,foreign,replay-authorizing or
+underprotecting the retained claims. Other source profiles retain their existing
+admission contracts. Do not replace any active reader/controller with this build.
