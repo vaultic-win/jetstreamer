@@ -34,6 +34,8 @@ class AuditHorizonUploadWrapperTests(unittest.TestCase):
 
     def write_wrapper(self, body):
         wrapper = self.root / "upload.zsh"
+        if wrapper.exists():
+            wrapper.chmod(0o755)
         wrapper.write_text("#!/usr/bin/zsh\n" + body, encoding="utf-8")
         wrapper.chmod(0o555)
         return wrapper
@@ -70,6 +72,60 @@ class AuditHorizonUploadWrapperTests(unittest.TestCase):
             wrapper, f"plugin-pipeline-sha256={self.pipeline}"
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_accepts_native_cli_space_separated_hash_options(self):
+        wrapper = self.write_wrapper(
+            f"  --plugin-pipeline-sha256 {self.pipeline_sha} \\\n"
+            f"  --full-verifier-sha256 {self.verifier_sha}\n"
+        )
+        result = self.run_audit(
+            wrapper,
+            f"plugin-pipeline-sha256={self.pipeline}",
+            f"full-verifier-sha256={self.verifier}",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(json.loads(result.stdout)["bindings"]), 2)
+
+    def test_mixed_option_syntax_still_rejects_duplicate_hash_binding(self):
+        wrapper = self.write_wrapper(
+            f"--plugin-pipeline-sha256={self.pipeline_sha}\n"
+            f"--plugin-pipeline-sha256 {self.pipeline_sha}\n"
+        )
+        result = self.run_audit(wrapper, f"plugin-pipeline-sha256={self.pipeline}")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("wrapper repeats", result.stderr)
+
+    def test_native_cli_receipt_directory_requires_exact_receipts_child(self):
+        state = self.root / "full-audit"
+        (state / "receipts").mkdir(parents=True)
+        for configured, expected_code in [(state / "receipts", 0), (state, 1)]:
+            with self.subTest(configured=configured):
+                wrapper = self.write_wrapper(
+                    f"--full-verifier-sha256 {self.verifier_sha} \\\n"
+                    f"--full-receipt-directory {configured}\n"
+                )
+                result = self.run_audit(
+                    wrapper,
+                    f"full-verifier-sha256={self.verifier}",
+                    receipt_states=[f"full-receipt-directory={state}"],
+                )
+                self.assertEqual(result.returncode, expected_code, result.stderr)
+
+    def test_mixed_receipt_syntax_still_rejects_duplicate_directory(self):
+        state = self.root / "full-audit"
+        (state / "receipts").mkdir(parents=True)
+        wrapper = self.write_wrapper(
+            f"--full-verifier-sha256 {self.verifier_sha}\n"
+            f"--full-receipt-directory={state / 'receipts'}\n"
+            f"--full-receipt-directory {state / 'receipts'}\n"
+        )
+        result = self.run_audit(
+            wrapper,
+            f"full-verifier-sha256={self.verifier}",
+            receipt_states=[f"full-receipt-directory={state}"],
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("wrapper repeats", result.stderr)
 
     def test_rejects_mistyped_configured_hash(self):
         wrapper = self.write_wrapper(

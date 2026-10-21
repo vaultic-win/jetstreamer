@@ -20,11 +20,11 @@ RECEIPT_DIRECTORY_OPTION_RE = re.compile(
     r"^(?:full|plugin|boundary)-receipt-directory$"
 )
 WRAPPER_HASH_RE = re.compile(
-    rf"(?m)^\s*--(?P<option>[a-z][a-z0-9-]*-sha256)="
+    rf"(?m)^\s*--(?P<option>[a-z][a-z0-9-]*-sha256)(?:=|[ \t]+)"
     rf"(?P<allowlist>{SHA256_RE}(?:,{SHA256_RE})*)\s*(?:\\)?\s*$"
 )
 WRAPPER_RECEIPT_DIRECTORY_RE = re.compile(
-    r"(?m)^\s*--(?P<option>(?:full|plugin|boundary)-receipt-directory)="
+    r"(?m)^\s*--(?P<option>(?:full|plugin|boundary)-receipt-directory)(?:=|[ \t]+)"
     r"(?P<path>/[^\s\\]+)\s*(?:\\)?\s*$"
 )
 
