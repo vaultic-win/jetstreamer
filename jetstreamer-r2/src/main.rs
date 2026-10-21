@@ -67,6 +67,7 @@ mod cohort_finalization;
 mod fleet;
 mod inactive_status;
 mod pipeline_status;
+mod transport_probe;
 mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
@@ -3164,6 +3165,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("probe-transport-217") {
+        return transport_probe::run().await;
+    }
     if matches!(
         env::args().nth(1).as_deref(),
         Some("observe-delivery-198" | "observe-handoff-198")
