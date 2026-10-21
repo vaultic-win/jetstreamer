@@ -247,7 +247,7 @@ struct ReplayObservation {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: jetstreamer-horizon-observe CONFIG.json");
+    eprintln!("usage: jetstreamer-horizon-observe CONFIG.json [--check-config]");
     std::process::exit(2);
 }
 
@@ -279,11 +279,22 @@ fn read_bounded(path: &Path, maximum: u64, label: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn parse_args() -> Result<Config> {
-    let mut args = env::args_os().skip(1);
-    let path = args.next().map(PathBuf::from).unwrap_or_else(|| usage());
+fn parse_cli(mut args: impl Iterator<Item = std::ffi::OsString>) -> Result<(PathBuf, bool)> {
+    let path = args
+        .next()
+        .map(PathBuf::from)
+        .context("missing config path")?;
+    let check_config = match args.next() {
+        None => false,
+        Some(flag) if flag == "--check-config" => true,
+        Some(_) => anyhow::bail!("unexpected argument; only --check-config is supported"),
+    };
     ensure!(args.next().is_none(), "unexpected extra argument");
-    let bytes = read_bounded(&path, MAX_CONFIG_BYTES, "config")?;
+    Ok((path, check_config))
+}
+
+fn load_config(path: &Path) -> Result<(Config, String)> {
+    let bytes = read_bounded(path, MAX_CONFIG_BYTES, "config")?;
     let config: Config = serde_json::from_slice(&bytes).context("invalid config JSON")?;
     ensure!(config.schema == CONFIG_SCHEMA, "unsupported config schema");
     ensure!(
@@ -312,7 +323,34 @@ fn parse_args() -> Result<Config> {
     );
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     validate_ram_auxiliary(&config)?;
-    Ok(config)
+    Ok((config, sha256(&bytes)))
+}
+
+// This branch is deliberately outside run(): it must not look up units, read
+// /proc/cgroups or the predecessor, scan scratch, consume cadence, or write a
+// sample. Both modes still use exactly the same static config validation.
+fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
+    let (config, digest) = load_config(path)?;
+    if check_config {
+        return Ok(Some(serde_json::json!({
+            "schema": "jetstreamer-horizon-observer-config-preflight-v1",
+            "config_path": path,
+            "config_sha256": digest,
+            "ordinary_replay_count": config.replays.len(),
+            "diagnostic_replay_count": config.diagnostic_replays.len(),
+            "configuration_validated": true,
+            "resource_observation_performed": false,
+            "live_invocations_verified": false,
+            "cadence_predecessor_verified": false,
+            "sample_written": false,
+            "replay_launch_authorized": false,
+            "publication_authorized": false,
+            "remote_mutations": false,
+            "r2_mutations": false
+        })));
+    }
+    run(config)?;
+    Ok(None)
 }
 
 fn validate_ram_auxiliary(config: &Config) -> Result<()> {
@@ -1929,12 +1967,134 @@ fn run(config: Config) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    run(parse_args()?)
+    let mut args = env::args_os().skip(1).peekable();
+    if args.peek().is_none() {
+        usage();
+    }
+    let (path, check_config) = parse_cli(args)?;
+    if let Some(result) = dispatch(&path, check_config)? {
+        println!("{}", serde_json::to_string(&result)?);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn preflight_fixture(root: &Path) -> Value {
+        serde_json::json!({
+            "schema": CONFIG_SCHEMA,
+            "previous_sample": root.join("absent-predecessor.json"),
+            "minimum_interval_seconds": 1800,
+            "not_before_utc": "2099-01-01T00:00:00Z",
+            "filesystem_path": root.join("absent-filesystem"),
+            "output": root.join("sample.json"),
+            "replays": [{
+                "range":"220-223", "controller_unit":"absent-controller.service",
+                "producer_unit":"absent-producer.service",
+                "expected_controller_invocation_id":"a".repeat(32),
+                "expected_producer_invocation_id":"b".repeat(32),
+                "scratch_path":root.join("absent-scratch"),
+                "worker_executable_basename":"historical-worker"
+            }],
+            "diagnostic_replays": []
+        })
+    }
+
+    #[test]
+    fn config_only_preflight_does_not_observe_or_consume_cadence() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("config.json");
+        let bytes = serde_json::to_vec(&preflight_fixture(temp.path())).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        // Future not-before plus absent predecessor, units, filesystem and
+        // scratch would all prevent a real observation. Static preflight must
+        // succeed without touching any of those live-resource inputs.
+        let report = dispatch(&path, true).unwrap().unwrap();
+        assert_eq!(report["config_sha256"], sha256(&bytes));
+        assert_eq!(report["ordinary_replay_count"], 1);
+        assert_eq!(report["configuration_validated"], true);
+        for flag in [
+            "resource_observation_performed",
+            "live_invocations_verified",
+            "cadence_predecessor_verified",
+            "sample_written",
+            "replay_launch_authorized",
+            "publication_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            assert_eq!(report[flag], false, "{flag}");
+        }
+        assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn config_only_preflight_rejects_duplicate_terminal_and_current_diagnostic_ranges() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("config.json");
+        let mut config = preflight_fixture(temp.path());
+        let mut old = config["replays"][0].clone();
+        old["range"] = serde_json::json!("203-203");
+        let mut replacement = old.clone();
+        replacement["producer_unit"] = serde_json::json!("replacement.service");
+        replacement["expected_producer_invocation_id"] = serde_json::json!("c".repeat(32));
+        config["diagnostic_replays"] = serde_json::json!([old, replacement]);
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let error = dispatch(&path, true).unwrap_err().to_string();
+        assert!(
+            error.contains("duplicate replay/diagnostic range"),
+            "{error}"
+        );
+        assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn config_only_preflight_retains_normal_schema_scope_and_cadence_gates() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("config.json");
+        for (key, value) in [
+            ("schema", serde_json::json!("old-schema")),
+            ("minimum_interval_seconds", serde_json::json!(1799)),
+            ("not_before_utc", serde_json::json!("invalid-time")),
+            ("replays", serde_json::json!([])),
+            ("output", serde_json::json!("relative.json")),
+            ("unexpected_field", serde_json::json!(true)),
+        ] {
+            let mut config = preflight_fixture(temp.path());
+            config[key] = value;
+            fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+            assert!(dispatch(&path, true).is_err(), "accepted {key}");
+            assert!(!temp.path().join("sample.json").exists());
+        }
+    }
+
+    #[test]
+    fn observer_cli_keeps_default_sampling_and_requires_explicit_config_only_flag() {
+        let args = |values: &[&str]| {
+            values
+                .iter()
+                .map(std::ffi::OsString::from)
+                .collect::<Vec<_>>()
+                .into_iter()
+        };
+        assert!(!parse_cli(args(&["/config.json"])).unwrap().1);
+        assert!(
+            parse_cli(args(&["/config.json", "--check-config"]))
+                .unwrap()
+                .1
+        );
+        for values in [
+            vec![],
+            vec!["/config.json", "--sample-now"],
+            vec!["/config.json", "--check-config", "extra"],
+            vec!["/config.json", "--check-config", "--check-config"],
+        ] {
+            assert!(parse_cli(args(&values)).is_err());
+        }
+    }
 
     #[test]
     fn oneshot_start_is_explicit_private_auxiliary_only() {
