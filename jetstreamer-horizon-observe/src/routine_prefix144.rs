@@ -1,9 +1,9 @@
 //! Fold one exact private144 reread event without changing replay/ETA semantics.
 use super::*;
 pub(super) const WRITER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch144-prefix-fleet-reader-20261021-v1/jetstreamer-r2";
+    "/usr/local/lib/jetstreamer/horizon-epoch144-prefix-fleet-reader-20261021-v2/jetstreamer-r2";
 pub(super) const WRITER_SHA: &str =
-    "37e320c9eba61828a0d56e907a91866c70c3963ea97ace852ae0856e2a6f9939";
+    "72023469c013a641fe5ebfb8da5da6aa1cec957e816a1f06e9b288dd3871c395";
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

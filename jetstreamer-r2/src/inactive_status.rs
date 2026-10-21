@@ -7,6 +7,12 @@ mod metadata_cycle;
 mod missing157;
 mod natural144;
 
+pub(super) fn private144_terminal_manager_proof(current: &Value) -> Result<()> {
+    natural144::terminal_shape(current)?;
+    natural144::manager_proof()?;
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {

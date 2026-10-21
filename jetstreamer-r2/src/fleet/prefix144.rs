@@ -170,12 +170,7 @@ struct Spec {
     output: PathBuf,
 }
 fn protected(previous: &Value) -> Result<Value> {
-    let names = previous["unit_census"]
-        .as_object()
-        .context("144 old census")?
-        .keys()
-        .cloned()
-        .collect();
+    let names = protected_census_names(previous)?;
     let current = census(&names, 101, 200)?;
     let mut result = serde_json::Map::new();
     for (name, row) in &current {
@@ -199,6 +194,19 @@ fn protected(previous: &Value) -> Result<Value> {
         }
     }
     Ok(Value::Object(result))
+}
+fn protected_census_names(previous: &Value) -> Result<BTreeSet<String>> {
+    let mut names: BTreeSet<String> = previous["unit_census"]
+        .as_object()
+        .context("144 old census")?
+        .keys()
+        .cloned()
+        .collect();
+    // The launch-capture census must explicitly name its own just-started,
+    // exact verifier; otherwise generic census correctly rejects it as unbound.
+    // Old claims remain in the set and every old producer is reauthenticated.
+    names.insert(UNIT.into());
+    Ok(names)
 }
 fn claim(r: &Value, b: &BoundFile) -> Result<DiagnosticClaim> {
     Ok(DiagnosticClaim {
@@ -490,5 +498,17 @@ mod tests {
         private157::resources(&o).unwrap();
         o["filesystem"]["conservative_available_bytes"] = json!(PROTECTED);
         assert!(private157::resources(&o).is_err());
+    }
+    #[test]
+    fn capture_census_adds_only_its_exact_verifier_and_preserves_all_old_names() {
+        let p = json!({"unit_census":{"old-producer.service":{},"old-diagnostic.service":{}}});
+        assert_eq!(
+            protected_census_names(&p).unwrap(),
+            BTreeSet::from([
+                "old-producer.service".into(),
+                "old-diagnostic.service".into(),
+                UNIT.into()
+            ])
+        );
     }
 }

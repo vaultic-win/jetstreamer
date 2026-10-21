@@ -90,6 +90,23 @@ pub(super) fn observe(
     if rows.is_empty() {
         return Ok(None);
     }
+    let overlaps: Vec<_> = plan
+        .diagnostics
+        .iter()
+        .filter(|d| diagnostic_scope(d).contains(&144))
+        .collect();
+    if !overlaps.is_empty() {
+        ensure!(
+            overlaps.len() == 1 && prefix144::namespace(overlaps[0]),
+            "private144 overlapping diagnostic is not its exact independent verifier"
+        );
+        // Preserve the old observation as terminal history, never as another
+        // live claim. Cleared IDs alone are not sufficient: authenticate PID1.
+        crate::inactive_status::private144_terminal_manager_proof(
+            census.get(UNIT).context("private144 old owner absent")?,
+        )?;
+        checked_diagnostic_launch(overlaps[0])?;
+    }
     ensure!(
         rows.len() == 1
             && plan.first_epoch == 101
@@ -99,10 +116,6 @@ pub(super) fn observe(
                 g.state.as_str(),
                 "blocked-qualification" | "failed-needs-repair"
             ))
-            && !plan
-                .diagnostics
-                .iter()
-                .any(|d| diagnostic_scope(d).contains(&144))
             && !plan.pipeline_claims.iter().any(|c| c.epoch == 144)
             && !observer["replays"]
                 .as_array()
@@ -123,6 +136,29 @@ pub(super) fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root-only exact retained144 verifier plan and real terminal manager journal; no remote access"]
+    fn exact_completed_old144_can_coexist_only_with_its_private_verifier() {
+        let p:Plan=serde_json::from_value(bound_json(&BoundFile{path:"/usr/local/lib/jetstreamer/horizon-prefix144-admission-plan-20261021-v1/fleet-plan.json".into(),sha256:"1a070f224017cb3364173bee353c71cdcd6f053a27e6a72068a88640ab18e8af".into()}).unwrap()).unwrap();
+        let o = bound_json(&p.observer).unwrap();
+        let c = BTreeMap::from([(UNIT.into(), unit(UNIT).unwrap())]);
+        let v = observe(&p, &o, &c, "2026-10-21T17:38:00Z")
+            .unwrap()
+            .unwrap();
+        assert_eq!(v["live"], false);
+        let mut active = c.clone();
+        active.get_mut(UNIT).unwrap()["ActiveState"] = json!("active");
+        active.get_mut(UNIT).unwrap()["SubState"] = json!("running");
+        assert!(observe(&p, &o, &active, "sample").is_err());
+        let mut foreign = p;
+        foreign
+            .diagnostics
+            .iter_mut()
+            .find(|d| d.epoch == 144)
+            .unwrap()
+            .unit = "horizon-qualify-144-unbound.service".into();
+        assert!(observe(&foreign, &o, &c, "sample").is_err());
+    }
     fn row() -> Value {
         json!({"range":"144","producer_unit":UNIT,"expected_producer_invocation_id":IID,"scratch_path":SCRATCH,
             "status":"unavailable","error":"no worker","observation":null,
