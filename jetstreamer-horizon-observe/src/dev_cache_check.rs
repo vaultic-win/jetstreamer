@@ -39,6 +39,13 @@ struct Plan {
     source_commit: String,
     cargo_lock_sha256: String,
     output: PathBuf,
+    #[serde(default)]
+    retirement: Option<Retirement>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Retirement {
+    prior_check: Bound,
 }
 fn hex(s: &str, n: usize) -> bool {
     s.len() == n
@@ -74,6 +81,10 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "invalid cache-check plan"
     );
     cache_target(&p.schema)?;
+    ensure!(
+        p.retirement.is_none() || cache_target(&p.schema)? == Path::new(SELECTED225_TARGET),
+        "retirement is restricted to selected225 debug cache"
+    );
     ensure!(
         p.output.file_name().is_some_and(|s| s == "check.json")
             && p.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
@@ -326,6 +337,31 @@ fn persist(path: &Path, v: &Value) -> Result<()> {
     File::open(parent)?.sync_all()?;
     Ok(())
 }
+fn retire_tree(target: &Path, device: u64, inode: u64) -> Result<()> {
+    let m = fs::symlink_metadata(target)?;
+    ensure!(
+        target.canonicalize()? == target && m.is_dir() && m.dev() == device && m.ino() == inode,
+        "cache root replaced before retirement"
+    );
+    // Rust's descriptor-relative implementation does not follow child symlinks.
+    fs::remove_dir_all(target)?;
+    File::open(target.parent().context("cache parent missing")?)?.sync_all()?;
+    ensure!(!target.try_exists()?, "cache remains after retirement");
+    Ok(())
+}
+fn retirement_matches(prior: &Value, tree: &Value) -> Result<()> {
+    ensure!(
+        prior["schema"] == "jetstreamer-horizon-dev-cache-check-v1"
+            && prior["cache_profile"] == "jetstreamer-horizon-selected225-dev-cache-check-plan-v1"
+            && prior["cache"] == *tree
+            && prior["process_scan"]["references"] == json!([])
+            && prior["staged_unit_references"] == json!([])
+            && prior["r2_mutations"] == false
+            && prior["archive_deletion_authorized"] == false,
+        "prior check differs from fixed unreferenced cache"
+    );
+    Ok(())
+}
 pub fn run() -> Result<()> {
     let a: Vec<_> = env::args().collect();
     ensure!(
@@ -407,12 +443,39 @@ pub fn run() -> Result<()> {
         tree["device"] == root.dev() && tree["inode"] == root.ino(),
         "cache identity changed before receipt"
     );
+    if let Some(r) = &p.retirement {
+        retirement_matches(&bound_json(&r.prior_check)?, &tree)?;
+    }
     persist(
         &p.output,
         &json!({"schema":"jetstreamer-horizon-dev-cache-check-v1","self_sha256":a[5],"plan":{"path":pb.path,"sha256":pb.sha256},
         "source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,"cache_profile":p.schema,"historical_lock_sha256":historical_lock_sha256,"cache":tree,"process_scan":scan,"staged_unit_references":staged,"missing_inactive_unit_aliases":missing,
         "retirement_authorized":false,"archive_deletion_authorized":false,"replay_scratch_deletion_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
+    if let Some(r) = &p.retirement {
+        let parent = p.output.parent().context("private output parent")?;
+        let check_sha = hash_file(&p.output, 1 << 20)?.0;
+        persist(
+            &parent.join("intent.json"),
+            &json!({
+                "schema":"jetstreamer-private-selected225-debug-retirement-intent-v1",
+                "prior_check":{"path":r.prior_check.path,"sha256":r.prior_check.sha256},
+                "current_check":{"path":p.output,"sha256":check_sha},
+                "cache":tree,"r2_mutations":false,"archive_deletion_authorized":false
+            }),
+        )?;
+        retire_tree(target, root.dev(), root.ino())?;
+        persist(
+            &parent.join("completion.json"),
+            &json!({
+                "schema":"jetstreamer-private-selected225-debug-retirement-completion-v1",
+                "cache":tree,"cache_absent":true,"source_commit":p.source_commit,
+                "current_check":{"path":p.output,"sha256":check_sha},
+                "r2_mutations":false,"archive_deletion_authorized":false,
+                "replay_scratch_deletion_authorized":false
+            }),
+        )?;
+    }
     println!("{}", p.output.display());
     Ok(())
 }
@@ -490,9 +553,17 @@ mod tests {
             source_commit: "a".repeat(40),
             cargo_lock_sha256: "b".repeat(64),
             output: "/var/lib/jetstreamer/horizon-dev-cache-check-test/check.json".into(),
+            retirement: None,
         };
         validate_plan(&p).unwrap();
         assert_eq!(cache_target(&p.schema).unwrap(), Path::new(TARGET));
+        p.retirement = Some(Retirement {
+            prior_check: Bound {
+                path: "/sealed/check.json".into(),
+                sha256: "c".repeat(64),
+            },
+        });
+        assert!(validate_plan(&p).is_err());
         p.schema = "jetstreamer-horizon-selected225-dev-cache-check-plan-v1".into();
         validate_plan(&p).unwrap();
         assert_eq!(
@@ -503,6 +574,51 @@ mod tests {
         p.output = "/home/ubuntu/horizon/check.json".into();
         assert!(validate_plan(&p).is_err());
         assert!(serde_json::from_value::<Plan>(json!({"schema":p.schema,"source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,"output":p.output,"target":"/"})).is_err());
+    }
+
+    #[test]
+    fn retirement_rejects_replacement_and_never_follows_child_links() {
+        let t = tempfile::tempdir().unwrap();
+        let cache = t.path().join("debug");
+        fs::create_dir(&cache).unwrap();
+        let outside = t.path().join("keep");
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("epoch-225.jet"), b"must remain").unwrap();
+        std::os::unix::fs::symlink(&outside, cache.join("outside")).unwrap();
+        let m = fs::metadata(&cache).unwrap();
+        assert!(retire_tree(&cache, m.dev(), m.ino() + 1).is_err());
+        assert!(cache.exists());
+        retire_tree(&cache, m.dev(), m.ino()).unwrap();
+        assert_eq!(
+            fs::read(outside.join("epoch-225.jet")).unwrap(),
+            b"must remain"
+        );
+    }
+
+    #[test]
+    fn retirement_requires_same_complete_positive_cache_census() {
+        let tree = json!({"device":1,"inode":2,"entries":3});
+        let good = json!({"schema":"jetstreamer-horizon-dev-cache-check-v1",
+            "cache_profile":"jetstreamer-horizon-selected225-dev-cache-check-plan-v1",
+            "cache":tree,"process_scan":{"references":[]},"staged_unit_references":[],
+            "r2_mutations":false,"archive_deletion_authorized":false});
+        retirement_matches(&good, &tree).unwrap();
+        for key in [
+            "schema",
+            "cache_profile",
+            "cache",
+            "process_scan",
+            "staged_unit_references",
+            "r2_mutations",
+            "archive_deletion_authorized",
+        ] {
+            let mut bad = good.clone();
+            bad[key] = json!(null);
+            assert!(retirement_matches(&bad, &tree).is_err(), "{key}");
+        }
+        let mut changed = tree.clone();
+        changed["inode"] = json!(4);
+        assert!(retirement_matches(&good, &changed).is_err());
     }
 
     #[test]
