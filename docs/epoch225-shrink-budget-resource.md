@@ -56,7 +56,7 @@ real selected-profile snapshot tests, exact-package capability, fresh admission,
 fleet registration and the guard's first real sandbox fire before leaving a
 new run unattended.
 
-When reproducible build-cache space is needed, the read-only Rust
+When reproducible build-cache space is needed, the default read-only Rust
 `jetstreamer-horizon-dev-cache-check` also accepts the distinct plan schema
 `jetstreamer-horizon-selected225-dev-cache-check-plan-v1`. It selects only
 `.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug`, never its release
@@ -67,3 +67,20 @@ requires empty live-process and staged-unit reference scans. Its receipt does
 not authorize deletion: preserve a separate reviewed retirement intent, rerun
 the check immediately before Cargo's dev-profile cleanup, and retain completion
 evidence. Neither this cache profile nor cleanup relaxes any admission bound.
+If Cargo cannot select that old dev profile without also selecting its release
+sibling, do not fabricate a cache tag or relax Cargo's checks. The selected225
+schema alone may explicitly opt into `retirement: { prior_check: { path,
+sha256 } }`. The checker revalidates the same complete cache census and every
+current source/reference gate, writes a fresh check and durable no-clobber intent,
+then removes only the fixed debug tree with Rust's non-symlink-following removal.
+It fsyncs the cache parent and writes a private completion receipt. The ordinary
+root debug-cache schema cannot request retirement. A failed or interrupted
+retirement remains fail-closed for explicit review; never treat a check receipt
+as completion or silently replace an occupied intent/check.
+
+For evidence gathering only, `jetstreamer-horizon-release-cache-check-plan-v1`
+selects the fixed root `target/release` build cache. It binds the clean source
+and lockfile, checks both absolute and relative staged-unit references, and
+retains the same complete process-reference and archive-exclusion checks.
+This profile rejects `retirement`; a successful release-cache check is not
+permission to remove it or any deployed binary.
