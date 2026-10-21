@@ -570,6 +570,57 @@ fn historical_epoch_213_post_update_count_roundtrips() {
 }
 
 #[test]
+fn historical_epoch_223_post_update_count_roundtrips() {
+    const OBSERVED_MINIMUM: usize = 16_385;
+    const SLOT: u64 = 96_540_992;
+    let mut writer = ArchiveWriter::new(
+        Vec::new(),
+        223,
+        SLOT,
+        1,
+        ArchiveWriterConfig {
+            compression: Compression::None,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    writer.begin_slot(SLOT).unwrap();
+    for write_version in 0..OBSERVED_MINIMUM as u64 {
+        writer
+            .write_reencoded_post_update(&AccountUpdateView {
+                pubkey: Address::new_from_array([7; 32]),
+                lamports: write_version,
+                owner: Address::new_from_array([9; 32]),
+                executable: false,
+                rent_epoch: 0,
+                write_version,
+                data: &[],
+            })
+            .unwrap();
+    }
+    let mut meta = BlockMeta::new_boxed();
+    meta.slot = SLOT;
+    writer.end_slot(&meta, &[]).unwrap();
+    let (archive, _) = writer.finish().unwrap();
+
+    #[derive(Default)]
+    struct CheckPostUpdates(usize);
+    impl SlotVisitor for CheckPostUpdates {
+        fn on_post_account_update(&mut self, slot: u64, update: &AccountUpdateView<'_>) {
+            assert_eq!(slot, SLOT);
+            assert_eq!(update.write_version, self.0 as u64);
+            assert_eq!(update.lamports, self.0 as u64);
+            self.0 += 1;
+        }
+    }
+
+    let mut reader = ArchiveReader::open(std::io::Cursor::new(archive)).unwrap();
+    let mut updates = CheckPostUpdates::default();
+    reader.read_slots(0, u64::MAX, &mut updates).unwrap();
+    assert_eq!(updates.0, OBSERVED_MINIMUM);
+}
+
+#[test]
 fn post_update_count_ceiling_remains_fail_closed() {
     let mut writer = ArchiveWriter::new(
         Vec::new(),
@@ -599,8 +650,8 @@ fn post_update_count_ceiling_remains_fail_closed() {
         writer.write_reencoded_post_update(&update),
         Err(ArchiveFormatError::SectionTooLarge {
             section: "post-transaction account updates",
-            bytes: 16_385,
-            limit: 16_384,
+            bytes: 32_769,
+            limit: 32_768,
         })
     ));
 }
