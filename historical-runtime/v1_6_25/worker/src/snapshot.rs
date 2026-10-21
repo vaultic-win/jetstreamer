@@ -457,6 +457,16 @@ fn supported_snapshot_version(version: &str) -> Result<SnapshotSchema, String> {
     }
 }
 
+fn snapshot_unpack_error(path: &Path, error: std::io::Error) -> String {
+    // tar wraps the OS error; Display omits that cause and hides whether a
+    // diagnostic failed from permissions, inode exhaustion, or invalid input.
+    format!(
+        "failed to unpack snapshot tar entry {}: {:?}",
+        path.display(),
+        error
+    )
+}
+
 /// Extracts the narrow canonical snapshot layout into worker-private
 /// storage. Every entry is admitted and charged at its logical on-disk size
 /// before `unpack_in` can create it. GNU sparse files remain sparse because
@@ -536,13 +546,9 @@ fn unpack_handoff_snapshot<R: Read>(
             ));
         }
 
-        let unpacked = entry.unpack_in(destination).map_err(|error| {
-            format!(
-                "failed to unpack snapshot tar entry {}: {}",
-                path.display(),
-                error
-            )
-        })?;
+        let unpacked = entry
+            .unpack_in(destination)
+            .map_err(|error| snapshot_unpack_error(&path, error))?;
         if !unpacked {
             return Err(format!(
                 "snapshot tar entry {} escaped extraction root",
@@ -1192,6 +1198,18 @@ mod tests {
             crate::runtime::boundary_snapshot_test_slot()
         );
         assert!(loaded.bank.verify_snapshot_bank());
+    }
+
+    #[test]
+    fn snapshot_unpack_diagnostic_preserves_nested_os_error() {
+        let error = std::io::Error::new(
+            std::io::ErrorKind::Other,
+            std::io::Error::from_raw_os_error(28),
+        );
+        let message = snapshot_unpack_error(Path::new("accounts/7.1"), error);
+        assert!(message.contains("accounts/7.1"));
+        assert!(message.contains("28"));
+        assert!(message.contains("No space left on device"));
     }
 
     #[test]
