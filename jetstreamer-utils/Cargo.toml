@@ -113,6 +113,10 @@ name = "jetstreamer-epoch144-snapshot-download"
 path = "src/epoch144_snapshot_download_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch223-bootstrap-prepare"
+path = "src/epoch223_bootstrap_prepare_bin.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-boundary-bridge"
 path = "src/horizon_boundary_bridge_bin.rs"
 
