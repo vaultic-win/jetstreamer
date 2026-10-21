@@ -54,6 +54,34 @@ schedule, and derive a new predecessor chain. The helper additionally fences
 against a newer full campaign ledger, but that fence is not permission to race
 two operators or to leave an obsolete resource timer armed.
 
+For the exact existing dev-samjohnson epoch157 deployment, an optional
+`epoch157_terminal_handoff` manifest binding allows the already-sealed parent to
+advance from its v1.5.6 terminal68,140,176 to its v1.5.8 terminal68,255,999.
+This is an ETA-model transition only, not runtime qualification, replay launch,
+restart or publication authority. The exact immutable preflight report path and
+SHA-256 are allowlisted; no other epoch, runtime or deployment is accepted.
+The original predecessor model and estimate bindings remain intact. The derived
+model moves the115,823 queued slots into the successor terminal, leaving zero
+additional slots, the same invocation identities, authoritative producer-start
+clock and43,200-second downstream allowance. No remaining replay is discarded.
+Only a clean global-slot rate window and one stable worker across the physical
+scans can consume the transition. A window crossing the known boundary includes
+handoff latency; transaction/update counter resets do not change its slot rate.
+The accumulated slot delta must exactly match the global first/last difference,
+and the rate must reproduce that delta divided by elapsed time. Slot resets,
+worker races, changed owners and unknown terminals fail closed without status
+publication or an extra resource poll. The successor helper retains a pending
+binding and drops it only after an authenticated completed cycle has consumed it.
+The estimator and R2 writer keep their independent checks. Deploying this source
+still requires a new seal, exact-package checks and a separately armed cycle;
+existing running producers and already-armed cycles are not modified.
+The offline `--prepare-next-terminal157` mode adds this exact binding to the
+next plan only after checking the genuine completed predecessor and immutable
+manifest; it does not arm timers or deploy anything. Later successors use the
+ordinary `--prepare-next` mode. Use the new qualified executable for both the
+handoff-enabled cycle and its successor preparation; older strict readers reject
+the new optional field instead of silently ignoring it.
+
 A failed preflight writes nothing. A failure after the intent writes a private
 failure record and may leave some statuses freshly published; preserve every
 receipt and inspect the exact stage. There is no automatic retry or interval

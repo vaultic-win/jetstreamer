@@ -25,6 +25,9 @@ const BUCKET: &str = "solana-archive-with-accounts-data";
 #[path = "routine_next.rs"]
 mod next_preparation;
 
+#[path = "routine_terminal.rs"]
+mod terminal_handoff;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -64,6 +67,8 @@ struct Plan {
     additional_gate_evidence: BTreeMap<String, Vec<Bound>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     scope_101_200: Option<Scope101200>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    epoch157_terminal_handoff: Option<Bound>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -1100,6 +1105,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     let estimates = bound_json(&p.previous_estimates, false)?;
     let old_observer = bound_json(&p.previous_observer, false)?;
     validate_templates(p, &model, &fleet, &previous, &estimates, &old_observer)?;
+    terminal_handoff::preflight(p, &model)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1164,6 +1170,9 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         sha256: sha(&bytes),
     };
     let observed: Value = serde_json::from_slice(&bytes)?;
+    // Keep the genuine predecessor intact. Only an explicitly qualified,
+    // manifest-bound runtime transition may change the next derived model.
+    let model = terminal_handoff::for_observation(p, &model, &observed)?;
     validate_observation(
         p,
         &model,
@@ -1382,10 +1391,13 @@ fn main() {
         ensure!(
             (args.len() == 6
                 || (args.len() == 7
-                    && matches!(args[6].as_str(), "--check-only" | "--prepare-next")))
+                    && matches!(
+                        args[6].as_str(),
+                        "--check-only" | "--prepare-next" | "--prepare-next-terminal157"
+                    )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
-            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next]"
+            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157]"
         );
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -1400,8 +1412,16 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
-        if args.get(6).map(String::as_str) == Some("--prepare-next") {
-            return next_preparation::prepare(&plan, &bound, &args[5]);
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--prepare-next" || arg == "--prepare-next-terminal157")
+        {
+            return next_preparation::prepare(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--prepare-next-terminal157",
+            );
         }
         execute(&plan, &bound, &args[5], args.len() == 7)
     })();
@@ -1788,7 +1808,7 @@ mod tests {
         assert!(utc_seconds("2026-10-20T10:34:42.0Z").is_err());
     }
 
-    fn fixture101() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
+    pub(super) fn fixture101() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
         let (mut p, mut model, mut fleet, mut prior, est, old, mut config, mut observer) =
             fixture();
         p.schema = PLAN_SCHEMA_101.into();
