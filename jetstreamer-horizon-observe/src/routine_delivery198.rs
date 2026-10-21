@@ -1088,6 +1088,13 @@ fn validate_publication(p: &Plan, observer: &Bound, plan: &Bound, r: &Value) -> 
 }
 
 pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
+    if c.get("public198_promotion").is_some() {
+        ensure!(public198::promoted(p, c)?, "foreign198 partial promotion");
+        return Ok(());
+    }
+    if p.public198_delivery.is_some() {
+        return public198::validate_completed(p, c);
+    }
     if p.epoch198_delivery.is_none() {
         ensure!(c["epoch198_delivery"].is_null(), "unexpected198 completion");
         return Ok(());
@@ -1646,7 +1653,7 @@ mod tests {
         }
         let parent = include_str!("routine_cycle.rs");
         let body = parent
-            .split("let pipeline = delivery198::publish")
+            .split("delivery198::publish(p, &model, &fleet, &observer)")
             .nth(1)
             .unwrap();
         assert!(body.contains("child-fleet.json"));

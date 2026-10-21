@@ -428,6 +428,13 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             .context("first epoch missing")?,
         fleet["last_epoch"].as_u64().context("last epoch missing")?,
     )?;
+    if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
+        ensure!(
+            fleet::watch198::child_start(&plan.binding.claim_phase, &current[&plan.binding.unit])?
+                .is_some(),
+            "198 watcher has no actual epoch child"
+        );
+    }
     ensure!(
         plan.binding.live_matches(&current[&plan.binding.unit]),
         "pipeline invocation or exact command is not live"
@@ -537,7 +544,12 @@ pub(super) async fn run() -> Result<()> {
         &plan.binding.origin_unit,
         &plan.binding.origin_invocation_id,
     )?;
-    let phase_start = manager_start(&plan.binding.unit, &plan.binding.invocation_id)?;
+    let phase_start = if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
+        fleet::watch198::child_start(&plan.binding.claim_phase, &fleet::unit(&plan.binding.unit)?)?
+            .context("198 verification child ended")?
+    } else {
+        manager_start(&plan.binding.unit, &plan.binding.invocation_id)?
+    };
     let sample_ms = fleet::utc_seconds(&sample)?
         .checked_mul(1000)
         .context("sample time overflow")?;

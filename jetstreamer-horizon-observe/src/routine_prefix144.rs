@@ -31,6 +31,9 @@ struct Spec {
     r2_mutations: bool,
 }
 pub(super) fn writer(p: &Plan) -> bool {
+    if p.public198_delivery.is_some() && public198::writer(p) {
+        return p.completed144_prefix.is_some();
+    }
     (p.prefix144_audit.is_some() || p.completed144_prefix.is_some())
         && ((p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA)
             || (p.epoch198_delivery.is_some()

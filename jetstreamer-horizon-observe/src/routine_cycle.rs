@@ -32,6 +32,8 @@ mod terminal_handoff;
 mod delivery198;
 #[path = "routine_delivery198_recover.rs"]
 mod delivery198_recover;
+#[path = "routine_public198.rs"]
+mod public198;
 
 #[path = "routine_private144.rs"]
 mod private144;
@@ -92,6 +94,8 @@ struct Plan {
     epoch157_terminal_handoff: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     epoch198_delivery: Option<delivery198::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    public198_delivery: Option<public198::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     package_controller_recovery: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -184,7 +188,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if p.completed144_prefix.is_some() && p.epoch198_delivery.is_some() {
+    if p.public198_delivery.is_some() {
+        "public198-completed144-v1"
+    } else if p.completed144_prefix.is_some() && p.epoch198_delivery.is_some() {
         "delivery198-completed144-v1"
     } else if p.completed144_prefix.is_some() {
         "completed144-v1"
@@ -1012,6 +1018,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     }
     apply_known_action_corrections(p, &mut fleet)?;
     delivery198::derive_fleet(p, &mut fleet)?;
+    public198::derive_fleet(p, &mut fleet)?;
     runtime157::derive_fleet(p, &mut fleet)?;
     prefix157::derive_fleet(p, &mut fleet)?;
     prefix144::derive_fleet(p, &mut fleet)?;
@@ -1437,7 +1444,11 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
                 sha256: sha(&bytes),
             });
         }
-        let pipeline = delivery198::publish(p, &model, &fleet, &observer)?;
+        let pipeline = if p.public198_delivery.is_some() {
+            public198::publish(p, &fleet, &observer)?
+        } else {
+            delivery198::publish(p, &model, &fleet, &observer)?
+        };
         let parent = p.fleet_output.parent().context("fleet parent missing")?;
         if !parent.exists() {
             private_dir(parent.parent().context("fleet ancestor missing")?)?;
@@ -1515,6 +1526,7 @@ fn main() {
                         args[6].as_str(),
                         "--check-only"
                             | "--recover-delivery198"
+                            | "--promote-partial2018"
                             | "--prepare-next"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
@@ -1538,6 +1550,12 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--promote-partial2018")
+        {
+            return public198::promote(&plan, &bound, &args[5]);
+        }
         if args
             .get(6)
             .is_some_and(|arg| arg == "--recover-delivery198")

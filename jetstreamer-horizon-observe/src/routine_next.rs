@@ -37,8 +37,9 @@ fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()> {
             && c["estimates"]["path"].as_str() == p.estimate_output.to_str()
             && c["model"]["path"].as_str()
                 == p.cycle_directory.join("sealed/eta-model.json").to_str()
-            && c["fleet_plan"]["path"].as_str()
-                == p.cycle_directory.join("sealed/fleet-plan.json").to_str(),
+            && (c["fleet_plan"]["path"].as_str()
+                == p.cycle_directory.join("sealed/fleet-plan.json").to_str()
+                || public198::promoted(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [
@@ -276,7 +277,12 @@ pub(super) fn prepare(
     let config = bound_json(&p.observer_config, true)?;
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
-    delivery198::consume_recovery(&mut next)?;
+    if completion.get("public198_promotion").is_some() {
+        public198::consume(&mut next, &completion)?;
+        public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    } else {
+        delivery198::consume_recovery(&mut next)?;
+    }
     let model = bound_json(&next.model_template, true)?;
     controller_recovery::consume(&mut next, &model)?;
     if enable_terminal157 {
