@@ -87,3 +87,35 @@ ceilings, not proof of memory or I/O admission. No production plugin, canonical
 import, sidecar, upload, or local retirement follows from this private check.
 Never replace a running metadata coordinator's pinned R2 binary to introduce
 this profile; qualify and seal a new future deployment instead.
+
+## Separately pinned capped-shrink attempt
+
+The observational launch schema
+`jetstreamer-private-epoch225-shrink-natural-root-resource-launch-v1` pins the
+same complete-span parent `945f36fe…` with capped-shrink worker `2dcc9b84…`.
+It requires a distinct `horizon-qualify-225-natural-root-resource-shrink-budget-`
+unit and `qualification-225-v1625-natural-root-shrink-budget-` private root.
+The older launch schema still accepts only its original worker; neither schema
+can borrow the other's worker binding or the bounded target-stop receipt.
+
+All three checkpoints, the natural terminal root, 863,465-slot coverage, private
+226 tail, seven-day limit, exact invocation, and denied publication authorities
+remain unchanged. The independent qualification reader recognizes this exact
+worker only under the new private root prefix and still verifies the complete
+archive, segment provenance, canonical bootstrap/terminal roots and upstream
+revision. Reader acceptance and fleet recognition are not runtime promotion or
+replay admission. Fresh complete resource admission, immutable package attestation,
+exact-package capability, a real sandboxed guard first fire and a new terminal
+outcome are required before proceeding. The older producer's terminal or verifier
+launch receipt must not be reused for a new invocation. Do not update any running
+producer, guard, uploader or metadata coordinator in place.
+
+Package attestation uses the existing century-floor-bound v3 plan with only the
+fixed new package path
+`/var/lib/jetstreamer/horizon-focused-225-complete-span-v1-6-25-shrink-budget-v1`
+and receipt prefix `epoch225-complete-span-v1-6-25-immutable-package-shrink-budget-`.
+That path selects only worker `2dcc9b84…`; the original path still selects only
+worker `7cd48efc…`. Both require the unchanged full-span parent `945f36fe…`, exact
+snapshot/checkpoint bytes, complete sealed member census, distinct snapshot inode,
+century floor, and no preclaimed capability or launch authority. The bounded
+parent `3915f578…` remains ineligible for either full-span package.

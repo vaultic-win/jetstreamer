@@ -325,8 +325,17 @@ fn complete_span_225(arguments: &Arguments) -> bool {
         && arguments.expected_bootstrap_slot == 97_199_617
         && arguments.expected_terminal_slot == 98_063_464
         && arguments.expected_runtime_profile == "solana-v1.6.25"
-        && arguments.expected_worker_sha256
+        && (arguments.expected_worker_sha256
             == "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"
+            || (arguments.expected_worker_sha256
+                == "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd"
+                && arguments
+                    .private_root
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| {
+                        name.starts_with("qualification-225-v1625-natural-root-shrink-budget-")
+                    })))
 }
 
 fn retained_prefix_157(arguments: &Arguments) -> bool {
@@ -886,6 +895,38 @@ mod tests {
             assert!(validate_archive_name(&args, &args.archive).is_err());
         }
         assert!(validate_archive_name(&args, Path::new("/private/epoch-225.jet")).is_err());
+    }
+
+    #[test]
+    fn capped_shrink_complete_span_225_stays_private_and_exact() {
+        let root = "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-test";
+        let mut args = parse_arguments(complete_span_225_arguments()).unwrap();
+        args.private_root = root.into();
+        args.archive = args.private_root.join("output/epoch-225.jet");
+        args.expected_worker_sha256 =
+            "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd".into();
+        assert!(complete_span_225(&args));
+        validate_archive_name(&args, &args.archive).unwrap();
+        validate_complete_span_225_roots(
+            &args,
+            "HE57JmgvEeZjBKN8cfTLrmyCbUnptJ9PWjUdTzgxSSdi",
+            "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR",
+            "7de8a55b54d3e11058b82f9483bb405d143b455c",
+        )
+        .unwrap();
+        args.expected_terminal_slot = 97_631_459;
+        assert!(!complete_span_225(&args));
+        assert!(validate_archive_name(&args, &args.archive).is_err());
+        args.expected_terminal_slot = 98_063_464;
+        args.expected_worker_sha256 = "a".repeat(64);
+        assert!(!complete_span_225(&args));
+        args.expected_worker_sha256 =
+            "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd".into();
+        args.private_root =
+            "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-test".into();
+        args.archive = args.private_root.join("output/epoch-225.jet");
+        assert!(!complete_span_225(&args));
+        assert!(validate_archive_name(&args, &args.archive).is_err());
     }
 
     #[test]
