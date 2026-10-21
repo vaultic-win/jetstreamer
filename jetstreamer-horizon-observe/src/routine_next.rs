@@ -234,16 +234,26 @@ fn validate_status(s: &Value, p: &Plan, observer: &Bound, estimate: &Value) -> R
     Ok(())
 }
 
-pub(super) fn prepare(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
+pub(super) fn prepare(
+    p: &Plan,
+    pb: &Bound,
+    self_sha: &str,
+    enable_terminal157: bool,
+) -> Result<()> {
     // No new service/remote observations. Consume only root-private accepted
     // cycle artifacts; the later normal --check-only gate remains mandatory.
     let completion_path = p.cycle_directory.join("completion.json");
     let bytes = read_checked(&completion_path, LIMIT, 0, false)?;
     let completion: Value = serde_json::from_slice(&bytes)?;
     let config = bound_json(&p.observer_config, true)?;
-    let (next, next_config, observer_package, cycle_package) =
+    let (mut next, next_config, observer_package, cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     let model = bound_json(&next.model_template, true)?;
+    if enable_terminal157 {
+        terminal_handoff::enable(&mut next, &model)?;
+    }
+    terminal_handoff::consume(&mut next, &model)?;
+    terminal_handoff::preflight(&next, &model)?;
     let fleet_plan = bound_json(&next.fleet_template, true)?;
     validate_folded_scope(p, &fleet_plan)?;
     let fleet = bound_json(&next.previous_fleet, false)?;

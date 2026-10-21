@@ -48,6 +48,8 @@ const ANCHOR: &str = "HpCoYsom9ZgNNAyCG9Ct72GyQaSdeUpeQKPJ5sKNSCRG";
 const CUT_HASH: &str = "8yiPTGWeYzuWFQc68fvKdG6Mp16XJTAqxGUtjMdHMFij";
 const PROTECTED: u64 = 4_740_696_923_590;
 const MAX_SLOT_WRITES: usize = 4_000_000;
+const LEGACY_RUNTIME_SECONDS: u64 = 21_600;
+const MAX_RUNTIME_SECONDS: u64 = 86_400;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -70,6 +72,53 @@ struct Plan {
     output: PathBuf,
     minimum_free_bytes: u64,
     minimum_available_memory_bytes: u64,
+    #[serde(default, deserialize_with = "provided_runtime")]
+    maximum_runtime_seconds: Option<u64>,
+}
+
+fn provided_runtime<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<u64>, D::Error> {
+    // Distinguish an absent legacy field from explicit null or non-integers.
+    u64::deserialize(deserializer).map(Some)
+}
+
+fn plan_runtime(plan: &Plan) -> Result<Duration> {
+    ensure!(
+        plan.unit.starts_with("horizon-epoch140-prefix-audit-")
+            && plan.unit.ends_with(".service")
+            && plan
+                .unit
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+            && plan.minimum_free_bytes >= PROTECTED
+            && plan.minimum_available_memory_bytes >= 384 * 1024u64.pow(3),
+        "wrong audit plan scope/bounds"
+    );
+    let seconds = match (plan.schema.as_str(), plan.maximum_runtime_seconds) {
+        ("jetstreamer-epoch140-private-prefix-audit-plan-v1", None) => LEGACY_RUNTIME_SECONDS,
+        ("jetstreamer-epoch140-private-prefix-audit-plan-v2", Some(seconds)) => {
+            ensure!(
+                (LEGACY_RUNTIME_SECONDS..=MAX_RUNTIME_SECONDS).contains(&seconds)
+                    && plan
+                        .unit
+                        .starts_with("horizon-epoch140-prefix-audit-runtime-")
+                    && plan
+                        .output
+                        .parent()
+                        .and_then(Path::file_name)
+                        .and_then(|p| p.to_str())
+                        == plan
+                            .unit
+                            .strip_prefix("horizon-")
+                            .and_then(|u| u.strip_suffix(".service")),
+                "v2 audit requires a bounded runtime and matching distinct unit/output namespace"
+            );
+            seconds
+        }
+        _ => anyhow::bail!("wrong audit runtime profile; v1 cannot override its six-hour bound"),
+    };
+    Ok(Duration::from_secs(seconds))
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -524,6 +573,23 @@ struct Guard {
     started: Instant,
     last: Instant,
     floor: u64,
+    runtime: Duration,
+}
+fn check_runtime(elapsed: Duration, limit: Duration) -> std::io::Result<()> {
+    if elapsed > limit {
+        return Err(std::io::Error::other(format!(
+            "private prefix audit runtime guard tripped: elapsed {elapsed:?}, limit {limit:?}"
+        )));
+    }
+    Ok(())
+}
+fn check_reserve(free: u64, floor: u64) -> std::io::Result<()> {
+    if free < floor {
+        return Err(std::io::Error::other(format!(
+            "private prefix audit reserve guard tripped: available {free} bytes, floor {floor} bytes"
+        )));
+    }
+    Ok(())
 }
 impl Guard {
     fn check(&mut self) -> std::io::Result<()> {
@@ -531,14 +597,11 @@ impl Guard {
             return Ok(());
         }
         self.last = Instant::now();
-        if self.started.elapsed() > Duration::from_secs(21_600)
-            || available(Path::new("/home/sol")).map_err(std::io::Error::other)? < self.floor
-        {
-            return Err(std::io::Error::other(
-                "private prefix audit reserve/runtime guard tripped",
-            ));
-        }
-        Ok(())
+        check_runtime(self.started.elapsed(), self.runtime)?;
+        check_reserve(
+            available(Path::new("/home/sol")).map_err(std::io::Error::other)?,
+            self.floor,
+        )
     }
 }
 struct Guarded {
@@ -704,18 +767,7 @@ fn run(args: &[String]) -> Result<()> {
         fs::symlink_metadata(&args[0])?.mode() & 0o077 == 0,
         "audit plan must be owner-only"
     );
-    ensure!(
-        plan.schema == "jetstreamer-epoch140-private-prefix-audit-plan-v1"
-            && plan.unit.starts_with("horizon-epoch140-prefix-audit-")
-            && plan.unit.ends_with(".service")
-            && plan
-                .unit
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
-            && plan.minimum_free_bytes >= PROTECTED
-            && plan.minimum_available_memory_bytes >= 384 * 1024u64.pow(3),
-        "wrong audit plan scope/bounds"
-    );
+    let runtime = plan_runtime(&plan)?;
     let (boot, cut) = validate_profile(
         &evidence(&plan.full, FULL_SHA)?,
         &evidence(&plan.anchored, ANCHORED_SHA)?,
@@ -776,7 +828,8 @@ fn run(args: &[String]) -> Result<()> {
     drop(reader);
     if args.len() == 6 {
         println!(
-            "exact prefix profile, source identity and admission bindings passed; no whole hash, decode, output or mutation"
+            "exact prefix profile, source identity and admission bindings passed; runtime_seconds={}; no whole hash, decode, output or mutation",
+            runtime.as_secs()
         );
         return Ok(());
     }
@@ -788,6 +841,7 @@ fn run(args: &[String]) -> Result<()> {
             started,
             last: Instant::now() - Duration::from_secs(2),
             floor: plan.minimum_free_bytes,
+            runtime,
         },
     };
     eprintln!("epoch140 selected-prefix audit phase=whole-source-hash-before");
@@ -851,6 +905,7 @@ fn run(args: &[String]) -> Result<()> {
         &plan.output,
         &json!({"schema":"jetstreamer-epoch140-private-selected-prefix-audit-v1","epoch":140,
         "unit":plan.unit,"invocation_id":invocation,"self_sha256":args[4],"plan_sha256":args[2],
+        "plan_schema":plan.schema,"maximum_runtime_seconds":runtime.as_secs(),
         "source":{"path":SOURCE,"sha256":SOURCE_SHA,"identity":identity(&source.file.metadata()?),
             "original_declared_slot_count":432000,"whole_hash_verified_before_and_after":true,
             "provenance":{"version":2,"generation_profile":provenance.base.generation_profile,
@@ -889,6 +944,112 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn runtime_fixture(schema: &str, seconds: Option<u64>) -> Value {
+        let bound = || json!({"path":"/unchanged-evidence","sha256":"0".repeat(64)});
+        let mut value = json!({
+            "schema":schema,
+            "unit":"horizon-epoch140-prefix-audit-runtime-test.service",
+            "full":bound(),"anchored":bound(),"bootstrap":bound(),
+            "checkpoint":bound(),"edge":bound(),"native":bound(),
+            "output":"/home/sol/.jetstreamer-private/epoch140-prefix-audit-runtime-test/prefix-audit.json",
+            "minimum_free_bytes":PROTECTED,
+            "minimum_available_memory_bytes":384 * 1024u64.pow(3)
+        });
+        if let Some(seconds) = seconds {
+            value["maximum_runtime_seconds"] = json!(seconds);
+        }
+        value
+    }
+
+    #[test]
+    fn legacy_runtime_remains_fixed_and_rejects_overrides() {
+        let schema = "jetstreamer-epoch140-private-prefix-audit-plan-v1";
+        let plan: Plan = serde_json::from_value(runtime_fixture(schema, None)).unwrap();
+        assert_eq!(plan_runtime(&plan).unwrap(), Duration::from_secs(21_600));
+        for seconds in [21_600, 86_400, u64::MAX] {
+            let plan: Plan =
+                serde_json::from_value(runtime_fixture(schema, Some(seconds))).unwrap();
+            assert!(plan_runtime(&plan).is_err());
+        }
+    }
+
+    #[test]
+    fn explicit_runtime_is_bounded_and_requires_its_new_profile_namespace() {
+        let schema = "jetstreamer-epoch140-private-prefix-audit-plan-v2";
+        for seconds in [21_600, 43_200, 86_400] {
+            let plan: Plan =
+                serde_json::from_value(runtime_fixture(schema, Some(seconds))).unwrap();
+            assert_eq!(plan_runtime(&plan).unwrap(), Duration::from_secs(seconds));
+        }
+        for seconds in [0, 21_599, 86_401, u64::MAX] {
+            let plan: Plan =
+                serde_json::from_value(runtime_fixture(schema, Some(seconds))).unwrap();
+            assert!(plan_runtime(&plan).is_err());
+        }
+        let plan: Plan = serde_json::from_value(runtime_fixture(schema, None)).unwrap();
+        assert!(plan_runtime(&plan).is_err());
+        let mut value = runtime_fixture(schema, Some(86_400));
+        value["unit"] = json!("horizon-epoch140-prefix-audit-reuse-test.service");
+        let plan: Plan = serde_json::from_value(value).unwrap();
+        assert!(plan_runtime(&plan).is_err());
+    }
+
+    #[test]
+    fn runtime_profile_never_weakens_disk_memory_or_unit_bounds() {
+        let original = runtime_fixture(
+            "jetstreamer-epoch140-private-prefix-audit-plan-v2",
+            Some(86_400),
+        );
+        for (field, value) in [
+            ("minimum_free_bytes", json!(PROTECTED - 1)),
+            (
+                "minimum_available_memory_bytes",
+                json!(384 * 1024u64.pow(3) - 1),
+            ),
+            (
+                "unit",
+                json!("horizon-epoch140-prefix-audit-runtime-test.service;other"),
+            ),
+            (
+                "output",
+                json!(
+                    "/home/sol/.jetstreamer-private/epoch140-prefix-audit-reuse-test/prefix-audit.json"
+                ),
+            ),
+            ("schema", json!("unqualified-profile")),
+        ] {
+            let mut bad = original.clone();
+            bad[field] = value;
+            let plan: Plan = serde_json::from_value(bad).unwrap();
+            assert!(plan_runtime(&plan).is_err(), "accepted weakened {field}");
+        }
+        for value in [Value::Null, json!("86400"), json!(-1), json!(86_400.5)] {
+            let mut bad = original.clone();
+            bad["maximum_runtime_seconds"] = value;
+            assert!(serde_json::from_value::<Plan>(bad).is_err());
+        }
+    }
+
+    #[test]
+    fn runtime_and_reserve_guards_have_distinct_exact_diagnostics() {
+        let limit = Duration::from_secs(21_600);
+        check_runtime(limit, limit).unwrap();
+        let runtime = check_runtime(limit + Duration::from_millis(1), limit)
+            .unwrap_err()
+            .to_string();
+        assert!(runtime.contains("runtime guard tripped"));
+        assert!(runtime.contains("21600.001s") && runtime.contains("21600s"));
+        assert!(!runtime.contains("reserve"));
+        check_reserve(PROTECTED, PROTECTED).unwrap();
+        let reserve = check_reserve(PROTECTED - 1, PROTECTED)
+            .unwrap_err()
+            .to_string();
+        assert!(reserve.contains("reserve guard tripped"));
+        assert!(reserve.contains(&(PROTECTED - 1).to_string()));
+        assert!(reserve.contains(&PROTECTED.to_string()));
+        assert!(!reserve.contains("runtime"));
+    }
 
     #[test]
     fn selected_cut_keeps_all_phases_and_ignores_later_frames_in_its_bucket() {
