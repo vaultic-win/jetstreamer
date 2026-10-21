@@ -1838,6 +1838,16 @@ pub(super) async fn run() -> Result<()> {
                     "live pipeline overlaps an ordinary replay claim"
                 );
             }
+            if claim.epoch == 198 && !finalization["importer"].is_null() {
+                let importer = &finalization["importer"];
+                ensure!(
+                    before.get(super::cohort198_handoff::IMPORTER) == Some(importer),
+                    "198 importer not bound to complete fleet census"
+                );
+                active.push(json!({"epoch":198,"phase":"local-publication","unit":importer,
+                    "owning_controller":current,"sampled_at_utc":sample,"evidence":entry["evidence"],
+                    "ordinary_replay_claim":false,"current_sidecar_eta_valid":false}));
+            }
             active.push(entry.clone());
         }
         pipelines.push(entry);

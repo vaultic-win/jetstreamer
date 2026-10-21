@@ -16,6 +16,48 @@ const ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singlet
 const RECOVERY: &str =
     "/usr/local/lib/jetstreamer/horizon-package-controller-first-fire-20261021-v1/first-fire.json";
 const RECOVERY_SHA: &str = "baad8fedb7ae8ab271da2c34850b54f626b907424eeb6c9669947b7d6dce3444";
+pub(super) const IMPORTER: &str =
+    "jetstreamer-root-import-e198-readerfix-20261019-v1-r2-e198-198-2.service";
+const IMPORT_IID: &str = "526647ab03104a1fb8f14303819d6cda";
+const SOURCE_RECEIPT: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/private/destination-bfa4ff91eb1803c6a2d6240f014cc6508bb805e8bddd619ff64ab57cde1c5ed9/evidence/archive-batches/destination-000000000000fc00-0000000005dd0043/batch-68f31b6384a5d2299937e32ab47a799a993ad8a1c53f1e0b012ef9b8e5b2f047.json";
+fn importer_command() -> String {
+    format!(
+        "{{ path=/usr/local/lib/jetstreamer/deploy-epoch198-readerfix-singleton-20261019-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/deploy-epoch198-readerfix-singleton-20261019-v1/jetstreamer-node 198 /home/sol/horizon --verify --recover-staged-cohort-only --cohort-manifest=/usr/local/lib/jetstreamer/deploy-epoch198-readerfix-singleton-20261019-v1/preflight-198-singleton-v4.json --cohort-manifest-fingerprint=sha256:2ac1c3bbb1d030f1bd1e8d7d19770e97d82153e9355d0bc18ca65ad9291b3d3b --source-cohort-receipt={SOURCE_RECEIPT} --publish-through-epoch=198"
+    )
+}
+fn importing(state: &Value, importer: &Value) -> Result<()> {
+    let a = &state["assignments"]["lane-a"];
+    for (key, value) in [
+        ("Id", IMPORTER),
+        ("InvocationID", IMPORT_IID),
+        ("MainPID", "3182197"),
+        ("LoadState", "loaded"),
+        ("ActiveState", "active"),
+        ("SubState", "running"),
+        ("NRestarts", "0"),
+        ("Type", "exec"),
+    ] {
+        ensure!(importer[key] == value, "198 actual importer differs:{key}");
+    }
+    let command = importer_command();
+    ensure!(
+        importer["ExecStart"]
+            .as_str()
+            .and_then(|s| s.split_once(" ; ignore_errors="))
+            .map(|(s, _)| s)
+            == Some(command.as_str())
+            && state["import_owner"] == "lane-a"
+            && a["phase"] == "importing"
+            && a["import_unit"] == IMPORTER
+            && a["receipt"] == SOURCE_RECEIPT
+            && a["source_evidence"]["receipt_sha256"]
+                == "a1734902c86c333be889f3da731da662308b542fa2c72e2e63da566f941cd226"
+            && a["source_evidence"]["members"]
+                == json!([{"epoch":198,"archive_sha256":"4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb"}]),
+        "198 importer command/source/owner differs"
+    );
+    Ok(())
+}
 
 pub(super) fn binding_matches(
     unit: &str,
@@ -110,10 +152,19 @@ fn manager_terminal(record: &Value) -> Result<()> {
     );
     Ok(())
 }
+#[cfg(test)]
 fn pending_state_with_manager(
     state: &Value,
     producer: &Value,
     manager: Option<&Value>,
+) -> Result<()> {
+    owned_state(state, producer, manager, None)
+}
+fn owned_state(
+    state: &Value,
+    producer: &Value,
+    manager: Option<&Value>,
+    importer: Option<&Value>,
 ) -> Result<()> {
     let collected = producer["LoadState"] == "not-found";
     if collected {
@@ -142,10 +193,17 @@ fn pending_state_with_manager(
         "198producer remains live or is not cleanly terminal"
     );
     let a = &state["assignments"]["lane-a"];
+    if let Some(importer) = importer {
+        importing(state, importer)?;
+    }
     ensure!(
         state["schema"] == "jetstreamer-adaptive-root-cohort-sweep-v3"
             && state["configuration_sha256"] == CONFIG
-            && state["import_owner"].is_null()
+            && (if importer.is_some() {
+                state["import_owner"] == "lane-a"
+            } else {
+                state["import_owner"].is_null()
+            })
             && state["assignments"]
                 .as_object()
                 .is_some_and(|a| a.len() == 1)
@@ -155,10 +213,18 @@ fn pending_state_with_manager(
             && a["unit"] == cohort198_finalization::UNIT
             && a["pid"] == 1165606
             && a["pid_start_time"] == 79845173
-            && matches!(a["phase"].as_str(), Some("producer" | "staged"))
+            && (if importer.is_some() {
+                a["phase"] == "importing"
+            } else {
+                matches!(a["phase"].as_str(), Some("producer" | "staged"))
+            })
             && a["source_recovery"] != true
             && a["failure"].is_null()
-            && a["import_unit"].is_null(),
+            && (if importer.is_some() {
+                a["import_unit"] == IMPORTER
+            } else {
+                a["import_unit"].is_null()
+            }),
         "198controller is not holding exact pending import; inspect actual importer/repair instead"
     );
     Ok(())
@@ -213,7 +279,27 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
     } else {
         None
     };
-    pending_state_with_manager(&state, &producer, manager.as_ref())?;
+    let importer = if state["assignments"]["lane-a"]["phase"] == "importing" {
+        Some(fleet::unit(IMPORTER)?)
+    } else {
+        None
+    };
+    owned_state(&state, &producer, manager.as_ref(), importer.as_ref())?;
+    let source_receipt = if importer.is_some() {
+        let bytes = read_stable_bounded(
+            Path::new(SOURCE_RECEIPT),
+            1 << 20,
+            "198 committed source receipt",
+        )?;
+        ensure!(
+            hex_lower(&Sha256::digest(&bytes))
+                == "a1734902c86c333be889f3da731da662308b542fa2c72e2e63da566f941cd226",
+            "198 source receipt changed"
+        );
+        Some(hex_lower(&Sha256::digest(&bytes)))
+    } else {
+        None
+    };
     let mut events = cohort198_finalization::journal_events(sampled_seconds)?;
     if let Some(manager) = &manager {
         let time = manager["__REALTIME_TIMESTAMP"]
@@ -244,6 +330,11 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
     ensure!(
         fleet::unit(CONTROLLER)? == *current
             && fleet::unit(cohort198_finalization::UNIT)? == producer
+            && (if let Some(importer) = &importer {
+                fleet::unit(IMPORTER)? == *importer
+            } else {
+                true
+            })
             && state_bytes()? == bytes
             && regular_identity(path)? == archive
             && fs::symlink_metadata(path)?.ctime() == m.ctime()
@@ -253,6 +344,8 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
     events["schema"] = json!("jetstreamer-epoch198-controller-import-handoff-v1");
     events["producer"] = producer;
     events["producer_terminal_manager"] = json!(manager);
+    events["importer"] = json!(importer);
+    events["source_receipt_sha256"] = json!(source_receipt);
     events["controller_state"] = state;
     events["controller_state_sha256"] = json!(hex_lower(&Sha256::digest(&bytes)));
     events["controller_sha256"] = json!(SCRIPT_SHA);
@@ -268,6 +361,48 @@ pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_importer_requires_exact_owner_command_source_and_state() {
+        let (mut state, producer) = fixture();
+        state["import_owner"] = json!("lane-a");
+        let a = &mut state["assignments"]["lane-a"];
+        a["phase"] = json!("importing");
+        a["import_unit"] = json!(IMPORTER);
+        a["receipt"] = json!(SOURCE_RECEIPT);
+        a["source_evidence"] = json!({"receipt_sha256":"a1734902c86c333be889f3da731da662308b542fa2c72e2e63da566f941cd226","members":[{"epoch":198,"archive_sha256":"4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb"}]});
+        let importer = json!({"Id":IMPORTER,"InvocationID":IMPORT_IID,"MainPID":"3182197","LoadState":"loaded","ActiveState":"active","SubState":"running","NRestarts":"0","Type":"exec","ExecStart":format!("{} ; ignore_errors=no }}", importer_command())});
+        assert!(pending_state(&state, &producer).is_err());
+        owned_state(&state, &producer, None, Some(&importer)).unwrap();
+        for key in [
+            "Id",
+            "InvocationID",
+            "MainPID",
+            "ActiveState",
+            "SubState",
+            "NRestarts",
+            "ExecStart",
+        ] {
+            let mut bad = importer.clone();
+            bad[key] = json!("changed");
+            assert!(
+                owned_state(&state, &producer, None, Some(&bad)).is_err(),
+                "{key}"
+            );
+        }
+        for pointer in [
+            "/import_owner",
+            "/assignments/lane-a/phase",
+            "/assignments/lane-a/import_unit",
+            "/assignments/lane-a/source_evidence/receipt_sha256",
+        ] {
+            let mut bad = state.clone();
+            *bad.pointer_mut(pointer).unwrap() = json!("changed");
+            assert!(
+                owned_state(&bad, &producer, None, Some(&importer)).is_err(),
+                "{pointer}"
+            );
+        }
+    }
     #[test]
     #[ignore = "requires root and exact retained198 deployment; preflight only, no terminal event or handoff claimed"]
     fn host_controller_preflight_denies_terminal_or_publication_claims() {
