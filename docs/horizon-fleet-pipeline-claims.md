@@ -48,6 +48,15 @@ transition consumes both exact, invocation-bound native launch receipts while
 preserving original producer elapsed time and the original downstream deadline.
 It does not launch workers, reset the ETA allowance, or authorize R2 publication.
 
+A sample taken before a replacement verifier starts cannot support that
+replacement's status, even if the sample is otherwise fresh. Wait for the next
+genuine coordinated sample; never backdate the phase or weaken the publisher's
+manager-start check. After a manager reload resets only displayed runtime
+annotations in `ExecStart`, preserve the original launch receipt and qualify a
+separate metadata correction binding the unchanged invocation, PID, executable
+arguments and non-ignored errors. This correction is not a new launch and does
+not reset either clock.
+
 The narrowly qualified `producer-finalization` phase covers only the exact
 sealed 216–219 v5 producer and its original invocation. It authenticates the
 immutable parent digest and requires the original user's journal events for

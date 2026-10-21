@@ -249,6 +249,13 @@ fn event_scope(
     );
     Ok(())
 }
+fn event_phase_clock(launched: u64, sampled: u64) -> Result<()> {
+    ensure!(
+        launched <= sampled,
+        "replacement phase postdates coordinated sample; wait for next genuine sample, never backdate status"
+    );
+    Ok(())
+}
 pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -> Result<()> {
     ensure!(is_101(p)?, "foreign native198 campaign");
     event_scope(
@@ -292,6 +299,20 @@ pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -
     let mut fleet = bound_json(&source, true)?;
     let mut event: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     enable_native(&mut event, spec)?;
+    for launch in &event
+        .public198_delivery
+        .as_ref()
+        .context("event profile")?
+        .native_verification
+    {
+        let proof = bound_json(launch, false)?;
+        event_phase_clock(
+            proof["recorded_unix_seconds"]
+                .as_u64()
+                .context("launch clock")?,
+            seconds,
+        )?;
+    }
     derive_fleet(&event, &mut fleet)?;
     event.cycle_directory = p.cycle_directory.join(if refreshed {
         "native198-status-event-v2"
@@ -769,6 +790,12 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn handoff_event_waits_for_genuine_post_launch_sample_before_any_remote_stage() {
+        assert!(event_phase_clock(1_792_618_274, 1_792_618_080).is_err());
+        event_phase_clock(1_792_618_274, 1_792_619_880).unwrap();
+        assert!(event_phase_clock(u64::MAX, 1_792_619_880).is_err());
+    }
     #[test]
     fn manager_refresh_allows_only_reset_runtime_annotations_not_command_changes() {
         let before = "{ path=/immutable/runner ; argv[]=/immutable/runner /plan sha selfsha ; ignore_errors=no ; start_time=[Wed] ; pid=123 ; code=(null) ; status=0/0 }";
