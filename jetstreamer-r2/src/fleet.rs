@@ -15,6 +15,7 @@ mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
 mod snapshot144;
+pub(crate) mod watch198;
 
 pub(super) fn prepare_private_prefix157() -> Result<()> {
     private157::prepare()
@@ -202,6 +203,9 @@ pub(super) fn pipeline_unit_range(
     phase: &str,
     unit: &str,
 ) -> Result<std::ops::RangeInclusive<u64>> {
+    if watch198::namespace(phase, unit) {
+        return Ok(198..=198);
+    }
     if phase == "producer-finalization" {
         return super::cohort_finalization::scope(unit);
     }
@@ -355,6 +359,10 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
                     .is_some_and(|pid| pid > 0),
             "pipeline live identity or exact command changed"
         );
+        if watch198::namespace(&claim.phase, &claim.unit) {
+            ensure!(claim.epoch == 198, "legacy watcher profile is198 only");
+            return Ok(watch198::child_start(&claim.phase, current)?.is_some());
+        }
     }
     Ok(live)
 }

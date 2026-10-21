@@ -245,8 +245,11 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["_UID"] == "0"
                 && r["MESSAGE"].as_str().is_some_and(|s| {
                     s.starts_with("Starting ")
-                        || (unit == super::cohort_finalization::CONTROLLER
-                            && invocation == super::cohort_finalization::CONTROLLER_INVOCATION
+                        || (((unit == super::cohort_finalization::CONTROLLER
+                            && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
+                            || (unit == super::cohort198_handoff::CONTROLLER
+                                && invocation == super::cohort198_handoff::CONTROLLER_INVOCATION
+                                && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"))
                             && s.starts_with("Started "))
                 })
         })
@@ -425,6 +428,13 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             .context("first epoch missing")?,
         fleet["last_epoch"].as_u64().context("last epoch missing")?,
     )?;
+    if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
+        ensure!(
+            fleet::watch198::child_start(&plan.binding.claim_phase, &current[&plan.binding.unit])?
+                .is_some(),
+            "198 watcher has no actual epoch child"
+        );
+    }
     ensure!(
         plan.binding.live_matches(&current[&plan.binding.unit]),
         "pipeline invocation or exact command is not live"
@@ -534,7 +544,12 @@ pub(super) async fn run() -> Result<()> {
         &plan.binding.origin_unit,
         &plan.binding.origin_invocation_id,
     )?;
-    let phase_start = manager_start(&plan.binding.unit, &plan.binding.invocation_id)?;
+    let phase_start = if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
+        fleet::watch198::child_start(&plan.binding.claim_phase, &fleet::unit(&plan.binding.unit)?)?
+            .context("198 verification child ended")?
+    } else {
+        manager_start(&plan.binding.unit, &plan.binding.invocation_id)?
+    };
     let sample_ms = fleet::utc_seconds(&sample)?
         .checked_mul(1000)
         .context("sample time overflow")?;
@@ -610,6 +625,22 @@ pub(super) async fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn exact198_recovered_controller_started_event_keeps_real_clock() {
+        let unit = super::super::cohort198_handoff::CONTROLLER;
+        let invocation = super::super::cohort198_handoff::CONTROLLER_INVOCATION;
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started exact198 controller.","__REALTIME_TIMESTAMP":"1792592033958341"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1792592033958
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("foreign");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
     use serde_json::json;
     fn directory_plan() -> Plan {
         let mut b = binding();

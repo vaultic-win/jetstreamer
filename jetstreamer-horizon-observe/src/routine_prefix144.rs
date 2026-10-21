@@ -8,6 +8,10 @@ pub(super) const DELIVERY_WRITER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch198-skipped-tail-reader-20261021-v3/jetstreamer-r2";
 pub(super) const DELIVERY_WRITER_SHA: &str =
     "992d06b9f4b76bd4beecfd9be9572f780131e0c57e1f5618aebaf9fb362dc398";
+pub(super) const RECOVERY_WRITER: &str =
+    "/usr/local/lib/jetstreamer/horizon-epoch198-start-clock-reader-20261021-v1/jetstreamer-r2";
+pub(super) const RECOVERY_WRITER_SHA: &str =
+    "f67c0a9e9390400e79c9b6f1f37969225a92cfeceafa8fde28e8c68ffeea26c6";
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -27,11 +31,16 @@ struct Spec {
     r2_mutations: bool,
 }
 pub(super) fn writer(p: &Plan) -> bool {
+    if p.public198_delivery.is_some() && public198::writer(p) {
+        return p.completed144_prefix.is_some();
+    }
     (p.prefix144_audit.is_some() || p.completed144_prefix.is_some())
         && ((p.tools.r2.path == Path::new(WRITER) && p.tools.r2.sha256 == WRITER_SHA)
             || (p.epoch198_delivery.is_some()
-                && p.tools.r2.path == Path::new(DELIVERY_WRITER)
-                && p.tools.r2.sha256 == DELIVERY_WRITER_SHA))
+                && ((p.tools.r2.path == Path::new(DELIVERY_WRITER)
+                    && p.tools.r2.sha256 == DELIVERY_WRITER_SHA)
+                    || (p.tools.r2.path == Path::new(RECOVERY_WRITER)
+                        && p.tools.r2.sha256 == RECOVERY_WRITER_SHA))))
 }
 pub(super) fn validate(p: &Plan) -> Result<()> {
     let Some(profile) = &p.prefix144_audit else {

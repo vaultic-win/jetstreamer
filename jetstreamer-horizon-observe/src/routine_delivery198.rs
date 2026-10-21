@@ -112,6 +112,10 @@ pub(super) fn consume_recovery(p: &mut Plan) -> Result<()> {
             "198 delayed recovery successor differs"
         );
         p.epoch198_delivery.as_mut().unwrap().delayed_recovery = false;
+        p.tools.r2 = Bound {
+            path: prefix144::RECOVERY_WRITER.into(),
+            sha256: prefix144::RECOVERY_WRITER_SHA.into(),
+        };
     }
     Ok(())
 }
@@ -572,6 +576,11 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
     if p.prefix144_audit.is_some() || p.completed144_prefix.is_some() {
+        if p.tools.r2.path == Path::new(prefix144::RECOVERY_WRITER)
+            && p.tools.r2.sha256 == prefix144::RECOVERY_WRITER_SHA
+        {
+            return (prefix144::RECOVERY_WRITER, prefix144::RECOVERY_WRITER_SHA);
+        }
         return (prefix144::DELIVERY_WRITER, prefix144::DELIVERY_WRITER_SHA);
     }
     if p.prefix157_audit.is_some() {
@@ -888,7 +897,7 @@ pub(super) fn namespaces(
     Ok(())
 }
 
-fn seal_values(p: &Plan, name: &str, values: &[(&str, Value)]) -> Result<PathBuf> {
+pub(super) fn seal_values(p: &Plan, name: &str, values: &[(&str, Value)]) -> Result<PathBuf> {
     let stage = p.cycle_directory.join(name);
     fs::create_dir(&stage)?;
     fs::set_permissions(&stage, fs::Permissions::from_mode(0o700))?;
@@ -1079,17 +1088,44 @@ fn validate_publication(p: &Plan, observer: &Bound, plan: &Bound, r: &Value) -> 
 }
 
 pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
+    if c.get("public198_promotion").is_some() {
+        ensure!(public198::promoted(p, c)?, "foreign198 partial promotion");
+        return Ok(());
+    }
+    if p.public198_delivery.is_some() {
+        return public198::validate_completed(p, c);
+    }
     if p.epoch198_delivery.is_none() {
         ensure!(c["epoch198_delivery"].is_null(), "unexpected198 completion");
         return Ok(());
     }
     let d = &c["epoch198_delivery"];
+    let recovered = !c["recovery_intent"].is_null();
+    if recovered {
+        let intent: Bound = serde_json::from_value(c["recovery_intent"].clone())?;
+        ensure!(
+            intent.path == p.cycle_directory.join("metadata-recovery-v1/intent.json"),
+            "foreign198 recovery intent"
+        );
+        let value = bound_json(&intent, false)?;
+        ensure!(
+            value["schema"] == "jetstreamer-epoch198-metadata-recovery-intent-v1"
+                && value["plan"]["sha256"]
+                    == "5820b69150677bd27c3a2dc18d8d101332c556b3e3078bd37281d409ee7e4014"
+                && value["new_resource_samples"] == 0
+                && value["archive_mutations"] == false,
+            "198 recovery intent differs"
+        );
+    }
     let observer: Bound = serde_json::from_value(c["observer"].clone())?;
     let plan: Bound = serde_json::from_value(d["pipeline_plan"].clone())?;
     ensure!(
         plan.path
-            == p.cycle_directory
-                .join("delivery198-status/sealed/pipeline-plan.json"),
+            == p.cycle_directory.join(if recovered {
+                "metadata-recovery-v1/status/sealed/pipeline-plan.json"
+            } else {
+                "delivery198-status/sealed/pipeline-plan.json"
+            }),
         "foreign198 pipeline plan"
     );
     let value = bound_json(&plan, true)?;
@@ -1109,7 +1145,12 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     validate_publication(p, &observer, &plan, &r)?;
     let fleet: Bound = serde_json::from_value(d["provisional_fleet"].clone())?;
     ensure!(
-        fleet.path == p.cycle_directory.join("delivery198-provisional-fleet.json")
+        fleet.path
+            == p.cycle_directory.join(if recovered {
+                "metadata-recovery-v1/provisional-fleet.json"
+            } else {
+                "delivery198-provisional-fleet.json"
+            })
             && value["fleet"]["sha256"] == fleet.sha256
             && value["fleet"]["path"].as_str() == fleet.path.to_str(),
         "198 provisional fleet binding differs"
@@ -1612,7 +1653,7 @@ mod tests {
         }
         let parent = include_str!("routine_cycle.rs");
         let body = parent
-            .split("let pipeline = delivery198::publish")
+            .split("delivery198::publish(p, &model, &fleet, &observer)")
             .nth(1)
             .unwrap();
         assert!(body.contains("child-fleet.json"));
