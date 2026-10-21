@@ -143,7 +143,7 @@ The plan binds only schema `horizon-failed-prefix220-recovery-plan-v1`, paths
 be least-privilege immutable deployment copies, but their exact original SHA-256
 values remain compiled in. Do not loosen the original private evidence tree's
 permissions. The validation receipt must be
-`/home/ubuntu/.jetstreamer-private/failed-prefix220-recovery-v1/validation.json`.
+`/home/ubuntu/.jetstreamer-private/failed-prefix220-recovery-mountfix-v2/validation.json`.
 Execute as original UID 1000 with the default shared epoch leases, an owner-only
 receipt directory, and the exact original immutable v1.6.20 worker configured.
 
@@ -171,6 +171,20 @@ run**: it still owns partial 223 and original failure evidence. Import success
 does not prove current-plugin or authenticated R2 completion; dispatch those
 ordinary per-epoch gates afterward. Preserve interrupted batch recovery state;
 do not blindly restart the importer.
+
+The first attempt's durable validation receipt and failure remain preserved under
+`failed-prefix220-recovery-v1`; its publication was `NotCommitted` because the
+sandbox placed source and destination on separate bind mounts. Equal filesystem
+device numbers do not prove cross-mount rename support. The updated preflight
+must call the real publication capability probe (private temporary entries only)
+before any expensive archive reread, exercising both cross-directory
+`RENAME_NOREPLACE` and `RENAME_EXCHANGE` in the actual sandbox. Qualify failure in
+the old split-bind layout and success in the corrected common-mount layout.
+Use one writable common ancestor mount for source/destination and read-only or
+inaccessible bindings for disjoint healthy replay trees and sensitive config;
+do not create distinct writable source/destination bind mounts again. The new
+attempt gets its own validation-receipt directory and never overwrites the old
+receipt. All full reread, checkpoint and transactional publication gates remain.
 
 ## Native independently gated delivery
 
