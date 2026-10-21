@@ -129,7 +129,7 @@ struct Replay {
 }
 
 #[derive(Debug, Deserialize)]
-struct Unit {
+pub(crate) struct Unit {
     #[serde(default)]
     unit: String,
     invocation_id: String,
@@ -196,7 +196,7 @@ struct Mutations {
 }
 
 #[derive(Debug, Serialize)]
-struct ProducerStartProof {
+pub(crate) struct ProducerStartProof {
     range: String,
     unit: String,
     before: BTreeMap<String, String>,
@@ -341,7 +341,11 @@ fn parse_start(bytes: &[u8]) -> Result<u64> {
     Ok(start)
 }
 
-fn producer_start_proof(range: &str, unit: &Unit, sample: &str) -> Result<ProducerStartProof> {
+pub(crate) fn producer_start_proof(
+    range: &str,
+    unit: &Unit,
+    sample: &str,
+) -> Result<ProducerStartProof> {
     ensure!(
         unit.unit.ends_with(".service")
             && unit

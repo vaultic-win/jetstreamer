@@ -6635,6 +6635,7 @@ struct AuditedArchiveRecovery {
     worker_path: &'static str,
     worker_sha256: [u8; 32],
     runtime_descriptor: &'static compatibility::RuntimeDescriptor,
+    bootstrap_state_kind: BootstrapStateKind,
     bootstrap_slot: Slot,
     bootstrap_hash: &'static str,
     requested_slot_start: Slot,
@@ -6665,6 +6666,7 @@ jetstreamer-historical-worker-v1-0-8",
             0x8f, 0x47, 0x4b, 0xb4,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_0_8_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 2_908_740,
         bootstrap_hash: "AYUia12SdC6EnauaynZJna2Pf3WNcmmFhpUJU6XritdT",
         requested_slot_start: 3_024_000,
@@ -6688,6 +6690,7 @@ jetstreamer-historical-worker-v1-0-13",
             0x0a, 0x61, 0x07, 0x0a,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_0_13_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 3_455_940,
         bootstrap_hash: "aCgGdj7tmTZQPF118GKxe7hn7yBv7MgVdn7dWL1Qcbw",
         requested_slot_start: 3_456_000,
@@ -6711,6 +6714,7 @@ jetstreamer-historical-worker-v1-0-14",
             0x6b, 0xf4, 0xa9, 0x4c,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_0_14_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 3_887_911,
         bootstrap_hash: "BsYGwLpE5NBbehe1utx657A1b9vsT4nJ9scKbff1awbN",
         requested_slot_start: 3_888_000,
@@ -6736,6 +6740,7 @@ jetstreamer-historical-worker-v1-0-14",
             0x6b, 0xf4, 0xa9, 0x4c,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_0_14_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 4_319_880,
         bootstrap_hash: "9wnXMY186BWwsUq7QjURqasDGKY4bG6mm5R4rCJD6ar",
         requested_slot_start: 4_320_000,
@@ -6759,6 +6764,7 @@ jetstreamer-historical-worker-v1-0-14",
             0x92, 0xa4, 0xb9, 0x96,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_0_14_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 4_751_796,
         bootstrap_hash: "6vJ22rwAfXfr4hFUJ7AtLupR6LHWBWX114AhKJqPYejb",
         requested_slot_start: 4_752_000,
@@ -6782,6 +6788,7 @@ jetstreamer-historical-worker-v1-0-23",
             0x2b, 0x31, 0x8b, 0xed,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_0_23_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 8_639_740,
         bootstrap_hash: "6Mqw6TTrvCHZDyfovexiLB5yiyeYnWsFXtnxn4yST8g6",
         requested_slot_start: 8_640_000,
@@ -6805,9 +6812,79 @@ jetstreamer-historical-worker-v1-5-6",
             0xcf, 0xaa, 0xbd, 0xb1,
         ],
         runtime_descriptor: &compatibility::SOLANA_V1_5_6_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
         bootstrap_slot: 65_231_862,
         bootstrap_hash: "3a597JjJKXJWaxCy5yEqhNwZBFsB8GDx7XMw17ectXQr",
         requested_slot_start: 65_232_000,
+        requested_slot_count: 432_000,
+        transaction_metadata: TransactionMetadataPolicy::observed(),
+    },
+    AuditedArchiveRecovery {
+        epoch: 220,
+        generation_profile: "jetstreamer-node/0.8.1/old-faithful-to-horizon-v2@9d8e964b8adbfb6c417590fddc87fc915d056a4e",
+        archive_bytes: 135699623364,
+        archive_sha256: [
+            0x24, 0x51, 0x8c, 0xa4, 0xb5, 0x5e, 0x7e, 0x4c, 0x86, 0x12, 0x26, 0x9f, 0xa9, 0x90,
+            0x38, 0x36, 0xe8, 0x38, 0x69, 0xda, 0xef, 0xb5, 0xc0, 0xc1, 0xef, 0xb7, 0x6b, 0x91,
+            0xee, 0xbb, 0x56, 0xc7,
+        ],
+        worker_path: "/var/lib/jetstreamer/horizon-contiguous-220-223-current-9d8e964-v1/jetstreamer-historical-worker-v1-6-20",
+        worker_sha256: [
+            0xf3, 0x91, 0x40, 0xb9, 0xa9, 0x65, 0x9e, 0x7c, 0x6e, 0x82, 0x07, 0x07, 0x6a, 0x2d,
+            0x0c, 0x56, 0x0a, 0x6b, 0x69, 0xdf, 0x42, 0xcc, 0x92, 0xe1, 0x9a, 0x42, 0x1c, 0xf4,
+            0x6c, 0x2b, 0x76, 0x1c,
+        ],
+        runtime_descriptor: &compatibility::SOLANA_V1_6_20_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
+        bootstrap_slot: 95039516,
+        bootstrap_hash: "9TaEWfKXJYo2a5UYx3HuE72aGa8FVXJzHCVzQjvF6HDG",
+        requested_slot_start: 95040000,
+        requested_slot_count: 432_000,
+        transaction_metadata: TransactionMetadataPolicy::observed(),
+    },
+    AuditedArchiveRecovery {
+        epoch: 221,
+        generation_profile: "jetstreamer-node/0.8.1/old-faithful-to-horizon-v2@9d8e964b8adbfb6c417590fddc87fc915d056a4e",
+        archive_bytes: 137055363091,
+        archive_sha256: [
+            0xd7, 0x72, 0xaa, 0x74, 0x4d, 0x5b, 0x79, 0x73, 0x65, 0x33, 0x26, 0xd4, 0xa3, 0xf0,
+            0x4f, 0x1d, 0x40, 0x60, 0x77, 0x6a, 0xcf, 0xf4, 0x0d, 0xf2, 0xb2, 0xcf, 0xf5, 0x7c,
+            0xcc, 0x1b, 0x26, 0xcd,
+        ],
+        worker_path: "/var/lib/jetstreamer/horizon-contiguous-220-223-current-9d8e964-v1/jetstreamer-historical-worker-v1-6-20",
+        worker_sha256: [
+            0xf3, 0x91, 0x40, 0xb9, 0xa9, 0x65, 0x9e, 0x7c, 0x6e, 0x82, 0x07, 0x07, 0x6a, 0x2d,
+            0x0c, 0x56, 0x0a, 0x6b, 0x69, 0xdf, 0x42, 0xcc, 0x92, 0xe1, 0x9a, 0x42, 0x1c, 0xf4,
+            0x6c, 0x2b, 0x76, 0x1c,
+        ],
+        runtime_descriptor: &compatibility::SOLANA_V1_6_20_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::CarriedBank,
+        bootstrap_slot: 95471999,
+        bootstrap_hash: "LfC96iH3fqBxWc7fotM15r6ncfAUfS6XQiTSiwdMJKw",
+        requested_slot_start: 95472000,
+        requested_slot_count: 432_000,
+        transaction_metadata: TransactionMetadataPolicy::observed(),
+    },
+    AuditedArchiveRecovery {
+        epoch: 222,
+        generation_profile: "jetstreamer-node/0.8.1/old-faithful-to-horizon-v2@9d8e964b8adbfb6c417590fddc87fc915d056a4e",
+        archive_bytes: 133175903649,
+        archive_sha256: [
+            0xb3, 0xdc, 0x28, 0xfd, 0x20, 0x6d, 0xe1, 0x62, 0xb4, 0x7f, 0x90, 0x63, 0x83, 0x48,
+            0xd4, 0x14, 0xe7, 0x70, 0x8c, 0x9f, 0x2b, 0x36, 0x87, 0x3d, 0xe1, 0x0e, 0x4d, 0x62,
+            0x14, 0x2f, 0x7a, 0x3a,
+        ],
+        worker_path: "/var/lib/jetstreamer/horizon-contiguous-220-223-current-9d8e964-v1/jetstreamer-historical-worker-v1-6-20",
+        worker_sha256: [
+            0xf3, 0x91, 0x40, 0xb9, 0xa9, 0x65, 0x9e, 0x7c, 0x6e, 0x82, 0x07, 0x07, 0x6a, 0x2d,
+            0x0c, 0x56, 0x0a, 0x6b, 0x69, 0xdf, 0x42, 0xcc, 0x92, 0xe1, 0x9a, 0x42, 0x1c, 0xf4,
+            0x6c, 0x2b, 0x76, 0x1c,
+        ],
+        runtime_descriptor: &compatibility::SOLANA_V1_6_20_RUNTIME,
+        bootstrap_state_kind: BootstrapStateKind::CarriedBank,
+        bootstrap_slot: 95903999,
+        bootstrap_hash: "CfwzRyUuQEoMjCB5Df2Sc6uKmRpC8wHeBpTSkuhh61ja",
+        requested_slot_start: 95904000,
         requested_slot_count: 432_000,
         transaction_metadata: TransactionMetadataPolicy::observed(),
     },
@@ -6872,7 +6949,7 @@ fn audited_archive_recovery_provenance_matches(
             == compatibility::MAINNET_GENESIS_HASH
                 .parse::<Hash>()
                 .expect("compiled mainnet genesis hash is valid")
-        && provenance.base.bootstrap_state_kind == BootstrapStateKind::SnapshotArchive
+        && provenance.base.bootstrap_state_kind == recovery.bootstrap_state_kind
         && provenance.base.bootstrap_slot == recovery.bootstrap_slot
         && provenance.base.bootstrap_state_hash == bootstrap_hash
         && provenance.base.requested_slot_start == recovery.requested_slot_start
@@ -18887,6 +18964,28 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    if matches!(
+        probe_args.first().map(String::as_str),
+        Some("--failed-prefix220-recover" | "--failed-prefix220-recovery-preflight")
+    ) {
+        if probe_args.len() != 4 {
+            eprintln!("--failed-prefix220-recover PLAN PLAN_SHA256 SELF_SHA256");
+            exit(2);
+        }
+        match failed_prefix220::recover(
+            Path::new(&probe_args[1]),
+            &probe_args[2],
+            &probe_args[3],
+            probe_args[0] == "--failed-prefix220-recovery-preflight",
+        ) {
+            Ok(result) => println!("{result}"),
+            Err(error) => {
+                eprintln!("failed-prefix recovery failed: {error}");
+                exit(1);
+            }
+        }
+        return;
+    }
     if let Some(epoch) = probe_args
         .first()
         .and_then(|arg| arg.strip_prefix("--failed-prefix220-artifact-probe="))
@@ -22823,7 +22922,7 @@ mod early_snapshot_tests {
         let mut provenance = build_archive_provenance(
             selection,
             Some(recovery.worker_sha256),
-            BootstrapStateKind::SnapshotArchive,
+            recovery.bootstrap_state_kind,
             recovery.bootstrap_slot,
             recovery.bootstrap_hash.parse().unwrap(),
             output_start,
@@ -22903,7 +23002,10 @@ mod early_snapshot_tests {
                 changed.base.genesis_hash = Hash::new_unique()
             });
             assert_audited_archive_provenance_mutation_rejected(recovery, &provenance, |changed| {
-                changed.base.bootstrap_state_kind = BootstrapStateKind::CarriedBank
+                changed.base.bootstrap_state_kind = match recovery.bootstrap_state_kind {
+                    BootstrapStateKind::SnapshotArchive => BootstrapStateKind::CarriedBank,
+                    _ => BootstrapStateKind::SnapshotArchive,
+                }
             });
             assert_audited_archive_provenance_mutation_rejected(recovery, &provenance, |changed| {
                 changed.base.bootstrap_slot += 1
