@@ -67,12 +67,12 @@ mod cohort_finalization;
 mod fleet;
 mod inactive_status;
 mod pipeline_status;
-mod transport_probe;
 mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
 mod resource_verify;
 mod status_inactive;
+mod transport_probe;
 
 #[derive(Debug)]
 struct Config {

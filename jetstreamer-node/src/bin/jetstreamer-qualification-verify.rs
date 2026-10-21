@@ -329,6 +329,24 @@ fn complete_span_225(arguments: &Arguments) -> bool {
             == "7cd48efc8719109a69fafcb3209a821ea9f07113e3fb0bfab49db23a6e77a146"
 }
 
+fn retained_prefix_157(arguments: &Arguments) -> bool {
+    arguments.private_root
+        == Path::new(
+            "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-j/output/.epoch-157.jet.runtime-segments",
+        )
+        && arguments.archive
+            == arguments
+                .private_root
+                .join("epoch-157.segment-00-67824000-68140177.jet")
+        && arguments.expected_epoch == 157
+        && arguments.expected_output_start_slot == 67_824_000
+        && arguments.expected_bootstrap_slot == 67_823_809
+        && arguments.expected_terminal_slot == 68_140_176
+        && arguments.expected_runtime_profile == "solana-v1.5.6"
+        && arguments.expected_worker_sha256
+            == "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819"
+}
+
 fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), String> {
     let expected_name = format!(
         "epoch-{}-through-{}.jet",
@@ -336,7 +354,9 @@ fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), St
     );
     if archive.file_name().and_then(|name| name.to_str()) != Some(expected_name.as_str())
         && !(archive == arguments.archive
-            && (root_prefix_203(arguments) || complete_span_225(arguments)))
+            && (root_prefix_203(arguments)
+                || complete_span_225(arguments)
+                || retained_prefix_157(arguments)))
     {
         return Err(format!(
             "qualification archive filename must be {expected_name}: {}",
@@ -884,6 +904,38 @@ mod tests {
                 validate_complete_span_225_roots(&args, bootstrap, terminal, revision).is_err()
             );
         }
+    }
+
+    #[test]
+    fn retained157_segment_keeps_exact_path_runtime_and_slot_bindings() {
+        let private_root = PathBuf::from(
+            "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-j/output/.epoch-157.jet.runtime-segments",
+        );
+        let args = Arguments {
+            archive: private_root.join("epoch-157.segment-00-67824000-68140177.jet"),
+            private_root,
+            receipt: None,
+            expected_epoch: 157,
+            expected_output_start_slot: 67824000,
+            expected_bootstrap_slot: 67823809,
+            expected_terminal_slot: 68140176,
+            expected_runtime_profile: "solana-v1.5.6".into(),
+            expected_worker_sha256:
+                "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819".into(),
+            expected_conflict: None,
+        };
+        assert!(retained_prefix_157(&args));
+        validate_archive_name(&args, &args.archive).unwrap();
+        let mut bad = args;
+        bad.expected_terminal_slot = 68255999;
+        assert!(!retained_prefix_157(&bad));
+        assert!(validate_archive_name(&bad, &bad.archive).is_err());
+        bad.expected_terminal_slot = 68140176;
+        bad.expected_output_start_slot = 67823810;
+        assert!(validate_archive_name(&bad, &bad.archive).is_err());
+        bad.expected_output_start_slot = 67824000;
+        bad.expected_worker_sha256 = "f".repeat(64);
+        assert!(validate_archive_name(&bad, &bad.archive).is_err());
     }
 
     #[test]

@@ -11939,6 +11939,26 @@ async fn run_geyser_replay(
                         Some(historical_replay::HistoricalCheckpointSummary::try_from(
                             &checkpoint,
                         )?)
+                    } else if let Some(manifest) = bootstrap_handoff_manifest.as_ref() {
+                        // Snapshot account hashes alone do not establish a
+                        // native cross-runtime restart. Freeze this very worker
+                        // before its first entry and compare the complete
+                        // predecessor tuple without equating local cursors.
+                        let checkpoint =
+                            client.freeze_checkpoint(slot).map_err(|e| e.to_string())?;
+                        let actual =
+                            historical_replay::HistoricalCheckpointSummary::try_from(&checkpoint)?;
+                        validate_native_runtime_handoff_checkpoint(
+                            &manifest.terminal,
+                            &segment_checkpoint_summary(&actual),
+                        )?;
+                        info!(
+                            "verified native runtime handoff checkpoint at slot {slot} before accepting replay entries; bootstrap writes=0"
+                        );
+                        // Keep the normal snapshot constructor: it independently
+                        // consumes the bootstrap commitment and preserves every
+                        // future canonical root. This is never carried state.
+                        None
                     } else {
                         None
                     };
@@ -14432,6 +14452,28 @@ fn handoff_snapshot_matches_predecessor(
         && manifest.terminal == predecessor.manifest.terminal
 }
 
+fn validate_native_runtime_handoff_checkpoint(
+    expected: &SegmentCheckpointSummary,
+    actual: &SegmentCheckpointSummary,
+) -> Result<(), String> {
+    if expected.slot != actual.slot
+        || expected.bank_hash != actual.bank_hash
+        || expected.accounts_hash != actual.accounts_hash
+        || expected.last_blockhash != actual.last_blockhash
+        || expected.capitalization != actual.capitalization
+        || expected.transaction_count != actual.transaction_count
+        || expected.tick_height != actual.tick_height
+        || !expected.slot_complete
+        || !actual.slot_complete
+        || actual.write_count != 0
+    {
+        return Err("native runtime handoff checkpoint differs from the verified predecessor, is incomplete, or emitted bootstrap writes".into());
+    }
+    // Snapshot restoration creates an independent validator-local write cursor.
+    // Do not force its equality with the predecessor's cursor or drained writes.
+    Ok(())
+}
+
 fn validate_canonical_handoff_snapshot_with_expectation(
     path: &Path,
     handoff: &compatibility::RuntimeHandoff,
@@ -15222,6 +15264,25 @@ fn publish_verified_runtime_assembly(
 /// Runs and assembles every runtime span inside one epoch. Segment archives
 /// and manifests remain in a private adjacent directory until the complete V3
 /// output is verified and atomically published, so interruption is resumable.
+fn validate_runtime_segment_terminal_checkpoints(
+    spans: &[compatibility::RuntimeSpan],
+    expected: &BTreeMap<Slot, BankHashExpectation>,
+) -> Result<(), String> {
+    for (index, span) in spans.iter().enumerate() {
+        let terminal = span
+            .slots
+            .end
+            .checked_sub(1)
+            .ok_or_else(|| "empty runtime segment".to_string())?;
+        if !expected.contains_key(&terminal) {
+            return Err(format!(
+                "runtime segment {index} requires the exact canonical terminal checkpoint at slot {terminal} before any segment replay or retained-archive reread; a nearby root cannot satisfy the focused qualification gate"
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_multi_runtime_epoch_supervisor(
     epoch: u64,
@@ -15295,6 +15356,14 @@ async fn run_multi_runtime_epoch_supervisor(
             epoch_hashes.display()
         ));
     }
+    // Every child uses focused qualification. Prove *all* of those exact
+    // terminal gates now, rather than spending days on an earlier segment and
+    // only then discovering a later span cannot start. This does not invent a
+    // terminal commitment or relax the child's independent checkpoint check.
+    let first_selection = runtime_span_selection(&spans[0])?;
+    let mut expected = read_epoch_hashes_file(epoch_hashes, first_selection.descriptor.bootstrap)?;
+    add_runtime_handoff_expectations(epoch_start..epoch_end.saturating_add(1), &mut expected)?;
+    validate_runtime_segment_terminal_checkpoints(&spans, &expected)?;
     fs::create_dir_all(&work_dir)
         .map_err(|err| format!("failed to create {}: {err}", work_dir.display()))?;
     let work_metadata = fs::symlink_metadata(&work_dir)
@@ -24135,6 +24204,83 @@ mod early_snapshot_tests {
                 .unwrap_err()
                 .contains("does not match the canonical checkpoint")
         );
+    }
+
+    #[test]
+    fn epoch157_nearby_root_cannot_admit_a_later_focused_segment() {
+        let spans = compatibility::plan_runtime_spans(67_824_000..68_256_000, true).unwrap();
+        assert_eq!(spans.len(), 2);
+        let mut expected = BTreeMap::from([
+            (
+                68_140_176,
+                BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+            ),
+            (
+                68_255_828,
+                BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+            ),
+        ]);
+        let error = validate_runtime_segment_terminal_checkpoints(&spans, &expected).unwrap_err();
+        assert!(
+            error.contains("runtime segment 1") && error.contains("68255999"),
+            "{error}"
+        );
+        // A test-only terminal commitment proves coverage arithmetic only; no
+        // operational checkpoint is derived or authorized by this fixture.
+        expected.insert(
+            68_255_999,
+            BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+        );
+        validate_runtime_segment_terminal_checkpoints(&spans, &expected).unwrap();
+        expected.remove(&68_140_176);
+        assert!(
+            validate_runtime_segment_terminal_checkpoints(&spans, &expected)
+                .unwrap_err()
+                .contains("runtime segment 0")
+        );
+    }
+
+    #[test]
+    fn native157_handoff_checks_full_consensus_tuple_but_not_local_cursor() {
+        let expected = SegmentCheckpointSummary {
+            slot: 68140176,
+            bank_hash: "649PT4VUyy3e9uHjsBKrJedSk8VW5YLhmMrXGdazPWb1".into(),
+            accounts_hash: "3TNSv7MXDB4GxhyRyHJcuBNeXaumYC8W8vu5WrwCXhhZ".into(),
+            last_blockhash: "FofVk6WLPqkgXGPQuTryL7wgxs9emSiTiPoczRb1NagB".into(),
+            capitalization: 490287533276355794,
+            transaction_count: 13041831150,
+            tick_height: 4360971328,
+            slot_complete: true,
+            write_count: 43,
+            next_write_version: 45611752025,
+        };
+        let mut actual = expected.clone();
+        actual.write_count = 0;
+        actual.next_write_version = u64::MAX;
+        validate_native_runtime_handoff_checkpoint(&expected, &actual).unwrap();
+        for field in [
+            "slot",
+            "bank_hash",
+            "accounts_hash",
+            "last_blockhash",
+            "capitalization",
+            "transaction_count",
+            "tick_height",
+            "slot_complete",
+            "write_count",
+        ] {
+            let mut bad = serde_json::to_value(&actual).unwrap();
+            bad[field] = match field {
+                "bank_hash" | "accounts_hash" | "last_blockhash" => serde_json::json!("wrong"),
+                "slot_complete" => serde_json::json!(false),
+                _ => serde_json::json!(1),
+            };
+            let bad = serde_json::from_value(bad).unwrap();
+            assert!(
+                validate_native_runtime_handoff_checkpoint(&expected, &bad).is_err(),
+                "accepted {field}"
+            );
+        }
     }
 
     #[test]

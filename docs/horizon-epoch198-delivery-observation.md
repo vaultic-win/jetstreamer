@@ -124,3 +124,27 @@ transition are separately qualified. The actual serialized importer remains a
 different dynamically authenticated `local-publication` phase, never a guessed
 future invocation. No new replay, importer launch, archive mutation, sidecar,
 upload, status deletion or R2 mutation is authorized by this observation command.
+# Routine pending-controller integration
+
+The routine handoff spec may name either a fresh producer-finalization proof or
+the separately pinned epoch-198 pending-controller proof. The latter binds the
+post-package-update controller, clean retained original producer, exact pending
+state/command and closed lane-a output archive. It never borrows another host's
+216–219 owner or invents a future importer invocation.
+
+A forward transition from an accepted finalization profile preserves its original
+replay publication/observer and elapsed clock. It binds both old and new proofs,
+requires identical canonical terminal events and close length, and replaces only
+the exact prior pipeline claim. Only that fresh forward proof permits offline
+preparation to consume the old completed cycle without requiring the obsolete
+private archive path to remain present. Ordinary execution still requires the
+current stage's exact archive and live ownership checks. The provisional fleet,
+pipeline publication and final fleet use the pending controller with status phase
+`publication`, not a live producer or replay countdown. The existing close-based
+43,200-second downstream deadline is neither restarted nor extended at handoff.
+
+When epoch157's verification-pause profile is also present, retain its qualified
+superset reader/publisher; do not downgrade to a writer that cannot retain157 in
+the full fleet. Source/tests alone do not activate either stage: fresh actual
+proof, sealed helper and plans, check-only qualification and normal timer
+handoff remain required. An active importer is a separate authenticated route.

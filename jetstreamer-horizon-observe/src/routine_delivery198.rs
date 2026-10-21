@@ -11,6 +11,11 @@ const PUBLISHER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-pipeline-re
 const PUBLISHER_SHA: &str = "c047afcd2d7a282bf394e29625aea1da7ca136d4aca7461e7ae2aaf54234e4c4";
 const STATUS: &str = "/home/sol/.jetstreamer-private/r2-status-receipts";
 const ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/private/destination-bfa4ff91eb1803c6a2d6240f014cc6508bb805e8bddd619ff64ab57cde1c5ed9/work/root-cohort-198-198/run-1165606-1792451794035486537/archives/epoch-198.jet";
+pub(super) const HANDOFF_WRITER: &str = "/usr/local/lib/jetstreamer/horizon-epoch198-controller-handoff-candidate-20261021-v1/jetstreamer-r2";
+pub(super) const HANDOFF_WRITER_SHA: &str =
+    "baa8472a68fee592eb1f124f8758d7a47b730ce40609bfdc0db3021034ec2194";
+const IMPORT_CONTROLLER: &str = "jetstreamer-epoch198-readerfix-singleton-20261019-v1-r2.service";
+const SOURCE_ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/output/epoch-198.jet";
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -20,6 +25,44 @@ pub(super) struct Profile {
     origin_observer: Bound,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     controller_recovery: Option<Bound>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    controller_handoff: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    predecessor_proof: Option<Bound>,
+}
+
+pub(super) fn pending(p: &Plan) -> bool {
+    p.epoch198_delivery
+        .as_ref()
+        .is_some_and(|p| p.controller_handoff)
+}
+
+fn stage(
+    profile: &Profile,
+) -> (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+) {
+    if profile.controller_handoff {
+        (
+            "controller-import-handoff",
+            "publication",
+            IMPORT_CONTROLLER,
+            controller_recovery::CONTROLLER198,
+            SOURCE_ARCHIVE,
+        )
+    } else {
+        (
+            "producer-finalization",
+            "finalization",
+            UNIT,
+            INVOCATION,
+            ARCHIVE,
+        )
+    }
 }
 
 #[derive(Deserialize)]
@@ -73,11 +116,22 @@ fn validate_range(r: &Value, controller: &str) -> Result<()> {
 }
 
 fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
+    let handoff = proof["phase"] == "controller-import-handoff";
     ensure!(
-        proof["schema"] == "jetstreamer-epoch198-delivery-observation-v1"
-            && proof["observer_sha256"] == WRITER_SHA
+        proof["schema"]
+            == if handoff {
+                "jetstreamer-epoch198-controller-handoff-observation-v1"
+            } else {
+                "jetstreamer-epoch198-delivery-observation-v1"
+            }
+            && proof["observer_sha256"]
+                == if handoff {
+                    HANDOFF_WRITER_SHA
+                } else {
+                    WRITER_SHA
+                }
             && proof["epoch"] == 198
-            && proof["phase"] == "producer-finalization"
+            && (handoff || proof["phase"] == "producer-finalization")
             && proof["before"] == proof["after"],
         "unqualified198 finalization proof"
     );
@@ -93,9 +147,16 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
     }
     let before = &proof["before"];
     for (key, value) in [
-        ("Id", UNIT),
-        ("InvocationID", INVOCATION),
-        ("MainPID", "1165606"),
+        ("Id", if handoff { IMPORT_CONTROLLER } else { UNIT }),
+        (
+            "InvocationID",
+            if handoff {
+                controller_recovery::CONTROLLER198
+            } else {
+                INVOCATION
+            },
+        ),
+        ("MainPID", if handoff { "2939002" } else { "1165606" }),
         ("NRestarts", "0"),
         ("LoadState", "loaded"),
         ("ActiveState", "active"),
@@ -122,7 +183,12 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
     );
     let evidence = &proof["terminal_evidence"];
     ensure!(
-        evidence["schema"] == "jetstreamer-epoch198-finalization-events-v1"
+        evidence["schema"]
+            == if handoff {
+                "jetstreamer-epoch198-controller-import-handoff-v1"
+            } else {
+                "jetstreamer-epoch198-finalization-events-v1"
+            }
             && evidence["unit"] == UNIT
             && evidence["invocation_id"] == INVOCATION
             && evidence["terminal_slot"] == 85_967_999u64
@@ -147,6 +213,9 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
             evidence[flag] == false,
             "198 terminal log grants integrity authority"
         );
+    }
+    if handoff {
+        validate_pending_evidence(evidence)?;
     }
     let events = evidence["events"]
         .as_array()
@@ -175,10 +244,81 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
     Ok(())
 }
 
+fn validate_pending_evidence(e: &Value) -> Result<()> {
+    let producer = &e["producer"];
+    for (key, value) in [
+        ("Id", UNIT),
+        ("InvocationID", INVOCATION),
+        ("LoadState", "loaded"),
+        ("MainPID", "0"),
+        ("NRestarts", "0"),
+        ("Result", "success"),
+        ("ExecMainStatus", "0"),
+    ] {
+        ensure!(
+            producer[key] == value,
+            "198handoff clean producer differs: {key}"
+        );
+    }
+    ensure!(
+        (producer["ActiveState"] == "inactive" && producer["SubState"] == "dead")
+            || (producer["ActiveState"] == "active" && producer["SubState"] == "exited"),
+        "198handoff producer not terminal"
+    );
+    let state = &e["controller_state"];
+    let a = &state["assignments"]["lane-a"];
+    ensure!(
+        state["schema"] == "jetstreamer-adaptive-root-cohort-sweep-v3"
+            && state["configuration_sha256"]
+                == "0929b892242b85f08cbe3d5828b6f4650c81c4730e5fd81f8dfe3e38f096aadd"
+            && state["import_owner"].is_null()
+            && state["assignments"]
+                .as_object()
+                .is_some_and(|a| a.len() == 1)
+            && a["first_epoch"] == 198
+            && a["last_epoch"] == 198
+            && a["attempt"] == 1
+            && a["unit"] == UNIT
+            && a["pid"] == 1165606
+            && a["pid_start_time"] == 79845173
+            && matches!(a["phase"].as_str(), Some("producer" | "staged"))
+            && a["source_recovery"] != true
+            && a["failure"].is_null()
+            && a["import_unit"].is_null()
+            && e["controller_sha256"]
+                == "62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e"
+            && e["controller_argv_sha256"]
+                == "d5c14bf6b156bc75ff4ac0f2d8fe6b3b6b9ba8dc669eda71045a566a9e03b803"
+            && e["jet_path"] == SOURCE_ARCHIVE
+            && e["jet_identity"]["length"] == e["archive_close_bytes"],
+        "198handoff state, command or closed archive differs"
+    );
+    let recovery: Bound = serde_json::from_value(e["controller_recovery"].clone())?;
+    ensure!(
+        recovery.path
+            == Path::new(
+                "/usr/local/lib/jetstreamer/horizon-package-controller-first-fire-20261021-v1/first-fire.json"
+            )
+            && recovery.sha256
+                == "baad8fedb7ae8ab271da2c34850b54f626b907424eeb6c9669947b7d6dce3444",
+        "foreign198handoff recovery evidence"
+    );
+    Ok(())
+}
+
 fn read_profile(p: &Plan, model: &Value) -> Result<Option<Value>> {
+    read_profile_with_archive(p, model, true)
+}
+
+fn read_profile_with_archive(
+    p: &Plan,
+    model: &Value,
+    current_archive: bool,
+) -> Result<Option<Value>> {
     let Some(profile) = &p.epoch198_delivery else {
         return Ok(None);
     };
+    let (_, _, _, _, archive_path) = stage(profile);
     ensure!(
         is_101(p)?
             && !p.expected_epochs.contains(&198)
@@ -191,28 +331,60 @@ fn read_profile(p: &Plan, model: &Value) -> Result<Option<Value>> {
         "foreign198 delivery deployment/census"
     );
     tool_ok(&Bound {
-        path: WRITER.into(),
-        sha256: WRITER_SHA.into(),
+        path: if profile.controller_handoff {
+            HANDOFF_WRITER
+        } else {
+            WRITER
+        }
+        .into(),
+        sha256: if profile.controller_handoff {
+            HANDOFF_WRITER_SHA
+        } else {
+            WRITER_SHA
+        }
+        .into(),
     })?;
     let proof = bound_json(&profile.proof, false)?;
+    ensure!(
+        (proof["phase"] == "controller-import-handoff") == profile.controller_handoff,
+        "198profile and proof phase differ"
+    );
+    if profile.controller_handoff {
+        ensure!(
+            profile.controller_recovery.is_some()
+                && proof["terminal_evidence"]["controller_recovery"]
+                    == serde_json::to_value(profile.controller_recovery.as_ref().unwrap())?,
+            "198controller handoff requires adopted origin"
+        );
+    }
     let controller = profile_controller(profile)?;
     let range = original_range(model)?;
     if let Some(r) = range {
         validate_range(r, controller)?;
     }
     validate_proof(&proof, utc_seconds(&p.sample_target_utc)?, range.is_some())?;
-    let archive = fs::symlink_metadata(ARCHIVE)?;
-    ensure!(
-        archive.is_file()
-            && !archive.file_type().is_symlink()
-            && archive.nlink() == 1
-            && Path::new(ARCHIVE).canonicalize()? == Path::new(ARCHIVE)
-            && archive.len()
-                == proof["terminal_evidence"]["archive_close_bytes"]
-                    .as_u64()
-                    .context("198 close bytes missing")?,
-        "198 private archive moved/changed; authenticate actual import handoff instead"
-    );
+    if let Some(previous) = &profile.predecessor_proof {
+        ensure!(
+            profile.controller_handoff && previous.path.parent() == profile.proof.path.parent(),
+            "198predecessor only valid for forward controller handoff"
+        );
+        let previous = bound_json(previous, false)?;
+        validate_forward(&previous, &proof, utc_seconds(&p.sample_target_utc)?, false)?;
+    }
+    if current_archive {
+        let archive = fs::symlink_metadata(archive_path)?;
+        ensure!(
+            archive.is_file()
+                && !archive.file_type().is_symlink()
+                && archive.nlink() == 1
+                && Path::new(archive_path).canonicalize()? == Path::new(archive_path)
+                && archive.len()
+                    == proof["terminal_evidence"]["archive_close_bytes"]
+                        .as_u64()
+                        .context("198 close bytes missing")?,
+            "198 private archive moved/changed; authenticate actual import handoff instead"
+        );
+    }
     let origin = bound_json(&profile.origin_publication, false)?;
     ensure!(
         profile.origin_publication.path.parent() == Some(Path::new(STATUS))
@@ -267,6 +439,12 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
 }
 
 fn publisher(p: &Plan) -> (&'static str, &'static str) {
+    if p.runtime_handoff157.is_some() {
+        return (runtime157::WRITER, runtime157::WRITER_SHA);
+    }
+    if pending(p) {
+        return (HANDOFF_WRITER, HANDOFF_WRITER_SHA);
+    }
     if p.scope_101_200
         .as_ref()
         .is_some_and(|s| s.private144_observer)
@@ -301,7 +479,8 @@ fn apply_model(model: &Value, profile: &Profile) -> Result<Value> {
 }
 
 fn claim(profile: &Profile, proof: &Value) -> Value {
-    json!({"epoch":198,"phase":"producer-finalization","unit":UNIT,"invocation_id":INVOCATION,
+    let (phase, _, unit, invocation, _) = stage(profile);
+    json!({"epoch":198,"phase":phase,"unit":unit,"invocation_id":invocation,
         "expected_exec_start":proof["before"]["ExecStart"],"evidence":[profile.proof,profile.origin_publication]})
 }
 
@@ -325,10 +504,25 @@ fn apply_fleet(profile: &Profile, proof: &Value, fleet: &mut Value) -> Result<()
     if existing.is_empty() {
         claims.push(expected);
     } else {
+        let prior = if let Some(binding) = &profile.predecessor_proof {
+            let proof = bound_json(binding, false)?;
+            let mut prior: Profile = serde_json::from_value(serde_json::to_value(profile)?)?;
+            prior.proof = binding.clone();
+            prior.controller_handoff = false;
+            prior.predecessor_proof = None;
+            Some(claim(&prior, &proof))
+        } else {
+            None
+        };
         ensure!(
-            existing.len() == 1 && *existing[0] == expected,
+            existing.len() == 1
+                && (*existing[0] == expected || prior.as_ref() == Some(existing[0])),
             "198 pipeline replaced or duplicated"
         );
+        if *existing[0] != expected {
+            let index = claims.iter().position(|c| c["epoch"] == 198).unwrap();
+            claims[index] = expected;
+        }
     }
     let gate = &mut fleet["gates"]["198"];
     ensure!(
@@ -339,9 +533,11 @@ fn apply_fleet(profile: &Profile, proof: &Value, fleet: &mut Value) -> Result<()
         "198 handoff cannot weaken a failed/qualification gate"
     );
     gate["state"] = json!("post-replay-pipeline");
-    gate["next_action"] = json!(
+    gate["next_action"] = json!(if profile.controller_handoff {
+        "Preserve exact pending controller import and original producer clock; retain independent full/plugin/import/upload/readback gates and authenticate the actual importer when ownership moves"
+    } else {
         "Preserve exact live producer finalization, original elapsed clock and independent full/plugin/import/upload/readback gates; authenticate actual controller/import handoff promptly when this owner exits"
-    );
+    });
     let evidence = gate["evidence"]
         .as_array_mut()
         .context("198 gate evidence")?;
@@ -361,10 +557,7 @@ pub(super) fn enable(
     completion: &Value,
     spec: &Bound,
 ) -> Result<()> {
-    ensure!(
-        next.epoch198_delivery.is_none() && is_101(next)? && next.expected_epochs.contains(&198),
-        "198 delivery already enabled or foreign scope"
-    );
+    ensure!(is_101(next)?, "foreign198delivery scope");
     let value: HandoffSpec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(
         value.schema == "jetstreamer-epoch198-routine-handoff-spec-v1"
@@ -374,6 +567,13 @@ pub(super) fn enable(
         "198 handoff spec authority differs"
     );
     let proof = value.proof;
+    if next.epoch198_delivery.is_some() {
+        return advance_pending(next, config, model, &proof);
+    }
+    ensure!(
+        next.expected_epochs.contains(&198),
+        "initial198delivery must consume replay claim"
+    );
     let prior = bound_json(&next.previous_fleet, false)?;
     ensure!(
         prior["epochs"]
@@ -405,11 +605,14 @@ pub(super) fn enable(
         }
     }
     ensure!(origins.len() == 1, "198 origin status missing/duplicate");
+    let controller_handoff = bound_json(&proof, false)?["phase"] == "controller-import-handoff";
     next.epoch198_delivery = Some(Profile {
         proof,
         origin_publication: origins.remove(0),
         origin_observer: next.previous_observer.clone(),
         controller_recovery: recovery,
+        controller_handoff,
+        predecessor_proof: None,
     });
     next.expected_epochs.retain(|e| *e != 198);
     next.tools.r2 = Bound {
@@ -426,6 +629,85 @@ pub(super) fn enable(
     );
     rows.retain(|r| r["range"] != "198");
     next.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
+    Ok(())
+}
+
+fn validate_forward(previous: &Value, proof: &Value, target: u64, fresh: bool) -> Result<()> {
+    validate_proof(previous, target, false)?;
+    validate_proof(proof, target, fresh)?;
+    ensure!(
+        previous["phase"] == "producer-finalization"
+            && proof["phase"] == "controller-import-handoff"
+            && previous["completed_unix_seconds"].as_u64()
+                <= proof["observed_unix_seconds"].as_u64()
+            && previous["terminal_evidence"]["events"] == proof["terminal_evidence"]["events"]
+            && previous["terminal_evidence"]["archive_close_bytes"]
+                == proof["terminal_evidence"]["archive_close_bytes"],
+        "198handoff is backward, changes original closed archive, or borrows another terminal"
+    );
+    Ok(())
+}
+
+// Preparation consumes durable accepted-cycle evidence. Only a fresh exact
+// forward-handoff proof may replace the obsolete source path check; normal
+// execution and ordinary successor preparation still require the current file.
+pub(super) fn preparation_model(p: &Plan, model: &Value, spec: Option<&Bound>) -> Result<Value> {
+    if let (Some(profile), Some(spec)) = (&p.epoch198_delivery, spec) {
+        let spec: HandoffSpec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
+        ensure!(
+            spec.schema == "jetstreamer-epoch198-routine-handoff-spec-v1"
+                && !spec.replay_launch_authorized
+                && !spec.archive_publication_authorized
+                && !spec.r2_archive_mutations,
+            "198forward spec grants authority"
+        );
+        ensure!(
+            !profile.controller_handoff && profile.predecessor_proof.is_none(),
+            "198already beyond finalization"
+        );
+        let previous = read_profile_with_archive(p, model, false)?.context("198prior missing")?;
+        let proof = bound_json(&spec.proof, false)?;
+        validate_forward(&previous, &proof, utc_seconds(&p.sample_target_utc)?, true)?;
+        return apply_model(model, profile);
+    }
+    effective_model(p, model)
+}
+
+fn advance_pending(
+    next: &mut Plan,
+    config: &mut Value,
+    model: &Value,
+    proof: &Bound,
+) -> Result<()> {
+    let previous = next
+        .epoch198_delivery
+        .as_ref()
+        .context("198prior missing")?;
+    ensure!(
+        !previous.controller_handoff
+            && previous.predecessor_proof.is_none()
+            && previous.controller_recovery.is_some()
+            && !next.expected_epochs.contains(&198)
+            && !config["replays"]
+                .as_array()
+                .context("198config census")?
+                .iter()
+                .any(|r| r["range"] == "198"),
+        "198pending handoff cannot replace replay or duplicate a claim"
+    );
+    let old =
+        read_profile_with_archive(next, model, false)?.context("198previous proof missing")?;
+    let current = bound_json(proof, false)?;
+    validate_forward(&old, &current, utc_seconds(&next.sample_target_utc)?, true)?;
+    let previous = next.epoch198_delivery.as_mut().unwrap();
+    previous.predecessor_proof = Some(previous.proof.clone());
+    previous.proof = proof.clone();
+    previous.controller_handoff = true;
+    next.tools.r2 = Bound {
+        path: publisher(next).0.into(),
+        sha256: publisher(next).1.into(),
+    };
+    read_profile(next, model)?;
     Ok(())
 }
 
@@ -509,6 +791,7 @@ pub(super) fn publish(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) 
         return Ok(Value::Null);
     };
     let proof = read_profile(p, model)?.context("198 profile missing")?;
+    let (claim_phase, status_phase, owner, owner_iid, archive_path) = stage(profile);
     let mut provisional = fleet.clone();
     let ledger_path = p.cycle_directory.join("delivery198-provisional-fleet.json");
     provisional["output"] = json!(ledger_path);
@@ -545,12 +828,12 @@ pub(super) fn publish(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) 
             && ledger["inventory"]["anomalies"] == 0,
         "198 provisional fleet differs"
     );
-    let meta = fs::symlink_metadata(ARCHIVE)?;
+    let meta = fs::symlink_metadata(archive_path)?;
     ensure!(
         meta.is_file()
             && !meta.file_type().is_symlink()
             && meta.nlink() == 1
-            && Path::new(ARCHIVE).canonicalize()? == Path::new(ARCHIVE)
+            && Path::new(archive_path).canonicalize()? == Path::new(archive_path)
             && meta.len()
                 == proof["terminal_evidence"]["archive_close_bytes"]
                     .as_u64()
@@ -561,13 +844,13 @@ pub(super) fn publish(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) 
         .cycle_directory
         .join("delivery198-status/sealed/pipeline-plan.json");
     let remaining = remaining_millis(&proof, &p.sample_target_utc)?;
-    let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":198,"phase":"finalization",
-        "binding":{"unit":UNIT,"invocation_id":INVOCATION,"expected_exec_start":proof["before"]["ExecStart"],
-        "claim_phase":"producer-finalization","origin_unit":UNIT,"origin_invocation_id":INVOCATION,
+    let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":198,"phase":status_phase,
+        "binding":{"unit":owner,"invocation_id":owner_iid,"expected_exec_start":proof["before"]["ExecStart"],
+        "claim_phase":claim_phase,"origin_unit":UNIT,"origin_invocation_id":INVOCATION,
         "model_path":model_path,"model_sha256":"","fleet_path":bound.path,"fleet_sha256":bound.sha256},
         "observer":observer,"fleet":bound,"origin_launch":profile.origin_publication,
-        "estimate_evidence":[profile.proof],"estimate_basis":"Exact active finalization is independently reauthenticated; actual archive close plus previously qualified43200second downstream budget, never an elapsed replay countdown or ready assertion",
-        "estimated_remaining_millis":remaining,"jet_path":ARCHIVE,"expected_jet_size_bytes":meta.len(),
+        "estimate_evidence":[profile.proof],"estimate_basis":"Exact active delivery owner is independently reauthenticated; actual archive close plus previously qualified43200second downstream budget, never an elapsed replay countdown or ready assertion",
+        "estimated_remaining_millis":remaining,"jet_path":archive_path,"expected_jet_size_bytes":meta.len(),
         "peer_units":[],"receipt_directory":STATUS,"receipt_directory_uid":1001});
     let sealed = seal_values(p, "delivery198-status", &[("pipeline-plan.json", value)])?;
     let plan = Bound {
@@ -611,6 +894,11 @@ pub(super) fn publish(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) 
 }
 
 fn validate_publication(p: &Plan, observer: &Bound, plan: &Bound, r: &Value) -> Result<()> {
+    let (claim_phase, status_phase, owner, owner_iid, _) = stage(
+        p.epoch198_delivery
+            .as_ref()
+            .context("198publication profile missing")?,
+    );
     ensure!(
         r["schema"]
             == "jetstreamer-horizon-r2-status-authenticated-pipeline-publication-receipt-v1"
@@ -619,12 +907,13 @@ fn validate_publication(p: &Plan, observer: &Bound, plan: &Bound, r: &Value) -> 
             && r["key"] == "epoch-198.epoch-status.json"
             && r["authenticated_readback"] == true
             && r["status"]["epoch"] == 198
-            && r["status"]["phase"] == "finalization"
+            && r["status"]["phase"] == status_phase
             && r["status"]["sampled_at_utc"] == p.sample_target_utc
             && r["observer_receipt"].as_str() == observer.path.to_str()
             && r["observer_receipt_sha256"] == observer.sha256
-            && r["pipeline_binding"]["unit"] == UNIT
-            && r["pipeline_binding"]["invocation_id"] == INVOCATION
+            && r["pipeline_binding"]["unit"] == owner
+            && r["pipeline_binding"]["invocation_id"] == owner_iid
+            && r["pipeline_binding"]["claim_phase"] == claim_phase
             && r["pipeline_binding"]["origin_unit"] == UNIT
             && r["pipeline_binding"]["origin_invocation_id"] == INVOCATION
             && r["pipeline_binding"]["model_path"].as_str() == plan.path.to_str()
@@ -691,6 +980,8 @@ mod tests {
             origin_publication: b("origin"),
             origin_observer: b("observer"),
             controller_recovery: None,
+            controller_handoff: false,
+            predecessor_proof: None,
         }
     }
     fn range() -> Value {
@@ -728,6 +1019,146 @@ mod tests {
                 "replay_terminal_observed":true,"archive_close_bytes":123,
                 "independent_full_verification_passed":false,"publication_authorized":false,
                 "replay_launch_authorized":false,"r2_mutations":false,"events":events}})
+    }
+    fn pending_proof() -> Value {
+        let mut p = proof();
+        p["schema"] = json!("jetstreamer-epoch198-controller-handoff-observation-v1");
+        p["observer_sha256"] = json!(HANDOFF_WRITER_SHA);
+        p["phase"] = json!("controller-import-handoff");
+        p["observed_unix_seconds"] = json!(30);
+        p["completed_unix_seconds"] = json!(31);
+        let owner = json!({"Id":IMPORT_CONTROLLER,"InvocationID":controller_recovery::CONTROLLER198,
+            "MainPID":"2939002","NRestarts":"0","LoadState":"loaded","ActiveState":"active",
+            "SubState":"running","ExecStart":"exact controller fixture command"});
+        p["before"] = owner.clone();
+        p["after"] = owner;
+        let e = &mut p["terminal_evidence"];
+        e["schema"] = json!("jetstreamer-epoch198-controller-import-handoff-v1");
+        e["producer"] = json!({"Id":UNIT,"InvocationID":INVOCATION,"LoadState":"loaded","MainPID":"0",
+            "NRestarts":"0","Result":"success","ExecMainStatus":"0","ActiveState":"inactive","SubState":"dead"});
+        e["controller_state"] = json!({"schema":"jetstreamer-adaptive-root-cohort-sweep-v3",
+            "configuration_sha256":"0929b892242b85f08cbe3d5828b6f4650c81c4730e5fd81f8dfe3e38f096aadd",
+            "import_owner":null,"assignments":{"lane-a":{"first_epoch":198,"last_epoch":198,"attempt":1,
+                "unit":UNIT,"pid":1165606,"pid_start_time":79845173,"phase":"staged"}}});
+        e["controller_sha256"] =
+            json!("62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e");
+        e["controller_argv_sha256"] =
+            json!("d5c14bf6b156bc75ff4ac0f2d8fe6b3b6b9ba8dc669eda71045a566a9e03b803");
+        e["controller_recovery"] = json!({"path":"/usr/local/lib/jetstreamer/horizon-package-controller-first-fire-20261021-v1/first-fire.json","sha256":"baad8fedb7ae8ab271da2c34850b54f626b907424eeb6c9669947b7d6dce3444"});
+        e["jet_path"] = json!(SOURCE_ARCHIVE);
+        e["jet_identity"] = json!({"length":123});
+        p
+    }
+    #[test]
+    fn pending_controller_proof_is_forward_clean_and_same_closed_source() {
+        let p = pending_proof();
+        validate_proof(&p, 1800, true).unwrap();
+        validate_forward(&proof(), &p, 1800, true).unwrap();
+        validate_forward(&proof(), &p, 3600, false).unwrap();
+        assert!(validate_forward(&proof(), &p, 3600, true).is_err());
+        assert!(validate_forward(&p, &proof(), 1800, true).is_err());
+        for (pointer, value) in [
+            ("/before/InvocationID", json!(INVOCATION)),
+            ("/terminal_evidence/producer/LoadState", json!("not-found")),
+            ("/terminal_evidence/producer/ExecMainStatus", json!("1")),
+            (
+                "/terminal_evidence/controller_state/import_owner",
+                json!("lane-a"),
+            ),
+            (
+                "/terminal_evidence/controller_state/assignments/lane-a/phase",
+                json!("importing"),
+            ),
+            ("/terminal_evidence/jet_identity/length", json!(124)),
+            (
+                "/terminal_evidence/controller_argv_sha256",
+                json!("f".repeat(64)),
+            ),
+            (
+                "/terminal_evidence/controller_recovery/sha256",
+                json!("f".repeat(64)),
+            ),
+        ] {
+            let mut bad = p.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                validate_proof(&bad, 1800, true).is_err(),
+                "accepted{pointer}"
+            );
+        }
+        let mut other = proof();
+        other["terminal_evidence"]["archive_close_bytes"] = json!(124);
+        assert!(validate_forward(&other, &p, 1800, true).is_err());
+    }
+    #[test]
+    fn pending_stage_uses_controller_but_keeps_original_elapsed_origin() {
+        let mut p = profile();
+        p.controller_handoff = true;
+        let c = claim(&p, &pending_proof());
+        assert_eq!(c["unit"], IMPORT_CONTROLLER);
+        assert_eq!(c["invocation_id"], controller_recovery::CONTROLLER198);
+        assert_eq!(c["phase"], "controller-import-handoff");
+        assert_eq!(
+            c["evidence"][1],
+            serde_json::to_value(&p.origin_publication).unwrap()
+        );
+        assert_eq!(
+            remaining_millis(&proof(), "1970-01-01T00:00:30Z").unwrap(),
+            remaining_millis(&pending_proof(), "1970-01-01T00:00:30Z").unwrap()
+        );
+    }
+    #[test]
+    fn pending_and_paused157_choose_the_qualified_superset_publisher() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let mut profile = profile();
+        profile.controller_handoff = true;
+        p.epoch198_delivery = Some(profile);
+        assert_eq!(publisher(&p), (HANDOFF_WRITER, HANDOFF_WRITER_SHA));
+        p.runtime_handoff157 = Some(Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        });
+        assert_eq!(publisher(&p), (runtime157::WRITER, runtime157::WRITER_SHA));
+    }
+    #[test]
+    fn pending_publication_binds_controller_and_publication_phase_not_replay_origin() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let mut profile = profile();
+        profile.controller_handoff = true;
+        p.epoch198_delivery = Some(profile);
+        let observer = Bound {
+            path: "/observer".into(),
+            sha256: "a".repeat(64),
+        };
+        let plan = Bound {
+            path: "/plan".into(),
+            sha256: "b".repeat(64),
+        };
+        let receipt = json!({"schema":"jetstreamer-horizon-r2-status-authenticated-pipeline-publication-receipt-v1",
+            "bucket":BUCKET,"epoch":198,"key":"epoch-198.epoch-status.json","authenticated_readback":true,
+            "observer_receipt":observer.path,"observer_receipt_sha256":observer.sha256,
+            "status":{"epoch":198,"phase":"publication","sampled_at_utc":p.sample_target_utc,
+                "elapsed_execution_millis":u64::MAX,"estimated_remaining_millis":1000},
+            "pipeline_binding":{"unit":IMPORT_CONTROLLER,"invocation_id":controller_recovery::CONTROLLER198,
+                "claim_phase":"controller-import-handoff","origin_unit":UNIT,"origin_invocation_id":INVOCATION,
+                "model_path":plan.path,"model_sha256":plan.sha256}});
+        validate_publication(&p, &observer, &plan, &receipt).unwrap();
+        for (pointer, value) in [
+            ("/status/phase", json!("finalization")),
+            ("/pipeline_binding/unit", json!(UNIT)),
+            ("/pipeline_binding/origin_unit", json!(IMPORT_CONTROLLER)),
+            (
+                "/pipeline_binding/claim_phase",
+                json!("producer-finalization"),
+            ),
+        ] {
+            let mut bad = receipt.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                validate_publication(&p, &observer, &plan, &bad).is_err(),
+                "accepted{pointer}"
+            );
+        }
     }
     #[test]
     fn proof_is_exact_non_authorizing_ordered_and_fresh_for_initial_transition() {
@@ -889,7 +1320,8 @@ mod tests {
     }
     #[test]
     fn publication_keeps_exact_phase_origin_model_and_authenticated_sample() {
-        let (p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        p.epoch198_delivery = Some(profile());
         let observer = Bound {
             path: "/observer".into(),
             sha256: "a".repeat(64),
@@ -903,7 +1335,7 @@ mod tests {
             "observer_receipt":observer.path,"observer_receipt_sha256":observer.sha256,
             "status":{"epoch":198,"phase":"finalization","sampled_at_utc":p.sample_target_utc,
                 "elapsed_execution_millis":u64::MAX,"estimated_remaining_millis":1000},
-            "pipeline_binding":{"unit":UNIT,"invocation_id":INVOCATION,"origin_unit":UNIT,
+            "pipeline_binding":{"unit":UNIT,"invocation_id":INVOCATION,"claim_phase":"producer-finalization","origin_unit":UNIT,
                 "origin_invocation_id":INVOCATION,"model_path":plan.path,"model_sha256":plan.sha256}});
         validate_publication(&p, &observer, &plan, &original).unwrap();
         for (pointer, value) in [

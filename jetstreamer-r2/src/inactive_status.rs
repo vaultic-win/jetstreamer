@@ -3,6 +3,9 @@ use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
+mod metadata_cycle;
+mod missing157;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -27,6 +30,8 @@ struct Plan {
     authenticated_other_host_handoffs: Vec<Value>,
     #[serde(default)]
     prior_intent: Option<Bound>,
+    #[serde(default)]
+    metadata_completion: Option<Bound>,
 }
 
 fn bound_json(bound: &Bound) -> Result<Value> {
@@ -291,6 +296,7 @@ pub(super) fn no_pending_owner_trigger(name: &str, collected: bool) -> Result<()
 }
 
 fn fresh_census(
+    plan: &Plan,
     fleet: &Value,
     terminal_fleet: &Value,
     owners: &[(String, String)],
@@ -304,14 +310,15 @@ fn fresh_census(
         fleet["first_epoch"].as_u64().context("range missing")?,
         fleet["last_epoch"].as_u64().context("range missing")?,
     )?;
-    ensure!(
-        serde_json::to_value(&current)? == fleet["unit_census"],
-        "fleet changed; reconcile before cleanup"
-    );
+    metadata_cycle::validate(plan, fleet, &current)?;
     let preserved =
         terminal_fleet["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1";
     if preserved {
         validate_preserved_failure(&current, terminal_fleet, owners)?;
+    }
+    let missing157 = missing157::recognized(terminal_fleet);
+    if missing157 {
+        missing157::validate_current(&current, terminal_fleet, owners)?;
     }
     let reserve = reserve_owner_evidence(terminal_fleet, owners)?;
     if let Some(stop) = &reserve {
@@ -325,7 +332,7 @@ fn fresh_census(
         let value = current
             .get(name)
             .context("owner omitted from complete census")?;
-        if !preserved && reserve.is_none() {
+        if !preserved && !missing157 && reserve.is_none() {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
         }
         no_pending_owner_trigger(name, value["LoadState"] == "not-found")?;
@@ -473,28 +480,39 @@ pub(super) async fn run() -> Result<()> {
     no_local_delivery(&plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
-    let history_time =
-        if history["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1" {
-            ensure!(
-                history["epoch"] == plan.epoch,
-                "terminal evidence epoch differs"
-            );
-            fleet::utc_seconds(
-                history["observed_at_utc"]
-                    .as_str()
-                    .context("terminal time missing")?,
-            )?
-        } else {
-            ensure!(
-                history["schema"] == fleet["schema"]
-                    && history["first_epoch"] == fleet["first_epoch"]
-                    && history["last_epoch"] == fleet["last_epoch"],
-                "terminal fleet assignment differs"
-            );
-            history["recorded_unix_seconds"]
-                .as_u64()
-                .context("terminal fleet time missing")?
-        };
+    let history_time = if missing157::recognized(&history) {
+        ensure!(
+            plan.epoch == 157
+                && plan.terminal_fleet.path
+                    == Path::new(
+                        "/var/lib/jetstreamer/horizon-epoch157-incident-20261021-v1/incident.json"
+                    )
+                && plan.terminal_fleet.sha256
+                    == "00c2bbed7338c19b688a50a7ad14bdc639f98659a56de2cbe8a31abe40c47159",
+            "foreign157terminal evidence"
+        );
+        missing157::time(&history)?
+    } else if history["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1" {
+        ensure!(
+            history["epoch"] == plan.epoch,
+            "terminal evidence epoch differs"
+        );
+        fleet::utc_seconds(
+            history["observed_at_utc"]
+                .as_str()
+                .context("terminal time missing")?,
+        )?
+    } else {
+        ensure!(
+            history["schema"] == fleet["schema"]
+                && history["first_epoch"] == fleet["first_epoch"]
+                && history["last_epoch"] == fleet["last_epoch"],
+            "terminal fleet assignment differs"
+        );
+        history["recorded_unix_seconds"]
+            .as_u64()
+            .context("terminal fleet time missing")?
+    };
     let r2 = r2_config_from_env()?;
     let (publication, pub_path, pub_sha) =
         latest_status_publication_receipt(&plan.status_receipt_directory, &r2.bucket, plan.epoch)?;
@@ -507,7 +525,7 @@ pub(super) async fn run() -> Result<()> {
         "terminal evidence predates status publication or is future-dated"
     );
     let owners = owner_units(&publication)?;
-    let before = fresh_census(&fleet, &history, &owners)?;
+    let before = fresh_census(&plan, &fleet, &history, &owners)?;
     if let Some(stop) = reserve_owner_evidence(&history, &owners)? {
         ensure!(stop.epoch == plan.epoch, "reserve stop epoch differs");
         stop.validate(&before, publication.verified_unix_seconds, now)?;
@@ -519,13 +537,21 @@ pub(super) async fn run() -> Result<()> {
     if let Some(object) = current.as_ref() {
         same_object(&object.bytes, &object.etag, &publication)?;
     }
-    let intent = json!({"schema":"jetstreamer-horizon-inactive-status-intent-v1","plan":plan_bound.path,
+    let mut intent = json!({"schema":"jetstreamer-horizon-inactive-status-intent-v1","plan":plan_bound.path,
         "plan_sha256":plan_bound.sha256,"epoch":plan.epoch,"bucket":r2.bucket,"key":key,
         "publication":pub_path,"publication_sha256":pub_sha,"status":publication.status,"etag":publication.object_etag,
         "fleet":plan.fleet.path,"fleet_sha256":plan.fleet.sha256,"terminal_fleet":plan.terminal_fleet.path,
         "terminal_fleet_sha256":plan.terminal_fleet.sha256,"owners":owners,"archive_completion_claimed":false,
         "prior_intent":plan.prior_intent.as_ref().map(|b|json!({"path":b.path,"sha256":b.sha256})),
         "repair_backlog":{"path":plan.repair_backlog.path,"sha256":plan.repair_backlog.sha256}});
+    if missing157::recognized(&history) {
+        intent["terminal_manager_journal"] = serde_json::to_value(
+            status_inactive::cleared_controller_proof(&owners[0].0, &owners[0].1)?,
+        )?;
+    }
+    if let Some(binding) = &plan.metadata_completion {
+        intent["metadata_completion"] = json!({"path":binding.path,"sha256":binding.sha256});
+    }
     if let Some(prior) = &plan.prior_intent {
         validate_recovery_intent(&bound_json(prior)?, &intent)?;
     }
@@ -546,7 +572,7 @@ pub(super) async fn run() -> Result<()> {
         }
         if args.len() == 6 {
             ensure!(
-                fresh_census(&fleet, &history, &owners)? == before,
+                fresh_census(&plan, &fleet, &history, &owners)? == before,
                 "census changed during preflight"
             );
             println!(
@@ -570,7 +596,7 @@ pub(super) async fn run() -> Result<()> {
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
     )?;
     ensure!(
-        fresh_census(&fleet, &history, &owners)? == before,
+        fresh_census(&plan, &fleet, &history, &owners)? == before,
         "census changed before cleanup"
     );
     no_local_delivery(&plan)?;
@@ -588,7 +614,7 @@ pub(super) async fn run() -> Result<()> {
         "status remains or a new owner published; reconcile"
     );
     ensure!(
-        fresh_census(&fleet, &history, &owners)? == before,
+        fresh_census(&plan, &fleet, &history, &owners)? == before,
         "claim appeared after cleanup; repair live status through gated publisher"
     );
     no_local_delivery(&plan)?;
@@ -697,6 +723,7 @@ mod tests {
             exclusive_local_epoch_ownership: true,
             authenticated_other_host_handoffs: vec![],
             prior_intent: None,
+            metadata_completion: None,
         };
         let fleet = json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":201,"last_epoch":300,
             "sampled_at_utc":"2026-10-20T04:04:42Z","recorded_unix_seconds":1792469100u64,

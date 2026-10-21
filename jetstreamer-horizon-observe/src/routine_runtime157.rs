@@ -2,9 +2,10 @@
 use super::*;
 const PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch157-verification-pause-evidence-20261021-v1/pause.json";
 const SHA: &str = "7551fdeafd0c5773dfb52a1b0df8b867f09e1dc1b2939569568bf5ede99789c2";
-const WRITER: &str =
+pub(super) const WRITER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch157-runtime-reader-20261021-v1/jetstreamer-r2";
-const WRITER_SHA: &str = "357d30f9d88bfe87758d256d5b1d98139311364e0ba3c1469ebea14db1c07b30";
+pub(super) const WRITER_SHA: &str =
+    "357d30f9d88bfe87758d256d5b1d98139311364e0ba3c1469ebea14db1c07b30";
 const OLD: &str = "2026-10-21T15:08:00Z";
 const NEXT: &str = "2026-10-21T16:08:00Z";
 pub(super) fn writer(p: &Plan) -> bool {
