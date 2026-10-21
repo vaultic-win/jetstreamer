@@ -175,6 +175,27 @@ fn staged_references(
     target: &Path,
     missing: &mut Vec<Value>,
 ) -> Result<Vec<String>> {
+    staged_references_inner(roots, target, missing, &BTreeSet::new(), true)
+}
+
+/// Read-only exact-path census shared with a separately scoped terminal checker.
+/// Only independently authenticated terminal-owner fragments may be excluded.
+pub(crate) fn staged_references_exact(
+    roots: &[&Path],
+    target: &Path,
+    missing: &mut Vec<Value>,
+    terminal_fragments: &BTreeSet<PathBuf>,
+) -> Result<Vec<String>> {
+    staged_references_inner(roots, target, missing, terminal_fragments, false)
+}
+
+fn staged_references_inner(
+    roots: &[&Path],
+    target: &Path,
+    missing: &mut Vec<Value>,
+    terminal_fragments: &BTreeSet<PathBuf>,
+    dev_cache_literal: bool,
+) -> Result<Vec<String>> {
     let mut queue: Vec<_> = roots.iter().map(|p| (p.to_path_buf(), 0u32)).collect();
     let mut seen = BTreeSet::new();
     let mut refs = Vec::new();
@@ -202,11 +223,12 @@ fn staged_references(
                         link.as_os_str().as_bytes(),
                         target.as_os_str().as_bytes(),
                         true
-                    ) && !link
-                        .as_os_str()
-                        .as_bytes()
-                        .windows(b"target/debug".len())
-                        .any(|b| b == b"target/debug"),
+                    ) && !(dev_cache_literal
+                        && link
+                            .as_os_str()
+                            .as_bytes()
+                            .windows(b"target/debug".len())
+                            .any(|b| b == b"target/debug")),
                     "dangling alias targets dev cache"
                 );
                 let name = path
@@ -257,10 +279,15 @@ fn staged_references(
             );
             let bytes = fs::read(&canonical)?;
             ensure!(bytes.len() <= 1 << 20, "unit grew during read");
-            if process_references::encoded_reference(&bytes, target.as_os_str().as_bytes(), true)
-                || bytes
-                    .windows(b"target/debug".len())
-                    .any(|s| s == b"target/debug")
+            if !terminal_fragments.contains(&canonical)
+                && (process_references::encoded_reference(
+                    &bytes,
+                    target.as_os_str().as_bytes(),
+                    true,
+                ) || (dev_cache_literal
+                    && bytes
+                        .windows(b"target/debug".len())
+                        .any(|s| s == b"target/debug")))
             {
                 refs.push(canonical.display().to_string());
             }
@@ -356,6 +383,43 @@ pub fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exact_staged_census_never_borrows_cache_literal_or_implicit_exclusions() {
+        let d = tempfile::tempdir().unwrap();
+        let file = d.path().join("owner.service");
+        let target = Path::new("/private/exact-stopped-run");
+        fs::write(&file, b"ExecStart=/unrelated/target/debug/tool\n").unwrap();
+        let mut missing = Vec::new();
+        assert_eq!(
+            staged_references(&[d.path()], target, &mut missing).unwrap(),
+            vec![file.display().to_string()]
+        );
+        assert!(
+            staged_references_exact(&[d.path()], target, &mut missing, &BTreeSet::new())
+                .unwrap()
+                .is_empty()
+        );
+        fs::write(
+            &file,
+            format!("ReadWritePaths={}/scratch\n", target.display()),
+        )
+        .unwrap();
+        assert_eq!(
+            staged_references_exact(&[d.path()], target, &mut missing, &BTreeSet::new()).unwrap(),
+            vec![file.display().to_string()]
+        );
+        assert!(
+            staged_references_exact(
+                &[d.path()],
+                target,
+                &mut missing,
+                &BTreeSet::from([file.canonicalize().unwrap()])
+            )
+            .unwrap()
+            .is_empty()
+        );
+    }
     #[test]
     fn staged_units_follow_real_aliases_and_match_only_exact_cache_or_relative_target() {
         let t = tempfile::tempdir().unwrap();

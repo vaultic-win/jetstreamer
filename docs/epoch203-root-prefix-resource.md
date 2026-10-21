@@ -83,3 +83,33 @@ the scan, created without clobbering, written mode0400, and fsynced together wit
 the bound parent directory. Failed validation writes no receipt; retain any
 interrupted write for explicit diagnosis rather than overwriting it. Without
 this option, the existing stdout-only interface is unchanged.
+
+## Read-only stopped-scratch qualification
+
+`jetstreamer-epoch203-stopped-scratch-check` is restricted to the exact October21
+reserve-stopped root-prefix invocation and its original private run directory.
+It accepts only `PLAN --plan-sha256 HEX --self-sha256 HEX`; there is no deletion
+or execute mode. Its strict plan binds the immutable incident, source review,
+original exact-build receipt, and a private no-clobber `check.json` destination.
+
+The checker independently rehashes the historical parent/runner source from
+their fixed Git objects, matches the retained parent to the original build,
+proves the failed non-restarting owner and stopped guard timer, checks queued
+jobs and staged unit inputs, and performs complete streaming process-reference
+scans. Only the independently hashed exact terminal owner's transient fragment
+is excluded from the staged-file census. All other matches fail closed.
+
+It hashes the entire retained partial archive and required inputs, inventories
+the exact scratch tree without following links, rejects foreign devices/owners,
+hardlinks, writable peers and nested mounts, then repeats ownership/reference/
+tree/retained-identity checks. Legacy read/execute bits are permitted beneath the
+owner-only scratch root; the stricter existing RAM-retirement policy is unchanged.
+The resulting catalog binds per-entry identities and clocks, not scratch-file
+contents or resumability. Partial archive hashing is not semantic verification.
+
+A positive receipt authorizes no removal, replay, admission or publication.
+Preserve the partial archive, inputs, failed unit and all stop evidence. A
+separately reviewed and qualified retirement implementation, with its own intent,
+reference checks, preservation proof and interruption handling, remains required
+before any scratch unlink. Existing singleton/RAM/restore-only retirees must not
+be pointed at this unsupported layout.
