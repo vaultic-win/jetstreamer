@@ -221,7 +221,7 @@ fn journal_proves_terminal(records: &[Value], name: &str, invocation: &str) -> R
     Ok(())
 }
 
-fn cleared_controller_proof(name: &str, invocation: &str) -> Result<Vec<Value>> {
+pub(super) fn cleared_controller_proof(name: &str, invocation: &str) -> Result<Vec<Value>> {
     let output = Command::new("journalctl")
         .args(["-u", name, "--no-pager", "-n", "128", "-o", "json"])
         .output()?;

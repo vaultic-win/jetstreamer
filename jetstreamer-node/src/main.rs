@@ -15222,6 +15222,25 @@ fn publish_verified_runtime_assembly(
 /// Runs and assembles every runtime span inside one epoch. Segment archives
 /// and manifests remain in a private adjacent directory until the complete V3
 /// output is verified and atomically published, so interruption is resumable.
+fn validate_runtime_segment_terminal_checkpoints(
+    spans: &[compatibility::RuntimeSpan],
+    expected: &BTreeMap<Slot, BankHashExpectation>,
+) -> Result<(), String> {
+    for (index, span) in spans.iter().enumerate() {
+        let terminal = span
+            .slots
+            .end
+            .checked_sub(1)
+            .ok_or_else(|| "empty runtime segment".to_string())?;
+        if !expected.contains_key(&terminal) {
+            return Err(format!(
+                "runtime segment {index} requires the exact canonical terminal checkpoint at slot {terminal} before any segment replay or retained-archive reread; a nearby root cannot satisfy the focused qualification gate"
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_multi_runtime_epoch_supervisor(
     epoch: u64,
@@ -15295,6 +15314,14 @@ async fn run_multi_runtime_epoch_supervisor(
             epoch_hashes.display()
         ));
     }
+    // Every child uses focused qualification. Prove *all* of those exact
+    // terminal gates now, rather than spending days on an earlier segment and
+    // only then discovering a later span cannot start. This does not invent a
+    // terminal commitment or relax the child's independent checkpoint check.
+    let first_selection = runtime_span_selection(&spans[0])?;
+    let mut expected = read_epoch_hashes_file(epoch_hashes, first_selection.descriptor.bootstrap)?;
+    add_runtime_handoff_expectations(epoch_start..epoch_end.saturating_add(1), &mut expected)?;
+    validate_runtime_segment_terminal_checkpoints(&spans, &expected)?;
     fs::create_dir_all(&work_dir)
         .map_err(|err| format!("failed to create {}: {err}", work_dir.display()))?;
     let work_metadata = fs::symlink_metadata(&work_dir)
@@ -24134,6 +24161,40 @@ mod early_snapshot_tests {
             qualification_expectations(wrong_bootstrap, plan, &snapshot, bootstrap)
                 .unwrap_err()
                 .contains("does not match the canonical checkpoint")
+        );
+    }
+
+    #[test]
+    fn epoch157_nearby_root_cannot_admit_a_later_focused_segment() {
+        let spans = compatibility::plan_runtime_spans(67_824_000..68_256_000, true).unwrap();
+        assert_eq!(spans.len(), 2);
+        let mut expected = BTreeMap::from([
+            (
+                68_140_176,
+                BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+            ),
+            (
+                68_255_828,
+                BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+            ),
+        ]);
+        let error = validate_runtime_segment_terminal_checkpoints(&spans, &expected).unwrap_err();
+        assert!(
+            error.contains("runtime segment 1") && error.contains("68255999"),
+            "{error}"
+        );
+        // A test-only terminal commitment proves coverage arithmetic only; no
+        // operational checkpoint is derived or authorized by this fixture.
+        expected.insert(
+            68_255_999,
+            BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+        );
+        validate_runtime_segment_terminal_checkpoints(&spans, &expected).unwrap();
+        expected.remove(&68_140_176);
+        assert!(
+            validate_runtime_segment_terminal_checkpoints(&spans, &expected)
+                .unwrap_err()
+                .contains("runtime segment 0")
         );
     }
 

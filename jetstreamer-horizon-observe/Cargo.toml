@@ -28,6 +28,10 @@ name = "jetstreamer-horizon-routine-cycle"
 path = "src/routine_cycle.rs"
 
 [[bin]]
+name = "jetstreamer-epoch157-incident"
+path = "src/incident157.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-ram-snapshot-test"
 path = "src/ram_snapshot_test.rs"
 
