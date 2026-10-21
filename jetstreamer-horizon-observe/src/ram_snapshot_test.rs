@@ -39,6 +39,11 @@ const RELEASED_225: bool = cfg!(all(
 ));
 const CPU_CORES: u64 = if RELEASED_225 || PROFILE225 { 8 } else { 2 };
 const PROFILE225: bool = cfg!(feature = "epoch225-shrink-snapshot-tests");
+const TMPFS_OPTIONS: &str = if PROFILE225 {
+    "/tmp:rw,size=512G,nr_inodes=1048576,nosuid,nodev,mode=1777"
+} else {
+    "/tmp:rw,size=512G,nosuid,nodev,mode=1777"
+};
 const SNAPSHOT_SHA: &str = if PROFILE225 {
     "094d3b28c39403580fbac083cdad67cc008b255dd375d611217103750d0f412d"
 } else {
@@ -309,9 +314,17 @@ fn ram_geometry() -> Result<u64> {
         v.f_blocks.checked_mul(v.f_frsize) == Some(TMPFS_SIZE),
         "wrong tmpfs size"
     );
+    validate_inode_geometry(v.f_files)?;
     v.f_bavail
         .checked_mul(v.f_frsize)
         .context("tmpfs free overflow")
+}
+fn validate_inode_geometry(files: u64) -> Result<()> {
+    ensure!(
+        !PROFILE225 || files == 1_048_576,
+        "wrong225 tmpfs inode limit"
+    );
+    Ok(())
 }
 fn authenticate(p: &Plan) -> Result<String> {
     ensure!(
@@ -415,10 +428,7 @@ fn validate_sandbox(text: &str, receipts: &Path) -> Result<()> {
         ("PrivateNetwork", "yes"),
         ("OOMPolicy", "kill"),
         ("OOMScoreAdjust", "1000"),
-        (
-            "TemporaryFileSystem",
-            "/tmp:rw,size=512G,nosuid,nodev,mode=1777",
-        ),
+        ("TemporaryFileSystem", TMPFS_OPTIONS),
     ] {
         ensure!(
             text.lines()
@@ -1127,10 +1137,24 @@ mod tests {
         let path =
             Path::new("/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-fixture");
         let s = format!(
-            "NoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=read-only\nProtectControlGroups=yes\nPrivateNetwork=yes\nOOMPolicy=kill\nOOMScoreAdjust=1000\nTemporaryFileSystem=/tmp:rw,size=512G,nosuid,nodev,mode=1777\nReadWritePaths={}\nCapabilityBoundingSet=cap_dac_override cap_kill cap_setgid cap_setuid\n",
+            "NoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=read-only\nProtectControlGroups=yes\nPrivateNetwork=yes\nOOMPolicy=kill\nOOMScoreAdjust=1000\nTemporaryFileSystem={}\nReadWritePaths={}\nCapabilityBoundingSet=cap_dac_override cap_kill cap_setgid cap_setuid\n",
+            TMPFS_OPTIONS,
             path.display()
         );
         validate_sandbox(&s, path).unwrap();
+        if PROFILE225 {
+            assert!(validate_sandbox(&s.replace("nr_inodes=1048576,", ""), path).is_err());
+            assert!(
+                validate_sandbox(&s.replace("nr_inodes=1048576", "nr_inodes=409600"), path)
+                    .is_err()
+            );
+            validate_inode_geometry(1_048_576).unwrap();
+            assert!(validate_inode_geometry(409_600).is_err());
+            assert!(validate_inode_geometry(1_048_575).is_err());
+            assert!(validate_inode_geometry(1_048_577).is_err());
+        } else {
+            validate_inode_geometry(409_600).unwrap();
+        }
         for (from, to) in [
             ("cap_setuid", "cap_sys_admin"),
             ("ProtectHome=read-only", "ProtectHome=no"),

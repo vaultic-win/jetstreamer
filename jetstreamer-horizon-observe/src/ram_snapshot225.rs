@@ -1,6 +1,13 @@
 //! Isolated epoch225 profile for the shared, bounded RAM-only test supervisor.
 use super::*;
 
+fn allowed_203_invocation(id: &str) -> bool {
+    matches!(
+        id,
+        "bfdfb1a74959444e9f477451fadc3d43" | "748ffa40e0a2408da0a10fc9e160cf0a"
+    )
+}
+
 pub(super) fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-private-v1625-ram-snapshot-test-plan-v1"
@@ -96,7 +103,9 @@ pub(super) fn validate_observer(v: &Value, now: u64) -> Result<()> {
     ensure!(
         diagnostics.len() <= 1
             && diagnostics.iter().all(|d| d["range"] == "203-203"
-                && d["expected_producer_invocation_id"] == "bfdfb1a74959444e9f477451fadc3d43"),
+                && d["expected_producer_invocation_id"]
+                    .as_str()
+                    .is_some_and(allowed_203_invocation)),
         "foreign diagnostic census"
     );
     Ok(())
@@ -118,7 +127,7 @@ fn validate_active(f: &Value) -> Result<Vec<&Value>> {
         let id = u["InvocationID"].as_str().context("missing invocation")?;
         let allowed = match phase {
             "replay" => (220..=223).contains(&epoch) && id == "c2adebaad0cb42b385156631156813fe",
-            "diagnostic-qualification" => epoch == 203 && id == "bfdfb1a74959444e9f477451fadc3d43",
+            "diagnostic-qualification" => epoch == 203 && allowed_203_invocation(id),
             "full-verification" => {
                 (216..=219).contains(&epoch) && id == "90240f6b62544d8aa35b1fc84101737c"
             }
@@ -232,6 +241,35 @@ pub(super) fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -
 mod tests {
     use super::*;
     #[test]
+    fn selected225_requires_exact_inode_mount_and_geometry() {
+        let path = Path::new(
+            "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-225-fixture",
+        );
+        let s = format!(
+            "NoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=read-only\nProtectControlGroups=yes\nPrivateNetwork=yes\nOOMPolicy=kill\nOOMScoreAdjust=1000\nTemporaryFileSystem={TMPFS_OPTIONS}\nReadWritePaths={}\nCapabilityBoundingSet=cap_dac_override cap_kill cap_setgid cap_setuid\n",
+            path.display()
+        );
+        validate_sandbox(&s, path).unwrap();
+        for altered in [
+            s.replace("nr_inodes=1048576,", ""),
+            s.replace("nr_inodes=1048576", "nr_inodes=409600"),
+            s.replace("size=512G", "size=1024G"),
+        ] {
+            assert!(validate_sandbox(&altered, path).is_err());
+        }
+        validate_inode_geometry(1_048_576).unwrap();
+        for files in [409_600, 1_048_575, 1_048_577] {
+            assert!(validate_inode_geometry(files).is_err());
+        }
+    }
+    #[test]
+    fn diagnostic_allowlist_is_exact() {
+        assert!(allowed_203_invocation("bfdfb1a74959444e9f477451fadc3d43"));
+        assert!(allowed_203_invocation("748ffa40e0a2408da0a10fc9e160cf0a"));
+        assert!(!allowed_203_invocation("748ffa40e0a2408da0a10fc9e160cf0b"));
+        assert!(!allowed_203_invocation(""));
+    }
+    #[test]
     fn plan_rejects_wrong_profile_fixture_and_scope() {
         let v = json!({"schema":"jetstreamer-private-v1625-ram-snapshot-test-plan-v1",
             "mode":"capability","unit":"horizon-v1625-snapshot-test-fixture.service",
@@ -282,6 +320,12 @@ mod tests {
             "host_memory":{"conservative_available_kib":START_MEMORY/1024},"replays":[r],"diagnostic_replays":[]});
         let now = utc("2026-10-21T14:00:00Z").unwrap();
         validate_observer(&good, now).unwrap();
+        let mut root203 = good.clone();
+        root203["diagnostic_replays"] = json!([{"range":"203-203", "expected_producer_invocation_id":"748ffa40e0a2408da0a10fc9e160cf0a"}]);
+        validate_observer(&root203, now).unwrap();
+        root203["diagnostic_replays"][0]["expected_producer_invocation_id"] =
+            json!("748ffa40e0a2408da0a10fc9e160cf0b");
+        assert!(validate_observer(&root203, now).is_err());
         for (ptr, value) in [
             ("/recorded_at_utc", json!("2026-10-21T13:00:00Z")),
             ("/host_memory/conservative_available_kib", json!(0)),
@@ -307,6 +351,11 @@ mod tests {
             .collect();
         let good = json!({"active":entries});
         validate_active(&good).unwrap();
+        let mut root203 = good.clone();
+        root203["active"].as_array_mut().unwrap().push(json!({"epoch":203,"phase":"diagnostic-qualification","unit":{"Id":"horizon-qualify-203-shrink-root-prefix-resource-f9fc5a0-v1.service","InvocationID":"748ffa40e0a2408da0a10fc9e160cf0a","MainPID":"42","NRestarts":"0","ActiveState":"active"}}));
+        validate_active(&root203).unwrap();
+        root203["active"][4]["unit"]["InvocationID"] = json!("748ffa40e0a2408da0a10fc9e160cf0b");
+        assert!(validate_active(&root203).is_err());
         for (ptr, v) in [
             ("/active/0/epoch", json!(225)),
             ("/active/0/producer/NRestarts", json!("1")),
