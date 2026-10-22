@@ -71,6 +71,14 @@ fleet/routine downstream handoff still precede use. The current assembler and
 routine reader are never hot-swapped to adopt this source, and canonical import
 and publication remain separately unqualified until their normal gates pass.
 
+Fleet rendering keeps a private resource observation in `observer_diagnostics`
+without adding a second active job when an exact captured diagnostic already
+binds the same epoch, unit, invocation and scratch path. Different owners remain
+distinct. This corrects duplicate private assembler rows without changing epoch
+claims, dashboard statuses, guard evidence or historical receipts. Adoption still
+requires a newly qualified reader transition; old sealed fleet receipts are not
+rewritten.
+
 ## Exact epoch193 to epoch194 ETA handoff
 
 The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.

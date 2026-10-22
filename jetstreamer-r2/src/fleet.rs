@@ -647,6 +647,14 @@ fn diagnostic_guard_workers_match(claim: &DiagnosticClaim, workers: &[Value]) ->
                 .is_some_and(|vmas| vmas > 0 && vmas <= 3_500_000)
     }
 }
+fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> bool {
+    claims.iter().any(|c| {
+        entry["epoch"] == c.epoch
+            && entry["producer"]["Id"] == c.unit
+            && entry["producer"]["InvocationID"] == c.invocation_id
+            && entry["scratch_path"].as_str() == c.scratch_path.to_str()
+    })
+}
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
     if continuation144::namespace(claim) || assembly144::namespace(claim) {
@@ -1919,7 +1927,10 @@ pub(super) async fn run() -> Result<()> {
     let private144 = private144::observe(&plan, &observer, &before, sample)?;
     if let Some(entry) = &private144
         && entry["live"] == true
+        && !diagnostic_owns_observation(&plan.diagnostics, entry)
     {
+        // A captured diagnostic below owns the same physical invocation. Keep
+        // its resource observation in observer_diagnostics, not a second job.
         active.push(entry.clone());
     }
     let mut live_diagnostic_epochs = BTreeSet::new();
@@ -2058,6 +2069,8 @@ pub(super) async fn run() -> Result<()> {
             );
             let phase = if assembly144::namespace(claim) {
                 "private-assembly-only"
+            } else if continuation144::namespace(claim) {
+                "private-checkpoint-continuation"
             } else if native_restore_140(claim) || native144::namespace(claim) {
                 "native-restore-only"
             } else if claim
@@ -2250,6 +2263,33 @@ pub(super) async fn run() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn exact_private_observation_is_not_a_second_captured_job() {
+        let c = DiagnosticClaim {
+            epoch: 144,
+            unit: assembly144::UNIT.into(),
+            invocation_id: "a".repeat(32),
+            scratch_path: assembly144::ROOT.into(),
+            launch_receipt: BoundFile {
+                path: "/launch".into(),
+                sha256: "b".repeat(64),
+            },
+        };
+        let row = json!({"epoch":144,"producer":{"Id":c.unit,"InvocationID":c.invocation_id},"scratch_path":c.scratch_path});
+        let claims = [c];
+        assert!(diagnostic_owns_observation(&claims, &row));
+        for (ptr, value) in [
+            ("/epoch", json!(145)),
+            ("/producer/Id", json!("another.service")),
+            ("/producer/InvocationID", json!("c".repeat(32))),
+            ("/scratch_path", json!("/another")),
+        ] {
+            let mut bad = row.clone();
+            *bad.pointer_mut(ptr).unwrap() = value;
+            assert!(!diagnostic_owns_observation(&claims, &bad));
+        }
+        assert!(!diagnostic_owns_observation(&[], &row));
+    }
     #[test]
     fn private_qualification_owner_cannot_make_a_production_countdown_valid() {
         assert!(production_status_binding_matches(true, "live-replay"));
