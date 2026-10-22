@@ -169,6 +169,9 @@ fn read(p: &Profile) -> Result<(Value, Value)> {
     let g = bound_json(&gb, false)?;
     checked(p, &r, &e, &plan, &g)
 }
+pub(super) fn completed_transition(p: &Plan) -> Result<Option<(Value, Value)>> {
+    p.continuation144.as_ref().map(read).transpose()
+}
 pub(super) fn validate(p: &Plan) -> Result<()> {
     let Some(profile) = &p.continuation144 else {
         return Ok(());
