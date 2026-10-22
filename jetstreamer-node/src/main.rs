@@ -9462,6 +9462,22 @@ struct ReplayRunResult {
     bootstrap_handoff_archive_sha256: Option<[u8; 32]>,
 }
 
+enum ReplayRunOutcome {
+    Completed(Box<ReplayRunResult>),
+    PlanningPreflight(serde_json::Value),
+}
+
+impl ReplayRunOutcome {
+    fn completed(self) -> Result<ReplayRunResult, String> {
+        match self {
+            Self::Completed(result) => Ok(*result),
+            Self::PlanningPreflight(_) => {
+                Err("planning-only outcome is not replay completion evidence".into())
+            }
+        }
+    }
+}
+
 struct CompletedCohortEpoch {
     epoch: u64,
     staged_output: PathBuf,
@@ -11583,7 +11599,36 @@ async fn run_geyser_replay(
     retain_runtime_state: bool,
     // Only exact independently validated private epoch144/213 runners construct these proofs.
     checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
-) -> Result<ReplayRunResult, String> {
+    epoch223_tail_mode: epoch223_qualification::TailMode,
+) -> Result<ReplayRunOutcome, String> {
+    let tail_comparison = epoch223_tail_mode != epoch223_qualification::TailMode::Disabled;
+    if tail_comparison {
+        if !cfg!(feature = "epoch223-v1-6-25-qualification")
+            || carried_state.is_some()
+            || audited_cohort_bootstrap.is_some()
+            || verification_end_inclusive.is_some()
+            || handoff_export_directory.is_some()
+            || retain_runtime_state
+            || checkpoint_restart.is_some()
+        {
+            return Err("explicit epoch223 tail execution cannot borrow ordinary, carried, cohort, handoff or restart authority".into());
+        }
+        let focused = qualification.map(|p| (p.bootstrap_slot, p.end_inclusive));
+        epoch223_qualification::validate_launch(
+            epoch,
+            epoch,
+            focused,
+            false,
+            false,
+            Some((ledger_dir, &horizon_output, replay_scratch_dir)),
+        )?;
+        epoch223_qualification::validate_tail_mode(
+            true,
+            epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight,
+            focused,
+            ledger_dir,
+        )?;
+    }
     if let Some(prefix) = checkpoint_restart {
         prefix.validate_invocation(
             epoch,
@@ -11662,6 +11707,29 @@ async fn run_geyser_replay(
             qualification.is_some(),
         )?
     };
+    if tail_comparison {
+        epoch223_qualification::validate_tail_runtime(&execution)?;
+        let verifier = snapshot_verifier
+            .as_ref()
+            .ok_or("explicit tail comparison requires bootstrap verification")?;
+        if verifier.expected.len() != 1 {
+            return Err(
+                "explicit tail comparison requires only its known bootstrap expectation".into(),
+            );
+        }
+        epoch223_qualification::tail_expectations(
+            verifier
+                .expected
+                .iter()
+                .map(|e| (*e.key(), *e.value()))
+                .collect(),
+            qualification.expect("tail plan validated"),
+            bootstrap
+                .snapshot_archive()
+                .ok_or("tail requires an exact snapshot")?,
+            execution.descriptor.bootstrap,
+        )?;
+    }
     if qualification.is_some() || execution.admission == compatibility::AdmissionLevel::Candidate {
         let Some(verifier) = snapshot_verifier.as_ref() else {
             return Err(format!(
@@ -11682,6 +11750,7 @@ async fn run_geyser_replay(
         }
         let checkpoint_count = verifier.checkpoint_count_in_range(replay_start, verification_end);
         if checkpoint_count == 0
+            && !tail_comparison
             && !checkpoint_restart.is_some_and(|prefix| {
                 prefix.covers_trusted_root(epoch, bootstrap_slot, output_slot_start, end_inclusive)
             })
@@ -11757,6 +11826,23 @@ async fn run_geyser_replay(
         replay_start,
         end_inclusive.saturating_add(1),
     );
+
+    // The real execution and planning-only paths share every no-worker gate
+    // above, including candidate checkpoint policy. Never return earlier in
+    // top-level CLI planning: that hid the second gate in the failed v2 launch.
+    if tail_comparison {
+        historical_worker_profile(runtime_descriptor)?;
+        let executable = configured_historical_worker_executable(runtime_descriptor)?;
+        if epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight {
+            let mut report = epoch223_qualification::planning_report(
+                qualification.expect("tail plan validated"),
+                &execution,
+            );
+            report["worker_profile_validated"] = serde_json::json!(true);
+            report["worker_executable"] = serde_json::json!(executable);
+            return Ok(ReplayRunOutcome::PlanningPreflight(report));
+        }
+    }
 
     let (confirmed_bank_sender, confirmed_bank_receiver) = unbounded();
     let confirmed_bank_handle =
@@ -13344,14 +13430,14 @@ async fn run_geyser_replay(
         replay_executor.shutdown()?;
         None
     };
-    Ok(ReplayRunResult {
+    Ok(ReplayRunOutcome::Completed(Box::new(ReplayRunResult {
         carried_state,
         historical_evidence,
         historical_worker_executable_sha256: worker_executable_sha256,
         bootstrap_handoff_archive_sha256: bootstrap_handoff_manifest
             .map(|manifest| manifest.archive_sha256)
             .or_else(|| checkpoint_restart.map(|prefix| prefix.snapshot_sha256())),
-    })
+    })))
 }
 
 async fn extract_tarball(archive: &Path, dest_dir: &Path) -> Result<(), String> {
@@ -16150,8 +16236,10 @@ async fn run_mixed_runtime_root_cohort_first_epoch(
             (!is_terminal).then_some(handoff_dir.as_path()),
             is_terminal,
             None,
+            epoch223_qualification::TailMode::Disabled,
         )
-        .await?;
+        .await?
+        .completed()?;
         publish_historical_segment_manifest(
             epoch,
             plan,
@@ -20848,41 +20936,6 @@ async fn main() {
         qualification.is_some(),
     )
     .expect("requested range was preflighted above");
-    if epoch223_tail_preflight {
-        let plan = qualification.expect("explicit tail mode validated");
-        if effective_epoch_spans.len() != 1
-            || !snapshot_expectations.get(&223).is_some_and(|e| {
-                e.len() == 1 && e.contains_key(&epoch223_qualification::TAIL_BOOTSTRAP)
-            })
-        {
-            eprintln!("error: tail preflight did not bind its exact runtime and sole bootstrap");
-            exit(1);
-        }
-        let worker = effective_runtime
-            .descriptor
-            .worker
-            .as_ref()
-            .expect("tail runtime validated");
-        println!(
-            "{}",
-            serde_json::json!({
-                "schema":"jetstreamer-private-epoch223-tail-planning-preflight-v1",
-                "epoch":223,"bootstrap_slot":plan.bootstrap_slot,"output_slot_start":plan.output_slot_start,
-                "terminal_slot":plan.end_inclusive,"output_slot_count":477,
-                "runtime_profile":effective_runtime.descriptor.identity.name,
-                "runtime_revision":effective_runtime.descriptor.identity.revision,
-                "worker_identity":worker.identity,"worker_environment_override":worker.environment_override,
-                "canonical_bootstrap_bound":true,"canonical_terminal_required":false,
-                "terminal_canonical_root_independently_known":false,"tail_comparison_only":true,
-                "complete_epoch_span_covered":false,"worker_spawned":false,"archive_created":false,
-            "snapshot_schema_or_contents_tested":false,"fresh_resource_admission_passed":false,
-            "canonical_prefix_qualified":false,"full_cold_epoch_peak_qualified":false,
-                "replay_launch_authorized":false,"runtime_promotion_authorized":false,
-                "canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false
-            })
-        );
-        return;
-    }
     if qualification.is_none() && effective_start == end_epoch && effective_epoch_spans.len() > 1 {
         if !verify_snapshots {
             eprintln!("error: multi-runtime epoch assembly requires --verify");
@@ -21194,10 +21247,21 @@ async fn main() {
                 .map(Path::new),
             epoch < end_epoch,
             None,
+            if epoch223_tail_preflight {
+                epoch223_qualification::TailMode::PlanningPreflight
+            } else if epoch223_tail_comparison {
+                epoch223_qualification::TailMode::Comparison
+            } else {
+                epoch223_qualification::TailMode::Disabled
+            },
         )
         .await;
         match result {
-            Ok(result) => {
+            Ok(ReplayRunOutcome::PlanningPreflight(report)) => {
+                println!("{report}");
+                return;
+            }
+            Ok(ReplayRunOutcome::Completed(result)) => {
                 let finalization_route =
                     archive_finalization_route(root_checkpoint_cohort, qualification, range_info);
                 if finalization_route == ArchiveFinalizationRoute::RootCheckpointCohort {

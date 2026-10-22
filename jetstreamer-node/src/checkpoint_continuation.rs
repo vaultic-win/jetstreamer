@@ -852,8 +852,10 @@ pub(crate) async fn run(
         None,
         false,
         Some(&validated),
+        epoch223_qualification::TailMode::Disabled,
     )
-    .await?;
+    .await?
+    .completed()?;
     require(
         !shutdown.load(Ordering::SeqCst),
         "continuation was interrupted",

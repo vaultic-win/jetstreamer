@@ -7,6 +7,40 @@ pub(crate) const COLD_BOOTSTRAP: u64 = 96_335_538;
 pub(crate) const TAIL_BOOTSTRAP: u64 = 96_767_522;
 pub(crate) const OUTPUT_END: u64 = 96_767_999;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TailMode {
+    Disabled,
+    Comparison,
+    PlanningPreflight,
+}
+
+pub(crate) fn planning_report(
+    plan: QualificationPlan,
+    selection: &compatibility::RuntimeSelection,
+) -> serde_json::Value {
+    let worker = selection
+        .descriptor
+        .worker
+        .as_ref()
+        .expect("tail runtime validated");
+    serde_json::json!({
+        "schema":"jetstreamer-private-epoch223-tail-planning-preflight-v2",
+        "epoch":223,"bootstrap_slot":plan.bootstrap_slot,"output_slot_start":plan.output_slot_start,
+        "terminal_slot":plan.end_inclusive,"output_slot_count":477,
+        "runtime_profile":selection.descriptor.identity.name,
+        "runtime_revision":selection.descriptor.identity.revision,
+        "worker_identity":worker.identity,"worker_environment_override":worker.environment_override,
+        "canonical_bootstrap_bound":true,"canonical_terminal_required":false,
+        "runtime_checkpoint_policy_validated":true,"pre_worker_barrier_reached":true,
+        "terminal_canonical_root_independently_known":false,"tail_comparison_only":true,
+        "complete_epoch_span_covered":false,"worker_spawned":false,"archive_created":false,
+        "snapshot_schema_or_contents_tested":false,"fresh_resource_admission_passed":false,
+        "canonical_prefix_qualified":false,"full_cold_epoch_peak_qualified":false,
+        "replay_launch_authorized":false,"runtime_promotion_authorized":false,
+        "canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false
+    })
+}
+
 pub(crate) fn validate_preflight_io(
     preflight: bool,
     extract_to_ledger: bool,
@@ -172,6 +206,103 @@ pub(crate) fn validate_launch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    async fn actual_worker_barrier(
+        mode: TailMode,
+        expected: Option<BTreeMap<u64, BankHashExpectation>>,
+    ) -> Result<crate::ReplayRunOutcome, String> {
+        use crate::{ReplayBootstrap, ReplayCursor, RestartTracker, SnapshotVerifier};
+        use std::sync::{Arc, atomic::AtomicBool};
+        let root = std::path::PathBuf::from(format!(
+            "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-tail-barrier-test-{}",
+            std::process::id()
+        ));
+        assert!(!root.exists(), "planning test must use absent paths");
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let result = crate::run_geyser_replay(
+            223, true, &root.join("ledger"), &root.join("scratch"),
+            &ReplayBootstrap::SnapshotArchive(Path::new("/absent/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst").into()),
+            shutdown.clone(), Arc::new(ReplayCursor::new()), Arc::new(RestartTracker::new()),
+            expected.map(|e| Arc::new(SnapshotVerifier::new(e, Some(shutdown)))),
+            root.join("output/epoch-223.jet"), Some(tail_plan()),
+            None, None, None, None, None, None, false, None, mode,
+        ).await;
+        assert!(
+            !root.exists(),
+            "planning must not create worker/archive state"
+        );
+        result
+    }
+    #[tokio::test]
+    #[cfg(feature = "epoch223-v1-6-25-qualification")]
+    async fn actual_replay_barrier_preflight_covers_candidate_checkpoint_gate_without_worker() {
+        let known = BankHashExpectation::LegacyAccountsHash(
+            "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7"
+                .parse()
+                .unwrap(),
+        );
+        let expected = BTreeMap::from([(TAIL_BOOTSTRAP, known)]);
+        let outcome = actual_worker_barrier(TailMode::PlanningPreflight, Some(expected.clone()))
+            .await
+            .unwrap();
+        let crate::ReplayRunOutcome::PlanningPreflight(report) = outcome else {
+            panic!("preflight cannot be replay completion");
+        };
+        assert_eq!(
+            report["schema"],
+            "jetstreamer-private-epoch223-tail-planning-preflight-v2"
+        );
+        assert_eq!(report["runtime_checkpoint_policy_validated"], true);
+        assert_eq!(report["pre_worker_barrier_reached"], true);
+        assert_eq!(report["worker_profile_validated"], true);
+        assert!(
+            report["worker_executable"]
+                .as_str()
+                .unwrap()
+                .ends_with("jetstreamer-historical-worker-v1-6-25")
+        );
+        assert_eq!(report["worker_spawned"], false);
+        assert!(
+            crate::ReplayRunOutcome::PlanningPreflight(report)
+                .completed()
+                .is_err()
+        );
+        let ordinary = actual_worker_barrier(TailMode::Disabled, Some(expected.clone())).await;
+        assert!(
+            matches!(ordinary, Err(e) if e.contains("at least one trusted post-bootstrap checkpoint"))
+        );
+        assert!(
+            actual_worker_barrier(TailMode::PlanningPreflight, None)
+                .await
+                .is_err()
+        );
+        assert!(
+            actual_worker_barrier(TailMode::PlanningPreflight, Some(BTreeMap::new()))
+                .await
+                .is_err()
+        );
+        let mut fabricated = expected;
+        fabricated.insert(COLD_BOOTSTRAP, known);
+        assert!(
+            actual_worker_barrier(TailMode::PlanningPreflight, Some(fabricated.clone()))
+                .await
+                .is_err()
+        );
+        fabricated.remove(&COLD_BOOTSTRAP);
+        fabricated.insert(OUTPUT_END, known);
+        assert!(
+            actual_worker_barrier(TailMode::PlanningPreflight, Some(fabricated))
+                .await
+                .is_err()
+        );
+    }
+    #[tokio::test]
+    #[cfg(not(feature = "epoch223-v1-6-25-qualification"))]
+    async fn actual_default_replay_barrier_rejects_private_tail_mode_without_worker() {
+        assert!(
+            matches!(actual_worker_barrier(TailMode::PlanningPreflight, None).await,
+            Err(e) if e.contains("explicit epoch223 tail execution cannot borrow ordinary"))
+        );
+    }
     fn tail_plan() -> QualificationPlan {
         QualificationPlan {
             epoch: 223,
@@ -263,6 +394,12 @@ mod tests {
         let selected = crate::bootstrap_runtime_selection(range.clone(), true, true).unwrap();
         validate_tail_runtime(&selected).unwrap();
         assert_eq!(selected.descriptor.identity.name, "solana-v1.6.25");
+        let profile = crate::historical_worker_profile(selected.descriptor).unwrap();
+        assert_eq!(profile.backend_id, "solana-v1.6.25");
+        assert_eq!(
+            profile.solana_commit,
+            "7de8a55b54d3e11058b82f9483bb405d143b455c"
+        );
         let spans = crate::plan_runtime_spans_for_invocation(range, true, true).unwrap();
         assert_eq!(spans.len(), 1);
         assert!(std::ptr::eq(

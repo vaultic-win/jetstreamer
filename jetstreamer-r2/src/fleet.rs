@@ -681,7 +681,7 @@ fn validate_same_sample_admission(
         guard_plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
             && guard_plan["unit"] == claim.unit
             && guard_plan["invocation_id"] == claim.invocation_id
-            && guard_plan["worker_root"].as_str() == claim.scratch_path.to_str()
+            && guard_plan["worker_root"].as_str() == diagnostic_guard_worker_root(claim).to_str()
             && diagnostic_guard_profile_matches(claim, guard_plan)
             && guard_plan["maximum_worker_vmas"] == 3_500_000
             && guard["maximum_worker_vmas"] == guard_plan["maximum_worker_vmas"]
@@ -696,6 +696,14 @@ fn validate_same_sample_admission(
         "admission guard plan or safety envelope differs"
     );
     Ok(())
+}
+
+fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
+    if tail223::namespace(claim) {
+        claim.scratch_path.join("scratch")
+    } else {
+        claim.scratch_path.clone()
+    }
 }
 
 fn diagnostic_guard_workers_match(claim: &DiagnosticClaim, workers: &[Value]) -> bool {
@@ -3044,6 +3052,61 @@ mod tests {
         let guard = json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_sha256":"61e189bb50d58fa446b84f016d3b19433c30f490c6d470907130f113a01b644a","recorded_unix_seconds":1792455124u64,"producer_invocation_id":"c".repeat(32),"producer":{"invocation_id":"c".repeat(32),"cgroup":"/system.slice/horizon-qualify-225-bounded-resource-test.service","active":"active","sub":"running","load_state":"loaded","result":"success","restart_policy":"no","kill_mode":"control-group","delegated":false,"restarts":0,"pid":123},"trip_reason":null,"worker_observation_error":null,"canary_target_error":null,"workers":[[124,416937]],"maximum_worker_vmas":3500000,"minimum_free_bytes":2910800286422u64,"available_bytes":3605067464704u64,"r2_mutations":false,"remote_mutations":false});
         let guard_plan = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":"horizon-qualify-225-bounded-resource-test.service","invocation_id":"c".repeat(32),"worker_root":"/new/scratch","bounded_canary":{"expected_uid":1000},"maximum_worker_vmas":3500000,"minimum_free_bytes":2910800286422u64});
         (previous, plan, guard, guard_plan)
+    }
+    #[test]
+    fn tail223_same_sample_admission_binds_nested_worker_root_at_real_call_site() {
+        let (previous, mut plan, mut guard, mut gp) = admission_fixture();
+        let (mut claim, launch) = tail223::tests::fixture();
+        claim.invocation_id = "c".repeat(32);
+        let root = tempfile::tempdir().unwrap();
+        let bytes = serde_json::to_vec(&launch).unwrap();
+        let path = root.path().join("tail-launch.json");
+        fs::write(&path, &bytes).unwrap();
+        claim.launch_receipt = BoundFile {
+            path,
+            sha256: hex_lower(&Sha256::digest(&bytes)),
+        };
+        gp["unit"] = json!(claim.unit);
+        gp["worker_root"] = json!(claim.scratch_path.join("scratch"));
+        gp["filesystem"] = json!("/");
+        gp["minimum_free_bytes"] = json!(3024728567181u64);
+        gp.as_object_mut().unwrap().remove("bounded_canary");
+        guard["producer"]["cgroup"] = json!(format!("/system.slice/{}", claim.unit));
+        guard["guard_sha256"] = json!(tail223::GUARD_SHA);
+        guard["minimum_free_bytes"] = gp["minimum_free_bytes"].clone();
+        plan.diagnostics[1] = claim;
+        let check = |g: &Value, p: &Value| {
+            validate_same_sample_admission(
+                &previous,
+                &plan,
+                "2026-10-20T00:04:42Z",
+                g,
+                p,
+                1792455200,
+            )
+        };
+        check(&guard, &gp).unwrap();
+        for path in [
+            plan.diagnostics[1].scratch_path.clone(),
+            root.path().to_owned(),
+            plan.diagnostics[1].scratch_path.join("scratch-other"),
+        ] {
+            let mut bad = gp.clone();
+            bad["worker_root"] = json!(path);
+            assert!(check(&guard, &bad).is_err());
+        }
+        for workers in [
+            json!([]),
+            json!([[124, 10], [125, 10]]),
+            json!([[124, 3500001]]),
+        ] {
+            let mut bad = guard.clone();
+            bad["workers"] = workers;
+            assert!(check(&bad, &gp).is_err());
+        }
+        let mut bad = gp.clone();
+        bad["bounded_canary"] = json!({"expected_uid":1000});
+        assert!(check(&guard, &bad).is_err());
     }
     #[test]
     fn natural_root_prefix_admission_still_requires_one_real_worker_and_protection() {
