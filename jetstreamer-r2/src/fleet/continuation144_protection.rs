@@ -170,7 +170,7 @@ pub(super) fn owners(fleet: &Value, current: &BTreeMap<String, Value>) -> Result
     Ok(())
 }
 
-fn remote_matches(remote: &InventoryEntry, ready: &Value) -> Result<()> {
+pub(super) fn remote_matches(remote: &InventoryEntry, ready: &Value) -> Result<()> {
     ensure!(
         remote.epoch == 198
             && remote.state == InventoryState::ReadyPair
@@ -336,7 +336,7 @@ mod tests {
     fn ready() -> Value {
         json!({"schema":"jetstreamer-horizon-r2-receipt-v1","epoch":198,"archive_key":"epoch-198.jet",
             "checksum_key":"epoch-198.jet.sha256","bucket":"solana-archive-with-accounts-data",
-            "archive_length":99381250591u64,"archive_sha256":ARCHIVE_SHA,"remote_sha256_readback":true})
+            "archive_length":99381250591u64,"archive_sha256":ARCHIVE_SHA,"remote_sha256_readback":true,"archive_etag":"original-etag"})
     }
     #[test]
     fn release_preserves_every_other_reservation_floor_margin_and_slack() {
@@ -351,6 +351,24 @@ mod tests {
         }
         assert_eq!(r["century_floor_bytes"], 205211459014u64);
         assert_eq!(r["priority_margin_bytes"], 64u64 << 30);
+    }
+    #[test]
+    fn authenticated_pair_must_retain_original_etag_and_metadata_not_just_length() {
+        let mut remote = InventoryEntry {
+            epoch: 198,
+            state: InventoryState::ReadyPair,
+            archive_length: Some(99_381_250_591),
+            archive_etag: Some("original-etag".into()),
+            archive_metadata_sha256: Some(ARCHIVE_SHA.into()),
+            sidecar_sha256: Some(ARCHIVE_SHA.into()),
+            native_composite_sha256: false,
+        };
+        remote_matches(&remote, &ready()).unwrap();
+        remote.archive_etag = Some("replaced-object".into());
+        assert!(remote_matches(&remote, &ready()).is_err());
+        remote.archive_etag = Some("original-etag".into());
+        remote.archive_metadata_sha256 = None;
+        assert!(remote_matches(&remote, &ready()).is_err());
     }
     #[test]
     fn no_release_from_wrong_pair_unverified_receipt_or_underfunded_policy() {
