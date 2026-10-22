@@ -42,6 +42,58 @@ const HANDOFF_EXTRACTION_LIMITS: SnapshotExtractionLimits = SnapshotExtractionLi
     extracted_size: MAX_HANDOFF_ARCHIVE_EXTRACTED_SIZE,
 };
 
+/// Metadata-only access uses the same bounded raw-tar guard as restoration,
+/// but extracts nothing and never initializes account stores or a Bank.
+#[cfg(feature = "snapshot-hard-fork-metadata")]
+pub fn snapshot_hard_forks<R: Read>(
+    reader: R,
+    expected_slot: u64,
+) -> Result<solana_runtime::serde_snapshot::SnapshotHardForkMetadata, String> {
+    let guarded = HandoffTarReader::new(reader, HANDOFF_EXTRACTION_LIMITS)?;
+    let mut archive = Archive::new(guarded);
+    let expected = PathBuf::from(format!("snapshots/{}/{}", expected_slot, expected_slot));
+    let mut version_seen = false;
+    for entry in archive.entries().map_err(|e| e.to_string())? {
+        let mut entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path().map_err(|e| e.to_string())?.into_owned();
+        if path == Path::new("version") {
+            if version_seen
+                || !entry.header().entry_type().is_file()
+                || entry.header().size().map_err(|e| e.to_string())? > MAX_VERSION_FILE_SIZE
+            {
+                return Err("unsafe or duplicate snapshot version".to_string());
+            }
+            let mut version = String::new();
+            entry
+                .read_to_string(&mut version)
+                .map_err(|e| e.to_string())?;
+            if version.trim() != SNAPSHOT_VERSION_1_2 {
+                return Err("unsupported snapshot metadata version".to_string());
+            }
+            version_seen = true;
+            continue;
+        }
+        if path != expected {
+            continue;
+        }
+        if !entry.header().entry_type().is_file()
+            || entry.header().size().map_err(|e| e.to_string())? > 128 * 1024 * 1024
+        {
+            return Err("unsafe or oversized bank metadata member".to_string());
+        }
+        if !version_seen {
+            return Err("native metadata requires version before bank member".to_string());
+        }
+        let decoded = solana_runtime::serde_snapshot::snapshot_hard_fork_metadata(&mut entry)
+            .map_err(|e| format!("native bank metadata decode: {}", e))?;
+        if decoded.slot != expected_slot {
+            return Err("bank metadata slot differs from bound member".to_string());
+        }
+        return Ok(decoded);
+    }
+    Err("exact bank metadata member not found".to_string())
+}
+
 /// Screens raw tar blocks before tar-rs sees them. tar 0.4.26's normal entry
 /// iterator eagerly reads GNU long-name/PAX payloads and GNU sparse extension
 /// chains before yielding an entry, so checks performed on yielded entries are
@@ -1173,6 +1225,30 @@ mod tests {
         assert!(error.contains("more than 1 entries"));
         assert!(destination.path().join("version").is_file());
         assert!(!destination.path().join("accounts/7.1").exists());
+    }
+
+    #[test]
+    #[cfg(feature = "snapshot-hard-fork-metadata")]
+    fn hard_fork_metadata_requires_exact_member_and_bounds_before_decode() {
+        let mut header = tar::Header::new_gnu();
+        header.set_mode(0o600);
+        header.set_entry_type(tar::EntryType::Regular);
+        header.set_path("snapshots/7/7").unwrap();
+        header.set_size(128 * 1024 * 1024 + 1);
+        header.set_cksum();
+        let error = snapshot_hard_forks(Cursor::new(header.as_bytes()), 7).unwrap_err();
+        assert!(error.contains("oversized bank metadata"));
+        let mut builder = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_mode(0o600);
+        header.set_size(5);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "version", Cursor::new(b"1.2.0"))
+            .unwrap();
+        builder.finish().unwrap();
+        let error = snapshot_hard_forks(Cursor::new(builder.into_inner().unwrap()), 7).unwrap_err();
+        assert!(error.contains("exact bank metadata member not found"));
     }
 
     #[test]
