@@ -67,6 +67,17 @@ directory as `pre223-v3.json` and `post225-v3.json`. The former contains markers
 hash matches the original successful bootstrap checkpoint. Metadata is not a
 replacement for full snapshot verification.
 
+The same sealed auditor also inspected the exact tail bootstrap at slot
+96,767,522 (snapshot SHA-256
+`dc7f2ac03813bc609629885af82222ac5af070cc6187b7bce08e10944fd214e1`).
+Its private `horizon-223-tail-hardfork-audit-20261022-v1/metadata.json`
+receipt SHA-256 is
+`b56472075e586b61af0e56796e7d91c8fe6a14900bc13fa599a7206cf8dbed75`.
+It contains all four markers, each with count one, parent slot 96,767,521,
+and serialized Bank hash `EWtQnBfEHcQ5hASVyH6u3LXT6WLu5MwWML6VKGg4MdxB`.
+This independently confirms the tail's persisted marker list; it does not
+verify the snapshot accounts, freeze a Bank, or qualify the 477-slot replay.
+
 The v1.6.20 candidate now restores these known future markers after loading a
 verified snapshot and before creating child Banks. It first validates the whole
 list: reject unknown markers, counts other than one, and any absent marker that
