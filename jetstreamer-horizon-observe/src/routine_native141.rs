@@ -24,9 +24,10 @@ pub(super) struct Profile {
 pub(super) fn reader(p: &Plan) -> bool {
     p.native141_audit.as_ref().is_some_and(|s| {
         if s.rejection.is_some() {
-            p.tools.r2.path == Path::new(REJECTION_READER)
+            (p.tools.r2.path == Path::new(REJECTION_READER)
                 && p.tools.r2.sha256 == REJECTION_READER_SHA
-                && is_sha(REJECTION_READER_SHA)
+                && is_sha(REJECTION_READER_SHA))
+                || assembly144_scans::reader(p)
         } else {
             p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA
         }

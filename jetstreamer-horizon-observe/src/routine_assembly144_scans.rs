@@ -3,6 +3,15 @@ use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-assembly144-scan-launches-20261022-v1";
 const RUNNER: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-tools-20261022-v1/jetstreamer-epoch144-private-verify";
 const RUNNER_SHA: &str = "7dfe0fdabbee8e5f79b131c2b7cece49dbebe489168fe195a9086ab25f0b8810";
+const READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-assembly144-scans-fleet-reader-20261022-v1/jetstreamer-r2";
+const READER_SHA: &str = "b67f113c2e54ec42751583bd3a4fdd0ab56e393de7b25e845973737c93926115";
+pub(super) fn reader(p: &Plan) -> bool {
+    p.assembly144_scans.is_some()
+        && p.tools.r2.path == Path::new(READER)
+        && p.tools.r2.sha256 == READER_SHA
+        && is_sha(READER_SHA)
+}
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
@@ -108,6 +117,10 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
         full: s.full,
         plugin: s.plugin,
     });
+    p.tools.r2 = Bound {
+        path: READER.into(),
+        sha256: READER_SHA.into(),
+    };
     validate(p)
 }
 fn fold(f: &mut Value, c: Value) -> Result<()> {

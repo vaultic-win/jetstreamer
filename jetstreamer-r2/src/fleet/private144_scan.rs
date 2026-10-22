@@ -253,6 +253,19 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
     live_limits(c, current)
 }
+fn root_identity(fields: &BTreeMap<&str, &str>) -> Result<()> {
+    ensure!(
+        fields
+            .get("User")
+            .is_some_and(|u| matches!(*u, "" | "root"))
+            && fields
+                .get("Group")
+                .is_some_and(|g| matches!(*g, "" | "root"))
+            && fields.get("DynamicUser") == Some(&"no"),
+        "private144scan requires explicit or default non-dynamic root"
+    );
+    Ok(())
+}
 fn live_limits(c: &PipelineClaim, current: &Value) -> Result<()> {
     ensure!(
         current["Type"] == "exec"
@@ -260,12 +273,12 @@ fn live_limits(c: &PipelineClaim, current: &Value) -> Result<()> {
             && current["NRestarts"] == "0",
         "private144scan owner changed"
     );
-    let o=ProcessCommand::new("systemctl").args(["show",&c.unit,"--property=User,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,RuntimeMaxUSec"]).output()?;
+    let o=ProcessCommand::new("systemctl").args(["show",&c.unit,"--property=User,Group,DynamicUser,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,RuntimeMaxUSec"]).output()?;
     ensure!(o.status.success(), "private144scan limits unreadable");
     let text = std::str::from_utf8(&o.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
+    root_identity(&fields)?;
     for (k, v) in [
-        ("User", "root"),
         ("Restart", "no"),
         ("KillMode", "control-group"),
         ("Delegate", "no"),
@@ -471,6 +484,27 @@ pub(super) fn capture_launch() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn root_identity_accepts_pid1_defaults_but_not_dynamic_or_foreign_users() {
+        for user in ["", "root"] {
+            for group in ["", "root"] {
+                let mut fields =
+                    BTreeMap::from([("User", user), ("Group", group), ("DynamicUser", "no")]);
+                root_identity(&fields).unwrap();
+                for (key, value) in [
+                    ("User", "sol"),
+                    ("Group", "horizon"),
+                    ("DynamicUser", "yes"),
+                ] {
+                    let mut bad = fields.clone();
+                    bad.insert(key, value);
+                    assert!(root_identity(&bad).is_err());
+                }
+                fields.remove("DynamicUser");
+                assert!(root_identity(&fields).is_err());
+            }
+        }
+    }
     #[test]
     fn capture_requires_exact_stage_and_live_owner() {
         for (stage, unit) in [
