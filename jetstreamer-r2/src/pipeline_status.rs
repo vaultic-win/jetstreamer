@@ -32,6 +32,40 @@ fn unit_name(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b))
 }
 
+// daemon-reload clears ExecStart's display-only timestamps and PID without
+// changing the live invocation or its executable/argv. Compare only those
+// metadata fields flexibly; command bytes and ignore_errors remain exact.
+fn exec_start_identity(value: &str) -> Option<&str> {
+    let (identity, metadata) = value.split_once(" ; start_time=")?;
+    if !identity.starts_with("{ path=")
+        || identity.matches(" ; argv[]=").count() != 1
+        || !identity.ends_with(" ; ignore_errors=no")
+        || value.matches(" ; start_time=").count() != 1
+    {
+        return None;
+    }
+    let fields: Vec<_> = metadata.strip_suffix(" }")?.split(" ; ").collect();
+    if fields.len() != 5
+        || !fields[0].starts_with('[')
+        || !fields[0].ends_with(']')
+        || !fields[1].starts_with("stop_time=[")
+        || !fields[1].ends_with(']')
+        || fields[2].strip_prefix("pid=")?.parse::<u32>().is_err()
+        || !fields[3].starts_with("code=")
+        || !fields[4].starts_with("status=")
+    {
+        return None;
+    }
+    Some(identity)
+}
+
+fn same_exec_start(expected: &str, current: &str) -> bool {
+    expected == current
+        || exec_start_identity(expected)
+            .zip(exec_start_identity(current))
+            .is_some_and(|(left, right)| left == right)
+}
+
 impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
@@ -85,7 +119,9 @@ impl Binding {
                 || (current["ActiveState"] == "activating" && current["SubState"] == "start"))
             && current["InvocationID"] == self.invocation_id
             && current["NRestarts"] == "0"
-            && current["ExecStart"] == self.expected_exec_start
+            && current["ExecStart"]
+                .as_str()
+                .is_some_and(|command| same_exec_start(&self.expected_exec_start, command))
             && current["MainPID"]
                 .as_str()
                 .and_then(|s| s.parse::<u64>().ok())
@@ -857,6 +893,38 @@ mod tests {
             ("MainPID", json!("0")),
             ("ExecStart", json!("different")),
             ("ActiveState", json!("inactive")),
+        ] {
+            let mut bad = current.clone();
+            bad[key] = value;
+            assert!(!b.live_matches(&bad));
+        }
+    }
+
+    #[test]
+    fn daemon_reload_changes_metadata_not_command_or_invocation() {
+        let before = "{ path=/sealed/upload.sh ; argv[]=/sealed/upload.sh --epochs 221-222 ; ignore_errors=no ; start_time=[Thu 2026-10-22 01:08:06 UTC] ; stop_time=[n/a] ; pid=2749578 ; code=(null) ; status=0/0 }";
+        let after = "{ path=/sealed/upload.sh ; argv[]=/sealed/upload.sh --epochs 221-222 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+        let mut b = binding();
+        b.expected_exec_start = before.to_owned();
+        let current = json!({"Id":b.unit,"LoadState":"loaded","ActiveState":"active","SubState":"running",
+            "InvocationID":b.invocation_id,"NRestarts":"0","MainPID":"2749578","ExecStart":after});
+        assert!(b.live_matches(&current));
+        for altered in [
+            after.replace("/sealed/upload.sh", "/other/upload.sh"),
+            after.replace("--epochs 221-222", "--epochs 220-222"),
+            after.replace(" ; ignore_errors=no", " --extra ; ignore_errors=no"),
+            after.replace("ignore_errors=no", "ignore_errors=yes"),
+            after.replace(" ; code=(null)", " ; start_time=[fake] ; code=(null)"),
+            after.replace(" ; pid=0", " ; pid=invalid"),
+        ] {
+            let mut bad = current.clone();
+            bad["ExecStart"] = json!(altered);
+            assert!(!b.live_matches(&bad), "accepted altered command: {altered}");
+        }
+        for (key, value) in [
+            ("InvocationID", json!("new")),
+            ("NRestarts", json!("1")),
+            ("MainPID", json!("0")),
         ] {
             let mut bad = current.clone();
             bad[key] = value;
