@@ -48,6 +48,9 @@ const PROTECTED: u64 = 4740696923590;
 const MARGIN: u64 = 1 << 30;
 const UID: u32 = 1001;
 const GID: u32 = 1003;
+// The writer lock opens every ancestor O_RDONLY|O_DIRECTORY, not O_PATH.
+// Only fresh, non-sensitive work roots get this mode; receipts stay0700.
+const WORK_MODE: u32 = 0o755;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -559,7 +562,7 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
     let dest = Path::new(PUBLIC);
     let public = directory(dest, UID, 0o3770)?;
     ensure!(public.metadata()?.gid() == GID, "destination group differs");
-    let work = directory(&p.work_directory, 0, 0o711)?;
+    let work = directory(&p.work_directory, 0, WORK_MODE)?;
     ensure!(
         work.metadata()?.dev() == source.metadata()?.dev()
             && work.metadata()?.dev() == public.metadata()?.dev(),
@@ -619,7 +622,7 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
             && current_public.metadata()?.ino() == public.metadata()?.ino(),
         "destination replaced during copy"
     );
-    let current_work = directory(&p.work_directory, 0, 0o711)?;
+    let current_work = directory(&p.work_directory, 0, WORK_MODE)?;
     ensure!(
         current_work.metadata()?.dev() == work.metadata()?.dev()
             && current_work.metadata()?.ino() == work.metadata()?.ino(),
@@ -676,7 +679,7 @@ fn capability(root: &Path, self_sha: &str) -> Result<()> {
                 .starts_with("epoch144-publication-capability-")),
         "foreign capability root"
     );
-    directory(root, 0, 0o711)?;
+    directory(root, 0, WORK_MODE)?;
     ensure!(
         fs::read_dir(root)?.next().is_none(),
         "capability root not empty"

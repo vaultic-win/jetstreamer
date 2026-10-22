@@ -49,7 +49,7 @@ mislabel their protected claims as the century floor, or bypass the guard to
 make this copy fit. Safe reclamation or a separately reviewed, measured envelope
 transition remains necessary if a later accepted sample still fails.
 
-The intended work root is a precreated root-owned mode0711 direct child of
+The intended work root is a precreated root-owned mode0755 direct child of
 `/home/sol/.jetstreamer-private` named `epoch144-publication-work-UNIQUE`.
 `stage/` must be absent. A root-owned mode0700 receipt root beneath
 `/var/lib/jetstreamer/horizon-epoch144-publication-UNIQUE` must have distinct
@@ -70,7 +70,7 @@ device numbers alone do not prove rename capability.
 ## Disposable kernel capability proof
 
 `--capability-probe ROOT --self-sha256 SHA` is a separate no-campaign mode.
-ROOT must be an empty root-owned mode0711 direct child of the private root named
+ROOT must be an empty root-owned mode0755 direct child of the private root named
 `epoch144-publication-capability-UNIQUE`. The sealed executable creates only fake
 bytes, a local destination and root-private receipt sinks beneath that root.
 It exercises the real write confinement, denial of an outside write, permanent
@@ -78,6 +78,14 @@ UID1001/GID1003 drop, checksum-last absence-only transaction, retained root
 receipt FD and transaction acknowledgement. It never opens the campaign source
 or public directory. The resulting receipt explicitly denies campaign import,
 registry promotion and R2 authority.
+
+Mode0755 is required on these fresh non-sensitive work roots because the
+transaction writer lock opens every ancestor with O_RDONLY|O_DIRECTORY, not
+O_PATH. Traverse-only0711 fails after the permanent privilege drop. Do not
+relax an existing root-private evidence tree; the receipt children stay0700.
+Set copy permissions while root still owns the new copy, then hand ownership
+to sol. The real publisher and capability probe share that checked helper and
+do not add CAP_FOWNER.
 
 Qualify this actual mode under the intended sandbox before any real import.
 Root needs only the reviewed traversal/ownership/credential-drop capabilities
