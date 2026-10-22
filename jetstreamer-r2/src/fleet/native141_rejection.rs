@@ -298,4 +298,33 @@ mod tests {
         bad["ExecStart"] = format!("{} --extra ; ignore_errors=no", expected_command(&r)).into();
         assert!(live(&c, &r, &bad).is_err());
     }
+    #[test]
+    #[ignore = "root-only exact guarded rejection attempt; no sample, inventory, native open or writes"]
+    fn root_actual_rejection_scope_and_sandbox() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let c = DiagnosticClaim {
+            epoch: 141,
+            unit: UNIT.into(),
+            invocation_id: "fa52eb7eb38b43178736eb70a61aeb16".into(),
+            scratch_path: ROOT.into(),
+            launch_receipt: BoundFile {
+                path: Path::new(ROOT).join("results/initial-guard.json"),
+                sha256: "55bf5992df561650e47fa5b1335f7b0f3b8527993060bede16c826490d5d148f".into(),
+            },
+        };
+        let r = bound_json(&c.launch_receipt).unwrap();
+        launch(&r, &c).unwrap();
+        let current = unit(UNIT).unwrap();
+        if current["ActiveState"] == "active" && current["SubState"] == "running" {
+            validate_live(&c, &current).unwrap();
+            println!(
+                "exact rejection diagnostic live scope, command and sandbox passed; no recovery authority"
+            );
+        } else {
+            assert_eq!(current["InvocationID"], c.invocation_id);
+            assert_eq!(current["NRestarts"], "0");
+            assert_eq!(current["MainPID"], "0");
+            println!("exact rejection attempt already terminal; no live proof or restart claimed");
+        }
+    }
 }
