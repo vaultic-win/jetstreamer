@@ -37,7 +37,7 @@ use {
         io::{Read, Seek, SeekFrom, Write},
         os::unix::{fs::MetadataExt as _, fs::OpenOptionsExt as _},
         path::{Path, PathBuf},
-        time::{Duration, SystemTime, UNIX_EPOCH},
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     },
     url::Url,
 };
@@ -69,6 +69,7 @@ mod cohort_finalization;
 mod fleet;
 mod inactive_status;
 mod pipeline_status;
+mod readback_progress;
 mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
@@ -2654,6 +2655,21 @@ async fn read_remote_sha256_resumable<W: Write>(
 
     let mut digest = Sha256::new();
     let mut received = 0u64;
+    let started = Instant::now();
+    let mut progress = readback_progress::ReadbackProgress::default();
+    eprintln!(
+        "{}",
+        serde_json::json!({
+            "event": "r2-readback-start",
+            "key": spec.key,
+            "expected_etag": spec.etag,
+            "expected_sha256": spec.expected_sha256,
+            "total_bytes": spec.expected_length,
+            "hashed_bytes": 0,
+            "elapsed_millis": 0,
+            "whole_file_sha256_verified": false
+        })
+    );
     // `buffered` polls several range requests concurrently but yields them in
     // input order. The writer and whole-object digest therefore still see one
     // canonical byte stream.
@@ -2673,6 +2689,19 @@ async fn read_remote_sha256_resumable<W: Write>(
         received = received
             .checked_add(u64::try_from(bytes.len())?)
             .ok_or_else(|| anyhow!("remote read length overflow"))?;
+        if progress.checkpoint(received, spec.expected_length) {
+            eprintln!(
+                "{}",
+                serde_json::json!({
+                    "event": "r2-readback-progress",
+                    "key": spec.key,
+                    "total_bytes": spec.expected_length,
+                    "hashed_bytes": received,
+                    "elapsed_millis": started.elapsed().as_millis(),
+                    "whole_file_sha256_verified": false
+                })
+            );
+        }
     }
     ensure!(
         received == spec.expected_length,
@@ -2681,6 +2710,17 @@ async fn read_remote_sha256_resumable<W: Write>(
     ensure!(
         format!("{:x}", digest.finalize()) == spec.expected_sha256,
         "remote SHA-256 mismatch"
+    );
+    eprintln!(
+        "{}",
+        serde_json::json!({
+            "event": "r2-readback-verified",
+            "key": spec.key,
+            "total_bytes": spec.expected_length,
+            "hashed_bytes": received,
+            "elapsed_millis": started.elapsed().as_millis(),
+            "whole_file_sha256_verified": true
+        })
     );
     Ok(())
 }
@@ -3081,7 +3121,13 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             .await?;
             true
         };
+    let revalidation_started = Instant::now();
+    eprintln!("epoch {epoch}: local source revalidation started after remote integrity proof");
     revalidate_local(&local)?;
+    eprintln!(
+        "epoch {epoch}: local source revalidation complete elapsed_millis={}",
+        revalidation_started.elapsed().as_millis()
+    );
 
     // The sidecar is the public completion marker. Publish it only after the
     // complete archive has passed every available remote integrity proof and
@@ -3927,6 +3973,118 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn instrumented_readback_preserves_digest_and_writer_failure_gates() {
+        const BODY: &[u8] = b"readback-fixture";
+        for outcome in ["success", "digest-mismatch", "writer-failure"] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let endpoint = format!("http://{}", listener.local_addr().unwrap());
+            listener.set_nonblocking(true).unwrap();
+            let server = std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(10);
+                let mut connection = loop {
+                    match listener.accept() {
+                        Ok((connection, _)) => break connection,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline, "fixture request never arrived");
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(error) => panic!("fixture accept failed: {error}"),
+                    }
+                };
+                connection
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut headers = Vec::new();
+                while !headers.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    connection.read_exact(&mut byte).unwrap();
+                    headers.push(byte[0]);
+                    assert!(headers.len() < 16 * 1024);
+                }
+                let headers = String::from_utf8(headers).unwrap().to_ascii_lowercase();
+                let mut request_line = headers.lines().next().unwrap().split_whitespace();
+                assert_eq!(request_line.next(), Some("get"));
+                assert_eq!(
+                    request_line.next().unwrap().split('?').next(),
+                    Some("/fixture/epoch-144.jet")
+                );
+                assert!(headers.contains(&format!("range: bytes=0-{}\r\n", BODY.len() - 1)));
+                let response = format!(
+                    "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes 0-{}/{}\r\nETag: \"fixture\"\r\nConnection: close\r\n\r\n",
+                    BODY.len(),
+                    BODY.len() - 1,
+                    BODY.len()
+                );
+                connection.write_all(response.as_bytes()).unwrap();
+                connection.write_all(BODY).unwrap();
+            });
+            let client = Client::from_conf(
+                S3ConfigBuilder::new()
+                    .behavior_version(BehaviorVersion::latest())
+                    .region(Region::new("auto"))
+                    .credentials_provider(SharedCredentialsProvider::new(Credentials::new(
+                        "fixture", "fixture", None, None, "fixture",
+                    )))
+                    .endpoint_url(endpoint)
+                    .force_path_style(true)
+                    .build(),
+            );
+            let expected_sha256 = if outcome == "digest-mismatch" {
+                "0".repeat(64)
+            } else {
+                format!("{:x}", Sha256::digest(BODY))
+            };
+            let spec = RemoteReadSpec {
+                bucket: "fixture",
+                key: "epoch-144.jet",
+                etag: "fixture",
+                expected_length: BODY.len() as u64,
+                expected_sha256: &expected_sha256,
+                concurrency: 1,
+            };
+            struct RejectWrites;
+            impl Write for RejectWrites {
+                fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::other("fixture writer failure"))
+                }
+                fn flush(&mut self) -> std::io::Result<()> {
+                    Ok(())
+                }
+            }
+            let mut written = Vec::new();
+            let result = tokio::time::timeout(Duration::from_secs(15), async {
+                if outcome == "writer-failure" {
+                    read_remote_sha256_resumable(&client, spec, &mut RejectWrites).await
+                } else {
+                    read_remote_sha256_resumable(&client, spec, &mut written).await
+                }
+            })
+            .await
+            .expect("local readback fixture timed out");
+            server.join().unwrap();
+            match outcome {
+                "success" => {
+                    result.unwrap();
+                    assert_eq!(written, BODY);
+                }
+                "digest-mismatch" => assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("remote SHA-256 mismatch")
+                ),
+                "writer-failure" => assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("fixture writer failure")
+                ),
+                _ => unreachable!(),
+            }
+        }
+    }
+
     #[test]
     fn discovers_sparse_local_pairs_only() {
         let directory = tempfile::tempdir().unwrap();
@@ -4327,5 +4485,33 @@ mod tests {
                 && sync_epoch.contains("&local.sidecar"),
             "orphan completion markers must be checked against the local sidecar"
         );
+    }
+
+    #[test]
+    fn readback_logs_count_only_ordered_written_and_hashed_bytes() {
+        let source = include_str!("main.rs");
+        let start = source
+            .find("async fn read_remote_sha256_resumable<")
+            .unwrap();
+        let end = start + source[start..].find("\nasync fn restore_epoch(").unwrap();
+        let readback = &source[start..end];
+        let ordered = readback.find("ensure!(start == received").unwrap();
+        let written = readback.find("writer.write_all(&bytes)?").unwrap();
+        let hashed = readback.find("digest.update(&bytes)").unwrap();
+        let checkpoint = readback
+            .find("progress.checkpoint(received, spec.expected_length)")
+            .unwrap();
+        let length_check = readback.find("received == spec.expected_length").unwrap();
+        let digest_check = readback
+            .find("format!(\"{:x}\", digest.finalize()) == spec.expected_sha256")
+            .unwrap();
+        let verified = readback
+            .find("\"event\": \"r2-readback-verified\"")
+            .unwrap();
+        assert!(ordered < written && written < hashed && hashed < checkpoint);
+        assert!(
+            checkpoint < length_check && length_check < digest_check && digest_check < verified
+        );
+        assert!(readback.contains("\"whole_file_sha256_verified\": false"));
     }
 }
