@@ -1,7 +1,7 @@
 # Epoch-223 tail package capability
 
 `jetstreamer-epoch223-tail-attest` is a closed, non-authorizing validator for
-the immutable `horizon-focused-223-v1625-tail-bd60006d-v1` package. It is not an
+the immutable `horizon-focused-223-v1625-tail-d2507ee8-v2` package. It is not an
 extension of complete-epoch attestation: its receipt explicitly describes only
 slots 96,767,523–96,767,999 (477 slots), with complete-epoch coverage, snapshot
 schema verification, fresh admission, launch and publication all false.
@@ -22,15 +22,31 @@ payload comparison. The first sealed attempt rejected this census safely;
 preserve that failed service and its journal. A regression binds the actual
 nine-line native checksum table rather than an invented eight-line format.
 
-Three actual-release probes run as UID/GID 1000 in a new isolated private root:
+Four actual-release probes run as UID/GID 1000 in a new isolated private root:
 reject the early failed-prefix recovery entrypoint; reject a wrong-but-nearby
 snapshot slot; and reach the correct focused v1.6.25 route before rejecting an
-intentionally absent exact-slot snapshot. Require the precise exit codes and
+intentionally absent exact-slot snapshot; then successfully finish actual
+post-bootstrap planning with the real sealed snapshot and checkpoint file,
+preseeded verified genesis, and both `--epoch223-tail-comparison` and
+`--epoch223-tail-preflight`. The fourth probe must report the exact selected
+v1.6.25 revision/worker, canonical bootstrap, 477-slot output range, no worker
+or archive creation, and no qualification/publication authority. An early
+missing-snapshot rejection alone did not exercise the terminal-planning gate
+that stopped the original tail parent before replay. Require precise exit codes and
 log markers, reject replay indications and archive/sidecar/segment evidence,
 and revalidate the complete package after all probes. Run the tool under a
 persistent read-only systemd sandbox, with network disabled and only exact
 receipt/private-probe creation paths writable. Root needs the minimal traversal
-and UID/GID-drop capabilities; do not weaken private directory modes.
+and UID/GID-drop capabilities plus `CAP_CHOWN` for the new user-owned probe root
+and genesis copies; bind the same minimal set through bounding and ambient
+capabilities. Children drop to UID/GID 1000 with no capabilities. Do not weaken
+private directory modes. Use the `qualification-223-v1625-tail-capability-*`
+namespace and the schema-v2 capability receipt; old three-probe receipts are
+not authority for this package. Set the probe service's `UMask=0077`: negative
+probes create directories before their expected snapshot rejection, and the
+fourth probe must find those directories still user-owned and private. The
+v5 sandbox inherited `0022` and correctly failed that gate; preserve its root
+and logs, then use a fresh plan/root/receipt generation with the corrected mask.
 
 The root-private logs and capability receipt are fsynced and no-clobber. A
 failed attempt is retained and cannot be retried in the same root or receipt
@@ -45,9 +61,10 @@ precede the tail replay. See `epoch223-v1625-qualification.md` for that isolated
 candidate; keep the original failed epoch and all canonical publication gates.
 
 The R2 fleet observer has a separate closed `horizon-qualify-223-v1625-tail-*`
-contract. It binds this exact package and successful three-probe capability
+contract. It binds this exact package and successful four-probe capability
 receipt, the 477-slot range, private paths, zero-restart identity and actual live
-command. Its ordinary natural-drainage guard has no target-stop exemption.
+command, including the comparison flag but never the preflight flag. Its
+ordinary natural-drainage guard has no target-stop exemption.
 The 416-GiB experiment envelope and protected older growth claims are minimum
 contract bounds, not resource admission. Fleet recognition neither launches the
 comparison nor authorizes full-prefix qualification, canonical sidecars or R2
