@@ -46,6 +46,20 @@ partial policy, then return without spawning a worker or creating an archive.
 Preflight requires preseeded regular genesis, forbids ledger extraction and
 performs no download. It is not snapshot-content verification or admission.
 Capability probes that stop at a missing snapshot do not prove this later gate.
+The second attempt exposed another gate inside the actual replay entrypoint:
+candidate execution also requires a trusted post-bootstrap checkpoint. The
+first preflight returned before that check. Its schema-v1 report therefore
+does not prove readiness to reach a worker. The revised schema-v2 preflight
+runs through the actual replay entrypoint and returns a distinct planning-only
+outcome at the real pre-worker barrier, after shared runtime/checkpoint and
+handoff validations. Only its exact explicit private 477-slot comparison may
+run with the known bootstrap alone; ordinary, cold, carried/cohort and restart
+paths retain their existing post-bootstrap obligations. Never turn a planning
+outcome into completion or construct a fictitious terminal expectation.
+The static audit also found the compiled IPC worker-profile identity had not
+included the epoch223 feature in its v1.6.25 overrides, although the registry
+descriptor already did. Bind and test both identities. The pre-worker report
+must now validate that profile and resolve its worker executable as well.
 The old static era label includes v1.6.20; the selected descriptor is v1.6.25,
 as asserted by the actual bootstrap-selector regression and new preflight.
 
