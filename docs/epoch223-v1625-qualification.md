@@ -84,3 +84,14 @@ fsyncs cgroup counters before exit. This RAM-only check neither reduces disk
 growth claims nor creates replay output, canonical sidecars or publication
 authority. A successful snapshot check is still not a tail replay or a cold
 epoch qualification.
+
+Use the optimized (`cargo test --release`) epoch223 test harness for new
+snapshot checks. The previous epoch225 debug attempt exhausted its 30-minute
+bound before finishing the first test; its optimized counterpart passed both
+checks within the same bounds. Epoch223's initial debug attempt remains
+independently sealed and supervised. Prepare a distinct optimized package and
+attempt instead of changing its executable, extending its timeout, or treating
+a timeout as a canonical mismatch. The optimized harness has the same source,
+feature and assertions, with 60 synthetic tests plus IPC passing; it still
+requires the two real snapshot tests. The replacement profile rejects the old
+debug digest and binds a distinct immutable release-harness directory.

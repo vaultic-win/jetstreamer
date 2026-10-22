@@ -68,7 +68,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
         p.test_binary.path.file_name().and_then(|s| s.to_str()) == Some("historical-worker")
             && p.test_binary.path.parent()
                 == Some(Path::new(
-                    "/var/lib/jetstreamer/horizon-223-tail-snapshot-harness-bd60006d-v1"
+                    "/var/lib/jetstreamer/horizon-223-tail-snapshot-harness-release-bd60006d-v1"
                 )),
         "foreign223 harness"
     );
@@ -384,7 +384,7 @@ mod tests {
     fn exact_223_profile_plan_cannot_borrow_225_or_run_entries() {
         let p = json!({"schema":"jetstreamer-private-epoch223-tail-ram-snapshot-test-plan-v1",
             "mode":"capability","unit":"archive-223-tail-snapshot-test-fixture.service",
-            "test_binary":{"path":"/var/lib/jetstreamer/horizon-223-tail-snapshot-harness-bd60006d-v1/historical-worker","sha256":TEST_SHA},
+            "test_binary":{"path":"/var/lib/jetstreamer/horizon-223-tail-snapshot-harness-release-bd60006d-v1/historical-worker","sha256":TEST_SHA},
             "snapshot":{"path":"/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst","sha256":SNAPSHOT_SHA},
             "genesis":{"path":"/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/genesis.tar.bz2","sha256":GENESIS_SHA},
             "observer":{"path":"/sample","sha256":"a".repeat(64)},"fleet":{"path":"/fleet","sha256":"b".repeat(64)},
@@ -398,6 +398,10 @@ mod tests {
             ("/mode", json!("replay")),
             ("/unit", json!("horizon-v1625-snapshot-test-225.service")),
             ("/test_binary/sha256", json!("a".repeat(64))),
+            (
+                "/test_binary/sha256",
+                json!("6baab37dfe86bd957ba21c22a2769f1d32c28bee930cad2b4b17d1eb25a087a5"),
+            ),
             ("/snapshot/path", json!("/foreign/snapshot")),
             ("/receipt_directory", json!("/tmp/receipts")),
             ("/maximum_runtime_seconds", json!(1801)),
