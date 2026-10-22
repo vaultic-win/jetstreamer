@@ -60,6 +60,10 @@ name = "jetstreamer-focused-package-attest"
 path = "src/focused_package_attest_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch223-tail-attest"
+path = "src/epoch223_tail_attest_bin.rs"
+
+[[bin]]
 name = "jetstreamer-gcs-metadata-observe"
 path = "src/gcs_metadata_observe_bin.rs"
 
