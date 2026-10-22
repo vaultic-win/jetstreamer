@@ -49,10 +49,22 @@ pub fn snapshot_hard_forks<R: Read>(
     reader: R,
     expected_slot: u64,
 ) -> Result<solana_runtime::serde_snapshot::SnapshotHardForkMetadata, String> {
+    let bytes = snapshot_bank_metadata_bytes(reader, expected_slot)?;
+    let decoded = solana_runtime::serde_snapshot::snapshot_hard_fork_metadata(&bytes[..])
+        .map_err(|e| format!("native bank metadata decode: {}", e))?;
+    if decoded.slot != expected_slot {
+        return Err("bank metadata slot differs from bound member".to_string());
+    }
+    Ok(decoded)
+}
+
+#[cfg(feature = "snapshot-hard-fork-metadata")]
+fn snapshot_bank_metadata_bytes<R: Read>(reader: R, expected_slot: u64) -> Result<Vec<u8>, String> {
     let guarded = HandoffTarReader::new(reader, HANDOFF_EXTRACTION_LIMITS)?;
     let mut archive = Archive::new(guarded);
     let expected = PathBuf::from(format!("snapshots/{}/{}", expected_slot, expected_slot));
     let mut version_seen = false;
+    let mut bank_bytes = None;
     for entry in archive.entries().map_err(|e| e.to_string())? {
         let mut entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path().map_err(|e| e.to_string())?.into_owned();
@@ -76,22 +88,22 @@ pub fn snapshot_hard_forks<R: Read>(
         if path != expected {
             continue;
         }
+        if bank_bytes.is_some() {
+            return Err("duplicate bank metadata member".to_string());
+        }
         if !entry.header().entry_type().is_file()
             || entry.header().size().map_err(|e| e.to_string())? > 256 * 1024 * 1024
         {
             return Err("unsafe or oversized bank metadata member".to_string());
         }
-        if !version_seen {
-            return Err("native metadata requires version before bank member".to_string());
-        }
-        let decoded = solana_runtime::serde_snapshot::snapshot_hard_fork_metadata(&mut entry)
-            .map_err(|e| format!("native bank metadata decode: {}", e))?;
-        if decoded.slot != expected_slot {
-            return Err("bank metadata slot differs from bound member".to_string());
-        }
-        return Ok(decoded);
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+        bank_bytes = Some(bytes);
     }
-    Err("exact bank metadata member not found".to_string())
+    if !version_seen {
+        return Err("snapshot metadata requires recognized version".to_string());
+    }
+    bank_bytes.ok_or_else(|| "exact bank metadata member not found".to_string())
 }
 
 /// Screens raw tar blocks before tar-rs sees them. tar 0.4.26's normal entry
@@ -1225,6 +1237,64 @@ mod tests {
         assert!(error.contains("more than 1 entries"));
         assert!(destination.path().join("version").is_file());
         assert!(!destination.path().join("accounts/7.1").exists());
+    }
+
+    #[test]
+    #[cfg(feature = "snapshot-hard-fork-metadata")]
+    fn hard_fork_metadata_validates_version_independent_of_tar_member_order() {
+        fn archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
+            let mut builder = tar::Builder::new(Vec::new());
+            for &(path, bytes) in entries {
+                let mut header = tar::Header::new_gnu();
+                header.set_mode(0o600);
+                header.set_size(bytes.len() as u64);
+                header.set_cksum();
+                builder
+                    .append_data(&mut header, path, Cursor::new(bytes))
+                    .unwrap();
+            }
+            builder.finish().unwrap();
+            builder.into_inner().unwrap()
+        }
+        for version_first in &[true, false] {
+            let version: (&str, &[u8]) = ("version", b"1.2.0");
+            let bank: (&str, &[u8]) = ("snapshots/7/7", b"bank");
+            let members = if *version_first {
+                vec![version, bank]
+            } else {
+                vec![bank, version]
+            };
+            assert_eq!(
+                snapshot_bank_metadata_bytes(Cursor::new(archive(&members)), 7).unwrap(),
+                b"bank"
+            );
+        }
+        let invalid = archive(&[("snapshots/7/7", b"bank"), ("version", b"9.9.9")]);
+        assert!(snapshot_bank_metadata_bytes(Cursor::new(invalid), 7)
+            .unwrap_err()
+            .contains("unsupported"));
+        let missing = archive(&[("snapshots/7/7", b"bank")]);
+        assert!(snapshot_bank_metadata_bytes(Cursor::new(missing), 7)
+            .unwrap_err()
+            .contains("recognized version"));
+        for members in &[
+            vec![
+                ("version", &b"1.2.0"[..]),
+                ("version", &b"1.2.0"[..]),
+                ("snapshots/7/7", &b"bank"[..]),
+            ],
+            vec![
+                ("version", &b"1.2.0"[..]),
+                ("snapshots/7/7", &b"bank"[..]),
+                ("snapshots/7/7", &b"bank"[..]),
+            ],
+        ] {
+            assert!(
+                snapshot_bank_metadata_bytes(Cursor::new(archive(members)), 7)
+                    .unwrap_err()
+                    .contains("duplicate")
+            );
+        }
     }
 
     #[test]

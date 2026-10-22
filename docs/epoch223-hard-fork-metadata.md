@@ -42,6 +42,13 @@ with the one-past-cap rejection regression retained. This changes no
 ordinary snapshot restoration limit or replay semantics; qualify a new auditor
 generation and preserve the initial failed audit.
 
+The next audit rejected the real tar ordering: its version member follows the
+bank member. The metadata reader now buffers at most the bounded bank member,
+finishes the guarded member census, validates the recognized version, and only
+then decodes the bank bytes. No accounts are extracted. Regressions cover both
+member orders and missing, unsupported, and duplicate version/bank members.
+Preserve the second failed audit; neither failure establishes a hard-fork list.
+
 On high-core hosts, run legacy tests serially with explicit bounded Rayon and
 PoH thread settings. Parallel synthetic Bank tests can exhaust a test unit's
 task ceiling; preserve such failures and diagnose their actual thread-pool
