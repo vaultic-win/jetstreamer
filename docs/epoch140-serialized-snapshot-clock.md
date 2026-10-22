@@ -63,3 +63,36 @@ input promotion, assembly, import, sidecars, publication or local retirement.
 Those gates stay independent, including the actual executing suffix worker's
 native tuple comparison and a complete retained-prefix reread/hash. Preserve
 the snapshot, original140archive and all141repair evidence on diagnostic failure.
+
+## Original failed-cohort bootstrap comparison
+
+The distinct `epoch140-original-bootstrap-clock-diagnostic` feature builds only
+`jetstreamer-epoch140-original-bootstrap-clock` for the retained60479583bootstrap
+used by the original140–143cohort. Its compile-bound input is a separate sealed
+root0400 copy, not the user-owned original. It pins size3238609546, SHA256
+`350464cd9a2341c94edde7544fcb8958a968ea9f322d38a8daec145e1a2bb48b`, device2304
+and inode6322697. The source's MD5/CRC32C match the original sealed generation
+1634786593623999 preflight. Neither the original snapshot nor any live lane is
+modified. This profile is mutually exclusive with both earlier clock profiles.
+
+It retains the same typed layout, full compressed hash/census, no-extraction,
+identity, no-clobber and900second guards. Its minimum3984782679494byte data-floor
+protection is the current delivery-only older-claim/guard envelope, not a
+change to an existing live guard or to either earlier profile's minimum.
+Fresh complete admission and an exact sandbox remain required before execution.
+Before opening the snapshot, this profile additionally checks130GiB available
+memory (128GiB protected plus a2GiB hard reader envelope) and retains100GiB OS
+free plus64MiB output/log headroom. It repeats these checks before committing
+the final receipt and records their exact values. Output is fixed to the new
+root-private OS directory's `clock.json`; older profiles keep their old scope.
+
+Only this diagnostic profile may report serialized `hashes_per_tick: 0` as an
+observation rather than reject it; missing/disabled work is the hypothesis being
+tested. Its distinct schema is
+`jetstreamer-epoch140-original-bootstrap-serialized-clock-v1`. It does not
+authenticate a runtime clock, prove the original live Bank's in-memory clock,
+or authorize changing work checks. In particular, enabled per-entry checks in
+the immutable failed worker make it necessary to inspect its actual bootstrap
+clock before borrowing the separate epoch208 reconstruction explanation.
+Native restore, exact source/Bank differential, root, plugin and publication
+gates remain independent regardless of the observed value.

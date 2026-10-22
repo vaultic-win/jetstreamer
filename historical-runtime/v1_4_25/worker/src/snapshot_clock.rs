@@ -11,19 +11,33 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(all(
-    feature = "epoch140-snapshot-clock-diagnostic",
-    feature = "epoch144-snapshot-clock-diagnostic"
+#[cfg(any(
+    all(
+        feature = "epoch140-snapshot-clock-diagnostic",
+        feature = "epoch144-snapshot-clock-diagnostic"
+    ),
+    all(
+        feature = "epoch140-original-bootstrap-clock-diagnostic",
+        feature = "epoch140-snapshot-clock-diagnostic"
+    ),
+    all(
+        feature = "epoch140-original-bootstrap-clock-diagnostic",
+        feature = "epoch144-snapshot-clock-diagnostic"
+    )
 ))]
 compile_error!("exact snapshot observation profiles are mutually exclusive");
 
-#[cfg(not(feature = "epoch144-snapshot-clock-diagnostic"))]
+#[cfg(not(any(
+    feature = "epoch144-snapshot-clock-diagnostic",
+    feature = "epoch140-original-bootstrap-clock-diagnostic"
+)))]
 mod profile {
     pub const SLOT: u64 = 60_911_751;
     pub const INPUT: &str = "/home/sol/.jetstreamer-private/epoch140-snapshot-source-20261020-v1/download/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst";
     pub const INPUT_SIZE: u64 = 2_741_858_751;
     pub const INPUT_SHA: &str = "47d5911465901975e397c570e06ccf72296db7ecd3b3b1beda710cacd3e683a1";
     pub const INPUT_INODE: u64 = 105578537;
+    pub const INPUT_DEVICE: u64 = 64512;
     pub const PROTECTED_FREE: u64 = 5_153_080_892_870;
     pub const SCHEMA: &str = "jetstreamer-epoch140-serialized-snapshot-clock-v1";
     pub const GUARD_SCHEMA: &str =
@@ -36,10 +50,23 @@ mod profile {
     pub const INPUT_SIZE: u64 = 2_569_233_422;
     pub const INPUT_SHA: &str = "f170976b2bc3f2d55dd0fbb5a415bfeae8d0903a0ad69334d8aa993b5cab35ae";
     pub const INPUT_INODE: u64 = 105578509;
+    pub const INPUT_DEVICE: u64 = 64512;
     pub const PROTECTED_FREE: u64 = 4_740_696_923_590;
     pub const SCHEMA: &str = "jetstreamer-epoch144-serialized-snapshot-clock-v1";
     pub const GUARD_SCHEMA: &str =
         "jetstreamer-epoch144-serialized-snapshot-clock-initial-guard-v1";
+}
+#[cfg(feature = "epoch140-original-bootstrap-clock-diagnostic")]
+mod profile {
+    pub const SLOT: u64 = 60_479_583;
+    pub const INPUT: &str = "/usr/local/lib/jetstreamer/horizon-epoch140-original-bootstrap-clock-input-20261022-v1/snapshot-60479583-J8K4RVWeRvQavXqwbhA58KCWHKWGaRENqALCed65rfkZ.tar.zst";
+    pub const INPUT_SIZE: u64 = 3_238_609_546;
+    pub const INPUT_SHA: &str = "350464cd9a2341c94edde7544fcb8958a968ea9f322d38a8daec145e1a2bb48b";
+    pub const INPUT_INODE: u64 = 6322697;
+    pub const INPUT_DEVICE: u64 = 2304;
+    pub const PROTECTED_FREE: u64 = 3_984_782_679_494;
+    pub const SCHEMA: &str = "jetstreamer-epoch140-original-bootstrap-serialized-clock-v1";
+    pub const GUARD_SCHEMA: &str = "jetstreamer-epoch140-original-bootstrap-clock-initial-guard-v1";
 }
 use self::profile::*;
 const MAX_SECONDS: u64 = 900;
@@ -75,7 +102,8 @@ fn clock<R: Read>(reader: R, expected_slot: u64) -> Result<Clock, String> {
     if prefix.slot != expected_slot
         || prefix.ticks_per_slot == 0
         || prefix.ticks_per_slot > 1024
-        || prefix.hashes_per_tick == Some(0)
+        || (prefix.hashes_per_tick == Some(0)
+            && !cfg!(feature = "epoch140-original-bootstrap-clock-diagnostic"))
     {
         return Err("serialized slot/clock is outside diagnostic scope".into());
     }
@@ -251,6 +279,59 @@ struct Guarded<'a, R> {
     inner: R,
     guard: &'a Guard,
 }
+
+fn original_memory_admission(text: &str) -> Result<serde_json::Value, String> {
+    let rows: Vec<_> = text
+        .lines()
+        .filter_map(|line| line.strip_prefix("MemAvailable:"))
+        .collect();
+    if rows.len() != 1 {
+        return Err("missing/duplicate MemAvailable".into());
+    }
+    let fields: Vec<_> = rows[0].split_whitespace().collect();
+    if fields.len() != 2 || fields[1] != "kB" {
+        return Err("invalid MemAvailable units".into());
+    }
+    let available = fields[0]
+        .parse::<u64>()
+        .map_err(|e| e.to_string())?
+        .checked_mul(1024)
+        .ok_or("memory overflow")?;
+    let minimum = 130_u64 << 30;
+    if available < minimum {
+        return Err("original clock memory reserve unavailable".into());
+    }
+    Ok(
+        serde_json::json!({"available_bytes":available,"protected_memory_bytes":128_u64<<30,
+        "diagnostic_memory_max_bytes":2_u64<<30,"minimum_available_bytes":minimum,"admitted":true}),
+    )
+}
+
+fn original_admission() -> Result<Option<serde_json::Value>, String> {
+    if !cfg!(feature = "epoch140-original-bootstrap-clock-diagnostic") {
+        return Ok(None);
+    }
+    let mut value = original_memory_admission(
+        &fs::read_to_string("/proc/meminfo").map_err(|e| e.to_string())?,
+    )?;
+    let path = std::ffi::CString::new("/var/lib/jetstreamer").unwrap();
+    let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    if unsafe { libc::statvfs(path.as_ptr(), stat.as_mut_ptr()) } != 0 {
+        return Err(io::Error::last_os_error().to_string());
+    }
+    let stat = unsafe { stat.assume_init() };
+    let available = stat
+        .f_bavail
+        .checked_mul(stat.f_frsize)
+        .ok_or("OS space overflow")?;
+    if available < (100_u64 << 30) + (64_u64 << 20) {
+        return Err("original clock OS reserve unavailable".into());
+    }
+    value["os_available_bytes"] = serde_json::json!(available);
+    value["os_protected_bytes"] = serde_json::json!(100_u64 << 30);
+    value["output_log_envelope_bytes"] = serde_json::json!(64_u64 << 20);
+    Ok(Some(value))
+}
 impl<'a, R: Read> Read for Guarded<'a, R> {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         self.guard.check()?;
@@ -282,6 +363,15 @@ pub fn run() -> Result<(), String> {
     }
     let output = PathBuf::from(&args[1]);
     let parent = output.parent().ok_or("missing output parent")?;
+    if cfg!(feature = "epoch140-original-bootstrap-clock-diagnostic")
+        && (parent
+            != Path::new(
+                "/var/lib/jetstreamer/horizon-epoch140-original-bootstrap-clock-20261022-v1",
+            )
+            || output.file_name().and_then(|name| name.to_str()) != Some("clock.json"))
+    {
+        return Err("original clock output outside exact OS private root".into());
+    }
     let m = fs::symlink_metadata(parent).map_err(|e| e.to_string())?;
     if !output.is_absolute()
         || parent.canonicalize().map_err(|e| e.to_string())? != parent
@@ -313,6 +403,7 @@ pub fn run() -> Result<(), String> {
     if source.finish().1 != LAYOUT_SHA {
         return Err("pinned serialized layout source changed".into());
     }
+    let admission = original_admission()?;
     let invocation = env::var("INVOCATION_ID").map_err(|e| e.to_string())?;
     if invocation.len() != 32
         || !invocation
@@ -332,7 +423,7 @@ pub fn run() -> Result<(), String> {
         || before.uid() != 0
         || before.mode() & 0o222 != 0
         || before.len() != INPUT_SIZE
-        || before.dev() != 64512
+        || before.dev() != INPUT_DEVICE
         || before.ino() != INPUT_INODE
     {
         return Err("frozen exact snapshot identity mismatch".into());
@@ -342,19 +433,20 @@ pub fn run() -> Result<(), String> {
         return Err("guard/output overlap".into());
     }
     let initial_available = guard.check().map_err(|e| e.to_string())?;
-    write_json(
-        &initial,
-        &serde_json::json!({
-            "schema":GUARD_SCHEMA,
-            "invocation_id":invocation,"self_sha256":exe_sha,"input":INPUT,
-            "input_device":before.dev(),"input_inode":before.ino(),"minimum_free_bytes":floor,
-            "available_bytes":initial_available,
-            "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e|e.to_string())?.as_secs(),
-            "maximum_runtime_seconds":MAX_SECONDS,"guard_on_each_compressed_read":true,
-            "trip":false,"replay_launch_authorized":false,"publication_authorized":false,
-            "remote_mutations":false,"r2_mutations":false
-        }),
-    )?;
+    let mut initial_value = serde_json::json!({
+        "schema":GUARD_SCHEMA,
+        "invocation_id":invocation,"self_sha256":exe_sha,"input":INPUT,
+        "input_device":before.dev(),"input_inode":before.ino(),"minimum_free_bytes":floor,
+        "available_bytes":initial_available,
+        "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e|e.to_string())?.as_secs(),
+        "maximum_runtime_seconds":MAX_SECONDS,"guard_on_each_compressed_read":true,
+        "trip":false,"replay_launch_authorized":false,"publication_authorized":false,
+        "remote_mutations":false,"r2_mutations":false
+    });
+    if let Some(ref value) = admission {
+        initial_value["admission"] = value.clone();
+    }
+    write_json(&initial, &initial_value)?;
     let mut hashed = HashReader::new(Guarded {
         inner: &mut file,
         guard: &guard,
@@ -377,7 +469,7 @@ pub fn run() -> Result<(), String> {
         return Err("snapshot identity changed".into());
     }
     guard.check().map_err(|e| e.to_string())?;
-    let receipt = serde_json::json!({
+    let mut receipt = serde_json::json!({
         "schema":SCHEMA,
         "input":INPUT,"input_sha256":INPUT_SHA,"input_bytes":length,
         "input_device":before.dev(),"input_inode":before.ino(),
@@ -391,6 +483,14 @@ pub fn run() -> Result<(), String> {
         "replay_launch_authorized":false,"publication_authorized":false,
         "remote_mutations":false,"r2_mutations":false
     });
+    if let Some(value) = original_admission()? {
+        receipt["admission"] = value;
+        let disabled = receipt["census"]["clock"]["hashes_per_tick"]
+            .as_u64()
+            .unwrap_or(0)
+            == 0;
+        receipt["serialized_poh_work_disabled"] = serde_json::json!(disabled);
+    }
     write_json(&output, &receipt)?;
     println!(
         "typed serialized snapshot clock observed; native restore/replay/publication unauthorized"
@@ -436,10 +536,44 @@ mod tests {
         bank::Bank,
         snapshot_utils::{add_snapshot, SnapshotVersion},
     };
+    #[test]
+    fn original_memory_admission_preserves_reserve_and_rejects_ambiguous_units() {
+        let minimum = (130_u64 << 30) / 1024;
+        assert!(original_memory_admission(&format!("MemAvailable: {} kB\n", minimum)).is_ok());
+        for text in &[
+            format!("MemAvailable: {} kB\n", minimum - 1),
+            "MemAvailable: 999999999 GiB\n".into(),
+            "MemAvailable: 18446744073709551615 kB\n".into(),
+            format!(
+                "MemAvailable: {} kB\nMemAvailable: {} kB\n",
+                minimum, minimum
+            ),
+            "".into(),
+        ] {
+            assert!(original_memory_admission(text).is_err());
+        }
+    }
 
     #[test]
     fn exact_profile_preserves_frozen_input_scope() {
-        if cfg!(feature = "epoch144-snapshot-clock-diagnostic") {
+        if cfg!(feature = "epoch140-original-bootstrap-clock-diagnostic") {
+            assert_eq!(SLOT, 60_479_583);
+            assert_eq!(INPUT_SIZE, 3_238_609_546);
+            assert_eq!(INPUT_INODE, 6322697);
+            assert_eq!(INPUT_DEVICE, 2304);
+            assert_eq!(
+                INPUT_SHA,
+                "350464cd9a2341c94edde7544fcb8958a968ea9f322d38a8daec145e1a2bb48b"
+            );
+            assert_eq!(PROTECTED_FREE, 3_984_782_679_494);
+            assert!(INPUT.starts_with(
+                "/usr/local/lib/jetstreamer/horizon-epoch140-original-bootstrap-clock-input-"
+            ));
+            assert_eq!(
+                SCHEMA,
+                "jetstreamer-epoch140-original-bootstrap-serialized-clock-v1"
+            );
+        } else if cfg!(feature = "epoch144-snapshot-clock-diagnostic") {
             assert_eq!(SLOT, 62_639_490);
             assert_eq!(INPUT_SIZE, 2_569_233_422);
             assert_eq!(INPUT_INODE, 105578509);
