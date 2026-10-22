@@ -1,4 +1,5 @@
-//! Exact reproducible dev-cache evidence. Never removes files or runs Cargo.
+//! Exact reproducible cache evidence, with separately bound retirement for two
+//! fixed debug profiles. Never runs Cargo or selects archives/replay scratch.
 use {
     crate::{
         process_references,
@@ -21,11 +22,15 @@ use {
     },
 };
 const REPO: &str = "/home/ubuntu/workspace/jetstreamer";
+const SOL_REPO: &str = "/home/sol/workspace/jetstreamer";
+const SOL_TARGET: &str = "/home/sol/workspace/jetstreamer/target/debug";
+const SOL_PROFILE: &str = "jetstreamer-horizon-sol-dev-cache-check-plan-v1";
 const TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/debug";
 const RELEASE_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/release";
 const SELECTED225_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug";
 fn cache_target(schema: &str) -> Result<&'static Path> {
     match schema {
+        SOL_PROFILE => Ok(Path::new(SOL_TARGET)),
         "jetstreamer-horizon-dev-cache-check-plan-v1" => Ok(Path::new(TARGET)),
         "jetstreamer-horizon-release-cache-check-plan-v1" => Ok(Path::new(RELEASE_TARGET)),
         "jetstreamer-horizon-selected225-dev-cache-check-plan-v1" => {
@@ -54,20 +59,20 @@ fn hex(s: &str, n: usize) -> bool {
         && s.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn git(args: &[&str]) -> Result<Vec<u8>> {
+fn git(repo: &str, args: &[&str]) -> Result<Vec<u8>> {
     let o = Command::new("/usr/bin/git")
         .env_clear()
         .env("PATH", "/usr/bin:/bin")
         .env("GIT_OPTIONAL_LOCKS", "0")
         .args([
             "-c",
-            &format!("safe.directory={REPO}"),
+            &format!("safe.directory={repo}"),
             "-c",
             "core.fsmonitor=false",
             "-c",
             "core.untrackedCache=false",
             "-C",
-            REPO,
+            repo,
         ])
         .args(args)
         .output()?;
@@ -84,8 +89,10 @@ fn validate_plan(p: &Plan) -> Result<()> {
     );
     cache_target(&p.schema)?;
     ensure!(
-        p.retirement.is_none() || cache_target(&p.schema)? == Path::new(SELECTED225_TARGET),
-        "retirement is restricted to selected225 debug cache"
+        p.retirement.is_none()
+            || cache_target(&p.schema)? == Path::new(SELECTED225_TARGET)
+            || p.schema == SOL_PROFILE,
+        "retirement is restricted to fixed qualified debug caches"
     );
     ensure!(
         p.output.file_name().is_some_and(|s| s == "check.json")
@@ -101,10 +108,10 @@ fn validate_plan(p: &Plan) -> Result<()> {
     );
     Ok(())
 }
-fn cache_tree(target: &Path) -> Result<Value> {
+fn cache_tree(target: &Path, expected_uid: u32) -> Result<Value> {
     let root = fs::symlink_metadata(target)?;
     ensure!(
-        target.canonicalize()? == target && root.is_dir() && root.uid() == 1000,
+        target.canonicalize()? == target && root.is_dir() && root.uid() == expected_uid,
         "unsafe dev-cache identity"
     );
     let mut queue = vec![(target.to_path_buf(), 0u32)];
@@ -355,10 +362,14 @@ fn retire_tree(target: &Path, device: u64, inode: u64) -> Result<()> {
     ensure!(!target.try_exists()?, "cache remains after retirement");
     Ok(())
 }
-fn retirement_matches(prior: &Value, tree: &Value) -> Result<()> {
+fn retirement_matches(prior: &Value, tree: &Value, profile: &str) -> Result<()> {
     ensure!(
         prior["schema"] == "jetstreamer-horizon-dev-cache-check-v1"
-            && prior["cache_profile"] == "jetstreamer-horizon-selected225-dev-cache-check-plan-v1"
+            && matches!(
+                profile,
+                SOL_PROFILE | "jetstreamer-horizon-selected225-dev-cache-check-plan-v1"
+            )
+            && prior["cache_profile"] == profile
             && prior["cache"] == *tree
             && prior["process_scan"]["references"] == json!([])
             && prior["staged_unit_references"] == json!([])
@@ -367,6 +378,47 @@ fn retirement_matches(prior: &Value, tree: &Value) -> Result<()> {
         "prior check differs from fixed unreferenced cache"
     );
     Ok(())
+}
+
+// Cargo can be between spawning rustc processes without a descriptor beneath
+// target/debug. Refuse that interval as well as exact-tree process references.
+fn no_builders(proc_root: &Path) -> Result<()> {
+    for entry in fs::read_dir(proc_root)? {
+        let entry = entry?;
+        if !entry.file_name().as_bytes().iter().all(u8::is_ascii_digit) {
+            continue;
+        }
+        let exe = match fs::read_link(entry.path().join("exe")) {
+            Ok(exe) => exe,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e).context("incomplete builder census"),
+        };
+        ensure!(
+            !matches!(
+                exe.file_name()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.trim_end_matches(" (deleted)")),
+                Some("cargo" | "rustc" | "sccache")
+            ),
+            "build process remains: {}",
+            entry.path().display()
+        );
+    }
+    Ok(())
+}
+
+fn cargo_profile_lock(target: &Path) -> Result<File> {
+    use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(target.join(".cargo-lock"))?;
+    ensure!(lock.metadata()?.is_file(), "unsafe Cargo lock");
+    ensure!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "Cargo profile lock is busy"
+    );
+    Ok(lock)
 }
 pub fn run() -> Result<()> {
     let a: Vec<_> = env::args().collect();
@@ -387,60 +439,83 @@ pub fn run() -> Result<()> {
     };
     let p: Plan = serde_json::from_value(bound_json(&pb)?)?;
     validate_plan(&p)?;
+    let sol = p.schema == SOL_PROFILE;
+    let repo = if sol { SOL_REPO } else { REPO };
     ensure!(
-        git(&["rev-parse", "HEAD"])? == format!("{}\n", p.source_commit).as_bytes()
-            && git(&["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
+        git(repo, &["rev-parse", "HEAD"])? == format!("{}\n", p.source_commit).as_bytes()
+            && git(repo, &["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
         "source revision is not preserved/clean"
     );
     let target = cache_target(&p.schema)?;
     let historical_lock_sha256 =
-        if target == Path::new(TARGET) || target == Path::new(RELEASE_TARGET) {
-            git(&[
-                "check-ignore",
-                if target == Path::new(TARGET) {
-                    "target/debug"
-                } else {
-                    "target/release"
-                },
-            ])?;
+        if target == Path::new(TARGET) || target == Path::new(RELEASE_TARGET) || sol {
+            git(
+                repo,
+                &[
+                    "check-ignore",
+                    if target == Path::new(TARGET) || sol {
+                        "target/debug"
+                    } else {
+                        "target/release"
+                    },
+                ],
+            )?;
             None
         } else {
             // This isolated historical target is untracked rather than ignored.
             // Bind its exact fixed scope and retain the tracked legacy lockfile.
             ensure!(
-                git(&[
-                    "ls-files",
-                    "--",
-                    ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
-                ])?
+                git(
+                    repo,
+                    &[
+                        "ls-files",
+                        "--",
+                        ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
+                    ]
+                )?
                 .is_empty(),
                 "selected cache contains tracked source"
             );
             ensure!(
-                git(&["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"])?
-                    == b"historical-runtime/v1_6_25/Cargo.lock\n",
+                git(
+                    repo,
+                    &["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"]
+                )? == b"historical-runtime/v1_6_25/Cargo.lock\n",
                 "legacy lockfile is not preserved by source revision"
             );
             Some(
                 hash_file(
-                    &Path::new(REPO).join("historical-runtime/v1_6_25/Cargo.lock"),
+                    &Path::new(repo).join("historical-runtime/v1_6_25/Cargo.lock"),
                     16 << 20,
                 )?
                 .0,
             )
         };
-    let lock = Path::new(REPO).join("Cargo.lock");
+    let lock = Path::new(repo).join("Cargo.lock");
     ensure!(
         hash_file(&lock, 16 << 20)?.0 == p.cargo_lock_sha256,
         "Cargo.lock differs"
     );
-    let tree = cache_tree(target)?;
+    let tree = cache_tree(target, if sol { 1001 } else { 1000 })?;
+    // Keep Cargo's existing profile lock throughout both censuses and removal.
+    // Never create a replacement lock or run Cargo from this process.
+    let _cargo_lock = if sol {
+        no_builders(Path::new("/proc"))?;
+        Some(cargo_profile_lock(target)?)
+    } else {
+        None
+    };
     let mut missing = Vec::new();
     let staged = staged_references(
         &[
             Path::new("/etc/systemd/system"),
             Path::new("/run/systemd/transient"),
-            Path::new("/home/ubuntu/.config/systemd/user"),
+            Path::new("/run/systemd/system"),
+            Path::new(if sol {
+                "/home/sol/.config/systemd/user"
+            } else {
+                "/home/ubuntu/.config/systemd/user"
+            }),
         ],
         target,
         &mut missing,
@@ -458,7 +533,15 @@ pub fn run() -> Result<()> {
         "cache identity changed before receipt"
     );
     if let Some(r) = &p.retirement {
-        retirement_matches(&bound_json(&r.prior_check)?, &tree)?;
+        let prior = bound_json(&r.prior_check)?;
+        retirement_matches(&prior, &tree, &p.schema)?;
+        if sol {
+            ensure!(
+                prior["source_commit"] == p.source_commit
+                    && prior["cargo_lock_sha256"] == p.cargo_lock_sha256,
+                "prior reproduction inputs differ"
+            );
+        }
     }
     persist(
         &p.output,
@@ -472,17 +555,26 @@ pub fn run() -> Result<()> {
         persist(
             &parent.join("intent.json"),
             &json!({
-                "schema":"jetstreamer-private-selected225-debug-retirement-intent-v1",
+                "schema":if sol { "jetstreamer-private-sol-debug-retirement-intent-v1" } else { "jetstreamer-private-selected225-debug-retirement-intent-v1" },
                 "prior_check":{"path":r.prior_check.path,"sha256":r.prior_check.sha256},
                 "current_check":{"path":p.output,"sha256":check_sha},
                 "cache":tree,"r2_mutations":false,"archive_deletion_authorized":false
             }),
         )?;
+        if sol {
+            no_builders(Path::new("/proc"))?;
+            ensure!(
+                process_references::scan(Path::new("/proc"), target)?
+                    .references
+                    .is_empty(),
+                "new live cache reference before removal"
+            );
+        }
         retire_tree(target, root.dev(), root.ino())?;
         persist(
             &parent.join("completion.json"),
             &json!({
-                "schema":"jetstreamer-private-selected225-debug-retirement-completion-v1",
+                "schema":if sol { "jetstreamer-private-sol-debug-retirement-completion-v1" } else { "jetstreamer-private-selected225-debug-retirement-completion-v1" },
                 "cache":tree,"cache_absent":true,"source_commit":p.source_commit,
                 "current_check":{"path":p.output,"sha256":check_sha},
                 "r2_mutations":false,"archive_deletion_authorized":false,
@@ -640,7 +732,8 @@ mod tests {
             "cache_profile":"jetstreamer-horizon-selected225-dev-cache-check-plan-v1",
             "cache":tree,"process_scan":{"references":[]},"staged_unit_references":[],
             "r2_mutations":false,"archive_deletion_authorized":false});
-        retirement_matches(&good, &tree).unwrap();
+        let profile = "jetstreamer-horizon-selected225-dev-cache-check-plan-v1";
+        retirement_matches(&good, &tree, profile).unwrap();
         for key in [
             "schema",
             "cache_profile",
@@ -652,11 +745,67 @@ mod tests {
         ] {
             let mut bad = good.clone();
             bad[key] = json!(null);
-            assert!(retirement_matches(&bad, &tree).is_err(), "{key}");
+            assert!(retirement_matches(&bad, &tree, profile).is_err(), "{key}");
         }
         let mut changed = tree.clone();
         changed["inode"] = json!(4);
-        assert!(retirement_matches(&good, &changed).is_err());
+        assert!(retirement_matches(&good, &changed, profile).is_err());
+        assert!(retirement_matches(&good, &tree, SOL_PROFILE).is_err());
+        let mut sol = good.clone();
+        sol["cache_profile"] = json!(SOL_PROFILE);
+        retirement_matches(&sol, &tree, SOL_PROFILE).unwrap();
+        assert!(retirement_matches(&sol, &tree, "arbitrary").is_err());
+    }
+
+    #[test]
+    fn sol_profile_has_a_fixed_cache_and_cannot_authorize_release_retirement() {
+        let mut p = Plan {
+            schema: SOL_PROFILE.into(),
+            source_commit: "a".repeat(40),
+            cargo_lock_sha256: "b".repeat(64),
+            output: "/var/lib/jetstreamer/horizon-dev-cache-check-sol-test/check.json".into(),
+            retirement: Some(Retirement {
+                prior_check: Bound {
+                    path: "/sealed/check.json".into(),
+                    sha256: "c".repeat(64),
+                },
+            }),
+        };
+        validate_plan(&p).unwrap();
+        assert_eq!(cache_target(&p.schema).unwrap(), Path::new(SOL_TARGET));
+        p.schema = "jetstreamer-horizon-release-cache-check-plan-v1".into();
+        assert!(validate_plan(&p).is_err());
+    }
+
+    #[test]
+    fn builder_census_rejects_cargo_rustc_and_cache_daemons() {
+        let t = tempfile::tempdir().unwrap();
+        let process = t.path().join("123");
+        fs::create_dir(&process).unwrap();
+        no_builders(t.path()).unwrap(); // disappearing process
+        for name in ["cargo", "rustc", "sccache", "cargo (deleted)"] {
+            let link = process.join("exe");
+            std::os::unix::fs::symlink(format!("/bin/{name}"), &link).unwrap();
+            assert!(no_builders(t.path()).is_err());
+            fs::remove_file(link).unwrap();
+        }
+        std::os::unix::fs::symlink("/bin/healthy-replay", process.join("exe")).unwrap();
+        no_builders(t.path()).unwrap();
+    }
+
+    #[test]
+    fn profile_lock_is_exclusive_nonblocking_and_never_creates_or_follows_links() {
+        let t = tempfile::tempdir().unwrap();
+        assert!(cargo_profile_lock(t.path()).is_err());
+        let path = t.path().join(".cargo-lock");
+        fs::write(&path, b"").unwrap();
+        let held = cargo_profile_lock(t.path()).unwrap();
+        assert!(cargo_profile_lock(t.path()).is_err());
+        drop(held);
+        cargo_profile_lock(t.path()).unwrap();
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink("/dev/null", &path).unwrap();
+        assert!(cargo_profile_lock(t.path()).is_err());
     }
 
     #[test]
@@ -667,18 +816,16 @@ mod tests {
             b"reproducible build bytes",
         )
         .unwrap();
-        if unsafe { libc::geteuid() } != 1000 {
-            assert!(cache_tree(t.path()).is_err());
-            return;
-        }
+        let owner = unsafe { libc::geteuid() };
+        assert!(cache_tree(t.path(), owner + 1).is_err());
         let external = tempfile::tempdir().unwrap();
         fs::write(external.path().join("epoch-203.jet"), b"never selected").unwrap();
         std::os::unix::fs::symlink(external.path(), t.path().join("external-link")).unwrap();
-        let v = cache_tree(t.path()).unwrap();
+        let v = cache_tree(t.path(), owner).unwrap();
         assert_eq!(v["symlinks_not_followed"], 1);
         assert_eq!(v["regular_files"], 1);
         fs::write(t.path().join("epoch-203.jet"), b"must block cleanup").unwrap();
-        assert!(cache_tree(t.path()).is_err());
+        assert!(cache_tree(t.path(), owner).is_err());
     }
 
     #[test]
