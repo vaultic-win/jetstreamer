@@ -17,6 +17,7 @@ use solana_sdk::{
     clock::{MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES},
     feature_set,
     genesis_config::{ClusterType, GenesisConfig},
+    hard_forks::HardForks,
     hash::Hash,
     instruction::InstructionError,
     pubkey::Pubkey,
@@ -53,6 +54,10 @@ const ABSOLUTE_MAX_POH_THREADS: usize = 256;
 // considered per root; the recovery budget bounds how often another can run.
 const ACCOUNTS_CLEAN_INTERVAL_ROOTS: u64 = 100;
 const ACCOUNTS_SHRINK_RECOVERY_PER_ROOT: usize = 250;
+// Independently decoded from the retained pre-223 and post-restart snapshots.
+// Both September 2021 boundaries matter; never infer a single restart marker
+// from the first failed vote or register a marker already applied by a snapshot.
+const MAINNET_HARD_FORK_SLOTS: [u64; 4] = [13_334_463, 53_180_900, 96_542_804, 96_542_805];
 
 pub struct RuntimeState {
     bank: Arc<Bank>,
@@ -140,6 +145,43 @@ impl ExecutionWaveMetrics {
     }
 }
 
+fn restore_mainnet_hard_forks(bank: &Bank) -> Result<(), String> {
+    restore_mainnet_hard_fork_markers(bank.slot(), &mut bank.hard_forks().write().unwrap())
+}
+
+fn restore_mainnet_hard_fork_markers(slot: u64, hard_forks: &mut HardForks) -> Result<(), String> {
+    // Validate everything before mutation, including missing already-applied
+    // markers. Such a snapshot cannot be repaired by registering its past fork.
+    for &(marker, count) in hard_forks.iter() {
+        if !MAINNET_HARD_FORK_SLOTS.contains(&marker) {
+            return Err(format!(
+                "snapshot contains unsupported mainnet hard fork {}",
+                marker
+            ));
+        }
+        if count != 1 {
+            return Err(format!(
+                "snapshot mainnet hard fork {} has count {}, expected 1",
+                marker, count
+            ));
+        }
+    }
+    for &marker in &MAINNET_HARD_FORK_SLOTS {
+        if slot >= marker && !hard_forks.iter().any(|&(present, _)| present == marker) {
+            return Err(format!(
+                "snapshot at slot {} is missing applied mainnet hard fork {}",
+                slot, marker
+            ));
+        }
+    }
+    for &marker in &MAINNET_HARD_FORK_SLOTS {
+        if !hard_forks.iter().any(|&(present, _)| present == marker) {
+            hard_forks.register(marker);
+        }
+    }
+    Ok(())
+}
+
 pub enum ProcessEntriesError<E> {
     Runtime(String),
     Emit(E),
@@ -206,6 +248,7 @@ impl RuntimeState {
                 ));
             }
         };
+        restore_mainnet_hard_forks(&bank)?;
         let write_cursor = bank.accounts().accounts_db.next_write_version();
         let last_entry_hash = bank.last_blockhash();
         let initialized = Initialized {
@@ -811,7 +854,7 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
-    if slot < MIN_SUPPORTED_SNAPSHOT_SLOT || slot >= MAX_SUPPORTED_SLOT_EXCLUSIVE {
+    if !(MIN_SUPPORTED_SNAPSHOT_SLOT..MAX_SUPPORTED_SLOT_EXCLUSIVE).contains(&slot) {
         return Err(format!(
             "Solana v1.6.20 candidate snapshot slot {} is outside {}..{}",
             slot, MIN_SUPPORTED_SNAPSHOT_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE
@@ -1359,6 +1402,85 @@ fn normalize_instruction_error(error: InstructionError) -> WireInstructionError 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn epoch223_restores_both_observed_restart_markers_exactly_once() {
+        let mut forks = HardForks::default();
+        forks.register(13_334_463);
+        forks.register(53_180_900);
+        restore_mainnet_hard_fork_markers(96_335_538, &mut forks).unwrap();
+        restore_mainnet_hard_fork_markers(96_335_538, &mut forks).unwrap();
+        assert_eq!(
+            forks.iter().copied().collect::<Vec<_>>(),
+            vec![
+                (13_334_463, 1),
+                (53_180_900, 1),
+                (96_542_804, 1),
+                (96_542_805, 1),
+            ]
+        );
+        assert_eq!(forks.get_hash_data(96_542_803, 96_542_802), None);
+        assert_eq!(
+            forks.get_hash_data(96_542_804, 96_542_803),
+            Some(1u64.to_le_bytes())
+        );
+        assert_eq!(
+            forks.get_hash_data(96_542_805, 96_542_804),
+            Some(1u64.to_le_bytes())
+        );
+        assert_eq!(
+            forks.get_hash_data(96_542_805, 96_542_803),
+            Some(2u64.to_le_bytes())
+        );
+        assert_eq!(forks.get_hash_data(96_542_806, 96_542_805), None);
+        let before = forks.clone();
+        restore_mainnet_hard_fork_markers(97_199_617, &mut forks).unwrap();
+        assert_eq!(forks, before);
+    }
+
+    #[test]
+    fn epoch223_rejects_bad_snapshot_markers_without_partial_mutation() {
+        for missing in &MAINNET_HARD_FORK_SLOTS {
+            let mut forks = HardForks::default();
+            for &slot in &MAINNET_HARD_FORK_SLOTS {
+                if slot != *missing {
+                    forks.register(slot);
+                }
+            }
+            let before = forks.clone();
+            assert!(restore_mainnet_hard_fork_markers(97_199_617, &mut forks)
+                .unwrap_err()
+                .contains("missing applied"));
+            assert_eq!(forks, before);
+        }
+        for duplicate in &MAINNET_HARD_FORK_SLOTS {
+            let mut forks = HardForks::default();
+            for &slot in &MAINNET_HARD_FORK_SLOTS {
+                forks.register(slot);
+            }
+            forks.register(*duplicate);
+            let before = forks.clone();
+            assert!(restore_mainnet_hard_fork_markers(96_335_538, &mut forks)
+                .unwrap_err()
+                .contains("count 2"));
+            assert_eq!(forks, before);
+        }
+        let mut forks = HardForks::default();
+        forks.register(42);
+        let before = forks.clone();
+        assert!(restore_mainnet_hard_fork_markers(96_335_538, &mut forks)
+            .unwrap_err()
+            .contains("unsupported"));
+        assert_eq!(forks, before);
+        // At the first boundary its applied marker is mandatory, whereas the
+        // following boundary may still be scheduled from this snapshot.
+        let mut forks = HardForks::default();
+        for &slot in &MAINNET_HARD_FORK_SLOTS[..3] {
+            forks.register(slot);
+        }
+        restore_mainnet_hard_fork_markers(96_542_804, &mut forks).unwrap();
+        assert_eq!(forks.iter().count(), 4);
+    }
 
     #[test]
     fn epoch225_wire_fixture_called_program_writability() {
