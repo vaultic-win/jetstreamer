@@ -1,4 +1,6 @@
 //! Private exact-target native candidates, never trusted boundaries/publication.
+#[path = "epoch141_native_acquisition.rs"]
+mod acquisition;
 #[allow(dead_code)]
 mod epoch141_ledger_common;
 #[allow(dead_code)]
@@ -99,7 +101,7 @@ fn profile(plan: &Plan) -> Result<bool> {
             );
             Ok(false)
         }
-        "jetstreamer-epoch141-ledger-native-full-census-plan-v2" => {
+        "jetstreamer-epoch141-ledger-native-full-census-plan-v2" | acquisition::SCHEMA => {
             ensure!(
                 plan.gap_audit.sha256 == FULL_CENSUS_SHA
                     && plan.finalized_collection_plan.is_some()
@@ -111,6 +113,14 @@ fn profile(plan: &Plan) -> Result<bool> {
                             .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))),
                 "full native profile requires explicit fixed census,completed metadata and exact unit"
             );
+            if plan.schema == acquisition::SCHEMA {
+                ensure!(
+                    plan.unit.as_deref().is_some_and(
+                        |u| u.starts_with("horizon-epoch141-native-full-census-acquisition-")
+                    ),
+                    "acquisition needs a distinct diagnostic unit"
+                );
+            }
             Ok(true)
         }
         _ => anyhow::bail!("unknown native profile"),
@@ -118,7 +128,7 @@ fn profile(plan: &Plan) -> Result<bool> {
 }
 
 fn output_reservation(plan: &Plan) -> Result<u64> {
-    Ok(if profile(plan)? {
+    Ok(if profile(plan)? && plan.schema != acquisition::SCHEMA {
         FULL_OUTPUT_RESERVATION
     } else {
         OUTPUT_RESERVATION
@@ -236,6 +246,12 @@ fn targets(audit: &Value) -> Result<Vec<LegacySlotScope>> {
 }
 
 fn admission(plan: &Plan, receipt: &Value, manifest: &Value, exe: &Path, sha: &str) -> Result<()> {
+    if plan.schema == acquisition::SCHEMA {
+        ensure!(
+            manifest["native_profile"] == "epoch141-read-only-first-target-acquisition-v4",
+            "acquisition needs separately qualified admission"
+        );
+    }
     let required = plan
         .minimum_free_bytes
         .checked_add(output_reservation(plan)?)
@@ -827,7 +843,7 @@ fn run() -> Result<()> {
         ensure!(
             free >= plan
                 .minimum_free_bytes
-                .checked_add(FULL_OUTPUT_RESERVATION)
+                .checked_add(output_reservation(&plan)?)
                 .context("full reserve overflow")?,
             "full native output reservation unavailable"
         );
@@ -865,6 +881,9 @@ fn run() -> Result<()> {
         "publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     if full {
+        if plan.schema == acquisition::SCHEMA {
+            return acquisition::run(&plan, &bound, &scopes, &invocation, &values, start, free);
+        }
         return run_full_census(&plan, &bound, &scopes, &invocation, &values, start, free);
     }
     let mut last = Instant::now();
@@ -1240,6 +1259,29 @@ mod tests {
             targets(&json!({"schema":"jetstreamer-horizon-finalized-paged-gap-census-v1"}))
                 .is_err()
         );
+    }
+    #[test]
+    fn acquisition_profile_cannot_borrow_an_old_unit_or_admission_profile() {
+        let mut p = full_plan();
+        p.schema = acquisition::SCHEMA.into();
+        assert!(profile(&p).is_err());
+        p.unit = Some("horizon-epoch141-native-full-census-acquisition-test.service".into());
+        assert!(profile(&p).unwrap());
+        assert_eq!(output_reservation(&p).unwrap(), OUTPUT_RESERVATION);
+        let exe = Path::new("/sealed/native");
+        let sha = "5".repeat(64);
+        let files = json!([{"path":exe,"sha256":sha,"uid":0,"mode":"0555"}]);
+        let minimum = p.minimum_free_bytes + OUTPUT_RESERVATION;
+        let mut manifest = json!({"schema":"jetstreamer-historical-performance-admission-v1","filesystem":"/home/sol","minimum_free_bytes":minimum,"files":files});
+        let receipt = json!({"schema":"jetstreamer-historical-performance-admission-receipt-v1","admitted":true,
+            "manifest":p.admission_manifest.path,"manifest_sha256":p.admission_manifest.sha256,
+            "services_started":false,"services_installed":false,"remote_mutations":false,"r2_mutations":false,
+            "evidence":{"minimum_free_bytes":minimum,"filesystem":"/home/sol","files":files}});
+        assert!(admission(&p, &receipt, &manifest, exe, &sha).is_err());
+        manifest["native_profile"] = json!("epoch141-read-only-full-census-rejection-v3");
+        assert!(admission(&p, &receipt, &manifest, exe, &sha).is_err());
+        manifest["native_profile"] = json!("epoch141-read-only-first-target-acquisition-v4");
+        admission(&p, &receipt, &manifest, exe, &sha).unwrap();
     }
 
     #[test]

@@ -84,8 +84,15 @@ fn native_readonly_wal_fixture_child() {
     options.create_missing_column_families(true);
     options.set_disable_auto_compactions(true);
     options.set_compression_type(DBCompressionType::Lz4);
-    let families = ["default", "data_shred", "meta"]
-        .map(|name| ColumnFamilyDescriptor::new(name, options.clone()));
+    let families = [
+        "default",
+        "data_shred",
+        "meta",
+        "root",
+        "dead_slots",
+        "orphans",
+    ]
+    .map(|name| ColumnFamilyDescriptor::new(name, options.clone()));
     let database = DB::open_cf_descriptors(&options, path, families).unwrap();
     let cf = database.cf_handle("data_shred").unwrap();
     let slot = 60912004_u64;
@@ -118,6 +125,30 @@ fn native_readonly_wal_fixture_child() {
                 vec![0u32],
             ))
             .unwrap(),
+        )
+        .unwrap();
+    database
+        .put_cf(
+            cf,
+            [60_911_776u64.to_be_bytes(), 0u64.to_be_bytes()].concat(),
+            vec![7u8; 1228],
+        )
+        .unwrap();
+    database
+        .put_cf(meta_cf, 60_911_771u64.to_be_bytes(), b"raw-parent-metadata")
+        .unwrap();
+    database
+        .put_cf(
+            database.cf_handle("root").unwrap(),
+            60_911_776u64.to_be_bytes(),
+            [1],
+        )
+        .unwrap();
+    database
+        .put_cf(
+            database.cf_handle("orphans").unwrap(),
+            60_911_771u64.to_be_bytes(),
+            [1],
         )
         .unwrap();
     for (scope, meta, shred) in legacy_gap_fixture() {
@@ -186,7 +217,7 @@ fn native_readonly_resolves_manifest_and_wal() {
         .collect();
     let options = Options::default();
     let families = DB::list_cf(&options, &path).unwrap();
-    assert_eq!(families.len(), 3);
+    assert_eq!(families.len(), 6);
     // Read-only RocksDB may permit a subset; the recovery policy must compare
     // its requested families against the full authenticated manifest census.
     if let Ok(partial) = DB::open_cf_for_read_only(&options, &path, ["data_shred"], false) {
@@ -490,6 +521,100 @@ fn native_readonly_resolves_manifest_and_wal() {
             );
             assert!(raw[0].value.is_some());
             assert_eq!(rejection, "target SlotMeta is not connected");
+        }
+    }
+    // A disconnected target can be acquired as raw diagnostic data without
+    // relaxing the recovery planner. The complete native close/rehash remains
+    // mandatory even when both bounded query batches already succeeded.
+    for mutate in [false, true] {
+        let acquired = with_native_read_session(
+            &collected,
+            &census,
+            &batch_logs(if mutate {
+                "acquisition-mutated"
+            } else {
+                "acquisition-revalidated"
+            }),
+            &families,
+            NativeReadBudget {
+                batches: 2,
+                queries: 16,
+                value_bytes: 16 * 1024,
+            },
+            &mut || Ok(()),
+            |reader, guard| {
+                fn borrowed(
+                    r: &jetstreamer_utils::horizon_ledger_native::NativeCandidate,
+                ) -> ResolvedLegacyRecord<'_> {
+                    ResolvedLegacyRecord {
+                        family: &r.family,
+                        key: &r.key,
+                        value: r.value.as_deref(),
+                    }
+                }
+                let first = reader.read_candidates(&disconnected_query, guard)?;
+                let records: Vec<_> = first.iter().map(borrowed).collect();
+                let scope = jetstreamer_utils::horizon_legacy_recovery::LegacySlotScope {
+                    slot: 60_911_776,
+                    parent_slot: 60_911_771,
+                };
+                assert!(
+                    jetstreamer_utils::horizon_legacy_recovery::plan_v1_4_25_scope_queries(
+                        &records,
+                        &[scope]
+                    )
+                    .is_err()
+                );
+                let plan=jetstreamer_utils::horizon_legacy_acquisition::plan_v1_4_25_acquisition_queries(&records,scope).unwrap();
+                let queries: Vec<_> = plan
+                    .queries
+                    .iter()
+                    .map(|q| jetstreamer_utils::horizon_ledger_native::NativeQuery {
+                        family: q.family.into(),
+                        key: q.key.clone(),
+                    })
+                    .collect();
+                let full = reader.read_candidates(&queries, guard)?;
+                let full_records: Vec<_> = full.iter().map(borrowed).collect();
+                let summary=jetstreamer_utils::horizon_legacy_acquisition::validate_v1_4_25_acquisition_records(&records,scope,&full_records).unwrap();
+                assert!(!summary.recorded_is_connected);
+                assert_eq!(summary.expected_data_shreds, 1);
+                assert!(
+                    summary.missing_data_shred_indexes.is_empty()
+                        && summary.unexpected_data_shred_length_indexes.is_empty()
+                );
+                assert_eq!(full[1].value.as_deref(), Some([1].as_slice()));
+                assert!(full[2].value.is_none() && full[3].value.is_none());
+                assert_eq!(
+                    full[4].value.as_deref(),
+                    Some(b"raw-parent-metadata".as_slice())
+                );
+                assert_eq!(full[7].value.as_deref(), Some([1].as_slice()));
+                if mutate {
+                    fs::write(
+                        collected.join("unexpected-after-acquisition"),
+                        b"new member",
+                    )?;
+                }
+                Ok(summary)
+            },
+        );
+        if mutate {
+            assert!(
+                acquired.is_err(),
+                "acquisition bypassed post-close source revalidation"
+            );
+            fs::remove_file(collected.join("unexpected-after-acquisition")).unwrap();
+        } else {
+            let (_, session) = acquired.unwrap();
+            assert_eq!(session.batches, 2);
+            assert_eq!(session.queries, 10);
+            assert!(session.complete_census_revalidated);
+            assert!(
+                !session.source_completeness_proven
+                    && !session.live_state_proven
+                    && !session.publication_authorized
+            );
         }
     }
     let mutated = with_native_read_session(

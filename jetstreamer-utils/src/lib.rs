@@ -16,6 +16,8 @@ pub mod horizon_legacy_entry;
 /// Bounded diagnostic verification of pinned legacy entry/tick/PoH chains.
 pub mod horizon_legacy_poh;
 
+/// Raw diagnostic acquisition independent of strict legacy recovery qualification.
+pub mod horizon_legacy_acquisition;
 /// Exact-key diagnostic binding from native legacy candidates to complete PoH chains.
 pub mod horizon_legacy_recovery;
 
