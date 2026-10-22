@@ -180,15 +180,64 @@ fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
     if requested != 0 {
         ensure!(
             requested == 1001
-                && plan.epoch == 198
-                && plan.binding.origin_unit == super::cohort198_finalization::UNIT
-                && plan.binding.origin_invocation_id == "e5612ef00a5b4fcab04df2c13a6b35b0"
+                && ((plan.epoch == 198
+                    && plan.binding.origin_unit == super::cohort198_finalization::UNIT
+                    && plan.binding.origin_invocation_id == "e5612ef00a5b4fcab04df2c13a6b35b0")
+                    || exact144_binding(plan))
                 && plan.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
-            "foreign-owned pipeline receipt directory is not the exact198 profile"
+            "foreign-owned pipeline receipt directory is not an exact198/144 profile"
         );
     }
     Ok(requested)
+}
+const PUB144: &str = "horizon-publish-144-v4-20261022-v1.service";
+const UPLOAD144: &str = "horizon-upload-144-v4-20261022-v1.service";
+const ORIGIN144: &str = "/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1/launch.json";
+fn exact144_binding(p: &Plan) -> bool {
+    p.epoch == 144
+        && p.binding.origin_unit == PUB144
+        && hex_id(&p.binding.origin_invocation_id, 32)
+        && p.origin_launch.path == Path::new(ORIGIN144)
+        && matches!(
+            (
+                p.binding.unit.as_str(),
+                p.binding.claim_phase.as_str(),
+                p.phase.as_str()
+            ),
+            (PUB144, "local-publication", "publication")
+                | (UPLOAD144, "upload-readback", "upload" | "readback")
+        )
+}
+fn validate144_origin(p: &Plan, origin: &Value) -> Result<()> {
+    ensure!(
+        exact144_binding(p)
+            && origin["schema"] == "jetstreamer-exact144-publication-launch-v1"
+            && origin["epoch"] == 144
+            && origin["launched"] == true
+            && origin["claim"]["unit"] == PUB144
+            && origin["claim"]["phase"] == "local-publication"
+            && origin["claim"]["invocation_id"] == p.binding.origin_invocation_id
+            && origin["publisher_sha256"]
+                == "1b5e71ad4d7fb3ed7b5ac3143fabaad110dfeca7d978e186d6b86264bcbc17eb"
+            && origin["tracker_sha256"]
+                == "0c2dc05018a46c7054790130565b13f83c8e235934e172730370d660c681ca0d",
+        "144 pipeline origin is not the exact captured canonical-artifact producer"
+    );
+    for flag in [
+        "ordinary_replay_claim",
+        "current_sidecar_eta_valid",
+        "publication_authorized",
+        "retirement_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(
+            origin[flag] == false,
+            "144 origin acquired authority:{flag}"
+        );
+    }
+    Ok(())
 }
 
 fn validate_receipt_directory(plan: &Plan) -> Result<()> {
@@ -562,6 +611,9 @@ pub(super) async fn run() -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let sample = validate_scope(&plan, &observer, &fleet, now)?;
     let origin = bound_json(&plan.origin_launch)?;
+    if plan.epoch == 144 {
+        validate144_origin(&plan, &origin)?;
+    }
     if origin["schema"] == STATUS_RECEIPT_SCHEMA {
         let receipt: StatusPublicationReceipt = serde_json::from_value(origin)?;
         let prior_observer = bound_bytes(&Bound {
@@ -748,6 +800,46 @@ mod tests {
         let mut root = directory_plan();
         root.receipt_directory_uid = None;
         assert_eq!(receipt_directory_owner(&root).unwrap(), 0);
+    }
+    #[test]
+    fn exact144_directory_requires_captured_origin_and_only_its_two_delivery_units() {
+        let mut p = directory_plan();
+        p.epoch = 144;
+        p.phase = "publication".into();
+        p.binding.unit = PUB144.into();
+        p.binding.claim_phase = "local-publication".into();
+        p.binding.origin_unit = PUB144.into();
+        p.binding.origin_invocation_id = "a".repeat(32);
+        p.origin_launch.path = ORIGIN144.into();
+        assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
+        let mut origin = json!({"schema":"jetstreamer-exact144-publication-launch-v1","epoch":144,"launched":true,"claim":{"unit":PUB144,"phase":"local-publication","invocation_id":"a".repeat(32)},"publisher_sha256":"1b5e71ad4d7fb3ed7b5ac3143fabaad110dfeca7d978e186d6b86264bcbc17eb","tracker_sha256":"0c2dc05018a46c7054790130565b13f83c8e235934e172730370d660c681ca0d"});
+        for flag in [
+            "ordinary_replay_claim",
+            "current_sidecar_eta_valid",
+            "publication_authorized",
+            "retirement_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            origin[flag] = json!(false);
+        }
+        validate144_origin(&p, &origin).unwrap();
+        let mut bad = origin.clone();
+        bad["claim"]["invocation_id"] = json!("b".repeat(32));
+        assert!(validate144_origin(&p, &bad).is_err());
+        bad = origin.clone();
+        bad["publication_authorized"] = json!(true);
+        assert!(validate144_origin(&p, &bad).is_err());
+        p.binding.unit = UPLOAD144.into();
+        p.binding.claim_phase = "upload-readback".into();
+        p.phase = "upload".into();
+        assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
+        validate144_origin(&p, &origin).unwrap();
+        p.binding.unit = "horizon-upload-145-v4-20261022-v1.service".into();
+        assert!(receipt_directory_owner(&p).is_err());
+        p.binding.unit = UPLOAD144.into();
+        p.origin_launch.path = "/another/launch.json".into();
+        assert!(receipt_directory_owner(&p).is_err());
     }
     #[test]
     #[ignore = "requires sealed root test under DAC_OVERRIDE-only sandbox and actual UID1001 receipt directory"]

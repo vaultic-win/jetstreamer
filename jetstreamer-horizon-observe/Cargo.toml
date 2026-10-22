@@ -108,6 +108,10 @@ required-features = ["epoch203-ram-resource-supervisor"]
 name = "jetstreamer-publication144-track"
 path = "src/publication144_track_bin.rs"
 
+[[bin]]
+name = "jetstreamer-publication144-calibrate"
+path = "src/publication144_calibrate_bin.rs"
+
 [dependencies]
 anyhow.workspace = true
 libc.workspace = true

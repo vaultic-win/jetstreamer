@@ -58,3 +58,28 @@ and downstream full/plugin uploader directories/hashes. The publication profile
 currently records no fabricated replay ETA. Active publication requires its own
 evidence-bound pipeline estimate through the normal status writer. No archive,
 sidecar, retirement, runtime promotion, or R2 authority follows from monitoring.
+
+## Delivery timing evidence
+
+`jetstreamer-publication144-calibrate --self-sha256 SHA [--check-only]` reads
+only four exact epoch198 uploader journal markers and a separately sealed copy
+of its verified R2 receipt. It binds the original unit, invocation, PID, UID,
+executable, message ordering, complete byte length and final verification time.
+It rejects missing, duplicated or differently owned events. No resource sample,
+network request or archive hash is performed.
+
+The no-clobber private calibration receipt records measured local hash, upload,
+and readback/revalidation durations. Its forecast scales each by the complete
+144/198 byte ratio, keeps three hash-equivalent import passes separate from the
+uploader's own hash/upload/readback work, and adds ten minutes for dispatch.
+This is a forecast, not a publication gate, capacity claim, guaranteed bound or
+permission to start. Consume it through a separately bound live pipeline model;
+do not invent a launch timestamp or silently reset an overdue deadline.
+
+The status writer's UID1001 receipt-directory exception is separately scoped to
+epoch144's exact captured canonical-artifact publisher origin and its fixed
+publication/upload service names. The original198 exception remains unchanged.
+An arbitrary144 job, another origin receipt, another epoch, or a generic launch
+cannot borrow either exception. Elapsed execution still comes from the actual
+root systemd manager start event. This source support alone neither publishes
+an ETA nor qualifies a downstream uploader.
