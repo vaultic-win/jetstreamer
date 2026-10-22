@@ -1,6 +1,8 @@
 //! Exact144 V4 artifact import. Preserves the root-owned original, requires both
 //! private scans, copies/hashes independently, and commits checksum last through
 //! the existing absence-only transaction after a permanent UID/GID drop.
+#[path = "epoch144_publish/capacity.rs"]
+mod capacity;
 #[allow(dead_code)]
 #[path = "../../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
 mod evidence;
@@ -72,6 +74,8 @@ struct Plan {
     runtime_registry_promotion_authorized: bool,
     remote_mutations: bool,
     r2_mutations: bool,
+    #[serde(default)]
+    refreshed_capacity: Option<capacity::Refresh>,
 }
 fn read(b: &Bound, immutable: bool) -> Result<Value> {
     Ok(serde_json::from_slice(&evidence::bound_file(
@@ -113,7 +117,10 @@ fn directory(p: &Path, owner: u32, mode: u32) -> Result<File> {
 }
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
-        p.schema == "jetstreamer-exact144-v4-publication-plan-v1"
+        ((p.schema == "jetstreamer-exact144-v4-publication-plan-v1"
+            && p.refreshed_capacity.is_none())
+            || (p.schema == "jetstreamer-exact144-v4-publication-plan-v2"
+                && p.refreshed_capacity.is_some()))
             && p.artifact_publication_authorized
             && !p.runtime_registry_promotion_authorized
             && !p.remote_mutations
@@ -362,22 +369,28 @@ fn resources(p: &Plan) -> Result<Value> {
             && fleet["inventory"]["anomalies"] == 0,
         "incomplete fleet binding"
     );
+    let (protected, refreshed) = if p.refreshed_capacity.is_some() {
+        let (bytes, report) = capacity::qualify(p, &o, &fleet, floor_bytes)?;
+        (bytes, report)
+    } else {
+        (PROTECTED, Value::Null)
+    };
     ensure!(
         o["filesystem"]["conservative_available_bytes"]
             .as_u64()
-            .is_some_and(|n| n >= PROTECTED + LENGTH + MARGIN)
+            .is_some_and(|n| n >= protected + LENGTH + MARGIN)
             && o["host_memory"]["conservative_available_kib"]
                 .as_u64()
                 .is_some_and(|n| n >= 192 * 1024 * 1024),
         "sample cannot fit independent copy above unchanged protections"
     );
-    actual_free(LENGTH)?;
+    actual_free(protected, LENGTH)?;
     live_owners(&fleet)?;
     Ok(
-        json!({"observer":p.observer,"fleet":p.fleet,"century_floor":p.century_floor,"century_floor_bytes":floor_bytes,"protected_remaining_and_guards_bytes":PROTECTED,"copy_bytes":LENGTH,"margin_bytes":MARGIN,"century_floor_recomputed":true,"policy":"conservative inherited protection, not the century floor; no live guard lowered"}),
+        json!({"observer":p.observer,"fleet":p.fleet,"century_floor":p.century_floor,"century_floor_bytes":floor_bytes,"protected_remaining_and_guards_bytes":protected,"copy_bytes":LENGTH,"margin_bytes":MARGIN,"century_floor_recomputed":true,"refreshed_capacity":refreshed,"policy":"separate growth/delivery and guard protection, not the century floor; no live guard lowered"}),
     )
 }
-fn actual_free(remaining: u64) -> Result<()> {
+fn actual_free(protected: u64, remaining: u64) -> Result<()> {
     let name = std::ffi::CString::new("/home/sol")?;
     let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
     ensure!(
@@ -397,7 +410,7 @@ fn actual_free(remaining: u64) -> Result<()> {
         })
         .context("memory availability")?;
     ensure!(
-        available >= PROTECTED + remaining + MARGIN && memory >= 192 * 1024 * 1024,
+        available >= protected + remaining + MARGIN && memory >= 192 * 1024 * 1024,
         "actual copy admission/guard rejected"
     );
     Ok(())
@@ -583,6 +596,9 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
     absent(&stage)?;
     let mount = write_scope::same_mount(&[&p.work_directory, dest])?;
     let admission = resources(p)?;
+    let protected = admission["protected_remaining_and_guards_bytes"]
+        .as_u64()
+        .context("admitted protection missing")?;
     if check {
         println!("exact144 publication preflight passed; no writes, copy, hash or import");
         return Ok(());
@@ -605,7 +621,9 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(&copied)?;
     let mut input = source.try_clone()?;
-    copy_checked(&mut input, &mut output, LENGTH, DIGEST, actual_free)?;
+    copy_checked(&mut input, &mut output, LENGTH, DIGEST, |remaining| {
+        actual_free(protected, remaining)
+    })?;
     output.sync_all()?;
     stage_dir.sync_all()?;
     work.sync_all()?;
@@ -639,7 +657,19 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
     audit_inputs(&v)?;
     read(&p.evidence, false)?;
     original(&v)?;
-    actual_free(0)?;
+    actual_free(protected, 0)?;
+    if p.refreshed_capacity.is_some() {
+        let (current, _) = capacity::qualify(
+            p,
+            &read(&p.observer, false)?,
+            &read(&p.fleet, false)?,
+            205211459014,
+        )?;
+        ensure!(
+            current == protected,
+            "admitted protection changed before import"
+        );
+    }
     live_owners(&read(&p.fleet, false)?)?;
     let transaction: [u8; 32] = Sha256::digest(evidence::bound_file(
         &plan.path,
@@ -825,6 +855,14 @@ mod tests {
                 "{pointer}"
             );
         }
+        let mut refreshed = fixture.clone();
+        refreshed["refreshed_capacity"] = json!({"schema":"jetstreamer-exact144-delivery-capacity-refresh-v1","growth_claims":[]});
+        assert!(validate_plan(&serde_json::from_value(refreshed.clone()).unwrap()).is_err());
+        refreshed["schema"] = json!("jetstreamer-exact144-v4-publication-plan-v2");
+        validate_plan(&serde_json::from_value(refreshed).unwrap()).unwrap();
+        let mut no_refresh = fixture.clone();
+        no_refresh["schema"] = json!("jetstreamer-exact144-v4-publication-plan-v2");
+        assert!(validate_plan(&serde_json::from_value(no_refresh).unwrap()).is_err());
         let mut v = fixture;
         v["overwrite_existing"] = json!(true);
         assert!(serde_json::from_value::<Plan>(v).is_err());

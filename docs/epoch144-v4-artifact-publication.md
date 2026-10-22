@@ -49,6 +49,41 @@ mislabel their protected claims as the century floor, or bypass the guard to
 make this copy fit. Safe reclamation or a separately reviewed, measured envelope
 transition remains necessary if a later accepted sample still fails.
 
+### Separately qualified four-producer delivery envelope
+
+Plan schema `jetstreamer-exact144-v4-publication-plan-v2` requires a
+`refreshed_capacity` object with schema
+`jetstreamer-exact144-delivery-capacity-refresh-v1` and four hash-bound
+`growth_claims`, ordered152-153,155-156,160,191-194. The original v1 profile
+continues unchanged and rejects this additional authority-bearing input.
+
+The refresh is specific to the exact nine active claims and four unchanged
+producers. Each claim must be produced by the pinned Rust growth verifier from
+at least six chained routine v2 samples, end at this plan's observer, and bind
+the current controller/producer invocations. The plans and sample files are
+rehash-validated. Budgets remain512,512,768,512GiB, respectively; no shrinkage
+or proposed deletion is credited. Each already includes one twice-max-jet
+allowance. Add five more such allowances for the remaining claimed epochs,
+the independently recomputed century floor, and64GiB of staging/uncertainty
+margin. This covers all nine downstream archive debts, not just four workers.
+
+Protection is the larger of that complete sum and every unchanged live guard
+threshold. Exact current guard commands, immutable script digests, successful
+actual fires within180seconds, zero restarts, hardened settings, live timers,
+controller/producer identities,800000VMA bounds and absence of trip receipts
+are required. The highest guard remains3984782679494bytes. The nine-epoch
+fleet census must match the observer and have no other live delivery pipeline;
+an extra/restarted/changed claim requires a new qualification, not a smaller
+constant. Current coordinated memory/OOM/VMA evidence and actual copy guards
+remain mandatory.
+
+The refreshed protection plus the complete copy and1GiB requires
+4095033902194bytes. No live guard is edited, lowered, stopped or replaced.
+The selected protection is retained through every copy write and requalified
+before import. This source path is not deployment, fleet-monitor integration,
+kernel capability proof, fresh admission, or permission to launch an
+unmonitored publisher. Qualify those separately before a real canonical copy.
+
 The intended work root is a precreated root-owned mode0755 direct child of
 `/home/sol/.jetstreamer-private` named `epoch144-publication-work-UNIQUE`.
 `stage/` must be absent. A root-owned mode0700 receipt root beneath
