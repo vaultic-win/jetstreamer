@@ -203,6 +203,8 @@ pub(super) async fn run() -> Result<()> {
     let f = bound_json(&s.fleet)?;
     let p = bound_json(&s.fleet_plan)?;
     let release = bound_json(&s.protection_release)?;
+    let original_ready: BoundFile = serde_json::from_value(release["epoch198_ready"].clone())?;
+    let ready198 = bound_json(&original_ready)?;
     let native = bound_json(&s.native_result)?;
     policy(&bound_json(&s.resource_policy)?, &native, &release)?;
     let floor = bound_json(&s.floor)?;
@@ -268,18 +270,41 @@ pub(super) async fn run() -> Result<()> {
                 .iter()
                 .find(|v| v["epoch"] == 201)
                 .context("audited201 sample")?;
+            let evidence = |path: &str, digest: &str| -> Result<Value> {
+                bound_json(&BoundFile {
+                    path: proof[path].as_str().context("floor proof path")?.into(),
+                    sha256: proof[digest].as_str().context("floor proof digest")?.into(),
+                })
+            };
+            let remote_proof = evidence("r2_receipt", "r2_receipt_sha256")?;
+            let verification = evidence(
+                "private_resource_verification",
+                "private_resource_verification_sha256",
+            )?;
             ensure!(
                 remote.archive_length == proof["jet_size_bytes"].as_u64()
-                    && remote.sidecar_sha256.as_deref() == proof["archive_sha256"].as_str(),
+                    && remote.sidecar_sha256.as_deref() == proof["archive_sha256"].as_str()
+                    && remote.archive_metadata_sha256.as_deref()
+                        == proof["archive_sha256"].as_str()
+                    && remote.archive_etag.as_deref() == remote_proof["archive_etag"].as_str()
+                    && remote_proof["authenticated_ready_pair_revalidated"] == true
+                    && remote_proof["remote_sha256_readback"] == true
+                    && verification["status"] == "passed"
+                    && verification["full_verifier"]["exit_code"] == 0
+                    && verification["current_plugin"]["exit_code"] == 0
+                    && verification["archive_sha256_before_after_verified"] == true,
                 "floor sample remote identity changed"
             );
+            for receipt in [&remote_proof, &verification] {
+                ensure!(
+                    receipt["epoch"] == 201
+                        && receipt["archive_length"] == proof["jet_size_bytes"]
+                        && receipt["archive_sha256"] == proof["archive_sha256"],
+                    "floor proof identity differs"
+                );
+            }
         } else {
-            ensure!(
-                remote.archive_length == Some(99_381_250_591)
-                    && remote.sidecar_sha256.as_deref()
-                        == Some("4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb"),
-                "198pair changed"
-            );
+            continuation144_protection::remote_matches(&remote, &ready198)?;
         }
     }
     let available = snapshot144::free_bytes()?;
