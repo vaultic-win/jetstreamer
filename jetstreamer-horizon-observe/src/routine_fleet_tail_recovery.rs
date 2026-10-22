@@ -86,9 +86,21 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     let observed = bound_json(&observer, false)?;
     let model = file(p.cycle_directory.join("sealed/eta-model.json"), true)?;
     let mv = bound_json(&model, true)?;
+    // Cadence validation consumes the genuine predecessor model, not the
+    // already-derived model whose timestamp is the current sample.
+    let prior_model = bound_json(&p.model_template, true)?;
+    let prior_model = private144::effective_model(
+        p,
+        &delivery160::effective_model(
+            p,
+            &delivery198::effective_model(p, &controller_recovery::model(p, &prior_model)?)?,
+        )?,
+    )?;
+    let prior_model = terminal_handoff::for_observation(p, &prior_model, &observed)?;
+    let prior_model = cohort191::for_observation(p, &prior_model, &observed)?;
     validate_observation(
         p,
-        &mv,
+        &prior_model,
         &observed,
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
     )?;
