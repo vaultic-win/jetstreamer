@@ -273,10 +273,10 @@ mod tests {
     #[test]
     fn manager_requires_exact_clean_terminal_and_never_absence_alone() {
         let r = serde_json::json!({"UNIT":cohort160_finalization::UNIT,"INVOCATION_ID":cohort160_finalization::IID,"_PID":"1","_UID":"0","MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{}: Deactivated successfully.",cohort160_finalization::UNIT),"__REALTIME_TIMESTAMP":"1792683730017883"});
-        manager(&[r.clone()], 1792684000).unwrap();
+        manager(std::slice::from_ref(&r), 1792684000).unwrap();
         assert!(manager(&[], 1792684000).is_err());
         assert!(manager(&[r.clone(), r.clone()], 1792684000).is_err());
-        assert!(manager(&[r.clone()], 1792683730).is_err());
+        assert!(manager(std::slice::from_ref(&r), 1792683730).is_err());
         for k in [
             "UNIT",
             "INVOCATION_ID",
