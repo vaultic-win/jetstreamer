@@ -1,5 +1,5 @@
 //! Exact reproducible cache evidence, with separately bound retirement for two
-//! fixed debug profiles. Never runs Cargo or selects archives/replay scratch.
+//! fixed cache profiles. Never runs Cargo or selects archives/replay scratch.
 use {
     crate::{
         process_references,
@@ -25,12 +25,15 @@ const REPO: &str = "/home/ubuntu/workspace/jetstreamer";
 const SOL_REPO: &str = "/home/sol/workspace/jetstreamer";
 const SOL_TARGET: &str = "/home/sol/workspace/jetstreamer/target/debug";
 const SOL_PROFILE: &str = "jetstreamer-horizon-sol-dev-cache-check-plan-v1";
+const SOL_RELEASE_DEPS: &str = "/home/sol/workspace/jetstreamer/target/release/deps";
+const SOL_RELEASE_DEPS_PROFILE: &str = "jetstreamer-horizon-sol-release-deps-cache-check-plan-v1";
 const TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/debug";
 const RELEASE_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/release";
 const SELECTED225_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug";
 fn cache_target(schema: &str) -> Result<&'static Path> {
     match schema {
         SOL_PROFILE => Ok(Path::new(SOL_TARGET)),
+        SOL_RELEASE_DEPS_PROFILE => Ok(Path::new(SOL_RELEASE_DEPS)),
         "jetstreamer-horizon-dev-cache-check-plan-v1" => Ok(Path::new(TARGET)),
         "jetstreamer-horizon-release-cache-check-plan-v1" => Ok(Path::new(RELEASE_TARGET)),
         "jetstreamer-horizon-selected225-dev-cache-check-plan-v1" => {
@@ -91,8 +94,8 @@ fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.retirement.is_none()
             || cache_target(&p.schema)? == Path::new(SELECTED225_TARGET)
-            || p.schema == SOL_PROFILE,
-        "retirement is restricted to fixed qualified debug caches"
+            || matches!(p.schema.as_str(), SOL_PROFILE | SOL_RELEASE_DEPS_PROFILE),
+        "retirement is restricted to fixed qualified caches"
     );
     ensure!(
         p.output.file_name().is_some_and(|s| s == "check.json")
@@ -253,11 +256,7 @@ fn staged_references_inner(
                         target.as_os_str().as_bytes(),
                         true
                     ) && !(dev_cache_literal
-                        && link
-                            .as_os_str()
-                            .as_bytes()
-                            .windows(b"target/debug".len())
-                            .any(|b| b == b"target/debug")),
+                        && relative_cache_reference(link.as_os_str().as_bytes(), target)),
                     "dangling alias targets dev cache"
                 );
                 let name = path
@@ -313,14 +312,7 @@ fn staged_references_inner(
                     &bytes,
                     target.as_os_str().as_bytes(),
                     true,
-                ) || (dev_cache_literal && {
-                    let relative: &[u8] = if target == Path::new(RELEASE_TARGET) {
-                        b"target/release"
-                    } else {
-                        b"target/debug"
-                    };
-                    bytes.windows(relative.len()).any(|s| s == relative)
-                }))
+                ) || (dev_cache_literal && { relative_cache_reference(&bytes, target) }))
             {
                 refs.push(canonical.display().to_string());
             }
@@ -328,6 +320,23 @@ fn staged_references_inner(
     }
     refs.sort();
     Ok(refs)
+}
+fn relative_cache_literal(target: &Path) -> &'static [u8] {
+    if target == Path::new(SOL_RELEASE_DEPS) {
+        b"target/release/deps"
+    } else if target == Path::new(RELEASE_TARGET) {
+        b"target/release"
+    } else {
+        b"target/debug"
+    }
+}
+fn relative_cache_reference(bytes: &[u8], target: &Path) -> bool {
+    let relative = relative_cache_literal(target);
+    if target == Path::new(SOL_RELEASE_DEPS) {
+        process_references::encoded_reference(bytes, relative, true)
+    } else {
+        bytes.windows(relative.len()).any(|s| s == relative)
+    }
 }
 fn persist(path: &Path, v: &Value) -> Result<()> {
     let parent = path.parent().context("output parent")?;
@@ -367,7 +376,9 @@ fn retirement_matches(prior: &Value, tree: &Value, profile: &str) -> Result<()> 
         prior["schema"] == "jetstreamer-horizon-dev-cache-check-v1"
             && matches!(
                 profile,
-                SOL_PROFILE | "jetstreamer-horizon-selected225-dev-cache-check-plan-v1"
+                SOL_PROFILE
+                    | SOL_RELEASE_DEPS_PROFILE
+                    | "jetstreamer-horizon-selected225-dev-cache-check-plan-v1"
             )
             && prior["cache_profile"] == profile
             && prior["cache"] == *tree
@@ -439,7 +450,8 @@ pub fn run() -> Result<()> {
     };
     let p: Plan = serde_json::from_value(bound_json(&pb)?)?;
     validate_plan(&p)?;
-    let sol = p.schema == SOL_PROFILE;
+    let sol_deps = p.schema == SOL_RELEASE_DEPS_PROFILE;
+    let sol = p.schema == SOL_PROFILE || sol_deps;
     let repo = if sol { SOL_REPO } else { REPO };
     ensure!(
         git(repo, &["rev-parse", "HEAD"])? == format!("{}\n", p.source_commit).as_bytes()
@@ -453,7 +465,9 @@ pub fn run() -> Result<()> {
                 repo,
                 &[
                     "check-ignore",
-                    if target == Path::new(TARGET) || sol {
+                    if sol_deps {
+                        "target/release/deps"
+                    } else if target == Path::new(TARGET) || sol {
                         "target/debug"
                     } else {
                         "target/release"
@@ -501,7 +515,13 @@ pub fn run() -> Result<()> {
     // Never create a replacement lock or run Cargo from this process.
     let _cargo_lock = if sol {
         no_builders(Path::new("/proc"))?;
-        Some(cargo_profile_lock(target)?)
+        // Retain the release profile lock outside the selected deps subtree.
+        // Deleting deps must never unlink the lock held against a new build.
+        Some(cargo_profile_lock(if sol_deps {
+            target.parent().context("release profile parent")?
+        } else {
+            target
+        })?)
     } else {
         None
     };
@@ -555,7 +575,7 @@ pub fn run() -> Result<()> {
         persist(
             &parent.join("intent.json"),
             &json!({
-                "schema":if sol { "jetstreamer-private-sol-debug-retirement-intent-v1" } else { "jetstreamer-private-selected225-debug-retirement-intent-v1" },
+                "schema":if sol_deps {"jetstreamer-private-sol-release-deps-retirement-intent-v1"} else if sol { "jetstreamer-private-sol-debug-retirement-intent-v1" } else { "jetstreamer-private-selected225-debug-retirement-intent-v1" },
                 "prior_check":{"path":r.prior_check.path,"sha256":r.prior_check.sha256},
                 "current_check":{"path":p.output,"sha256":check_sha},
                 "cache":tree,"r2_mutations":false,"archive_deletion_authorized":false
@@ -574,7 +594,7 @@ pub fn run() -> Result<()> {
         persist(
             &parent.join("completion.json"),
             &json!({
-                "schema":if sol { "jetstreamer-private-sol-debug-retirement-completion-v1" } else { "jetstreamer-private-selected225-debug-retirement-completion-v1" },
+                "schema":if sol_deps {"jetstreamer-private-sol-release-deps-retirement-completion-v1"} else if sol { "jetstreamer-private-sol-debug-retirement-completion-v1" } else { "jetstreamer-private-selected225-debug-retirement-completion-v1" },
                 "cache":tree,"cache_absent":true,"source_commit":p.source_commit,
                 "current_check":{"path":p.output,"sha256":check_sha},
                 "r2_mutations":false,"archive_deletion_authorized":false,
@@ -775,6 +795,57 @@ mod tests {
         assert_eq!(cache_target(&p.schema).unwrap(), Path::new(SOL_TARGET));
         p.schema = "jetstreamer-horizon-release-cache-check-plan-v1".into();
         assert!(validate_plan(&p).is_err());
+    }
+    #[test]
+    fn sol_release_dependencies_are_a_distinct_fixed_reproducible_subtree() {
+        let mut p = Plan {
+            schema: SOL_RELEASE_DEPS_PROFILE.into(),
+            source_commit: "a".repeat(40),
+            cargo_lock_sha256: "b".repeat(64),
+            output: "/var/lib/jetstreamer/horizon-dev-cache-check-sol-deps/check.json".into(),
+            retirement: Some(Retirement {
+                prior_check: Bound {
+                    path: "/sealed/check.json".into(),
+                    sha256: "c".repeat(64),
+                },
+            }),
+        };
+        validate_plan(&p).unwrap();
+        assert_eq!(
+            cache_target(&p.schema).unwrap(),
+            Path::new(SOL_RELEASE_DEPS)
+        );
+        assert_ne!(cache_target(&p.schema).unwrap(), Path::new(SOL_TARGET));
+        p.schema = "jetstreamer-horizon-sol-release-cache-check-plan-v1".into();
+        assert!(validate_plan(&p).is_err());
+        assert!(relative_cache_reference(
+            b"ExecStart=target/release/deps/tool\n",
+            Path::new(SOL_RELEASE_DEPS)
+        ));
+        for bytes in [
+            b"ExecStart=target/release/tool\n".as_slice(),
+            b"ExecStart=target/release/deps-sibling/tool\n",
+        ] {
+            assert!(!relative_cache_reference(
+                bytes,
+                Path::new(SOL_RELEASE_DEPS)
+            ));
+        }
+    }
+    #[test]
+    fn dependency_retirement_keeps_the_parent_cargo_profile_lock_held() {
+        let t = tempfile::tempdir().unwrap();
+        fs::write(t.path().join(".cargo-lock"), b"").unwrap();
+        let deps = t.path().join("deps");
+        fs::create_dir(&deps).unwrap();
+        fs::write(deps.join("reproducible.rlib"), b"fixture").unwrap();
+        let lock = cargo_profile_lock(t.path()).unwrap();
+        let m = fs::metadata(&deps).unwrap();
+        retire_tree(&deps, m.dev(), m.ino()).unwrap();
+        assert!(t.path().join(".cargo-lock").is_file());
+        assert!(cargo_profile_lock(t.path()).is_err());
+        drop(lock);
+        cargo_profile_lock(t.path()).unwrap();
     }
 
     #[test]
