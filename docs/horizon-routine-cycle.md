@@ -99,6 +99,19 @@ publication. Stop/authenticate superseded pending timers before launching this
 owner; seal and sandbox-preflight the adopted successor before arming it. Reader
 source support, unit tests and an offline successor do not authorize a launch.
 
+`--prepare-next-native141-all-retry SPEC --handoff-sha256 HEX` adopts only the
+correctedv2attempt under strict schema
+`jetstreamer-native141-all-retry-monitor-handoff-v1`. It requires an accepted
+original all-target profile, the exact retained failedv1guard and actual
+zero-restart failed parent invocation. The new real initial guard binds distinct
+v2binary, plan, admission and output paths. The successor uses the separate
+`native141-all-retry-public160-timed-…` namespace and newly sealed retry-aware
+reader, retaining both attempts and every earlier failure. It does not replace
+old evidence, claim recovery, change ordinary ETA clocks or authorize launch.
+Never start the retry while a pending baseline observer/metadata generation
+cannot census it; wait for its accepted completion or perform the authenticated
+timer handoff before launch, then seal/preflight/arm the adopted successor.
+
 ## Private epoch144 assembly-only fallback
 
 The separately qualified assembly-only owner is never ordinary replay or an ETA

@@ -236,6 +236,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if native141::all_retry_enabled(p) {
+        return "native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if native141::all_acquisition_enabled(p) {
         return "native141-all-acquisition-public160-timed-scans-upload198-v1";
     }
@@ -1713,6 +1716,7 @@ fn main() {
                         args[6].as_str(),
                         "--prepare-next-delivery198"
                             | "--prepare-next-native141-all-acquisition"
+                            | "--prepare-next-native141-all-retry"
                             | "--prepare-next-publication144"
                             | "--prepare-next-native141-rejection"
                             | "--prepare-next-native141-acquisition"
@@ -1888,6 +1892,9 @@ mod tests {
     fn accepted_all_target_preparation_cannot_fall_through_to_live_execution() {
         assert!(super::preparation_mode(
             "--prepare-next-native141-all-acquisition"
+        ));
+        assert!(super::preparation_mode(
+            "--prepare-next-native141-all-retry"
         ));
         assert!(super::preparation_mode("--prepare-next"));
         assert!(super::preparation_mode("--prepare-package-recovery"));

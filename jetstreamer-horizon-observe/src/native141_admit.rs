@@ -26,6 +26,11 @@ const ACQUISITION_NATIVE_SHA: &str =
 const ALL_ACQUISITION_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-all-acquisition-candidate-20261022-v1/jetstreamer-epoch141-ledger-native";
 const ALL_ACQUISITION_NATIVE_SHA: &str =
     "ccf620b21f3c75cde3e9c22df058b0f3e4cefac9f7ae52c533f44bde38d757ec";
+const ALL_RETRY_UNIT: &str =
+    "horizon-epoch141-native-full-census-acquisition-all-20261022-v2.service";
+const ALL_RETRY_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-all-acquisition-candidate-20261022-v2/jetstreamer-epoch141-ledger-native";
+const ALL_RETRY_NATIVE_SHA: &str =
+    "153a0d1302369f7ff1272d8b62ca9e777d4d1e3bd5a172e5edec5fe3ad28c295";
 const FLOOR: u64 = 4_740_696_923_590;
 const RESERVATION: u64 = 32 << 30;
 // First-target output is capped at192MiB; native logging rolls at4MiB/two logs.
@@ -173,6 +178,9 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "epoch141-read-only-first-target-acquisition-v4" => {
             (ACQUISITION_NATIVE, ACQUISITION_NATIVE_SHA)
         }
+        "epoch141-read-only-all-target-acquisition-v5" if p.native_unit == ALL_RETRY_UNIT => {
+            (ALL_RETRY_NATIVE, ALL_RETRY_NATIVE_SHA)
+        }
         "epoch141-read-only-all-target-acquisition-v5" => {
             (ALL_ACQUISITION_NATIVE, ALL_ACQUISITION_NATIVE_SHA)
         }
@@ -201,7 +209,8 @@ fn validate_plan(p: &Plan) -> Result<()> {
     if p.native_profile == "epoch141-read-only-all-target-acquisition-v5" {
         ensure!(
             p.native_unit
-                == "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service",
+                == "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service"
+                || p.native_unit == ALL_RETRY_UNIT,
             "all-target acquisition admission needs its exact separate unit"
         );
     }
@@ -766,6 +775,25 @@ mod tests {
         p.native_unit =
             "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service".into();
         p.files[0].sha256 = ACQUISITION_NATIVE_SHA.into();
+        assert!(validate_plan(&p).is_err());
+    }
+    #[test]
+    fn corrected_all_target_retry_needs_its_own_exact_unit_binary_and_full_budget() {
+        let mut p = plan();
+        p.native_profile = "epoch141-read-only-all-target-acquisition-v5".into();
+        p.native_unit = ALL_RETRY_UNIT.into();
+        p.files[0].path = ALL_RETRY_NATIVE.into();
+        p.files[0].sha256 = ALL_RETRY_NATIVE_SHA.into();
+        p.minimum_free_bytes = FLOOR + RESERVATION;
+        validate_plan(&p).unwrap();
+        p.native_unit =
+            "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service".into();
+        assert!(validate_plan(&p).is_err());
+        p.native_unit = ALL_RETRY_UNIT.into();
+        p.files[0].sha256 = ALL_ACQUISITION_NATIVE_SHA.into();
+        assert!(validate_plan(&p).is_err());
+        p.files[0].sha256 = ALL_RETRY_NATIVE_SHA.into();
+        p.minimum_free_bytes -= 1;
         assert!(validate_plan(&p).is_err());
     }
     #[test]
