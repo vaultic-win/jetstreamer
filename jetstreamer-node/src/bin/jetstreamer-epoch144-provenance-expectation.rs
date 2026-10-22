@@ -17,6 +17,7 @@ const UNIT: &str = "horizon-qualify-144-checkpoint-continuation-20261022-v1.serv
 const IID: &str = "8fddd3ef045c4fe5b12c7d25f43a4b73";
 const PREFIX: &str = "917f700274c0ff0386cd8be2f27eb2ace9f3bc7dff38e1010d0c04bb79b8c273";
 const PREFIX_MANIFEST: &str = "691d5f3768b8c283678937b49790606b6091d4ab632372bfff38664c005b544a";
+const SUFFIX: &str = "3df30cabba516ff6de39bfc236fca030e3bb75b45603d88ef7baf7a6d669a414";
 const SNAPSHOT: &str = "f170976b2bc3f2d55dd0fbb5a415bfeae8d0903a0ad69334d8aa993b5cab35ae";
 const WORKER: &str = "2cca500106d274ebfbbc8c5bfa0e6e8343cd5e41003f9e82c93282800732d8c8";
 const NODE: &str = "ac47031ac2cc42c0d7c343aebbfe049433fc76b7ee8d6da3ca2ac7de9f428dbd";
@@ -38,10 +39,24 @@ struct Plan {
     output: PathBuf,
 }
 fn read(b: &Bound) -> Result<Vec<u8>> {
-    evidence::bound_file(&b.path, &b.sha256, 1 << 20, true)
+    bound_file(&b.path, &b.sha256, 1 << 20, true)
+}
+pub(crate) fn bound_file(
+    path: &Path,
+    digest: &str,
+    maximum: u64,
+    immutable: bool,
+) -> Result<Vec<u8>> {
+    evidence::bound_file(path, digest, maximum, immutable)
+}
+pub(crate) fn write_receipt(path: &Path, value: &Value) -> Result<()> {
+    evidence::write_receipt(path, value)
+}
+pub(crate) fn is_sha(value: &str) -> bool {
+    evidence::is_sha(value)
 }
 fn digest(s: &str) -> Result<[u8; 32]> {
-    ensure!(evidence::is_sha(s), "noncanonical digest");
+    ensure!(is_sha(s), "noncanonical digest");
     let mut bytes = [0; 32];
     for (i, b) in bytes.iter_mut().enumerate() {
         *b = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16)?;
@@ -97,6 +112,18 @@ fn derive(
     v: &Value,
 ) -> Result<ArchiveProvenance> {
     outcome(v)?;
+    ensure!(
+        v["suffix_archive_sha256"] == SUFFIX,
+        "wrong completed suffix digest"
+    );
+    derive_pair(p, s, false)
+}
+// Pure source-pair construction grants no recovery or publication authority.
+pub(crate) fn derive_pair(
+    p: &HistoricalSegmentManifest,
+    s: &HistoricalSegmentManifest,
+    assembly_only: bool,
+) -> Result<ArchiveProvenance> {
     p.validate()?;
     s.validate()?;
     ensure!(
@@ -114,12 +141,7 @@ fn derive(
     );
     ensure!(
         p.archive_sha256 == digest(PREFIX)?
-            && s.archive_sha256
-                == digest(
-                    v["suffix_archive_sha256"]
-                        .as_str()
-                        .context("suffix digest")?
-                )?
+            && s.archive_sha256 == digest(SUFFIX)?
             && s.bootstrap_archive_sha256 == Some(digest(SNAPSHOT)?)
             && s.bootstrap.write_count == 0,
         "source or snapshot differs"
@@ -162,10 +184,14 @@ fn derive(
     }
     let expected = ArchiveProvenance::V4(ArchiveProvenanceV4 {
         base: ArchiveProvenanceV3 {
-            assembly_profile: format!(
-                "{}/epoch144-checkpoint-continuation-v2",
-                s.runtime.generation_profile
-            ),
+            assembly_profile: if assembly_only {
+                "jetstreamer-epoch144-assembly-only-v1".into()
+            } else {
+                format!(
+                    "{}/epoch144-checkpoint-continuation-v2",
+                    s.runtime.generation_profile
+                )
+            },
             genesis_hash: p.runtime.genesis_hash.parse()?,
             bootstrap_state_kind: BootstrapStateKind::SnapshotArchive,
             bootstrap_state: StateCommitment {
@@ -245,7 +271,7 @@ mod tests {
         s.output_slot_start = 62639491;
         s.output_slot_count = 509;
         s.bootstrap_archive_sha256 = Some(digest(SNAPSHOT).unwrap());
-        s.archive_sha256 = [3; 32];
+        s.archive_sha256 = digest(SUFFIX).unwrap();
         s.emitted_raw_write_versions.start = 100;
         s.emitted_raw_write_versions.end = 200;
         let v = json!({"schema":"jetstreamer-private-epoch144-checkpoint-continuation-v2","producer_unit":UNIT,"producer_invocation_id":IID,
@@ -309,6 +335,29 @@ mod tests {
             encode_archive_provenance(&derive(&p, &s, &v).unwrap()).unwrap()
         );
     }
+    #[test]
+    fn assembly_only_is_distinct_provenance_not_a_forged_original_outcome() {
+        let (p, s, v) = sources();
+        let ArchiveProvenance::V4(original) = derive(&p, &s, &v).unwrap() else {
+            panic!("V4")
+        };
+        let ArchiveProvenance::V4(recovery) = derive_pair(&p, &s, true).unwrap() else {
+            panic!("V4")
+        };
+        assert_ne!(
+            original.base.assembly_profile,
+            recovery.base.assembly_profile
+        );
+        assert_eq!(
+            recovery.base.assembly_profile,
+            "jetstreamer-epoch144-assembly-only-v1"
+        );
+        assert_eq!(
+            original.base.runtime_segments,
+            recovery.base.runtime_segments
+        );
+        assert_eq!(original.base.handoffs, recovery.base.handoffs);
+    }
 }
 async fn capture_boundaries(output: &Path, self_sha: &str) -> Result<()> {
     let client = reqwest::Client::builder()
@@ -344,7 +393,7 @@ async fn capture_boundaries(output: &Path, self_sha: &str) -> Result<()> {
         );
         blocks.push(json!({"slot":slot,"blockhash":blockhash,"request":request,"raw_response":std::str::from_utf8(&bytes)?,"raw_response_sha256":evidence::sha(&bytes)}));
     }
-    evidence::write_receipt(
+    write_receipt(
         output,
         &json!({"schema":"jetstreamer-private144-finalized-boundaries-v2","epoch":144,"rpc":"https://api.mainnet-beta.solana.com",
         "tool_sha256":self_sha,"blocks":blocks,"accounts_root_qualification_authorized":false,"runtime_admission_authorized":false,
