@@ -51,6 +51,62 @@ struct Plan {
     acquisition: Bound,
     output_directory: PathBuf,
 }
+const OWN_UNIT: &str = "horizon-epoch141-census-poh-diagnostic-20261022-v1.service";
+fn own_identity() -> Result<Value> {
+    let iid = std::env::var("INVOCATION_ID")?;
+    let o=Command::new("/usr/bin/systemctl").args(["show",OWN_UNIT,"--property=Id,InvocationID,MainPID,NRestarts,Restart,Type,ActiveState,SubState,ExecStart"]).output()?;
+    ensure!(
+        o.status.success() && o.stdout.len() <= 32768,
+        "diagnostic owner unreadable"
+    );
+    let text = std::str::from_utf8(&o.stdout)?;
+    let fields: std::collections::BTreeMap<_, _> = text
+        .lines()
+        .map(|s| s.split_once('=').context("diagnostic property malformed"))
+        .collect::<Result<_>>()?;
+    let v = json!(fields);
+    validate_own(&v, &iid, std::process::id())?;
+    Ok(v)
+}
+fn validate_own(v: &Value, iid: &str, pid: u32) -> Result<()> {
+    ensure!(
+        iid.len() == 32 && evidence::is_sha(&format!("{iid}{iid}")),
+        "invalid diagnostic invocation"
+    );
+    ensure!(
+        v["Id"] == OWN_UNIT
+            && v["InvocationID"] == iid
+            && v["MainPID"].as_str().and_then(|s| s.parse::<u32>().ok()) == Some(pid)
+            && v["NRestarts"] == "0"
+            && v["Restart"] == "no"
+            && v["Type"] == "exec"
+            && v["ActiveState"] == "active"
+            && v["SubState"] == "running",
+        "diagnostic requires exact live nonrestarting owner"
+    );
+    Ok(())
+}
+fn memory_admission() -> Result<Value> {
+    let text = fs::read_to_string("/proc/meminfo")?;
+    let available = text
+        .lines()
+        .find_map(|line| line.strip_prefix("MemAvailable:"))
+        .context("MemAvailable absent")?
+        .split_whitespace()
+        .next()
+        .context("MemAvailable malformed")?
+        .parse::<u64>()?
+        .checked_mul(1024)
+        .context("memory overflow")?;
+    let minimum = 130u64 << 30; // existing128GiB host reserve plus hard2GiB diagnostic envelope
+    ensure!(
+        available >= minimum,
+        "private PoH memory admission unavailable"
+    );
+    Ok(
+        json!({"available_bytes":available,"protected_memory_bytes":128u64<<30,"diagnostic_memory_max_bytes":2u64<<30,"minimum_available_bytes":minimum,"admitted":true}),
+    )
+}
 fn read(b: &Bound, maximum: u64, immutable: bool) -> Result<Value> {
     Ok(serde_json::from_slice(&evidence::bound_file(
         &b.path, &b.sha256, maximum, immutable,
@@ -395,11 +451,13 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    let own = own_identity()?;
+    let memory = memory_admission()?;
     let mut accounted = 8 << 20; // final manifest/context reservation
     write(
         &p.output_directory,
         "intent.json",
-        &json!({"schema":"jetstreamer-epoch141-census-poh-intent-v1","plan":pb,"tool_sha256":a[5],"acquisition":p.acquisition,"native_terminal":owner,"clock":clock,"target_count":TARGETS,"expected_boundaries":BOUNDARIES,"publication_authorized":false,"runtime_boundary_input_authorized":false,"r2_mutations":false}),
+        &json!({"schema":"jetstreamer-epoch141-census-poh-intent-v2","plan":pb,"tool_sha256":a[5],"acquisition":p.acquisition,"native_terminal":owner,"owner":own,"memory_admission":memory,"clock":clock,"target_count":TARGETS,"expected_boundaries":BOUNDARIES,"publication_authorized":false,"runtime_boundary_input_authorized":false,"replay_launch_authorized":false,"runtime_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         &mut accounted,
     )?;
     let outputs = p.output_directory.join("targets");
@@ -497,6 +555,26 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn own_execution_cannot_borrow_a_foreign_pid_restart_or_unit() {
+        let iid = "a".repeat(32);
+        let v = json!({"Id":OWN_UNIT,"InvocationID":iid,"MainPID":"123","NRestarts":"0","Restart":"no","Type":"exec","ActiveState":"active","SubState":"running"});
+        validate_own(&v, &iid, 123).unwrap();
+        assert!(validate_own(&v, &iid, 124).is_err());
+        for (key, value) in [
+            ("Id", "foreign.service"),
+            ("InvocationID", "foreign"),
+            ("MainPID", "0"),
+            ("NRestarts", "1"),
+            ("Restart", "on-failure"),
+            ("Type", "oneshot"),
+            ("SubState", "exited"),
+        ] {
+            let mut bad = v.clone();
+            bad[key] = json!(value);
+            assert!(validate_own(&bad, &iid, 123).is_err());
+        }
+    }
     #[test]
     #[ignore = "root read-only retained first-target/clock proof; no outputs or full-census claim"]
     fn actual_first_target_matches_previously_verified_chain_without_connectivity_promotion() {

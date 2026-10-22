@@ -285,6 +285,7 @@ pub(super) fn prepare(
         "--prepare-next-native141-acquisition"
             | "--prepare-next-native141-all-acquisition"
             | "--prepare-next-native141-all-retry"
+            | "--prepare-next-census141-poh"
     ) {
         handoff_spec
     } else {
@@ -465,6 +466,16 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         native141::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-census141-poh" {
+        census141_poh::enable(
+            &mut next,
+            acquisition_spec.context("census PoH handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        census141_poh::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     if mode == "--prepare-next-publication144" {
         publication144::enable(

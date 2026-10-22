@@ -28,6 +28,8 @@ mod next_preparation;
 #[path = "routine_terminal.rs"]
 mod terminal_handoff;
 
+#[path = "routine_census141_poh.rs"]
+mod census141_poh;
 #[path = "routine_delivery160.rs"]
 mod delivery160;
 #[path = "routine_delivery198.rs"]
@@ -128,6 +130,8 @@ struct Plan {
     public198_delivery: Option<public198::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     package_controller_recovery: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    census141_poh: Option<census141_poh::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     runtime_handoff157: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -238,6 +242,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.census141_poh.is_some() {
+        return "census141-poh-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if native141::all_retry_enabled(p) {
         return "native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -719,6 +726,7 @@ fn validate_templates(
     continuation144::validate(p)?;
     assembly144::validate(p)?;
     native141::validate(p)?;
+    census141_poh::validate(p)?;
     assembly144_scans::validate(p)?;
     publication144::validate(p)?;
     ensure!(
@@ -1190,6 +1198,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     native144::derive_fleet(p, &mut fleet)?;
     continuation144::derive_fleet(p, &mut fleet)?;
     native141::derive_fleet(p, &mut fleet)?;
+    census141_poh::derive_fleet(p, &mut fleet)?;
     assembly144_scans::derive_fleet(p, &mut fleet)?;
     publication144::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
@@ -1412,6 +1421,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     native144::derive_fleet(p, &mut fleet.clone())?;
     continuation144::derive_fleet(p, &mut fleet.clone())?;
     native141::derive_fleet(p, &mut fleet.clone())?;
+    census141_poh::derive_fleet(p, &mut fleet.clone())?;
     assembly144_scans::derive_fleet(p, &mut fleet.clone())?;
     publication144::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
@@ -1719,6 +1729,7 @@ fn main() {
                         "--prepare-next-delivery198"
                             | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-native141-all-retry"
+                            | "--prepare-next-census141-poh"
                             | "--prepare-next-publication144"
                             | "--prepare-next-native141-rejection"
                             | "--prepare-next-native141-acquisition"
