@@ -33,12 +33,26 @@ jobs:
             flags: "--features epoch140-native-restore-diagnostic"
             examples: false
           - name: all-compatible-features
-            scope: "--workspace --exclude jetstreamer-node"
+            scope: "--workspace --exclude jetstreamer-node --exclude jetstreamer-horizon-observe"
             flags: "--all-features"
+            examples: true
+          # The exact epoch223 snapshot package cannot be combined with the
+          # older snapshot profiles. Exercise both feature families explicitly.
+          - name: observer-existing-compatible-features
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features ram-snapshot-eight-core-stopped225,epoch225-shrink-snapshot-tests,epoch203-ram-resource-supervisor,epoch203-ram-shrink-candidate"
+            examples: true
+          - name: observer-epoch223-tail-snapshot
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-tail-snapshot-tests"
             examples: true
           - name: node-epoch213-continuation
             scope: "-p jetstreamer-node"
             flags: "--features epoch213-checkpoint-continuation-diagnostic"
+            examples: false
+          - name: node-epoch223-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch223-v1-6-25-qualification"
             examples: false
           - name: node-epoch144-continuation
             scope: "-p jetstreamer-node"
