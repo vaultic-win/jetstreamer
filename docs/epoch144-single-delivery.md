@@ -101,3 +101,40 @@ field and all artifact/receipt identities must remain equal. The original raw
 receipts stay unchanged. This prevents a daemon reload from falsely rejecting
 an otherwise unchanged long-running handoff, without accepting a new owner or
 a changed publication gate.
+
+## Authenticated child progress reader
+
+`jetstreamer-publication144-progress PLAN --plan-sha256 SHA --self-sha256 SHA`
+is a read-only progress-evidence producer, not the routine status writer. Its
+strict `jetstreamer-exact144-child-progress-plan-v1` binds `delivery_plan`,
+`delivery_launch`, `child_launch`, and `observer` path/SHA pairs,
+`sample_unix_millis`, and a no-clobber `output_receipt` under the precreated
+root-owned0700 `/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1`.
+The filename is exactly `progress-SAMPLE_MILLIS.json`. Seal both executable and
+plan before operational use. It accepts the pinned v6 delivery worker and
+progress client only; a replacement worker requires separate qualification.
+
+The reader checks the coordinated v2 sample time, exact live zero-restart
+oneshot, historical capture and archive child command. Before and after its
+bounded journald read it requires the actual child PID/start ticks, parent,
+executable, exact sync argv, cgroup, permanent UID1001/GID1003 and empty
+capabilities to agree. Progress messages must have trusted journald PID, UID,
+executable, unit and invocation metadata, and timestamps inside that child and
+sample interval. Missing executable metadata fails closed. A sandbox probe
+showed that a two-second unprivileged child receives its own PID/UID/executable
+attribution; a child that has already exited can lack `_EXE` and is not accepted.
+
+The event state machine rejects duplicate starts, regressing/repeated counters,
+clock resets, wrong object lengths or digests, out-of-order phase transitions,
+and premature verification claims. Idempotent existing-object readback may
+start without a new multipart upload. Multipart completion is not whole-object
+proof, and successful whole-file readback still owes source revalidation and
+the sidecar. Even then the output explicitly denies ready-pair proof and
+status/ETA authority. It performs no resource scan, archive hash, lock
+acquisition or network request.
+
+This reader does not yet implement queue contention or a time-to-sidecar
+forecast, adopt the upload into the fleet, or authorize a dashboard update.
+Those consumers and the exact inactive/failure lifecycle remain separate real
+gates before starting144 delivery. Use the existing coordinated cadence; do not
+create a second progress polling loop.
