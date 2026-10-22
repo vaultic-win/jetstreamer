@@ -1698,6 +1698,11 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     }
 }
 
+// Call only after the strict argument allowlist above. Every accepted prepare
+//mode must remain offline; a newly added mode must never fall through to execute.
+fn preparation_mode(arg: &str) -> bool {
+    arg.starts_with("--prepare-")
+}
 fn main() {
     let result = (|| -> Result<()> {
         let args: Vec<_> = env::args().collect();
@@ -1858,31 +1863,7 @@ fn main() {
         {
             return delivery198_recover::run(&plan, &bound, &args[5]);
         }
-        if args.get(6).is_some_and(|arg| {
-            arg == "--prepare-next"
-                || arg == "--prepare-next-publication144"
-                || arg == "--prepare-next-upload198"
-                || arg == "--prepare-next-assembly144-reader"
-                || arg == "--prepare-next-native141"
-                || arg == "--prepare-next-native141-rejection"
-                || arg == "--prepare-next-native141-acquisition"
-                || arg == "--prepare-next-assembly144-scans"
-                || arg == "--prepare-next-terminal157"
-                || arg == "--prepare-next-delivery198"
-                || arg == "--prepare-next-delivery160"
-                || arg == "--prepare-next-public160"
-                || arg == "--prepare-next-public160-timing"
-                || arg == "--prepare-next-native198"
-                || arg == "--prepare-next-native144"
-                || arg == "--prepare-next-continuation144"
-                || arg == "--prepare-next-assembly144"
-                || arg == "--prepare-next-private144"
-                || arg == "--prepare-package-recovery"
-                || arg == "--prepare-runtime157-pause"
-                || arg == "--prepare-next-prefix157"
-                || arg == "--prepare-next-prefix144"
-                || arg == "--prepare-next-completed144"
-        }) {
+        if args.get(6).is_some_and(|arg| preparation_mode(arg)) {
             let spec = if args.len() == 10 {
                 Some(Bound {
                     path: args[7].clone().into(),
@@ -1903,6 +1884,25 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn accepted_all_target_preparation_cannot_fall_through_to_live_execution() {
+        assert!(super::preparation_mode(
+            "--prepare-next-native141-all-acquisition"
+        ));
+        assert!(super::preparation_mode("--prepare-next"));
+        assert!(super::preparation_mode("--prepare-package-recovery"));
+        for mode in [
+            "--check-only",
+            "--recover-public160",
+            "--publish-upload198-event",
+        ] {
+            assert!(!super::preparation_mode(mode));
+        }
+        assert!(
+            include_str!("routine_cycle.rs")
+                .contains("if args.get(6).is_some_and(|arg| preparation_mode(arg))")
+        );
+    }
     fn oct22_action_fixture() -> (Bound, Value, Value) {
         let evidence = Bound {
             path: OCT22_ACTION_REVIEW_PATH.into(),

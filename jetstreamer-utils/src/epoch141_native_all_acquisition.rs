@@ -65,13 +65,15 @@ fn acquire_target(
         odd,
     })
 }
-fn scope(scopes: &[LegacySlotScope]) -> Result<()> {
+pub(super) fn scope(scopes: &[LegacySlotScope]) -> Result<()> {
     ensure!(
         scopes.len() == 18283
             && scopes
                 .first()
                 .is_some_and(|s| s.slot == 60911776 && s.parent_slot == 60911771)
-            && scopes.last().is_some_and(|s| s.slot == 61328765)
+            // The interval ends61328765, but the independently finalized gap
+            //census's last post-gap target is61328744. They are not aliases.
+            && scopes.last().is_some_and(|s| s.slot == 61328744)
             && scopes.windows(2).all(|w| w[0].slot < w[1].slot)
             && scopes
                 .iter()
@@ -417,11 +419,38 @@ mod tests {
                 parent_slot: 60911771 + i * 20,
             })
             .collect();
-        s.last_mut().unwrap().slot = 61328765;
+        s.last_mut().unwrap().slot = 61328744;
         scope(&s).unwrap();
+        s.last_mut().unwrap().slot = 61328765;
+        assert!(
+            scope(&s).is_err(),
+            "interval end must not replace final post-gap target"
+        );
+        s.last_mut().unwrap().slot = 61328744;
         assert!(scope(&s[..1]).is_err());
         s.swap(1, 2);
         assert!(scope(&s).is_err());
+    }
+    #[test]
+    #[ignore = "root exact finalized18283target census metadata only; no native open, resource sample, archive read or remote access"]
+    fn actual_finalized_census_ends_at_last_gap_not_interval_end() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let targets = finalized::validate_complete_collection(
+            Path::new("/usr/local/lib/jetstreamer/horizon-epoch140-gap-metadata-fetch-20261021-v1/plan.json"),
+            "fc320b12c2a53c95f6781ed9130a57e179078ce09b654f96b79c675a96fdf5cc",
+            Path::new("/var/lib/jetstreamer-epoch140-gap-metadata-20261021-v1/complete.json"),
+            "21427d5debbc22ab44c337fb32679620ec663f44c52c5ceeb7100fcb450f8fe4",
+        ).unwrap();
+        let scopes: Vec<_> = targets
+            .iter()
+            .map(|m| LegacySlotScope {
+                slot: m.slot,
+                parent_slot: m.parent_slot,
+            })
+            .collect();
+        scope(&scopes).unwrap();
+        assert_eq!(scopes.len(), 18283);
+        assert_eq!(scopes.last().unwrap().slot, 61328744);
     }
     #[test]
     fn every_rejection_is_still_an_explicit_attempt_not_recovery() {
