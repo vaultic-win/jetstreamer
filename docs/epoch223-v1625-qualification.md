@@ -11,7 +11,8 @@ Build both the historical v1.6.25 worker and parent with only
 The parent identifies the exact upstream v1.6.25 revision, executable and
 environment override. The candidate accepts only focused epoch 223 in one
 isolated `qualification-223-v1625-*` private root, explicit verification,
-snapshot/checkpoint inputs, and an exact terminal of 96,767,999. Ordinary
+snapshot/checkpoint inputs, and an exact full/tail terminal of 96,767,999 or
+the separately namespaced known-root prefix described below. Ordinary
 replay, root cohorts, recovery, inherited leases, and early maintenance/recovery
 entrypoints are rejected before they can touch artifacts. Existing generic
 filesystem-only checks reject aliased private roots/children; no epoch-225
@@ -40,19 +41,36 @@ not qualify a cold prefix or authorize publication. Cold focused qualification
 still requires a trusted terminal root or a separately reviewed later-root
 verification/continuation route; this flag cannot make a cold run pass.
 
-One possible separately reviewed recovery route is a cold prefix ending at the
+The private prefix route is a cold prefix ending at the
 known 96,767,522 root, followed by an independently qualified native restart
 and the remaining 477 slots. Such a prefix would replay 431,984 slots including
 warmup and record 431,523 epoch slots. The existing checkpoint rules accept the
-two known commitments for that span, but the current isolated CLI deliberately
-does **not** admit this prefix endpoint. A regression binds both facts. This
-is not a staged launch or resource approval: it still needs explicit closed
-parent/worker bounds, real cold-snapshot qualification, a qualified full-prefix
+two known commitments for that span. The isolated CLI admits only this exact
+prefix span in an exclusive `qualification-223-v1625-prefix-*` root. That
+namespace cannot request the tail, a full epoch, recovery or a cohort; the tail
+comparison flag cannot bypass its ordinary terminal-checkpoint gate. Both the
+cold bootstrap and terminal accounts commitments are independently pinned in
+the prefix expectation validator. Default builds and full-cold terminal rules
+are unchanged. This source route is not a staged launch or resource approval:
+it still needs exact-package capability and closed worker bounds, real cold-snapshot
+qualification, a qualified full-prefix
 reread, the exact native restart tuple and independent write-cursor mapping,
 private assembly/provenance and full/plugin/publication gates. A short-tail
 resource measurement is not a full-prefix peak bound. Preserve every existing
 artifact and do not treat the current diagnostic tail as a reusable qualified
 suffix before those obligations are proven.
+
+The independent reader has a separate closed prefix profile for
+`qualification-223-v1625-prefix-*/output/epoch-223.jet`, output slots
+96,336,000–96,767,522, the exact candidate worker digest and upstream revision.
+It requires both independently preserved accounts and Bank commitments: cold
+Bank `8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F` and terminal
+Bank `EWtQnBfEHcQ5hASVyH6u3LXT6WLu5MwWML6VKGg4MdxB` alongside the
+two checkpoint accounts hashes. It cannot fall back to generic through-slot
+naming when any bound differs. The complete independent reread retains absent
+canonical sidecars and explicitly denies full-epoch, native-restart, assembly,
+peak, runtime-promotion and publication authority. Passing it does not qualify
+the complete prefix-to-sidecar path.
 
 Before replay, use the same tail arguments plus `--epoch223-tail-preflight`
 against the exact sealed parent. It must reach the post-bootstrap planning

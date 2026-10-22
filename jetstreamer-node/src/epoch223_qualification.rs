@@ -7,6 +7,46 @@ pub(crate) const COLD_BOOTSTRAP: u64 = 96_335_538;
 pub(crate) const TAIL_BOOTSTRAP: u64 = 96_767_522;
 pub(crate) const OUTPUT_END: u64 = 96_767_999;
 
+/// This exact private span retains the ordinary terminal-checkpoint obligation.
+/// It is a prefix qualification, never an exception like the bootstrap-only tail.
+pub(crate) fn is_known_root_prefix(plan: QualificationPlan) -> bool {
+    plan.epoch == 223
+        && plan.bootstrap_slot == COLD_BOOTSTRAP
+        && plan.replay_start == COLD_BOOTSTRAP + 1
+        && plan.output_slot_start == 96_336_000
+        && plan.end_inclusive == TAIL_BOOTSTRAP
+}
+
+pub(crate) fn validate_prefix_expectations(
+    expected: &BTreeMap<u64, BankHashExpectation>,
+    plan: QualificationPlan,
+) -> Result<(), String> {
+    if !is_known_root_prefix(plan) {
+        return Err("epoch223 prefix requires its exact cold bootstrap, epoch output start and known terminal root".into());
+    }
+    for (slot, hash) in [
+        (
+            COLD_BOOTSTRAP,
+            "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE",
+        ),
+        (
+            TAIL_BOOTSTRAP,
+            "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7",
+        ),
+    ] {
+        let known = BankHashExpectation::LegacyAccountsHash(
+            hash.parse()
+                .map_err(|e| format!("prefix checkpoint: {e}"))?,
+        );
+        if expected.get(&slot) != Some(&known) {
+            return Err(format!(
+                "epoch223 prefix requires the independently known accounts checkpoint at slot {slot}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TailMode {
     Disabled,
@@ -175,17 +215,39 @@ pub(crate) fn validate_launch(
 ) -> Result<(), String> {
     if first != 223
         || last != 223
-        || !matches!(focused, Some((COLD_BOOTSTRAP | TAIL_BOOTSTRAP, OUTPUT_END)))
+        || !matches!(
+            focused,
+            Some((COLD_BOOTSTRAP | TAIL_BOOTSTRAP, OUTPUT_END) | (COLD_BOOTSTRAP, TAIL_BOOTSTRAP))
+        )
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch223-v1-6-25-qualification requires private focused epoch223, exact96335538 or96767522 bootstrap and96767999 terminal; no ordinary replay, cohorts, recovery, inherited leases or publication".into());
+        return Err("epoch223-v1-6-25-qualification requires private focused epoch223, exact cold-to-known-root prefix or cold/tail-to96767999 span; no ordinary replay, cohorts, recovery, inherited leases or publication".into());
     }
     let (ledger, output, scratch) =
         paths.ok_or("epoch223 qualification requires explicit private paths")?;
     let root = ledger
         .parent()
         .ok_or("missing private qualification root")?;
+    let prefix_namespace = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.strip_prefix("qualification-223-v1625-prefix-"))
+        .is_some_and(|suffix| {
+            !suffix.is_empty()
+                && suffix
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        });
+    let prefix_reserved = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .is_some_and(|s| s.starts_with("qualification-223-v1625-prefix"));
+    if (prefix_reserved && !prefix_namespace)
+        || prefix_namespace != (focused == Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)))
+    {
+        return Err("epoch223 known-root prefix requires its exclusive private prefix namespace and exact span".into());
+    }
     if root.parent() != Some(Path::new("/home/ubuntu/.jetstreamer-private"))
         || !root.file_name().and_then(|s| s.to_str()).is_some_and(|s| {
             s.starts_with("qualification-223-v1625-")
@@ -313,7 +375,7 @@ mod tests {
         }
     }
     #[test]
-    fn cold_epoch_requires_missing_terminal_and_known_root_prefix_is_not_yet_a_launch_route() {
+    fn cold_epoch_still_requires_missing_terminal_but_private_prefix_binds_known_root() {
         let bootstrap = compatibility::SOLANA_V1_6_20_RUNTIME.bootstrap;
         let snapshot = Path::new(
             "/private/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst",
@@ -337,26 +399,83 @@ mod tests {
         assert!(error.contains("exact canonical terminal checkpoint at slot 96767999"));
         assert!(tail_expectations(expected.clone(), plan, snapshot, bootstrap).is_err());
 
-        // These expectations would satisfy the existing checkpoint rules at
-        // the known root, but the isolated CLI does NOT admit this new route.
-        // It needs separate prefix/restart/assembly and resource qualification.
+        // The prefix uses the existing exact terminal rules, not the tail's
+        // bootstrap-only exception. Restart/assembly and admission stay separate.
         plan.end_inclusive = TAIL_BOOTSTRAP;
         let bound = crate::qualification_expectations(expected, plan, snapshot, bootstrap).unwrap();
+        validate_prefix_expectations(&bound, plan).unwrap();
+        if cfg!(feature = "epoch223-v1-6-25-qualification") {
+            let mut invented = bound.clone();
+            invented.insert(TAIL_BOOTSTRAP, cold_hash);
+            assert!(
+                crate::qualification_expectations(invented, plan, snapshot, bootstrap).is_err()
+            );
+        }
         assert_eq!(bound.len(), 2);
         assert_eq!(plan.slot_count(), 431_523);
         assert_eq!(plan.end_inclusive - plan.replay_start + 1, 431_984);
         assert_eq!(432_000 - plan.slot_count(), 477);
-        assert!(
-            validate_launch(
-                223,
-                223,
-                Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)),
-                false,
-                false,
-                paths()
-            )
-            .is_err()
-        );
+        for slot in [COLD_BOOTSTRAP, TAIL_BOOTSTRAP] {
+            let mut missing = bound.clone();
+            missing.remove(&slot);
+            assert!(validate_prefix_expectations(&missing, plan).is_err());
+            missing.insert(
+                slot,
+                if slot == COLD_BOOTSTRAP {
+                    root_hash
+                } else {
+                    cold_hash
+                },
+            );
+            assert!(validate_prefix_expectations(&missing, plan).is_err());
+        }
+        assert!(validate_prefix_expectations(&bound, tail_plan()).is_err());
+    }
+    #[test]
+    fn prefix_namespace_cannot_borrow_tail_cold_full_or_cohort_authority() {
+        let root =
+            Path::new("/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-test");
+        let ledger = root.join("ledger");
+        let output = root.join("output/epoch-223.jet");
+        let scratch = root.join("scratch");
+        let prefix_paths = Some((ledger.as_path(), output.as_path(), scratch.as_path()));
+        let prefix = Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP));
+        validate_launch(223, 223, prefix, false, false, prefix_paths).unwrap();
+        for span in [
+            None,
+            Some((COLD_BOOTSTRAP, OUTPUT_END)),
+            Some((TAIL_BOOTSTRAP, OUTPUT_END)),
+            Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP - 1)),
+        ] {
+            assert!(validate_launch(223, 223, span, false, false, prefix_paths).is_err());
+        }
+        assert!(validate_launch(223, 223, prefix, false, false, paths()).is_err());
+        assert!(validate_launch(223, 223, prefix, true, false, prefix_paths).is_err());
+        assert!(validate_launch(223, 223, prefix, false, true, prefix_paths).is_err());
+        assert!(validate_launch(223, 224, prefix, false, false, prefix_paths).is_err());
+        assert!(validate_tail_mode(true, false, prefix, &ledger).is_err());
+        for name in [
+            "qualification-223-v1625-prefix-",
+            "qualification-223-v1625-prefix-bad_name",
+        ] {
+            let root = root.with_file_name(name);
+            let ledger = root.join("ledger");
+            let output = root.join("output/epoch-223.jet");
+            let scratch = root.join("scratch");
+            let paths = Some((ledger.as_path(), output.as_path(), scratch.as_path()));
+            assert!(validate_launch(223, 223, prefix, false, false, paths).is_err());
+            assert!(
+                validate_launch(
+                    223,
+                    223,
+                    Some((COLD_BOOTSTRAP, OUTPUT_END)),
+                    false,
+                    false,
+                    paths
+                )
+                .is_err()
+            );
+        }
     }
     #[test]
     fn preflight_cannot_download_genesis_or_extract_accounts() {
