@@ -57,6 +57,10 @@ zstd = "0.5.1"
 crate-type = ["lib"]
 name = "solana_runtime"
 
+[features]
+# Read-only snapshot metadata decoder; not enabled by ordinary workers.
+snapshot-hard-fork-metadata = []
+
 [dev-dependencies]
 assert_matches = "1.3.0"
 solana-noop-program = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }

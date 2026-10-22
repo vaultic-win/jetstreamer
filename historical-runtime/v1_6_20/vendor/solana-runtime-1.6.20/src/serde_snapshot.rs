@@ -205,6 +205,31 @@ where
     deserialize_from(reader)
 }
 
+/// Decode the native serialized bank fields without restoring AccountsDb,
+/// opening account stores, freezing a Bank, or changing its hard-fork list.
+/// This is metadata evidence only, never a snapshot verification or replay gate.
+#[cfg(feature = "snapshot-hard-fork-metadata")]
+#[derive(Debug, Serialize)]
+pub struct SnapshotHardForkMetadata {
+    pub slot: Slot,
+    pub bank_hash: Hash,
+    pub parent_slot: Slot,
+    pub hard_forks: Vec<(Slot, usize)>,
+}
+
+#[cfg(feature = "snapshot-hard-fork-metadata")]
+pub fn snapshot_hard_fork_metadata<R: Read>(
+    reader: R,
+) -> bincode::Result<SnapshotHardForkMetadata> {
+    let fields: future::DeserializableVersionedBank = deserialize_from(reader)?;
+    Ok(SnapshotHardForkMetadata {
+        slot: fields.slot,
+        bank_hash: fields.hash,
+        parent_slot: fields.parent_slot,
+        hard_forks: fields.hard_forks.iter().copied().collect(),
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn bank_from_stream<R>(
     serde_style: SerdeStyle,
