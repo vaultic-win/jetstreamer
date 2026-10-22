@@ -213,7 +213,11 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
 }
 fn generation_101(p: &Plan) -> &'static str {
     if p.assembly144_recovery.is_some() {
-        "assembly144-upload198-refresh-completed144-v1"
+        if assembly144::reader_v2(p) {
+            "assembly144-upload198-refresh-completed144-v2"
+        } else {
+            "assembly144-upload198-refresh-completed144-v1"
+        }
     } else if p.continuation144.is_some() {
         "continuation144-upload198-refresh-completed144-v2"
     } else if p.native144_restore.is_some() && public198::upload(p) {
@@ -1599,6 +1603,7 @@ fn main() {
                             | "--promote-partial2018"
                             | "--prepare-next"
                             | "--prepare-next-upload198"
+                            | "--prepare-next-assembly144-reader"
                             | "--publish-upload198-event"
                             | "--recover-native144-observer"
                             | "--check-native144-recovery"
@@ -1681,6 +1686,7 @@ fn main() {
         if args.get(6).is_some_and(|arg| {
             arg == "--prepare-next"
                 || arg == "--prepare-next-upload198"
+                || arg == "--prepare-next-assembly144-reader"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-native198"

@@ -6,6 +6,9 @@ const ROOT: &str = "/home/sol/.jetstreamer-private/epoch144-assembly-only-202610
 const READER: &str =
     "/usr/local/lib/jetstreamer/horizon-assembly144-fleet-reader-20261022-v1/jetstreamer-r2";
 const READER_SHA: &str = "16d95994451b4d665154d19609ff76e40ad4e40f3c82bfc96702298cf1ed676b";
+const READER_V2: &str =
+    "/usr/local/lib/jetstreamer/horizon-assembly144-scan-fleet-reader-20261022-v2/jetstreamer-r2";
+const READER_V2_SHA: &str = "60b51166d0e953c887bda59e3f7c0d9aafd90f91de7af3aa51fc8af271f8bd88";
 const TOOL_SHA: &str = "25402432882dc8fdcb7331c34be7a20056c0df13ce0eaec33f571edba9695b97";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -37,9 +40,30 @@ pub(super) fn owner(p: &Plan, d: &DiagnosticClaim) -> bool {
 }
 pub(super) fn writer(p: &Plan) -> bool {
     p.assembly144_recovery.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
-        && is_sha(READER_SHA)
+        && ((p.tools.r2.path == Path::new(READER)
+            && p.tools.r2.sha256 == READER_SHA
+            && is_sha(READER_SHA))
+            || reader_v2(p))
+}
+pub(super) fn reader_v2(p: &Plan) -> bool {
+    p.assembly144_recovery.is_some()
+        && p.tools.r2.path == Path::new(READER_V2)
+        && p.tools.r2.sha256 == READER_V2_SHA
+}
+pub(super) fn upgrade_reader(p: &mut Plan) -> Result<()> {
+    ensure!(
+        is_101(p)?
+            && p.assembly144_recovery.is_some()
+            && p.continuation144.is_some()
+            && p.tools.r2.path == Path::new(READER)
+            && p.tools.r2.sha256 == READER_SHA,
+        "assembly reader migration needs exact original private profile"
+    );
+    p.tools.r2 = Bound {
+        path: READER_V2.into(),
+        sha256: READER_V2_SHA.into(),
+    };
+    Ok(())
 }
 fn claim(p: &Profile) -> Value {
     json!({"epoch":144,"unit":UNIT,"invocation_id":p.invocation_id,"scratch_path":ROOT,"launch_receipt":p.launch})
@@ -425,6 +449,46 @@ fn migrate(scope: &mut Scope101200, config: &mut Value, iid: &str) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reader_upgrade_changes_only_exact_tool_and_gets_distinct_namespaces() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let profile = fixture().0;
+        p.assembly144_recovery = Some(profile);
+        p.continuation144=Some(serde_json::from_value(json!({"launch":{"path":"/old","sha256":"a".repeat(64)},
+            "event_fleet":{"path":"/oldfleet","sha256":"b".repeat(64)},"event_plan":{"path":"/oldplan","sha256":"c".repeat(64)},
+            "invocation_id":"8fddd3ef045c4fe5b12c7d25f43a4b73"})).unwrap());
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.private144_observer = true;
+        scope.diagnostic_ranges = vec![DiagnosticClaim {
+            range: "144".into(),
+            controller_unit: UNIT.into(),
+            producer_unit: UNIT.into(),
+            expected_controller_invocation_id: "b".repeat(32),
+            expected_producer_invocation_id: "b".repeat(32),
+        }];
+        p.tools.r2 = Bound {
+            path: READER.into(),
+            sha256: READER_SHA.into(),
+        };
+        assert_eq!(
+            generation_101(&p),
+            "assembly144-upload198-refresh-completed144-v1"
+        );
+        let mut expected = serde_json::to_value(&p).unwrap();
+        upgrade_reader(&mut p).unwrap();
+        assert!(writer(&p));
+        assert!(reader_v2(&p));
+        expected["tools"]["r2"] = serde_json::to_value(&p.tools.r2).unwrap();
+        assert_eq!(serde_json::to_value(&p).unwrap(), expected);
+        assert_eq!(
+            generation_101(&p),
+            "assembly144-upload198-refresh-completed144-v2"
+        );
+        assert!(upgrade_reader(&mut p).is_err());
+        p.tools.r2.sha256 = "d".repeat(64);
+        assert!(!writer(&p));
+        assert!(!reader_v2(&p));
+    }
     fn fixture() -> (Profile, Value, Value, Value, Value, Value) {
         let b = || Bound {
             path: "/bound/evidence".into(),

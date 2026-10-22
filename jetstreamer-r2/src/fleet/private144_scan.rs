@@ -228,10 +228,13 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
         "private144scan requires one exact launch receipt"
     );
     let r = bound_json(&c.evidence[0])?;
+    validate_bound(c, &r)
+}
+fn validate_bound(c: &PipelineClaim, r: &Value) -> Result<()> {
     let pb: BoundFile = serde_json::from_value(r["scan_plan"].clone())?;
     let ob: BoundFile = serde_json::from_value(r["producer_outcome"].clone())?;
     let p = bound_json(&pb)?;
-    checked(c, &r, &p, &bound_json(&ob)?)?;
+    checked(c, r, &p, &bound_json(&ob)?)?;
     if recovery(&c.unit) {
         let lb: BoundFile = serde_json::from_value(p["assembly_launch"].clone())?;
         let l = bound_json(&lb)?;
@@ -248,6 +251,9 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
+    live_limits(c, current)
+}
+fn live_limits(c: &PipelineClaim, current: &Value) -> Result<()> {
     ensure!(
         current["Type"] == "exec"
             && current["InvocationID"] == c.invocation_id
@@ -293,9 +299,231 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     );
     Ok(())
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CaptureSpec {
+    schema: String,
+    stage: String,
+    scan_plan: BoundFile,
+}
+fn capture_unit(s: &CaptureSpec) -> Result<&'static str> {
+    ensure!(
+        s.schema == "jetstreamer-private144-assembly-only-scan-capture-spec-v1",
+        "foreign assembly scan capture spec"
+    );
+    let unit = match s.stage.as_str() {
+        "full" => ASSEMBLY_FULL_UNIT,
+        "plugin" => ASSEMBLY_PLUGIN_UNIT,
+        _ => anyhow::bail!("unknown private scan stage"),
+    };
+    ensure!(
+        s.scan_plan.path
+            == Path::new(
+                "/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-plan-20261022-v1"
+            )
+            .join(format!("{}.json", s.stage)),
+        "foreign assembly scan plan path"
+    );
+    Ok(unit)
+}
+fn capture_owner(v: &Value, unit: &str) -> Result<String> {
+    let iid = v["InvocationID"]
+        .as_str()
+        .context("scan invocation missing")?;
+    ensure!(
+        v["Id"] == unit
+            && v["LoadState"] == "loaded"
+            && v["ActiveState"] == "active"
+            && v["SubState"] == "running"
+            && v["MainPID"]
+                .as_str()
+                .and_then(|s| s.parse::<u32>().ok())
+                .is_some_and(|p| p > 0)
+            && v["NRestarts"] == "0"
+            && iid.len() == 32
+            && iid
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()),
+        "scan capture needs an exact live zero-restart owner"
+    );
+    Ok(iid.into())
+}
+fn completed_assembler(v: &Value) -> Result<()> {
+    for (key, expected) in [
+        ("Id", assembly144::UNIT),
+        ("LoadState", "loaded"),
+        ("Type", "exec"),
+        ("InvocationID", "00ca9bfb862549f6b99117b1ce590365"),
+        ("MainPID", "0"),
+        ("NRestarts", "0"),
+        ("Result", "success"),
+        ("ExecMainStatus", "0"),
+        ("ActiveState", "active"),
+        ("SubState", "exited"),
+    ] {
+        ensure!(
+            v[key] == expected,
+            "assembler not exact clean terminal:{key}"
+        );
+    }
+    Ok(())
+}
+fn sealed_input(path: &Path) -> Result<()> {
+    let m = fs::symlink_metadata(path)?;
+    ensure!(
+        m.is_file()
+            && m.uid() == 0
+            && m.nlink() == 1
+            && m.mode() & 0o222 == 0
+            && path.canonicalize()? == path,
+        "unsealed scan input"
+    );
+    Ok(())
+}
+/// Observe an independently launched scanner; never launch or admit one.
+pub(super) fn capture_launch() -> Result<()> {
+    use std::os::unix::fs::DirBuilderExt;
+    let args: Vec<_> = env::args().collect();
+    ensure!(
+        args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
+        "usage: capture-assembly144-scan-launch SPEC --spec-sha256 SHA --self-sha256 SHA"
+    );
+    continuation144::sealed_self(&args[6])?;
+    let sb = BoundFile {
+        path: args[2].clone().into(),
+        sha256: args[4].clone(),
+    };
+    let sm = fs::symlink_metadata(&sb.path)?;
+    ensure!(
+        sm.is_file() && sm.uid() == 0 && sm.nlink() == 1 && sm.mode() & 0o222 == 0,
+        "unsealed scan capture spec"
+    );
+    let s: CaptureSpec = serde_json::from_value(bound_json(&sb)?)?;
+    let name = capture_unit(&s)?;
+    sealed_input(&s.scan_plan.path)?;
+    let p = bound_json(&s.scan_plan)?;
+    let outcome: BoundFile = serde_json::from_value(p["producer_outcome"].clone())?;
+    sealed_input(&outcome.path)?;
+    let assembler = unit(assembly144::UNIT)?;
+    completed_assembler(&assembler)?;
+    let original = assembly144_admission::timeout_properties()?;
+    let before = unit(name)?;
+    let iid = capture_owner(&before, name)?;
+    let mut r = json!({"schema":"jetstreamer-private144-assembly-only-scan-launch-v1",
+        "epoch":144,"unit":name,"invocation_id":iid,"expected_exec_start":before["ExecStart"],
+        "runner_sha256":ASSEMBLY_RUNNER_SHA,"scan_plan":private157::binding(&s.scan_plan),
+        "producer_outcome":p["producer_outcome"],"private_verification_only":true,
+        "capture_spec":private157::binding(&sb),"capture_self_sha256":args[6],
+        "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()});
+    for flag in [
+        "ordinary_replay_claim",
+        "current_sidecar_eta_valid",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+        "replay_launch_authorized",
+        "local_retirement_authorized",
+    ] {
+        r[flag] = json!(false);
+    }
+    let c = PipelineClaim {
+        epoch: 144,
+        phase: format!("private-{}-verification", s.stage),
+        unit: name.into(),
+        invocation_id: iid,
+        expected_exec_start: before["ExecStart"].as_str().context("scan command")?.into(),
+        evidence: vec![],
+    };
+    validate_bound(&c, &r)?;
+    live_limits(&c, &before)?;
+    let executable = fs::symlink_metadata(ASSEMBLY_RUNNER)?;
+    ensure!(
+        executable.is_file()
+            && executable.uid() == 0
+            && executable.nlink() == 1
+            && executable.mode() & 0o222 == 0
+            && hex_lower(&Sha256::digest(fs::read(ASSEMBLY_RUNNER)?)) == ASSEMBLY_RUNNER_SHA,
+        "scan runner changed"
+    );
+    ensure!(
+        unit(name)? == before
+            && unit(assembly144::UNIT)? == assembler
+            && assembly144_admission::timeout_properties()? == original,
+        "scan or source owner changed during capture"
+    );
+    let root = Path::new("/var/lib/jetstreamer/horizon-assembly144-scan-launches-20261022-v1")
+        .join(&s.stage);
+    // The root parent is precreated by the operator; each stage is no-clobber.
+    let parent = root.parent().context("scan capture parent")?;
+    let pm = fs::symlink_metadata(parent)?;
+    ensure!(
+        pm.is_dir() && pm.uid() == 0 && pm.mode() & 0o077 == 0 && parent.canonicalize()? == parent,
+        "unsafe scan capture parent"
+    );
+    fs::DirBuilder::new().mode(0o700).create(&root)?;
+    File::open(parent)?.sync_all()?;
+    private157::immutable_receipt(&root.join("launch.json"), &r)?;
+    println!("private assembly scan owner captured; no launch, admission or publication authority");
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capture_requires_exact_stage_and_live_owner() {
+        for (stage, unit) in [
+            ("full", ASSEMBLY_FULL_UNIT),
+            ("plugin", ASSEMBLY_PLUGIN_UNIT),
+        ] {
+            let mut s = CaptureSpec { schema:"jetstreamer-private144-assembly-only-scan-capture-spec-v1".into(),
+                stage:stage.into(), scan_plan:BoundFile {path:format!("/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-plan-20261022-v1/{stage}.json").into(), sha256:"a".repeat(64)} };
+            assert_eq!(capture_unit(&s).unwrap(), unit);
+            let v = json!({"Id":unit,"LoadState":"loaded","ActiveState":"active","SubState":"running",
+                "MainPID":"123","InvocationID":"c".repeat(32),"NRestarts":"0"});
+            assert_eq!(capture_owner(&v, unit).unwrap(), "c".repeat(32));
+            for (key, bad) in [
+                ("Id", json!(FULL_UNIT)),
+                ("LoadState", json!("not-found")),
+                ("ActiveState", json!("failed")),
+                ("SubState", json!("exited")),
+                ("MainPID", json!("0")),
+                ("InvocationID", json!("C".repeat(32))),
+                ("NRestarts", json!("1")),
+            ] {
+                let mut changed = v.clone();
+                changed[key] = bad;
+                assert!(capture_owner(&changed, unit).is_err(), "{key}");
+            }
+            s.scan_plan.path = "/tmp/substituted.json".into();
+            assert!(capture_unit(&s).is_err());
+        }
+        assert!(
+            serde_json::from_value::<CaptureSpec>(json!({"schema":"x","stage":"full",
+            "scan_plan":{"path":"/tmp/x","sha256":"a".repeat(64)},"publication_authorized":true}))
+            .is_err()
+        );
+    }
+    #[test]
+    fn scan_capture_rejects_running_failed_or_replaced_assembler() {
+        let v = json!({"Id":assembly144::UNIT,"LoadState":"loaded","Type":"exec",
+            "InvocationID":"00ca9bfb862549f6b99117b1ce590365","MainPID":"0","NRestarts":"0",
+            "Result":"success","ExecMainStatus":"0","ActiveState":"active","SubState":"exited"});
+        completed_assembler(&v).unwrap();
+        for (key, bad) in [
+            ("MainPID", "123"),
+            ("SubState", "running"),
+            ("Result", "timeout"),
+            ("InvocationID", "8fddd3ef045c4fe5b12c7d25f43a4b73"),
+            ("NRestarts", "1"),
+            ("ExecMainStatus", "15"),
+        ] {
+            let mut changed = v.clone();
+            changed[key] = json!(bad);
+            assert!(completed_assembler(&changed).is_err(), "{key}");
+        }
+    }
     fn fixture() -> (PipelineClaim, Value, Value, Value) {
         let plan = json!({"path":"/usr/local/lib/jetstreamer/horizon-epoch144-private-scan-plan-20261022-v1/full.json","sha256":"a".repeat(64)});
         let ob = json!({"path":"/sealed/outcome.json","sha256":"b".repeat(64)});
