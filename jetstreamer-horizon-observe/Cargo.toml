@@ -80,6 +80,10 @@ name = "jetstreamer-horizon-dev-cache-check"
 path = "src/dev_cache_check_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch141-native-admit"
+path = "src/native141_admit_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch203-stopped-scratch-check"
 path = "src/stopped203_check_bin.rs"
 

@@ -1,5 +1,6 @@
 //! Reusable, scope-bound safety components; no autonomous polling or launch.
 pub mod dev_cache_check;
+pub mod native141_admit;
 pub mod process_references;
 pub mod ram_artifact_retention;
 pub mod ram_launch_attest;
