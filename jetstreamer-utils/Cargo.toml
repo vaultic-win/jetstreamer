@@ -206,6 +206,10 @@ name = "jetstreamer-epoch141-byte-diagnostic"
 path = "src/epoch141_byte_diagnostic_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch141-poh-diagnostic"
+path = "src/epoch141_poh_diagnostic_bin.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-gap-audit"
 path = "src/horizon_gap_audit_bin.rs"
 
