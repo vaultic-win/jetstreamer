@@ -25,6 +25,7 @@ mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
 mod snapshot144;
+pub(crate) mod watch160;
 pub(crate) mod watch198;
 
 pub(super) fn prepare_private_prefix157() -> Result<()> {
@@ -239,6 +240,16 @@ struct PipelineClaim {
 
 // Unit names describe scope, not authority. Every live claim still needs the
 // exact invocation/command, immutable evidence and an independent delivery gate.
+pub(super) fn pipeline_unit_range_for_epoch(
+    phase: &str,
+    unit: &str,
+    epoch: u64,
+) -> Result<std::ops::RangeInclusive<u64>> {
+    if epoch == 160 && watch160::namespace(phase, unit) {
+        return Ok(160..=160);
+    }
+    pipeline_unit_range(phase, unit)
+}
 pub(super) fn pipeline_unit_range(
     phase: &str,
     unit: &str,
@@ -328,7 +339,7 @@ pub(super) fn pipeline_unit_range(
 }
 
 fn validate_pipeline_claim(claim: &PipelineClaim, first: u64, last: u64) -> Result<()> {
-    let scope = pipeline_unit_range(&claim.phase, &claim.unit)?;
+    let scope = pipeline_unit_range_for_epoch(&claim.phase, &claim.unit, claim.epoch)?;
     ensure!(
         (first..=last).contains(&claim.epoch)
             && scope.contains(&claim.epoch)
@@ -406,6 +417,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         );
         if private144_scan::scope(&claim.phase, &claim.unit) {
             private144_scan::validate_live(claim, current)?;
+        }
+        if claim.epoch == 160 && watch160::namespace(&claim.phase, &claim.unit) {
+            return Ok(watch160::child_start(&claim.phase, current)?.is_some());
         }
         if watch198::namespace(&claim.phase, &claim.unit) {
             ensure!(claim.epoch == 198, "legacy watcher profile is198 only");

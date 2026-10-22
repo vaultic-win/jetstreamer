@@ -34,6 +34,8 @@ mod delivery160;
 mod delivery198;
 #[path = "routine_delivery198_recover.rs"]
 mod delivery198_recover;
+#[path = "routine_public160.rs"]
+mod public160;
 #[path = "routine_public198.rs"]
 mod public198;
 
@@ -230,6 +232,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if public160::enabled(p) {
+        return "public160-native141-acquisition-scans-upload198-v1";
+    }
     if p.epoch160_delivery.is_some() {
         return "delivery160-native141-acquisition-scans-upload198-v1";
     }
@@ -1671,6 +1676,7 @@ fn main() {
                             | "--prepare-next"
                             | "--prepare-next-upload198"
                             | "--prepare-next-delivery160"
+                            | "--prepare-next-public160"
                             | "--prepare-next-assembly144-reader"
                             | "--prepare-next-native141"
                             | "--publish-upload198-event"
@@ -1782,6 +1788,7 @@ fn main() {
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-delivery160"
+                || arg == "--prepare-next-public160"
                 || arg == "--prepare-next-native198"
                 || arg == "--prepare-next-native144"
                 || arg == "--prepare-next-continuation144"

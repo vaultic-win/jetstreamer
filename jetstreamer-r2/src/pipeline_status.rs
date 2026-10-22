@@ -123,7 +123,8 @@ impl Binding {
         }
         ensure!(
             unit_name(&self.unit)
-                && fleet::pipeline_unit_range(&self.claim_phase, &self.unit)?.contains(&epoch)
+                && fleet::pipeline_unit_range_for_epoch(&self.claim_phase, &self.unit, epoch)?
+                    .contains(&epoch)
                 && unit_name(&self.origin_unit)
                 && hex_id(&self.invocation_id, 32)
                 && hex_id(&self.origin_invocation_id, 32)
@@ -530,8 +531,10 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
                     "controller-import-handoff"
                 ]
                 .iter()
-                .any(|phase| fleet::pipeline_unit_range(phase, peer)
-                    .is_ok_and(|range| range.contains(&plan.epoch)))
+                .any(
+                    |phase| fleet::pipeline_unit_range_for_epoch(phase, peer, plan.epoch)
+                        .is_ok_and(|range| range.contains(&plan.epoch))
+                )
                 && peers.insert(peer.clone()),
             "pipeline peer is duplicate or names another epoch"
         );
@@ -544,7 +547,15 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             .context("first epoch missing")?,
         fleet["last_epoch"].as_u64().context("last epoch missing")?,
     )?;
-    if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
+    if plan.epoch == 160
+        && fleet::watch160::namespace(&plan.binding.claim_phase, &plan.binding.unit)
+    {
+        ensure!(
+            fleet::watch160::child_start(&plan.binding.claim_phase, &current[&plan.binding.unit])?
+                .is_some(),
+            "160 watcher has no actual epoch child"
+        );
+    } else if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
         ensure!(
             fleet::watch198::child_start(&plan.binding.claim_phase, &current[&plan.binding.unit])?
                 .is_some(),
@@ -663,7 +674,12 @@ pub(super) async fn run() -> Result<()> {
         &plan.binding.origin_unit,
         &plan.binding.origin_invocation_id,
     )?;
-    let phase_start = if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
+    let phase_start = if plan.epoch == 160
+        && fleet::watch160::namespace(&plan.binding.claim_phase, &plan.binding.unit)
+    {
+        fleet::watch160::child_start(&plan.binding.claim_phase, &fleet::unit(&plan.binding.unit)?)?
+            .context("160 verification/upload child ended")?
+    } else if fleet::watch198::namespace(&plan.binding.claim_phase, &plan.binding.unit) {
         fleet::watch198::child_start(&plan.binding.claim_phase, &fleet::unit(&plan.binding.unit)?)?
             .context("198 verification child ended")?
     } else {

@@ -24,19 +24,21 @@ pub(super) const READER_SHA: &str =
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
-    proof: Bound,
+    pub(super) proof: Bound,
     handoff: Bound,
-    origin_publication: Bound,
+    pub(super) origin_publication: Bound,
     origin_observer: Bound,
     delayed_recovery: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) public_observation: Option<Bound>,
 }
 pub(super) fn reader(p: &Plan) -> bool {
     p.epoch160_delivery.is_some()
         && native141::acquisition_enabled(p)
         && p.assembly144_scans.is_some()
         && p.public198_delivery.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+            || public160::reader(p))
 }
 fn range(r: &Value) -> Result<()> {
     ensure!(
@@ -138,17 +140,9 @@ fn proof(p: &Plan) -> Result<Value> {
                 == 1,
         "160 original observer differs"
     );
-    let m = fs::symlink_metadata(ARCHIVE)?;
-    ensure!(
-        m.is_file()
-            && m.nlink() == 1
-            && m.uid() == 1001
-            && m.mode() & 0o022 == 0
-            && m.len() == LENGTH
-            && Path::new(ARCHIVE).canonicalize()? == Path::new(ARCHIVE)
-            && e_identity(&v, &m),
-        "160 archive moved/changed; authenticate actual import handoff"
-    );
+    // This is retained terminal/clock history, not current custody. The actual
+    //fleet reader and status publisher independently revalidate a live owner
+    //and its current archive; an ended handoff must not freeze healthy ranges.
     ensure!(
         s.handoff.path == Path::new(HANDOFF),
         "foreign160 controller handoff path"
@@ -175,9 +169,6 @@ fn proof(p: &Plan) -> Result<Value> {
     );
     v["controller_handoff"] = h["evidence"].clone();
     Ok(v)
-}
-fn e_identity(v: &Value, m: &fs::Metadata) -> bool {
-    v["evidence"]["archive"]["device"] == m.dev() && v["evidence"]["archive"]["inode"] == m.ino()
 }
 pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     if p.epoch160_delivery.is_none() {
@@ -310,6 +301,7 @@ pub(super) fn enable(
         origin_publication: origins.remove(0),
         origin_observer: p.previous_observer.clone(),
         delayed_recovery: true,
+        public_observation: None,
     });
     p.expected_epochs.retain(|e| *e != 160);
     p.tools.r2 = Bound {
@@ -340,6 +332,9 @@ pub(super) fn enable(
     Ok(())
 }
 pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
+    if public160::enabled(p) {
+        return public160::derive_fleet(p, fleet);
+    }
     let Some(s) = &p.epoch160_delivery else {
         return Ok(());
     };
@@ -377,7 +372,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     );
     gate["state"] = json!("post-replay-pipeline");
     gate["next_action"] = json!(
-        "Preserve exact160 controller-owned staged/importing handoff and original producer launch clock; authenticate actual importer and dispatch independent full/current-plugin checks plus existing receipt-gated uploader as canonical archive appears. Clean producer completion and lane publication are not independent verification or remote readiness."
+        "Track160 controller-owned staged/importing handoff with original producer clock. On terminal controller/canonical import, promptly authenticate existing160 verifier/upload children and repair status; do not present the old owner projection as fresh, restart replay, or infer remote readiness. Preserve independent gates."
     );
     for b in [&s.proof, &s.handoff, &s.origin_publication] {
         let b = serde_json::to_value(b)?;
@@ -390,7 +385,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     }
     Ok(())
 }
-fn remaining(v: &Value, target: &str) -> Result<u64> {
+pub(super) fn remaining(v: &Value, target: &str) -> Result<u64> {
     let close = v["evidence"]["events"]["events"][3]["__REALTIME_TIMESTAMP"]
         .as_str()
         .context("160 close timestamp")?
@@ -407,12 +402,31 @@ fn remaining(v: &Value, target: &str) -> Result<u64> {
         .context("160 downstream budget exhausted; qualify revised estimate, no zero clamp")
 }
 pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> {
+    if public160::enabled(p) {
+        return public160::publish(p, pipeline, observer);
+    }
     let Some(s) = &p.epoch160_delivery else {
         return Ok(Value::Null);
     };
     let v = proof(p)?;
     let fleet: Bound = serde_json::from_value(pipeline["provisional_fleet"].clone())?;
     let f = bound_json(&fleet, false)?;
+    let matching = f["active"]
+        .as_array()
+        .context("160 active census")?
+        .iter()
+        .filter(|r| {
+            r["epoch"] == 160
+                && r["phase"] == "controller-import-handoff"
+                && r["unit"]["Id"] == OWNER
+                && r["unit"]["InvocationID"] == CONTROLLER
+        })
+        .count();
+    if matching == 0 {
+        return Ok(
+            json!({"provisional_fleet":fleet,"publication_skipped":true,"reason":"Original160 controller handoff ended; exact downstream child qualification/status repair is open. Other healthy replay publications continue; old160 projection is not current."}),
+        );
+    }
     ensure!(
         f["sampled_at_utc"] == p.sample_target_utc
             && f["observer_sha256"] == observer.sha256
@@ -509,6 +523,9 @@ fn validate_publication(p: &Plan, o: &Bound, m: &Bound, r: &Value) -> Result<()>
     Ok(())
 }
 pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
+    if public160::enabled(p) {
+        return public160::validate_completed(p, c);
+    }
     if p.epoch160_delivery.is_none() {
         ensure!(c["epoch160_delivery"].is_null(), "unexpected160 completion");
         return Ok(());
@@ -518,6 +535,21 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         d["provisional_fleet"] == c["epoch198_delivery"]["provisional_fleet"],
         "160 used another fleet sample"
     );
+    if d["publication_skipped"] == true {
+        let fleet: Bound = serde_json::from_value(d["provisional_fleet"].clone())?;
+        let f = bound_json(&fleet, false)?;
+        ensure!(
+            d["publication"].is_null()
+                && f["sampled_at_utc"] == p.sample_target_utc
+                && !f["active"]
+                    .as_array()
+                    .context("160 skipped active census")?
+                    .iter()
+                    .any(|r| r["epoch"] == 160),
+            "live160 cannot be skipped"
+        );
+        return Ok(());
+    }
     let m: Bound = serde_json::from_value(d["pipeline_plan"].clone())?;
     let r: Bound = serde_json::from_value(d["publication"].clone())?;
     let o: Bound = serde_json::from_value(c["observer"].clone())?;
@@ -595,6 +627,7 @@ mod tests {
             origin_publication: binding(),
             origin_observer: binding(),
             delayed_recovery: true,
+            public_observation: None,
         });
         p.sample_target_utc = "2026-10-22T15:58:00Z".into();
         p.previous_observer=Bound{path:"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261022T145800Z.json".into(),sha256:"50ac2a4f84f258c709b8cff4d333488e6a2cf483f85edc4dc2901dba2fb53c21".into()};
