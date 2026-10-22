@@ -242,6 +242,12 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if census141_poh::collected(p) && p.publication144.is_some() {
+        return "publication144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
+    if census141_poh::collected(p) {
+        return "census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if p.census141_poh.is_some() && p.publication144.is_some() {
         return "publication144-census141-poh-native141-all-retry-public160-timed-scans-upload198-v1";
     }

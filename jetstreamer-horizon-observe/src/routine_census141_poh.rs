@@ -14,6 +14,79 @@ const READER_SHA: &str = "1bc95d482d6fe5eb461814a9d5ac96bb9d5f11919331c98ef9fcb3
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
     launch: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    collection: Option<Bound>,
+}
+pub(super) fn collected(p: &Plan) -> bool {
+    p.census141_poh
+        .as_ref()
+        .is_some_and(|s| s.collection.is_some())
+}
+fn collection_shape(v: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == "jetstreamer-epoch141-collected-gap-boundaries-v1"
+            && v["epoch"] == 141
+            && v["target_count"] == 18283
+            && v["total_boundaries"] == 84597
+            && v["hidden_boundaries"] == 66314
+            && v["all_boundary_hashes_distinct"] == true
+            && v["finalized_parent_and_final_hash_matches"] == true
+            && v["complete_diagnostic_lineage_validated"] == true
+            && v["diagnostic"]["path"] == format!("{ROOT}/completion.json")
+            && v["diagnostic"]["sha256"]
+                == "12cb942626d34662080dfc981dd0588b8baef39ee31e5fb35bd8fd1593e5cd4f"
+            && v["tool_sha256"]
+                == "7d353f068762ee101451e44e6d4cf4772375254b44c9e560a234be5634a01369"
+            && v["output"]["path"]
+                == "/var/lib/jetstreamer/horizon-epoch141-boundary-collection-20261022-v1/boundaries.json"
+            && v["output"]["sha256"]
+                == "e371b3546d62e5fdac79a497607b61ea2647c3c5d410157b3ff456709f78be4a",
+        "foreign or incomplete141boundary collection"
+    );
+    for flag in [
+        "canonical_ancestry_proven",
+        "source_completeness_proven",
+        "live_state_proven",
+        "runtime_boundary_input_authorized",
+        "replay_launch_authorized",
+        "runtime_promotion_authorized",
+        "publication_authorized",
+        "retirement_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(v[flag] == false, "collection grants authority:{flag}");
+    }
+    Ok(())
+}
+fn collection(b: &Bound) -> Result<()> {
+    ensure!(
+        b.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-epoch141-boundary-collection-20261022-v1/collection.json"
+            )
+            && b.sha256 == "b7b8c12df60021b3f7fc37288b41601b2179dd670dd4ffb83316a640349f3dfd",
+        "foreign141collection binding"
+    );
+    let v = bound_json(b, false)?;
+    collection_shape(&v)?;
+    let output: Bound = serde_json::from_value(v["output"].clone())?;
+    let output = bound_json(&output, false)?;
+    ensure!(
+        output["schema"] == "jetstreamer-epoch141-decoded-gap-boundaries-v1"
+            && output["slots"].as_array().is_some_and(|a| a.len() == 18283),
+        "collected boundary bytes changed"
+    );
+    let diagnostic: Bound = serde_json::from_value(v["diagnostic"].clone())?;
+    let d = bound_json(&diagnostic, false)?;
+    ensure!(
+        d["full_census_poh_chains_verified"] == true
+            && d["passed_targets"] == 18283
+            && d["failed_targets"] == 0
+            && d["verified_boundary_count"] == 84597,
+        "collection lost genuine complete diagnostic"
+    );
+    Ok(())
 }
 pub(super) fn reader(p: &Plan) -> bool {
     p.census141_poh.is_some()
@@ -118,6 +191,9 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             "PoH profile cannot replace replay/publication"
         );
         evidence(&s.launch)?;
+        if let Some(b) = &s.collection {
+            collection(b)?;
+        }
     }
     Ok(())
 }
@@ -127,18 +203,33 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
     struct Spec {
         schema: String,
         launch: Bound,
+        #[serde(default)]
+        collection: Option<Bound>,
+    }
+    let s: Spec = serde_json::from_value(bound_json(b, true)?)?;
+    if let Some(current) = &p.census141_poh {
+        ensure!(
+            s.schema == "jetstreamer-census141-boundary-collection-monitor-handoff-v1"
+                && current.collection.is_none()
+                && s.collection.is_some()
+                && serde_json::to_value(&current.launch)? == serde_json::to_value(&s.launch)?,
+            "collection adoption cannot replace existing141owner/history"
+        );
+        collection(s.collection.as_ref().unwrap())?;
+        p.census141_poh.as_mut().unwrap().collection = s.collection;
+        return validate(p);
     }
     ensure!(
-        p.census141_poh.is_none() && native141::all_retry_enabled(p),
-        "PoH adoption needs exact retained native history"
-    );
-    let s: Spec = serde_json::from_value(bound_json(b, true)?)?;
-    ensure!(
-        s.schema == "jetstreamer-census141-poh-monitor-handoff-v1",
+        native141::all_retry_enabled(p)
+            && s.collection.is_none()
+            && s.schema == "jetstreamer-census141-poh-monitor-handoff-v1",
         "foreign PoH handoff"
     );
     evidence(&s.launch)?;
-    p.census141_poh = Some(Profile { launch: s.launch });
+    p.census141_poh = Some(Profile {
+        launch: s.launch,
+        collection: None,
+    });
     p.tools.r2 = if p.publication144.is_some() {
         Bound {
             path: publication144::COMPOSITE_READER.into(),
@@ -188,11 +279,50 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     if !e.contains(&b) {
         e.push(b);
     }
+    if let Some(collection) = &s.collection {
+        let b = serde_json::to_value(collection)?;
+        if !e.contains(&b) {
+            e.push(b);
+        }
+        g["next_action"] = json!(
+            "Complete private141PoH and independent boundary collection passed for18283groups/84597distinctboundaries,including66314hidden hashes. Preserve all originals and candidate readable bundle. Qualify the exact v1.4.25 source/boundary consumer and private canonical-root path before runtime input use,route promotion,full/plugin/publication or R2delivery. Keep141repair open until verified ready pair; collection is not ancestry/liveness/root or launch authority."
+        );
+    }
     Ok(())
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn collection_cannot_close_repair_or_borrow_partial_or_authorizing_evidence() {
+        let mut v = json!({"schema":"jetstreamer-epoch141-collected-gap-boundaries-v1","epoch":141,"target_count":18283,"total_boundaries":84597,"hidden_boundaries":66314,
+            "all_boundary_hashes_distinct":true,"finalized_parent_and_final_hash_matches":true,"complete_diagnostic_lineage_validated":true,
+            "diagnostic":{"path":format!("{ROOT}/completion.json"),"sha256":"12cb942626d34662080dfc981dd0588b8baef39ee31e5fb35bd8fd1593e5cd4f"},
+            "tool_sha256":"7d353f068762ee101451e44e6d4cf4772375254b44c9e560a234be5634a01369",
+            "output":{"path":"/var/lib/jetstreamer/horizon-epoch141-boundary-collection-20261022-v1/boundaries.json","sha256":"e371b3546d62e5fdac79a497607b61ea2647c3c5d410157b3ff456709f78be4a"}});
+        for flag in [
+            "canonical_ancestry_proven",
+            "source_completeness_proven",
+            "live_state_proven",
+            "runtime_boundary_input_authorized",
+            "replay_launch_authorized",
+            "runtime_promotion_authorized",
+            "publication_authorized",
+            "retirement_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            v[flag] = json!(false);
+        }
+        collection_shape(&v).unwrap();
+        for key in v.as_object().unwrap().keys() {
+            let mut bad = v.clone();
+            bad[key] = Value::Null;
+            assert!(collection_shape(&bad).is_err(), "{key}");
+        }
+        v["publication_authorized"] = json!(true);
+        assert!(collection_shape(&v).is_err());
+    }
     #[test]
     fn no_profile_cannot_borrow_new_reader_or_publish_ordinary_eta() {
         let (p, ..) = crate::tests::fixture101();
