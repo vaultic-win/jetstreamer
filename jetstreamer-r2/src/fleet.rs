@@ -386,7 +386,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         ensure!(
             current["InvocationID"] == claim.invocation_id
                 && current["NRestarts"] == "0"
-                && current["ExecStart"] == claim.expected_exec_start
+                && current["ExecStart"].as_str().is_some_and(|command| {
+                    pipeline_status::same_exec_start(&claim.expected_exec_start, command)
+                })
                 && current["LoadState"] == "loaded"
                 && current["MainPID"]
                     .as_str()
@@ -2392,6 +2394,37 @@ mod tests {
         terminal["ActiveState"] = json!("inactive");
         terminal["SubState"] = json!("dead");
         assert!(!pipeline_live(&claim, &terminal).unwrap());
+    }
+
+    #[test]
+    fn pipeline_observation_accepts_only_display_metadata_reset() {
+        let (mut claim, mut current) = pipeline_fixture();
+        claim.expected_exec_start = "{ path=/sealed/publisher ; argv[]=/sealed/publisher /sealed/plan ; ignore_errors=no ; start_time=[Thu 2026-10-22 01:08:06 UTC] ; stop_time=[n/a] ; pid=123 ; code=(null) ; status=0/0 }".into();
+        let reset = "{ path=/sealed/publisher ; argv[]=/sealed/publisher /sealed/plan ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+        current["ExecStart"] = json!(reset);
+        assert!(pipeline_live(&claim, &current).unwrap());
+        for changed in [
+            reset.replace("path=/sealed/publisher", "path=/different"),
+            reset.replace("/sealed/plan", "/different/plan"),
+            reset.replace("/sealed/plan ;", "/sealed/plan --extra ;"),
+            reset.replace("ignore_errors=no", "ignore_errors=yes"),
+            reset.replace("pid=0", "pid=invalid"),
+            reset.replace(" ; status=0/0", " ; status=0/0 ; extra=1"),
+        ] {
+            let mut bad = current.clone();
+            bad["ExecStart"] = json!(changed);
+            assert!(pipeline_live(&claim, &bad).is_err());
+        }
+        for (field, value) in [
+            ("InvocationID", json!("c".repeat(32))),
+            ("NRestarts", json!("1")),
+            ("MainPID", json!("0")),
+            ("LoadState", json!("not-found")),
+        ] {
+            let mut bad = current.clone();
+            bad[field] = value;
+            assert!(pipeline_live(&claim, &bad).is_err(), "{field}");
+        }
     }
 
     #[test]

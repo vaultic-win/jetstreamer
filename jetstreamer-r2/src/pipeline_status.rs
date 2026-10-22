@@ -59,7 +59,7 @@ fn exec_start_identity(value: &str) -> Option<&str> {
     Some(identity)
 }
 
-fn same_exec_start(expected: &str, current: &str) -> bool {
+pub(super) fn same_exec_start(expected: &str, current: &str) -> bool {
     expected == current
         || exec_start_identity(expected)
             .zip(exec_start_identity(current))
