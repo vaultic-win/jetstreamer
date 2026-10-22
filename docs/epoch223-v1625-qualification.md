@@ -58,3 +58,40 @@ archive import, R2 upload or retirement is authorized until the complete
 candidate passes all independent qualification, current-plugin and publication
 gates. Preserve the original failed invocation/partial and keep the repair open
 until epoch 223 reaches a verified R2 ready pair.
+
+The shared RAM-only snapshot supervisor has a distinct
+`epoch223-tail-snapshot-tests` build profile, incompatible with its epoch225
+and released-CPU profiles. It accepts only the exact sealed epoch223 test
+harness and tail snapshot, its own plan/unit/receipt namespaces, and the
+complete fresh 201–300 fleet with the unchanged live epoch203/225 identities.
+The 13 independently established canonical size samples bind the century
+floor to 248,289,182,611 bytes. A changed census requires a reviewed update.
+
+Run its capability mode under the same actual sandbox before snapshot mode.
+The supervisor requires private 512-GiB tmpfs with 1,048,576 inodes, 128-GiB
+memory maximum, 112-GiB memory high, no swap, eight-core CPU quota and 512
+tasks. Only its exact root-private receipt directory is host-writable.
+The child drops to UID/GID1000 with no supplementary groups/capabilities,
+has no network, and runs exactly the two ignored load/initialize tests with
+anchor 96,767,522, 128-MiB test stack and two Solana Rayon threads. Its
+prebuilt harness was compiled in the historical workspace with Rust1.51;
+the runtime working directory is private tmpfs, never the mutable workspace.
+
+Fresh sampled and actual available memory must cover the 448-GiB host stop
+reserve plus the full 128-GiB test cap. The existing bound supervisor enforces
+its 30-minute runtime cap and memory/tmpfs reserve during the child and
+fsyncs cgroup counters before exit. This RAM-only check neither reduces disk
+growth claims nor creates replay output, canonical sidecars or publication
+authority. A successful snapshot check is still not a tail replay or a cold
+epoch qualification.
+
+Use the optimized (`cargo test --release`) epoch223 test harness for new
+snapshot checks. The previous epoch225 debug attempt exhausted its 30-minute
+bound before finishing the first test; its optimized counterpart passed both
+checks within the same bounds. Epoch223's initial debug attempt remains
+independently sealed and supervised. Prepare a distinct optimized package and
+attempt instead of changing its executable, extending its timeout, or treating
+a timeout as a canonical mismatch. The optimized harness has the same source,
+feature and assertions, with 60 synthetic tests plus IPC passing; it still
+requires the two real snapshot tests. The replacement profile rejects the old
+debug digest and binds a distinct immutable release-harness directory.

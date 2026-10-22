@@ -1,4 +1,16 @@
 //! Exact v1.6.16 snapshot load/freeze tests, not an entry replay or publisher.
+#[cfg(all(
+    feature = "epoch223-tail-snapshot-tests",
+    any(
+        feature = "epoch225-shrink-snapshot-tests",
+        feature = "ram-snapshot-eight-core-stopped225"
+    )
+))]
+compile_error!("epoch223 snapshot profile cannot be combined with another profile");
+#[cfg(feature = "epoch223-tail-snapshot-tests")]
+mod ram_snapshot223;
+#[cfg(feature = "epoch223-tail-snapshot-tests")]
+use ram_snapshot223::{validate_fleet, validate_observer, validate_plan};
 #[cfg(feature = "epoch225-shrink-snapshot-tests")]
 mod ram_snapshot225;
 #[cfg(feature = "epoch225-shrink-snapshot-tests")]
@@ -29,7 +41,9 @@ const GIB: u64 = 1 << 30;
 const MEMORY_MAX: u64 = 128 * GIB;
 const MEMORY_HIGH: u64 = 112 * GIB;
 const TMPFS_SIZE: u64 = 512 * GIB;
-const FLOOR: u64 = if PROFILE225 {
+const FLOOR: u64 = if PROFILE223 {
+    248_289_182_611
+} else if PROFILE225 {
     // Seven verified campaign samples after epoch216's sidecar commit.
     235_600_351_300
 } else {
@@ -42,30 +56,41 @@ const RELEASED_225: bool = cfg!(all(
     feature = "ram-snapshot-eight-core-stopped225",
     not(feature = "epoch225-shrink-snapshot-tests")
 ));
-const CPU_CORES: u64 = if RELEASED_225 || PROFILE225 { 8 } else { 2 };
+const CPU_CORES: u64 = if RELEASED_225 || PROFILE225 || PROFILE223 {
+    8
+} else {
+    2
+};
 const PROFILE225: bool = cfg!(feature = "epoch225-shrink-snapshot-tests");
-const TMPFS_OPTIONS: &str = if PROFILE225 {
+const PROFILE223: bool = cfg!(feature = "epoch223-tail-snapshot-tests");
+const TMPFS_OPTIONS: &str = if PROFILE225 || PROFILE223 {
     "/tmp:rw,size=512G,nr_inodes=1048576,nosuid,nodev,mode=1777"
 } else {
     "/tmp:rw,size=512G,nosuid,nodev,mode=1777"
 };
-const SNAPSHOT_SHA: &str = if PROFILE225 {
+const SNAPSHOT_SHA: &str = if PROFILE223 {
+    "dc7f2ac03813bc609629885af82222ac5af070cc6187b7bce08e10944fd214e1"
+} else if PROFILE225 {
     "094d3b28c39403580fbac083cdad67cc008b255dd375d611217103750d0f412d"
 } else {
     "348cba573c9e737e77c512d2c7ceda7bc81db61be6f4dc02838d168a10103043"
 };
-const SNAPSHOT_SIZE: u64 = if PROFILE225 {
+const SNAPSHOT_SIZE: u64 = if PROFILE223 {
+    9_705_551_147
+} else if PROFILE225 {
     10_177_204_112
 } else {
     8_046_142_592
 };
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const TEST_SHA: &str = if PROFILE225 {
+const TEST_SHA: &str = if PROFILE223 {
+    "d685cbbe8ad720e1bff567ebbcfbd92d92e47f16d798e74783c06e0114c0b92f"
+} else if PROFILE225 {
     "207c0d2d4735eb745570686f7323ed63a8b4caed6536219d0529467e7036329d"
 } else {
     "bfa7aadf5be9d895747b379c18354ecc312e50ba895341a5e46a21a6a085fd64"
 };
-const FILTER: &str = if PROFILE225 {
+const FILTER: &str = if PROFILE225 || PROFILE223 {
     "_v1_6_25_boundary_snapshot"
 } else {
     "_v1_6_16_boundary_snapshot"
@@ -84,7 +109,7 @@ const RESOURCE_FILES: [&str; 12] = [
     "io.stat",
     "io.pressure",
 ];
-const TEST_NAMES: [&str; 2] = if PROFILE225 {
+const TEST_NAMES: [&str; 2] = if PROFILE225 || PROFILE223 {
     [
         "runtime::tests::initializes_and_checkpoints_v1_6_25_boundary_snapshot: test",
         "snapshot::tests::loads_and_verifies_v1_6_25_boundary_snapshot: test",
@@ -136,7 +161,13 @@ fn hex(b: &[u8]) -> String {
 fn receipt_schema(kind: &str) -> String {
     format!(
         "jetstreamer-private-{}-ram-snapshot-{kind}-v1",
-        if PROFILE225 { "v1625" } else { "v1616" }
+        if PROFILE223 {
+            "epoch223-tail-v1625"
+        } else if PROFILE225 {
+            "v1625"
+        } else {
+            "v1616"
+        }
     )
 }
 fn is_sha(s: &str) -> bool {
@@ -224,7 +255,10 @@ fn write_new(dir: &Path, name: &str, value: &Value) -> Result<()> {
     File::open(dir)?.sync_all()?;
     Ok(())
 }
-#[cfg(not(feature = "epoch225-shrink-snapshot-tests"))]
+#[cfg(not(any(
+    feature = "epoch225-shrink-snapshot-tests",
+    feature = "epoch223-tail-snapshot-tests"
+)))]
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-private-v1616-ram-snapshot-test-plan-v1"
@@ -326,7 +360,7 @@ fn ram_geometry() -> Result<u64> {
 }
 fn validate_inode_geometry(files: u64) -> Result<()> {
     ensure!(
-        !PROFILE225 || files == 1_048_576,
+        !(PROFILE225 || PROFILE223) || files == 1_048_576,
         "wrong225 tmpfs inode limit"
     );
     Ok(())
@@ -485,7 +519,10 @@ fn utc(s: &str) -> Result<u64> {
     );
     Ok(u64::try_from(n)?)
 }
-#[cfg(not(feature = "epoch225-shrink-snapshot-tests"))]
+#[cfg(not(any(
+    feature = "epoch225-shrink-snapshot-tests",
+    feature = "epoch223-tail-snapshot-tests"
+)))]
 fn validate_observer(v: &Value, now: u64) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -607,7 +644,10 @@ fn validate_reserves(tmpfs: u64, maximum: u64, floor: u64, stop: u64) -> Result<
     );
     Ok(())
 }
-#[cfg(not(feature = "epoch225-shrink-snapshot-tests"))]
+#[cfg(not(any(
+    feature = "epoch225-shrink-snapshot-tests",
+    feature = "epoch223-tail-snapshot-tests"
+)))]
 fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -> Result<()> {
     ensure!(
         f["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
@@ -854,7 +894,11 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
     let test = immutable(
         &p.test_binary.path,
         &p.test_binary.sha256,
-        if PROFILE225 { 256 << 20 } else { 64 << 20 },
+        if PROFILE225 || PROFILE223 {
+            256 << 20
+        } else {
+            64 << 20
+        },
     )?;
     let snapshot = immutable(&p.snapshot.path, &p.snapshot.sha256, SNAPSHOT_SIZE)?;
     ensure!(snapshot.len() == SNAPSHOT_SIZE, "wrong snapshot size");
@@ -871,7 +915,10 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
         host_memory()? >= START_MEMORY,
         "post-hash memory admission failed"
     );
-    #[cfg(feature = "epoch225-shrink-snapshot-tests")]
+    #[cfg(any(
+        feature = "epoch225-shrink-snapshot-tests",
+        feature = "epoch223-tail-snapshot-tests"
+    ))]
     validate_fleet(&fleet, &observer, &p.observer.sha256)?;
     #[cfg(all(
         feature = "ram-snapshot-eight-core-stopped225",
@@ -896,9 +943,9 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
             .env_clear()
             .env("TMPDIR", "/tmp")
             .env("RUST_MIN_STACK", "134217728")
-            .env("SOLANA_RAYON_THREADS", "16")
+            .env("SOLANA_RAYON_THREADS", if PROFILE223 { "2" } else { "16" })
             .env(
-                if PROFILE225 {
+                if PROFILE225 || PROFILE223 {
                     "JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT"
                 } else {
                     "JETSTREAMER_SNAPSHOT_86831488"
@@ -909,6 +956,11 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
                 "JETSTREAMER_MAINNET_LEDGER",
                 p.genesis.path.parent().unwrap(),
             )
+            .envs(if PROFILE223 {
+                vec![("JETSTREAMER_V1_6_25_EPOCH223_TEST_ANCHOR", "96767522")]
+            } else {
+                Vec::new()
+            })
             .current_dir("/tmp")
             .process_group(0)
             .spawn()?,
@@ -1033,7 +1085,13 @@ fn main() {
     }
 }
 
-#[cfg(all(test, not(feature = "epoch225-shrink-snapshot-tests")))]
+#[cfg(all(
+    test,
+    not(any(
+        feature = "epoch225-shrink-snapshot-tests",
+        feature = "epoch223-tail-snapshot-tests"
+    ))
+))]
 mod tests {
     use super::*;
 
