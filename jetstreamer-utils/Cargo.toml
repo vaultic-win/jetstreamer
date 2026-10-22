@@ -202,6 +202,10 @@ name = "jetstreamer-epoch144-publication-evidence"
 path = "src/epoch144_publication_evidence_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch141-byte-diagnostic"
+path = "src/epoch141_byte_diagnostic_bin.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-gap-audit"
 path = "src/horizon_gap_audit_bin.rs"
 
