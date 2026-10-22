@@ -348,6 +348,16 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    if mode == "--prepare-next-assembly144-reader" {
+        ensure!(
+            handoff_spec.is_none(),
+            "reader-only migration cannot consume another handoff"
+        );
+        assembly144::upgrade_reader(&mut next)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+    }
     if mode == "--prepare-next-upload198" {
         ensure!(
             handoff_spec.is_none(),

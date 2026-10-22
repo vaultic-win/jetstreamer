@@ -79,6 +79,15 @@ claims, dashboard statuses, guard evidence or historical receipts. Adoption stil
 requires a newly qualified reader transition; old sealed fleet receipts are not
 rewritten.
 
+For the exact active assembly profile, the offline
+`--prepare-next-assembly144-reader` mode migrates only the pinned reader from
+16d959 to the sealed 60b511 v2 reader after genuine cycle completion. It keeps
+all observer/model/launch/guard history, changes no epoch claims and cannot
+launch a scanner or replay. Distinct `assembly144-...-v2` namespaces prevent
+overwriting prepared v1 plans. Seal and sandbox-preflight the successor before
+arming its normal cadence; no extra resource observation is authorized. Later
+successors use ordinary `--prepare-next` and retain the v2 reader.
+
 ## Exact epoch193 to epoch194 ETA handoff
 
 The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.
