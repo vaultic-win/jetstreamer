@@ -59,6 +59,9 @@ pub(super) async fn admit_assembly144() -> Result<()> {
 pub(super) fn capture_assembly144_launch() -> Result<()> {
     assembly144::capture_launch()
 }
+pub(super) fn capture_assembly144_scan_launch() -> Result<()> {
+    private144_scan::capture_launch()
+}
 pub(super) fn prepare_assembly144_fleet() -> Result<()> {
     assembly144_prepare::run()
 }

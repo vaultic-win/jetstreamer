@@ -71,6 +71,21 @@ fleet/routine downstream handoff still precede use. The current assembler and
 routine reader are never hot-swapped to adopt this source, and canonical import
 and publication remain separately unqualified until their normal gates pass.
 
+`capture-assembly144-scan-launch SPEC --spec-sha256 SHA --self-sha256 SHA`
+observes an independently launched full or plugin scanner; it never starts one.
+The sealed spec uses schema
+`jetstreamer-private144-assembly-only-scan-capture-spec-v1` with only `stage`
+(`full` or `plugin`) and the exact `scan_plan: {path,sha256}` binding. The writer
+requires the sealed scan plan and frozen successful outcome, the actual original
+timeout and clean terminal assembler, the exact runner/command and live
+zero-restart scanner, and its reviewed sandbox. It rechecks both owners before
+writing a no-clobber private launch receipt. Precreate the root-owned mode0700
+parent `/var/lib/jetstreamer/horizon-assembly144-scan-launches-20261022-v1`;
+each stage gets a distinct `STAGE/launch.json`. Capture is ownership evidence,
+not independent scan success, admission, a fleet transition, import or publication
+authority. A scanner that has already exited cannot be called live or restarted
+merely to satisfy capture; preserve and reconcile that terminal outcome instead.
+
 Fleet rendering keeps a private resource observation in `observer_diagnostics`
 without adding a second active job when an exact captured diagnostic already
 binds the same epoch, unit, invocation and scratch path. Different owners remain
