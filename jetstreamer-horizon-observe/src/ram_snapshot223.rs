@@ -1,5 +1,31 @@
-//! Closed RAM-only snapshot gate for the isolated epoch223 tail candidate.
+//! Separate closed RAM-only cold/tail gates for the isolated epoch223 candidate.
 use super::*;
+
+const PLAN_SCHEMA: &str = if COLD223 {
+    "jetstreamer-private-epoch223-cold-ram-snapshot-test-plan-v1"
+} else {
+    "jetstreamer-private-epoch223-tail-ram-snapshot-test-plan-v1"
+};
+const UNIT_PREFIX: &str = if COLD223 {
+    "archive-223-cold-snapshot-test-"
+} else {
+    "archive-223-tail-snapshot-test-"
+};
+const RECEIPT_PREFIX: &str = if COLD223 {
+    "ram-snapshot-test-223-cold-"
+} else {
+    "ram-snapshot-test-223-tail-"
+};
+const SNAPSHOT_PATH: &str = if COLD223 {
+    "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst"
+} else {
+    "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst"
+};
+const GENESIS_PATH: &str = if COLD223 {
+    "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2"
+} else {
+    "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/genesis.tar.bz2"
+};
 
 const CLAIMS: [(u64, &str, &str, &str); 2] = [
     (
@@ -37,14 +63,13 @@ fn safe_name(s: &str, prefix: &str) -> bool {
 }
 pub(super) fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
-        p.schema == "jetstreamer-private-epoch223-tail-ram-snapshot-test-plan-v1"
-            && matches!(p.mode.as_str(), "capability" | "snapshot-tests"),
+        p.schema == PLAN_SCHEMA && matches!(p.mode.as_str(), "capability" | "snapshot-tests"),
         "wrong223 schema/mode"
     );
     ensure!(
         p.unit
             .strip_suffix(".service")
-            .is_some_and(|s| safe_name(s, "archive-223-tail-snapshot-test-")),
+            .is_some_and(|s| safe_name(s, UNIT_PREFIX)),
         "foreign223 unit"
     );
     ensure!(
@@ -54,14 +79,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
         "foreign223 inputs"
     );
     ensure!(
-        p.snapshot.path
-            == Path::new(
-                "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst"
-            )
-            && p.genesis.path
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/genesis.tar.bz2"
-                ),
+        p.snapshot.path == Path::new(SNAPSHOT_PATH) && p.genesis.path == Path::new(GENESIS_PATH),
         "foreign223 package"
     );
     ensure!(
@@ -78,7 +96,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
             && p.receipt_directory
                 .file_name()
                 .and_then(|s| s.to_str())
-                .is_some_and(|s| safe_name(s, "ram-snapshot-test-223-tail-"))
+                .is_some_and(|s| safe_name(s, RECEIPT_PREFIX))
             && (60..=1800).contains(&p.maximum_runtime_seconds),
         "foreign223 receipt/time scope"
     );
@@ -382,13 +400,13 @@ mod tests {
     }
     #[test]
     fn exact_223_profile_plan_cannot_borrow_225_or_run_entries() {
-        let p = json!({"schema":"jetstreamer-private-epoch223-tail-ram-snapshot-test-plan-v1",
-            "mode":"capability","unit":"archive-223-tail-snapshot-test-fixture.service",
+        let p = json!({"schema":PLAN_SCHEMA,
+            "mode":"capability","unit":format!("{UNIT_PREFIX}fixture.service"),
             "test_binary":{"path":"/var/lib/jetstreamer/horizon-223-tail-snapshot-harness-release-bd60006d-v1/historical-worker","sha256":TEST_SHA},
-            "snapshot":{"path":"/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst","sha256":SNAPSHOT_SHA},
-            "genesis":{"path":"/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1/genesis.tar.bz2","sha256":GENESIS_SHA},
+            "snapshot":{"path":SNAPSHOT_PATH,"sha256":SNAPSHOT_SHA},
+            "genesis":{"path":GENESIS_PATH,"sha256":GENESIS_SHA},
             "observer":{"path":"/sample","sha256":"a".repeat(64)},"fleet":{"path":"/fleet","sha256":"b".repeat(64)},
-            "receipt_directory":"/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-tail-fixture","maximum_runtime_seconds":1800});
+            "receipt_directory":format!("/var/lib/jetstreamer/horizon-ram-snapshot-tests/{RECEIPT_PREFIX}fixture"),"maximum_runtime_seconds":1800});
         validate_plan(&serde_json::from_value(p.clone()).unwrap()).unwrap();
         for (ptr, value) in [
             (
@@ -403,6 +421,39 @@ mod tests {
                 json!("6baab37dfe86bd957ba21c22a2769f1d32c28bee930cad2b4b17d1eb25a087a5"),
             ),
             ("/snapshot/path", json!("/foreign/snapshot")),
+            ("/genesis/path", json!("/foreign/genesis.tar.bz2")),
+            (
+                "/snapshot/sha256",
+                json!(if COLD223 {
+                    "dc7f2ac03813bc609629885af82222ac5af070cc6187b7bce08e10944fd214e1"
+                } else {
+                    "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"
+                }),
+            ),
+            (
+                "/schema",
+                json!(if COLD223 {
+                    "jetstreamer-private-epoch223-tail-ram-snapshot-test-plan-v1"
+                } else {
+                    "jetstreamer-private-epoch223-cold-ram-snapshot-test-plan-v1"
+                }),
+            ),
+            (
+                "/unit",
+                json!(if COLD223 {
+                    "archive-223-tail-snapshot-test-foreign.service"
+                } else {
+                    "archive-223-cold-snapshot-test-foreign.service"
+                }),
+            ),
+            (
+                "/receipt_directory",
+                json!(if COLD223 {
+                    "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-tail-foreign"
+                } else {
+                    "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-cold-foreign"
+                }),
+            ),
             ("/receipt_directory", json!("/tmp/receipts")),
             ("/maximum_runtime_seconds", json!(1801)),
         ] {
@@ -414,7 +465,23 @@ mod tests {
             );
         }
         assert_eq!(CPU_CORES, 8);
-        assert_eq!(SNAPSHOT_SIZE, 9_705_551_147);
+        assert_eq!(
+            SNAPSHOT_SIZE,
+            if COLD223 {
+                9_815_262_303
+            } else {
+                9_705_551_147
+            }
+        );
+        assert_eq!(ANCHOR223, if COLD223 { "96335538" } else { "96767522" });
+        assert_eq!(
+            receipt_schema("result"),
+            if COLD223 {
+                "jetstreamer-private-epoch223-cold-v1625-ram-snapshot-result-v1"
+            } else {
+                "jetstreamer-private-epoch223-tail-v1625-ram-snapshot-result-v1"
+            }
+        );
         validate_test_list(&format!(
             "{}\n{}\n2 tests, 0 benchmarks\n",
             TEST_NAMES[0], TEST_NAMES[1]

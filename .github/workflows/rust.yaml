@@ -46,6 +46,10 @@ jobs:
             scope: "-p jetstreamer-horizon-observe"
             flags: "--features epoch223-tail-snapshot-tests"
             examples: false
+          - name: observer-epoch223-cold-snapshot
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-cold-snapshot-tests"
+            examples: false
           - name: node-epoch213-continuation
             scope: "-p jetstreamer-node"
             flags: "--features epoch213-checkpoint-continuation-diagnostic"
