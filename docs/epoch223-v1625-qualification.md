@@ -95,3 +95,21 @@ a timeout as a canonical mismatch. The optimized harness has the same source,
 feature and assertions, with 60 synthetic tests plus IPC passing; it still
 requires the two real snapshot tests. The replacement profile rejects the old
 debug digest and binds a distinct immutable release-harness directory.
+
+After natural completion of the 477-slot replay, independently reread its
+archive with the separately sealed `jetstreamer-qualification-verify` reader.
+Its closed epoch223-tail profile accepts only the exact private
+`qualification-223-v1625-tail-*` root, `output/epoch-223.jet`, bootstrap
+96,767,522, output 96,767,523–96,767,999, v1.6.25 and candidate worker digest
+`fde3ba53cc52012b894bac29bd7889b4cfd326fff75f4f67ec4cbdbf2ac7136c`.
+It binds bootstrap accounts hash `3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7`,
+serialized/frozen Bank hash `EWtQnBfEHcQ5hASVyH6u3LXT6WLu5MwWML6VKGg4MdxB`
+and upstream revision `7de8a55b54d3e11058b82f9483bb405d143b455c`.
+The reserved tail namespace cannot escape into generic through-slot naming.
+Use the durable segment's exact output start/count, require full independent
+archive/manifest validation and absent canonical sidecar, and retain the
+normal private receipt identity/durability checks. Its receipt explicitly
+denies complete-epoch coverage, canonical-prefix/peak qualification, a known
+independent terminal root, runtime promotion, sidecars and publication. A
+successful tail reread remains evidence only; no production plugin or R2
+upload is authorized for this partial artifact.
