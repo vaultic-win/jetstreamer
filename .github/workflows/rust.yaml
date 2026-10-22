@@ -52,6 +52,10 @@ jobs:
             scope: "-p jetstreamer-node"
             flags: "--features epoch203-native-restore-diagnostic"
             examples: false
+          - name: node-epoch205-native-restore
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch205-native-restore-diagnostic"
+            examples: false
           - name: node-epoch224-account-delta
             scope: "-p jetstreamer-node"
             flags: "--features epoch224-account-delta-diagnostic"

@@ -784,6 +784,11 @@ checks only the capped-shrink prefix's frozen restart state after a complete ind
 reread. It remains dormant without fresh protected admission and a proven guard; it sends no
 replay entries and does not qualify the remaining 419 slots, assembly, or publication.
 
+The separate [epoch-205 native restore profile](docs/horizon-epoch205-native-restore.md)
+pins its verified terminal snapshot and unchanged store8 worker. It is dormant
+until the exact complete prefix, independent reader and fresh protected admission
+exist; it does not qualify the remaining 949 slots or enable ordinary replay.
+
 The dedicated `epoch213-checkpoint-continuation-diagnostic` node build exposes only the private
 epoch-213 continuation experiment. Invoke it with `213 /PRIVATE_RUN_ROOT/ledger --verify
 --checkpoint-continuation-plan=/SEALED/plan.json --checkpoint-continuation-plan-sha256=HEX`.
