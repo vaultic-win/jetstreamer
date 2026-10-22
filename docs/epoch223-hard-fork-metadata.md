@@ -82,3 +82,15 @@ both restart slots, reproduces canonical transaction outcomes and the terminal
 root, and passes the normal independent archive/plugin/publication gates.
 Keep the original failed invocation and archive preserved; no source change or
 unit test closes the incident or authorizes a sidecar or upload.
+
+Do not blindly reuse the old complete-epoch launch after this correction. The
+retained `horizon-qualify-224-singleton-bounded-8a4f843-v3.service` journal
+independently records v1.6.20 failing at slot 96,767,526, entry 8, transaction 7
+(signature `3RrSHaC4s6asQJAY3b62dXL5YDRGVTDwqqwtS623RpTwx9648RiwHyYq6BecDGfMHqMGkRPLJEgwhehmM8M6vPTr`).
+That warmup slot is actually in epoch 223's final 477 slots, beyond its trusted
+root at 96,767,522. The later v1.6.25 epoch-224 invocation starts from that root.
+Its existence is not an epoch-223 suffix/assembly qualification. Before a new
+long replay, bind a complete prefix-through-root and separately qualified
+suffix/assembly path, or establish a single worker that demonstrably passes
+both boundaries. Never spend another full replay assuming this marker fix
+also fixes the distinct later compatibility gate.
