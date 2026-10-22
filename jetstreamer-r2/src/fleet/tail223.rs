@@ -189,9 +189,9 @@ fn planning_preflight(v: &Value) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
-    fn fixture() -> (DiagnosticClaim, Value) {
+    pub(in crate::fleet) fn fixture() -> (DiagnosticClaim, Value) {
         let c = DiagnosticClaim {
             epoch: 223,
             unit: "horizon-qualify-223-v1625-tail-test.service".into(),
