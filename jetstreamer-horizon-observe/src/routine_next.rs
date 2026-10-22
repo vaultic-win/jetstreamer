@@ -309,7 +309,16 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     native144_recovery::consume(&mut next, &completion)?;
+    public160_recovery::consume(&mut next, &completion)?;
     delivery160::consume(&mut next)?;
+    if mode == "--prepare-next-public160" {
+        ensure!(
+            handoff_spec.is_none(),
+            "160 public handoff consumes exact event capture only"
+        );
+        public160::enable(&mut next)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
     assembly144_scans_recover::consume(&mut next, &completion)?;
     if completion.get("public198_promotion").is_some() {
         public198::consume(&mut next, &completion, &mut next_config)?;

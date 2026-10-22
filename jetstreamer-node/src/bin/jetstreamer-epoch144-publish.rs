@@ -349,15 +349,18 @@ fn resources(p: &Plan) -> Result<Value> {
     let fleet = read(&p.fleet, false)?;
     let sample = utc(o["recorded_at_utc"].as_str().context("observer clock")?)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let replay_count = capacity::replay_count(p)?;
     ensure!(
         o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && sample <= now
             && now - sample <= 1800
             && o["cadence"]["routine_minimum_interval_enforced"] == true
-            && o["replays"].as_array().is_some_and(|a| a.len() == 4
-                && a.iter().all(|r| r["invocation_binding_stable"] == true
-                    && r["controller_after"]["restarts"] == 0
-                    && r["producer_after"]["restarts"] == 0)),
+            && o["replays"]
+                .as_array()
+                .is_some_and(|a| a.len() == replay_count
+                    && a.iter().all(|r| r["invocation_binding_stable"] == true
+                        && r["controller_after"]["restarts"] == 0
+                        && r["producer_after"]["restarts"] == 0)),
         "stale or unstable resource sample"
     );
     ensure!(

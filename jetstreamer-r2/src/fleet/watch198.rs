@@ -93,10 +93,28 @@ fn child_matches(phase: &str, executable: &str, argv: &[&str], worker: &str) -> 
         _ => false,
     }
 }
-fn immutable(path: &str, digest: &str) -> Result<()> {
+pub(super) fn immutable(path: &str, digest: &str) -> Result<()> {
+    pinned_member(path, digest, false)
+}
+pub(super) fn legacy160_member(path: &str, digest: &str) -> Result<()> {
+    ensure!(
+        path == "/usr/local/lib/jetstreamer/horizon-plugin-merged-main-20260930-v1/horizon_pipeline"
+            && digest == "9f4abe27011b04d0c33cb3e24d0d9bc14dbce9f46528f22c4bde367af97a7070",
+        "foreign legacy160 member"
+    );
+    pinned_member(path, digest, true)
+}
+fn pinned_member(path: &str, digest: &str, legacy160: bool) -> Result<()> {
     let m = fs::symlink_metadata(path)?;
     ensure!(
-        m.is_file() && m.uid() == 0 && m.nlink() == 1 && m.mode() & 0o222 == 0,
+        m.is_file()
+            && m.uid() == 0
+            && m.nlink() == 1
+            && if legacy160 {
+                m.mode() & 0o7777 == 0o755
+            } else {
+                m.mode() & 0o222 == 0
+            },
         "198 watcher input is not immutable"
     );
     ensure!(
@@ -164,6 +182,15 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
             _ => anyhow::bail!("foreign198 stage"),
         },
     )?;
+    scan_children(phase, current, worker, child_matches)
+}
+pub(super) fn scan_children(
+    phase: &str,
+    current: &Value,
+    worker: &str,
+    matches: impl Fn(&str, &str, &[&str], &str) -> bool,
+) -> Result<Option<u64>> {
+    let name = current["Id"].as_str().context("watcher unit missing")?;
     let group = format!("/system.slice/{name}");
     ensure!(
         current["ControlGroup"] == group,
@@ -189,7 +216,7 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
                 .filter(|a| !a.is_empty())
                 .map(std::str::from_utf8)
                 .collect::<std::result::Result<Vec<_>, _>>()?;
-            if !child_matches(phase, executable.to_str().unwrap_or(""), &argv, worker) {
+            if !matches(phase, executable.to_str().unwrap_or(""), &argv, worker) {
                 return Ok(None);
             }
             ensure!(

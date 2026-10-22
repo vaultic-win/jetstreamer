@@ -19,6 +19,76 @@ const RANGES: [(&str, u64, &str, u64); 4] = [
 pub(super) struct Refresh {
     pub(super) schema: String,
     pub(super) growth_claims: Vec<Bound>,
+    #[serde(default)]
+    pub(super) epoch160_handoff: Option<Bound>,
+}
+const RETAINED_PROTECTION: u64 = 3984782679494;
+const DELIVERY160_GIB: u64 = 768;
+
+pub(super) fn replay_count(p: &Plan) -> Result<usize> {
+    let Some(s) = &p.refreshed_capacity else {
+        return Ok(4);
+    };
+    match (
+        s.schema.as_str(),
+        s.epoch160_handoff.is_some(),
+        s.growth_claims.len(),
+    ) {
+        ("jetstreamer-exact144-delivery-capacity-refresh-v1", false, 4) => Ok(4),
+        ("jetstreamer-exact144-delivery-capacity-refresh-v2", true, 3) => Ok(3),
+        _ => anyhow::bail!("wrong capacity schema/claim/handoff census"),
+    }
+}
+fn census(fleet: &Value, handoff: bool) -> Result<()> {
+    let active = fleet["active"].as_array().context("active epoch census")?;
+    let epochs: BTreeSet<_> = active
+        .iter()
+        .map(|a| a["epoch"].as_u64().context("active epoch"))
+        .collect::<Result<_>>()?;
+    ensure!(
+        active.len() == 9
+            && epochs == BTreeSet::from([152, 153, 155, 156, 160, 191, 192, 193, 194])
+            && active.iter().all(|a| if handoff && a["epoch"] == 160 {
+                a["phase"] == "controller-import-handoff"
+                    && a["unit"]["Id"]
+                        == "jetstreamer-epoch160-singleton-20261020-controller-v1-r2.service"
+                    && a["unit"]["InvocationID"] == "f07e4e26c28642b8826b13d625edf89c"
+                    && a["unit"]["NRestarts"] == "0"
+            } else {
+                a["phase"] == "replay"
+            }),
+        "delivery claim census changed"
+    );
+    let live: Vec<_> = fleet["pipelines"]
+        .as_array()
+        .context("pipeline census")?
+        .iter()
+        .filter(|p| p["live"] == true)
+        .collect();
+    ensure!(
+        (!handoff && live.is_empty())
+            || (handoff
+                && live.len() == 1
+                && live[0]["epoch"] == 160
+                && live[0]["phase"] == "controller-import-handoff"),
+        "unbudgeted live delivery pipeline"
+    );
+    Ok(())
+}
+fn post_replay_protection(claims: u64, floor: u64, guards: u64) -> Result<(u64, u64)> {
+    // Preserve the *entire* previous four-owner envelope, including768GiB
+    // formerly reserved for160. It is now explicit delivery debt, not a claim
+    // that its dead producer or old reserve guard remains live. No budget or
+    // live guard is lowered. The five other epoch debts remain protected too.
+    let delivery = DELIVERY160_GIB * GIB;
+    let (protected, debt) = arithmetic(
+        claims
+            .checked_add(delivery)
+            .context("delivery160 overflow")?,
+        floor,
+        guards,
+    )?;
+    Ok((protected.max(RETAINED_PROTECTION), debt))
 }
 
 fn fields(unit: &str, properties: &str) -> Result<Value> {
@@ -155,35 +225,67 @@ fn arithmetic(claims: u64, floor: u64, guards: u64) -> Result<(u64, u64)> {
 }
 pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<(u64, Value)> {
     let s = p.refreshed_capacity.as_ref().context("refresh missing")?;
-    ensure!(
-        s.schema == "jetstreamer-exact144-delivery-capacity-refresh-v1"
-            && s.growth_claims.len() == 4
-            && floor == 205211459014,
-        "wrong capacity profile"
-    );
+    let handoff = replay_count(p)? == 3;
+    ensure!(floor == 205211459014, "wrong capacity profile");
+    census(fleet, handoff)?;
     let active = fleet["active"].as_array().context("active epoch census")?;
-    let epochs: BTreeSet<_> = active
-        .iter()
-        .map(|a| a["epoch"].as_u64().context("active epoch"))
-        .collect::<Result<_>>()?;
-    ensure!(
-        active.len() == 9
-            && epochs == BTreeSet::from([152, 153, 155, 156, 160, 191, 192, 193, 194])
-            && active.iter().all(|a| a["phase"] == "replay"),
-        "delivery claim census changed"
-    );
-    ensure!(
-        fleet["pipelines"]
+    let delivery = if let Some(b) = &s.epoch160_handoff {
+        ensure!(
+            b.path
+                == Path::new(
+                    "/var/lib/jetstreamer/horizon-epoch160-delivery-observations-20261022-v1/handoff.json"
+                )
+                && b.sha256 == "e14b5044e4ba2b4e49d478d5bd5a07d3aec5935abf3ae3e181349cf083eca6de",
+            "foreign160 handoff proof"
+        );
+        let proof = read(b, false)?;
+        let current = &fleet["pipelines"]
             .as_array()
-            .context("pipeline census")?
+            .unwrap()
             .iter()
-            .all(|p| p["live"] == false),
-        "unbudgeted live delivery pipeline"
-    );
+            .find(|r| r["epoch"] == 160 && r["live"] == true)
+            .context("160 current pipeline")?["finalization_evidence"];
+        ensure!(
+            proof["schema"] == "jetstreamer-epoch160-delivery-proof-v1"
+                && proof["resource_samples"] == 0
+                && proof["publication_authorized"] == false
+                && proof["r2_mutations"] == false
+                && current["schema"] == "jetstreamer-epoch160-controller-import-handoff-v1"
+                && current["controller"] == proof["evidence"]["controller"]
+                && current["source_receipt_sha256"] == proof["evidence"]["source_receipt_sha256"]
+                && current["terminal_evidence"] == proof["evidence"]["terminal_evidence"]
+                && current["archive_bytes"] == 148095631232u64
+                && current["archive_inode"] == 99942496u64
+                && current["producer_terminal_manager"]
+                    == proof["evidence"]["producer_terminal_manager"],
+            "160 delivery lineage changed"
+        );
+        // Five simultaneous full-size copies plus8GiB stay below the retained
+        //768GiB debt. Actual downstream storage is bounded by that larger debt;
+        // it is not credited as free space or removed when a worker disappears.
+        ensure!(
+            148095631232u64
+                .checked_mul(5)
+                .and_then(|n| n.checked_add(8 * GIB))
+                .is_some_and(|n| n <= DELIVERY160_GIB * GIB),
+            "160 copy debt insufficient"
+        );
+        json!({"binding":b,"current_handoff":current,"reserved_delivery_bytes":DELIVERY160_GIB*GIB,"replay_claim":false,"old_guard_counted_as_live":false})
+    } else {
+        Value::Null
+    };
     let mut sum = 0u64;
     let mut guards = Vec::new();
     let mut claims = Vec::new();
-    for ((range, gib, label, guard_floor), binding) in RANGES.iter().zip(&s.growth_claims) {
+    let ranges: Vec<_> = RANGES.iter().filter(|r| !handoff || r.0 != "160").collect();
+    ensure!(
+        o["replays"]
+            .as_array()
+            .is_some_and(|a| a.len() == ranges.len()),
+        "unbudgeted replay census"
+    );
+    for ((range, gib, label, guard_floor), binding) in ranges.iter().copied().zip(&s.growth_claims)
+    {
         let c = read(binding, false)?;
         let row: Vec<_> = o["replays"]
             .as_array()
@@ -319,12 +421,16 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
         sum = sum.checked_add(gib * GIB).context("claim sum overflow")?;
         claims.push(json!({"binding":binding,"claim":c}));
     }
-    let max_guard = RANGES.iter().map(|r| r.3).max().unwrap();
-    let (protected, debt) = arithmetic(sum, floor, max_guard)?;
+    let max_guard = ranges.iter().map(|r| r.3).max().unwrap();
+    let (protected, debt) = if handoff {
+        post_replay_protection(sum, floor, max_guard)?
+    } else {
+        arithmetic(sum, floor, max_guard)?
+    };
     Ok((
         protected,
-        json!({"schema":"jetstreamer-exact144-delivery-capacity-refresh-result-v1",
-        "growth_claims":claims,"unchanged_guards":guards,"sum_growth_claims_bytes":sum,
+        json!({"schema":if handoff {"jetstreamer-exact144-delivery-capacity-refresh-result-v2"} else {"jetstreamer-exact144-delivery-capacity-refresh-result-v1"},
+        "growth_claims":claims,"unchanged_guards":guards,"sum_growth_claims_bytes":sum,"epoch160_delivery":delivery,
         "extra_five_epoch_delivery_debt_bytes":debt,"additional_staging_margin_bytes":64*GIB,
         "century_floor_bytes":floor,"maximum_unchanged_live_guard_bytes":max_guard,
         "protected_bytes":protected,"live_guard_changed":false,"replay_admission_authorized":false}),
@@ -333,6 +439,48 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn completed160_keeps_its_entire_old_reservation_as_delivery_debt() {
+        let floor = 205211459014;
+        let old = arithmetic((3 * 512 + 768) * GIB, floor, RETAINED_PROTECTION).unwrap();
+        let new = post_replay_protection(3 * 512 * GIB, floor, 3264175144960).unwrap();
+        assert_eq!(new, old);
+        assert_eq!(new.0, RETAINED_PROTECTION);
+        assert!(new.0 >= 3 * 512 * GIB + DELIVERY160_GIB * GIB + 6 * floor + 64 * GIB);
+        assert!(post_replay_protection(u64::MAX, floor, 0).is_err());
+        assert!(post_replay_protection(0, u64::MAX, 0).is_err());
+    }
+    #[test]
+    fn controller_handoff_census_never_treats_dead160_as_replay_or_omits_other_work() {
+        let mut active: Vec<_> = [152, 153, 155, 156, 191, 192, 193, 194]
+            .map(|e| json!({"epoch":e,"phase":"replay"}))
+            .into();
+        active.push(json!({"epoch":160,"phase":"controller-import-handoff","unit":{"Id":"jetstreamer-epoch160-singleton-20261020-controller-v1-r2.service","InvocationID":"f07e4e26c28642b8826b13d625edf89c","NRestarts":"0"}}));
+        let f = json!({"active":active,"pipelines":[{"epoch":160,"phase":"controller-import-handoff","live":true}]});
+        census(&f, true).unwrap();
+        assert!(census(&f, false).is_err());
+        for pointer in [
+            "/active/8/epoch",
+            "/active/8/phase",
+            "/active/8/unit/InvocationID",
+            "/active/8/unit/NRestarts",
+            "/pipelines/0/epoch",
+            "/pipelines/0/live",
+        ] {
+            let mut bad = f.clone();
+            *bad.pointer_mut(pointer).unwrap() = json!("foreign");
+            assert!(census(&bad, true).is_err(), "{pointer}");
+        }
+        let mut bad = f.clone();
+        bad["active"].as_array_mut().unwrap().pop();
+        assert!(census(&bad, true).is_err());
+        let mut bad = f;
+        bad["pipelines"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"epoch":144,"phase":"local-publication","live":true}));
+        assert!(census(&bad, true).is_err());
+    }
     #[test]
     fn complete_delivery_debt_and_guards_both_survive_refresh() {
         let floor = 205211459014;

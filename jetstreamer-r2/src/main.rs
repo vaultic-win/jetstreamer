@@ -3234,6 +3234,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("observe-public-160") {
+        return fleet::watch160::run();
+    }
     if env::args().nth(1).as_deref() == Some("status-delete-inactive") {
         return status_inactive::run().await;
     }

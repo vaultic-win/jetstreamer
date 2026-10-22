@@ -34,6 +34,10 @@ mod delivery160;
 mod delivery198;
 #[path = "routine_delivery198_recover.rs"]
 mod delivery198_recover;
+#[path = "routine_public160.rs"]
+mod public160;
+#[path = "routine_public160_recovery.rs"]
+mod public160_recovery;
 #[path = "routine_public198.rs"]
 mod public198;
 
@@ -230,6 +234,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if public160::enabled(p) {
+        return "public160-native141-acquisition-scans-upload198-v1";
+    }
     if p.epoch160_delivery.is_some() {
         return "delivery160-native141-acquisition-scans-upload198-v1";
     }
@@ -1717,11 +1724,14 @@ fn main() {
                             | "--prepare-next"
                             | "--prepare-next-upload198"
                             | "--prepare-next-delivery160"
+                            | "--prepare-next-public160"
                             | "--prepare-next-assembly144-reader"
                             | "--prepare-next-native141"
                             | "--publish-upload198-event"
                             | "--recover-native144-observer"
                             | "--check-native144-recovery"
+                            | "--recover-public160"
+                            | "--check-public160-recovery"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
@@ -1744,6 +1754,17 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--recover-public160" || a == "--check-public160-recovery")
+        {
+            return public160_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-public160-recovery",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             matches!(
                 a.as_str(),
@@ -1828,6 +1849,7 @@ fn main() {
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-delivery160"
+                || arg == "--prepare-next-public160"
                 || arg == "--prepare-next-native198"
                 || arg == "--prepare-next-native144"
                 || arg == "--prepare-next-continuation144"
