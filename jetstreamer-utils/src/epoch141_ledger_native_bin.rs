@@ -1,6 +1,8 @@
 //! Private exact-target native candidates, never trusted boundaries/publication.
 #[path = "epoch141_native_acquisition.rs"]
 mod acquisition;
+#[path = "epoch141_native_all_acquisition.rs"]
+mod all_acquisition;
 #[allow(dead_code)]
 mod epoch141_ledger_common;
 #[allow(dead_code)]
@@ -101,7 +103,9 @@ fn profile(plan: &Plan) -> Result<bool> {
             );
             Ok(false)
         }
-        "jetstreamer-epoch141-ledger-native-full-census-plan-v2" | acquisition::SCHEMA => {
+        "jetstreamer-epoch141-ledger-native-full-census-plan-v2"
+        | acquisition::SCHEMA
+        | all_acquisition::SCHEMA => {
             ensure!(
                 plan.gap_audit.sha256 == FULL_CENSUS_SHA
                     && plan.finalized_collection_plan.is_some()
@@ -119,6 +123,15 @@ fn profile(plan: &Plan) -> Result<bool> {
                         |u| u.starts_with("horizon-epoch141-native-full-census-acquisition-")
                     ),
                     "acquisition needs a distinct diagnostic unit"
+                );
+            }
+            if plan.schema == all_acquisition::SCHEMA {
+                ensure!(
+                    plan.unit
+                        .as_deref()
+                        .is_some_and(|u| u
+                            .starts_with("horizon-epoch141-native-full-census-acquisition-all-")),
+                    "all-target acquisition needs its own diagnostic namespace"
                 );
             }
             Ok(true)
@@ -246,6 +259,12 @@ fn targets(audit: &Value) -> Result<Vec<LegacySlotScope>> {
 }
 
 fn admission(plan: &Plan, receipt: &Value, manifest: &Value, exe: &Path, sha: &str) -> Result<()> {
+    if plan.schema == all_acquisition::SCHEMA {
+        ensure!(
+            manifest["native_profile"] == all_acquisition::ADMISSION,
+            "all-target acquisition needs independently qualified32GiB admission"
+        );
+    }
     if plan.schema == acquisition::SCHEMA {
         ensure!(
             manifest["native_profile"] == "epoch141-read-only-first-target-acquisition-v4",
@@ -881,6 +900,9 @@ fn run() -> Result<()> {
         "publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     if full {
+        if plan.schema == all_acquisition::SCHEMA {
+            return all_acquisition::run(&plan, &bound, &scopes, &invocation, &values, start, free);
+        }
         if plan.schema == acquisition::SCHEMA {
             return acquisition::run(&plan, &bound, &scopes, &invocation, &values, start, free);
         }
@@ -1284,6 +1306,32 @@ mod tests {
         admission(&p, &receipt, &manifest, exe, &sha).unwrap();
     }
 
+    #[test]
+    fn all_target_acquisition_requires_new_profile_namespace_and_full_reservation() {
+        let mut p = full_plan();
+        p.schema = all_acquisition::SCHEMA.into();
+        assert!(profile(&p).is_err());
+        p.unit = Some("horizon-epoch141-native-full-census-acquisition-all-test.service".into());
+        assert!(profile(&p).unwrap());
+        assert_eq!(output_reservation(&p).unwrap(), FULL_OUTPUT_RESERVATION);
+        let exe = Path::new("/sealed/all-target-native");
+        let sha = "5".repeat(64);
+        let files = json!([{"path":exe,"sha256":sha,"uid":0,"mode":"0555"}]);
+        let minimum = p.minimum_free_bytes + FULL_OUTPUT_RESERVATION;
+        let mut m = json!({"schema":"jetstreamer-historical-performance-admission-v1","native_profile":all_acquisition::ADMISSION,
+            "filesystem":"/home/sol","minimum_free_bytes":minimum,"files":files});
+        let mut r = json!({"schema":"jetstreamer-historical-performance-admission-receipt-v1","admitted":true,
+            "manifest":p.admission_manifest.path,"manifest_sha256":p.admission_manifest.sha256,
+            "services_started":false,"services_installed":false,"remote_mutations":false,"r2_mutations":false,
+            "evidence":{"minimum_free_bytes":minimum,"filesystem":"/home/sol","files":files}});
+        admission(&p, &r, &m, exe, &sha).unwrap();
+        m["native_profile"] = json!("epoch141-read-only-first-target-acquisition-v4");
+        assert!(admission(&p, &r, &m, exe, &sha).is_err());
+        m["native_profile"] = json!(all_acquisition::ADMISSION);
+        m["minimum_free_bytes"] = json!(p.minimum_free_bytes + OUTPUT_RESERVATION);
+        r["evidence"]["minimum_free_bytes"] = m["minimum_free_bytes"].clone();
+        assert!(admission(&p, &r, &m, exe, &sha).is_err());
+    }
     #[test]
     fn full_native_admission_cannot_reuse_the_small_legacy_output_allowance() {
         let p = full_plan();

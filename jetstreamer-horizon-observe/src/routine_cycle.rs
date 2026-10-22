@@ -38,6 +38,8 @@ mod delivery198_recover;
 mod public160;
 #[path = "routine_public160_recovery.rs"]
 mod public160_recovery;
+#[path = "routine_public160_timing.rs"]
+mod public160_timing;
 #[path = "routine_public198.rs"]
 mod public198;
 
@@ -234,6 +236,15 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if native141::all_acquisition_enabled(p) {
+        return "native141-all-acquisition-public160-timed-scans-upload198-v1";
+    }
+    if p.publication144.is_some() && public160_timing::enabled(p) {
+        return "publication144-public160-timed-native141-acquisition-scans-upload198-v1";
+    }
+    if public160_timing::enabled(p) {
+        return "public160-timed-native141-acquisition-scans-upload198-v1";
+    }
     if public160::enabled(p) {
         return "public160-native141-acquisition-scans-upload198-v1";
     }
@@ -1696,6 +1707,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-publication144"
                             | "--prepare-next-native141-rejection"
                             | "--prepare-next-native141-acquisition"
@@ -1725,6 +1737,8 @@ fn main() {
                             | "--prepare-next-upload198"
                             | "--prepare-next-delivery160"
                             | "--prepare-next-public160"
+                            | "--prepare-next-public160-timing"
+                            | "--check-public160-upload-timing"
                             | "--prepare-next-assembly144-reader"
                             | "--prepare-next-native141"
                             | "--publish-upload198-event"
@@ -1754,6 +1768,13 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--check-public160-upload-timing")
+        {
+            println!("{}", public160_timing::preview(&plan)?);
+            return Ok(());
+        }
         if args
             .get(6)
             .is_some_and(|a| a == "--recover-public160" || a == "--check-public160-recovery")
@@ -1850,6 +1871,7 @@ fn main() {
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-delivery160"
                 || arg == "--prepare-next-public160"
+                || arg == "--prepare-next-public160-timing"
                 || arg == "--prepare-next-native198"
                 || arg == "--prepare-next-native144"
                 || arg == "--prepare-next-continuation144"

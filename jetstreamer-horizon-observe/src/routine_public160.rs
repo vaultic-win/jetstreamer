@@ -19,7 +19,10 @@ pub(super) fn reader(p: &Plan) -> bool {
     enabled(p)
         && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
             || (p.tools.r2.path == Path::new(public160_recovery::READER)
-                && p.tools.r2.sha256 == public160_recovery::READER_SHA))
+                && p.tools.r2.sha256 == public160_recovery::READER_SHA)
+            || (p.tools.r2.path == Path::new(publication144::READER)
+                && p.tools.r2.sha256 == publication144::READER_SHA)
+            || native141::all_acquisition_reader(p))
 }
 fn read(p: &Plan) -> Result<Value> {
     let b = p
@@ -250,14 +253,30 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
     } else {
         "verification"
     };
-    let old = bound_json(&profile.proof, false)?;
-    let eta = delivery160::remaining(&old, &p.sample_target_utc)?;
+    let mut estimate_evidence = json!([profile.proof, profile.public_observation]);
+    let (eta, basis) = if public160_timing::enabled(p) && phase == "upload" {
+        let (eta, timing) = public160_timing::seal(p, owner)?;
+        estimate_evidence
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::to_value(timing)?);
+        (
+            eta,
+            "Actual160 upload dispatch anchored once to verified198 byte-scaled hash/upload/readback/source-revalidation timings plus10minutes margin; completed replay/import/full/plugin debt excluded; original producer elapsed clock and all independent integrity gates unchanged.",
+        )
+    } else {
+        let old = bound_json(&profile.proof, false)?;
+        (
+            delivery160::remaining(&old, &p.sample_target_utc)?,
+            "Canonical160 committed import and actual epoch-specific watcher child; retained43200second downstream deadline anchored to original archive close, no clock reset or watcher-as-child substitution; independent full/plugin/R2readback/sidecar gates remain separate.",
+        )
+    };
     let target = p
         .cycle_directory
         .join("delivery160-status/sealed/pipeline-plan.json");
     let model = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":160,"phase":phase,
         "binding":{"unit":owner["unit"]["Id"],"invocation_id":owner["unit"]["InvocationID"],"expected_exec_start":owner["unit"]["ExecStart"],"claim_phase":owner["phase"],"origin_unit":ORIGIN,"origin_invocation_id":ORIGIN_IID,"model_path":target,"model_sha256":"","fleet_path":fleet.path,"fleet_sha256":fleet.sha256},
-        "observer":observer,"fleet":fleet,"origin_launch":profile.origin_publication,"estimate_evidence":[profile.proof,profile.public_observation],"estimate_basis":"Canonical160 committed import and actual epoch-specific watcher child; retained43200second downstream deadline anchored to original archive close, no clock reset or watcher-as-child substitution; independent full/plugin/R2readback/sidecar gates remain separate.","estimated_remaining_millis":eta,"jet_path":ARCHIVE,"expected_jet_size_bytes":148095631232u64,"peer_units":[],"receipt_directory":STATUS,"receipt_directory_uid":1001});
+        "observer":observer,"fleet":fleet,"origin_launch":profile.origin_publication,"estimate_evidence":estimate_evidence,"estimate_basis":basis,"estimated_remaining_millis":eta,"jet_path":ARCHIVE,"expected_jet_size_bytes":148095631232u64,"peer_units":[],"receipt_directory":STATUS,"receipt_directory_uid":1001});
     let package =
         delivery198::seal_values(p, "delivery160-status", &[("pipeline-plan.json", model)])?;
     let model = file(package.join("pipeline-plan.json"), true)?;

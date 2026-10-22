@@ -862,7 +862,29 @@ mod tests {
         refreshed["refreshed_capacity"] = json!({"schema":"jetstreamer-exact144-delivery-capacity-refresh-v1","growth_claims":[]});
         assert!(validate_plan(&serde_json::from_value(refreshed.clone()).unwrap()).is_err());
         refreshed["schema"] = json!("jetstreamer-exact144-v4-publication-plan-v2");
-        validate_plan(&serde_json::from_value(refreshed).unwrap()).unwrap();
+        validate_plan(&serde_json::from_value(refreshed.clone()).unwrap()).unwrap();
+        refreshed["refreshed_capacity"] = json!({"schema":"jetstreamer-exact144-delivery-capacity-refresh-v3",
+            "growth_claims":[b,b,b],"epoch160_public_delivery":b});
+        assert_eq!(
+            capacity::replay_count(&serde_json::from_value(refreshed.clone()).unwrap()).unwrap(),
+            3
+        );
+        for (field, value) in [
+            (
+                "schema",
+                json!("jetstreamer-exact144-delivery-capacity-refresh-v2"),
+            ),
+            ("growth_claims", json!([b, b, b, b])),
+            ("epoch160_handoff", b.clone()),
+            ("epoch160_public_delivery", Value::Null),
+        ] {
+            let mut bad = refreshed.clone();
+            bad["refreshed_capacity"][field] = value;
+            assert!(
+                capacity::replay_count(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{field}"
+            );
+        }
         let mut no_refresh = fixture.clone();
         no_refresh["schema"] = json!("jetstreamer-exact144-v4-publication-plan-v2");
         assert!(validate_plan(&serde_json::from_value(no_refresh).unwrap()).is_err());

@@ -3,6 +3,8 @@
 use super::*;
 #[path = "routine_native141_acquisition.rs"]
 mod acquisition;
+#[path = "routine_native141_all_acquisition.rs"]
+mod all_acquisition;
 const UNIT: &str = "horizon-epoch141-native-full-census-20261022-v1.service";
 const IID: &str = "1ca7610a4db34ceaaf2322736fa22092";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1";
@@ -24,6 +26,19 @@ pub(super) struct Profile {
     rejection: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     acquisition: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    all_acquisition: Option<Bound>,
+}
+pub(super) fn all_acquisition_enabled(p: &Plan) -> bool {
+    p.native141_audit
+        .as_ref()
+        .is_some_and(|s| s.all_acquisition.is_some())
+}
+pub(super) fn all_acquisition_reader(p: &Plan) -> bool {
+    all_acquisition::reader(p)
+}
+pub(super) fn enable_all_acquisition(p: &mut Plan, spec: &Bound) -> Result<()> {
+    all_acquisition::enable(p, spec)
 }
 pub(super) fn acquisition_enabled(p: &Plan) -> bool {
     p.native141_audit
@@ -166,6 +181,13 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             );
             acquisition::evidence(b)?;
         }
+        if let Some(b) = &s.all_acquisition {
+            ensure!(
+                all_acquisition::reader(p),
+                "all-target acquisition requires its exact reader and earlier history"
+            );
+            all_acquisition::evidence(b)?;
+        }
     }
     Ok(())
 }
@@ -181,6 +203,7 @@ pub(super) fn enable(p: &mut Plan) -> Result<()> {
         },
         rejection: None,
         acquisition: None,
+        all_acquisition: None,
     };
     evidence(&s)?;
     p.native141_audit = Some(s);
@@ -288,6 +311,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         }
     }
     acquisition::derive_fleet(p, f)?;
+    all_acquisition::derive_fleet(p, f)?;
     Ok(())
 }
 #[cfg(test)]
@@ -308,6 +332,7 @@ mod tests {
             },
             rejection: None,
             acquisition: None,
+            all_acquisition: None,
         });
         p.tools.r2 = Bound {
             path: READER.into(),

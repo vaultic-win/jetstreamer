@@ -12,8 +12,8 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-const TOOL: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-publisher-candidate-20261022-v4/jetstreamer-epoch144-publish";
-const TOOL_SHA: &str = "1b5e71ad4d7fb3ed7b5ac3143fabaad110dfeca7d978e186d6b86264bcbc17eb";
+const TOOL: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-publisher-candidate-20261022-v6/jetstreamer-epoch144-publish";
+const TOOL_SHA: &str = "4274f83c6d84a2bc2014b30122a38406b6498045f543ba170598baa8369a7efa";
 const UNIT: &str = "horizon-publish-144-v4-20261022-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1";
 #[derive(Clone, Deserialize, Serialize)]
@@ -91,7 +91,15 @@ fn shape(p: &Plan, v: &Value, c: &Value) -> Result<()> {
             && v["remote_mutations"] == false
             && v["r2_mutations"] == false
             && v["refreshed_capacity"]["schema"]
-                == "jetstreamer-exact144-delivery-capacity-refresh-v1"
+                == "jetstreamer-exact144-delivery-capacity-refresh-v3"
+            && v["refreshed_capacity"]["growth_claims"]
+                .as_array()
+                .is_some_and(|a| a.len() == 3)
+            && v["refreshed_capacity"]["epoch160_handoff"].is_null()
+            && v["refreshed_capacity"]["epoch160_public_delivery"]["path"]
+                == "/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json"
+            && v["refreshed_capacity"]["epoch160_public_delivery"]["sha256"]
+                == "c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008"
             && v["evidence"]["sha256"]
                 == "5196699c86959e9704269ae7dbfc1c9432ebc82eb40f305dca6dd56ded891f64",
         "foreign exact144 publication owner plan"
@@ -318,7 +326,7 @@ mod tests {
                 sha256: "b".repeat(64),
             },
         };
-        let v = json!({"schema":"jetstreamer-exact144-v4-publication-plan-v2","artifact_publication_authorized":true,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false,"refreshed_capacity":{"schema":"jetstreamer-exact144-delivery-capacity-refresh-v1"},"evidence":{"sha256":"5196699c86959e9704269ae7dbfc1c9432ebc82eb40f305dca6dd56ded891f64"},"work_directory":"/home/sol/.jetstreamer-private/epoch144-publication-work-test","receipt_directory":"/var/lib/jetstreamer/horizon-epoch144-publication-test"});
+        let v = json!({"schema":"jetstreamer-exact144-v4-publication-plan-v2","artifact_publication_authorized":true,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false,"refreshed_capacity":{"schema":"jetstreamer-exact144-delivery-capacity-refresh-v3","growth_claims":[{},{},{}],"epoch160_public_delivery":{"path":"/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json","sha256":"c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008"}},"evidence":{"sha256":"5196699c86959e9704269ae7dbfc1c9432ebc82eb40f305dca6dd56ded891f64"},"work_directory":"/home/sol/.jetstreamer-private/epoch144-publication-work-test","receipt_directory":"/var/lib/jetstreamer/horizon-epoch144-publication-test"});
         let c = json!({"schema":"jetstreamer-exact144-publication-capability-v1","publisher_sha256":TOOL_SHA,"diagnostic_fixture":true,"filesystem_transaction_passed":true,"outside_write_denied":true,"effective_uid":1001,"effective_gid":1003,"root_receipt_fd_survives_permanent_privilege_drop":true,"artifact_publication_authorized":false,"runtime_registry_promotion_authorized":false,"r2_mutations":false,"remote_mutations":false});
         (p, v, c)
     }
@@ -338,6 +346,15 @@ mod tests {
             ("/work_directory", json!("/home/sol")),
             ("/receipt_directory", json!("/var/lib/jetstreamer")),
             ("/evidence/sha256", json!("a".repeat(64))),
+            (
+                "/refreshed_capacity/schema",
+                json!("jetstreamer-exact144-delivery-capacity-refresh-v1"),
+            ),
+            ("/refreshed_capacity/growth_claims", json!([{}, {}, {}, {}])),
+            (
+                "/refreshed_capacity/epoch160_public_delivery/sha256",
+                json!("f".repeat(64)),
+            ),
         ] {
             let mut wrong = v.clone();
             *wrong.pointer_mut(pointer).unwrap() = value;

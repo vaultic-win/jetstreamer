@@ -1,5 +1,23 @@
 # Bounded routine metadata cycle
 
+## Overdue160 readback forecast
+
+The initial160 upload-only forecast used measured198 hash/upload/readback
+durations scaled by archive size. Once that deadline expires, never reset the
+same allowance, clamp the countdown to zero or call an archive-only object ready.
+The qualified revision binds the exact original uploader invocation and child,
+the actual17:59:31readback event, four stable child-owned TCP socket inodes and
+receive counters from the same normal metadata cycle. It estimates outstanding
+bytes at the observed since-readback average after deducting1MiB/socket and a
+10percent transport margin, plus the independently calibrated local whole-file
+rehash and10minute sidecar allowance. Omitted closed sockets bias this estimate
+later. These counters are approximate transport evidence, never authenticated
+readback progress, digest verification or completion evidence. Preserve both the
+superseded forecast and its revision. Child changes, retries, ambiguous events,
+unexpected endpoints, descriptor races, unavailable counters and stale transport
+observations fail closed instead of fabricating a replacement countdown. No
+extra resource observer, HTTP request, archive scan or periodic loop is added.
+
 ## Exact native141 acquisition history
 
 The guarded full-census native attempt `1ca7610a…` stopped with
@@ -60,6 +78,26 @@ baseline artifacts. Stop and authenticate both old observer/metadata timers befo
 launching an owner they cannot census, then seal/preflight/arm the adopted pair.
 Never let an old baseline fire during this handoff. Later `--prepare-next` retains
 the new profile without restarting any producer or taking an extra resource sample.
+
+### All-target native141 raw acquisition
+
+`--prepare-next-native141-all-acquisition SPEC --handoff-sha256 HEX` is a distinct
+handoff for the fixed `acquisition-all-20261022-v1` diagnostic. Its strict schema
+is `jetstreamer-native141-all-acquisition-monitor-handoff-v1`, with the real
+`first_guard: {path,sha256}` and all four replay/publication/remote/R2 authority
+flags false. It requires the accepted timed160 profile and preserves the
+original failed native, rejection and first-target acquisitions plus144scans.
+Both guard and admission must retain the full32GiB output reservation. A
+first-target receipt or a plan is never all-target launch evidence.
+
+The successor uses a separate `native141-all-acquisition-public160-timed-…`
+namespace and the exact sealed all-target-aware reader. The helper preserves
+ordinary replay claims, ETA clocks and prior diagnostics, adds the authenticated
+private owner and keeps141 `failed-needs-repair`. Complete attempt coverage is
+not complete raw acquisition, PoH recovery, canonical root qualification or
+publication. Stop/authenticate superseded pending timers before launching this
+owner; seal and sandbox-preflight the adopted successor before arming it. Reader
+source support, unit tests and an offline successor do not authorize a launch.
 
 ## Private epoch144 assembly-only fallback
 

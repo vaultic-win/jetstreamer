@@ -23,6 +23,9 @@ const REJECTION_NATIVE_SHA: &str =
 const ACQUISITION_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-acquisition-candidate-20261022-v1/jetstreamer-epoch141-ledger-native";
 const ACQUISITION_NATIVE_SHA: &str =
     "0e7f847b520a91ba033f97181023ea20f9c833653744715c9e3448fbd4de088b";
+const ALL_ACQUISITION_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-all-acquisition-candidate-20261022-v1/jetstreamer-epoch141-ledger-native";
+const ALL_ACQUISITION_NATIVE_SHA: &str =
+    "ccf620b21f3c75cde3e9c22df058b0f3e4cefac9f7ae52c533f44bde38d757ec";
 const FLOOR: u64 = 4_740_696_923_590;
 const RESERVATION: u64 = 32 << 30;
 // First-target output is capped at192MiB; native logging rolls at4MiB/two logs.
@@ -170,6 +173,9 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "epoch141-read-only-first-target-acquisition-v4" => {
             (ACQUISITION_NATIVE, ACQUISITION_NATIVE_SHA)
         }
+        "epoch141-read-only-all-target-acquisition-v5" => {
+            (ALL_ACQUISITION_NATIVE, ALL_ACQUISITION_NATIVE_SHA)
+        }
         _ => anyhow::bail!("unknown fixed native admission profile"),
     };
     ensure!(
@@ -190,6 +196,13 @@ fn validate_plan(p: &Plan) -> Result<()> {
             p.native_unit
                 == "horizon-epoch141-native-full-census-acquisition-first-20261022-v1.service",
             "acquisition admission needs its exact distinct unit"
+        );
+    }
+    if p.native_profile == "epoch141-read-only-all-target-acquisition-v5" {
+        ensure!(
+            p.native_unit
+                == "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service",
+            "all-target acquisition admission needs its exact separate unit"
         );
     }
     ensure!(
@@ -732,6 +745,27 @@ mod tests {
         p.native_unit =
             "horizon-epoch141-native-full-census-acquisition-first-20261022-v1.service".into();
         p.native_profile = "epoch141-read-only-full-census-rejection-v3".into();
+        assert!(validate_plan(&p).is_err());
+    }
+    #[test]
+    fn all_target_acquisition_cannot_borrow_first_target_budget_or_identity() {
+        let mut p = plan();
+        p.native_profile = "epoch141-read-only-all-target-acquisition-v5".into();
+        assert!(validate_plan(&p).is_err());
+        p.native_unit =
+            "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service".into();
+        p.files[0].path = ALL_ACQUISITION_NATIVE.into();
+        p.files[0].sha256 = ALL_ACQUISITION_NATIVE_SHA.into();
+        validate_plan(&p).unwrap();
+        p.minimum_free_bytes = FLOOR + ACQUISITION_RESERVATION;
+        assert!(validate_plan(&p).is_err());
+        p.minimum_free_bytes = FLOOR + RESERVATION;
+        p.native_unit =
+            "horizon-epoch141-native-full-census-acquisition-first-20261022-v1.service".into();
+        assert!(validate_plan(&p).is_err());
+        p.native_unit =
+            "horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service".into();
+        p.files[0].sha256 = ACQUISITION_NATIVE_SHA.into();
         assert!(validate_plan(&p).is_err());
     }
     #[test]
