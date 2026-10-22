@@ -43,3 +43,12 @@ supported diagnostic fleet contract, fresh resource admission, real snapshot
 checks, exact invocation-bound guard and first real sandboxed fire still
 precede the tail replay. See `epoch223-v1625-qualification.md` for that isolated
 candidate; keep the original failed epoch and all canonical publication gates.
+
+The R2 fleet observer has a separate closed `horizon-qualify-223-v1625-tail-*`
+contract. It binds this exact package and successful three-probe capability
+receipt, the 477-slot range, private paths, zero-restart identity and actual live
+command. Its ordinary natural-drainage guard has no target-stop exemption.
+The 416-GiB experiment envelope and protected older growth claims are minimum
+contract bounds, not resource admission. Fleet recognition neither launches the
+comparison nor authorizes full-prefix qualification, canonical sidecars or R2
+mutation. Keep the original epoch-223 repair open through this comparison.
