@@ -10,6 +10,7 @@ mod assembly144_admission;
 mod assembly144_prepare;
 mod bounded205;
 mod census141_poh;
+mod cold223_scan;
 mod continuation144;
 mod continuation144_admission;
 mod continuation144_prepare;
@@ -264,7 +265,7 @@ pub(super) fn pipeline_unit_range(
     if private144_scan::scope(phase, unit) {
         return Ok(144..=144);
     }
-    if tail223_scan::scope(phase, unit) {
+    if tail223_scan::scope(phase, unit) || cold223_scan::scope(phase, unit) {
         return Ok(223..=223);
     }
     if watch198::namespace(phase, unit) {
@@ -459,6 +460,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         }
         if tail223_scan::scope(&claim.phase, &claim.unit) {
             tail223_scan::validate_live(claim, current)?;
+        }
+        if cold223_scan::scope(&claim.phase, &claim.unit) {
+            cold223_scan::validate_live(claim, current)?;
         }
         if claim.epoch == 160 && watch160::namespace(&claim.phase, &claim.unit) {
             return Ok(watch160::child_start(&claim.phase, current)?.is_some());
@@ -1972,6 +1976,9 @@ pub(super) async fn run() -> Result<()> {
         if tail223_scan::scope(&claim.phase, &claim.unit) {
             tail223_scan::validate(claim)?;
         }
+        if cold223_scan::scope(&claim.phase, &claim.unit) {
+            cold223_scan::validate(claim)?;
+        }
         ensure!(
             pipeline_epoch_units.insert((claim.epoch, claim.unit.clone()))
                 && !diagnostic_units.contains(&claim.unit),
@@ -2063,7 +2070,8 @@ pub(super) async fn run() -> Result<()> {
             Value::Null
         };
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
-            || tail223_scan::scope(&claim.phase, &claim.unit);
+            || tail223_scan::scope(&claim.phase, &claim.unit)
+            || cold223_scan::scope(&claim.phase, &claim.unit);
         let mut entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
             "finalization_evidence":finalization,
             "live":is_active,"expected_invocation_id":claim.invocation_id,
@@ -2078,7 +2086,8 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
-                        || (tail223_scan::scope(&claim.phase, &claim.unit)
+                        || ((tail223_scan::scope(&claim.phase, &claim.unit)
+                            || cold223_scan::scope(&claim.phase, &claim.unit))
                             && plan.gates[&claim.epoch].state == "failed-needs-repair")
                 } else {
                     plan.gates[&claim.epoch].state == "post-replay-pipeline"

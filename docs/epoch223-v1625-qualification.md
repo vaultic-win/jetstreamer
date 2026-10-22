@@ -148,6 +148,11 @@ tmpfs, task, CPU, credential-drop, full-fleet and century-floor gates. They
 run no entries and grant no prefix replay, restart, assembly or publication
 authority. Run the cold capability proof and then the two actual tests only
 after fresh coordinated observation and matching complete fleet evidence.
+The fleet reconciler's closed `private-cold-snapshot-verification` role binds
+the exact actual-test unit, immutable plan and supervisor digest to the
+Rust-generated durable test intent. While live it remains private qualification
+with no sidecar ETA, and epoch223 stays in `failed-needs-repair`. It never
+relabels a snapshot test as an ordinary replay or post-replay delivery stage.
 
 Run its capability mode under the same actual sandbox before snapshot mode.
 The supervisor requires private 512-GiB tmpfs with 1,048,576 inodes, 128-GiB
