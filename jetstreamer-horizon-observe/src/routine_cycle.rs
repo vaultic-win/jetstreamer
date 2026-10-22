@@ -44,6 +44,8 @@ mod controller_recovery;
 #[path = "routine_runtime157.rs"]
 mod runtime157;
 
+#[path = "routine_cohort191.rs"]
+mod cohort191;
 #[path = "routine_completed144.rs"]
 mod completed144;
 #[path = "routine_continuation144.rs"]
@@ -1313,6 +1315,21 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         );
     }
     if check_only {
+        // A scheduled sample may already exist after an early metadata-only
+        // rejection. Validate it without taking another resource observation
+        // or claiming the cycle, before a reviewed recovery invocation.
+        if p.observer.try_exists()? {
+            let observed: Value =
+                serde_json::from_slice(&read_checked(&p.observer, LIMIT, 0, false)?)?;
+            let checked = terminal_handoff::for_observation(p, &model, &observed)?;
+            let checked = cohort191::for_observation(p, &checked, &observed)?;
+            validate_observation(
+                p,
+                &checked,
+                &observed,
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+            )?;
+        }
         println!("routine cycle preflight passed; no sampling, remote access or mutation");
         return Ok(());
     }
@@ -1326,6 +1343,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     // Keep the genuine predecessor intact. Only an explicitly qualified,
     // manifest-bound runtime transition may change the next derived model.
     let model = terminal_handoff::for_observation(p, &model, &observed)?;
+    let model = cohort191::for_observation(p, &model, &observed)?;
     validate_observation(
         p,
         &model,
