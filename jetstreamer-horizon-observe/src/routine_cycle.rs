@@ -48,6 +48,8 @@ mod runtime157;
 mod assembly144;
 #[path = "routine_assembly144_scans.rs"]
 mod assembly144_scans;
+#[path = "routine_assembly144_scans_recover.rs"]
+mod assembly144_scans_recover;
 #[path = "routine_cohort191.rs"]
 mod cohort191;
 #[path = "routine_completed144.rs"]
@@ -1624,6 +1626,8 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--check-assembly144-scans-recovery"
+                            | "--recover-assembly144-scans"
                             | "--recover-delivery198"
                             | "--promote-partial2018"
                             | "--prepare-next"
@@ -1655,6 +1659,16 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| {
+            a == "--recover-assembly144-scans" || a == "--check-assembly144-scans-recovery"
+        }) {
+            return assembly144_scans_recover::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-assembly144-scans-recovery",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             a == "--recover-native144-observer" || a == "--check-native144-recovery"
         }) {

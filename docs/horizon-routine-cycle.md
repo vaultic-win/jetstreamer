@@ -136,6 +136,16 @@ namespace permits qualification before stopping an older pending timer pair.
 Later successors use ordinary `--prepare-next`. Capture and adoption do not
 establish scan success or canonical V4 import/publication authority.
 
+The exact October22 10:28 transition has a separately bounded metadata recovery:
+`--check-assembly144-scans-recovery` and `--recover-assembly144-scans` authenticate
+both failed owners and the fixed scanner-aware plan. They reuse the original v2
+sample, byte-identical estimator model, estimate and nine successful authenticated
+status receipts; they never resample or republish those statuses. The recovery
+seals corrected fleet metadata in the normal completion namespace and reconciles
+through the qualified scanner-aware reader. Original failed receipts remain
+untouched. Only genuine completion permits ordinary successor preparation; this
+path does not authorize replay, archive/sidecar changes, or scanner restarts.
+
 Fleet rendering keeps a private resource observation in `observer_diagnostics`
 without adding a second active job when an exact captured diagnostic already
 binds the same epoch, unit, invocation and scratch path. Different owners remain
