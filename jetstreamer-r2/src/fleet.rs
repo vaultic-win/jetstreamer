@@ -5,7 +5,9 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod continuation144;
 mod continuation144_admission;
+mod continuation144_prepare;
 mod continuation144_protection;
 mod native144;
 mod prefix144;
@@ -36,6 +38,15 @@ pub(super) async fn prepare_continuation144_protection() -> Result<()> {
 }
 pub(super) async fn admit_continuation144() -> Result<()> {
     continuation144_admission::run().await
+}
+pub(super) fn prepare_continuation144_layout() -> Result<()> {
+    continuation144::prepare_layout()
+}
+pub(super) fn capture_continuation144_launch() -> Result<()> {
+    continuation144::capture_launch()
+}
+pub(super) fn prepare_continuation144_fleet() -> Result<()> {
+    continuation144_prepare::run()
 }
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -480,6 +491,9 @@ fn validate_same_sample_admission(
         144 if native144::namespace(claim) => {
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
+        144 if continuation144::namespace(claim) => {
+            "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
+        }
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -549,7 +563,10 @@ fn validate_same_sample_admission(
             && guard
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
-            && if native_restore_140(claim) || native144::namespace(claim) {
+            && if native_restore_140(claim)
+                || native144::namespace(claim)
+                || continuation144::namespace(claim)
+            {
                 // The pinned eca guard predates bounded-canary fields.
                 guard.get("canary_target_error").is_none()
                     && guard["bounded_measurement"] == false
@@ -597,7 +614,15 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if native144::namespace(claim) {
+    if continuation144::namespace(claim) {
+        let Ok(launch) = checked_diagnostic_launch(claim) else {
+            return false;
+        };
+        plan.get("bounded_canary").is_none_or(Value::is_null)
+            && plan.get("bounded_measurement").is_none_or(Value::is_null)
+            && plan["filesystem"] == "/home/sol"
+            && plan["minimum_free_bytes"] == launch["required_guard_minimum_free_bytes"]
+    } else if native144::namespace(claim) {
         plan.get("bounded_canary").is_none()
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
             && plan["filesystem"] == "/home/sol"
@@ -667,6 +692,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if continuation144::namespace(claim) || receipt["schema"] == continuation144::SCHEMA {
+        return continuation144::launch(receipt, claim);
+    }
     if native144::namespace(claim) || receipt["schema"] == native144::SCHEMA {
         return native144::launch(receipt, claim);
     }
@@ -1909,6 +1937,9 @@ pub(super) async fn run() -> Result<()> {
             }
             if native144::namespace(claim) {
                 native144::validate_live(claim, current)?;
+            }
+            if continuation144::namespace(claim) {
+                continuation144::validate_live(claim, current)?;
             }
             if retained220::namespace(claim) {
                 retained220::validate_live(claim, current)?;

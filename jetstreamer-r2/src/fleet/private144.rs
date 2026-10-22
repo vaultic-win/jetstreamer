@@ -88,7 +88,8 @@ fn classify_owner(
         "expected_invocation_id":iid,"scratch_path":scratch,"live":live,
         "sampled_at_utc":sample,"resource_observation":row,
         "ordinary_replay_claim":false,"current_sidecar_eta_valid":false,
-        "terminal_outcome_requires_canary_receipt":phase!="native-restore-only",
+        "terminal_outcome_requires_canary_receipt":phase!="native-restore-only"&&phase!="private-checkpoint-continuation",
+        "terminal_outcome_requires_continuation_receipt":phase=="private-checkpoint-continuation",
         "terminal_outcome_requires_native_receipt":phase=="native-restore-only","inactivity_or_cleanup_proven":false,
         "publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false}))
 }
@@ -115,10 +116,10 @@ pub(super) fn observe(
         .collect();
     if !overlaps.is_empty() {
         ensure!(
-            overlaps.len() <= 2
-                && overlaps
-                    .iter()
-                    .all(|c| prefix144::namespace(c) || native144::namespace(c))
+            overlaps.len() <= 3
+                && overlaps.iter().all(|c| prefix144::namespace(c)
+                    || native144::namespace(c)
+                    || continuation144::namespace(c))
                 && overlaps.iter().filter(|c| prefix144::namespace(c)).count() <= 1
                 && overlaps.iter().filter(|c| native144::namespace(c)).count() <= 1,
             "private144 overlapping diagnostic is not its exact independent verifier"
@@ -130,6 +131,28 @@ pub(super) fn observe(
         )?;
         for claim in &overlaps {
             checked_diagnostic_launch(claim)?;
+        }
+        ensure!(
+            overlaps
+                .iter()
+                .filter(|c| continuation144::namespace(c))
+                .count()
+                <= 1,
+            "duplicated144 continuation"
+        );
+        if overlaps.iter().any(|c| continuation144::namespace(c)) {
+            let native = census
+                .get(native144::UNIT)
+                .context("native144 history absent")?;
+            ensure!(
+                native["InvocationID"] == "1219f5b93e0a40639db09f6996746243"
+                    && native["ActiveState"] == "active"
+                    && native["SubState"] == "exited"
+                    && native["MainPID"] == "0"
+                    && native["Result"] == "success"
+                    && native["ExecMainStatus"] == "0",
+                "continuation144 cannot overlap native comparison"
+            );
         }
     }
     ensure!(
@@ -149,6 +172,28 @@ pub(super) fn observe(
                 .any(|r| r["range"] == "144"),
         "private144 fleet scope, gate, tracking or overlapping owner differs"
     );
+    if rows[0]["producer_unit"] == continuation144::UNIT {
+        let claim = overlaps
+            .iter()
+            .find(|c| continuation144::namespace(c))
+            .context("continuation144 observer has no bound launch")?;
+        ensure!(
+            rows[0]["expected_producer_invocation_id"] == claim.invocation_id
+                && rows[0]["scratch_path"].as_str() == claim.scratch_path.to_str(),
+            "continuation144 observer differs from launch"
+        );
+        return Ok(Some(classify_owner(
+            rows[0],
+            census
+                .get(continuation144::UNIT)
+                .context("continuation144 owner absent")?,
+            sample,
+            continuation144::UNIT,
+            &claim.invocation_id,
+            continuation144::SCRATCH,
+            "private-checkpoint-continuation",
+        )?));
+    }
     if rows[0]["producer_unit"] == native144::UNIT {
         let claim = overlaps
             .iter()
@@ -184,6 +229,47 @@ pub(super) fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn continuation_envelope_is_private_and_requires_its_own_terminal_receipt() {
+        let iid = "d".repeat(32);
+        let mut r = row();
+        r["producer_unit"] = json!(continuation144::UNIT);
+        r["expected_producer_invocation_id"] = json!(iid);
+        r["scratch_path"] = json!(continuation144::SCRATCH);
+        let current =
+            json!({"ActiveState":"active","SubState":"running","InvocationID":iid,"NRestarts":"0"});
+        let v = classify_owner(
+            &r,
+            &current,
+            "sample",
+            continuation144::UNIT,
+            &iid,
+            continuation144::SCRATCH,
+            "private-checkpoint-continuation",
+        )
+        .unwrap();
+        assert_eq!(v["live"], true);
+        assert_eq!(v["current_sidecar_eta_valid"], false);
+        assert_eq!(v["terminal_outcome_requires_continuation_receipt"], true);
+        assert_eq!(v["terminal_outcome_requires_native_receipt"], false);
+        assert_eq!(v["terminal_outcome_requires_canary_receipt"], false);
+        assert_eq!(v["inactivity_or_cleanup_proven"], false);
+        assert!(classify(&r, &current, "sample").is_err());
+        let mut bad = r.clone();
+        bad["expected_producer_invocation_id"] = json!("e".repeat(32));
+        assert!(
+            classify_owner(
+                &bad,
+                &current,
+                "sample",
+                continuation144::UNIT,
+                &iid,
+                continuation144::SCRATCH,
+                "private-checkpoint-continuation"
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn native_observer_is_exact_diagnostic_history_not_a_live_eta_or_cleanup_proof() {
         let iid = "b".repeat(32);
