@@ -1,5 +1,25 @@
 # Bounded routine metadata cycle
 
+## Exact epoch193 to epoch194 ETA handoff
+
+The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.
+Its observed terminal advances from 83807999 to 84239999 when epoch194 begins.
+The routine helper binds the exact immutable manifest, original controller and
+producer, archive directory and complete four-epoch model. It transfers the
+432000 queued slots into the observed terminal for every epoch, preserving total
+remaining work, delivery order/allowances and original execution clocks. Unknown
+terminals, backward transitions, changed owners/workers and inconsistent global
+slot rates fail closed. This is ETA model support, not replay or publication
+authority. Normal independent estimator, status readback and fleet gates remain.
+
+If an old helper rejects this boundary before claiming a cycle, preserve its
+failed invocation and journal. Qualify a new sealed helper against the retained
+v2 sample: check-only now validates an already-present sample without another
+resource observation or any writes. Confirm the cycle and estimate outputs are
+absent before a deliberate metadata-only recovery. Do not retry a partially
+published cycle through this path or change a healthy producer. Derive the next
+30-minute cycle only from genuine recovered completion.
+
 ## Exact October21 controller/package recovery
 
 The dev-samjohnson controllers were externally restarted at14:13:53 while their
