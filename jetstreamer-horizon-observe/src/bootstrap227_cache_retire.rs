@@ -32,13 +32,13 @@ const CAPABILITY: &str =
     "/var/lib/jetstreamer/horizon-stage227-bootstrap-capability-0538-v1/capability.json";
 const CAPABILITY_SHA: &str = "e0a768f31956567536f8a66a55fa94794815e678ebcf7e85c72a180f88ab2d36";
 
-fn bound(path: PathBuf, sha256: &str) -> Bound {
+pub(crate) fn bound(path: PathBuf, sha256: &str) -> Bound {
     Bound {
         path,
         sha256: sha256.into(),
     }
 }
-fn identity(m: &fs::Metadata) -> Value {
+pub(crate) fn identity(m: &fs::Metadata) -> Value {
     json!([
         m.dev(),
         m.ino(),
@@ -52,14 +52,14 @@ fn identity(m: &fs::Metadata) -> Value {
         m.ctime_nsec()
     ])
 }
-fn absent(path: &Path) -> Result<bool> {
+pub(crate) fn absent(path: &Path) -> Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(_) => Ok(false),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
         Err(e) => Err(e.into()),
     }
 }
-fn available_bytes() -> Result<u64> {
+pub(crate) fn available_bytes() -> Result<u64> {
     let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     ensure!(
         unsafe { libc::statvfs(c"/var/lib/jetstreamer".as_ptr(), stat.as_mut_ptr()) } == 0,
@@ -70,7 +70,7 @@ fn available_bytes() -> Result<u64> {
         .checked_mul(stat.f_frsize)
         .context("free-space overflow")
 }
-fn private_dir(path: &Path) -> Result<()> {
+pub(crate) fn private_dir(path: &Path) -> Result<()> {
     let m = fs::symlink_metadata(path)?;
     ensure!(
         path.canonicalize()? == path && m.is_dir() && m.uid() == 0 && m.mode() & 0o7777 == 0o700,
@@ -78,7 +78,7 @@ fn private_dir(path: &Path) -> Result<()> {
     );
     Ok(())
 }
-fn persist(path: &Path, value: &Value) -> Result<()> {
+pub(crate) fn persist(path: &Path, value: &Value) -> Result<()> {
     let parent = path.parent().context("receipt parent")?;
     private_dir(parent)?;
     let mut f = tempfile::NamedTempFile::new_in(parent)?;
@@ -293,7 +293,7 @@ fn prove(cache_required: bool) -> Result<Value> {
         json!({"cache":cache,"cache_identity":cache_identity,"cache_physical_bytes":physical_bytes,"filesystem_available_bytes":available_bytes()?,"preserved_copy":Path::new(PACKAGE).join(NAME),"preserved_identity":identity(&copy),"package":package,"acquisition_sha256":ACQUISITION_SHA,"capability_sha256":CAPABILITY_SHA,"owner":owner,"process_scan":scan,"staged_references":staged,"missing_unit_aliases":missing}),
     )
 }
-fn lock(root: &Path) -> Result<File> {
+pub(crate) fn lock(root: &Path) -> Result<File> {
     private_dir(root)?;
     let p = root.join("retirement.lock");
     let f = OpenOptions::new()
@@ -320,7 +320,7 @@ fn lock(root: &Path) -> Result<File> {
     );
     Ok(f)
 }
-fn unlink_exact(
+pub(crate) fn unlink_exact(
     cache: &Path,
     expected: &Value,
     preserved: &Path,

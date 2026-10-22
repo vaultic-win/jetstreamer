@@ -28,6 +28,10 @@ name = "jetstreamer-bootstrap227-cache-retire"
 path = "src/bootstrap227_cache_retire_bin.rs"
 
 [[bin]]
+name = "jetstreamer-terminal205-cache-retire"
+path = "src/terminal205_cache_retire_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch223-bootstrap-estimate"
 path = "src/epoch223_bootstrap_estimate.rs"
 
