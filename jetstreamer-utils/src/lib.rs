@@ -19,6 +19,9 @@ pub mod horizon_legacy_poh;
 /// Exact-key diagnostic binding from native legacy candidates to complete PoH chains.
 pub mod horizon_legacy_recovery;
 
+/// Explicit pinned Solana v1.5.6 diagnostic legacy-record recovery profile.
+pub mod horizon_legacy_v1_5_6;
+
 /// Bounded diagnostic collection of a complete flat RocksDB tar file set.
 pub mod horizon_ledger_tar;
 
