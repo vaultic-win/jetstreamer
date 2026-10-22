@@ -36,6 +36,9 @@ use {
 };
 
 pub const SEGMENT_MANIFEST_SCHEMA_VERSION: u32 = 1;
+/// Hash of the typed manifest's compact serde JSON, not its source whitespace.
+/// This binds every checkpoint/runtime field that an independent reader used.
+pub const SEGMENT_MANIFEST_CONTENT_ENCODING: &str = "historical-segment-manifest-serde-json-v1";
 pub const SEGMENT_MANIFEST_SUFFIX: &str = ".segment.json";
 const MAX_SEGMENT_MANIFEST_BYTES: u64 = 1 << 20;
 const MAX_IDENTITY_TEXT_BYTES: usize = 1 << 10;
@@ -117,6 +120,13 @@ pub struct HistoricalSegmentManifest {
 }
 
 impl HistoricalSegmentManifest {
+    /// Structural/content binding only; this does not reread or verify an archive.
+    pub fn content_sha256(&self) -> Result<[u8; 32], SegmentManifestError> {
+        self.validate()?;
+        let bytes = serde_json::to_vec(self).map_err(SegmentManifestError::JsonEncode)?;
+        Ok(Sha256::digest(bytes).into())
+    }
+
     pub fn output_slot_end(&self) -> Result<u64, SegmentManifestError> {
         self.output_slot_start
             .checked_add(self.output_slot_count)

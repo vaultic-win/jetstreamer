@@ -8,8 +8,8 @@ use {
     jetstreamer_node::{
         archive_checksum::archive_checksum_path,
         segment_manifest::{
-            SegmentRuntimeAdmission, read_and_validate_segment_manifest, segment_manifest_path,
-            sha256_hex_string,
+            SEGMENT_MANIFEST_CONTENT_ENCODING, SegmentRuntimeAdmission,
+            read_and_validate_segment_manifest, segment_manifest_path, sha256_hex_string,
         },
     },
     serde_json::json,
@@ -559,6 +559,8 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
         "archive_gid": archive_after.gid(),
         "archive_sha256": sha256_hex_string(&manifest.archive_sha256),
         "manifest": manifest_path,
+        "manifest_content_encoding": SEGMENT_MANIFEST_CONTENT_ENCODING,
+        "manifest_content_sha256": sha256_hex_string(&manifest.content_sha256().map_err(|e| e.to_string())?),
         "manifest_bytes": manifest_after.len(),
         "manifest_mode": format!("{:04o}", manifest_after.permissions().mode() & 0o7777),
         "manifest_uid": manifest_after.uid(),
@@ -1173,6 +1175,28 @@ mod tests {
         assert_eq!(receipt["validation"], "pass");
         assert_eq!(receipt["canonical_checksum_sidecar_absent"], true);
         assert!(receipt["conflict_write_gate"].is_null());
+        let manifest = read_and_validate_segment_manifest(&archive).unwrap();
+        assert_eq!(
+            receipt["manifest_content_encoding"],
+            SEGMENT_MANIFEST_CONTENT_ENCODING
+        );
+        assert_eq!(
+            receipt["manifest_content_sha256"],
+            sha256_hex_string(&manifest.content_sha256().unwrap())
+        );
+        let pretty = serde_json::to_vec_pretty(&manifest).unwrap();
+        let decoded: jetstreamer_node::segment_manifest::HistoricalSegmentManifest =
+            serde_json::from_slice(&pretty).unwrap();
+        assert_eq!(
+            decoded.content_sha256().unwrap(),
+            manifest.content_sha256().unwrap()
+        );
+        let mut changed = manifest.clone();
+        changed.terminal.capitalization += 1;
+        assert_ne!(
+            changed.content_sha256().unwrap(),
+            manifest.content_sha256().unwrap()
+        );
         let archive_bytes = fs::read(&archive).unwrap();
         let destination = directory.path().join("epoch-1.validation.json");
         arguments.receipt = Some(destination.clone());

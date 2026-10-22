@@ -779,6 +779,11 @@ cold-epoch peak; it grants no replay, runtime promotion, canonical sidecar or pu
 If restoration or measurement fails while the parent is alive, it captures private cgroup and
 cleanup diagnostics in a separate no-clobber `failure.json`; that never substitutes for success.
 
+The opt-in [epoch-203 native restore comparison](docs/horizon-epoch203-native-restore.md)
+checks only the capped-shrink prefix's frozen restart state after a complete independent
+reread. It remains dormant without fresh protected admission and a proven guard; it sends no
+replay entries and does not qualify the remaining 419 slots, assembly, or publication.
+
 The dedicated `epoch213-checkpoint-continuation-diagnostic` node build exposes only the private
 epoch-213 continuation experiment. Invoke it with `213 /PRIVATE_RUN_ROOT/ledger --verify
 --checkpoint-continuation-plan=/SEALED/plan.json --checkpoint-continuation-plan-sha256=HEX`.

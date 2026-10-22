@@ -13,6 +13,7 @@ default = []
 # Fixed60911751 native restore comparison; never sends replay entries.
 epoch140-native-restore-diagnostic = ["dep:chrono"]
 epoch144-native-restore-diagnostic = ["dep:chrono"]
+epoch203-native-restore-diagnostic = ["dep:chrono"]
 # Private epoch213 prefix/checkpoint continuation. Never creates a canonical
 # checksum or enables ordinary archive reuse/publication.
 epoch213-checkpoint-continuation-diagnostic = []
@@ -32,6 +33,11 @@ epoch224-v1-6-25-qualification = []
 epoch225-v1-6-25-diagnostic = []
 # Complete private epoch225 plus its first later-root verification suffix.
 epoch225-v1-6-25-qualification = []
+
+[[bin]]
+name = "jetstreamer-epoch203-native-restore-probe"
+path = "src/bin/jetstreamer-epoch203-native-restore-probe.rs"
+required-features = ["epoch203-native-restore-diagnostic"]
 
 [[bin]]
 name = "jetstreamer-epoch140-native-restore-probe"
