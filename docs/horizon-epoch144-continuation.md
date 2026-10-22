@@ -84,6 +84,19 @@ counts other fleet allocations against the experiment too, so a mistaken peak
 cannot consume older claims. An oversized suffix stays private and must be
 requalified rather than assembled under the smaller reservation.
 
+The exact continuation fleet profile keeps native-only, original-prefix and
+continuation histories separate. `prepare-continuation144-layout` creates only
+the empty isolated owner-only run root and a safely owned, unoccupied shared
+lease; it never truncates a preexisting file or retires prior work. The producer
+must receive only its run root and that exact lease as writable private paths.
+`capture-continuation144-launch` authenticates the actual non-restarting unit,
+immutable plan/admission, measured native environment and current command before
+writing a private receipt and invocation-bound guard plan. The separate fleet
+preparer requires a real successful one-worker guard invocation under its deployed
+sandbox. Its same-sample event appends the new claim without replacing prior
+diagnostics. Runtime/observer handoff qualification and ordinary publication gates
+remain separate; these commands never launch replay or mutate R2.
+
 ## Gates that remain separate
 
 Source tests and native-only comparison do not establish a successful suffix or

@@ -3172,6 +3172,15 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("prepare-continuation144-fleet") {
+        return fleet::prepare_continuation144_fleet();
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-continuation144-layout") {
+        return fleet::prepare_continuation144_layout();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-continuation144-launch") {
+        return fleet::capture_continuation144_launch();
+    }
     if env::args().nth(1).as_deref() == Some("admit-continuation144") {
         return fleet::admit_continuation144().await;
     }
