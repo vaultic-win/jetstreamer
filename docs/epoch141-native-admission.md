@@ -1,7 +1,14 @@
 # Private epoch-141 native admission
 
-`jetstreamer-epoch141-native-admit` admits only the sealed `f1592d…` full-census
-read-only native candidate on dev-samjohnson. It does not restore a snapshot,
+`jetstreamer-epoch141-native-admit` admits only two exact sealed full-census
+read-only native generations on dev-samjohnson. The original `f1592d…` is bound
+only to `epoch141-read-only-full-census-v2`. The rejection-evidence generation
+`573ce1…`, under `horizon-epoch141-native-rejection-candidate-20261022-v1`, is
+bound only to `epoch141-read-only-full-census-rejection-v3`; path, digest and
+profile cannot be mixed. This profile retains strict planner rejection evidence
+only after native close and complete source revalidation; see
+[metadata rejection evidence](epoch141-native-metadata-rejection.md).
+Neither profile admits an arbitrary executable. Admission does not restore a snapshot,
 open a database, install/start a service, launch replay, or access R2/network.
 The existing full-census runner still independently validates all 18,283 RPC
 targets, source/census bindings, complete retained member hashes, exact column
@@ -9,7 +16,7 @@ families and live SST references before its one bounded native read session.
 
 The root-owned owner-only manifest keeps the existing
 `jetstreamer-historical-performance-admission-v1` schema understood by that
-runner, with a distinct `native_profile: epoch141-read-only-full-census-v2`.
+runner, with one of the two exact `native_profile` values above.
 It has no snapshot field and cannot be consumed as generic replay admission.
 Required fields are the fixed `/home/sol` filesystem, `minimum_free_bytes` of at
 least 4,740,696,923,590 + 32 GiB, at least 144 GiB available memory (128 GiB
