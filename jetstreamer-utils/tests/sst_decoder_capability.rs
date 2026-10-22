@@ -100,6 +100,26 @@ fn native_readonly_wal_fixture_child() {
     database.put_cf(cf, key(2), b"new-wal-value").unwrap();
     database.put_cf(cf, key(3), b"wal-only-value").unwrap();
     let meta_cf = database.cf_handle("meta").unwrap();
+    // Complete, explicitly disconnected metadata shaped like the first actual
+    // epoch141 rejection. Synthetic bytes, not historical-source evidence.
+    database
+        .put_cf(
+            meta_cf,
+            60_911_776u64.to_be_bytes(),
+            bincode::serialize(&(
+                60_911_776u64,
+                1u64,
+                1u64,
+                123u64,
+                0u64,
+                60_911_771u64,
+                Vec::<u64>::new(),
+                false,
+                vec![0u32],
+            ))
+            .unwrap(),
+        )
+        .unwrap();
     for (scope, meta, shred) in legacy_gap_fixture() {
         database
             .put_cf(meta_cf, scope.slot.to_be_bytes(), meta)
@@ -409,6 +429,68 @@ fn native_readonly_resolves_manifest_and_wal() {
         assert_eq!(actual.family, original.family);
         assert_eq!(actual.key, original.key);
         assert_eq!(actual.value, original.value);
+    }
+    // Returning a planner rejection as data must close and rehash the DB before
+    // exposing final diagnostic evidence. Never suppress native/guard failures.
+    let disconnected_query = [jetstreamer_utils::horizon_ledger_native::NativeQuery {
+        family: "meta".into(),
+        key: 60_911_776u64.to_be_bytes().to_vec(),
+    }];
+    for mutate in [false, true] {
+        let diagnostic = with_native_read_session(
+            &collected,
+            &census,
+            &batch_logs(if mutate {
+                "rejection-mutated"
+            } else {
+                "rejection-revalidated"
+            }),
+            &families,
+            budget,
+            &mut || Ok(()),
+            |reader, guard| {
+                let raw = reader.read_candidates(&disconnected_query, guard)?;
+                let records = [ResolvedLegacyRecord {
+                    family: &raw[0].family,
+                    key: &raw[0].key,
+                    value: raw[0].value.as_deref(),
+                }];
+                let scope = jetstreamer_utils::horizon_legacy_recovery::LegacySlotScope {
+                    slot: 60_911_776,
+                    parent_slot: 60_911_771,
+                };
+                let rejection =
+                    jetstreamer_utils::horizon_legacy_recovery::plan_v1_4_25_scope_queries(
+                        &records,
+                        &[scope],
+                    )
+                    .unwrap_err();
+                assert_eq!(rejection, "target SlotMeta is not connected");
+                if mutate {
+                    fs::write(collected.join("unexpected-after-rejection"), b"new member")?;
+                }
+                Ok((raw, rejection))
+            },
+        );
+        if mutate {
+            assert!(
+                diagnostic.is_err(),
+                "typed rejection bypassed post-close census"
+            );
+            fs::remove_file(collected.join("unexpected-after-rejection")).unwrap();
+        } else {
+            let ((raw, rejection), summary) = diagnostic.unwrap();
+            assert_eq!(summary.batches, 1);
+            assert_eq!(summary.queries, 1);
+            assert!(summary.complete_census_revalidated);
+            assert!(
+                !summary.source_completeness_proven
+                    && !summary.live_state_proven
+                    && !summary.publication_authorized
+            );
+            assert!(raw[0].value.is_some());
+            assert_eq!(rejection, "target SlotMeta is not connected");
+        }
     }
     let mutated = with_native_read_session(
         &collected,
