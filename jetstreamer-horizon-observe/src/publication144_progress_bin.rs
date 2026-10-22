@@ -41,6 +41,8 @@ struct Plan {
     observer: Bound,
     sample_unix_millis: u64,
     output_receipt: PathBuf,
+    #[serde(default)]
+    phase_handoff_event: bool,
 }
 fn read(b: &Bound, immutable: bool) -> Result<Value> {
     Ok(serde_json::from_slice(&evidence::bound_file(
@@ -93,17 +95,26 @@ fn identity(
     observer: &Value,
 ) -> Result<()> {
     ensure!(
-        p.schema == "jetstreamer-exact144-child-progress-plan-v1"
+        ((p.schema == "jetstreamer-exact144-child-progress-plan-v1" && !p.phase_handoff_event)
+            || (p.schema == "jetstreamer-exact144-child-progress-event-plan-v1"
+                && p.phase_handoff_event))
             && p.output_receipt.parent() == Some(Path::new(ROOT))
             && p.output_receipt.file_name().and_then(|n| n.to_str())
-                == Some(format!("progress-{}.json", p.sample_unix_millis).as_str()),
+                == Some(
+                    format!(
+                        "{}progress-{}.json",
+                        if p.phase_handoff_event { "event-" } else { "" },
+                        p.sample_unix_millis
+                    )
+                    .as_str()
+                ),
         "foreign progress plan/output scope"
     );
     ensure!(
-        observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
-            && observer["recorded_at_utc"] == epoch_utc(p.sample_unix_millis)?,
-        "progress must bind exact coordinated v2 sample"
+        observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2",
+        "progress must retain coordinated v2 resource evidence"
     );
+    sample_clock(p, observer, child)?;
     let root = Path::new(
         delivery["output_directory"]
             .as_str()
@@ -172,6 +183,51 @@ fn identity(
         );
     }
     Ok(())
+}
+fn sample_clock(p: &Plan, observer: &Value, child: &Value) -> Result<()> {
+    let sample = epoch_utc(p.sample_unix_millis)?;
+    if !p.phase_handoff_event {
+        ensure!(
+            observer["recorded_at_utc"] == sample,
+            "normal progress must use coordinated sample time"
+        );
+        return Ok(());
+    }
+    // A metadata event uses its own fresh clock, never an invented resource
+    // observation. Require a newly handed-off child after the last observation;
+    // this profile cannot become a second same-phase polling loop.
+    let resource_time = observer["recorded_at_utc"]
+        .as_str()
+        .context("resource time")?;
+    let resource = utc_millis(resource_time)?;
+    let spawned = child["spawned_millis"]
+        .as_u64()
+        .context("handoff spawn time")?;
+    ensure!(
+        spawned > resource
+            && spawned <= p.sample_unix_millis
+            && p.sample_unix_millis - spawned <= 300000
+            && p.sample_unix_millis > resource
+            && p.sample_unix_millis - resource <= 1800000,
+        "event progress must follow a fresh actual child handoff after the resource sample"
+    );
+    Ok(())
+}
+fn utc_millis(value: &str) -> Result<u64> {
+    ensure!(value.len() == 20, "noncanonical resource timestamp");
+    let value_c = std::ffi::CString::new(value)?;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    let end = unsafe { libc::strptime(value_c.as_ptr(), c"%Y-%m-%dT%H:%M:%SZ".as_ptr(), &mut tm) };
+    ensure!(
+        !end.is_null() && unsafe { *end } == 0,
+        "invalid resource timestamp"
+    );
+    let seconds = unsafe { libc::timegm(&mut tm) };
+    let millis = u64::try_from(seconds)?
+        .checked_mul(1000)
+        .context("resource clock overflow")?;
+    ensure!(epoch_utc(millis)? == value, "normalized resource timestamp");
+    Ok(millis)
 }
 fn hex_id(s: &str) -> bool {
     s.len() == 32
@@ -413,6 +469,7 @@ fn run() -> Result<()> {
         &p.output_receipt,
         &json!({"schema":"jetstreamer-exact144-authenticated-child-progress-v2","epoch":144,
         "plan":pb,"self_sha256":a[5],"observer":p.observer,"delivery_launch":p.delivery_launch,"child_launch":p.child_launch,
+        "phase_handoff_event":p.phase_handoff_event,"sampled_at_utc":epoch_utc(p.sample_unix_millis)?,
         "owner":before,"child_identity":proc_before,"trusted_journal_events":journal,"progress":summary,
         "calibration":calibration,"forecast":forecast,"lock_acquisition":lock_bound,
         "resource_samples_taken":0,"current_sidecar_eta_valid":false,"status_publication_authorized":false,
@@ -430,6 +487,19 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn resource_timestamp_must_roundtrip_without_normalization() {
+        assert_eq!(utc_millis("2026-10-22T22:58:00Z").unwrap(), 1792709880000);
+        for value in [
+            "2026-02-30T22:58:00Z",
+            "2026-10-22T22:58:00X",
+            "2026-10-22T22:58:00Zjunk",
+            "2026-10-22T22:58:60Z",
+            "1960-10-22T22:58:00Z",
+        ] {
+            assert!(utc_millis(value).is_err(), "{value}");
+        }
+    }
     #[test]
     #[ignore = "root sandbox journal credential attribution probe; only disposable test child, no campaign or network access"]
     fn journal_sender_probe() {
@@ -519,6 +589,7 @@ mod tests {
             observer: b("/sample.json"),
             sample_unix_millis: 1792709880000,
             output_receipt: format!("{ROOT}/progress-1792709880000.json").into(),
+            phase_handoff_event: false,
         };
         let d = json!({"schema":"jetstreamer-exact144-single-delivery-plan-v1","output_directory":"/var/lib/jetstreamer/horizon-epoch144-delivery-fixture",
             "client":{"path":events::CLIENT,"sha256":events::CLIENT_SHA},"r2_create_missing_pair_authorized":true,"r2_overwrite_authorized":false,"local_retirement_authorized":false});
@@ -529,6 +600,30 @@ mod tests {
         let c = json!({"schema":"horizon-exact144-delivery-child-launch-v1","plan":p.delivery_plan,"owner":l["owner"],"client":d["client"],"archive_sync":true,"arguments":sync_args(),"current_liveness_proven":false,"archive_ready":false,"local_retirement_authorized":false});
         let o = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":"2026-10-22T22:58:00Z"});
         identity(&p, &d, &l, &c, &o).unwrap();
+        let mut event: Plan = serde_json::from_value(json!({
+            "schema":"jetstreamer-exact144-child-progress-event-plan-v1",
+            "delivery_plan":p.delivery_plan,"delivery_launch":p.delivery_launch,"child_launch":p.child_launch,
+            "observer":p.observer,"sample_unix_millis":1792709882000u64,
+            "output_receipt":format!("{ROOT}/event-progress-1792709882000.json"),"phase_handoff_event":true
+        })).unwrap();
+        let mut handed_off = c.clone();
+        handed_off["spawned_millis"] = json!(1792709881000u64);
+        identity(&event, &d, &l, &handed_off, &o).unwrap();
+        event.sample_unix_millis = 1792709880000;
+        assert!(
+            sample_clock(&event, &o, &handed_off).is_err(),
+            "must not backdate to old observation"
+        );
+        event.sample_unix_millis = 1792710182000;
+        assert!(
+            sample_clock(&event, &o, &handed_off).is_err(),
+            "not a repeated refresh loop"
+        );
+        handed_off["spawned_millis"] = json!(1792709879000u64);
+        assert!(
+            sample_clock(&event, &o, &handed_off).is_err(),
+            "old child is not a fresh handoff"
+        );
         for (pointer, value) in [
             ("/client/sha256", json!("b".repeat(64))),
             ("/r2_overwrite_authorized", json!(true)),
