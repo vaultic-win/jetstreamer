@@ -392,12 +392,42 @@ fn child_identity() -> std::io::Result<()> {
     }
     Ok(())
 }
+fn status_args() -> Vec<String> {
+    [
+        "status-delete",
+        PUBLIC,
+        "--epochs",
+        "144-144",
+        "--receipt-directory",
+        STATUS,
+        "--archive-receipt-directory",
+        R2,
+        "--latest-status-publication-receipt",
+    ]
+    .map(str::to_owned)
+    .into()
+}
+fn archive_child(args: &[String]) -> Result<bool> {
+    if args == sync_args() {
+        return Ok(true);
+    }
+    ensure!(
+        args == status_args(),
+        "144 client child may execute only exact archive sync or owned-status cleanup"
+    );
+    Ok(false)
+}
 fn child(p: &Plan, args: &[String]) -> Result<std::process::ExitStatus> {
     let mut c = Command::new(&p.client.path);
     c.args(args);
-    unsafe {
-        c.pre_exec(child_identity);
+    if archive_child(args)? {
+        unsafe {
+            c.pre_exec(child_identity);
+        }
     }
+    // Metadata publications are root-owned0600, even beneath the UID1001
+    //directory. Only the fixed completion-only status command keeps root;
+    //the payload upload always permanently drops IDs and capabilities.
     Ok(c.status()?)
 }
 fn ready(r: &Value) -> Result<()> {
@@ -509,18 +539,7 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
         }
     }
     if known {
-        let args = [
-            "status-delete",
-            PUBLIC,
-            "--epochs",
-            "144-144",
-            "--receipt-directory",
-            STATUS,
-            "--archive-receipt-directory",
-            R2,
-            "--latest-status-publication-receipt",
-        ]
-        .map(str::to_owned);
+        let args = status_args();
         let status = child(p, &args)?;
         evidence::write_receipt(
             &p.output_directory.join("status-cleanup-child.json"),
@@ -602,6 +621,22 @@ mod tests {
             "receipt_directory":"/var/lib/jetstreamer/horizon-epoch144-publication-test"});
         let t = json!({"schema":"jetstreamer-exact144-publication-owner-plan-v1","publisher_plan":p.publisher_plan});
         (p, v, t)
+    }
+    #[test]
+    fn root_metadata_identity_cannot_be_used_for_archive_or_arbitrary_commands() {
+        assert!(archive_child(&sync_args()).unwrap());
+        assert!(!archive_child(&status_args()).unwrap());
+        for args in [
+            vec!["sync".into(), "/other".into()],
+            vec![
+                "status-delete".into(),
+                PUBLIC.into(),
+                "--epochs".into(),
+                "160-160".into(),
+            ],
+        ] {
+            assert!(archive_child(&args).is_err());
+        }
     }
     #[test]
     fn single_delivery_cannot_expand_epoch_client_or_mutation_scope() {

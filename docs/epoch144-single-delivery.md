@@ -21,9 +21,11 @@ by the unchanged global uploader, then revalidates all terminal/canonical gates
 after acquisition. The lock spans the existing Rust client's144-only sync and
 owned-status cleanup. Both uploaders therefore serialize even if the global
 coordinator independently becomes eligible for144. No live160 upload is stopped
-or restarted. The child permanently changes to UID1001/GID1003, replaces its
+or restarted. The archive-sync child permanently changes to UID1001/GID1003, replaces its
 supplementary groups, clears ambient/effective/permitted/inheritable capabilities,
-and verifies the drop before exec.
+and verifies the drop before exec. The distinct fixed completion-only status
+command retains root because publication receipts are root-owned0600. No
+arbitrary command or different epoch can borrow that metadata identity.
 
 The only archive command is ordinary `sync --epochs 144-144`; no overwrite,
 repair-orphaned, trusted-legacy or local-deletion flag is available. A matching
