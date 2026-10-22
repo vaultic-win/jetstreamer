@@ -42,3 +42,22 @@ publication/upload fleet handoff, queued-upload ETA, positive terminal event
 capture and inactive-status failure lifecycle must be qualified separately
 before this worker or the canonical publisher is armed. Fresh publication
 admission remains mandatory; a staged delivery configuration does not refresh it.
+
+The ownership-aware candidate records `launch.json` itself after its durable
+intent and before the global lock wait. This covers even a fast idempotent
+delivery. `--capture` may verify that same capture or recover a missing one only
+while the exact nonrestarting worker is live; it never changes the original
+publisher clock. Its initial phase is `queued-upload` before lock acquisition,
+or `upload-readback` with an exact durable lock receipt. This is historical
+ownership evidence, not a current phase/ETA model: consumers must authenticate
+the current worker and fresh downstream evidence separately.
+
+`--terminal` binds the original capture/intent and the exact terminal invocation,
+recording service success or failure without claiming authenticated archive
+readiness. Both modes validate the sealed plan/client/canonical gate as applicable,
+make no R2 request, hash no archive, and never take the global mutation lock or
+invoke its client. A separate root-private metadata mutex prevents concurrent
+capture writers; canonical complete JSON, fsync, owner-only final permissions
+and no-clobber writes prevent partial or foreign receipts from being adopted.
+Existing genuine captures are revalidated without overwriting their bytes.
+No actual144capture or terminal event is claimed until a real worker exists.
