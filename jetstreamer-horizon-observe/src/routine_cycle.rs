@@ -34,6 +34,8 @@ mod delivery160;
 mod delivery198;
 #[path = "routine_delivery198_recover.rs"]
 mod delivery198_recover;
+#[path = "routine_fleet_tail_recovery.rs"]
+mod fleet_tail_recovery;
 #[path = "routine_public160.rs"]
 mod public160;
 #[path = "routine_public160_recovery.rs"]
@@ -1736,6 +1738,8 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--recover-fleet-tail"
+                            | "--check-fleet-tail-recovery"
                             | "--check-assembly144-scans-recovery"
                             | "--recover-assembly144-scans"
                             | "--check-assembly144-scans-tail"
@@ -1777,6 +1781,19 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| {
+            matches!(
+                a.as_str(),
+                "--recover-fleet-tail" | "--check-fleet-tail-recovery"
+            )
+        }) {
+            return fleet_tail_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-fleet-tail-recovery",
+            );
+        }
         if args
             .get(6)
             .is_some_and(|a| a == "--check-public160-upload-timing")
