@@ -13,6 +13,7 @@ pub(crate) const CLIENT_SHA: &str =
 #[derive(Default)]
 struct Counter {
     started: bool,
+    started_at: u64,
     bytes: u64,
     elapsed: u64,
     last_at: u64,
@@ -25,6 +26,7 @@ impl Counter {
             "duplicate or invalid progress start"
         );
         self.started = true;
+        self.started_at = at;
         self.last_at = at;
         Ok(())
     }
@@ -63,13 +65,31 @@ pub(crate) fn summarize(
     let mut readback = Counter::default();
     let mut committed = false;
     let mut verified = false;
+    let mut source_hash_started = None;
+    let mut revalidation_started = None;
+    let mut revalidation_finished = None;
     let mut last = 0;
     let mut relevant = 0;
     for envelope in events {
         let Some(message) = envelope["MESSAGE"].as_str() else {
             continue;
         };
-        let Ok(v) = serde_json::from_str::<Value>(message) else {
+        let marker = if message == "epoch 144: hashing /home/sol/horizon/epoch-144.jet" {
+            Some(json!({"event":"source-hash-start"}))
+        } else if message
+            == "epoch 144: local source revalidation started after remote integrity proof"
+        {
+            Some(json!({"event":"source-revalidation-start"}))
+        } else if let Some(n) =
+            message.strip_prefix("epoch 144: local source revalidation complete elapsed_millis=")
+        {
+            Some(
+                json!({"event":"source-revalidation-complete","elapsed_millis":n.parse::<u64>().context("source revalidation elapsed")?}),
+            )
+        } else {
+            None
+        };
+        let Some(v) = marker.or_else(|| serde_json::from_str::<Value>(message).ok()) else {
             continue;
         };
         let Some(event) = v["event"].as_str() else {
@@ -77,7 +97,10 @@ pub(crate) fn summarize(
         };
         if !matches!(
             event,
-            "r2-upload-start"
+            "source-hash-start"
+                | "source-revalidation-start"
+                | "source-revalidation-complete"
+                | "r2-upload-start"
                 | "r2-upload-progress"
                 | "r2-upload-committed"
                 | "r2-readback-start"
@@ -107,6 +130,39 @@ pub(crate) fn summarize(
             "progress timestamp outside sampled child lifetime"
         );
         last = at;
+        if event.starts_with("source-") {
+            match event {
+                "source-hash-start" => {
+                    ensure!(
+                        source_hash_started.is_none() && !upload.started && !readback.started,
+                        "duplicate or late initial source hash"
+                    );
+                    source_hash_started = Some(at);
+                }
+                "source-revalidation-start" => {
+                    ensure!(
+                        verified && revalidation_started.is_none(),
+                        "source revalidation lacks verified remote readback or repeats"
+                    );
+                    revalidation_started = Some(at);
+                }
+                _ => {
+                    let started = revalidation_started
+                        .context("source revalidation complete without start")?;
+                    ensure!(
+                        verified
+                            && revalidation_finished.is_none()
+                            && v["elapsed_millis"]
+                                .as_u64()
+                                .is_some_and(|n| n <= at - started),
+                        "invalid or repeated source revalidation completion"
+                    );
+                    revalidation_finished = Some(at);
+                }
+            }
+            relevant += 1;
+            continue;
+        }
         ensure!(
             v["key"] == "epoch-144.jet" && v["total_bytes"] == LENGTH,
             "foreign progress object or length"
@@ -177,7 +233,19 @@ pub(crate) fn summarize(
         relevant > 0,
         "no authenticated client progress yet; do not invent a phase or ETA"
     );
-    let (phase, counter) = if verified {
+    if let Some(started) = source_hash_started.filter(|_| !upload.started && !readback.started) {
+        return Ok(
+            json!({"phase":"pre-upload-source-hash","completed_phase_bytes":0,"total_bytes":LENGTH,
+            "phase_started_at_millis":started,"phase_entered_at_millis":started,
+            "phase_elapsed_millis":sample-started,"last_progress_at_millis":last,"sampled_at_millis":sample,
+            "progress_age_millis":sample-last,"progress_points":0,"multipart_committed":false,
+            "whole_file_readback_verified":false,"archive_ready_pair_proven":false,"sidecar_committed":false,
+            "current_sidecar_eta_valid":false,"status_publication_authorized":false,"r2_mutations":false}),
+        );
+    }
+    let (phase, counter) = if revalidation_finished.is_some() {
+        ("sidecar-commit", &readback)
+    } else if verified {
         ("source-revalidation-sidecar", &readback)
     } else if readback.started {
         ("readback", &readback)
@@ -188,6 +256,8 @@ pub(crate) fn summarize(
     };
     Ok(
         json!({"phase":phase,"completed_phase_bytes":counter.bytes,"total_bytes":LENGTH,
+        "phase_started_at_millis":counter.started_at,
+        "phase_entered_at_millis":revalidation_finished.or(revalidation_started).unwrap_or(if committed && !readback.started || verified { last } else { counter.started_at }),
         "phase_elapsed_millis":counter.elapsed,"last_progress_at_millis":last,
         "sampled_at_millis":sample,"progress_age_millis":sample-last,"progress_points":counter.points,
         "multipart_committed":committed,"whole_file_readback_verified":verified,
@@ -307,5 +377,46 @@ mod tests {
         v["expected_sha256"] = json!("b".repeat(64));
         e["MESSAGE"] = json!(v.to_string());
         assert!(run(&[e]).is_err());
+    }
+    #[test]
+    fn exact_initial_hash_and_terminal_revalidation_markers_are_phase_evidence_only() {
+        let marker = |message: &str, at: u64| {
+            let mut v = event("unused", 0, 0, at);
+            v["MESSAGE"] = json!(message);
+            v
+        };
+        let hash = marker("epoch 144: hashing /home/sol/horizon/epoch-144.jet", 1000);
+        assert_eq!(
+            run(std::slice::from_ref(&hash)).unwrap()["phase"],
+            "pre-upload-source-hash"
+        );
+        assert!(run(&[hash.clone(), hash]).is_err());
+        let mut e = upload();
+        e.extend([
+            event("r2-readback-start", 0, 0, 2200),
+            event("r2-readback-verified", LENGTH, 1000, 3200),
+            marker(
+                "epoch 144: local source revalidation started after remote integrity proof",
+                3300,
+            ),
+            marker(
+                "epoch 144: local source revalidation complete elapsed_millis=1000",
+                4300,
+            ),
+        ]);
+        let v = run(&e).unwrap();
+        assert_eq!(v["phase"], "sidecar-commit");
+        assert_eq!(v["phase_entered_at_millis"], 4300);
+        assert_eq!(v["sidecar_committed"], false);
+        let last = e.last().unwrap().clone();
+        e.push(last);
+        assert!(run(&e).is_err());
+        assert!(
+            run(&[marker(
+                "epoch 144: local source revalidation started after remote integrity proof",
+                3300
+            )])
+            .is_err()
+        );
     }
 }

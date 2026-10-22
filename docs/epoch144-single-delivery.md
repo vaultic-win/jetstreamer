@@ -133,8 +133,24 @@ the sidecar. Even then the output explicitly denies ready-pair proof and
 status/ETA authority. It performs no resource scan, archive hash, lock
 acquisition or network request.
 
-This reader does not yet implement queue contention or a time-to-sidecar
-forecast, adopt the upload into the fleet, or authorize a dashboard update.
-Those consumers and the exact inactive/failure lifecycle remain separate real
-gates before starting144 delivery. Use the existing coordinated cadence; do not
-create a second progress polling loop.
+The follow-up candidate's `authenticated-child-progress-v2` receipt adds a
+definite integer forecast for an authenticated active child, binding the exact
+retained198 timing calibration. Upload and ordered readback use the slower of
+their actual wall-time rate and byte-scaled historical rate. Wall time runs
+through the sample, including a silent interval since the last checkpoint.
+The model keeps separate complete readback, source-revalidation and sidecar
+allowances; complete multipart and verified readback anchor fixed downstream
+deadlines that are never reset or clamped when overdue. Missing rates, stale
+progress, a changed calibration or overdue phase fails closed.
+
+Exact trusted client text markers also distinguish initial source hashing,
+post-readback source revalidation, and sidecar wait. Each has its own anchored
+allowance; neither a revalidation marker nor its completion is sidecar readiness
+proof. Duplicate or out-of-order markers are rejected.
+
+This forecast does not model shared-lock queue contention,
+adopt an upload into the fleet, or authorize a dashboard update. It does not
+retroactively change the sealed v1 reader. Queue handling, the fleet/status
+consumer and the exact inactive/failure lifecycle remain separate real gates
+before starting144 delivery. Use the existing coordinated cadence; do not create
+a second progress polling loop.
