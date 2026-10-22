@@ -1,6 +1,8 @@
 //! Metadata-only adoption of the exact actual guarded native141 acquisition.
 //! The observer/model/status census is unchanged; this is not a new replay lane.
 use super::*;
+#[path = "routine_native141_acquisition.rs"]
+mod acquisition;
 const UNIT: &str = "horizon-epoch141-native-full-census-20261022-v1.service";
 const IID: &str = "1ca7610a4db34ceaaf2322736fa22092";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1";
@@ -20,6 +22,19 @@ pub(super) struct Profile {
     first_guard: Bound,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rejection: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    acquisition: Option<Bound>,
+}
+pub(super) fn acquisition_enabled(p: &Plan) -> bool {
+    p.native141_audit
+        .as_ref()
+        .is_some_and(|s| s.acquisition.is_some())
+}
+pub(super) fn acquisition_reader(p: &Plan) -> bool {
+    acquisition::reader(p)
+}
+pub(super) fn enable_acquisition(p: &mut Plan, spec: &Bound) -> Result<()> {
+    acquisition::enable(p, spec)
 }
 pub(super) fn reader(p: &Plan) -> bool {
     p.native141_audit.as_ref().is_some_and(|s| {
@@ -144,6 +159,13 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
         if let Some(b) = &s.rejection {
             rejection_evidence(b)?;
         }
+        if let Some(b) = &s.acquisition {
+            ensure!(
+                acquisition::reader(p),
+                "acquisition requires its qualified reader"
+            );
+            acquisition::evidence(b)?;
+        }
     }
     Ok(())
 }
@@ -158,6 +180,7 @@ pub(super) fn enable(p: &mut Plan) -> Result<()> {
             sha256: GUARD_SHA.into(),
         },
         rejection: None,
+        acquisition: None,
     };
     evidence(&s)?;
     p.native141_audit = Some(s);
@@ -264,6 +287,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
             entries.push(b);
         }
     }
+    acquisition::derive_fleet(p, f)?;
     Ok(())
 }
 #[cfg(test)]
@@ -283,6 +307,7 @@ mod tests {
                 sha256: GUARD_SHA.into(),
             },
             rejection: None,
+            acquisition: None,
         });
         p.tools.r2 = Bound {
             path: READER.into(),

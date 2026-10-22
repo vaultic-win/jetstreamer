@@ -222,6 +222,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if native141::acquisition_enabled(p) {
+        return "native141-acquisition-assembly144-scans-upload198-refresh-completed144-v1";
+    }
     if p.assembly144_scans.is_some() {
         return "native141-rejection-assembly144-scans-upload198-refresh-completed144-v1";
     }
@@ -1610,6 +1613,7 @@ fn main() {
                         args[6].as_str(),
                         "--prepare-next-delivery198"
                             | "--prepare-next-native141-rejection"
+                            | "--prepare-next-native141-acquisition"
                             | "--prepare-next-assembly144-scans"
                             | "--prepare-next-native198"
                             | "--prepare-next-native144"
@@ -1739,6 +1743,7 @@ fn main() {
                 || arg == "--prepare-next-assembly144-reader"
                 || arg == "--prepare-next-native141"
                 || arg == "--prepare-next-native141-rejection"
+                || arg == "--prepare-next-native141-acquisition"
                 || arg == "--prepare-next-assembly144-scans"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"

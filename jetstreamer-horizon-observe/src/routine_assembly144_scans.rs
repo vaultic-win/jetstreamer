@@ -49,7 +49,8 @@ pub(super) fn reader(p: &Plan) -> bool {
     p.assembly144_scans.is_some()
         && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
             || (p.tools.r2.path == coexistence_reader().path
-                && p.tools.r2.sha256 == coexistence_reader().sha256))
+                && p.tools.r2.sha256 == coexistence_reader().sha256)
+            || native141::acquisition_reader(p))
         && is_sha(READER_SHA)
 }
 #[derive(Debug, Deserialize, Serialize)]

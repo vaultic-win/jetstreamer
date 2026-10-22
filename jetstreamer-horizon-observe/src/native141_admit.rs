@@ -20,8 +20,14 @@ const NATIVE_SHA: &str = "f1592d185a51f5d7503a8b3763e0f18899bc0aa0b62b61cd00dc56
 const REJECTION_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-rejection-candidate-20261022-v1/jetstreamer-epoch141-ledger-native";
 const REJECTION_NATIVE_SHA: &str =
     "573ce13e04f25972962c671b88c5afea8e5dd445e0e425c93816ca73b72fba42";
+const ACQUISITION_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-acquisition-candidate-20261022-v1/jetstreamer-epoch141-ledger-native";
+const ACQUISITION_NATIVE_SHA: &str =
+    "0e7f847b520a91ba033f97181023ea20f9c833653744715c9e3448fbd4de088b";
 const FLOOR: u64 = 4_740_696_923_590;
 const RESERVATION: u64 = 32 << 30;
+// First-target output is capped at192MiB; native logging rolls at4MiB/two logs.
+// One GiB includes slack, without reducing the protected reserve or old profiles.
+const ACQUISITION_RESERVATION: u64 = 1 << 30;
 const MEMORY: u64 = 144 << 30;
 const COLLECTOR: &str = "horizon-epoch140-gap-metadata-fetch-20261021-v1.service";
 const COLLECTOR_IID: &str = "dfc713bbd0c64597bdb00570b89dab4c";
@@ -161,15 +167,31 @@ fn validate_plan(p: &Plan) -> Result<()> {
     let (native, native_sha) = match p.native_profile.as_str() {
         "epoch141-read-only-full-census-v2" => (NATIVE, NATIVE_SHA),
         "epoch141-read-only-full-census-rejection-v3" => (REJECTION_NATIVE, REJECTION_NATIVE_SHA),
+        "epoch141-read-only-first-target-acquisition-v4" => {
+            (ACQUISITION_NATIVE, ACQUISITION_NATIVE_SHA)
+        }
         _ => anyhow::bail!("unknown fixed native admission profile"),
     };
     ensure!(
         p.schema == "jetstreamer-historical-performance-admission-v1"
             && p.filesystem == Path::new("/home/sol")
-            && p.minimum_free_bytes >= FLOOR + RESERVATION
+            && p.minimum_free_bytes
+                >= FLOOR
+                    + if p.native_profile == "epoch141-read-only-first-target-acquisition-v4" {
+                        ACQUISITION_RESERVATION
+                    } else {
+                        RESERVATION
+                    }
             && p.minimum_memory_available_bytes >= MEMORY,
         "wrong native admission envelope"
     );
+    if p.native_profile == "epoch141-read-only-first-target-acquisition-v4" {
+        ensure!(
+            p.native_unit
+                == "horizon-epoch141-native-full-census-acquisition-first-20261022-v1.service",
+            "acquisition admission needs its exact distinct unit"
+        );
+    }
     ensure!(
         p.files.len() == 1
             && p.files[0].path == Path::new(native)
@@ -299,7 +321,7 @@ fn owner_bindings(fleet: &Value) -> Result<BTreeMap<String, String>> {
     {
         ensure!(row["epoch"] != 141, "epoch141 already has an active owner");
         let mut found = false;
-        for key in ["controller", "producer"] {
+        for key in ["controller", "producer", "unit"] {
             if row[key].is_null() {
                 continue;
             }
@@ -686,6 +708,48 @@ mod tests {
         p.minimum_memory_available_bytes += 1;
         p.native_profile = "epoch141-read-only-full-census-v2".into();
         assert!(validate_plan(&p).is_err());
+    }
+    #[test]
+    fn acquisition_admission_requires_exact_candidate_unit_and_unchanged_envelope() {
+        let mut p = plan();
+        p.native_profile = "epoch141-read-only-first-target-acquisition-v4".into();
+        assert!(validate_plan(&p).is_err());
+        p.native_unit =
+            "horizon-epoch141-native-full-census-acquisition-first-20261022-v1.service".into();
+        p.files[0].path = ACQUISITION_NATIVE.into();
+        assert!(validate_plan(&p).is_err());
+        p.files[0].sha256 = ACQUISITION_NATIVE_SHA.into();
+        p.minimum_free_bytes = FLOOR + ACQUISITION_RESERVATION;
+        validate_plan(&p).unwrap();
+        p.minimum_free_bytes -= 1;
+        assert!(validate_plan(&p).is_err());
+        p.minimum_free_bytes += 1;
+        p.minimum_memory_available_bytes -= 1;
+        assert!(validate_plan(&p).is_err());
+        p.minimum_memory_available_bytes += 1;
+        p.native_unit = "horizon-epoch141-native-full-census-rejection-20261022-v1.service".into();
+        assert!(validate_plan(&p).is_err());
+        p.native_unit =
+            "horizon-epoch141-native-full-census-acquisition-first-20261022-v1.service".into();
+        p.native_profile = "epoch141-read-only-full-census-rejection-v3".into();
+        assert!(validate_plan(&p).is_err());
+    }
+    #[test]
+    fn authenticated_pipeline_units_are_part_of_admission_owner_census() {
+        let unit = json!({"Id":"private-plugin.service","InvocationID":"a".repeat(32),"NRestarts":"0","ActiveState":"active"});
+        let mut fleet =
+            json!({"active":[{"epoch":144,"phase":"private-plugin-verification","unit":unit}]});
+        assert_eq!(
+            owner_bindings(&fleet)
+                .unwrap()
+                .get("private-plugin.service"),
+            Some(&"a".repeat(32))
+        );
+        fleet["active"][0]["unit"]["NRestarts"] = json!("1");
+        assert!(owner_bindings(&fleet).is_err());
+        fleet["active"][0]["unit"]["NRestarts"] = json!("0");
+        fleet["active"][0]["epoch"] = json!(141);
+        assert!(owner_bindings(&fleet).is_err());
     }
     #[test]
     fn timestamp_is_canonical_and_late_fleet_cannot_extend_sample_freshness() {
