@@ -66,6 +66,25 @@ fn same_exec_start(expected: &str, current: &str) -> bool {
             .is_some_and(|(left, right)| left == right)
 }
 
+fn same_unit_census(expected: &Value, current: &Value) -> bool {
+    if expected == current {
+        return true;
+    }
+    let Some((left, right)) = expected
+        .get("ExecStart")
+        .and_then(Value::as_str)
+        .zip(current.get("ExecStart").and_then(Value::as_str))
+    else {
+        return false;
+    };
+    if !same_exec_start(left, right) {
+        return false;
+    }
+    let mut normalized = current.clone();
+    normalized["ExecStart"] = expected["ExecStart"].clone();
+    normalized == *expected
+}
+
 impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
@@ -498,8 +517,8 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
     for (name, prior) in previous {
         if name != &plan.binding.unit && !peers.contains(name) {
             ensure!(
-                current[name] == *prior,
-                "fleet changed outside the explicit delivery handoff"
+                same_unit_census(prior, &current[name]),
+                "fleet changed outside the explicit delivery handoff: {name}"
             );
         }
     }
@@ -909,6 +928,9 @@ mod tests {
         let current = json!({"Id":b.unit,"LoadState":"loaded","ActiveState":"active","SubState":"running",
             "InvocationID":b.invocation_id,"NRestarts":"0","MainPID":"2749578","ExecStart":after});
         assert!(b.live_matches(&current));
+        let mut previous = current.clone();
+        previous["ExecStart"] = json!(before);
+        assert!(same_unit_census(&previous, &current));
         for altered in [
             after.replace("/sealed/upload.sh", "/other/upload.sh"),
             after.replace("--epochs 221-222", "--epochs 220-222"),
@@ -920,6 +942,7 @@ mod tests {
             let mut bad = current.clone();
             bad["ExecStart"] = json!(altered);
             assert!(!b.live_matches(&bad), "accepted altered command: {altered}");
+            assert!(!same_unit_census(&previous, &bad));
         }
         for (key, value) in [
             ("InvocationID", json!("new")),
@@ -929,7 +952,11 @@ mod tests {
             let mut bad = current.clone();
             bad[key] = value;
             assert!(!b.live_matches(&bad));
+            assert!(!same_unit_census(&previous, &bad));
         }
+        let mut foreign_field = current.clone();
+        foreign_field["Result"] = json!("exit-code");
+        assert!(!same_unit_census(&previous, &foreign_field));
     }
 
     #[test]
