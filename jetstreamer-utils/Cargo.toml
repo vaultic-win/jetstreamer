@@ -198,6 +198,10 @@ name = "jetstreamer-epoch144-private-verify"
 path = "src/epoch144_private_verify_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch144-publication-evidence"
+path = "src/epoch144_publication_evidence_bin.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-gap-audit"
 path = "src/horizon_gap_audit_bin.rs"
 
