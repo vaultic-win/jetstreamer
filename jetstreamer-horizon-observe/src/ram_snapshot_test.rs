@@ -1,15 +1,29 @@
-//! Exact v1.6.16 snapshot load/freeze tests, not an entry replay or publisher.
+//! Exact historical snapshot load/freeze tests, not an entry replay or publisher.
 #[cfg(all(
     feature = "epoch223-tail-snapshot-tests",
+    feature = "epoch223-cold-snapshot-tests"
+))]
+compile_error!("epoch223 cold and tail snapshot profiles cannot be combined");
+#[cfg(all(
+    any(
+        feature = "epoch223-tail-snapshot-tests",
+        feature = "epoch223-cold-snapshot-tests"
+    ),
     any(
         feature = "epoch225-shrink-snapshot-tests",
         feature = "ram-snapshot-eight-core-stopped225"
     )
 ))]
 compile_error!("epoch223 snapshot profile cannot be combined with another profile");
-#[cfg(feature = "epoch223-tail-snapshot-tests")]
+#[cfg(any(
+    feature = "epoch223-tail-snapshot-tests",
+    feature = "epoch223-cold-snapshot-tests"
+))]
 mod ram_snapshot223;
-#[cfg(feature = "epoch223-tail-snapshot-tests")]
+#[cfg(any(
+    feature = "epoch223-tail-snapshot-tests",
+    feature = "epoch223-cold-snapshot-tests"
+))]
 use ram_snapshot223::{validate_fleet, validate_observer, validate_plan};
 #[cfg(feature = "epoch225-shrink-snapshot-tests")]
 mod ram_snapshot225;
@@ -62,20 +76,29 @@ const CPU_CORES: u64 = if RELEASED_225 || PROFILE225 || PROFILE223 {
     2
 };
 const PROFILE225: bool = cfg!(feature = "epoch225-shrink-snapshot-tests");
-const PROFILE223: bool = cfg!(feature = "epoch223-tail-snapshot-tests");
+const COLD223: bool = cfg!(feature = "epoch223-cold-snapshot-tests");
+const ANCHOR223: &str = if COLD223 { "96335538" } else { "96767522" };
+const PROFILE223: bool = cfg!(any(
+    feature = "epoch223-tail-snapshot-tests",
+    feature = "epoch223-cold-snapshot-tests"
+));
 const TMPFS_OPTIONS: &str = if PROFILE225 || PROFILE223 {
     "/tmp:rw,size=512G,nr_inodes=1048576,nosuid,nodev,mode=1777"
 } else {
     "/tmp:rw,size=512G,nosuid,nodev,mode=1777"
 };
-const SNAPSHOT_SHA: &str = if PROFILE223 {
+const SNAPSHOT_SHA: &str = if COLD223 {
+    "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"
+} else if PROFILE223 {
     "dc7f2ac03813bc609629885af82222ac5af070cc6187b7bce08e10944fd214e1"
 } else if PROFILE225 {
     "094d3b28c39403580fbac083cdad67cc008b255dd375d611217103750d0f412d"
 } else {
     "348cba573c9e737e77c512d2c7ceda7bc81db61be6f4dc02838d168a10103043"
 };
-const SNAPSHOT_SIZE: u64 = if PROFILE223 {
+const SNAPSHOT_SIZE: u64 = if COLD223 {
+    9_815_262_303
+} else if PROFILE223 {
     9_705_551_147
 } else if PROFILE225 {
     10_177_204_112
@@ -161,7 +184,9 @@ fn hex(b: &[u8]) -> String {
 fn receipt_schema(kind: &str) -> String {
     format!(
         "jetstreamer-private-{}-ram-snapshot-{kind}-v1",
-        if PROFILE223 {
+        if COLD223 {
+            "epoch223-cold-v1625"
+        } else if PROFILE223 {
             "epoch223-tail-v1625"
         } else if PROFILE225 {
             "v1625"
@@ -257,7 +282,10 @@ fn write_new(dir: &Path, name: &str, value: &Value) -> Result<()> {
 }
 #[cfg(not(any(
     feature = "epoch225-shrink-snapshot-tests",
-    feature = "epoch223-tail-snapshot-tests"
+    any(
+        feature = "epoch223-tail-snapshot-tests",
+        feature = "epoch223-cold-snapshot-tests"
+    )
 )))]
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
@@ -521,7 +549,10 @@ fn utc(s: &str) -> Result<u64> {
 }
 #[cfg(not(any(
     feature = "epoch225-shrink-snapshot-tests",
-    feature = "epoch223-tail-snapshot-tests"
+    any(
+        feature = "epoch223-tail-snapshot-tests",
+        feature = "epoch223-cold-snapshot-tests"
+    )
 )))]
 fn validate_observer(v: &Value, now: u64) -> Result<()> {
     ensure!(
@@ -646,7 +677,10 @@ fn validate_reserves(tmpfs: u64, maximum: u64, floor: u64, stop: u64) -> Result<
 }
 #[cfg(not(any(
     feature = "epoch225-shrink-snapshot-tests",
-    feature = "epoch223-tail-snapshot-tests"
+    any(
+        feature = "epoch223-tail-snapshot-tests",
+        feature = "epoch223-cold-snapshot-tests"
+    )
 )))]
 fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -> Result<()> {
     ensure!(
@@ -917,7 +951,10 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
     );
     #[cfg(any(
         feature = "epoch225-shrink-snapshot-tests",
-        feature = "epoch223-tail-snapshot-tests"
+        any(
+            feature = "epoch223-tail-snapshot-tests",
+            feature = "epoch223-cold-snapshot-tests"
+        )
     ))]
     validate_fleet(&fleet, &observer, &p.observer.sha256)?;
     #[cfg(all(
@@ -957,7 +994,7 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
                 p.genesis.path.parent().unwrap(),
             )
             .envs(if PROFILE223 {
-                vec![("JETSTREAMER_V1_6_25_EPOCH223_TEST_ANCHOR", "96767522")]
+                vec![("JETSTREAMER_V1_6_25_EPOCH223_TEST_ANCHOR", ANCHOR223)]
             } else {
                 Vec::new()
             })
@@ -1089,7 +1126,10 @@ fn main() {
     test,
     not(any(
         feature = "epoch225-shrink-snapshot-tests",
-        feature = "epoch223-tail-snapshot-tests"
+        any(
+            feature = "epoch223-tail-snapshot-tests",
+            feature = "epoch223-cold-snapshot-tests"
+        )
     ))
 ))]
 mod tests {

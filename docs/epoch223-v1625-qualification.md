@@ -135,6 +135,20 @@ complete fresh 201–300 fleet with the unchanged live epoch203/225 identities.
 The 13 independently established canonical size samples bind the century
 floor to 248,289,182,611 bytes. A changed census requires a reviewed update.
 
+Its separate `epoch223-cold-snapshot-tests` build accepts only the sealed cold
+snapshot in `horizon-223-known-root-prefix-b1670f57-v1`, SHA-256
+`301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665`,
+9,815,262,303 bytes, and test anchor 96,335,538. It reuses the unchanged
+optimized epoch223 harness, not the tail input or tail plan. Plans use schema
+`jetstreamer-private-epoch223-cold-ram-snapshot-test-plan-v1`, units
+`archive-223-cold-snapshot-test-*`, and receipts `ram-snapshot-test-223-cold-*`.
+Cold and tail profiles cannot be compiled together or borrow one another's
+schema, input hashes, names or result schema. Both keep identical memory,
+tmpfs, task, CPU, credential-drop, full-fleet and century-floor gates. They
+run no entries and grant no prefix replay, restart, assembly or publication
+authority. Run the cold capability proof and then the two actual tests only
+after fresh coordinated observation and matching complete fleet evidence.
+
 Run its capability mode under the same actual sandbox before snapshot mode.
 The supervisor requires private 512-GiB tmpfs with 1,048,576 inodes, 128-GiB
 memory maximum, 112-GiB memory high, no swap, eight-core CPU quota and 512

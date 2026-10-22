@@ -122,20 +122,25 @@ fn observer_feature_families_are_complete_and_epoch223_remains_isolated() {
         .collect();
     let covered: BTreeSet<_> = observer.iter().flatten().copied().collect();
     assert_eq!(declared, covered, "all observer features need CI coverage");
-    let isolated: Vec<_> = observer
-        .iter()
-        .filter(|family| family.contains(&"epoch223-tail-snapshot-tests"))
-        .collect();
-    assert_eq!(
-        isolated.len(),
-        1,
-        "epoch223 needs exactly one explicit family"
-    );
-    assert_eq!(
-        isolated[0].as_slice(),
-        ["epoch223-tail-snapshot-tests"],
-        "exclusive snapshot profiles must not be combined"
-    );
+    for feature in [
+        "epoch223-tail-snapshot-tests",
+        "epoch223-cold-snapshot-tests",
+    ] {
+        let isolated: Vec<_> = observer
+            .iter()
+            .filter(|family| family.contains(&feature))
+            .collect();
+        assert_eq!(
+            isolated.len(),
+            1,
+            "{feature} needs exactly one explicit family"
+        );
+        assert_eq!(
+            isolated[0].as_slice(),
+            [feature],
+            "exclusive snapshot profiles must not be combined"
+        );
+    }
 }
 
 #[test]
