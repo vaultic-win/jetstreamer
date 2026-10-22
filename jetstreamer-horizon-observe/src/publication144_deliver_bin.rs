@@ -3,6 +3,8 @@
 #[allow(dead_code)]
 #[path = "../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
 mod evidence;
+#[path = "publication144_gate_identity.rs"]
+mod gate_identity;
 #[path = "publication144_delivery_track.rs"]
 mod tracking;
 use anyhow::{Context, Result, ensure};
@@ -541,7 +543,7 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
     );
     let locked = gates(p, &v)?;
     ensure!(
-        before == locked,
+        gate_identity::same_gate(&before, &locked),
         "144 gate or canonical identity changed while queued"
     );
     evidence::write_receipt(
@@ -561,7 +563,7 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
     let receipt: Value = serde_json::from_slice(&b)?;
     ready(&receipt)?;
     ensure!(
-        gates(p, &v)? == before,
+        gate_identity::same_gate(&before, &gates(p, &v)?),
         "144 source publication changed during upload"
     );
     evidence::write_receipt(

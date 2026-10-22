@@ -157,7 +157,7 @@ fn lock(v: &Value, i: &Value, pb: &Bound) -> Result<()> {
             && v["owner"] == i["owner"]
             && v["plan"] == serde_json::to_value(pb)?
             && v["shared_mutation_lock"] == LOCK
-            && v["gates"] == i["publisher"]
+            && gate_identity::same_gate(&i["publisher"], &v["gates"])
             && v["acquired_millis"]
                 .as_u64()
                 .zip(i["lock_wait_started_millis"].as_u64())
