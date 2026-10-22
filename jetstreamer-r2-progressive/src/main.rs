@@ -51,6 +51,8 @@ struct Config {
     concurrency: u64,
     legacy_part_size_mib: u64,
     delete_local: bool,
+    retirement_only: bool,
+    retirement_check_only: bool,
     local_mutation_lock: Option<PathBuf>,
     full: Gate,
     plugin: Gate,
@@ -130,7 +132,7 @@ fn usage() -> ! {
     eprintln!(concat!(
         "usage: jetstreamer-r2-progressive UPLOADER HORIZON_DIRECTORY RECEIPT_DIRECTORY ",
         "FIRST_EPOCH LAST_EPOCH [--poll-seconds N] [--concurrency N] ",
-        "[--legacy-part-size-mib N] [--delete-local] [--local-mutation-lock PATH] ",
+        "[--legacy-part-size-mib N] [--delete-local] [--retirement-only|--check-retirement-only] [--local-mutation-lock PATH] ",
         "[--public-receipt-directory DIR] ",
         "--full-receipt-directory DIR --full-verifier-sha256 HASH[,HASH...] ",
         "--full-verifier-script-sha256 HASH[,HASH...] --plugin-receipt-directory DIR ",
@@ -243,6 +245,8 @@ fn parse_args() -> Result<Config> {
     let mut concurrency = DEFAULT_CONCURRENCY;
     let mut legacy_part_size_mib = DEFAULT_LEGACY_PART_SIZE_MIB;
     let mut delete_local = false;
+    let mut retirement_only = false;
+    let mut retirement_check_only = false;
     let mut local_mutation_lock = None;
     let mut public_receipt_directory = None;
     let mut full_directory = None;
@@ -265,6 +269,21 @@ fn parse_args() -> Result<Config> {
                 (option, Some(value))
             });
         match option {
+            "--check-retirement-only" => {
+                ensure!(
+                    inline_value.is_none(),
+                    "--check-retirement-only does not take a value"
+                );
+                retirement_only = true;
+                retirement_check_only = true;
+            }
+            "--retirement-only" => {
+                ensure!(
+                    inline_value.is_none(),
+                    "--retirement-only does not take a value"
+                );
+                retirement_only = true;
+            }
             "--poll-seconds" => {
                 poll_seconds =
                     parse_positive(&option_value(&mut args, option, inline_value)?, option)?
@@ -401,7 +420,7 @@ fn parse_args() -> Result<Config> {
             "--local-mutation-lock must be directly inside the receipt directory"
         );
     }
-    Ok(Config {
+    let config = Config {
         uploader,
         horizon_directory,
         receipt_directory,
@@ -412,12 +431,33 @@ fn parse_args() -> Result<Config> {
         concurrency,
         legacy_part_size_mib,
         delete_local,
+        retirement_only,
+        retirement_check_only,
         local_mutation_lock,
         full,
         plugin,
         boundary,
         defer_epochs,
-    })
+    };
+    validate_retirement_mode(&config)?;
+    Ok(config)
+}
+
+fn validate_retirement_mode(config: &Config) -> Result<()> {
+    ensure!(
+        !config.retirement_check_only || config.retirement_only,
+        "retirement check needs bounded retirement mode"
+    );
+    if config.retirement_only {
+        ensure!(
+            config.first_epoch == config.last_epoch
+                && config.delete_local
+                && config.local_mutation_lock.is_some()
+                && config.public_receipt_directory.is_none(),
+            "retirement-only requires one epoch, --delete-local, shared mutation lock and authenticated-only mode"
+        );
+    }
+    Ok(())
 }
 
 fn read_regular(path: &Path, maximum_bytes: u64) -> Result<Option<Vec<u8>>> {
@@ -795,6 +835,9 @@ fn status_text(status: ExitStatus) -> String {
 }
 
 fn run(config: &Config) -> Result<()> {
+    if config.retirement_only {
+        return run_retirement_only(config);
+    }
     loop {
         let mut incomplete = 0_u64;
         for epoch in config.first_epoch..=config.last_epoch {
@@ -865,6 +908,69 @@ fn run(config: &Config) -> Result<()> {
     }
 }
 
+fn retirement_command(config: &Config, epoch: u64) -> Command {
+    let mut command = Command::new(&config.uploader);
+    command
+        .arg("retire-local")
+        .arg(&config.horizon_directory)
+        .arg("--epochs")
+        .arg(format!("{epoch}-{epoch}"))
+        .arg("--receipt-directory")
+        .arg(&config.receipt_directory);
+    command
+}
+
+// Bounded local retirement helper, not a second progressive uploader. It never
+// calls sync/public-verify, polls, uploads or mutates R2. The shared lock spans
+// all normal policy gates and the Rust uploader's authenticated retirement.
+fn run_retirement_only(config: &Config) -> Result<()> {
+    run_retirement_only_with(config, |epoch| {
+        let status = retirement_command(config, epoch).status()?;
+        ensure!(
+            status.success(),
+            "retirement-only child failed: {}",
+            status_text(status)
+        );
+        Ok(())
+    })
+}
+
+fn run_retirement_only_with(
+    config: &Config,
+    execute: impl FnOnce(u64) -> Result<()>,
+) -> Result<()> {
+    validate_retirement_mode(config)?;
+    ensure!(config.retirement_only, "not a retirement-only request");
+    let _lock = MutationLock::acquire(config.local_mutation_lock.as_deref())?;
+    let epoch = config.first_epoch;
+    let pair =
+        local_pair(&config.horizon_directory, epoch)?.context("local complete pair absent")?;
+    let receipt = config
+        .receipt_directory
+        .join(format!("epoch-{epoch}.r2.json"));
+    ensure!(
+        receipt_matches(&receipt, epoch, &pair.digest, &pair),
+        "retirement-only requires existing matching authenticated R2 readback evidence"
+    );
+    ensure!(
+        retirement_allowed(config, epoch, &pair.digest, true),
+        "retirement-only blocked by full/plugin/boundary/defer gates"
+    );
+    if config.retirement_check_only {
+        println!(
+            "epoch {epoch}: retirement-only policy preflight passed; no child, archive hash, remote requests or local removal"
+        );
+        return Ok(());
+    }
+    execute(epoch)?;
+    ensure!(
+        local_pair(&config.horizon_directory, epoch)?.is_none(),
+        "local pair remains after retirement"
+    );
+    println!("epoch {epoch}: bounded local retirement completed; no upload or R2 mutation");
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let config = parse_args()?;
     run(&config)
@@ -876,6 +982,113 @@ mod tests {
 
     fn digest(byte: &str) -> String {
         byte.repeat(64)
+    }
+
+    #[test]
+    fn bounded_retirement_mode_cannot_upload_poll_or_broaden_selection() {
+        let temp = TempDir::new().unwrap();
+        let mut c = test_config(temp.path());
+        c.retirement_only = true;
+        c.public_receipt_directory = None;
+        c.local_mutation_lock = Some(c.receipt_directory.join("mutation.lock"));
+        validate_retirement_mode(&c).unwrap();
+        let args: Vec<_> = retirement_command(&c, 7)
+            .get_args()
+            .map(|v| v.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "retire-local",
+                c.horizon_directory.to_str().unwrap(),
+                "--epochs",
+                "7-7",
+                "--receipt-directory",
+                c.receipt_directory.to_str().unwrap()
+            ]
+        );
+        let mut changed = c.clone();
+        changed.last_epoch = 8;
+        assert!(validate_retirement_mode(&changed).is_err());
+        let mut changed = c.clone();
+        changed.delete_local = false;
+        assert!(validate_retirement_mode(&changed).is_err());
+        let mut changed = c.clone();
+        changed.local_mutation_lock = None;
+        assert!(validate_retirement_mode(&changed).is_err());
+        let mut changed = c.clone();
+        changed.public_receipt_directory = Some(temp.path().into());
+        assert!(validate_retirement_mode(&changed).is_err());
+    }
+
+    #[test]
+    fn retirement_only_real_callsite_gates_and_shared_lock_span_the_child() {
+        let temp = TempDir::new().unwrap();
+        let mut c = test_config(temp.path());
+        c.retirement_only = true;
+        c.public_receipt_directory = None;
+        let lock = c.receipt_directory.join("mutation.lock");
+        c.local_mutation_lock = Some(lock.clone());
+        let checksum = digest("a");
+        let verifier = digest("c");
+        let script = digest("e");
+        let archive = c.horizon_directory.join("epoch-7.jet");
+        let sidecar = c.horizon_directory.join("epoch-7.jet.sha256");
+        fs::write(&archive, b"data").unwrap();
+        fs::write(&sidecar, format!("{checksum}  epoch-7.jet\n")).unwrap();
+        let paths = [
+            c.full.directory.join("epoch-7.full.ok"),
+            c.plugin.directory.join("epoch-7.plugin.ok"),
+            c.boundary.directory.join("boundary-6-7.ok"),
+            c.boundary.directory.join("boundary-7-8.ok"),
+        ];
+        for (path, bytes) in paths.iter().zip([
+            format!("{checksum} {verifier} {script}\n"),
+            format!("{checksum} {verifier} {script}\n"),
+            format!("{} {checksum} {verifier} {script}\n", digest("0")),
+            format!("{checksum} {} {verifier} {script}\n", digest("1")),
+        ]) {
+            fs::write(path, bytes).unwrap();
+        }
+        let receipt = c.receipt_directory.join("epoch-7.r2.json");
+        assert!(
+            run_retirement_only_with(&c, |_| panic!("missing R2 proof must not execute")).is_err()
+        );
+        let proof = serde_json::json!({"schema":"jetstreamer-horizon-r2-receipt-v1","bucket":"test","epoch":7,
+            "archive_key":"epoch-7.jet","checksum_key":"epoch-7.jet.sha256","archive_sha256":checksum,
+            "archive_length":4,"archive_etag":"test","remote_sha256_readback":true,
+            "verified_unix_seconds":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()+1});
+        fs::write(&receipt, serde_json::to_vec(&proof).unwrap()).unwrap();
+        for path in paths {
+            let original = fs::read(&path).unwrap();
+            fs::write(&path, b"wrong\n").unwrap();
+            assert!(run_retirement_only_with(&c, |_| panic!("bad gate must not execute")).is_err());
+            fs::write(&path, original).unwrap();
+        }
+        let mut changed = c.clone();
+        changed.defer_epochs.push((7, 7));
+        assert!(
+            run_retirement_only_with(&changed, |_| panic!("deferred epoch must not execute"))
+                .is_err()
+        );
+        assert!(run_retirement_only_with(&c, |_| Err(anyhow!("child failed"))).is_err());
+        assert!(archive.exists() && sidecar.exists());
+        let mut checked = c.clone();
+        checked.retirement_check_only = true;
+        run_retirement_only_with(&checked, |_| panic!("check-only must not execute")).unwrap();
+        assert!(archive.exists() && sidecar.exists());
+        run_retirement_only_with(&c, |epoch| {
+            assert_eq!(epoch, 7);
+            let file = OpenOptions::new().read(true).write(true).open(&lock)?;
+            assert_ne!(
+                unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+                0
+            );
+            fs::remove_file(&sidecar)?;
+            fs::remove_file(&archive)?;
+            Ok(())
+        })
+        .unwrap();
     }
 
     #[test]
@@ -935,6 +1148,8 @@ mod tests {
             concurrency: 4,
             legacy_part_size_mib: 5,
             delete_local: true,
+            retirement_only: false,
+            retirement_check_only: false,
             local_mutation_lock: None,
             full: gate(&root.join("full"), &verifier, &script),
             plugin: gate(&root.join("plugin"), &verifier, &script),
