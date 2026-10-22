@@ -1,7 +1,7 @@
 # Epoch-223 tail package capability
 
 `jetstreamer-epoch223-tail-attest` is a closed, non-authorizing validator for
-the immutable `horizon-focused-223-v1625-tail-d2507ee8-v2` package. It is not an
+the immutable `horizon-focused-223-v1625-tail-b364126a-v3` package. It is not an
 extension of complete-epoch attestation: its receipt explicitly describes only
 slots 96,767,523–96,767,999 (477 slots), with complete-epoch coverage, snapshot
 schema verification, fresh admission, launch and publication all false.
@@ -47,6 +47,16 @@ probes create directories before their expected snapshot rejection, and the
 fourth probe must find those directories still user-owned and private. The
 v5 sandbox inherited `0022` and correctly failed that gate; preserve its root
 and logs, then use a fresh plan/root/receipt generation with the corrected mask.
+
+The next four-probe attempt (v6) passed the initial top-level preflight, but
+the subsequent parent attempt found an additional post-bootstrap requirement
+inside the actual replay entrypoint and stopped before any worker or archive.
+Preserve that failure too. Require the nested schema-v2 planning report, not
+the earlier schema-v1 report: it must reach the shared actual pre-worker
+barrier, validate the candidate checkpoint policy and compiled worker profile,
+and resolve the exact packaged worker executable. A planning-only result has
+a distinct type and cannot be consumed as completed replay evidence. The
+ordinary/cold trusted-terminal and post-bootstrap obligations remain unchanged.
 
 The root-private logs and capability receipt are fsynced and no-clobber. A
 failed attempt is retained and cannot be retried in the same root or receipt

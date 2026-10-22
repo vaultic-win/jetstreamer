@@ -17,13 +17,13 @@ use std::{
     process::Command,
 };
 
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-d2507ee8-v2";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-b364126a-v3";
 const SEALER: &str = "2c939dde066672a13d6119d86dfb2bf460c428fd95e0854da726c6c6419f6853";
 const SNAPSHOT: &str = "snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst";
 const CORE: &[(&str, &str)] = &[
     (
         "jetstreamer-node",
-        "b859bce6efc54f8f31b8eb4963f7996f8cdda1b136b79b8566bb5e032d5c26df",
+        "4449d7e3ba116c346567996ac5205bd20b05c67bb2c1625f353555a7c0ce445c",
     ),
     (
         "jetstreamer-historical-worker-v1-6-25",
@@ -47,7 +47,7 @@ const CORE: &[(&str, &str)] = &[
     ),
     (
         "qualification-design.md",
-        "59ae782fb168afefeceae751af14fc283b03a4cf240686a84d6dc8bbd48f1038",
+        "c57b5ba07c3b73efa479593eed5c64fcf74830dd557869f2d3c82dc29ef44bc0",
     ),
 ];
 
@@ -384,7 +384,7 @@ fn planning_preflight(text: &str) -> Result<Value> {
     let reports: Vec<Value> = text
         .lines()
         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter(|v| v["schema"] == "jetstreamer-private-epoch223-tail-planning-preflight-v1")
+        .filter(|v| v["schema"] == "jetstreamer-private-epoch223-tail-planning-preflight-v2")
         .collect();
     ensure!(
         reports.len() == 1,
@@ -402,7 +402,11 @@ fn planning_preflight(text: &str) -> Result<Value> {
             && v["worker_identity"] == "jetstreamer-historical-worker-v1-6-25"
             && v["worker_environment_override"] == "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
             && v["canonical_bootstrap_bound"] == true
-            && v["tail_comparison_only"] == true,
+            && v["tail_comparison_only"] == true
+            && v["runtime_checkpoint_policy_validated"] == true
+            && v["pre_worker_barrier_reached"] == true
+            && v["worker_profile_validated"] == true
+            && v["worker_executable"] == format!("{PACKAGE}/jetstreamer-historical-worker-v1-6-25"),
         "planning preflight scope/runtime/bootstrap differs"
     );
     for key in [
@@ -638,13 +642,15 @@ fn main() {
 mod tests {
     use super::*;
     fn preflight_fixture() -> Value {
-        let mut v = json!({"schema":"jetstreamer-private-epoch223-tail-planning-preflight-v1",
+        let mut v = json!({"schema":"jetstreamer-private-epoch223-tail-planning-preflight-v2",
             "epoch":223,"bootstrap_slot":96767522,"output_slot_start":96767523,
             "terminal_slot":96767999,"output_slot_count":477,"runtime_profile":"solana-v1.6.25",
             "runtime_revision":"7de8a55b54d3e11058b82f9483bb405d143b455c",
             "worker_identity":"jetstreamer-historical-worker-v1-6-25",
             "worker_environment_override":"JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
-            "canonical_bootstrap_bound":true,"tail_comparison_only":true});
+            "canonical_bootstrap_bound":true,"tail_comparison_only":true,
+            "runtime_checkpoint_policy_validated":true,"pre_worker_barrier_reached":true,
+            "worker_profile_validated":true,"worker_executable":format!("{PACKAGE}/jetstreamer-historical-worker-v1-6-25")});
         for key in [
             "canonical_terminal_required",
             "terminal_canonical_root_independently_known",
@@ -711,7 +717,7 @@ mod tests {
         assert_eq!(parsed.len(), 9);
         assert_eq!(
             parsed.remove("deployment-seal-receipt.json").unwrap(),
-            "66c92353066ef0c4920f945b095ac6ae955f8bfc09ce60e30c7042f1e4bd5da7"
+            "4b9f0b3e527c33b2f005a1d1a850b594b2ddf75bb4158dc2a96e202dc2b253d0"
         );
         assert_eq!(parsed.len(), 8);
         assert!(
