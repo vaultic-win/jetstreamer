@@ -47,8 +47,8 @@ pub(super) fn writer(p: &Plan) -> bool {
 }
 pub(super) fn reader_v2(p: &Plan) -> bool {
     p.assembly144_recovery.is_some()
-        && p.tools.r2.path == Path::new(READER_V2)
-        && p.tools.r2.sha256 == READER_V2_SHA
+        && ((p.tools.r2.path == Path::new(READER_V2) && p.tools.r2.sha256 == READER_V2_SHA)
+            || native141::reader(p))
 }
 pub(super) fn upgrade_reader(p: &mut Plan) -> Result<()> {
     ensure!(

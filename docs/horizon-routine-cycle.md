@@ -1,5 +1,24 @@
 # Bounded routine metadata cycle
 
+## Exact native141 acquisition history
+
+The guarded full-census native attempt `1ca7610a…` stopped with
+`target SlotMeta is not connected`. Its initial guard is evidence of an actual
+admitted private acquisition, not full native-session success or epoch recovery.
+The native141 reader pins this exact unit, guard, plan, admission and executable;
+live rows also require the exact command and sandbox. Terminal attempts remain
+diagnostic history, leave epoch141 `failed-needs-repair`, and have no ordinary
+replay claim, dashboard ETA or publication authority. Unknown native full-census
+owners fail closed instead of disappearing from the campaign census.
+
+`--prepare-next-native141` consumes a genuinely completed ordinary cycle and the
+actual initial guard. It adopts only this private diagnostic history and its
+qualified fleet reader, preserving every observer/model/status claim and the
+original assembly history. Distinct `native141-assembly144-…` namespaces avoid
+clobbering prepared baseline plans. It takes no resource sample, starts no job,
+and does not retry the failed native acquisition. Seal and sandbox-preflight the
+successor before arming its normal cadence. Later successors use `--prepare-next`.
+
 ## Private epoch144 assembly-only fallback
 
 The separately qualified assembly-only owner is never ordinary replay or an ETA

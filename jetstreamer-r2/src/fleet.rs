@@ -13,6 +13,7 @@ mod continuation144;
 mod continuation144_admission;
 mod continuation144_prepare;
 mod continuation144_protection;
+mod native141;
 mod native144;
 mod prefix144;
 mod private144;
@@ -741,6 +742,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if native141::namespace(claim) || receipt["schema"] == native141::SCHEMA {
+        return native141::launch(receipt, claim);
+    }
     if assembly144::namespace(claim) || receipt["schema"] == assembly144::SCHEMA {
         return assembly144::launch(receipt, claim);
     }
@@ -1404,6 +1408,7 @@ pub(super) fn census(
             || ram_entry_owner(name)
             || assigned_diagnostic
             || assigned_pipeline
+            || ((first_epoch..=last_epoch).contains(&141) && native141::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
         {
             ensure!(
@@ -1807,6 +1812,12 @@ pub(super) async fn run() -> Result<()> {
     }
     let mut diagnostic_units = BTreeSet::new();
     for claim in &plan.diagnostics {
+        if native141::namespace(claim) {
+            ensure!(
+                plan.gates[&141].state == "failed-needs-repair",
+                "private native141 acquisition cannot close or relabel the failed repair"
+            );
+        }
         ensure!(
             (plan.first_epoch..=plan.last_epoch).contains(&claim.epoch)
                 && diagnostic_units.insert(claim.unit.clone()),
@@ -2014,6 +2025,9 @@ pub(super) async fn run() -> Result<()> {
             if native144::namespace(claim) {
                 native144::validate_live(claim, current)?;
             }
+            if native141::namespace(claim) {
+                native141::validate_live(claim, current)?;
+            }
             if continuation144::namespace(claim) {
                 continuation144::validate_live(claim, current)?;
             }
@@ -2070,7 +2084,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if assembly144::namespace(claim) {
+            let phase = if native141::namespace(claim) {
+                "native-ledger-read-only"
+            } else if assembly144::namespace(claim) {
                 "private-assembly-only"
             } else if continuation144::namespace(claim) {
                 "private-checkpoint-continuation"
@@ -2138,7 +2154,9 @@ pub(super) async fn run() -> Result<()> {
                     .as_u64()
                     .is_some_and(|last| epoch <= last)
         }) {
-            state = "blocked-qualification";
+            if !(epoch == 141 && plan.diagnostics.iter().any(native141::namespace)) {
+                state = "blocked-qualification";
+            }
             if epoch == 226
                 && diagnostics.iter().any(|claim| {
                     claim["epoch"] == 225

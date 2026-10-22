@@ -358,6 +358,17 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
     }
+    if mode == "--prepare-next-native141" {
+        ensure!(
+            handoff_spec.is_none(),
+            "native141 consumes only its exact actual first guard"
+        );
+        native141::enable(&mut next)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        native141::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
     if mode == "--prepare-next-upload198" {
         ensure!(
             handoff_spec.is_none(),

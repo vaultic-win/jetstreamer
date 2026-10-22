@@ -52,6 +52,8 @@ mod cohort191;
 mod completed144;
 #[path = "routine_continuation144.rs"]
 mod continuation144;
+#[path = "routine_native141.rs"]
+mod native141;
 #[path = "routine_native144.rs"]
 mod native144;
 #[path = "routine_native144_recovery.rs"]
@@ -122,6 +124,8 @@ struct Plan {
     continuation144: Option<continuation144::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_recovery: Option<assembly144::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native141_audit: Option<native141::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -212,6 +216,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.native141_audit.is_some() {
+        return "native141-assembly144-upload198-refresh-completed144-v1";
+    }
     if p.assembly144_recovery.is_some() {
         if assembly144::reader_v2(p) {
             "assembly144-upload198-refresh-completed144-v2"
@@ -652,6 +659,7 @@ fn validate_templates(
     native144::validate(p)?;
     continuation144::validate(p)?;
     assembly144::validate(p)?;
+    native141::validate(p)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1073,6 +1081,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     completed144::derive_fleet(p, &mut fleet)?;
     native144::derive_fleet(p, &mut fleet)?;
     continuation144::derive_fleet(p, &mut fleet)?;
+    native141::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1288,6 +1297,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     completed144::derive_fleet(p, &mut fleet.clone())?;
     native144::derive_fleet(p, &mut fleet.clone())?;
     continuation144::derive_fleet(p, &mut fleet.clone())?;
+    native141::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1604,6 +1614,7 @@ fn main() {
                             | "--prepare-next"
                             | "--prepare-next-upload198"
                             | "--prepare-next-assembly144-reader"
+                            | "--prepare-next-native141"
                             | "--publish-upload198-event"
                             | "--recover-native144-observer"
                             | "--check-native144-recovery"
@@ -1687,6 +1698,7 @@ fn main() {
             arg == "--prepare-next"
                 || arg == "--prepare-next-upload198"
                 || arg == "--prepare-next-assembly144-reader"
+                || arg == "--prepare-next-native141"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-native198"
