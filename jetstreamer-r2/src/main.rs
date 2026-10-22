@@ -2312,11 +2312,10 @@ fn receipt_path(directory: &Path, epoch: u64) -> PathBuf {
 }
 
 fn write_receipt(directory: &Path, receipt: &Receipt, overwrite_existing: bool) -> Result<PathBuf> {
-    fs::create_dir_all(directory)?;
-    fs::set_permissions(
-        directory,
-        std::os::unix::fs::PermissionsExt::from_mode(0o700),
-    )?;
+    // A root delivery service may traverse the campaign user's private directory
+    // with DAC_OVERRIDE only. Do not require FOWNER merely to chmod an already
+    // private directory after the remote pair has committed.
+    prepare_status_receipt_directory(directory)?;
     let final_path = receipt_path(directory, receipt.epoch);
     if final_path.exists() {
         let existing: Receipt = serde_json::from_slice(&fs::read(&final_path)?)?;
@@ -2938,6 +2937,14 @@ fn validate_remote_pair_state(
 }
 
 async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64) -> Result<()> {
+    // Discover a receipt-directory sandbox failure before any remote mutation
+    // or expensive whole-object readback, not after committing the sidecar.
+    preflight_status_receipt_write(
+        config
+            .receipt_directory
+            .as_deref()
+            .expect("delivery requires a receipt directory"),
+    )?;
     let local = read_local_archive(&config.directory, epoch)?;
     let archive_key = format!("epoch-{epoch}.jet");
     let checksum_key = format!("epoch-{epoch}.jet.sha256");
@@ -4079,6 +4086,20 @@ mod tests {
             verified_unix_seconds: 1,
         };
         write_receipt(directory.path(), &receipt, false).unwrap();
+
+        // An already-private directory must not be chmod'ed, even to the same
+        // mode: a DAC_OVERRIDE-only root service lacks FOWNER for a user's dir.
+        let before = fs::metadata(directory.path()).unwrap();
+        write_receipt(directory.path(), &receipt, false).unwrap();
+        let after = fs::metadata(directory.path()).unwrap();
+        assert_eq!(
+            (before.ctime(), before.ctime_nsec()),
+            (after.ctime(), after.ctime_nsec())
+        );
+        let alias = directory.path().with_extension("receipt-alias");
+        std::os::unix::fs::symlink(directory.path(), &alias).unwrap();
+        assert!(write_receipt(&alias, &receipt, false).is_err());
+        fs::remove_file(alias).unwrap();
 
         let mut replacement = receipt.clone();
         replacement.archive_etag = "new-etag".to_owned();
