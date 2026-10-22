@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod bounded205;
 mod continuation144_admission;
 mod continuation144_protection;
 mod native144;
@@ -486,6 +487,7 @@ fn validate_same_sample_admission(
         {
             "f4f5c0758c1c02b7d9a3b2b1595af7bbc033997f671cd43f2d4a92d38c346c69"
         }
+        205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
         225 if claim
             .unit
             .starts_with("horizon-qualify-225-bounded-resource-") =>
@@ -597,7 +599,10 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if native144::namespace(claim) {
+    if bounded205::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|receipt| bounded205::guard_matches(claim, &receipt, plan))
+    } else if native144::namespace(claim) {
         plan.get("bounded_canary").is_none()
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
             && plan["filesystem"] == "/home/sol"
@@ -696,6 +701,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     );
     let bounded_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
+    let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
+    ensure!(
+        !bounded205::namespace(claim) || bounded_205,
+        "bounded205 namespace requires its own launch schema"
+    );
     let shrink_budget_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-shrink-budget-resource-launch-v1";
     let bounded_224 =
@@ -727,6 +737,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || bounded_v1625
             || shrink_budget_225
             || bounded_203
+            || bounded_205
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -740,7 +751,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if native_restore {
+    let scope_valid = if bounded_205 {
+        bounded205::launch_matches(claim, receipt)
+    } else if native_restore {
         native_restore_140_launch_matches(claim, receipt)
     } else if continuation {
         claim.epoch == 213
@@ -1936,6 +1949,13 @@ pub(super) async fn run() -> Result<()> {
                         &launch["expected_exec_start"]
                     ),
                     "shrink-root diagnostic live command changed"
+                );
+            }
+            if bounded205::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    bounded205::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
+                    "bounded205 diagnostic live command changed"
                 );
             }
             if shrink_budget225::namespace(claim) {
