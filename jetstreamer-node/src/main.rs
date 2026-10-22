@@ -14453,6 +14453,12 @@ fn qualification_expectations(
             plan.replay_start, plan.end_inclusive
         ));
     }
+    if cfg!(feature = "epoch223-v1-6-25-qualification")
+        && plan.epoch == 223
+        && plan.end_inclusive == epoch223_qualification::TAIL_BOOTSTRAP
+    {
+        epoch223_qualification::validate_prefix_expectations(&expected, plan)?;
+    }
     Ok(expected)
 }
 

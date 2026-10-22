@@ -2,6 +2,8 @@
 
 #[path = "qualification_verify/prefix203.rs"]
 mod prefix203;
+#[path = "qualification_verify/prefix223.rs"]
+mod prefix223;
 #[path = "qualification_verify/tail223.rs"]
 mod tail223;
 
@@ -365,6 +367,11 @@ fn retained_prefix_157(arguments: &Arguments) -> bool {
 }
 
 fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), String> {
+    if prefix223::namespace(arguments) && !prefix223::matches(arguments) {
+        return Err(
+            "epoch223 prefix namespace requires its exact checkpoint-bounded partial scope".into(),
+        );
+    }
     if tail223::namespace(arguments) && !tail223::matches(arguments) {
         return Err("epoch223 tail namespace requires its exact partial comparison scope".into());
     }
@@ -377,6 +384,7 @@ fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), St
             && (root_prefix_203(arguments)
                 || complete_span_225(arguments)
                 || tail223::matches(arguments)
+                || prefix223::matches(arguments)
                 || retained_prefix_157(arguments)))
     {
         return Err(format!(
@@ -504,6 +512,14 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
         &manifest.bootstrap.bank_hash,
         &manifest.runtime.runtime_revision,
     )?;
+    prefix223::validate_roots(
+        arguments,
+        &manifest.bootstrap.accounts_hash,
+        &manifest.bootstrap.bank_hash,
+        &manifest.terminal.accounts_hash,
+        &manifest.terminal.bank_hash,
+        &manifest.runtime.runtime_revision,
+    )?;
 
     let conflict_write_gate = if let Some(expected) = &arguments.expected_conflict {
         let output_end = manifest
@@ -591,6 +607,7 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
         "conflict_write_gate": conflict_write_gate,
     });
     tail223::annotate(arguments, &mut receipt);
+    prefix223::annotate(arguments, &mut receipt);
     Ok(receipt)
 }
 
