@@ -40,3 +40,14 @@ qualify its admission tuple, complete the fleet/guard handoff and on-node
 capability proof, and perform fresh complete admission before launch. Preserve
 both earlier failed attempts, the post-close rejection and the successful
 first-target byte/PoH diagnostics. The epoch141 repair remains open.
+
+The fleet reader recognizes the all-target diagnostic only under the distinct
+fixed `horizon-epoch141-native-full-census-acquisition-all-20261022-v1.service`
+owner and its sealed candidate, plan, admission manifest and private output root.
+It requires the full32GiB output reservation in both initial guard and admission;
+the first-target profile retains its original smaller limits and cannot supply
+proof for this owner. Command identity, zero restarts, all16column families,
+retained source digests and the unchanged12hour/16GiB hard sandbox remain bound.
+Unknown acquisition units and cross-profile evidence fail closed. Reader source
+support does not adopt a claim or authorize a launch: qualify and seal the reader,
+extend the routine handoff, and bind the real initial guard before activation.

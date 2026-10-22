@@ -11,7 +11,8 @@ pub(super) fn reader(p: &Plan) -> bool {
         && p.assembly144_scans.is_some()
         && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
             || publication144::reader(p)
-            || delivery160::reader(p))
+            || delivery160::reader(p)
+            || all_acquisition_reader(p))
         && is_sha(READER_SHA)
 }
 pub(super) fn evidence(b: &Bound) -> Result<Value> {

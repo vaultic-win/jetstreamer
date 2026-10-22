@@ -1,6 +1,8 @@
 //! Measured upload-only forecast. Never resets the original execution clock or
 //! counts already completed replay/import/full/plugin scans as remaining work.
 use super::*;
+#[path = "routine_public160_readback.rs"]
+mod readback;
 const CALIBRATION: &str =
     "/var/lib/jetstreamer/horizon-publication144-calibration-20261022-v1/eta.json";
 const CALIBRATION_SHA: &str = "bc2c99fc95e795424cfa9a1f383765d37d34dcc35b35945d7e9cb2943b135dd7";
@@ -127,11 +129,18 @@ pub(super) fn preview(p: &Plan) -> Result<Value> {
     let sample = utc_seconds(&p.sample_target_utc)?
         .checked_mul(1000)
         .context("160 sample overflow")?;
-    let remaining = remaining(start, total, sample)?;
+    let (remaining, readback_revision) = match remaining(start, total, sample) {
+        Ok(value) => (value, Value::Null),
+        Err(_) => {
+            let (value, evidence) = readback::estimate(sample, &c)?;
+            (value, evidence)
+        }
+    };
     Ok(
         json!({"schema":"horizon-exact160-upload-timing-v1","calibration":cal,
         "dispatch_event":records.iter().find(|e|e["MESSAGE"]==MARKER).unwrap(),"formula":formula,
         "upload_start_millis":start,"sampled_at_utc":p.sample_target_utc,"estimated_remaining_millis":remaining,
+        "readback_revision":readback_revision,
         "original_producer_clock_unchanged":true,"new_resource_samples":0,"archive_hash_performed":false,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     )

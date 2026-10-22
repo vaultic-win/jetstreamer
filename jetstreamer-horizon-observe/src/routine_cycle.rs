@@ -236,6 +236,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if native141::all_acquisition_enabled(p) {
+        return "native141-all-acquisition-public160-timed-scans-upload198-v1";
+    }
     if p.publication144.is_some() && public160_timing::enabled(p) {
         return "publication144-public160-timed-native141-acquisition-scans-upload198-v1";
     }
@@ -1704,6 +1707,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-publication144"
                             | "--prepare-next-native141-rejection"
                             | "--prepare-next-native141-acquisition"

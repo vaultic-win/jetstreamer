@@ -21,7 +21,8 @@ pub(super) fn reader(p: &Plan) -> bool {
             || (p.tools.r2.path == Path::new(public160_recovery::READER)
                 && p.tools.r2.sha256 == public160_recovery::READER_SHA)
             || (p.tools.r2.path == Path::new(publication144::READER)
-                && p.tools.r2.sha256 == publication144::READER_SHA))
+                && p.tools.r2.sha256 == publication144::READER_SHA)
+            || native141::all_acquisition_reader(p))
 }
 fn read(p: &Plan) -> Result<Value> {
     let b = p
