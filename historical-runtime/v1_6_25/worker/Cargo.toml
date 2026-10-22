@@ -14,6 +14,8 @@ poh-force-soft = ["sha2-fast/force-soft"]
 # the ordinary conflict-wave path. The worker still requires historical trace
 # output at runtime and remains an explicitly unqualified candidate.
 diagnostic-singleton = []
+# Private epoch223 candidate: two exact bootstraps, never beyond that epoch.
+epoch223-v1-6-25-qualification = []
 # Build-bound epoch-224 v1.6.25 comparison. It keeps ordinary conflict-wave
 # execution but refuses input after the first previously observed downstream
 # mismatch, so the candidate cannot become an unbounded replay accidentally.

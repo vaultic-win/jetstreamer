@@ -1,5 +1,6 @@
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
+mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
@@ -40,6 +41,24 @@ compile_error!("epoch225 full-span qualification cannot combine other diagnostic
     )
 ))]
 compile_error!("epoch225 comparison cannot combine unrelated qualification modes");
+
+#[cfg(all(
+    feature = "epoch223-v1-6-25-qualification",
+    any(
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic"
+    )
+))]
+compile_error!("epoch223 qualification cannot combine unrelated diagnostic modes");
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
@@ -18985,6 +19004,12 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    if cfg!(feature = "epoch223-v1-6-25-qualification")
+        && let Err(error) = epoch223_qualification::validate_entrypoint(&probe_args)
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if matches!(
         probe_args.first().map(String::as_str),
         Some("--failed-prefix220-recover" | "--failed-prefix220-recovery-preflight")
@@ -19319,6 +19344,7 @@ async fn main() {
             || unreceipted_recovery_evidence.is_some()
             || publish_through_epoch.is_some()
             || inherited_epoch_lease
+            || cfg!(feature = "epoch223-v1-6-25-qualification")
             || cfg!(feature = "epoch224-v1-6-25-qualification")
             || cfg!(feature = "epoch224-v1-6-25-diagnostic")
             || cfg!(feature = "epoch224-account-delta-diagnostic");
@@ -19521,6 +19547,26 @@ async fn main() {
             exit(2);
         }
     };
+    if cfg!(feature = "epoch223-v1-6-25-qualification")
+        && let Err(error) = epoch223_qualification::validate_launch(
+            start_epoch,
+            end_epoch,
+            qualification.map(|plan| (plan.bootstrap_slot, plan.end_inclusive)),
+            root_checkpoint_cohort,
+            recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease,
+            horizon_output
+                .as_deref()
+                .zip(replay_scratch.as_deref())
+                .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
+        )
+        .and_then(|_| epoch223_qualification::validate_filesystem(dest_dir.as_path()))
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if cfg!(feature = "epoch225-v1-6-25-diagnostic")
         && let Err(error) = epoch225_diagnostic::validate_launch(
             start_epoch,
