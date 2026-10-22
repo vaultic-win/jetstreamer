@@ -18,6 +18,8 @@ pub mod horizon_legacy_poh;
 
 /// Raw diagnostic acquisition independent of strict legacy recovery qualification.
 pub mod horizon_legacy_acquisition;
+/// Non-authorizing byte interpretation of an acquired legacy target, preserving connectivity.
+pub mod horizon_legacy_byte_diagnostic;
 /// Exact-key diagnostic binding from native legacy candidates to complete PoH chains.
 pub mod horizon_legacy_recovery;
 

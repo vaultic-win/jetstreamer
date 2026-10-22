@@ -280,10 +280,17 @@ pub(super) fn prepare(
     } else {
         None
     };
+    let acquisition_spec = if mode == "--prepare-next-native141-acquisition" {
+        handoff_spec
+    } else {
+        None
+    };
     let delivery_spec = if prefix_spec.is_some()
         || native_spec.is_some()
         || rejection_spec.is_some()
         || scans_spec.is_some()
+        || acquisition_spec.is_some()
+        || mode == "--prepare-next-publication144"
     {
         None
     } else {
@@ -302,6 +309,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     native144_recovery::consume(&mut next, &completion)?;
+    delivery160::consume(&mut next)?;
     assembly144_scans_recover::consume(&mut next, &completion)?;
     if completion.get("public198_promotion").is_some() {
         public198::consume(&mut next, &completion, &mut next_config)?;
@@ -324,7 +332,10 @@ pub(super) fn prepare(
     validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
     let effective = private144::effective_model(
         &next,
-        &delivery198::preparation_model(&next, &model, delivery_spec)?,
+        &delivery160::effective_model(
+            &next,
+            &delivery198::preparation_model(&next, &model, delivery_spec)?,
+        )?,
     )?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
@@ -363,6 +374,8 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    delivery160::validate_completed(p, &completion)?;
+    publication144::validate_completed(p, &completion)?;
     if mode == "--prepare-next-assembly144-reader" {
         ensure!(
             handoff_spec.is_none(),
@@ -400,6 +413,26 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         assembly144_scans::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-native141-acquisition" {
+        native141::enable_acquisition(
+            &mut next,
+            acquisition_spec.context("acquisition handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        native141::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-publication144" {
+        publication144::enable(
+            &mut next,
+            handoff_spec.context("publisher handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        publication144::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     if mode == "--prepare-next-upload198" {
         ensure!(
@@ -513,6 +546,22 @@ pub(super) fn prepare(
         validate_observer_config(&next, &effective, &next_config)?;
         tool_ok(&next.tools.r2)?;
         delivery198::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-delivery160" {
+        ensure!(
+            handoff_spec.is_none(),
+            "160 transition consumes exact sealed event proof only"
+        );
+        delivery160::enable(&mut next, &mut next_config, &model, &completion)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        let effective = private144::effective_model(
+            &next,
+            &delivery160::effective_model(&next, &delivery198::effective_model(&next, &model)?)?,
+        )?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        delivery160::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     let host101 = is_101(p)?;
     let root = Path::new(if host101 { ROOT_101 } else { ROOT });

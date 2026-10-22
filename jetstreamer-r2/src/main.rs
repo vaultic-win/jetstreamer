@@ -61,6 +61,8 @@ const PIPELINE_STATUS_RECEIPT_SCHEMA: &str =
 const STATUS_DELETION_RECEIPT_SCHEMA: &str =
     "jetstreamer-horizon-r2-status-authenticated-deletion-receipt-v1";
 
+mod cohort160_finalization;
+mod cohort160_handoff;
 mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
@@ -3216,6 +3218,12 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("probe-transport-217") {
         return transport_probe::run().await;
+    }
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some("observe-delivery-160" | "observe-handoff-160")
+    ) {
+        return cohort160_finalization::run();
     }
     if matches!(
         env::args().nth(1).as_deref(),

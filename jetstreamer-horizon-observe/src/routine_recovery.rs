@@ -122,6 +122,9 @@ fn evidence(binding: &Bound) -> Result<Value> {
 }
 
 pub(super) fn interval(p: &Plan) -> Result<u64> {
+    if let Some(interval) = delivery160::interval(p)? {
+        return Ok(interval);
+    }
     if let Some(interval) = public198::interval(p)? {
         return Ok(interval);
     }

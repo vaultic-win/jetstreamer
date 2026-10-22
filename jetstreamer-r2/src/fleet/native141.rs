@@ -1,5 +1,7 @@
 //! Exact, already-started private full-census ledger acquisition, not replay.
 use super::*;
+#[path = "native141_acquisition.rs"]
+mod acquisition;
 #[path = "native141_rejection.rs"]
 mod rejection;
 pub(super) const SCHEMA: &str = "jetstreamer-epoch141-native-initial-guard-v1";
@@ -19,7 +21,7 @@ pub(super) fn unit_name(s: &str) -> bool {
     s.starts_with("horizon-epoch141-native-full-census-") && s.ends_with(".service")
 }
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
-    (c.epoch == 141 && c.unit == UNIT) || rejection::namespace(c)
+    (c.epoch == 141 && c.unit == UNIT) || rejection::namespace(c) || acquisition::namespace(c)
 }
 fn command(v: &Value) -> Option<&str> {
     v.as_str()?.split_once(" ; ignore_errors=").map(|(s, _)| s)
@@ -96,6 +98,9 @@ fn bindings(p: &Value, a: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
+    if acquisition::namespace(c) {
+        return acquisition::launch(r, c);
+    }
     if rejection::namespace(c) {
         return rejection::launch(r, c);
     }
@@ -172,6 +177,9 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate_live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
+    if acquisition::namespace(c) {
+        return acquisition::validate_live(c, v);
+    }
     if rejection::namespace(c) {
         return rejection::validate_live(c, v);
     }

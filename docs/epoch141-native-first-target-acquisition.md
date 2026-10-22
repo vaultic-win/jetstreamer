@@ -30,10 +30,12 @@ runtime promotion, replay, publication and remote/R2 mutation.
 
 The new driver requires admission profile
 `epoch141-read-only-first-target-acquisition-v4` and its own executable binding.
-The existing admission helper accepts only its original two exact binaries;
-it must not be reused, renamed or bypassed to admit this candidate. Source tests
-alone authorize no launch. Still required are native fixture tests (including
-post-close mutation rejection), sealed exact binary and plan, independent
-admission/fleet/guard profile qualification, fresh complete resource admission,
-and actual sandbox proof. Preserve both previous failed native attempts and
+Older immutable admission helpers still accept only their original two exact
+binaries and must not be renamed or bypassed. The explicitly extended helper
+pins this exact candidate under a distinct profile and 1 GiB incremental allowance;
+the 32 GiB full-census allowances and inherited protected reserve stay unchanged.
+Source tests alone authorize no launch. Native fixture and retained-metadata
+planning tests have passed; sealed exact binary/plan, independent admission,
+fleet/guard handoff qualification, fresh complete admission and actual sandbox
+proof still precede launch. Preserve both previous failed native attempts and
 the successful post-close metadata-rejection evidence.

@@ -49,7 +49,8 @@ pub(super) fn reader(p: &Plan) -> bool {
     p.assembly144_scans.is_some()
         && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
             || (p.tools.r2.path == coexistence_reader().path
-                && p.tools.r2.sha256 == coexistence_reader().sha256))
+                && p.tools.r2.sha256 == coexistence_reader().sha256)
+            || native141::acquisition_reader(p))
         && is_sha(READER_SHA)
 }
 #[derive(Debug, Deserialize, Serialize)]
@@ -202,8 +203,16 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         return Ok(());
     };
     validate(p)?;
+    let retained_delivery = publication144::retained_gate(p, f)?;
+    if retained_delivery.is_some() {
+        f["gates"]["144"]["state"] = json!("blocked-qualification");
+    }
     for (stage, b) in [("full", &s.full), ("plugin", &s.plugin)] {
         fold(f, checked(stage, b, &bound_json(b, true)?)?)?;
+    }
+    if let Some((state, action)) = retained_delivery {
+        f["gates"]["144"]["state"] = state;
+        f["gates"]["144"]["next_action"] = action;
     }
     Ok(())
 }

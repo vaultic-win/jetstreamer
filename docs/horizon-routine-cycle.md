@@ -39,6 +39,28 @@ epoch recovery. A rejected target remains failed-needs-repair even when its raw
 metadata is retained after successful native close and source rehash. See
 [metadata rejection evidence](epoch141-native-metadata-rejection.md).
 
+### First-target native141 raw acquisition
+
+`--prepare-next-native141-acquisition SPEC --handoff-sha256 HEX` adopts only the
+distinct, genuinely admitted first-target acquisition after its initial guard
+exists. The strict spec schema is `jetstreamer-native141-acquisition-monitor-handoff-v1`,
+with `first_guard: {path,sha256}` and false replay/publication/remote/R2 authority
+flags. Both original failed native histories and both captured144 scans remain
+required. Ordinary observer/model/status claims and execution clocks are unchanged.
+
+The reader pins the new candidate, exact unit, source/census, v2 immutable plan
+and admission manifest, inherited protected reserve and unchanged hard sandbox.
+Only this first-target profile uses its reviewed 1 GiB admission allowance and
+256 MiB native-output guard; neither full-census profile changes. Native success
+is raw diagnostic acquisition, not complete18,283-target recovery or PoH/root
+qualification. Epoch141 remains failed-needs-repair with no public ETA.
+
+The distinct `native141-acquisition-assembly144-scans-…` namespace avoids pending
+baseline artifacts. Stop and authenticate both old observer/metadata timers before
+launching an owner they cannot census, then seal/preflight/arm the adopted pair.
+Never let an old baseline fire during this handoff. Later `--prepare-next` retains
+the new profile without restarting any producer or taking an extra resource sample.
+
 ## Private epoch144 assembly-only fallback
 
 The separately qualified assembly-only owner is never ordinary replay or an ETA

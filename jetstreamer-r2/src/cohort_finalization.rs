@@ -24,6 +24,9 @@ const BATCH_SHA: &str = "84edb7b4c90f8a78d218d3992b28831ea8279b51f1cfe3af9acbaea
 const COMMIT: &str = "root-checkpoint cohort 216-219 published 4 archive(s) with checksums in transaction 2958b2841e8e4c0307c2478e81ffe63254355da59ed0e782d09b48eb4d744d54; receipt ";
 
 pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == super::cohort160_finalization::UNIT {
+        return Ok(160..=160);
+    }
     if unit == super::cohort198_finalization::UNIT {
         return Ok(198..=198);
     }
@@ -31,6 +34,9 @@ pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
     Ok(216..=219)
 }
 pub(super) fn handoff_scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == super::cohort160_handoff::CONTROLLER {
+        return Ok(160..=160);
+    }
     if unit == super::cohort198_handoff::CONTROLLER {
         return Ok(198..=198);
     }
@@ -96,6 +102,9 @@ fn handoff_state(controller: &Value, producer: &Value, state: &Value) -> Result<
 }
 
 pub(super) fn observe_handoff(controller: &Value, sampled_seconds: u64) -> Result<Value> {
+    if controller["Id"] == super::cohort160_handoff::CONTROLLER {
+        return super::cohort160_handoff::observe(controller, sampled_seconds);
+    }
     if controller["Id"] == super::cohort198_handoff::CONTROLLER {
         return super::cohort198_handoff::observe(controller, sampled_seconds);
     }
@@ -221,6 +230,9 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
 }
 
 pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
+    if current["Id"] == super::cohort160_finalization::UNIT {
+        return super::cohort160_finalization::observe(current, sampled_seconds);
+    }
     if current["Id"] == super::cohort198_finalization::UNIT {
         return super::cohort198_finalization::observe(current, sampled_seconds);
     }

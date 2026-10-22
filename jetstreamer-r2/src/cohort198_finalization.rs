@@ -81,7 +81,7 @@ fn validate_observation_plan(p: &ObservationPlan) -> Result<()> {
     Ok(())
 }
 
-fn write_observation(path: &Path, value: &Value) -> Result<()> {
+pub(super) fn write_observation(path: &Path, value: &Value) -> Result<()> {
     resource_audit::private_directory(path.parent().context("198 proof parent missing")?)?;
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
@@ -274,7 +274,7 @@ pub(super) fn immutable_inputs() -> Result<()> {
     Ok(())
 }
 
-fn fields<'a>(message: &'a str, marker: &str) -> Result<BTreeMap<&'a str, &'a str>> {
+pub(super) fn fields<'a>(message: &'a str, marker: &str) -> Result<BTreeMap<&'a str, &'a str>> {
     let (_, body) = message
         .split_once(marker)
         .context("198 event marker missing")?;
@@ -290,7 +290,7 @@ fn fields<'a>(message: &'a str, marker: &str) -> Result<BTreeMap<&'a str, &'a st
     Ok(fields)
 }
 
-fn integer(fields: &BTreeMap<&str, &str>, name: &str) -> Result<u64> {
+pub(super) fn integer(fields: &BTreeMap<&str, &str>, name: &str) -> Result<u64> {
     let text = fields.get(name).context("198 integer field missing")?;
     ensure!(
         text.bytes().all(|b| b.is_ascii_digit()),
@@ -299,7 +299,7 @@ fn integer(fields: &BTreeMap<&str, &str>, name: &str) -> Result<u64> {
     Ok(text.parse()?)
 }
 
-fn checkpoint(message: &str, slot: u64) -> Result<()> {
+pub(super) fn checkpoint(message: &str, slot: u64) -> Result<()> {
     let f = fields(message, "historical checkpoint ")?;
     ensure!(
         f.len() == 10 && integer(&f, "slot")? == slot && f.get("complete") == Some(&"true"),
