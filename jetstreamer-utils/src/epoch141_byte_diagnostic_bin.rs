@@ -371,4 +371,145 @@ mod tests {
         assert!(r.final_entry_matches_finalized_hash);
         assert!(!r.recorded_is_connected && !r.poh_chain_verified);
     }
+    #[test]
+    #[ignore = "explicit root read-only PoH diagnostic from exact retained typed/native clock; no receipt, runtime route or publication"]
+    fn retained_actual_first_target_poh_diagnostic() {
+        use jetstreamer_utils::{
+            horizon_legacy_entry::decode_v1_4_25_padded_entries,
+            horizon_legacy_poh::{PohExpectation, verify_v1_4_25_poh_chain},
+            horizon_legacy_shred::{
+                assemble_v1_4_25_padded_batches, assemble_v1_4_25_slot_from_meta,
+                decode_v1_4_25_complete_slot_meta,
+            },
+        };
+        let clock_sha = "f74aacd82655179686a43c6bb137e0c0e7c7bd2955809008a745ef80f16f8be2";
+        let clock=read(&Bound{path:"/usr/local/lib/jetstreamer/horizon-epoch140-serialized-clock-complete-20261020-v1/clock.json".into(),sha256:clock_sha.into()},true).unwrap();
+        let native=read(&Bound{path:"/usr/local/lib/jetstreamer/horizon-epoch140-native-restore-complete-20261020-v1/native.json".into(),sha256:"53f1aa88f8f5f24aed1e291ff02318c102fac3bfb8ececf5c215c9fb70c11b20".into()},true).unwrap();
+        assert_eq!(
+            clock["schema"],
+            "jetstreamer-epoch140-serialized-snapshot-clock-v1"
+        );
+        assert_eq!(clock["pinned_typed_serialized_clock_only"], true);
+        assert_eq!(
+            clock["input_sha256"],
+            "47d5911465901975e397c570e06ccf72296db7ecd3b3b1beda710cacd3e683a1"
+        );
+        assert_eq!(clock["census"]["clock"]["slot"], 60911751);
+        assert_eq!(clock["census"]["clock"]["complete"], true);
+        assert_eq!(
+            native["schema"],
+            "jetstreamer-private-epoch140-native-restore-probe-v1"
+        );
+        assert_eq!(native["passed"], true);
+        assert_eq!(native["native_result"]["comparison_passed"], true);
+        assert_eq!(native["serialized_clock_sha256"], clock_sha);
+        assert_eq!(native["snapshot_sha256"], clock["input_sha256"]);
+        assert_eq!(
+            native["native_result"]["native_checkpoint"]["bank_hash"],
+            clock["census"]["clock"]["bank_hash"]
+        );
+        assert_eq!(
+            native["native_result"]["native_checkpoint"]["initialized_ticks_per_slot"],
+            clock["census"]["clock"]["ticks_per_slot"]
+        );
+        let bank = include_bytes!(
+            "../../historical-runtime/v1_4_25/vendor/solana-runtime-1.4.25/src/bank.rs"
+        );
+        assert_eq!(
+            evidence::sha(bank),
+            "f136ec6b4d40bced37936df1800cc7f2d64484a0640d76edb2839dd04599d4ac"
+        );
+        let bank = std::str::from_utf8(bank).unwrap();
+        assert!(
+            bank.contains("hashes_per_tick: parent.hashes_per_tick,")
+                && bank.contains("ticks_per_slot: parent.ticks_per_slot,")
+        );
+        let worker = include_str!("../../historical-runtime/v1_4_25/worker/src/runtime.rs");
+        assert!(!worker.contains(".set_hashes_per_tick("));
+        let raw = read(
+            &Bound {
+                path: RAW.into(),
+                sha256: RAW_SHA.into(),
+            },
+            true,
+        )
+        .unwrap();
+        validate_acquisition(&raw).unwrap();
+        let target = read(
+            &Bound {
+                path: TARGET.into(),
+                sha256: TARGET_SHA.into(),
+            },
+            false,
+        )
+        .unwrap();
+        let hash = |field: &str| -> [u8; 32] {
+            bs58::decode(target["metadata"][field].as_str().unwrap())
+                .into_vec()
+                .unwrap()
+                .try_into()
+                .unwrap()
+        };
+        let expected = PohExpectation {
+            parent_slot: 60911771,
+            slot: 60911776,
+            parent_hash: hash("previous_poh_hash"),
+            final_hash: hash("final_poh_hash"),
+            ticks_per_slot: clock["census"]["clock"]["ticks_per_slot"].as_u64().unwrap(),
+            hashes_per_tick: clock["census"]["clock"]["hashes_per_tick"]
+                .as_u64()
+                .unwrap(),
+        };
+        assert_eq!(
+            (expected.ticks_per_slot, expected.hashes_per_tick),
+            (64, 12500)
+        );
+        let first = decode(&raw["first_metadata"], 1).unwrap();
+        let records = decode(&raw["records"], 786).unwrap();
+        let first: Vec<_> = first.iter().map(Owned::borrowed).collect();
+        let records: Vec<_> = records.iter().map(Owned::borrowed).collect();
+        let byte = diagnose_v1_4_25_acquired_bytes(
+            &first,
+            LegacySlotScope {
+                slot: expected.slot,
+                parent_slot: expected.parent_slot,
+            },
+            &records,
+            expected.final_hash,
+        )
+        .unwrap();
+        assert!(!byte.recorded_is_connected && byte.final_entry_matches_finalized_hash);
+        let meta = decode_v1_4_25_complete_slot_meta(
+            first[0].value.unwrap(),
+            expected.slot,
+            expected.parent_slot,
+        )
+        .unwrap();
+        let shreds: Vec<_> = records[8..].iter().map(|r| r.value.unwrap()).collect();
+        assert!(assemble_v1_4_25_slot_from_meta(&meta, &shreds).is_err());
+        let assembled = assemble_v1_4_25_padded_batches(
+            expected.slot,
+            expected.parent_slot,
+            meta.last_index,
+            &shreds,
+        )
+        .unwrap();
+        assert_eq!(
+            assembled.iter().map(|b| b.last_index).collect::<Vec<_>>(),
+            meta.completed_data_indexes
+        );
+        let entries: Vec<_> = assembled
+            .iter()
+            .map(|b| decode_v1_4_25_padded_entries(&b.bytes).unwrap())
+            .collect();
+        let result = verify_v1_4_25_poh_chain(&entries, &expected, 4_000_000, || Ok(())).unwrap();
+        assert_eq!(result.boundaries.len(), 5);
+        assert!(!result.source_completeness_proven && !result.publication_authorized);
+        assert!(!meta.is_connected && assemble_v1_4_25_slot_from_meta(&meta, &shreds).is_err());
+        let boundaries:Vec<_>=result.boundaries.iter().map(|b|json!({"slot":b.slot,"tick_ordinal":b.tick_ordinal,"hash":bs58::encode(b.hash).into_string()})).collect();
+        println!(
+            "{}",
+            json!({"diagnostic_only":true,"clock_sha256":clock_sha,"executed_hashes":result.executed_hashes,"boundaries":boundaries,"canonical_ancestry_proven":false,"source_completeness_proven":false,"runtime_route_changed":false,"publication_authorized":false})
+        );
+    }
 }

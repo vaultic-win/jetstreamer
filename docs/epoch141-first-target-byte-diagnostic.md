@@ -52,3 +52,16 @@ clock merely because its work arithmetic fits. Root marker presence and a
 matching final hash do not repair the original disconnected ancestry bit.
 Keep epoch141 failed-needs-repair until qualified complete recovery reaches
 the actual verified ready-pair outcome; this diagnostic alone cannot close it.
+
+## Explicit read-only PoH regression
+
+The separately ignored test `retained_actual_first_target_poh_diagnostic` binds
+the retained typed snapshot-clock receipt SHAf74aacd8… and native-restore
+comparison SHA53f1aa88… for the same60911751 snapshot, the pinned Bank source
+and unchanged clock inheritance, and the finalized target anchors. It executes
+the existing bounded PoH verifier over the actual raw records without writing
+a receipt or changing a runtime route. This is preliminary diagnostic test
+evidence, not a production boundary bundle or promotion of the byte receipt.
+A separately sealed PoH driver and its actual sandbox/output gates are still
+required before durable diagnostic boundaries can be consumed by another stage.
+The original connected recovery gate remains rejected before and after the test.
