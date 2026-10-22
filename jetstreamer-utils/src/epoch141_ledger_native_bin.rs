@@ -15,12 +15,13 @@ use {
     jetstreamer_utils::{
         horizon_ledger_bzip::BoundBzipCollection,
         horizon_ledger_native::{
-            NativeQuery, NativeReadBudget, NativeResolution, resolve_native_candidates,
-            with_native_read_session,
+            NativeCandidate, NativeQuery, NativeReadBudget, NativeResolution,
+            resolve_native_candidates, with_native_read_session,
         },
         horizon_legacy_recovery::{
             LegacySlotScope, ResolvedLegacyRecord, plan_v1_4_25_scope_queries,
         },
+        horizon_legacy_shred::decode_v1_4_25_complete_slot_meta,
     },
     serde::Deserialize,
     serde_json::{Value, json},
@@ -305,6 +306,21 @@ fn paths(plan: &Plan) -> Result<()> {
         .parent()
         .context("missing output parent")?;
     let output = private_directory(result)?;
+    if profile(plan)? {
+        let rejection = result.join("metadata-rejection.json");
+        ensure!(
+            [
+                &plan.initial_guard_receipt,
+                &plan.metadata_receipt,
+                &plan.output_receipt
+            ]
+            .iter()
+            .all(|p| **p != rejection)
+                && fs::symlink_metadata(&rejection)
+                    .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+            "reserved rejection output exists or aliases a planned output"
+        );
+    }
     ensure!(
         database.dev() == fs::metadata("/home/sol")?.dev()
             && logs.dev() == database.dev()
@@ -397,6 +413,66 @@ fn bounded_write(path: &Path, value: &Value) -> Result<usize> {
     Ok(bytes)
 }
 
+// A planner rejection is diagnostic data, not a native read failure. Return it
+// through the successful session callback so DB close and the complete input
+// rehash still run. Native I/O, guard and post-close failures remain fatal and
+// must never be converted to this outcome.
+struct FullCensusRead {
+    receipts: Vec<Value>,
+    rejection: Option<Value>,
+}
+
+fn scope_queries_or_rejection(
+    first: &[NativeCandidate],
+    scope: LegacySlotScope,
+) -> Result<Vec<NativeQuery>, Value> {
+    let records: Vec<_> = first
+        .iter()
+        .map(|r| ResolvedLegacyRecord {
+            family: &r.family,
+            key: &r.key,
+            value: r.value.as_deref(),
+        })
+        .collect();
+    match plan_v1_4_25_scope_queries(&records, &[scope]) {
+        Ok(queries) => Ok(queries
+            .into_iter()
+            .map(|q| NativeQuery {
+                family: q.family.into(),
+                key: q.key,
+            })
+            .collect()),
+        Err(reason) => {
+            let decoded = match first {
+                [r] if r.family == "meta" && r.key == scope.slot.to_be_bytes() => {
+                    match r.value.as_deref() {
+                        Some(bytes) => match decode_v1_4_25_complete_slot_meta(
+                            bytes,
+                            scope.slot,
+                            scope.parent_slot,
+                        ) {
+                            Ok(meta) => json!({"slot":meta.slot,"parent_slot":meta.parent_slot,
+                                "last_index":meta.last_index,"is_connected":meta.is_connected,
+                                "completed_data_indexes":meta.completed_data_indexes}),
+                            Err(error) => json!({"decode_error":error}),
+                        },
+                        None => json!({"decode_error":"missing native metadata value"}),
+                    }
+                }
+                _ => json!({"decode_error":"not one exact target metadata record"}),
+            };
+            Err(json!({
+                "slot":scope.slot,"parent_slot":scope.parent_slot,"planner_error":reason,
+                "pinned_layout":"solana-893cc764-SlotMeta",
+                "decoded_complete_slot_meta":decoded,
+                "records":first.iter().map(|r| json!({"family":r.family,
+                    "key_base64":STANDARD.encode(&r.key),
+                    "value_base64":r.value.as_ref().map(|v|STANDARD.encode(v))})).collect::<Vec<_>>()
+            }))
+        }
+    }
+}
+
 fn run_full_census(
     plan: &Plan,
     bound: &BoundBzipCollection,
@@ -441,7 +517,7 @@ fn run_full_census(
         Ok(())
     };
     let mut written = 1u64 << 20; // includes initial/intent/final-manifest overhead
-    let (receipts, session) = with_native_read_session(
+    let (read, session) = with_native_read_session(
         &plan.database_directory,
         &bound.collection,
         &logs,
@@ -462,22 +538,15 @@ fn run_full_census(
                     }],
                     guard_callback,
                 )?;
-                let records: Vec<_> = first
-                    .iter()
-                    .map(|r| ResolvedLegacyRecord {
-                        family: &r.family,
-                        key: &r.key,
-                        value: r.value.as_deref(),
-                    })
-                    .collect();
-                let queries: Vec<_> = plan_v1_4_25_scope_queries(&records, &[*scope])
-                    .map_err(anyhow::Error::msg)?
-                    .into_iter()
-                    .map(|q| NativeQuery {
-                        family: q.family.into(),
-                        key: q.key,
-                    })
-                    .collect();
+                let queries = match scope_queries_or_rejection(&first, *scope) {
+                    Ok(queries) => queries,
+                    Err(rejection) => {
+                        return Ok(FullCensusRead {
+                            receipts,
+                            rejection: Some(rejection),
+                        });
+                    }
+                };
                 let complete = reader.read_candidates(&queries, guard_callback)?;
                 ensure!(
                     complete.iter().all(|c| c.value.is_some())
@@ -523,13 +592,27 @@ fn run_full_census(
                     );
                 }
             }
-            Ok(receipts)
+            Ok(FullCensusRead {
+                receipts,
+                rejection: None,
+            })
         },
     )?;
-    ensure!(
-        session.batches == 36_566 && receipts.len() == 18_283,
-        "incomplete full native session"
-    );
+    let FullCensusRead {
+        receipts,
+        rejection,
+    } = read;
+    if rejection.is_some() {
+        ensure!(
+            session.batches == 2 * receipts.len() + 1 && receipts.len() < scopes.len(),
+            "inconsistent rejected native session"
+        );
+    } else {
+        ensure!(
+            session.batches == 36_566 && receipts.len() == 18_283,
+            "incomplete full native session"
+        );
+    }
     // Final completion is separate from all provisional batches. Rehash every
     // durable output only after the native database closed and input revalidation
     // succeeded, then bind all exact inputs again before the final commit.
@@ -562,6 +645,43 @@ fn run_full_census(
         65536,
         true,
     )?;
+    if let Some(rejection) = rejection {
+        let output = json!({
+            "schema":"jetstreamer-epoch141-native-metadata-rejection-v1",
+            "epoch":141,"recorded_unix_seconds":now()?,"invocation_id":invocation,
+            "plan_sha256":values["--plan-sha256"],"self_sha256":values["--self-sha256"],
+            "source_verification_sha256":plan.source_verification.sha256,
+            "collection_sha256":plan.collection_receipt.sha256,
+            "complete_census_sha256":plan.complete_census.sha256,"gap_census_sha256":FULL_CENSUS_SHA,
+            "finalized_collection_plan_sha256":plan.finalized_collection_plan.as_ref().unwrap().sha256,
+            "finalized_collection_receipt_sha256":plan.finalized_collection_receipt.as_ref().unwrap().sha256,
+            "admission_sha256":values["--admission-sha256"],
+            "completed_target_count":receipts.len(),"target_receipts":receipts,
+            "rejection":rejection,"native_session":session,
+            "native_session_complete":true,"full_target_census_complete":false,
+            "source_completeness_proven":false,"live_state_proven":false,
+            "runtime_clock_authenticated":false,"hidden_poh_hashes_recovered":false,
+            "runtime_promotion_authorized":false,"replay_launch_authorized":false,
+            "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
+        });
+        let bytes = serde_json::to_vec_pretty(&output)?.len() as u64 + 1;
+        ensure!(
+            written
+                .checked_add(bytes)
+                .is_some_and(|n| n <= FULL_OUTPUT_LIMIT)
+                && guard(plan, start)?
+                    >= plan
+                        .minimum_free_bytes
+                        .checked_add(bytes)
+                        .context("rejection reserve overflow")?,
+            "rejection output exceeds budget/reserve"
+        );
+        bounded_write(&output_parent.join("metadata-rejection.json"), &output)?;
+        anyhow::bail!(
+            "native metadata planner rejected target {}; post-close-revalidated diagnostic retained, full census incomplete",
+            output["rejection"]["slot"]
+        );
+    }
     let output = json!({
         "schema":"jetstreamer-epoch141-native-full-census-candidates-v2",
         "epoch":141,"first_slot":60911751u64,"last_slot":61328765u64,
@@ -854,6 +974,86 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn native_meta(connected: bool) -> (LegacySlotScope, Vec<NativeCandidate>) {
+        let scope = LegacySlotScope {
+            slot: 60_911_776,
+            parent_slot: 60_911_771,
+        };
+        let value = bincode::serialize(&(
+            scope.slot,
+            1u64,
+            1u64,
+            123u64,
+            0u64,
+            scope.parent_slot,
+            Vec::<u64>::new(),
+            connected,
+            vec![0u32],
+        ))
+        .unwrap();
+        (
+            scope,
+            vec![NativeCandidate {
+                family: "meta".into(),
+                key: scope.slot.to_be_bytes().to_vec(),
+                value: Some(value),
+            }],
+        )
+    }
+
+    #[test]
+    fn disconnected_metadata_is_retained_exactly_without_relaxing_planner() {
+        let (scope, first) = native_meta(false);
+        let rejection = scope_queries_or_rejection(&first, scope).unwrap_err();
+        assert_eq!(
+            rejection["planner_error"],
+            "target SlotMeta is not connected"
+        );
+        assert_eq!(rejection["slot"], scope.slot);
+        assert_eq!(rejection["parent_slot"], scope.parent_slot);
+        assert_eq!(
+            rejection["decoded_complete_slot_meta"]["is_connected"],
+            false
+        );
+        assert_eq!(rejection["decoded_complete_slot_meta"]["last_index"], 0);
+        assert_eq!(
+            STANDARD
+                .decode(rejection["records"][0]["value_base64"].as_str().unwrap())
+                .unwrap(),
+            *first[0].value.as_ref().unwrap()
+        );
+        assert_eq!(
+            STANDARD
+                .decode(rejection["records"][0]["key_base64"].as_str().unwrap())
+                .unwrap(),
+            first[0].key
+        );
+        let (scope, connected) = native_meta(true);
+        let queries = scope_queries_or_rejection(&connected, scope).unwrap();
+        assert_eq!(queries.len(), 2);
+        assert_eq!(queries[0].family, "meta");
+        assert_eq!(queries[1].family, "data_shred");
+    }
+
+    #[test]
+    fn malformed_missing_or_wrong_metadata_remains_diagnostic_not_accepted() {
+        for case in 0..5 {
+            let (scope, mut first) = native_meta(false);
+            match case {
+                0 => first[0].value = None,
+                1 => first[0].value.as_mut().unwrap().truncate(4),
+                2 => first[0].key = vec![0; 8],
+                3 => first[0].family = "data_shred".into(),
+                _ => first.clear(),
+            }
+            let rejection = scope_queries_or_rejection(&first, scope).unwrap_err();
+            assert!(rejection["decoded_complete_slot_meta"]["decode_error"].is_string());
+            assert!(rejection["decoded_complete_slot_meta"]["last_index"].is_null());
+            assert!(rejection["planner_error"].is_string());
+            assert_eq!(rejection["records"].as_array().unwrap().len(), first.len());
+        }
+    }
+
     fn plan() -> Plan {
         serde_json::from_value(
             json!({"schema":"jetstreamer-epoch141-ledger-native-plan-v1",

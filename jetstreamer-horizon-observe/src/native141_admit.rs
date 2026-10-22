@@ -17,6 +17,9 @@ use {
 };
 const NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-full-census-native-candidate-20261021-v1/jetstreamer-epoch141-ledger-native";
 const NATIVE_SHA: &str = "f1592d185a51f5d7503a8b3763e0f18899bc0aa0b62b61cd00dc5659bf985e02";
+const REJECTION_NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-native-rejection-candidate-20261022-v1/jetstreamer-epoch141-ledger-native";
+const REJECTION_NATIVE_SHA: &str =
+    "573ce13e04f25972962c671b88c5afea8e5dd445e0e425c93816ca73b72fba42";
 const FLOOR: u64 = 4_740_696_923_590;
 const RESERVATION: u64 = 32 << 30;
 const MEMORY: u64 = 144 << 30;
@@ -155,9 +158,13 @@ fn read_json(binding: &Bound, owner_only: bool) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 fn validate_plan(p: &Plan) -> Result<()> {
+    let (native, native_sha) = match p.native_profile.as_str() {
+        "epoch141-read-only-full-census-v2" => (NATIVE, NATIVE_SHA),
+        "epoch141-read-only-full-census-rejection-v3" => (REJECTION_NATIVE, REJECTION_NATIVE_SHA),
+        _ => anyhow::bail!("unknown fixed native admission profile"),
+    };
     ensure!(
         p.schema == "jetstreamer-historical-performance-admission-v1"
-            && p.native_profile == "epoch141-read-only-full-census-v2"
             && p.filesystem == Path::new("/home/sol")
             && p.minimum_free_bytes >= FLOOR + RESERVATION
             && p.minimum_memory_available_bytes >= MEMORY,
@@ -165,8 +172,8 @@ fn validate_plan(p: &Plan) -> Result<()> {
     );
     ensure!(
         p.files.len() == 1
-            && p.files[0].path == Path::new(NATIVE)
-            && p.files[0].sha256 == NATIVE_SHA
+            && p.files[0].path == Path::new(native)
+            && p.files[0].sha256 == native_sha
             && p.files[0].uid == 0
             && p.files[0].gid == 0
             && p.files[0].mode == "0555",
@@ -549,9 +556,11 @@ pub fn run() -> Result<()> {
     let before = owner_states(&owners)?;
     let collector = collector_terminal()?;
     native_idle(&p.native_unit)?;
-    let (native_sha, native_meta) = hash_file(Path::new(NATIVE), 128 << 20)?;
+    // validate_plan has already selected one fixed profile/path/hash tuple;
+    // accepting the rejection-capable generation never admits arbitrary tools.
+    let (native_sha, native_meta) = hash_file(&p.files[0].path, 128 << 20)?;
     ensure!(
-        native_sha == NATIVE_SHA
+        native_sha == p.files[0].sha256
             && native_meta.uid() == 0
             && native_meta.gid() == 0
             && native_meta.mode() & 0o7777 == 0o555,
@@ -657,6 +666,25 @@ mod tests {
         assert!(validate_plan(&p).is_err());
         let mut p = plan();
         p.finalized_collection.path = "/tmp/partial.json".into();
+        assert!(validate_plan(&p).is_err());
+    }
+    #[test]
+    fn rejection_profile_requires_its_exact_qualified_tuple_and_same_envelope() {
+        let mut p = plan();
+        p.native_profile = "epoch141-read-only-full-census-rejection-v3".into();
+        // Neither old tool under new profile nor a mixed path/hash is allowed.
+        assert!(validate_plan(&p).is_err());
+        p.files[0].path = REJECTION_NATIVE.into();
+        assert!(validate_plan(&p).is_err());
+        p.files[0].sha256 = REJECTION_NATIVE_SHA.into();
+        validate_plan(&p).unwrap();
+        p.minimum_free_bytes -= 1;
+        assert!(validate_plan(&p).is_err());
+        p.minimum_free_bytes += 1;
+        p.minimum_memory_available_bytes -= 1;
+        assert!(validate_plan(&p).is_err());
+        p.minimum_memory_available_bytes += 1;
+        p.native_profile = "epoch141-read-only-full-census-v2".into();
         assert!(validate_plan(&p).is_err());
     }
     #[test]

@@ -216,6 +216,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if native141::rejection_enabled(p) {
+        return "native141-rejection-assembly144-upload198-refresh-completed144-v1";
+    }
     if p.native141_audit.is_some() {
         return "native141-assembly144-upload198-refresh-completed144-v1";
     }
@@ -1594,6 +1597,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-native141-rejection"
                             | "--prepare-next-native198"
                             | "--prepare-next-native144"
                             | "--prepare-next-continuation144"
@@ -1699,6 +1703,7 @@ fn main() {
                 || arg == "--prepare-next-upload198"
                 || arg == "--prepare-next-assembly144-reader"
                 || arg == "--prepare-next-native141"
+                || arg == "--prepare-next-native141-rejection"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
                 || arg == "--prepare-next-native198"

@@ -1,5 +1,7 @@
 //! Exact, already-started private full-census ledger acquisition, not replay.
 use super::*;
+#[path = "native141_rejection.rs"]
+mod rejection;
 pub(super) const SCHEMA: &str = "jetstreamer-epoch141-native-initial-guard-v1";
 pub(super) const UNIT: &str = "horizon-epoch141-native-full-census-20261022-v1.service";
 const IID: &str = "1ca7610a4db34ceaaf2322736fa22092";
@@ -17,7 +19,7 @@ pub(super) fn unit_name(s: &str) -> bool {
     s.starts_with("horizon-epoch141-native-full-census-") && s.ends_with(".service")
 }
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
-    c.epoch == 141 && c.unit == UNIT
+    (c.epoch == 141 && c.unit == UNIT) || rejection::namespace(c)
 }
 fn command(v: &Value) -> Option<&str> {
     v.as_str()?.split_once(" ; ignore_errors=").map(|(s, _)| s)
@@ -94,6 +96,9 @@ fn bindings(p: &Value, a: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
+    if rejection::namespace(c) {
+        return rejection::launch(r, c);
+    }
     shape(r, c)?;
     bindings(
         &bound_json(&BoundFile {
@@ -125,7 +130,7 @@ fn live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
+fn common_limits(p: &BTreeMap<&str, &str>) -> Result<()> {
     for (k, v) in [
         ("Type", "exec"),
         ("Restart", "no"),
@@ -145,10 +150,6 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
         ("NoNewPrivileges", "yes"),
         ("CapabilityBoundingSet", "cap_dac_override"),
         ("AmbientCapabilities", "cap_dac_override"),
-        (
-            "ReadWritePaths",
-            "/home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1/logs /home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1/results",
-        ),
     ] {
         ensure!(p.get(k) == Some(&v), "native141 sandbox differs:{k}");
     }
@@ -159,7 +160,21 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
     );
     Ok(())
 }
+fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
+    common_limits(p)?;
+    ensure!(
+        p.get("ReadWritePaths")
+            == Some(
+                &"/home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1/logs /home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1/results"
+            ),
+        "native141 writable paths differ"
+    );
+    Ok(())
+}
 pub(super) fn validate_live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
+    if rejection::namespace(c) {
+        return rejection::validate_live(c, v);
+    }
     launch(&bound_json(&c.launch_receipt)?, c)?;
     live(c, v)?;
     let output=ProcessCommand::new("systemctl").args(["show",UNIT,"--no-pager","--property=Type,Restart,KillMode,Delegate,RuntimeMaxUSec,CPUQuotaPerSecUSec,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,UMask,ProtectSystem,ProtectHome,PrivateNetwork,PrivateTmp,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,User,Group"]).output()?;

@@ -19,6 +19,26 @@ clobbering prepared baseline plans. It takes no resource sample, starts no job,
 and does not retry the failed native acquisition. Seal and sandbox-preflight the
 successor before arming its normal cadence. Later successors use `--prepare-next`.
 
+### Separately qualified native141 rejection-evidence attempt
+
+`--prepare-next-native141-rejection SPEC --handoff-sha256 HEX` adopts the fixed
+`horizon-epoch141-native-full-census-rejection-20261022-v1.service` attempt only
+after it has a real initial guard. The immutable spec has schema
+`jetstreamer-native141-rejection-monitor-handoff-v1`, a `first_guard` path/SHA
+binding, and false `replay_launch_authorized`, `publication_authorized`,
+`remote_mutations` and `r2_mutations` flags. It selects only the separately
+sealed rejection-aware reader and new `native141-rejection-assembly144-…`
+namespace. Ordinary `--prepare-next` retains this profile thereafter.
+
+The new reader independently binds the fixed rejection-capable executable,
+actual invocation, source census, immutable plan, new admission manifest and
+receipt, 16-family policy, unchanged reserve and exact sandbox. Original native
+failure history stays present. This attempt is private read-only diagnostic
+work, never ordinary replay, an ETA, successful full-target acquisition, or
+epoch recovery. A rejected target remains failed-needs-repair even when its raw
+metadata is retained after successful native close and source rehash. See
+[metadata rejection evidence](epoch141-native-metadata-rejection.md).
+
 ## Private epoch144 assembly-only fallback
 
 The separately qualified assembly-only owner is never ordinary replay or an ETA
