@@ -125,6 +125,17 @@ not independent scan success, admission, a fleet transition, import or publicati
 authority. A scanner that has already exited cannot be called live or restarted
 merely to satisfy capture; preserve and reconcile that terminal outcome instead.
 
+`--prepare-next-assembly144-scans SPEC --handoff-sha256 HEX` consumes the two
+actual immutable captures under the existing native141-rejection reader profile.
+The spec schema is `jetstreamer-assembly144-scans-monitor-handoff-v1`, with
+`full` and `plugin` path/SHA bindings and false replay/publication/remote/R2
+authority flags. It appends exact private pipeline claims, preserves assembler
+and native failure history, and leaves every ordinary observer/model/status
+claim unchanged. The distinct `native141-rejection-assembly144-scans-…`
+namespace permits qualification before stopping an older pending timer pair.
+Later successors use ordinary `--prepare-next`. Capture and adoption do not
+establish scan success or canonical V4 import/publication authority.
+
 Fleet rendering keeps a private resource observation in `observer_diagnostics`
 without adding a second active job when an exact captured diagnostic already
 binds the same epoch, unit, invocation and scratch path. Different owners remain

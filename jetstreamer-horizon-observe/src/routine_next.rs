@@ -275,12 +275,20 @@ pub(super) fn prepare(
     } else {
         None
     };
-    let delivery_spec =
-        if prefix_spec.is_some() || native_spec.is_some() || rejection_spec.is_some() {
-            None
-        } else {
-            handoff_spec
-        };
+    let scans_spec = if mode == "--prepare-next-assembly144-scans" {
+        handoff_spec
+    } else {
+        None
+    };
+    let delivery_spec = if prefix_spec.is_some()
+        || native_spec.is_some()
+        || rejection_spec.is_some()
+        || scans_spec.is_some()
+    {
+        None
+    } else {
+        handoff_spec
+    };
     let enable_terminal157 = mode == "--prepare-next-terminal157";
     let enable_private144 = mode == "--prepare-next-private144";
     let recover_controllers = mode == "--prepare-package-recovery";
@@ -384,6 +392,13 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         native141::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-assembly144-scans" {
+        assembly144_scans::enable(&mut next, scans_spec.context("scan handoff required")?)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        assembly144_scans::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     if mode == "--prepare-next-upload198" {
         ensure!(
