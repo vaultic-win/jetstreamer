@@ -53,3 +53,32 @@ On high-core hosts, run legacy tests serially with explicit bounded Rayon and
 PoH thread settings. Parallel synthetic Bank tests can exhaust a test unit's
 task ceiling; preserve such failures and diagnose their actual thread-pool
 errors without altering production replay limits or ignoring semantic tests.
+
+## Observed metadata and candidate correction
+
+The sealed v3 auditor succeeded against both retained snapshots. The pre-223
+receipt SHA-256 is `a046d0b4fdb856dd55a87cf3c7cf3486817d22d3259023bf027b7b3aba4f831b`;
+the post-restart receipt SHA-256 is
+`3b49f4f5d1c108feedba0a5b1bbce1a5bbc35e71bbd02a76a323eb6906bfe152`.
+Both are in the host-private `horizon-snapshot-fork-metadata-receipts-20261022-v1`
+directory as `pre223-v3.json` and `post225-v3.json`. The former contains markers
+13,334,463 and 53,180,900, each with count one. The latter additionally contains
+**both** 96,542,804 and 96,542,805, each with count one. The decoded pre-223 Bank
+hash matches the original successful bootstrap checkpoint. Metadata is not a
+replacement for full snapshot verification.
+
+The v1.6.20 candidate now restores these known future markers after loading a
+verified snapshot and before creating child Banks. It first validates the whole
+list: reject unknown markers, counts other than one, and any absent marker that
+should already have applied at the snapshot slot. Only then register missing
+future markers. Existing markers are never registered again, and an already
+frozen snapshot Bank is not rehashed. This uses upstream `HardForks` and Bank
+hash semantics, not an injected hash, fabricated PoH boundary, or ignored vote.
+Regressions bind the observed pre/post lists, both adjacent restart boundaries,
+the two-marker parent jump, idempotence, and fail-before-mutation behavior.
+
+This remains an unqualified correction until the fresh guarded replay crosses
+both restart slots, reproduces canonical transaction outcomes and the terminal
+root, and passes the normal independent archive/plugin/publication gates.
+Keep the original failed invocation and archive preserved; no source change or
+unit test closes the incident or authorizes a sidecar or upload.
