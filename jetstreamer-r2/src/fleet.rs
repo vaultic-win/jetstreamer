@@ -706,6 +706,16 @@ fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
     }
 }
 
+fn private_qualification_inventory_state(gate_state: &str) -> &str {
+    if gate_state == "failed-needs-repair" {
+        // A live diagnostic is repair progress, not closure of the incident.
+        // Only the later authenticated ready-pair classification closes it.
+        gate_state
+    } else {
+        "blocked-qualification"
+    }
+}
+
 fn diagnostic_guard_workers_match(claim: &DiagnosticClaim, workers: &[Value]) -> bool {
     if assembly144::namespace(claim) {
         workers.is_empty()
@@ -2258,7 +2268,7 @@ pub(super) async fn run() -> Result<()> {
                     .iter()
                     .any(|c| native141::namespace(c) || census141_poh::namespace(c)))
             {
-                state = "blocked-qualification";
+                state = private_qualification_inventory_state(gate.state.as_str());
             }
             if epoch == 226
                 && diagnostics.iter().any(|claim| {
@@ -2451,6 +2461,27 @@ mod tests {
                 "accepted status for {state}"
             );
         }
+    }
+    #[test]
+    fn live_private_qualification_does_not_remove_an_open_failed_epoch_from_backlog() {
+        assert_eq!(
+            private_qualification_inventory_state("failed-needs-repair"),
+            "failed-needs-repair"
+        );
+        for state in [
+            "blocked-qualification",
+            "staged-admissible",
+            "not-yet-staged",
+        ] {
+            assert_eq!(
+                private_qualification_inventory_state(state),
+                "blocked-qualification"
+            );
+        }
+        assert!(!production_status_binding_matches(
+            true,
+            private_qualification_inventory_state("failed-needs-repair")
+        ));
     }
 
     fn epoch154_guard_properties() -> Value {
