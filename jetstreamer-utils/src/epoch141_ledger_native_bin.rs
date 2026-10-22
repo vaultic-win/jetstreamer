@@ -838,6 +838,11 @@ fn run() -> Result<()> {
     } else {
         targets(&audit)?
     };
+    if plan.schema == all_acquisition::SCHEMA {
+        // Scope must be checked by the actual check-only sandbox too, before
+        //any initial-guard receipt or native session is created.
+        all_acquisition::scope(&scopes)?;
+    }
     let manifest = read_json(&plan.admission_manifest, 4 * 1024 * 1024, true)?;
     ensure!(
         fs::symlink_metadata(&plan.admission_manifest.path)?.mode() & 0o077 == 0,

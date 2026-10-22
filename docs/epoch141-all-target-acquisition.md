@@ -51,3 +51,13 @@ retained source digests and the unchanged12hour/16GiB hard sandbox remain bound.
 Unknown acquisition units and cross-profile evidence fail closed. Reader source
 support does not adopt a claim or authorize a launch: qualify and seal the reader,
 extend the routine handoff, and bind the real initial guard before activation.
+
+The first all-target invocation `72424001…` stopped before any native database
+open: its scope predicate confused the enclosing interval end61328765 with the
+finalized census's actual last post-gap target61328744. Preserve that invocation
+and guard as failure evidence, never as a completed native session. The corrected
+candidate checks the exact18283target scope before check-only returns and before
+writing the initial guard. A root read-only regression revalidates the actual
+finalized collection and all its retained target receipts, not just a synthetic
+topology. A corrected binary still needs a distinct immutable attempt, fresh
+admission and monitoring bindings; never replace the failed invocation's output.
