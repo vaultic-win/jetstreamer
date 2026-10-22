@@ -1,5 +1,18 @@
 # Routine metadata child diagnostics
 
+The fixed October22 narrative review may update only the exact superseded
+`next_action` strings for epochs203,205,227. Bind its immutable path and
+SHA-256 in each affected epoch's `additional_gate_evidence`. The coordinator
+authenticates the ordinary predecessor template unchanged, then applies this
+exact compiled-in review while deriving the new fleet plan. It preserves states,
+owner/claim census, resource protection, repair history and all integrity gates;
+newer actions and ready/live downstream states are never replaced. In particular,
+lane-local `memory.high` events alone do not demonstrate host-global saturation,
+and a retired redundant download cache is not the retained deployed input.
+This is narrative correction only, not admission or replay authority. Do not
+substitute a manually edited predecessor template: the exact prior ledger's
+template path and digest must still match during preflight.
+
 The separately bound October21 epoch203 capacity-stop incident may replace only
 its exact stale natural-root task with an open `failed-needs-repair` gate. The
 coordinator authenticates the fixed immutable incident, exact failed invocation,

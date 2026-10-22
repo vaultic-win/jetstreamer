@@ -1028,7 +1028,53 @@ fn record_exact_203_stop(fleet: &mut Value, evidence: &Bound, incident: &Value) 
     Ok(true)
 }
 
+const OCT22_ACTION_REVIEW_SHA: &str =
+    "2b9df8cb36a4b0d4a939fcad5ea121298743ea8d5ad0f42ccb5e6cf91a789d64";
+const OCT22_ACTION_REVIEW_PATH: &str =
+    "/var/lib/jetstreamer/horizon-fleet-next-action-review-20261022T1540Z-v1/review.json";
+const OCT22_ACTION_REVIEW: &str = include_str!("fixtures/fleet-action-review-20261022.json");
+
+/// A fixed narrative-only transition applied after authenticating the original
+/// predecessor template. Never substitute a template or rewrite prior receipts.
+fn correct_oct22_action(
+    fleet: &mut Value,
+    epoch: &str,
+    evidence: &Bound,
+    review: &Value,
+) -> Result<bool> {
+    if !matches!(epoch, "203" | "205" | "227")
+        || evidence.sha256 != OCT22_ACTION_REVIEW_SHA
+        || evidence.path != Path::new(OCT22_ACTION_REVIEW_PATH)
+    {
+        return Ok(false);
+    }
+    let expected: Value = serde_json::from_str(OCT22_ACTION_REVIEW)?;
+    ensure!(
+        sha(OCT22_ACTION_REVIEW.as_bytes()) == OCT22_ACTION_REVIEW_SHA && review == &expected,
+        "Oct22 action review differs from the exact non-authorizing correction"
+    );
+    let gate = &fleet["gates"][epoch];
+    let eligible = gate["state"] == "blocked-qualification"
+        || (epoch == "203" && gate["state"] == "failed-needs-repair");
+    if !eligible || gate["next_action"] != review["changes"][epoch]["old_next_action"] {
+        // Preserve idempotent results, newer reviews, and every operational state.
+        return Ok(false);
+    }
+    fleet["gates"][epoch]["next_action"] = review["changes"][epoch]["new_next_action"].clone();
+    Ok(true)
+}
+
 fn apply_known_action_corrections(p: &Plan, fleet: &mut Value) -> Result<()> {
+    for epoch in ["203", "205", "227"] {
+        if let Some(evidence) = p.additional_gate_evidence.get(epoch) {
+            for e in evidence
+                .iter()
+                .filter(|e| e.sha256 == OCT22_ACTION_REVIEW_SHA)
+            {
+                correct_oct22_action(fleet, epoch, e, &bound_json(e, true)?)?;
+            }
+        }
+    }
     if let Some(evidence) = p.additional_gate_evidence.get("203") {
         for e in evidence.iter().filter(|e| e.sha256 == INCIDENT_203_SHA) {
             record_exact_203_stop(fleet, e, &bound_json(e, false)?)?;
@@ -1773,6 +1819,91 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    fn oct22_action_fixture() -> (Bound, Value, Value) {
+        let evidence = Bound {
+            path: OCT22_ACTION_REVIEW_PATH.into(),
+            sha256: OCT22_ACTION_REVIEW_SHA.into(),
+        };
+        let review: Value = serde_json::from_str(OCT22_ACTION_REVIEW).unwrap();
+        let mut fleet = json!({"gates":{},"tracked_units":["preserved-owner"],
+            "diagnostics":[{"epoch":203}],"first_epoch":201,"last_epoch":300,
+            "previous_fleet":{"path":"preserved-predecessor","sha256":"preserved-digest"}});
+        for epoch in ["203", "205", "227"] {
+            fleet["gates"][epoch] = json!({"state":"blocked-qualification",
+                "next_action":review["changes"][epoch]["old_next_action"],
+                "evidence":[{"path":OCT22_ACTION_REVIEW_PATH,"sha256":OCT22_ACTION_REVIEW_SHA}]});
+        }
+        (evidence, review, fleet)
+    }
+
+    #[test]
+    fn oct22_action_changes_only_exact_narrative_and_is_idempotent() {
+        let (evidence, review, original) = oct22_action_fixture();
+        assert_eq!(sha(OCT22_ACTION_REVIEW.as_bytes()), OCT22_ACTION_REVIEW_SHA);
+        for epoch in ["203", "205", "227"] {
+            let mut fleet = original.clone();
+            assert!(correct_oct22_action(&mut fleet, epoch, &evidence, &review).unwrap());
+            let mut expected = original.clone();
+            expected["gates"][epoch]["next_action"] =
+                review["changes"][epoch]["new_next_action"].clone();
+            assert_eq!(fleet, expected);
+            assert!(!correct_oct22_action(&mut fleet, epoch, &evidence, &review).unwrap());
+            assert_eq!(fleet, expected);
+        }
+    }
+
+    #[test]
+    fn oct22_action_rejects_changed_review_without_mutating_fleet() {
+        let (evidence, review, original) = oct22_action_fixture();
+        for (key, value) in [
+            ("launch_authorized", json!(true)),
+            ("resource_claims_changed", json!(true)),
+            ("remote_mutations", json!(true)),
+            ("schema", json!("foreign")),
+        ] {
+            let mut bad = review.clone();
+            bad[key] = value;
+            let mut fleet = original.clone();
+            assert!(correct_oct22_action(&mut fleet, "205", &evidence, &bad).is_err());
+            assert_eq!(fleet, original);
+        }
+        let mut bad = review;
+        bad["changes"]["205"]["new_next_action"] = json!("launch now");
+        let mut fleet = original.clone();
+        assert!(correct_oct22_action(&mut fleet, "205", &evidence, &bad).is_err());
+        assert_eq!(fleet, original);
+    }
+
+    #[test]
+    fn oct22_action_preserves_foreign_bindings_newer_actions_and_states() {
+        let (evidence, review, original) = oct22_action_fixture();
+        for epoch in ["203", "205", "227"] {
+            for (key, value) in [
+                ("next_action", json!("newer reviewed action")),
+                ("state", json!("remote-ready")),
+                ("state", json!("live-replay")),
+                ("state", json!("post-replay-pipeline")),
+            ] {
+                let mut fleet = original.clone();
+                fleet["gates"][epoch][key] = value;
+                let before = fleet.clone();
+                assert!(!correct_oct22_action(&mut fleet, epoch, &evidence, &review).unwrap());
+                assert_eq!(fleet, before);
+            }
+        }
+        let mut foreign = evidence.clone();
+        foreign.path = "/foreign/review.json".into();
+        let mut fleet = original.clone();
+        assert!(!correct_oct22_action(&mut fleet, "205", &foreign, &review).unwrap());
+        assert_eq!(fleet, original);
+        let mut foreign = evidence.clone();
+        foreign.sha256 = "0".repeat(64);
+        let mut fleet = original.clone();
+        assert!(!correct_oct22_action(&mut fleet, "205", &foreign, &review).unwrap());
+        assert!(!correct_oct22_action(&mut fleet, "301", &evidence, &review).unwrap());
+        assert_eq!(fleet, original);
+    }
+
     fn incident203_fixture() -> (Bound, Value, Value) {
         let old = "Continue exact guarded natural-root prefix qualification; no independent full prefix or full epoch is qualified yet. Independent native validator now supports literal prefix203filename and no-clobber fsynced private --receipt;6tests passed,source pushed and reader sealed. On natural parent success and exact431581slot segment, freshly admit independent complete reread. No prefix sidecar/public countdown; native restart,419slot suffix,assembly,current plugin and publication remain separate.";
         assert_eq!(sha(old.as_bytes()), STALE_203_ACTION_SHA);
