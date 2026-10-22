@@ -22,11 +22,12 @@ Two exact snapshot slots are admitted:
 - **96,767,522**: first run the small 477-slot tail comparison through
   96,767,999, covering the known 96,767,526 vote. This is not a complete epoch,
   checkpoint-continuation qualification, or publishable artifact.
-- **96,335,538**: only after the tail comparison and fresh full-run admission,
-  evaluate the cold candidate. Replay starts at 96,335,539; output starts at
-  96,336,000 and contains exactly 432,000 epoch slots. Bind the existing trusted
-  96,767,522 root account hash in the checkpoint file and independently verify
-  its reproduction, the remaining tail, and every canonical transaction outcome.
+- **96,335,538**: the cold candidate remains dormant even after a successful
+  tail comparison and sufficient resources. The retained checkpoint input
+  binds this snapshot and the 96,767,522 root, but not the required full-epoch
+  terminal at 96,767,999. Replay would start at 96,335,539 and full output at
+  96,336,000; do not launch that 432,000-slot path with a bootstrap-only policy
+  or infer its terminal commitment from the private tail result.
 
 The initial parent attempt stopped before worker spawn because ordinary
 focused qualification correctly requires an independently known terminal root;
@@ -38,6 +39,20 @@ transaction checks, and records an unqualified terminal checkpoint. It does
 not qualify a cold prefix or authorize publication. Cold focused qualification
 still requires a trusted terminal root or a separately reviewed later-root
 verification/continuation route; this flag cannot make a cold run pass.
+
+One possible separately reviewed recovery route is a cold prefix ending at the
+known 96,767,522 root, followed by an independently qualified native restart
+and the remaining 477 slots. Such a prefix would replay 431,984 slots including
+warmup and record 431,523 epoch slots. The existing checkpoint rules accept the
+two known commitments for that span, but the current isolated CLI deliberately
+does **not** admit this prefix endpoint. A regression binds both facts. This
+is not a staged launch or resource approval: it still needs explicit closed
+parent/worker bounds, real cold-snapshot qualification, a qualified full-prefix
+reread, the exact native restart tuple and independent write-cursor mapping,
+private assembly/provenance and full/plugin/publication gates. A short-tail
+resource measurement is not a full-prefix peak bound. Preserve every existing
+artifact and do not treat the current diagnostic tail as a reusable qualified
+suffix before those obligations are proven.
 
 Before replay, use the same tail arguments plus `--epoch223-tail-preflight`
 against the exact sealed parent. It must reach the post-bootstrap planning

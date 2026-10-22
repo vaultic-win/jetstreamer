@@ -27,6 +27,7 @@ mod shrink_budget225;
 mod shrink_root203;
 mod snapshot144;
 mod tail223;
+mod tail223_scan;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
 
@@ -263,6 +264,9 @@ pub(super) fn pipeline_unit_range(
     if private144_scan::scope(phase, unit) {
         return Ok(144..=144);
     }
+    if tail223_scan::scope(phase, unit) {
+        return Ok(223..=223);
+    }
     if watch198::namespace(phase, unit) {
         return Ok(198..=198);
     }
@@ -452,6 +456,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         );
         if private144_scan::scope(&claim.phase, &claim.unit) {
             private144_scan::validate_live(claim, current)?;
+        }
+        if tail223_scan::scope(&claim.phase, &claim.unit) {
+            tail223_scan::validate_live(claim, current)?;
         }
         if claim.epoch == 160 && watch160::namespace(&claim.phase, &claim.unit) {
             return Ok(watch160::child_start(&claim.phase, current)?.is_some());
@@ -703,6 +710,16 @@ fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
         claim.scratch_path.join("scratch")
     } else {
         claim.scratch_path.clone()
+    }
+}
+
+fn private_qualification_inventory_state(gate_state: &str) -> &str {
+    if gate_state == "failed-needs-repair" {
+        // A live diagnostic is repair progress, not closure of the incident.
+        // Only the later authenticated ready-pair classification closes it.
+        gate_state
+    } else {
+        "blocked-qualification"
     }
 }
 
@@ -1491,6 +1508,7 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&141) && native141::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
+            || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
         {
             ensure!(
                 names.contains(name),
@@ -1951,6 +1969,9 @@ pub(super) async fn run() -> Result<()> {
         if private144_scan::scope(&claim.phase, &claim.unit) {
             private144_scan::validate(claim)?;
         }
+        if tail223_scan::scope(&claim.phase, &claim.unit) {
+            tail223_scan::validate(claim)?;
+        }
         ensure!(
             pipeline_epoch_units.insert((claim.epoch, claim.unit.clone()))
                 && !diagnostic_units.contains(&claim.unit),
@@ -2041,7 +2062,8 @@ pub(super) async fn run() -> Result<()> {
         } else {
             Value::Null
         };
-        let private_scan = private144_scan::scope(&claim.phase, &claim.unit);
+        let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
+            || tail223_scan::scope(&claim.phase, &claim.unit);
         let mut entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
             "finalization_evidence":finalization,
             "live":is_active,"expected_invocation_id":claim.invocation_id,
@@ -2056,6 +2078,8 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
+                        || (tail223_scan::scope(&claim.phase, &claim.unit)
+                            && plan.gates[&claim.epoch].state == "failed-needs-repair")
                 } else {
                     plan.gates[&claim.epoch].state == "post-replay-pipeline"
                 },
@@ -2258,7 +2282,7 @@ pub(super) async fn run() -> Result<()> {
                     .iter()
                     .any(|c| native141::namespace(c) || census141_poh::namespace(c)))
             {
-                state = "blocked-qualification";
+                state = private_qualification_inventory_state(gate.state.as_str());
             }
             if epoch == 226
                 && diagnostics.iter().any(|claim| {
@@ -2451,6 +2475,27 @@ mod tests {
                 "accepted status for {state}"
             );
         }
+    }
+    #[test]
+    fn live_private_qualification_does_not_remove_an_open_failed_epoch_from_backlog() {
+        assert_eq!(
+            private_qualification_inventory_state("failed-needs-repair"),
+            "failed-needs-repair"
+        );
+        for state in [
+            "blocked-qualification",
+            "staged-admissible",
+            "not-yet-staged",
+        ] {
+            assert_eq!(
+                private_qualification_inventory_state(state),
+                "blocked-qualification"
+            );
+        }
+        assert!(!production_status_binding_matches(
+            true,
+            private_qualification_inventory_state("failed-needs-repair")
+        ));
     }
 
     fn epoch154_guard_properties() -> Value {

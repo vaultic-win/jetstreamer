@@ -313,6 +313,52 @@ mod tests {
         }
     }
     #[test]
+    fn cold_epoch_requires_missing_terminal_and_known_root_prefix_is_not_yet_a_launch_route() {
+        let bootstrap = compatibility::SOLANA_V1_6_20_RUNTIME.bootstrap;
+        let snapshot = Path::new(
+            "/private/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst",
+        );
+        let (_, cold_hash) = snapshot_path_expectation(snapshot, bootstrap).unwrap();
+        let root_hash = BankHashExpectation::LegacyAccountsHash(
+            "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7"
+                .parse()
+                .unwrap(),
+        );
+        let expected = BTreeMap::from([(COLD_BOOTSTRAP, cold_hash), (TAIL_BOOTSTRAP, root_hash)]);
+        let mut plan = QualificationPlan {
+            epoch: 223,
+            bootstrap_slot: COLD_BOOTSTRAP,
+            replay_start: COLD_BOOTSTRAP + 1,
+            output_slot_start: 96_336_000,
+            end_inclusive: OUTPUT_END,
+        };
+        let error = crate::qualification_expectations(expected.clone(), plan, snapshot, bootstrap)
+            .unwrap_err();
+        assert!(error.contains("exact canonical terminal checkpoint at slot 96767999"));
+        assert!(tail_expectations(expected.clone(), plan, snapshot, bootstrap).is_err());
+
+        // These expectations would satisfy the existing checkpoint rules at
+        // the known root, but the isolated CLI does NOT admit this new route.
+        // It needs separate prefix/restart/assembly and resource qualification.
+        plan.end_inclusive = TAIL_BOOTSTRAP;
+        let bound = crate::qualification_expectations(expected, plan, snapshot, bootstrap).unwrap();
+        assert_eq!(bound.len(), 2);
+        assert_eq!(plan.slot_count(), 431_523);
+        assert_eq!(plan.end_inclusive - plan.replay_start + 1, 431_984);
+        assert_eq!(432_000 - plan.slot_count(), 477);
+        assert!(
+            validate_launch(
+                223,
+                223,
+                Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)),
+                false,
+                false,
+                paths()
+            )
+            .is_err()
+        );
+    }
+    #[test]
     fn preflight_cannot_download_genesis_or_extract_accounts() {
         let t = tempfile::tempdir().unwrap();
         assert!(validate_preflight_io(true, false, t.path()).is_err());
