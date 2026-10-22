@@ -21,3 +21,21 @@ It does not permit an early retry after a failed routine observation.
 Qualify and seal a new observer build before operational use. Do not replace or
 restart a healthy replay, controller or already-armed observation merely to add
 this mode.
+
+## Optional host-global pressure
+
+New observer builds accept `"host_global_pressure": true` (default false). This
+adds bounded reads of `/proc/pressure/{cpu,memory,io}` and the host boot ID before
+and after the existing coordinated scan, never a second loop. The v2 receipt
+reports integer cumulative microsecond totals, within-observation deltas, and
+cross-sample deltas only when boot, counter set and monotonic timestamps agree.
+The first enabled sample has no cross-sample baseline. Missing/malformed inputs,
+counter resets, or a host reboot yield explicit unavailable evidence, never zero
+pressure or a failure of otherwise healthy replay/status observation. Static
+`--check-config` does not read these proc files.
+
+These counters distinguish host-global contention from pressure caused by a
+lane's deliberately low `MemoryHigh`. They do not authorize additional lanes,
+relax existing guards, or replace full multi-window admission review. Enable only
+in a newly sealed future observer configuration, preserving the single existing
+30-minute cadence and all replay identities. Existing armed owners stay intact.

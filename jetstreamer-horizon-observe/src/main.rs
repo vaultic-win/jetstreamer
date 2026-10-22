@@ -26,6 +26,7 @@ use {
 
 const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2";
 mod append_log;
+mod host_pressure;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_PREVIOUS_SAMPLE_BYTES: u64 = 4 * 1024 * 1024;
@@ -99,6 +100,9 @@ struct Config {
     // Its predecessor namespace must not collide with the primary epoch203.
     #[serde(default)]
     epoch203_ram_auxiliary: Option<RamAuxiliaryConfig>,
+    // Telemetry only, sampled inside this same cadence. Never changes admission.
+    #[serde(default)]
+    host_global_pressure: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1828,6 +1832,9 @@ fn run(config: Config) -> Result<()> {
 
     let available_before = filesystem_available_bytes(&config.filesystem_path)?;
     let (memory_total_kib, memory_available_before_kib) = host_memory()?;
+    let host_pressure_before = config
+        .host_global_pressure
+        .then(|| host_pressure::capture(Path::new("/proc")));
     let progress_since_unix = progress_window_start(&previous_value, previous_unix)?;
     ensure!(
         started_unix >= progress_since_unix,
@@ -1909,6 +1916,13 @@ fn run(config: Config) -> Result<()> {
     }
     let available_after = filesystem_available_bytes(&config.filesystem_path)?;
     let (_, memory_available_after_kib) = host_memory()?;
+    let host_pressure = host_pressure_before.map(|before| {
+        host_pressure::report(
+            before,
+            host_pressure::capture(Path::new("/proc")),
+            &previous_value["host_global_pressure"]["after"],
+        )
+    });
     let completed_unix = now_unix()?;
     let next_observation = started_unix
         .checked_add(config.minimum_interval_seconds)
@@ -1941,6 +1955,7 @@ fn run(config: Config) -> Result<()> {
             "available_kib_after": memory_available_after_kib,
             "conservative_available_kib": memory_available_before_kib.min(memory_available_after_kib),
         },
+        "host_global_pressure": host_pressure,
         "vm_max_map_count": vm_max_map_count()?,
         "replays": observations,
         "diagnostic_replays": diagnostic_observations,
@@ -2046,6 +2061,22 @@ mod tests {
         assert_eq!(report["replay_launch_authorized"], false);
         assert_eq!(report["publication_authorized"], false);
         assert!(!temp.path().join("sample.json").exists());
+    }
+
+    #[test]
+    fn host_pressure_is_optional_and_static_preflight_reads_no_telemetry() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut value = preflight_fixture(temp.path());
+        let config: Config = serde_json::from_value(value.clone()).unwrap();
+        assert!(!config.host_global_pressure);
+        value["host_global_pressure"] = serde_json::json!(true);
+        let path = temp.path().join("config.json");
+        fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let report = dispatch(&path, true).unwrap().unwrap();
+        assert_eq!(report["resource_observation_performed"], false);
+        assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
+        value["host_global_pressure"] = serde_json::json!("true");
+        assert!(serde_json::from_value::<Config>(value).is_err());
     }
 
     #[test]
@@ -2292,6 +2323,7 @@ mod tests {
             output: "/output.json".into(),
             replays: Vec::new(),
             diagnostic_replays: vec![primary],
+            host_global_pressure: false,
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
                 supervisor_profile: "jetstreamer-private-epoch203-ram-bounded-runner-plan-v1"
