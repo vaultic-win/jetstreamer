@@ -15,6 +15,13 @@ checks the original generation-bound snapshot metadata specifically at epoch
 identify the retained snapshot generation; its runtime/publication plan is
 never adopted for epoch 223.
 
+Native `SHA256SUMS` includes the generated deployment receipt in addition to
+the eight declared payload members. Verify that generated entry against the
+independently supplied receipt digest, then exclude it only from the declared
+payload comparison. The first sealed attempt rejected this census safely;
+preserve that failed service and its journal. A regression binds the actual
+nine-line native checksum table rather than an invented eight-line format.
+
 Three actual-release probes run as UID/GID 1000 in a new isolated private root:
 reject the early failed-prefix recovery entrypoint; reject a wrong-but-nearby
 snapshot slot; and reach the correct focused v1.6.25 route before rejecting an

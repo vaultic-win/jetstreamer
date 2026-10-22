@@ -210,7 +210,9 @@ fn sums(text: &str) -> Result<BTreeMap<String, String>> {
         );
     }
     ensure!(
-        out.len() == CORE.len() + 1 && out.contains_key("parent-build-final.log"),
+        out.len() == CORE.len() + 2
+            && out.contains_key("parent-build-final.log")
+            && out.contains_key("deployment-seal-receipt.json"),
         "wrong member census"
     );
     for &(name, sha) in CORE {
@@ -284,7 +286,11 @@ fn package(p: &Plan) -> Result<BTreeMap<String, Identity>> {
         seal.sha256 == p.seal_sha256 && checksum.sha256 == p.sums_sha256,
         "package metadata binding"
     );
-    let expected = sums(&fs::read_to_string(p.package.join("SHA256SUMS"))?)?;
+    let mut expected = sums(&fs::read_to_string(p.package.join("SHA256SUMS"))?)?;
+    ensure!(
+        expected.remove("deployment-seal-receipt.json").as_deref() == Some(p.seal_sha256.as_str()),
+        "generated native seal digest differs"
+    );
     let mut names = std::collections::BTreeSet::new();
     for e in fs::read_dir(&p.package)? {
         let e = e?;
@@ -510,6 +516,24 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
+    fn actual_native_sums_separate_generated_receipt_from_eight_payload_members() {
+        let mut parsed = sums(include_str!(
+            "../tests/fixtures/epoch223-tail-native-sha256sums.txt"
+        ))
+        .unwrap();
+        assert_eq!(parsed.len(), 9);
+        assert_eq!(
+            parsed.remove("deployment-seal-receipt.json").unwrap(),
+            "4ab0f74e4fc69d3bb0382242bf9c862c5274532cb991e3843258981f264b5ba3"
+        );
+        assert_eq!(parsed.len(), 8);
+        assert!(
+            parsed
+                .keys()
+                .all(|k| k != "SHA256SUMS" && k != "deployment-seal-receipt.json")
+        );
+    }
+    #[test]
     fn native_seal_never_grants_authority_or_accepts_changed_members() {
         let member = Identity {
             sha256: CORE[0].1.into(),
@@ -608,7 +632,11 @@ mod tests {
             .iter()
             .map(|(n, s)| format!("{s}  {n}\n"))
             .collect::<String>()
-            + &format!("{}  parent-build-final.log\n", "a".repeat(64));
+            + &format!(
+                "{}  parent-build-final.log\n{}  deployment-seal-receipt.json\n",
+                "a".repeat(64),
+                "b".repeat(64)
+            );
         assert!(sums(&valid).is_ok());
         assert!(sums(&(valid.clone() + &format!("{}  extra\n", "b".repeat(64)))).is_err());
         assert!(sums(&(valid.clone() + &format!("{}  jetstreamer-node\n", CORE[0].1))).is_err());
