@@ -1,8 +1,8 @@
 //! Fresh, read-only-storage admission for exact144 assembly-only recovery.
 //! Never launches a service or mutates any R2 object.
 use super::*;
-const ASSEMBLER: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-assembly-only-tools-20261022-v1/jetstreamer-epoch144-assembly-only";
-const ASSEMBLER_SHA: &str = "9cde9f28e1f281eed76faae4a99a6f251984d7bcb8c62ee90a3e8b271a5f3e71";
+const ASSEMBLER: &str = assembly144::TOOL;
+const ASSEMBLER_SHA: &str = assembly144::TOOL_SHA;
 const ORIGINAL_IID: &str = "8fddd3ef045c4fe5b12c7d25f43a4b73";
 const PREFIX: &str = "917f700274c0ff0386cd8be2f27eb2ace9f3bc7dff38e1010d0c04bb79b8c273";
 const SUFFIX: &str = "3df30cabba516ff6de39bfc236fca030e3bb75b45603d88ef7baf7a6d669a414";
@@ -121,7 +121,7 @@ fn source_manifests(p: &Value, s: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn timeout_properties() -> Result<Value> {
+pub(super) fn timeout_properties() -> Result<Value> {
     let out=ProcessCommand::new("systemctl").args(["show",continuation144::UNIT,"--property=Id,InvocationID,MainPID,NRestarts,Restart,Result,ActiveState,SubState,RuntimeMaxUSec,ExecMainStatus,ExecStart"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 16384,
@@ -136,7 +136,7 @@ fn timeout_properties() -> Result<Value> {
     check_timeout(&v)?;
     Ok(v)
 }
-fn check_timeout(v: &Value) -> Result<()> {
+pub(super) fn check_timeout(v: &Value) -> Result<()> {
     ensure!(
         v["Id"] == continuation144::UNIT
             && v["InvocationID"] == ORIGINAL_IID
@@ -272,6 +272,16 @@ pub(super) async fn run() -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     accepted(&s, &o, &f, &plan, now)?;
     validate_output_destination(&s.output)?;
+    let output_parent = Path::new(assembly144::ROOT)
+        .parent()
+        .context("assembly output parent")?;
+    let output_device = fs::metadata("/home/sol")?.dev();
+    ensure!(
+        output_parent.canonicalize()? == output_parent
+            && fs::symlink_metadata(output_parent)?.is_dir()
+            && fs::metadata(output_parent)?.dev() == output_device,
+        "assembly destination is not on the admitted data filesystem"
+    );
     if check {
         println!(
             "assembly-only admission preflight passed; no service/resource/remote observation,writes or launch; actual original timeout remains required"
@@ -333,6 +343,7 @@ pub(super) async fn run() -> Result<()> {
         &s.output,
         &json!({"schema":"jetstreamer-private144-assembly-only-admission-v1","epoch":144,"admitted":true,"assembly_only_no_replay":true,
         "assembler_sha256":ASSEMBLER_SHA,"prefix_sha256":PREFIX,"suffix_sha256":SUFFIX,"prefix_manifest_sha256":PREFIX_MANIFEST,"suffix_manifest_sha256":SUFFIX_MANIFEST,
+        "output_root":assembly144::ROOT,"output_filesystem":"/home/sol","output_filesystem_device":output_device,
         "candidate_incremental_peak_bytes":PEAK,"protected_existing_floor_bytes":BASELINE,"maximum_archive_bytes":112u64<<30,"maximum_runtime_seconds":86400,
         "available_bytes":available,"memory_available_kib":mem,"required_guard_minimum_free_bytes":available.saturating_sub(PEAK).max(BASELINE),"century_floor_bytes":floor_bytes,
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"spec":private157::binding(&sb),"original_timeout":timeout,

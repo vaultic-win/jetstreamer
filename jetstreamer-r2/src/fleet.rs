@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod assembly144;
 mod assembly144_admission;
 mod bounded205;
 mod continuation144;
@@ -53,6 +54,9 @@ pub(super) fn prepare_continuation144_fleet() -> Result<()> {
 }
 pub(super) async fn admit_assembly144() -> Result<()> {
     assembly144_admission::run().await
+}
+pub(super) fn capture_assembly144_launch() -> Result<()> {
+    assembly144::capture_launch()
 }
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -506,6 +510,9 @@ fn validate_same_sample_admission(
         144 if continuation144::namespace(claim) => {
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
+        144 if assembly144::namespace(claim) => {
+            "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
+        }
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -579,6 +586,7 @@ fn validate_same_sample_admission(
             && if native_restore_140(claim)
                 || native144::namespace(claim)
                 || continuation144::namespace(claim)
+                || assembly144::namespace(claim)
             {
                 // The pinned eca guard predates bounded-canary fields.
                 guard.get("canary_target_error").is_none()
@@ -598,12 +606,8 @@ fn validate_same_sample_admission(
         .as_array()
         .context("guard workers missing")?;
     ensure!(
-        workers.len() == 1
-            && workers[0][0].as_u64().is_some_and(|pid| pid > 0)
-            && workers[0][1]
-                .as_u64()
-                .is_some_and(|vmas| vmas > 0 && vmas <= 3_500_000),
-        "admission must prove one readable real worker"
+        diagnostic_guard_workers_match(claim, workers),
+        "admission must prove its exact worker census (assembly-only requires zero)"
     );
     ensure!(
         guard_plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
@@ -626,8 +630,20 @@ fn validate_same_sample_admission(
     Ok(())
 }
 
+fn diagnostic_guard_workers_match(claim: &DiagnosticClaim, workers: &[Value]) -> bool {
+    if assembly144::namespace(claim) {
+        workers.is_empty()
+    } else {
+        workers.len() == 1
+            && workers[0][0].as_u64().is_some_and(|pid| pid > 0)
+            && workers[0][1]
+                .as_u64()
+                .is_some_and(|vmas| vmas > 0 && vmas <= 3_500_000)
+    }
+}
+
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if continuation144::namespace(claim) {
+    if continuation144::namespace(claim) || assembly144::namespace(claim) {
         let Ok(launch) = checked_diagnostic_launch(claim) else {
             return false;
         };
@@ -708,6 +724,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if assembly144::namespace(claim) || receipt["schema"] == assembly144::SCHEMA {
+        return assembly144::launch(receipt, claim);
+    }
     if continuation144::namespace(claim) || receipt["schema"] == continuation144::SCHEMA {
         return continuation144::launch(receipt, claim);
     }
@@ -1978,6 +1997,9 @@ pub(super) async fn run() -> Result<()> {
             if continuation144::namespace(claim) {
                 continuation144::validate_live(claim, current)?;
             }
+            if assembly144::namespace(claim) {
+                assembly144::validate_live(claim, current)?;
+            }
             if retained220::namespace(claim) {
                 retained220::validate_live(claim, current)?;
             }
@@ -2028,7 +2050,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if native_restore_140(claim) || native144::namespace(claim) {
+            let phase = if assembly144::namespace(claim) {
+                "private-assembly-only"
+            } else if native_restore_140(claim) || native144::namespace(claim) {
                 "native-restore-only"
             } else if claim
                 .unit

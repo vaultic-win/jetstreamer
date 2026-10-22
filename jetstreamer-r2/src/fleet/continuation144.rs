@@ -296,7 +296,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
 }
 
 const STATE: &str = "/var/lib/jetstreamer/horizon-continuation144-launch-20261022-v1";
-fn sealed_self(expected: &str) -> Result<()> {
+pub(super) fn sealed_self(expected: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "continuation144 preparation requires root"

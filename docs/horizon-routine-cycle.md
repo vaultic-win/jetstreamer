@@ -1,5 +1,24 @@
 # Bounded routine metadata cycle
 
+## Private epoch144 assembly-only fallback
+
+The separately qualified assembly-only owner is never ordinary replay or an ETA
+claim. Its launch capture binds the exact assembler, plan, native prefix/suffix,
+fresh protected admission and authenticated original continuation timeout. Live
+or successful original owners forbid fallback. Capture alone does not install
+the guard, create a fleet event, migrate routine observation or authorize final
+verification, import or publication; those gates must be qualified separately.
+The fleet's zero-worker first-fire exception is exclusive to this exact no-replay
+owner; it must reject any worker and preserve all older diagnostic history.
+
+Assembly output belongs on the admitted `/home/sol` data filesystem, not the
+smaller `/var/lib` system filesystem. The v2 assembler package pins its new
+root-private output path and requires admission to bind `/home/sol` and its
+device number. Both admission and execution check destination device identity;
+execution still checks actual free space before work and throughout output.
+Retain old sealed v1 packages as history, not launch candidates. Do not create a
+bind mount or relax private ancestry to make an obsolete path appear admissible.
+
 ## Exact epoch193 to epoch194 ETA handoff
 
 The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.

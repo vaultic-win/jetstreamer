@@ -22,7 +22,7 @@ const ORIGINAL: &str = "horizon-qualify-144-checkpoint-continuation-20261022-v1.
 const ORIGINAL_IID: &str = "8fddd3ef045c4fe5b12c7d25f43a4b73";
 const LEASE: &str = "/home/sol/.jetstreamer-private/checkpoint-continuation-144.lock";
 const UNIT: &str = "horizon-qualify-144-assembly-only-recovery-20261022-v1.service";
-const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch144-assembly-only-20261022-v1";
+const ROOT: &str = "/home/sol/.jetstreamer-private/epoch144-assembly-only-20261022-v2";
 const PREFIX: &str = "/home/sol/.jetstreamer-private/epoch144-upgradeable-loader-focus-20261016-v1/output/epoch-144-through-62639490.jet";
 const SUFFIX: &str = "/home/sol/.jetstreamer-private/checkpoint-continuation-144-20261022-v1/output/epoch-144-suffix.jet";
 const PREFIX_SHA: &str = "917f700274c0ff0386cd8be2f27eb2ace9f3bc7dff38e1010d0c04bb79b8c273";
@@ -103,6 +103,9 @@ fn admission(p: &Plan, a: &Value, now: u64) -> Result<u64> {
             && a["admitted"] == true
             && a["assembly_only_no_replay"] == true
             && a["assembler_sha256"] == p.assembler_sha256
+            && a["output_root"] == ROOT
+            && a["output_filesystem"] == "/home/sol"
+            && a["output_filesystem_device"].as_u64().is_some()
             && a["prefix_sha256"] == PREFIX_SHA
             && a["suffix_sha256"] == SUFFIX_SHA
             && a["prefix_manifest_sha256"] == PREFIX_MANIFEST
@@ -261,6 +264,8 @@ fn run() -> Result<()> {
     ensure!(
         dir.is_dir()
             && dir.uid() == 0
+            && dir.dev() == fs::metadata("/home/sol")?.dev()
+            && admitted["output_filesystem_device"].as_u64() == Some(dir.dev())
             && dir.mode() & 0o077 == 0
             && p.output_root.canonicalize()? == p.output_root
             && fs::read_dir(ROOT)?.next().is_none(),
@@ -432,7 +437,8 @@ mod tests {
         let mut a = json!({"schema":"jetstreamer-private144-assembly-only-admission-v1","admitted":true,"assembly_only_no_replay":true,"assembler_sha256":p.assembler_sha256,
             "prefix_sha256":PREFIX_SHA,"suffix_sha256":SUFFIX_SHA,"prefix_manifest_sha256":PREFIX_MANIFEST,"suffix_manifest_sha256":SUFFIX_MANIFEST,
             "candidate_incremental_peak_bytes":PEAK,"protected_existing_floor_bytes":BASELINE,"maximum_archive_bytes":MAX_ARCHIVE,"maximum_runtime_seconds":86400,
-            "recorded_unix_seconds":1000,"required_guard_minimum_free_bytes":BASELINE+100,"available_bytes":BASELINE+PEAK+100,"memory_available_kib":128u64*1024*1024});
+            "recorded_unix_seconds":1000,"required_guard_minimum_free_bytes":BASELINE+100,"available_bytes":BASELINE+PEAK+100,"memory_available_kib":128u64*1024*1024,
+            "output_root":ROOT,"output_filesystem":"/home/sol","output_filesystem_device":123});
         for k in [
             "replay_launch_authorized",
             "canonical_sidecar_authorized",
@@ -450,6 +456,12 @@ mod tests {
             ("required_guard_minimum_free_bytes", json!(BASELINE)),
             ("publication_authorized", json!(true)),
             ("memory_available_kib", json!(1)),
+            (
+                "output_root",
+                json!("/var/lib/jetstreamer/horizon-epoch144-assembly-only-20261022-v1"),
+            ),
+            ("output_filesystem", json!("/var/lib/jetstreamer")),
+            ("output_filesystem_device", Value::Null),
         ] {
             let mut bad = a.clone();
             bad[k] = v;

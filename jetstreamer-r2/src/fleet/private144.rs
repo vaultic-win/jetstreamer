@@ -116,12 +116,18 @@ pub(super) fn observe(
         .collect();
     if !overlaps.is_empty() {
         ensure!(
-            overlaps.len() <= 3
+            overlaps.len() <= 4
                 && overlaps.iter().all(|c| prefix144::namespace(c)
                     || native144::namespace(c)
-                    || continuation144::namespace(c))
+                    || continuation144::namespace(c)
+                    || assembly144::namespace(c))
                 && overlaps.iter().filter(|c| prefix144::namespace(c)).count() <= 1
-                && overlaps.iter().filter(|c| native144::namespace(c)).count() <= 1,
+                && overlaps.iter().filter(|c| native144::namespace(c)).count() <= 1
+                && overlaps
+                    .iter()
+                    .filter(|c| assembly144::namespace(c))
+                    .count()
+                    <= 1,
             "private144 overlapping diagnostic is not its exact independent verifier"
         );
         // Preserve the old observation as terminal history, never as another
@@ -154,6 +160,17 @@ pub(super) fn observe(
                 "continuation144 cannot overlap native comparison"
             );
         }
+        if overlaps.iter().any(|c| assembly144::namespace(c)) {
+            ensure!(
+                overlaps
+                    .iter()
+                    .filter(|c| continuation144::namespace(c))
+                    .count()
+                    == 1,
+                "assembly144 lost original continuation history"
+            );
+            assembly144_admission::timeout_properties()?;
+        }
     }
     ensure!(
         rows.len() == 1
@@ -172,6 +189,28 @@ pub(super) fn observe(
                 .any(|r| r["range"] == "144"),
         "private144 fleet scope, gate, tracking or overlapping owner differs"
     );
+    if rows[0]["producer_unit"] == assembly144::UNIT {
+        let claim = overlaps
+            .iter()
+            .find(|c| assembly144::namespace(c))
+            .context("assembly144 observer has no bound launch")?;
+        ensure!(
+            rows[0]["expected_producer_invocation_id"] == claim.invocation_id
+                && rows[0]["scratch_path"].as_str() == claim.scratch_path.to_str(),
+            "assembly144 observer differs from launch"
+        );
+        return Ok(Some(classify_owner(
+            rows[0],
+            census
+                .get(assembly144::UNIT)
+                .context("assembly144 owner absent")?,
+            sample,
+            assembly144::UNIT,
+            &claim.invocation_id,
+            assembly144::ROOT,
+            "private-assembly-only",
+        )?));
+    }
     if rows[0]["producer_unit"] == continuation144::UNIT {
         let claim = overlaps
             .iter()
