@@ -298,10 +298,10 @@ fn gates(p: &Plan, v: &Value) -> Result<Value> {
 }
 struct MutationLock(File);
 impl MutationLock {
-    fn acquire(path: &Path) -> Result<Self> {
-        Self::acquire_owned(path, 1001)
+    fn try_acquire(path: &Path, device: u64, inode: u64) -> Result<Option<Self>> {
+        Self::try_owned(path, 1001, Some((device, inode)))
     }
-    fn acquire_owned(path: &Path, uid: u32) -> Result<Self> {
+    fn try_owned(path: &Path, uid: u32, expected: Option<(u64, u64)>) -> Result<Option<Self>> {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -309,19 +309,27 @@ impl MutationLock {
             .open(path)?;
         let m = f.metadata()?;
         ensure!(
-            m.is_file() && m.uid() == uid && m.nlink() == 1 && m.mode() & 0o777 == 0o600,
+            m.is_file()
+                && m.uid() == uid
+                && m.nlink() == 1
+                && m.mode() & 0o777 == 0o600
+                && expected.is_none_or(|(d, i)| m.dev() == d && m.ino() == i),
             "shared144 mutation lock identity differs"
         );
-        ensure!(
-            unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX) } == 0,
-            "shared144 mutation lock acquisition failed"
-        );
+        let locked = unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0;
+        if !locked {
+            let error = std::io::Error::last_os_error();
+            ensure!(
+                error.kind() == std::io::ErrorKind::WouldBlock,
+                "shared144 lock acquisition failed:{error}"
+            );
+        }
         ensure!(
             evidence::identity(&m) == evidence::identity(&f.metadata()?)
                 && evidence::identity(&m) == evidence::identity(&fs::symlink_metadata(path)?),
             "shared mutation lock replaced"
         );
-        Ok(Self(f))
+        Ok(locked.then_some(Self(f)))
     }
 }
 impl Drop for MutationLock {
@@ -530,12 +538,24 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
     evidence::write_receipt(
         &p.output_directory.join("intent.json"),
         &json!({"schema":"horizon-exact144-delivery-intent-v1","plan":pb,"self_sha256":self_sha,"owner":owner,"publisher":before,
-        "shared_mutation_lock":LOCK,"lock_wait_started_millis":now()?,"another_progressive_coordinator":false,"local_retirement_authorized":false}),
+        "shared_mutation_lock":LOCK,"lock_wait_started_millis":now()?,"lock_acquisition_mode":"nonblocking-no-queue","another_progressive_coordinator":false,"local_retirement_authorized":false}),
     )?;
-    // Capture while this exact worker is live, even when an idempotent sync
-    // could finish before an external observer has time to query the unit.
-    tracking::run(p, pb, self_sha, false)?;
-    let _lock = MutationLock::acquire(Path::new(LOCK))?;
+    // Refuse contention instead of creating an unmodeled queue countdown.
+    // The existing owner remains untouched and no client has been spawned.
+    let Some(_lock) =
+        MutationLock::try_acquire(Path::new(LOCK), p.shared_lock_device, p.shared_lock_inode)?
+    else {
+        evidence::write_receipt(
+            &p.output_directory.join("lock-declined.json"),
+            &json!({"schema":"horizon-exact144-delivery-lock-declined-v1","owner":owner,"plan":pb,"self_sha256":self_sha,
+                "shared_mutation_lock":LOCK,"lock_device":p.shared_lock_device,"lock_inode":p.shared_lock_inode,
+                "declined_at_millis":now()?,"delivery_launched":false,"client_started":false,"queued":false,
+                "archive_or_status_mutations":false,"automatic_retry_authorized":false}),
+        )?;
+        anyhow::bail!(
+            "144 delivery not launched: exact shared upload lock busy; preserve evidence and admit a fresh attempt after authenticated release"
+        );
+    };
     let lock_meta = _lock.0.metadata()?;
     ensure!(
         lock_meta.dev() == p.shared_lock_device && lock_meta.ino() == p.shared_lock_inode,
@@ -550,6 +570,8 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
         &p.output_directory.join("lock-acquired.json"),
         &json!({"schema":"horizon-exact144-delivery-lock-v1","owner":owner,"plan":pb,"acquired_millis":now()?,"shared_mutation_lock":LOCK,"gates":locked}),
     )?;
+    // Capture only after exclusive ownership is durable, before any client.
+    tracking::run(p, pb, self_sha, false)?;
     let status = child(p, &sync_args(), &owner, pb)?;
     evidence::write_receipt(
         &p.output_directory.join("upload-child.json"),
@@ -798,7 +820,16 @@ mod tests {
             .mode(0o600)
             .open(&path)
             .unwrap();
-        let lock = MutationLock::acquire_owned(&path, unsafe { libc::geteuid() }).unwrap();
+        let lock = MutationLock::try_owned(&path, unsafe { libc::geteuid() }, None)
+            .unwrap()
+            .unwrap();
+        let began = std::time::Instant::now();
+        assert!(
+            MutationLock::try_owned(&path, unsafe { libc::geteuid() }, None)
+                .unwrap()
+                .is_none()
+        );
+        assert!(began.elapsed() < std::time::Duration::from_secs(1));
         let other = OpenOptions::new()
             .read(true)
             .write(true)

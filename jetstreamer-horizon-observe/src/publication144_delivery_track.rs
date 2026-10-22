@@ -135,6 +135,7 @@ fn intent(v: &Value, pb: &Bound, sha: &str, exe: &Path) -> Result<()> {
             && v["plan"] == serde_json::to_value(pb)?
             && v["self_sha256"] == sha
             && v["shared_mutation_lock"] == LOCK
+            && v["lock_acquisition_mode"] == "nonblocking-no-queue"
             && v["lock_wait_started_millis"]
                 .as_u64()
                 .is_some_and(|n| n > 0)
@@ -190,17 +191,16 @@ fn launch(v: &Value, b: &Bound, i: &Value, pb: &Bound, sha: &str, exe: &Path) ->
         "capture precedes worker lock wait"
     );
     ensure!(
-        (v["initial_delivery_phase"] == "queued-upload" && v["lock_acquisition"].is_null())
-            || (v["initial_delivery_phase"] == "upload-readback"
-                && v["lock_acquisition"]["path"].as_str()
-                    == b.path
-                        .parent()
-                        .map(|p| p.join("lock-acquired.json"))
-                        .as_ref()
-                        .and_then(|p| p.to_str())
-                && v["lock_acquisition"]["sha256"]
-                    .as_str()
-                    .is_some_and(evidence::is_sha)),
+        v["initial_delivery_phase"] == "upload-readback"
+            && v["lock_acquisition"]["path"].as_str()
+                == b.path
+                    .parent()
+                    .map(|p| p.join("lock-acquired.json"))
+                    .as_ref()
+                    .and_then(|p| p.to_str())
+            && v["lock_acquisition"]["sha256"]
+                .as_str()
+                .is_some_and(evidence::is_sha),
         "delivery capture phase/lock evidence changed"
     );
     owner(&v["owner"], &i["owner"]["InvocationID"], pb, sha, exe)?;
@@ -216,6 +216,35 @@ fn launch(v: &Value, b: &Bound, i: &Value, pb: &Bound, sha: &str, exe: &Path) ->
         ensure!(
             v[flag] == false,
             "delivery capture acquired authority:{flag}"
+        );
+    }
+    Ok(())
+}
+fn declined(v: &Value, i: &Value, pb: &Bound, sha: &str, device: u64, inode: u64) -> Result<()> {
+    ensure!(
+        v["schema"] == "horizon-exact144-delivery-lock-declined-v1"
+            && v["owner"] == i["owner"]
+            && v["plan"] == serde_json::to_value(pb)?
+            && v["self_sha256"] == sha
+            && v["shared_mutation_lock"] == LOCK
+            && v["lock_device"] == device
+            && v["lock_inode"] == inode
+            && v["declined_at_millis"]
+                .as_u64()
+                .zip(i["lock_wait_started_millis"].as_u64())
+                .is_some_and(|(a, b)| a >= b),
+        "foreign busy-lock decline receipt"
+    );
+    for flag in [
+        "delivery_launched",
+        "client_started",
+        "queued",
+        "archive_or_status_mutations",
+        "automatic_retry_authorized",
+    ] {
+        ensure!(
+            v[flag] == false,
+            "busy-lock decline acquired authority:{flag}"
         );
     }
     Ok(())
@@ -238,6 +267,50 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, is_terminal: bool) -> Re
     // This tiny private metadata mutex is distinct from the global archive
     // mutation lock. Acquire only after a genuine owner is authenticated.
     let _capture_mutex = CaptureMutex::acquire(&p.output_directory)?;
+    if is_terminal
+        && matches!(fs::symlink_metadata(p.output_directory.join("launch.json")),Err(e) if e.kind()==std::io::ErrorKind::NotFound)
+    {
+        let (db, d) = receipt(&p.output_directory.join("lock-declined.json"))?;
+        declined(
+            &d,
+            &i,
+            pb,
+            self_sha,
+            p.shared_lock_device,
+            p.shared_lock_inode,
+        )?;
+        ensure!(
+            !terminal(&before)?,
+            "declined busy-lock attempt cannot claim successful delivery"
+        );
+        for name in [
+            "lock-acquired.json",
+            "upload-child-launch.json",
+            "upload-child.json",
+            "archive-complete.json",
+            "completion.json",
+        ] {
+            ensure!(
+                matches!(fs::symlink_metadata(p.output_directory.join(name)),Err(e) if e.kind()==std::io::ErrorKind::NotFound),
+                "declined attempt has downstream evidence:{name}"
+            );
+        }
+        ensure!(
+            fields(UNIT)? == before,
+            "declined owner changed during terminal capture"
+        );
+        durable(
+            &p.output_directory.join("terminal.json"),
+            &json!({"schema":"jetstreamer-exact144-delivery-terminal-v1",
+            "epoch":144,"plan":pb,"self_sha256":self_sha,"worker_intent":ib,"decline":db,"owner":before,
+            "service_success":false,"delivery_not_launched":true,"queued":false,"automatic_retry_authorized":false,
+            "archive_verification_or_ready_pair_proven":false,"publication_authorized":false,"retirement_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+        )?;
+        println!(
+            "exact144 declined attempt captured; no delivery, client,queue or remote mutation"
+        );
+        return Ok(());
+    }
     if !is_terminal {
         ensure!(
             live(&before),
@@ -273,7 +346,9 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, is_terminal: bool) -> Re
                 lock(&v, &i, pb)?;
                 ("upload-readback", Some(b))
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => ("queued-upload", None),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => anyhow::bail!(
+                "nonblocking delivery cannot capture a queued claim before lock ownership"
+            ),
             Err(e) => return Err(e.into()),
         };
         let after = fields(UNIT)?;
@@ -341,11 +416,11 @@ mod tests {
         };
         let exe = PathBuf::from("/sealed/deliver");
         let owner = json!({"Id":UNIT,"LoadState":"loaded","InvocationID":"b".repeat(32),"NRestarts":"0","Restart":"no","Type":"oneshot","RemainAfterExit":"yes","ActiveState":"activating","SubState":"start","MainPID":"123","ExecStart":format!("{} ; ignore_errors=no ; start_time=[now] }}",command(&pb,&"c".repeat(64),&exe))});
-        let v = json!({"schema":"horizon-exact144-delivery-intent-v1","plan":pb,"self_sha256":"c".repeat(64),"owner":owner,"publisher":{"publisher":{"Id":PUB,"InvocationID":"d".repeat(32)},"publication":{"committed":true}},"shared_mutation_lock":LOCK,"lock_wait_started_millis":10,"another_progressive_coordinator":false,"local_retirement_authorized":false});
+        let v = json!({"schema":"horizon-exact144-delivery-intent-v1","plan":pb,"self_sha256":"c".repeat(64),"owner":owner,"publisher":{"publisher":{"Id":PUB,"InvocationID":"d".repeat(32)},"publication":{"committed":true}},"shared_mutation_lock":LOCK,"lock_wait_started_millis":10,"lock_acquisition_mode":"nonblocking-no-queue","another_progressive_coordinator":false,"local_retirement_authorized":false});
         (pb, exe, v)
     }
     #[test]
-    fn queued_capture_retains_exact_live_worker_and_original_publisher() {
+    fn nonblocking_intent_retains_exact_live_worker_and_original_publisher() {
         let (p, e, v) = fixture();
         intent(&v, &p, &"c".repeat(64), &e).unwrap();
         for key in v.as_object().unwrap().keys() {
@@ -395,13 +470,30 @@ mod tests {
         assert!(terminal(&u).is_err());
     }
     #[test]
+    fn busy_decline_is_bound_and_never_a_queued_upload_or_retry_permission() {
+        let (p, _, i) = fixture();
+        let d = json!({"schema":"horizon-exact144-delivery-lock-declined-v1","owner":i["owner"],"plan":p,"self_sha256":"c".repeat(64),
+            "shared_mutation_lock":LOCK,"lock_device":1,"lock_inode":2,"declined_at_millis":11,
+            "delivery_launched":false,"client_started":false,"queued":false,"archive_or_status_mutations":false,"automatic_retry_authorized":false});
+        declined(&d, &i, &p, &"c".repeat(64), 1, 2).unwrap();
+        for key in d.as_object().unwrap().keys() {
+            let mut bad = d.clone();
+            bad[key] = Value::Null;
+            assert!(
+                declined(&bad, &i, &p, &"c".repeat(64), 1, 2).is_err(),
+                "{key}"
+            );
+        }
+        assert!(declined(&d, &i, &p, &"c".repeat(64), 1, 3).is_err());
+    }
+    #[test]
     fn captured_claim_cannot_change_origin_command_phase_or_authority() {
         let (p, e, i) = fixture();
         let b = Bound {
             path: "/private/intent.json".into(),
             sha256: "e".repeat(64),
         };
-        let v = json!({"schema":"jetstreamer-exact144-delivery-launch-v1","epoch":144,"plan":p,"self_sha256":"c".repeat(64),"worker_intent":b,"owner":i["owner"],"captured_at_millis":11,"initial_delivery_phase":"queued-upload","lock_acquisition":null,"claim":{"unit":UNIT,"invocation_id":i["owner"]["InvocationID"],"expected_exec_start":i["owner"]["ExecStart"],"phase":"upload-readback","origin_unit":PUB,"origin_invocation_id":i["publisher"]["publisher"]["InvocationID"]},"ordinary_replay_claim":false,"current_sidecar_eta_valid":false,"publication_authorized":false,"retirement_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        let v = json!({"schema":"jetstreamer-exact144-delivery-launch-v1","epoch":144,"plan":p,"self_sha256":"c".repeat(64),"worker_intent":b,"owner":i["owner"],"captured_at_millis":11,"initial_delivery_phase":"upload-readback","lock_acquisition":{"path":"/private/lock-acquired.json","sha256":"f".repeat(64)},"claim":{"unit":UNIT,"invocation_id":i["owner"]["InvocationID"],"expected_exec_start":i["owner"]["ExecStart"],"phase":"upload-readback","origin_unit":PUB,"origin_invocation_id":i["publisher"]["publisher"]["InvocationID"]},"ordinary_replay_claim":false,"current_sidecar_eta_valid":false,"publication_authorized":false,"retirement_authorized":false,"remote_mutations":false,"r2_mutations":false});
         launch(&v, &b, &i, &p, &"c".repeat(64), &e).unwrap();
         for key in [
             "worker_intent",
@@ -424,7 +516,7 @@ mod tests {
         bad["claim"]["expected_exec_start"] = json!("foreign");
         assert!(launch(&bad, &b, &i, &p, &"c".repeat(64), &e).is_err());
         let mut bad = v;
-        bad["initial_delivery_phase"] = json!("upload-readback");
+        bad["initial_delivery_phase"] = json!("queued-upload");
         assert!(launch(&bad, &b, &i, &p, &"c".repeat(64), &e).is_err());
     }
 }
