@@ -9,6 +9,7 @@ mod assembly144;
 mod assembly144_admission;
 mod assembly144_prepare;
 mod bounded205;
+mod census141_poh;
 mod continuation144;
 mod continuation144_admission;
 mod continuation144_prepare;
@@ -802,6 +803,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if census141_poh::namespace(claim) || receipt["schema"] == census141_poh::SCHEMA {
+        return census141_poh::launch(receipt, claim);
+    }
     if native141::namespace(claim) || receipt["schema"] == native141::SCHEMA {
         return native141::launch(receipt, claim);
     }
@@ -1477,6 +1481,7 @@ pub(super) fn census(
             || assigned_diagnostic
             || assigned_pipeline
             || ((first_epoch..=last_epoch).contains(&141) && native141::unit_name(name))
+            || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
         {
             ensure!(
@@ -1880,7 +1885,7 @@ pub(super) async fn run() -> Result<()> {
     }
     let mut diagnostic_units = BTreeSet::new();
     for claim in &plan.diagnostics {
-        if native141::namespace(claim) {
+        if native141::namespace(claim) || census141_poh::namespace(claim) {
             ensure!(
                 plan.gates[&141].state == "failed-needs-repair",
                 "private native141 acquisition cannot close or relabel the failed repair"
@@ -2095,6 +2100,9 @@ pub(super) async fn run() -> Result<()> {
             if native141::namespace(claim) {
                 native141::validate_live(claim, current)?;
             }
+            if census141_poh::namespace(claim) {
+                census141_poh::validate_live(claim, current)?;
+            }
             if continuation144::namespace(claim) {
                 continuation144::validate_live(claim, current)?;
             }
@@ -2164,6 +2172,8 @@ pub(super) async fn run() -> Result<()> {
             );
             let phase = if tail223::namespace(claim) {
                 "private-tail-comparison"
+            } else if census141_poh::namespace(claim) {
+                "private-poh-diagnostic"
             } else if native141::namespace(claim) {
                 "native-ledger-read-only"
             } else if assembly144::namespace(claim) {
@@ -2234,7 +2244,12 @@ pub(super) async fn run() -> Result<()> {
                     .as_u64()
                     .is_some_and(|last| epoch <= last)
         }) {
-            if !(epoch == 141 && plan.diagnostics.iter().any(native141::namespace)) {
+            if !(epoch == 141
+                && plan
+                    .diagnostics
+                    .iter()
+                    .any(|c| native141::namespace(c) || census141_poh::namespace(c)))
+            {
                 state = "blocked-qualification";
             }
             if epoch == 226

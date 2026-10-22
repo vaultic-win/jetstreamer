@@ -21,8 +21,8 @@ pub(super) fn reader(p: &Plan) -> bool {
             && s.acquisition.is_some()
             && s.rejection.is_some()
     }) && p.assembly144_scans.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+            || census141_poh::reader(p))
         && is_sha(READER_SHA)
 }
 fn failed_parent(v: &Value) -> Result<()> {

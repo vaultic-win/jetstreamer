@@ -29,6 +29,14 @@ target and 51.2 million hash steps per target. Deploy with a separately qualifie
 nonrestarting systemd sandbox, no network, read-only inputs and a hard memory/CPU
 envelope. Qualification and fresh resource admission precede launch.
 
+The owner-bound candidate also requires the exact nonrestarting `Type=exec`
+unit to report its current PID and invocation before writing the v2 intent.
+It admits its hard 2-GiB memory envelope only when fresh `MemAvailable` retains
+the existing 128-GiB host reserve. The v2 intent records that admission and exact
+owner. Fleet monitoring pins the candidate, plan, output and closed acquisition;
+it separately validates the live command and every sandbox limit. This private
+phase has no production status JSON or sidecar ETA and cannot close the repair.
+
 After processing, every raw target and output is rehashed, all finalized metadata
 is revalidated, and the exact terminal native identity is rechecked before the
 final manifest. Partial results remain provisional. Even complete diagnostic
