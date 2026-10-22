@@ -83,3 +83,15 @@ An arbitrary144 job, another origin receipt, another epoch, or a generic launch
 cannot borrow either exception. Elapsed execution still comes from the actual
 root systemd manager start event. This source support alone neither publishes
 an ETA nor qualifies a downstream uploader.
+
+The revised routine source uses the already-generated coordinated provisional
+fleet from the same control cycle; it does not take another resource sample or
+inventory loop for144. A live publisher gets phase `publication`, the retained
+complete109177480876-byte original as the measured current archive, and the
+calibrated4979863-millisecond total deadline anchored to its unique root manager
+start event. The model and publication receipt are independently bound and
+authenticated. A pre-launch sample, overdue deadline, changed owner, invalid
+model or failed readback publishes no replacement. Successor preparation checks
+the144receipt separately from the nine ordinary replay statuses. An absent live
+publisher is not labelled replay or ready. Uploader phase integration and the
+terminal/inactive status lifecycle remain separate launch prerequisites.

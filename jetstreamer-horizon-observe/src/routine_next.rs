@@ -370,6 +370,7 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    publication144::validate_completed(p, &completion)?;
     if mode == "--prepare-next-assembly144-reader" {
         ensure!(
             handoff_spec.is_none(),

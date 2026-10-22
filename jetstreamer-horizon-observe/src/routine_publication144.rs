@@ -1,13 +1,16 @@
 //! Metadata-only adoption of one genuinely captured exact144 local publisher.
 use super::*;
+#[path = "routine_publication144_status.rs"]
+mod status;
+pub(super) use status::{publish, validate_completed};
 const UNIT: &str = "horizon-publish-144-v4-20261022-v1.service";
 const LAUNCH: &str = "/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1/launch.json";
 const TOOL: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-publisher-candidate-20261022-v4/jetstreamer-epoch144-publish";
 const TOOL_SHA: &str = "1b5e71ad4d7fb3ed7b5ac3143fabaad110dfeca7d978e186d6b86264bcbc17eb";
 const TRACKER_SHA: &str = "0c2dc05018a46c7054790130565b13f83c8e235934e172730370d660c681ca0d";
 const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261022-v1/jetstreamer-r2";
-const READER_SHA: &str = "785aa2eb66b5da9817eabf17021a810bff0fd726dd500f21e332dbf5b34789b1";
+    "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261022-v2/jetstreamer-r2";
+const READER_SHA: &str = "b01112fe416b9315f474cf21533891548c8824e65187fa22e5c5764ba5ba18e3";
 const ACTIVE: &str = "Track exact144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
 const SUCCESS: &str = "Exact144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
 const FAILED: &str = "Exact144 publisher terminated unsuccessfully; capture terminal evidence immediately, preserve original and partial/copy/transaction receipts, remove any owned stale countdown through qualified lifecycle, and diagnose/recover the exact no-clobber transaction. Never blindly restart or discard valid artifacts.";
