@@ -17,13 +17,13 @@ use std::{
     process::Command,
 };
 
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-d2507ee8-v2";
 const SEALER: &str = "2c939dde066672a13d6119d86dfb2bf460c428fd95e0854da726c6c6419f6853";
 const SNAPSHOT: &str = "snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst";
 const CORE: &[(&str, &str)] = &[
     (
         "jetstreamer-node",
-        "ad7204ff573ce552df57125fb82f984575585378958c9232d6c13afea2f34b01",
+        "b859bce6efc54f8f31b8eb4963f7996f8cdda1b136b79b8566bb5e032d5c26df",
     ),
     (
         "jetstreamer-historical-worker-v1-6-25",
@@ -47,7 +47,7 @@ const CORE: &[(&str, &str)] = &[
     ),
     (
         "qualification-design.md",
-        "827e27955424d34c4899fadf1b2554e2534795804991f8c42a4af69d6cc4b6d5",
+        "59ae782fb168afefeceae751af14fc283b03a4cf240686a84d6dc8bbd48f1038",
     ),
 ];
 
@@ -181,7 +181,7 @@ fn shape(p: &Plan) -> Result<()> {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s
-                    .strip_prefix("qualification-223-v1625-capability-")
+                    .strip_prefix("qualification-223-v1625-tail-capability-")
                     .is_some_and(|s| !s.is_empty()
                         && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))),
         "wrong probe root"
@@ -352,6 +352,14 @@ fn artifact_free(path: &Path, remaining: &mut usize) -> Result<()> {
     Ok(())
 }
 fn output_gate(code: Option<i32>, text: &str, mode: usize, missing: &Path) -> Result<()> {
+    if mode == 3 {
+        ensure!(code == Some(0), "planning preflight did not succeed");
+        ensure!(
+            !text.to_ascii_lowercase().contains("replaying"),
+            "preflight started replay"
+        );
+        return planning_preflight(text).map(|_| ());
+    }
     let marker = match mode {
         0 => "epoch223 private build accepts only focused epoch223".to_string(),
         1 => "epoch223-v1-6-25-qualification requires private focused epoch223".to_string(),
@@ -372,6 +380,100 @@ fn output_gate(code: Option<i32>, text: &str, mode: usize, missing: &Path) -> Re
     }
     Ok(())
 }
+fn planning_preflight(text: &str) -> Result<Value> {
+    let reports: Vec<Value> = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|v| v["schema"] == "jetstreamer-private-epoch223-tail-planning-preflight-v1")
+        .collect();
+    ensure!(
+        reports.len() == 1,
+        "missing or ambiguous post-bootstrap planning preflight"
+    );
+    let v = reports.into_iter().next().expect("one report");
+    ensure!(
+        v["epoch"] == 223
+            && v["bootstrap_slot"] == 96_767_522u64
+            && v["output_slot_start"] == 96_767_523u64
+            && v["terminal_slot"] == 96_767_999u64
+            && v["output_slot_count"] == 477
+            && v["runtime_profile"] == "solana-v1.6.25"
+            && v["runtime_revision"] == "7de8a55b54d3e11058b82f9483bb405d143b455c"
+            && v["worker_identity"] == "jetstreamer-historical-worker-v1-6-25"
+            && v["worker_environment_override"] == "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
+            && v["canonical_bootstrap_bound"] == true
+            && v["tail_comparison_only"] == true,
+        "planning preflight scope/runtime/bootstrap differs"
+    );
+    for key in [
+        "canonical_terminal_required",
+        "terminal_canonical_root_independently_known",
+        "complete_epoch_span_covered",
+        "worker_spawned",
+        "archive_created",
+        "snapshot_schema_or_contents_tested",
+        "fresh_resource_admission_passed",
+        "canonical_prefix_qualified",
+        "full_cold_epoch_peak_qualified",
+        "replay_launch_authorized",
+        "runtime_promotion_authorized",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(
+            v[key] == false,
+            "planning preflight grants foreign authority: {key}"
+        );
+    }
+    Ok(v)
+}
+fn preseed_genesis(p: &Plan) -> Result<()> {
+    for name in ["ledger", "output"] {
+        let dir = p.probe_root.join(name);
+        match fs::create_dir(&dir) {
+            Ok(()) => {
+                fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))?;
+                let path = std::ffi::CString::new(std::os::unix::ffi::OsStrExt::as_bytes(
+                    dir.as_os_str(),
+                ))?;
+                ensure!(
+                    unsafe { libc::chown(path.as_ptr(), 1000, 1000) } == 0,
+                    "genesis directory owner"
+                );
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
+        directory(&dir, 1000, true)?;
+        let mut input = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(p.package.join("genesis.tar.bz2"))?;
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(dir.join("genesis.tar.bz2"))?;
+        std::io::copy(&mut input, &mut output)?;
+        output.sync_all()?;
+        ensure!(
+            hash(File::open(dir.join("genesis.tar.bz2"))?)? == CORE[3].1,
+            "preseeded genesis digest differs"
+        );
+        use std::os::fd::AsRawFd;
+        ensure!(
+            unsafe { libc::fchown(output.as_raw_fd(), 1000, 1000) } == 0,
+            "genesis owner"
+        );
+        output.sync_all()?;
+        File::open(&dir)?.sync_all()?;
+    }
+    File::open(&p.probe_root)?.sync_all()?;
+    Ok(())
+}
 fn probe(p: &Plan) -> Result<Vec<Value>> {
     fs::create_dir(&p.probe_root)?;
     fs::set_permissions(&p.probe_root, fs::Permissions::from_mode(0o700))?;
@@ -388,7 +490,10 @@ fn probe(p: &Plan) -> Result<Vec<Value>> {
         .probe_root
         .join("missing/snapshot-96767521-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst");
     let mut evidence = Vec::new();
-    for mode in 0..3 {
+    for mode in 0..4 {
+        if mode == 3 {
+            preseed_genesis(p)?;
+        }
         let mut cmd = Command::new(p.package.join("jetstreamer-node"));
         if mode == 0 {
             cmd.args([
@@ -403,7 +508,14 @@ fn probe(p: &Plan) -> Result<Vec<Value>> {
                 .args(["--verify", "--qualification-end-slot=96767999"])
                 .arg(format!(
                     "--snapshot-archive={}",
-                    if mode == 1 { &wrong } else { &missing }.display()
+                    if mode == 1 {
+                        wrong.clone()
+                    } else if mode == 3 {
+                        p.package.join(SNAPSHOT)
+                    } else {
+                        missing.clone()
+                    }
+                    .display()
                 ))
                 .arg(format!(
                     "--epoch-hashes={}",
@@ -419,6 +531,9 @@ fn probe(p: &Plan) -> Result<Vec<Value>> {
                     "--replay-scratch={}",
                     p.probe_root.join("scratch").display()
                 ));
+            if mode == 3 {
+                cmd.args(["--epoch223-tail-comparison", "--epoch223-tail-preflight"]);
+            }
         }
         cmd.env_clear()
             .env("PATH", "/usr/bin:/bin")
@@ -446,7 +561,11 @@ fn probe(p: &Plan) -> Result<Vec<Value>> {
             &missing,
         )?;
         artifact_free(&p.probe_root, &mut 4096)?;
-        evidence.push(json!({"mode":mode,"exit_code":out.status.code(),"log":log,"log_sha256":format!("{:x}",Sha256::digest(&bytes))}));
+        let mut result = json!({"mode":mode,"exit_code":out.status.code(),"log":log,"log_sha256":format!("{:x}",Sha256::digest(&bytes))});
+        if mode == 3 {
+            result["planning_preflight"] = planning_preflight(&String::from_utf8_lossy(&bytes))?;
+        }
+        evidence.push(result);
     }
     Ok(evidence)
 }
@@ -474,6 +593,7 @@ fn run() -> Result<()> {
         "probe-0.log",
         "probe-1.log",
         "probe-2.log",
+        "probe-3.log",
     ] {
         ensure!(
             fs::symlink_metadata(p.receipt_directory.join(name))
@@ -492,12 +612,14 @@ fn run() -> Result<()> {
     let before = package(&p)?;
     let probes = probe(&p)?;
     ensure!(before == package(&p)?, "package changed across probes");
-    let value = json!({"schema":"jetstreamer-private-epoch223-tail-package-capability-v1","epoch":223,
+    let value = json!({"schema":"jetstreamer-private-epoch223-tail-package-capability-v2","epoch":223,
         "plan_path":a[1],"plan_sha256":a[3],"self_sha256":a[5],"package":p.package,"members":before,"probes":probes,
         "invocation_id":invocation,"recorded_unix_seconds":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),
         "snapshot_source_role":"generation-bound source only; original epoch224 plan is not launch authority",
         "output_slot_start":96767523u64,"terminal_slot":96767999u64,"slot_count":477,
         "tail_comparison_only":true,"complete_epoch_span_covered":false,"snapshot_schema_or_contents_tested":false,
+        "canonical_prefix_qualified":false,"full_cold_epoch_peak_qualified":false,
+        "runtime_promotion_authorized":false,"canonical_sidecar_authorized":false,
         "fresh_resource_admission_passed":false,"replay_launch_authorized":false,"publication_authorized":false,
         "remote_mutations":false,"r2_mutations":false,"probe_cleanup_pending":true,"probe_retirement_authorized":false});
     let mut bytes = serde_json::to_vec_pretty(&value)?;
@@ -515,6 +637,71 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn preflight_fixture() -> Value {
+        let mut v = json!({"schema":"jetstreamer-private-epoch223-tail-planning-preflight-v1",
+            "epoch":223,"bootstrap_slot":96767522,"output_slot_start":96767523,
+            "terminal_slot":96767999,"output_slot_count":477,"runtime_profile":"solana-v1.6.25",
+            "runtime_revision":"7de8a55b54d3e11058b82f9483bb405d143b455c",
+            "worker_identity":"jetstreamer-historical-worker-v1-6-25",
+            "worker_environment_override":"JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
+            "canonical_bootstrap_bound":true,"tail_comparison_only":true});
+        for key in [
+            "canonical_terminal_required",
+            "terminal_canonical_root_independently_known",
+            "complete_epoch_span_covered",
+            "worker_spawned",
+            "archive_created",
+            "snapshot_schema_or_contents_tested",
+            "fresh_resource_admission_passed",
+            "canonical_prefix_qualified",
+            "full_cold_epoch_peak_qualified",
+            "replay_launch_authorized",
+            "runtime_promotion_authorized",
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            v[key] = json!(false);
+        }
+        v
+    }
+    #[test]
+    fn full_planning_probe_requires_one_successful_exact_non_authorizing_report() {
+        let v = preflight_fixture();
+        let text = format!("selected execution profile solana-v1.6.25\n{v}\n");
+        output_gate(Some(0), &text, 3, Path::new("/missing")).unwrap();
+        assert!(output_gate(Some(1), &text, 3, Path::new("/missing")).is_err());
+        assert!(planning_preflight("selected execution profile solana-v1.6.25").is_err());
+        assert!(planning_preflight(&format!("{v}\n{v}\n")).is_err());
+        assert!(
+            output_gate(
+                Some(0),
+                &format!("{text}replaying"),
+                3,
+                Path::new("/missing")
+            )
+            .is_err()
+        );
+        for key in v.as_object().unwrap().keys() {
+            let mut bad = v.clone();
+            bad.as_object_mut().unwrap().remove(key);
+            assert!(
+                planning_preflight(&bad.to_string()).is_err(),
+                "missing {key}"
+            );
+            let mut bad = v.clone();
+            bad[key] = if v[key].is_boolean() {
+                json!(!v[key].as_bool().unwrap())
+            } else {
+                json!("wrong")
+            };
+            assert!(
+                planning_preflight(&bad.to_string()).is_err(),
+                "changed {key}"
+            );
+        }
+    }
     #[test]
     fn actual_native_sums_separate_generated_receipt_from_eight_payload_members() {
         let mut parsed = sums(include_str!(
@@ -524,7 +711,7 @@ mod tests {
         assert_eq!(parsed.len(), 9);
         assert_eq!(
             parsed.remove("deployment-seal-receipt.json").unwrap(),
-            "4ab0f74e4fc69d3bb0382242bf9c862c5274532cb991e3843258981f264b5ba3"
+            "66c92353066ef0c4920f945b095ac6ae955f8bfc09ce60e30c7042f1e4bd5da7"
         );
         assert_eq!(parsed.len(), 8);
         assert!(
