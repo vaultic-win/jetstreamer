@@ -51,10 +51,21 @@ const ALL: Profile = Profile {
     guard_reservation: 32u64 << 30,
     admission_reservation: 32u64 << 30,
 };
+const ALL_RETRY: Profile = Profile {
+    unit: "horizon-epoch141-native-full-census-acquisition-all-20261022-v2.service",
+    root: "/home/sol/.jetstreamer-private/epoch141-native-acquisition-all-20261022-v2",
+    tool: "/usr/local/lib/jetstreamer/horizon-epoch141-native-all-acquisition-candidate-20261022-v2/jetstreamer-epoch141-ledger-native",
+    tool_sha: "153a0d1302369f7ff1272d8b62ca9e777d4d1e3bd5a172e5edec5fe3ad28c295",
+    plan: "/usr/local/lib/jetstreamer/horizon-native141-all-acquisition-plan-20261022-v2/plan.json",
+    manifest: "/usr/local/lib/jetstreamer/horizon-native141-all-acquisition-admission-plan-20261022-v2/manifest.json",
+    admission: "/var/lib/jetstreamer/horizon-native141-admission-all-acquisition-20261022-v2/admission.json",
+    ..ALL
+};
 fn profile(unit: &str) -> Result<&'static Profile> {
     match unit {
         UNIT => Ok(&FIRST),
         u if u == ALL.unit => Ok(&ALL),
+        u if u == ALL_RETRY.unit => Ok(&ALL_RETRY),
         _ => anyhow::bail!("unknown native141 acquisition owner"),
     }
 }
@@ -459,5 +470,38 @@ mod tests {
         unknown.unit = "horizon-epoch141-native-full-census-acquisition-all-foreign.service".into();
         assert!(!namespace(&unknown));
         assert!(shape(&r, &unknown).is_err());
+    }
+    #[test]
+    fn corrected_retry_cannot_alias_failed_all_target_owner_or_its_evidence() {
+        let (mut c, mut r, mut p, mut a, mut m) = all_fixture();
+        c.unit = ALL_RETRY.unit.into();
+        c.scratch_path = ALL_RETRY.root.into();
+        c.launch_receipt.path = Path::new(ALL_RETRY.root).join("results/initial-guard.json");
+        r["self_sha256"] = json!(ALL_RETRY.tool_sha);
+        p["unit"] = json!(ALL_RETRY.unit);
+        p["admission_manifest"]["path"] = json!(ALL_RETRY.manifest);
+        p["admission_receipt"] = json!(ALL_RETRY.admission);
+        p["log_directory"] = json!(format!("{}/logs", ALL_RETRY.root));
+        p["initial_guard_receipt"] = json!(c.launch_receipt.path);
+        p["metadata_receipt"] = json!(format!("{}/results/intent.json", ALL_RETRY.root));
+        p["output_receipt"] = json!(format!(
+            "{}/results/{}",
+            ALL_RETRY.root, ALL_RETRY.output_name
+        ));
+        m["native_unit"] = json!(ALL_RETRY.unit);
+        m["files"] = json!([{"path":ALL_RETRY.tool,"sha256":ALL_RETRY.tool_sha,"uid":0,"gid":0,"mode":"0555"}]);
+        a["native_unit"] = m["native_unit"].clone();
+        a["manifest"] = json!(ALL_RETRY.manifest);
+        a["evidence"]["files"] = m["files"].clone();
+        shape(&r, &c).unwrap();
+        bindings(&p, &a, &m).unwrap();
+        let (old, old_r, old_p, old_a, old_m) = all_fixture();
+        assert!(shape(&old_r, &c).is_err());
+        assert!(shape(&r, &old).is_err());
+        assert!(bindings(&p, &old_a, &old_m).is_err());
+        assert!(bindings(&old_p, &a, &m).is_err());
+        assert_ne!(expected_command(&r, &ALL_RETRY), expected_command(&r, &ALL));
+        assert_eq!(ALL_RETRY.guard_reservation, 32u64 << 30);
+        assert_eq!(ALL_RETRY.admission_reservation, 32u64 << 30);
     }
 }

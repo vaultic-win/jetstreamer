@@ -61,3 +61,13 @@ writing the initial guard. A root read-only regression revalidates the actual
 finalized collection and all its retained target receipts, not just a synthetic
 topology. A corrected binary still needs a distinct immutable attempt, fresh
 admission and monitoring bindings; never replace the failed invocation's output.
+
+The corrected attempt uses the distinct `acquisition-all-20261022-v2` unit,
+private root, plan and admission receipt. Its admission profile remainsv5: the
+18283target scope,32GiB reservation,144GiB available-memory requirement and hard
+native sandbox are unchanged. The admitter selects the new binary only for that
+exact new unit; old/new binary, unit or receipt pairs cannot be exchanged. The
+fleet keeps both all-target attempts as separate diagnostics. Its routine retry
+handoff requires the exact retainedv1guard and actual zero-restart failedv1owner
+before adopting the new initial guard. Corrected code, an old admission or an
+offline handoff is never new launch authority.

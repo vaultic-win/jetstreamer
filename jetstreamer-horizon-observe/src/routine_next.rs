@@ -282,7 +282,9 @@ pub(super) fn prepare(
     };
     let acquisition_spec = if matches!(
         mode,
-        "--prepare-next-native141-acquisition" | "--prepare-next-native141-all-acquisition"
+        "--prepare-next-native141-acquisition"
+            | "--prepare-next-native141-all-acquisition"
+            | "--prepare-next-native141-all-retry"
     ) {
         handoff_spec
     } else {
@@ -448,6 +450,16 @@ pub(super) fn prepare(
         native141::enable_all_acquisition(
             &mut next,
             acquisition_spec.context("all-target acquisition handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        native141::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-native141-all-retry" {
+        native141::enable_all_retry(
+            &mut next,
+            acquisition_spec.context("all-target retry handoff required")?,
         )?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
         tool_ok(&next.tools.r2)?;

@@ -5,6 +5,8 @@ use super::*;
 mod acquisition;
 #[path = "routine_native141_all_acquisition.rs"]
 mod all_acquisition;
+#[path = "routine_native141_all_retry.rs"]
+mod all_retry;
 const UNIT: &str = "horizon-epoch141-native-full-census-20261022-v1.service";
 const IID: &str = "1ca7610a4db34ceaaf2322736fa22092";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1";
@@ -28,6 +30,14 @@ pub(super) struct Profile {
     acquisition: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     all_acquisition: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    all_retry: Option<Bound>,
+}
+pub(super) fn all_retry_enabled(p: &Plan) -> bool {
+    all_retry::enabled(p)
+}
+pub(super) fn enable_all_retry(p: &mut Plan, spec: &Bound) -> Result<()> {
+    all_retry::enable(p, spec)
 }
 pub(super) fn all_acquisition_enabled(p: &Plan) -> bool {
     p.native141_audit
@@ -188,6 +198,13 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             );
             all_acquisition::evidence(b)?;
         }
+        if let Some(b) = &s.all_retry {
+            ensure!(
+                all_retry::reader(p),
+                "all-target retry requires failed-attempt history and its qualified reader"
+            );
+            all_acquisition::evidence_at(b, &all_acquisition::RETRY)?;
+        }
     }
     Ok(())
 }
@@ -204,6 +221,7 @@ pub(super) fn enable(p: &mut Plan) -> Result<()> {
         rejection: None,
         acquisition: None,
         all_acquisition: None,
+        all_retry: None,
     };
     evidence(&s)?;
     p.native141_audit = Some(s);
@@ -312,6 +330,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     }
     acquisition::derive_fleet(p, f)?;
     all_acquisition::derive_fleet(p, f)?;
+    all_retry::derive_fleet(p, f)?;
     Ok(())
 }
 #[cfg(test)]
@@ -333,6 +352,7 @@ mod tests {
             rejection: None,
             acquisition: None,
             all_acquisition: None,
+            all_retry: None,
         });
         p.tools.r2 = Bound {
             path: READER.into(),

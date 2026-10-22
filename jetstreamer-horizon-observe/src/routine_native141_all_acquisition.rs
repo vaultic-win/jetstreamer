@@ -9,19 +9,46 @@ const ADMISSION: &str =
     "/var/lib/jetstreamer/horizon-native141-admission-all-acquisition-20261022-v1/admission.json";
 const READER: &str = "/usr/local/lib/jetstreamer/horizon-native141-all-acquisition-fleet-reader-20261022-v1/jetstreamer-r2";
 const READER_SHA: &str = "3fc77aac05c985be1fd8549bcb53872937c251de81fe85df2838a1668e00bca2";
+pub(super) struct Attempt {
+    pub(super) unit: &'static str,
+    pub(super) root: &'static str,
+    native_sha: &'static str,
+    plan: &'static str,
+    admission: &'static str,
+}
+const ORIGINAL: Attempt = Attempt {
+    unit: UNIT,
+    root: ROOT,
+    native_sha: NATIVE_SHA,
+    plan: PLAN,
+    admission: ADMISSION,
+};
+pub(super) const RETRY: Attempt = Attempt {
+    unit: "horizon-epoch141-native-full-census-acquisition-all-20261022-v2.service",
+    root: "/home/sol/.jetstreamer-private/epoch141-native-acquisition-all-20261022-v2",
+    native_sha: "153a0d1302369f7ff1272d8b62ca9e777d4d1e3bd5a172e5edec5fe3ad28c295",
+    plan: "/usr/local/lib/jetstreamer/horizon-native141-all-acquisition-plan-20261022-v2/plan.json",
+    admission: "/var/lib/jetstreamer/horizon-native141-admission-all-acquisition-20261022-v2/admission.json",
+};
 pub(super) fn reader(p: &Plan) -> bool {
     p.native141_audit.as_ref().is_some_and(|s| {
         s.all_acquisition.is_some() && s.acquisition.is_some() && s.rejection.is_some()
     }) && p.assembly144_scans.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.tools.r2.path == Path::new(READER)
+            && p.tools.r2.sha256 == READER_SHA
+            && !all_retry::enabled(p))
+            || all_retry::reader(p))
         && is_sha(READER_SHA)
 }
+#[cfg(test)]
 fn guard_shape(g: &Value) -> Result<()> {
+    guard_shape_at(g, NATIVE_SHA)
+}
+fn guard_shape_at(g: &Value, native_sha: &str) -> Result<()> {
     ensure!(
         g["schema"] == "jetstreamer-epoch141-native-initial-guard-v1"
             && g["epoch"] == 141
-            && g["self_sha256"] == NATIVE_SHA
+            && g["self_sha256"] == native_sha
             && g["invocation_id"].as_str().is_some_and(|s| s.len() == 32
                 && s.bytes()
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
@@ -44,34 +71,38 @@ fn guard_shape(g: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn evidence(b: &Bound) -> Result<Value> {
+    evidence_at(b, &ORIGINAL)
+}
+pub(super) fn evidence_at(b: &Bound, attempt: &Attempt) -> Result<Value> {
+    let root = attempt.root;
     ensure!(
-        b.path == Path::new(ROOT).join("results/initial-guard.json") && is_sha(&b.sha256),
+        b.path == Path::new(root).join("results/initial-guard.json") && is_sha(&b.sha256),
         "foreign all-target acquisition guard"
     );
     let g = bound_json(b, false)?;
-    guard_shape(&g)?;
+    guard_shape_at(&g, attempt.native_sha)?;
     let plan = bound_json(
         &Bound {
-            path: PLAN.into(),
+            path: attempt.plan.into(),
             sha256: g["plan_sha256"].as_str().unwrap().into(),
         },
         true,
     )?;
     let a = bound_json(
         &Bound {
-            path: ADMISSION.into(),
+            path: attempt.admission.into(),
             sha256: g["admission_sha256"].as_str().unwrap().into(),
         },
         false,
     )?;
     ensure!(
         plan["schema"] == "jetstreamer-epoch141-ledger-native-all-target-acquisition-plan-v2"
-            && plan["unit"] == UNIT
+            && plan["unit"] == attempt.unit
             && plan["minimum_free_bytes"] == 4740696923590u64
             && plan["initial_guard_receipt"].as_str() == b.path.to_str()
-            && plan["output_receipt"] == format!("{ROOT}/results/all-target-acquisition.json")
+            && plan["output_receipt"] == format!("{root}/results/all-target-acquisition.json")
             && a["native_profile"] == "epoch141-read-only-all-target-acquisition-v5"
-            && a["native_unit"] == UNIT
+            && a["native_unit"] == attempt.unit
             && a["admitted"] == true
             && a["evidence"]["minimum_free_bytes"]
                 .as_u64()
@@ -134,10 +165,17 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
     validate(p)
 }
 fn fold(f: &mut Value, claim: Value, b: &Bound) -> Result<()> {
+    fold_at(f, claim, b, UNIT)
+}
+pub(super) fn fold_at(f: &mut Value, claim: Value, b: &Bound, unit: &str) -> Result<()> {
+    ensure!(
+        (unit == UNIT || unit == RETRY.unit) && claim["unit"] == unit,
+        "foreign all-target fold owner"
+    );
     let ds = f["diagnostics"]
         .as_array_mut()
         .context("all-target diagnostics missing")?;
-    let found: Vec<_> = ds.iter().filter(|c| c["unit"] == UNIT).collect();
+    let found: Vec<_> = ds.iter().filter(|c| c["unit"] == unit).collect();
     ensure!(
         found.is_empty() || (found.len() == 1 && found[0] == &claim),
         "all-target history changed"
@@ -148,8 +186,8 @@ fn fold(f: &mut Value, claim: Value, b: &Bound) -> Result<()> {
     let units = f["tracked_units"]
         .as_array_mut()
         .context("all-target tracked units missing")?;
-    if !units.contains(&json!(UNIT)) {
-        units.push(json!(UNIT));
+    if !units.contains(&json!(unit)) {
+        units.push(json!(unit));
     }
     let gate = &mut f["gates"]["141"];
     ensure!(
