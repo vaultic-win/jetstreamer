@@ -16,7 +16,10 @@ pub(super) fn enabled(p: &Plan) -> bool {
         .is_some_and(|s| s.public_observation.is_some())
 }
 pub(super) fn reader(p: &Plan) -> bool {
-    enabled(p) && p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA
+    enabled(p)
+        && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+            || (p.tools.r2.path == Path::new(public160_recovery::READER)
+                && p.tools.r2.sha256 == public160_recovery::READER_SHA))
 }
 fn read(p: &Plan) -> Result<Value> {
     let b = p
@@ -268,13 +271,24 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
         if check {
             args.push("--check-only".into());
         }
-        child(
+        let result = child(
             &p.tools.r2,
             &args,
             !check,
             &p.cycle_directory
                 .join(format!("child-public160-{suffix}.json")),
-        )?;
+        );
+        if let Err(error) = result {
+            if check {
+                let rejected = file(p.cycle_directory.join("child-public160-check.json"), false)?;
+                if post_sample_handoff(&bound_json(&rejected, false)?, &p.tools.r2)? {
+                    return Ok(json!({"provisional_fleet":fleet,"publication_skipped":true,
+                        "post_sample_handoff":rejected,"pipeline_plan":model,
+                        "reason":"Actual downstream child began after coordinated sample; preserve rejected check and repair with next fresh sample, never backdate a live claim"}));
+                }
+            }
+            return Err(error);
+        }
     }
     let digits: String = p
         .sample_target_utc
@@ -322,6 +336,15 @@ fn validate(p: &Plan, observer: &Bound, model: &Bound, r: &Value) -> Result<()> 
     );
     Ok(())
 }
+fn post_sample_handoff(r: &Value, tool: &Bound) -> Result<bool> {
+    Ok(r["schema"] == "jetstreamer-horizon-routine-child-result-v1"
+        && r["tool"] == serde_json::to_value(tool)?
+        && r["success"] == false
+        && r["exit_code"] == 1
+        && r["signal"].is_null()
+        && r["stderr"]["text"]
+            == "Error: phase started after coordinated sample; do not backdate a status claim\n")
+}
 pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     let d = &c["epoch160_delivery"];
     let fleet: Bound = serde_json::from_value(d["provisional_fleet"].clone())?;
@@ -331,6 +354,31 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     );
     if d["publication_skipped"] == true {
         let f = bound_json(&fleet, false)?;
+        if !d["post_sample_handoff"].is_null() {
+            let b: Bound = serde_json::from_value(d["post_sample_handoff"].clone())?;
+            let model: Bound = serde_json::from_value(d["pipeline_plan"].clone())?;
+            let m = bound_json(&model, true)?;
+            ensure!(
+                b.path == p.cycle_directory.join("child-public160-check.json")
+                    && model.path
+                        == p.cycle_directory
+                            .join("delivery160-status/sealed/pipeline-plan.json")
+                    && m["epoch"] == 160
+                    && m["fleet"] == d["provisional_fleet"]
+                    && m["observer"] == c["observer"]
+                    && d["publication"].is_null(),
+                "foreign160 post-sample handoff rejection"
+            );
+            let r = bound_json(&b, false)?;
+            // The original cycle plan still pins the pre-recovery reader.
+            ensure!(
+                post_sample_handoff(&r, &p.tools.r2)?
+                    || (c.get("public160_recovery").is_some()
+                        && post_sample_handoff(&r, &public160_recovery::reader())?),
+                "160 handoff was not an exact non-mutating backdate rejection"
+            );
+            return Ok(());
+        }
         ensure!(
             d["publication"].is_null()
                 && (d["ready_pair_verified_cleanup"] == true
@@ -357,6 +405,24 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn post_sample_handoff_deferral_is_exact_check_failure_only() {
+        let tool = public160_recovery::reader();
+        let r = json!({"schema":"jetstreamer-horizon-routine-child-result-v1","tool":tool,
+            "success":false,"exit_code":1,"signal":null,"stderr":{"text":"Error: phase started after coordinated sample; do not backdate a status claim\n"}});
+        assert!(post_sample_handoff(&r, &tool).unwrap());
+        for (key, value) in [
+            ("success", json!(true)),
+            ("exit_code", json!(0)),
+            ("signal", json!(9)),
+            ("tool", json!({})),
+            ("stderr", json!({"text":"unrelated error"})),
+        ] {
+            let mut bad = r.clone();
+            bad[key] = value;
+            assert!(!post_sample_handoff(&bad, &tool).unwrap(), "{key}");
+        }
+    }
     fn capture() -> Value {
         let rows=[("full-verification","jetstreamer-horizon-audit-epochs101-181-v4.service","2612e3bb8fe4415b804532ee87d46ea3"),("plugin-verification","jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service","89b072dea9cd4167881d060c571be6cf"),("upload-readback","horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service","e4e455fbd455483282107652ca37b83d")].map(|(phase,unit,iid)|json!({"phase":phase,"unit":{"Id":unit,"InvocationID":iid,"NRestarts":"0","ExecStart":"exact sealed command"},"actual_child_start_millis":1}));
         json!({"schema":"jetstreamer-epoch160-public-observation-v1","observer_sha256":READER_SHA,"observed_unix_seconds":1,"import_receipt_sha256":"628e3525ec55ecaf7bcbade1c5a26d4afe6fe948a203f73de28a571a6bf40815","archive_path":ARCHIVE,"archive_bytes":148095631232u64,"archive_inode":99942496,"new_resource_samples":0,"archive_hash_performed":false,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false,"owners":rows})

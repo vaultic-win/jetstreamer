@@ -68,7 +68,7 @@ pub(super) fn prepare_assembly144_fleet() -> Result<()> {
     assembly144_prepare::run()
 }
 
-#[derive(Deserialize, Eq, PartialEq)]
+#[derive(Deserialize, serde::Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct BoundFile {
     path: PathBuf,
@@ -227,7 +227,7 @@ fn register_live_diagnostic_scope(
 
 // Observational only: these claims never authorize launch, publication or upload.
 // Keep delivery distinct from private diagnostics, which forbid remote mutation.
-#[derive(Deserialize, Eq, PartialEq)]
+#[derive(Deserialize, serde::Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct PipelineClaim {
     epoch: u64,
@@ -357,6 +357,34 @@ fn validate_pipeline_claim(claim: &PipelineClaim, first: u64, last: u64) -> Resu
     Ok(())
 }
 
+// The existing serial uploader owns independently evidenced epochs, not one
+// shared replay cohort. Keep the generic cohort evidence-equality rule; admit
+// only the two reviewed delivery bindings for this exact unchanged invocation.
+fn independent160_198_upload_evidence(a: &PipelineClaim, b: &PipelineClaim) -> bool {
+    let evidence = |c: &PipelineClaim| {
+        serde_json::to_value(&c.evidence).ok().is_some_and(|v| match c.epoch {
+            160 => v == json!([
+                {"path":"/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json","sha256":"c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008"},
+                {"path":"/home/sol/.jetstreamer-private/r2-status-receipts/epoch-160.status-20261022145800.json","sha256":"77cf948e486907911de4371c1109afcf318700e92d1d4eef90fb77f4f2b96246"}
+            ]),
+            198 => v == json!([
+                {"path":"/usr/local/lib/jetstreamer/horizon-epoch198-uploader-transition-20261021-v1/transition.json","sha256":"024b23f765a26f17c252df2bf0281cd3439aae046ee7a545227bd0ded98f4794"}
+            ]),
+            _ => false,
+        })
+    };
+    a.unit == watch198::UPLOAD
+        && b.unit == a.unit
+        && a.phase == "upload-readback"
+        && b.phase == a.phase
+        && a.invocation_id == "e4e455fbd455483282107652ca37b83d"
+        && b.invocation_id == a.invocation_id
+        && a.expected_exec_start == b.expected_exec_start
+        && matches!((a.epoch, b.epoch), (160, 198) | (198, 160))
+        && evidence(a)
+        && evidence(b)
+}
+
 fn register_pipeline_claim<'a>(
     units: &mut BTreeMap<&'a str, &'a PipelineClaim>,
     claim: &'a PipelineClaim,
@@ -367,7 +395,8 @@ fn register_pipeline_claim<'a>(
                 && prior.phase == claim.phase
                 && prior.invocation_id == claim.invocation_id
                 && prior.expected_exec_start == claim.expected_exec_start
-                && prior.evidence == claim.evidence,
+                && (prior.evidence == claim.evidence
+                    || independent160_198_upload_evidence(prior, claim)),
             "duplicate or inconsistent cohort pipeline claim"
         );
     } else {
@@ -2633,6 +2662,59 @@ mod tests {
                 "{unit}"
             );
         }
+    }
+
+    #[test]
+    fn independent160_198_upload_requires_exact_distinct_epoch_evidence() {
+        let claim = |epoch, evidence| -> PipelineClaim {
+            serde_json::from_value(json!({"epoch":epoch,"phase":"upload-readback",
+                "unit":watch198::UPLOAD,"invocation_id":"e4e455fbd455483282107652ca37b83d",
+                "expected_exec_start":"exact unchanged uploader command","evidence":evidence}))
+            .unwrap()
+        };
+        let a = claim(
+            160,
+            json!([
+                {"path":"/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json","sha256":"c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008"},
+                {"path":"/home/sol/.jetstreamer-private/r2-status-receipts/epoch-160.status-20261022145800.json","sha256":"77cf948e486907911de4371c1109afcf318700e92d1d4eef90fb77f4f2b96246"}
+            ]),
+        );
+        let b = claim(
+            198,
+            json!([
+                {"path":"/usr/local/lib/jetstreamer/horizon-epoch198-uploader-transition-20261021-v1/transition.json","sha256":"024b23f765a26f17c252df2bf0281cd3439aae046ee7a545227bd0ded98f4794"}
+            ]),
+        );
+        for (first, second) in [(&a, &b), (&b, &a)] {
+            let mut units = BTreeMap::new();
+            register_pipeline_claim(&mut units, first).unwrap();
+            register_pipeline_claim(&mut units, second).unwrap();
+            assert!(register_pipeline_claim(&mut units, first).is_err());
+        }
+        for field in [
+            "epoch",
+            "unit",
+            "phase",
+            "invocation_id",
+            "expected_exec_start",
+            "evidence",
+        ] {
+            let mut v = serde_json::to_value(&b).unwrap();
+            v[field] = match field {
+                "epoch" => json!(197),
+                "evidence" => json!([]),
+                _ => json!("foreign"),
+            };
+            let bad: PipelineClaim = serde_json::from_value(v).unwrap();
+            assert!(!independent160_198_upload_evidence(&a, &bad), "{field}");
+            assert!(!independent160_198_upload_evidence(&bad, &a), "{field}");
+        }
+        let mut bad = serde_json::to_value(&a).unwrap();
+        bad["evidence"][0]["sha256"] = json!("f".repeat(64));
+        assert!(!independent160_198_upload_evidence(
+            &serde_json::from_value(bad).unwrap(),
+            &b
+        ));
     }
 
     #[test]

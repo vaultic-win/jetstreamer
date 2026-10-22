@@ -309,6 +309,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     native144_recovery::consume(&mut next, &completion)?;
+    public160_recovery::consume(&mut next, &completion)?;
     delivery160::consume(&mut next)?;
     if mode == "--prepare-next-public160" {
         ensure!(

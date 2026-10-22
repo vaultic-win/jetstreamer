@@ -36,6 +36,8 @@ mod delivery198;
 mod delivery198_recover;
 #[path = "routine_public160.rs"]
 mod public160;
+#[path = "routine_public160_recovery.rs"]
+mod public160_recovery;
 #[path = "routine_public198.rs"]
 mod public198;
 
@@ -1728,6 +1730,8 @@ fn main() {
                             | "--publish-upload198-event"
                             | "--recover-native144-observer"
                             | "--check-native144-recovery"
+                            | "--recover-public160"
+                            | "--check-public160-recovery"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
@@ -1750,6 +1754,17 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--recover-public160" || a == "--check-public160-recovery")
+        {
+            return public160_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-public160-recovery",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             matches!(
                 a.as_str(),
