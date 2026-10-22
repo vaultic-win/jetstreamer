@@ -13,6 +13,7 @@ mod continuation144_protection;
 mod native144;
 mod prefix144;
 mod private144;
+mod private144_scan;
 mod private157;
 mod ram_auxiliary;
 mod retained220;
@@ -226,6 +227,9 @@ pub(super) fn pipeline_unit_range(
     phase: &str,
     unit: &str,
 ) -> Result<std::ops::RangeInclusive<u64>> {
+    if private144_scan::scope(phase, unit) {
+        return Ok(144..=144);
+    }
     if watch198::namespace(phase, unit) {
         return Ok(198..=198);
     }
@@ -382,6 +386,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
                     .is_some_and(|pid| pid > 0),
             "pipeline live identity or exact command changed"
         );
+        if private144_scan::scope(&claim.phase, &claim.unit) {
+            private144_scan::validate_live(claim, current)?;
+        }
         if watch198::namespace(&claim.phase, &claim.unit) {
             ensure!(claim.epoch == 198, "legacy watcher profile is198 only");
             return Ok(watch198::child_start(&claim.phase, current)?.is_some());
@@ -1357,6 +1364,7 @@ pub(super) fn census(
             || ram_entry_owner(name)
             || assigned_diagnostic
             || assigned_pipeline
+            || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
         {
             ensure!(
                 names.contains(name),
@@ -1808,6 +1816,9 @@ pub(super) async fn run() -> Result<()> {
     }
     for claim in &plan.pipeline_claims {
         validate_pipeline_claim(claim, plan.first_epoch, plan.last_epoch)?;
+        if private144_scan::scope(&claim.phase, &claim.unit) {
+            private144_scan::validate(claim)?;
+        }
         ensure!(
             pipeline_epoch_units.insert((claim.epoch, claim.unit.clone()))
                 && !diagnostic_units.contains(&claim.unit),
@@ -1895,16 +1906,24 @@ pub(super) async fn run() -> Result<()> {
         } else {
             Value::Null
         };
-        let entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
+        let private_scan = private144_scan::scope(&claim.phase, &claim.unit);
+        let mut entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
             "finalization_evidence":finalization,
             "live":is_active,"expected_invocation_id":claim.invocation_id,
             "evidence":claim.evidence.iter().map(|e|json!({"path":e.path,"sha256":e.sha256})).collect::<Vec<_>>(),
             "sampled_at_utc":sample,"ordinary_replay_claim":false,
             "current_sidecar_eta_valid":false,"grants_launch_or_publication_authority":false});
+        if private_scan {
+            entry["private_qualification_only"] = json!(true);
+        }
         if is_active {
             register_live_pipeline_stage(&mut live_pipeline_stages, claim)?;
             ensure!(
-                plan.gates[&claim.epoch].state == "post-replay-pipeline",
+                if private_scan {
+                    plan.gates[&claim.epoch].state == "blocked-qualification"
+                } else {
+                    plan.gates[&claim.epoch].state == "post-replay-pipeline"
+                },
                 "live pipeline requires an independently evidenced post-replay gate"
             );
             ensure!(
@@ -1912,7 +1931,8 @@ pub(super) async fn run() -> Result<()> {
                     .diagnostics
                     .iter()
                     .any(|d| diagnostic_scope(d).contains(&claim.epoch)
-                        && before[&d.unit]["ActiveState"] == "active"),
+                        && before[&d.unit]["ActiveState"] == "active"
+                        && (!private_scan || before[&d.unit]["SubState"] == "running")),
                 "live delivery overlaps private diagnostic work"
             );
             for replay in replays {
@@ -2079,10 +2099,11 @@ pub(super) async fn run() -> Result<()> {
                 next = "Preserve private epoch-226 tail of live epoch-225 natural-root qualification; no ordinary replay, plugin publication or sidecar until a separately qualified handoff";
             }
         }
-        if pipelines
-            .iter()
-            .any(|claim| claim["epoch"] == epoch && claim["live"] == true)
-        {
+        if pipelines.iter().any(|claim| {
+            claim["epoch"] == epoch
+                && claim["live"] == true
+                && claim["private_qualification_only"] != true
+        }) {
             state = "post-replay-pipeline";
         }
         let mut live = None;
