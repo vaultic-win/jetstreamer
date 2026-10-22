@@ -25,6 +25,7 @@ mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
 mod snapshot144;
+mod tail223;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
 
@@ -209,6 +210,10 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     if private_225_verification(claim) {
         let evidence: BoundFile = serde_json::from_value(launch["terminal_evidence"].clone())?;
         validate_private_225_terminal(&bound_json(&evidence)?)?;
+    }
+    if tail223::namespace(claim) {
+        let evidence: BoundFile = serde_json::from_value(launch["capability"].clone())?;
+        tail223::capability(&bound_json(&evidence)?)?;
     }
     Ok(launch)
 }
@@ -574,6 +579,7 @@ fn validate_same_sample_admission(
         144 if assembly144::namespace(claim) => {
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
+        223 if tail223::namespace(claim) => tail223::GUARD_SHA,
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -720,6 +726,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
             && plan["filesystem"] == "/home/sol"
             && plan["minimum_free_bytes"] == launch["required_guard_minimum_free_bytes"]
+    } else if tail223::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|receipt| tail223::guard_matches(claim, &receipt, plan))
     } else if bounded205::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| bounded205::guard_matches(claim, &receipt, plan))
@@ -832,6 +841,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let bounded_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
     let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
+    let tail_223 = receipt["schema"] == tail223::SCHEMA;
+    ensure!(
+        !tail223::namespace(claim) || tail_223,
+        "tail223 namespace requires its own private schema"
+    );
     ensure!(
         !bounded205::namespace(claim) || bounded_205,
         "bounded205 namespace requires its own launch schema"
@@ -868,6 +882,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || shrink_budget_225
             || bounded_203
             || bounded_205
+            || tail_223
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -881,7 +896,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if bounded_205 {
+    let scope_valid = if tail_223 {
+        tail223::launch_matches(claim, receipt)
+    } else if bounded_205 {
         bounded205::launch_matches(claim, receipt)
     } else if native_restore {
         native_restore_140_launch_matches(claim, receipt)
@@ -2112,6 +2129,17 @@ pub(super) async fn run() -> Result<()> {
                     "shrink-root diagnostic live command changed"
                 );
             }
+            if tail223::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    tail223::same_command(
+                        claim,
+                        &current["ExecStart"],
+                        &launch["expected_exec_start"]
+                    ),
+                    "tail223 diagnostic live command changed"
+                );
+            }
             if bounded205::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -2134,7 +2162,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if native141::namespace(claim) {
+            let phase = if tail223::namespace(claim) {
+                "private-tail-comparison"
+            } else if native141::namespace(claim) {
                 "native-ledger-read-only"
             } else if assembly144::namespace(claim) {
                 "private-assembly-only"
