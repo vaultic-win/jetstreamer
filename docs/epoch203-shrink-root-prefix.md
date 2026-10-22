@@ -40,3 +40,27 @@ prove the new guard's first real sandboxed fire. Preserve all earlier partials.
 After natural success: independently reread the full prefix and qualify the
 native restart tuple,419-slot suffix, private assembly, complete current-plugin
 and publication path. This root diagnostic alone closes none of those gates.
+
+The Rust `jetstreamer-prefix203-completion-dispatch` can perform the closed
+one-shot reader handoff. Its path event watches only this producer's durable
+`receipts/root-prefix.json`; it authenticates and stops its own watcher before
+admission, preventing retries or a persistent-path spin. A clean terminal owner
+and exact manager success event, unchanged producer result/manifest/archive
+identities, absent sidecar and prior validation, and the pinned reader/unit
+files are mandatory. It does not scan or qualify the archive itself.
+
+The dispatch plan binds a fresh routine observer and complete fleet, including
+the unchanged225owner, thirteen canonical size samples, and optional exact
+cold223snapshot verifier. It reserves the complete128GiB cold-test cap plus
+8GiB reader/4GiB dispatcher above the448GiB host reserve, and protects225's
+640GiB remaining growth plus the century floor on disk. Live producer, stale
+observation, changed ownership or any failed gate stops the handoff; it never
+restarts or stops a producer, edits guards, retires scratch or touches R2.
+
+Only a fsynced root-owned `ready.json` and successful dispatcher exit permit
+systemd `OnSuccess` to start the separately sealed independent reader. The
+reader's own receipt remains the independent integrity event. No419slot suffix,
+native restore, assembly, sidecar or publication is authorized. A deliberately
+triggered negative qualification while the producer is live must prove no
+reader launch and that the watcher stops; afterward rearm only with a separately
+sealed fresh plan, preserving the failed probe journal.

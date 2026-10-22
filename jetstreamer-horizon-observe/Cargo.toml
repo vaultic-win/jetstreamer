@@ -24,6 +24,10 @@ epoch203-ram-resource-supervisor = []
 epoch203-ram-shrink-candidate = ["epoch203-ram-resource-supervisor"]
 
 [[bin]]
+name = "jetstreamer-prefix203-completion-dispatch"
+path = "src/prefix203_completion_dispatch.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-status-estimate"
 path = "src/status_estimate.rs"
 
