@@ -19,6 +19,11 @@ const UNIT: &str = "horizon-qualify-144-checkpoint-continuation-20261022-v1.serv
 const IID: &str = "8fddd3ef045c4fe5b12c7d25f43a4b73";
 const SOURCE: &str = "/home/sol/.jetstreamer-private/checkpoint-continuation-144-20261022-v1/output/epoch-144-checkpoint-restart-v4.jet";
 const VIEW: &str = "/run/horizon-epoch144-private-verification-20261022-v1/epoch-144.jet";
+const ASSEMBLY_UNIT: &str = "horizon-qualify-144-assembly-only-recovery-20261022-v1.service";
+const ASSEMBLY_SOURCE: &str = "/home/sol/.jetstreamer-private/epoch144-assembly-only-20261022-v2/epoch-144-assembly-only-v4.jet";
+const ASSEMBLY_VIEW: &str =
+    "/run/horizon-epoch144-assembly-only-verification-20261022-v1/epoch-144.jet";
+const ASSEMBLER_SHA: &str = "25402432882dc8fdcb7331c34be7a20056c0df13ce0eaec33f571edba9695b97";
 const FULL: &str = "41c03e493daa309ab7cffd9760b4e6cfe2195b3af0bb13a17f19508eb929d6e7";
 const PLUGIN: &str = "73e7535b9cedc7e565a92735ca6e07c7efb8e66755a6d5272ed16649b4d8cee9";
 const FLOOR: u64 = 4_577_238_421_504;
@@ -45,6 +50,17 @@ struct Plan {
     observer: Bound,
     verifier: Bound,
     state_directory: PathBuf,
+    #[serde(default)]
+    assembly_launch: Option<Bound>,
+}
+fn recovery(p: &Plan) -> bool {
+    p.schema == "jetstreamer-private144-assembly-only-verification-plan-v1"
+}
+fn source_path(p: &Plan) -> &'static str {
+    if recovery(p) { ASSEMBLY_SOURCE } else { SOURCE }
+}
+fn view_path(p: &Plan) -> &'static str {
+    if recovery(p) { ASSEMBLY_VIEW } else { VIEW }
 }
 fn read(b: &Bound, immutable: bool) -> Result<Value> {
     Ok(serde_json::from_slice(&evidence::bound_file(
@@ -61,39 +77,52 @@ fn validate(p: &Plan, v: &Value, e: &Value, b: &Value) -> Result<()> {
         "plugin"
     };
     ensure!(
-        p.schema == "jetstreamer-private144-verification-plan-v2"
+        ((p.schema == "jetstreamer-private144-verification-plan-v2"
+            && p.assembly_launch.is_none())
+            || (recovery(p) && p.assembly_launch.is_some()))
             && p.state_directory
-                == Path::new(
+                == Path::new(if recovery(p) {
+                    "/var/lib/jetstreamer/horizon-epoch144-assembly-only-verification-20261022-v1"
+                } else {
                     "/var/lib/jetstreamer/horizon-epoch144-private-verification-20261022-v1"
-                )
+                })
                 .join(stage),
         "foreign144scan plan"
     );
+    if recovery(p) {
+        validate_recovery(
+            p,
+            v,
+            e,
+            &read(p.assembly_launch.as_ref().context("assembly launch")?, true)?,
+        )?;
+    } else {
+        ensure!(
+            v["schema"] == "jetstreamer-private-epoch144-checkpoint-continuation-v2"
+                && v["producer_unit"] == UNIT
+                && v["producer_invocation_id"] == IID
+                && v["private_output"] == SOURCE
+                && v["assembly"]["slots_merged"] == 432000
+                && v["assembly"]["provenance_version"] == 4
+                && v["fresh_prefix_full_validation_passed"] == true
+                && v["fresh_native_checkpoint_matches"] == true,
+            "not complete private144 assembly"
+        );
+        ensure!(
+            e["schema"] == "jetstreamer-private-epoch144-provenance-expectation-v2"
+                && e["epoch"] == 144
+                && e["producer_outcome"] == serde_json::to_value(&p.producer_outcome)?
+                && e["source_manifest_scope_validated"] == true
+                && e["assembled_target_opened"] == false
+                && e["expected_provenance_sha256"]
+                    .as_str()
+                    .is_some_and(evidence::is_sha),
+            "wrong independent provenance expectation"
+        );
+    }
     ensure!(
         p.verifier.sha256 == if p.stage == Stage::Full { FULL } else { PLUGIN },
         "unqualified verifier"
-    );
-    ensure!(
-        v["schema"] == "jetstreamer-private-epoch144-checkpoint-continuation-v2"
-            && v["producer_unit"] == UNIT
-            && v["producer_invocation_id"] == IID
-            && v["private_output"] == SOURCE
-            && v["assembly"]["slots_merged"] == 432000
-            && v["assembly"]["provenance_version"] == 4
-            && v["fresh_prefix_full_validation_passed"] == true
-            && v["fresh_native_checkpoint_matches"] == true,
-        "not complete private144 assembly"
-    );
-    ensure!(
-        e["schema"] == "jetstreamer-private-epoch144-provenance-expectation-v2"
-            && e["epoch"] == 144
-            && e["producer_outcome"] == serde_json::to_value(&p.producer_outcome)?
-            && e["source_manifest_scope_validated"] == true
-            && e["assembled_target_opened"] == false
-            && e["expected_provenance_sha256"]
-                .as_str()
-                .is_some_and(evidence::is_sha),
-        "wrong independent provenance expectation"
     );
     ensure!(
         b["schema"] == "jetstreamer-private144-finalized-boundaries-v2"
@@ -116,13 +145,124 @@ fn validate(p: &Plan, v: &Value, e: &Value, b: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn terminal() -> Result<Value> {
-    let o=Command::new("/usr/bin/systemctl").args(["show",UNIT,"--property=InvocationID,MainPID,NRestarts,Restart,Result,ExecMainStatus,ActiveState,SubState"]).output()?;
+fn validate_recovery(p: &Plan, v: &Value, e: &Value, r: &Value) -> Result<()> {
+    let iid = r["invocation_id"].as_str().context("assembly launch iid")?;
+    ensure!(
+        recovery(p)
+            && r["schema"] == "jetstreamer-private144-assembly-only-launch-v1"
+            && r["epoch"] == 144
+            && r["unit"] == ASSEMBLY_UNIT
+            && iid.len() == 32
+            && iid
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+            && r["assembler_sha256"] == ASSEMBLER_SHA
+            && r["assembly_only_no_replay"] == true
+            && r["launched"] == true
+            && r["maximum_runtime_seconds"] == 86400
+            && r["maximum_archive_bytes"] == 112u64 << 30,
+        "foreign assembly-only launch"
+    );
+    ensure!(
+        v["schema"] == "jetstreamer-private144-assembly-only-v1"
+            && v["epoch"] == 144
+            && v["unit"] == ASSEMBLY_UNIT
+            && v["invocation_id"] == iid
+            && v["assembler_sha256"] == ASSEMBLER_SHA
+            && v["plan"] == r["assembly_plan"]
+            && v["private_output"] == ASSEMBLY_SOURCE
+            && v["source_archives"] == 2
+            && v["slots_merged"] == 432000
+            && v["provenance_version"] == 4
+            && v["assembly_profile"] == "jetstreamer-epoch144-assembly-only-v1"
+            && v["no_replay"] == true
+            && v["archive_sha256"].as_str().is_some_and(evidence::is_sha)
+            && v["archive_bytes"]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n <= 112u64 << 30),
+        "not complete distinct assembly-only outcome"
+    );
+    check_timeout(&v["original_terminal"])?;
+    ensure!(
+        e["schema"] == "jetstreamer-private144-assembly-only-provenance-expectation-v1"
+            && e["epoch"] == 144
+            && e["assembly_outcome"] == serde_json::to_value(&p.producer_outcome)?
+            && Some(&e["assembly_launch"])
+                == p.assembly_launch
+                    .as_ref()
+                    .map(serde_json::to_value)
+                    .transpose()?
+                    .as_ref()
+            && e["source_manifest_scope_validated"] == true
+            && e["assembly_only_profile_validated"] == true
+            && e["tool_sha256"]
+                == "7bb191df1252039e6add085d445ccb271033f61ea7871f2757767b91f539aa93"
+            && e["prefix_manifest"] == v["prefix_manifest"]
+            && e["suffix_manifest"] == v["suffix_manifest"]
+            && e["prefix_manifest"]["sha256"]
+                == "691d5f3768b8c283678937b49790606b6091d4ab632372bfff38664c005b544a"
+            && e["suffix_manifest"]["sha256"]
+                == "065445bef8d301a45a24ba8e14f34b2c0c06906a9cfe7a06cbfd04eeba3f15ce"
+            && e["assembled_target_opened"] == false
+            && e["expected_provenance_sha256"]
+                .as_str()
+                .is_some_and(evidence::is_sha),
+        "wrong assembly-only independent expectation"
+    );
+    for value in [v, e] {
+        for key in [
+            "independent_final_archive_verification_passed",
+            "current_plugin_verification_passed",
+        ] {
+            ensure!(
+                value[key] == false,
+                "producer/expectation cannot supply independent verification"
+            );
+        }
+    }
+    for key in [
+        "ordinary_replay_claim",
+        "current_sidecar_eta_valid",
+        "full_epoch_verified",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "r2_mutations",
+    ] {
+        ensure!(r[key] == false, "assembly launch grants authority:{key}");
+    }
+    Ok(())
+}
+fn check_timeout(v: &Value) -> Result<()> {
+    ensure!(
+        v["InvocationID"] == IID
+            && v["MainPID"] == "0"
+            && v["NRestarts"] == "0"
+            && v["Restart"] == "no"
+            && v["Result"] == "timeout"
+            && v["ActiveState"] == "failed"
+            && v["SubState"] == "failed"
+            && v["RuntimeMaxUSec"] == "2h"
+            && matches!(v["ExecMainStatus"].as_str(), Some("9" | "15" | "1")),
+        "original is not exact terminal timeout"
+    );
+    Ok(())
+}
+fn terminal_unit(name: &str) -> Result<Value> {
+    let o=Command::new("/usr/bin/systemctl").args(["show",name,"--property=InvocationID,MainPID,NRestarts,Restart,Result,ExecMainStatus,ActiveState,SubState,Type,RuntimeMaxUSec"]).output()?;
     ensure!(o.status.success(), "terminal observation failed");
     let t = std::str::from_utf8(&o.stdout)?;
     let f: std::collections::BTreeMap<_, _> = t.lines().filter_map(|l| l.split_once('=')).collect();
+    Ok(json!(f))
+}
+fn terminal(p: &Plan, outcome: &Value) -> Result<Value> {
+    let f = terminal_unit(if recovery(p) { ASSEMBLY_UNIT } else { UNIT })?;
+    let iid = if recovery(p) {
+        outcome["invocation_id"].as_str().context("assembly iid")?
+    } else {
+        IID
+    };
     for (k, v) in [
-        ("InvocationID", IID),
+        ("InvocationID", iid),
         ("MainPID", "0"),
         ("NRestarts", "0"),
         ("Restart", "no"),
@@ -131,9 +271,18 @@ fn terminal() -> Result<Value> {
         ("ActiveState", "active"),
         ("SubState", "exited"),
     ] {
-        ensure!(f.get(k) == Some(&v), "producer not exact terminal:{k}");
+        ensure!(f[k] == v, "producer not exact terminal:{k}");
     }
-    Ok(json!(f))
+    if recovery(p) {
+        ensure!(
+            f["Type"] == "exec" && f["RuntimeMaxUSec"] == "1d",
+            "assembly terminal limits differ"
+        );
+        let original = terminal_unit(UNIT)?;
+        check_timeout(&original)?;
+        return Ok(json!({"assembly":f,"original_timeout":original}));
+    }
+    Ok(f)
 }
 fn open(path: &Path) -> Result<File> {
     ensure!(
@@ -182,14 +331,18 @@ fn command(p: &Plan, expected: &Value) -> Vec<String> {
     if p.stage == Stage::Plugin {
         return vec![
             "144:144".into(),
-            Path::new(VIEW).parent().unwrap().display().to_string(),
+            Path::new(view_path(p))
+                .parent()
+                .unwrap()
+                .display()
+                .to_string(),
             "--threads".into(),
             "8".into(),
             "--verify-only".into(),
         ];
     }
     vec![
-        VIEW.into(),
+        view_path(p).into(),
         "--full".into(),
         "--anchor".into(),
         "62207999".into(),
@@ -301,16 +454,16 @@ fn run() -> Result<()> {
     let boundaries = read(&p.boundaries, true)?;
     validate(&p, &outcome, &expected, &boundaries)?;
     evidence::bound_file(&p.verifier.path, &p.verifier.sha256, 512 << 20, true)?;
-    let owner = terminal()?;
-    let source = open(Path::new(SOURCE))?;
-    let view = open(Path::new(VIEW))?;
+    let owner = terminal(&p, &outcome)?;
+    let source = open(Path::new(source_path(&p)))?;
+    let view = open(Path::new(view_path(&p)))?;
     ensure!(
         evidence::identity(&source.metadata()?) == evidence::identity(&view.metadata()?),
         "canonical view is not the same bound source inode"
     );
     for path in [
-        Path::new(SOURCE).with_extension("jet.sha256"),
-        Path::new(VIEW).with_extension("jet.sha256"),
+        Path::new(source_path(&p)).with_extension("jet.sha256"),
+        Path::new(view_path(&p)).with_extension("jet.sha256"),
     ] {
         ensure!(
             matches!(fs::symlink_metadata(path),Err(e)if e.kind()==std::io::ErrorKind::NotFound),
@@ -322,10 +475,16 @@ fn run() -> Result<()> {
         println!("private144 scan preflight passed; no archive hash,child scan or writes");
         return Ok(());
     }
-    let before = measured(Path::new(SOURCE))?;
+    let before = measured(Path::new(source_path(&p)))?;
+    if recovery(&p) {
+        ensure!(
+            outcome["archive_sha256"] == before.0 && outcome["archive_bytes"] == before.1[2],
+            "producer digest/length differs from independent reread"
+        );
+    }
     evidence::write_receipt(
         &p.state_directory.join("intent.json"),
-        &json!({"schema":"jetstreamer-private144-scan-intent-v2","plan_sha256":a[3],"stage":p.stage,"archive_sha256":before.0,"archive_identity":before.1,"source":SOURCE,"canonical_view":VIEW,"copy_performed":false,"producer":owner,"publication_authorized":false,"r2_mutations":false}),
+        &json!({"schema":if recovery(&p) {"jetstreamer-private144-assembly-only-scan-intent-v1"} else {"jetstreamer-private144-scan-intent-v2"},"plan_sha256":a[3],"stage":p.stage,"archive_sha256":before.0,"archive_identity":before.1,"source":source_path(&p),"canonical_view":view_path(&p),"copy_performed":false,"producer":owner,"publication_authorized":false,"r2_mutations":false}),
     )?;
     let args = command(&p, &expected);
     let log_path = p.state_directory.join("scan.log");
@@ -353,21 +512,37 @@ fn run() -> Result<()> {
         "private scan failed; preserve exact scan log:{status}"
     );
     ensure!(
-        measured(Path::new(SOURCE))? == before
+        measured(Path::new(source_path(&p)))? == before
             && evidence::identity(&source.metadata()?) == evidence::identity(&view.metadata()?),
         "archive/view changed during scan"
     );
-    let after = terminal()?;
+    let after = terminal(&p, &outcome)?;
+    ensure!(
+        after == owner,
+        "producer terminal identity changed during scan"
+    );
     evidence::bound_file(&p.verifier.path, &p.verifier.sha256, 512 << 20, true)?;
     read(&p.producer_outcome, true)?;
     read(&p.provenance_expectation, true)?;
     read(&p.boundaries, true)?;
+    if let Some(b) = &p.assembly_launch {
+        read(b, true)?;
+    }
+    for path in [
+        Path::new(source_path(&p)).with_extension("jet.sha256"),
+        Path::new(view_path(&p)).with_extension("jet.sha256"),
+    ] {
+        ensure!(
+            matches!(fs::symlink_metadata(path),Err(e)if e.kind()==std::io::ErrorKind::NotFound),
+            "private scan created a sidecar"
+        );
+    }
     evidence::write_receipt(
         &p.state_directory.join("verification.json"),
-        &json!({"schema":"jetstreamer-private144-independent-scan-v2","epoch":144,"stage":p.stage,
+        &json!({"schema":if recovery(&p) {"jetstreamer-private144-assembly-only-independent-scan-v1"} else {"jetstreamer-private144-independent-scan-v2"},"epoch":144,"stage":p.stage,
         "plan":{"path":a[1],"sha256":a[3]},"runner_sha256":a[5],"producer_outcome":p.producer_outcome,"producer_terminal":after,
         "provenance_expectation":p.provenance_expectation,"boundaries":p.boundaries,"verifier":p.verifier,"arguments":args,"elapsed_millis":u64::try_from(start.elapsed().as_millis())?,
-        "exit_code":0,"archive_path":SOURCE,"archive_sha256":before.0,"archive_identity":before.1,"canonical_view":VIEW,"copy_performed":false,
+        "exit_code":0,"archive_path":source_path(&p),"archive_sha256":before.0,"archive_identity":before.1,"canonical_view":view_path(&p),"copy_performed":false,
         "runtime_admission_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,"retirement_authorized":false,"r2_mutations":false}),
     )?;
     Ok(())
@@ -387,6 +562,7 @@ mod tests {
         };
         let p = Plan {
             schema: "jetstreamer-private144-verification-plan-v2".into(),
+            assembly_launch: None,
             stage: Stage::Full,
             producer_outcome: bound(),
             provenance_expectation: bound(),
@@ -410,6 +586,106 @@ mod tests {
             {"slot":62639999,"blockhash":"Fnoa95TKZ1U419CubZrxYDtFnqadRmvM554FFi2xSizB"}],
             "canonical_sidecar_authorized":false,"publication_authorized":false,"r2_mutations":false});
         (p, v, e, b)
+    }
+    fn recovery_fixture() -> (Plan, Value, Value, Value) {
+        let (mut p, _, _, _) = fixture();
+        p.schema = "jetstreamer-private144-assembly-only-verification-plan-v1".into();
+        p.state_directory =
+            "/var/lib/jetstreamer/horizon-epoch144-assembly-only-verification-20261022-v1/full"
+                .into();
+        p.assembly_launch = Some(Bound {
+            path: "/sealed/assembly-launch".into(),
+            sha256: "c".repeat(64),
+        });
+        let mut r = json!({"schema":"jetstreamer-private144-assembly-only-launch-v1","epoch":144,"unit":ASSEMBLY_UNIT,
+            "invocation_id":"a".repeat(32),"assembler_sha256":ASSEMBLER_SHA,"assembly_only_no_replay":true,"launched":true,
+            "maximum_runtime_seconds":86400,"maximum_archive_bytes":112u64<<30,"assembly_plan":{"path":"/sealed/assembly-plan","sha256":"d".repeat(64)}});
+        for key in [
+            "ordinary_replay_claim",
+            "current_sidecar_eta_valid",
+            "full_epoch_verified",
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "r2_mutations",
+        ] {
+            r[key] = json!(false);
+        }
+        let prefix = json!({"path":"/sealed/prefix","sha256":"691d5f3768b8c283678937b49790606b6091d4ab632372bfff38664c005b544a"});
+        let suffix = json!({"path":"/sealed/suffix","sha256":"065445bef8d301a45a24ba8e14f34b2c0c06906a9cfe7a06cbfd04eeba3f15ce"});
+        let mut v = json!({"schema":"jetstreamer-private144-assembly-only-v1","epoch":144,"unit":ASSEMBLY_UNIT,"invocation_id":r["invocation_id"],
+            "assembler_sha256":ASSEMBLER_SHA,"plan":r["assembly_plan"],"private_output":ASSEMBLY_SOURCE,"source_archives":2,"slots_merged":432000,
+            "provenance_version":4,"assembly_profile":"jetstreamer-epoch144-assembly-only-v1","no_replay":true,"archive_sha256":"b".repeat(64),"archive_bytes":109000000000u64,
+            "prefix_manifest":prefix,"suffix_manifest":suffix,
+            "original_terminal":{"InvocationID":IID,"MainPID":"0","NRestarts":"0","Restart":"no","Result":"timeout","ActiveState":"failed","SubState":"failed","RuntimeMaxUSec":"2h","ExecMainStatus":"15"}});
+        let mut e = json!({"schema":"jetstreamer-private144-assembly-only-provenance-expectation-v1","epoch":144,"assembly_outcome":p.producer_outcome,
+            "assembly_launch":p.assembly_launch,"source_manifest_scope_validated":true,"assembly_only_profile_validated":true,
+            "assembled_target_opened":false,"expected_provenance_sha256":"b".repeat(64),"prefix_manifest":prefix,"suffix_manifest":suffix,
+            "tool_sha256":"7bb191df1252039e6add085d445ccb271033f61ea7871f2757767b91f539aa93"});
+        for value in [&mut v, &mut e] {
+            for key in [
+                "independent_final_archive_verification_passed",
+                "current_plugin_verification_passed",
+                "canonical_sidecar_authorized",
+                "publication_authorized",
+                "r2_mutations",
+            ] {
+                value[key] = json!(false);
+            }
+        }
+        (p, v, e, r)
+    }
+    #[test]
+    fn distinct_recovery_profile_uses_separate_readonly_view_and_real_source_identity() {
+        let (mut p, v, e, r) = recovery_fixture();
+        validate_recovery(&p, &v, &e, &r).unwrap();
+        assert_eq!(source_path(&p), ASSEMBLY_SOURCE);
+        assert_eq!(command(&p, &e)[0], ASSEMBLY_VIEW);
+        p.stage = Stage::Plugin;
+        p.verifier.sha256 = PLUGIN.into();
+        p.state_directory.set_file_name("plugin");
+        assert_eq!(
+            command(&p, &e),
+            vec![
+                "144:144",
+                Path::new(ASSEMBLY_VIEW).parent().unwrap().to_str().unwrap(),
+                "--threads",
+                "8",
+                "--verify-only"
+            ]
+        );
+        let (mut old, ov, oe, b) = fixture();
+        old.assembly_launch = p.assembly_launch;
+        assert!(validate(&old, &ov, &oe, &b).is_err());
+    }
+    #[test]
+    fn old_success_forged_proof_and_unsafe_recovery_outcome_are_rejected() {
+        let (p, v, e, r) = recovery_fixture();
+        for (ptr, x) in [
+            (
+                "/schema",
+                json!("jetstreamer-private-epoch144-checkpoint-continuation-v2"),
+            ),
+            ("/unit", json!(UNIT)),
+            ("/original_terminal/Result", json!("success")),
+            ("/no_replay", json!(false)),
+            ("/archive_bytes", json!(0)),
+            ("/assembly_profile", json!("uninterrupted")),
+            ("/current_plugin_verification_passed", json!(true)),
+        ] {
+            let mut bad = v.clone();
+            *bad.pointer_mut(ptr).unwrap() = x;
+            assert!(validate_recovery(&p, &bad, &e, &r).is_err(), "{ptr}");
+        }
+        for (ptr, x) in [
+            ("/tool_sha256", json!("d".repeat(64))),
+            ("/assembly_outcome/sha256", json!("d".repeat(64))),
+            ("/expected_provenance_sha256", json!("not a hash")),
+            ("/prefix_manifest/sha256", json!("d".repeat(64))),
+        ] {
+            let mut bad = e.clone();
+            *bad.pointer_mut(ptr).unwrap() = x;
+            assert!(validate_recovery(&p, &v, &bad, &r).is_err(), "{ptr}");
+        }
     }
     #[test]
     fn commands_bind_strict_full_and_independent_plugin_without_copy_or_sidecar() {

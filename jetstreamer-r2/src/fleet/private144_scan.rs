@@ -4,16 +4,47 @@ const FULL_UNIT: &str = "horizon-private144-full-verification-20261022-v1.servic
 const PLUGIN_UNIT: &str = "horizon-private144-plugin-verification-20261022-v1.service";
 const RUNNER: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-private-scan-tools-20261022-v1/jetstreamer-epoch144-private-verify";
 const RUNNER_SHA: &str = "6d46519f639818d2dffd0529e2db21d8da71cf57f870c224f57e241b19aaa194";
+const ASSEMBLY_FULL_UNIT: &str = "horizon-assembly144-full-verification-20261022-v1.service";
+const ASSEMBLY_PLUGIN_UNIT: &str = "horizon-assembly144-plugin-verification-20261022-v1.service";
+const ASSEMBLY_RUNNER: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-tools-20261022-v1/jetstreamer-epoch144-private-verify";
+const ASSEMBLY_RUNNER_SHA: &str =
+    "7dfe0fdabbee8e5f79b131c2b7cece49dbebe489168fe195a9086ab25f0b8810";
+fn recovery(unit: &str) -> bool {
+    matches!(unit, ASSEMBLY_FULL_UNIT | ASSEMBLY_PLUGIN_UNIT)
+}
+fn stage(unit: &str) -> &'static str {
+    if matches!(unit, FULL_UNIT | ASSEMBLY_FULL_UNIT) {
+        "full"
+    } else {
+        "plugin"
+    }
+}
+fn state_root(unit: &str) -> &'static str {
+    if recovery(unit) {
+        "/var/lib/jetstreamer/horizon-epoch144-assembly-only-verification-20261022-v1"
+    } else {
+        "/var/lib/jetstreamer/horizon-epoch144-private-verification-20261022-v1"
+    }
+}
 pub(super) fn unit_name(unit: &str) -> bool {
-    matches!(unit, FULL_UNIT | PLUGIN_UNIT)
+    matches!(
+        unit,
+        FULL_UNIT | PLUGIN_UNIT | ASSEMBLY_FULL_UNIT | ASSEMBLY_PLUGIN_UNIT
+    )
 }
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
     matches!(
         (phase, unit),
-        ("private-full-verification", FULL_UNIT) | ("private-plugin-verification", PLUGIN_UNIT)
+        ("private-full-verification", FULL_UNIT)
+            | ("private-plugin-verification", PLUGIN_UNIT)
+            | ("private-full-verification", ASSEMBLY_FULL_UNIT)
+            | ("private-plugin-verification", ASSEMBLY_PLUGIN_UNIT)
     )
 }
 fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
+    if recovery(&c.unit) || r["schema"] == "jetstreamer-private144-assembly-only-scan-launch-v1" {
+        return checked_recovery(c, r, p, o);
+    }
     ensure!(
         c.epoch == 144
             && scope(&c.phase, &c.unit)
@@ -97,6 +128,100 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn checked_recovery(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
+    let stage = stage(&c.unit);
+    ensure!(
+        c.epoch == 144
+            && recovery(&c.unit)
+            && scope(&c.phase, &c.unit)
+            && r["schema"] == "jetstreamer-private144-assembly-only-scan-launch-v1"
+            && r["epoch"] == 144
+            && r["unit"] == c.unit
+            && r["invocation_id"] == c.invocation_id
+            && r["expected_exec_start"] == c.expected_exec_start
+            && r["runner_sha256"] == ASSEMBLY_RUNNER_SHA
+            && r["private_verification_only"] == true,
+        "foreign assembly-only scan launch"
+    );
+    for flag in [
+        "ordinary_replay_claim",
+        "current_sidecar_eta_valid",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(r[flag] == false, "assembly scan grants authority:{flag}");
+    }
+    let pb: BoundFile = serde_json::from_value(r["scan_plan"].clone())?;
+    ensure!(
+        pb.path
+            == Path::new(
+                "/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-plan-20261022-v1"
+            )
+            .join(format!("{stage}.json"))
+            && canonical_digest(&r["scan_plan"]["sha256"])
+            && p["schema"] == "jetstreamer-private144-assembly-only-verification-plan-v1"
+            && p["stage"] == stage
+            && p["state_directory"] == format!("{}/{stage}", state_root(&c.unit))
+            && p["producer_outcome"] == r["producer_outcome"]
+            && p["assembly_launch"]["path"]
+                == "/var/lib/jetstreamer/horizon-assembly144-launch-20261022-v1/launch.json"
+            && p["assembly_launch"]["sha256"]
+                == "f601ec77e6b697192f2032b5afd0d04d8bcb870fc163f341ec00f24d41594a4e",
+        "assembly scan plan/source differs"
+    );
+    let expected = format!(
+        "{{ path={ASSEMBLY_RUNNER} ; argv[]={ASSEMBLY_RUNNER} {} --plan-sha256 {} --self-sha256 {ASSEMBLY_RUNNER_SHA}",
+        pb.path.display(),
+        pb.sha256
+    );
+    ensure!(
+        c.expected_exec_start
+            .split_once(" ; ignore_errors=")
+            .map(|(s, _)| s)
+            == Some(expected.as_str()),
+        "assembly scan command differs"
+    );
+    ensure!(
+        p["verifier"]["sha256"]
+            == if stage == "full" {
+                "41c03e493daa309ab7cffd9760b4e6cfe2195b3af0bb13a17f19508eb929d6e7"
+            } else {
+                "73e7535b9cedc7e565a92735ca6e07c7efb8e66755a6d5272ed16649b4d8cee9"
+            },
+        "unqualified assembly verifier"
+    );
+    ensure!(
+        o["schema"] == "jetstreamer-private144-assembly-only-v1"
+            && o["epoch"] == 144
+            && o["unit"] == assembly144::UNIT
+            && o["invocation_id"] == "00ca9bfb862549f6b99117b1ce590365"
+            && o["assembler_sha256"] == assembly144::TOOL_SHA
+            && o["plan"]["path"] == assembly144::PLAN
+            && o["plan"]["sha256"]
+                == "fe01e2fe674c1ad72a5f00f28861b970f7fcb3ed78363ad4e685387e499caccd"
+            && o["source_archives"] == 2
+            && o["slots_merged"] == 432000
+            && o["provenance_version"] == 4
+            && o["assembly_profile"] == "jetstreamer-epoch144-assembly-only-v1"
+            && o["no_replay"] == true
+            && o["private_output"]
+                == format!("{}/epoch-144-assembly-only-v4.jet", assembly144::ROOT)
+            && canonical_digest(&o["archive_sha256"])
+            && o["archive_bytes"]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n <= 112u64 << 30)
+            && o["independent_final_archive_verification_passed"] == false
+            && o["current_plugin_verification_passed"] == false
+            && o["canonical_sidecar_authorized"] == false
+            && o["publication_authorized"] == false
+            && o["r2_mutations"] == false,
+        "not genuine complete assembly-only source"
+    );
+    assembly144_admission::check_retained_timeout(&o["original_terminal"])?;
+    Ok(())
+}
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     ensure!(
         c.evidence.len() == 1,
@@ -105,7 +230,21 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     let r = bound_json(&c.evidence[0])?;
     let pb: BoundFile = serde_json::from_value(r["scan_plan"].clone())?;
     let ob: BoundFile = serde_json::from_value(r["producer_outcome"].clone())?;
-    checked(c, &r, &bound_json(&pb)?, &bound_json(&ob)?)
+    let p = bound_json(&pb)?;
+    checked(c, &r, &p, &bound_json(&ob)?)?;
+    if recovery(&c.unit) {
+        let lb: BoundFile = serde_json::from_value(p["assembly_launch"].clone())?;
+        let l = bound_json(&lb)?;
+        let assembler = DiagnosticClaim {
+            epoch: 144,
+            unit: assembly144::UNIT.into(),
+            invocation_id: l["invocation_id"].as_str().context("assembler iid")?.into(),
+            scratch_path: assembly144::ROOT.into(),
+            launch_receipt: lb,
+        };
+        assembly144::launch(&l, &assembler)?;
+    }
+    Ok(())
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
@@ -115,7 +254,7 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
             && current["NRestarts"] == "0",
         "private144scan owner changed"
     );
-    let o=ProcessCommand::new("systemctl").args(["show",&c.unit,"--property=User,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths"]).output()?;
+    let o=ProcessCommand::new("systemctl").args(["show",&c.unit,"--property=User,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,RuntimeMaxUSec"]).output()?;
     ensure!(o.status.success(), "private144scan limits unreadable");
     let text = std::str::from_utf8(&o.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
@@ -141,19 +280,15 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
             "private144scan sandbox differs:{k}"
         );
     }
-    let stage = if c.unit == FULL_UNIT {
-        "full"
-    } else {
-        "plugin"
-    };
+    let stage = stage(&c.unit);
+    if recovery(&c.unit) {
+        ensure!(
+            fields.get("RuntimeMaxUSec") == Some(&"1d"),
+            "assembly scan runtime bound differs"
+        );
+    }
     ensure!(
-        fields.get("ReadWritePaths")
-            == Some(
-                &format!(
-                    "/var/lib/jetstreamer/horizon-epoch144-private-verification-20261022-v1/{stage}"
-                )
-                .as_str()
-            ),
+        fields.get("ReadWritePaths") == Some(&format!("{}/{stage}", state_root(&c.unit)).as_str()),
         "private144scan writable paths differ"
     );
     Ok(())
@@ -195,6 +330,78 @@ mod tests {
             "node_sha256":continuation144::NODE_SHA,"plan":{"sha256":"7d03772b0cbb865822eec517d3e856f0c28cbd7bbcb7e24ae58ed708647cf8df"},"assembly":{"slots_merged":432000,"provenance_version":4},
             "fresh_prefix_full_validation_passed":true,"fresh_native_checkpoint_matches":true,"publication_authorized":false,"canonical_sidecar_authorized":false,"r2_mutations":false});
         (c, r, p, o)
+    }
+    fn recovery_fixture(plugin: bool) -> (PipelineClaim, Value, Value, Value) {
+        let unit = if plugin {
+            ASSEMBLY_PLUGIN_UNIT
+        } else {
+            ASSEMBLY_FULL_UNIT
+        };
+        let stage = stage(unit);
+        let pb = json!({"path":format!("/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-plan-20261022-v1/{stage}.json"),"sha256":"a".repeat(64)});
+        let ob = json!({"path":"/sealed/assembly-outcome","sha256":"b".repeat(64)});
+        let cmd = format!(
+            "{{ path={ASSEMBLY_RUNNER} ; argv[]={ASSEMBLY_RUNNER} {} --plan-sha256 {} --self-sha256 {ASSEMBLY_RUNNER_SHA} ; ignore_errors=no }}",
+            pb["path"].as_str().unwrap(),
+            pb["sha256"].as_str().unwrap()
+        );
+        let c = PipelineClaim {
+            epoch: 144,
+            phase: format!("private-{stage}-verification"),
+            unit: unit.into(),
+            invocation_id: "c".repeat(32),
+            expected_exec_start: cmd.clone(),
+            evidence: vec![],
+        };
+        let mut r = json!({"schema":"jetstreamer-private144-assembly-only-scan-launch-v1","epoch":144,"unit":unit,"invocation_id":c.invocation_id,
+            "expected_exec_start":cmd,"runner_sha256":ASSEMBLY_RUNNER_SHA,"private_verification_only":true,"scan_plan":pb,"producer_outcome":ob});
+        for key in [
+            "ordinary_replay_claim",
+            "current_sidecar_eta_valid",
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            r[key] = json!(false);
+        }
+        let p = json!({"schema":"jetstreamer-private144-assembly-only-verification-plan-v1","stage":stage,
+            "state_directory":format!("{}/{stage}",state_root(unit)),"producer_outcome":ob,
+            "assembly_launch":{"path":"/var/lib/jetstreamer/horizon-assembly144-launch-20261022-v1/launch.json","sha256":"f601ec77e6b697192f2032b5afd0d04d8bcb870fc163f341ec00f24d41594a4e"},
+            "verifier":{"sha256":if plugin {"73e7535b9cedc7e565a92735ca6e07c7efb8e66755a6d5272ed16649b4d8cee9"} else {"41c03e493daa309ab7cffd9760b4e6cfe2195b3af0bb13a17f19508eb929d6e7"}}});
+        let o = json!({"schema":"jetstreamer-private144-assembly-only-v1","epoch":144,"unit":assembly144::UNIT,"invocation_id":"00ca9bfb862549f6b99117b1ce590365",
+            "assembler_sha256":assembly144::TOOL_SHA,"plan":{"path":assembly144::PLAN,"sha256":"fe01e2fe674c1ad72a5f00f28861b970f7fcb3ed78363ad4e685387e499caccd"},
+            "source_archives":2,"slots_merged":432000,"provenance_version":4,"assembly_profile":"jetstreamer-epoch144-assembly-only-v1","no_replay":true,
+            "private_output":format!("{}/epoch-144-assembly-only-v4.jet",assembly144::ROOT),"archive_sha256":"d".repeat(64),"archive_bytes":109000000000u64,
+            "independent_final_archive_verification_passed":false,"current_plugin_verification_passed":false,"canonical_sidecar_authorized":false,"publication_authorized":false,"r2_mutations":false,
+            "original_terminal":{"InvocationID":"8fddd3ef045c4fe5b12c7d25f43a4b73","MainPID":"0","NRestarts":"0","Restart":"no","Result":"timeout","ActiveState":"failed","SubState":"failed","RuntimeMaxUSec":"2h","ExecMainStatus":"15"}});
+        (c, r, p, o)
+    }
+    #[test]
+    fn assembly_scans_are_distinct_private_stages_not_aliases_or_delivery() {
+        for plugin in [false, true] {
+            let (c, r, p, o) = recovery_fixture(plugin);
+            checked(&c, &r, &p, &o).unwrap();
+            assert_eq!(pipeline_unit_range(&c.phase, &c.unit).unwrap(), 144..=144);
+            assert!(pipeline_unit_range("full-verification", &c.unit).is_err());
+            assert!(assembly144_admission::check_timeout(&o["original_terminal"]).is_err());
+            assembly144_admission::check_retained_timeout(&o["original_terminal"]).unwrap();
+            for (key, v) in [
+                ("schema", json!("jetstreamer-private144-scan-launch-v2")),
+                ("runner_sha256", json!(RUNNER_SHA)),
+                ("publication_authorized", json!(true)),
+            ] {
+                let mut bad = r.clone();
+                bad[key] = v;
+                assert!(checked(&c, &bad, &p, &o).is_err(), "{key}");
+            }
+            let mut bad = o.clone();
+            bad["original_terminal"]["Result"] = json!("success");
+            assert!(checked(&c, &r, &p, &bad).is_err());
+            let mut bad = o;
+            bad["schema"] = json!("jetstreamer-private-epoch144-checkpoint-continuation-v2");
+            assert!(checked(&c, &r, &p, &bad).is_err());
+        }
     }
     #[test]
     fn private_stages_have_exact_scope_not_delivery_authority() {

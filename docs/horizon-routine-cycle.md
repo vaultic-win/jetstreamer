@@ -50,6 +50,27 @@ feed it to the original-success-only private scan runner as an alias: that runne
 must continue to reject this different profile until its explicit replacement is
 independently qualified.
 
+The prospective assembly scan runner uses the distinct plan schema
+`jetstreamer-private144-assembly-only-verification-plan-v1` and requires an
+`assembly_launch` binding. It checks the frozen assembly-only outcome, the
+dedicated collector's digest and source-manifest bindings, and the actual
+original timeout plus assembler terminal success. Its canonical filename is a
+separate read-only same-inode view, not a copy or public import. Full verification
+still uses strict `--full` and the independently derived provenance digest;
+plugin verification still uses `--verify-only`. Both scans hash the source
+before and after, check the producer's digest/length, revalidate terminal state
+and tools, and remain sidecar-free. Private receipts have a distinct schema.
+
+The new fleet scan namespaces are private qualification only. Their validation
+reopens the exact captured assembler launch and its resource/source bindings;
+the retained assembler timeout tuple does not replace the stricter live-unit
+admission proof (that retained tuple intentionally has no `Id` field).
+Source support or a sealed prospective scanner is not launch authority. Real
+complete-source/read-only-view/admission sandbox probes, invocation capture and
+fleet/routine downstream handoff still precede use. The current assembler and
+routine reader are never hot-swapped to adopt this source, and canonical import
+and publication remain separately unqualified until their normal gates pass.
+
 ## Exact epoch193 to epoch194 ETA handoff
 
 The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.

@@ -152,6 +152,24 @@ pub(super) fn check_timeout(v: &Value) -> Result<()> {
     );
     Ok(())
 }
+// The assembler's retained terminal record deliberately excludes Id. Its
+// named original_terminal field is accepted only inside the separately bound
+// assembly-only outcome, never as an admission/unit-observation substitute.
+pub(super) fn check_retained_timeout(v: &Value) -> Result<()> {
+    ensure!(
+        v["InvocationID"] == ORIGINAL_IID
+            && v["MainPID"] == "0"
+            && v["NRestarts"] == "0"
+            && v["Restart"] == "no"
+            && v["Result"] == "timeout"
+            && v["ActiveState"] == "failed"
+            && v["SubState"] == "failed"
+            && v["RuntimeMaxUSec"] == "2h"
+            && matches!(v["ExecMainStatus"].as_str(), Some("9" | "15" | "1")),
+        "assembly outcome lacks exact retained original timeout"
+    );
+    Ok(())
+}
 pub(super) fn protected_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     let mut filtered = f.clone();
     let old = filtered["unit_census"][continuation144::UNIT].clone();
