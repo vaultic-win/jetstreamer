@@ -309,6 +309,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     native144_recovery::consume(&mut next, &completion)?;
+    delivery160::consume(&mut next)?;
     assembly144_scans_recover::consume(&mut next, &completion)?;
     if completion.get("public198_promotion").is_some() {
         public198::consume(&mut next, &completion, &mut next_config)?;
@@ -331,7 +332,10 @@ pub(super) fn prepare(
     validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
     let effective = private144::effective_model(
         &next,
-        &delivery198::preparation_model(&next, &model, delivery_spec)?,
+        &delivery160::effective_model(
+            &next,
+            &delivery198::preparation_model(&next, &model, delivery_spec)?,
+        )?,
     )?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
@@ -370,6 +374,7 @@ pub(super) fn prepare(
         );
     }
     delivery198::validate_completed(p, &completion)?;
+    delivery160::validate_completed(p, &completion)?;
     publication144::validate_completed(p, &completion)?;
     if mode == "--prepare-next-assembly144-reader" {
         ensure!(
@@ -541,6 +546,22 @@ pub(super) fn prepare(
         validate_observer_config(&next, &effective, &next_config)?;
         tool_ok(&next.tools.r2)?;
         delivery198::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-delivery160" {
+        ensure!(
+            handoff_spec.is_none(),
+            "160 transition consumes exact sealed event proof only"
+        );
+        delivery160::enable(&mut next, &mut next_config, &model, &completion)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        let effective = private144::effective_model(
+            &next,
+            &delivery160::effective_model(&next, &delivery198::effective_model(&next, &model)?)?,
+        )?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        delivery160::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     let host101 = is_101(p)?;
     let root = Path::new(if host101 { ROOT_101 } else { ROOT });

@@ -28,6 +28,8 @@ mod next_preparation;
 #[path = "routine_terminal.rs"]
 mod terminal_handoff;
 
+#[path = "routine_delivery160.rs"]
+mod delivery160;
 #[path = "routine_delivery198.rs"]
 mod delivery198;
 #[path = "routine_delivery198_recover.rs"]
@@ -112,6 +114,8 @@ struct Plan {
     epoch157_terminal_handoff: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     epoch198_delivery: Option<delivery198::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    epoch160_delivery: Option<delivery160::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     public198_delivery: Option<public198::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -226,6 +230,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.epoch160_delivery.is_some() {
+        return "delivery160-native141-acquisition-scans-upload198-v1";
+    }
     if p.publication144.is_some() {
         return "publication144-native141-acquisition-scans-upload198-v1";
     }
@@ -671,6 +678,13 @@ fn validate_templates(
         );
         epochs.remove(&198);
     }
+    if p.epoch160_delivery.is_some() {
+        ensure!(
+            host101 && !p.expected_epochs.contains(&160),
+            "foreign160 delivery census"
+        );
+        epochs.remove(&160);
+    }
     if p.runtime_handoff157.is_some() {
         runtime157::validate(p)?;
         epochs.remove(&157);
@@ -1098,6 +1112,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     }
     apply_known_action_corrections(p, &mut fleet)?;
     delivery198::derive_fleet(p, &mut fleet)?;
+    delivery160::derive_fleet(p, &mut fleet)?;
     public198::derive_fleet(p, &mut fleet)?;
     runtime157::derive_fleet(p, &mut fleet)?;
     prefix157::derive_fleet(p, &mut fleet)?;
@@ -1301,7 +1316,10 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     terminal_handoff::preflight(p, &model)?;
     let model = private144::effective_model(
         p,
-        &delivery198::effective_model(p, &controller_recovery::model(p, &model)?)?,
+        &delivery160::effective_model(
+            p,
+            &delivery198::effective_model(p, &controller_recovery::model(p, &model)?)?,
+        )?,
     )?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
@@ -1317,6 +1335,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     // is an in-memory preview, not a new fleet receipt or resource poll.
     apply_known_action_corrections(p, &mut fleet.clone())?;
     delivery198::derive_fleet(p, &mut fleet.clone())?;
+    delivery160::derive_fleet(p, &mut fleet.clone())?;
     runtime157::derive_fleet(p, &mut fleet.clone())?;
     prefix157::derive_fleet(p, &mut fleet.clone())?;
     prefix144::derive_fleet(p, &mut fleet.clone())?;
@@ -1556,6 +1575,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             delivery198::publish(p, &model, &fleet, &observer)?
         };
         let publication144_status = publication144::publish(p, &pipeline, &observer)?;
+        let delivery160_status = delivery160::publish(p, &pipeline, &observer)?;
         let parent = p.fleet_output.parent().context("fleet parent missing")?;
         if !parent.exists() {
             private_dir(parent.parent().context("fleet ancestor missing")?)?;
@@ -1592,7 +1612,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":plan_bound,"self_sha256":self_sha,
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
-            "inventory":ledger["inventory"],"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"replay_launch_authorized":false,"archive_mutations":false,
+            "inventory":ledger["inventory"],"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
             "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
@@ -1650,6 +1670,7 @@ fn main() {
                             | "--promote-partial2018"
                             | "--prepare-next"
                             | "--prepare-next-upload198"
+                            | "--prepare-next-delivery160"
                             | "--prepare-next-assembly144-reader"
                             | "--prepare-next-native141"
                             | "--publish-upload198-event"
@@ -1760,6 +1781,7 @@ fn main() {
                 || arg == "--prepare-next-assembly144-scans"
                 || arg == "--prepare-next-terminal157"
                 || arg == "--prepare-next-delivery198"
+                || arg == "--prepare-next-delivery160"
                 || arg == "--prepare-next-native198"
                 || arg == "--prepare-next-native144"
                 || arg == "--prepare-next-continuation144"

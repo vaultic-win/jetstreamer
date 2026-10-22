@@ -108,6 +108,11 @@ impl Binding {
                     &self.invocation_id,
                     &self.origin_unit,
                     &self.origin_invocation_id
+                ) || super::cohort160_handoff::binding_matches(
+                    &self.unit,
+                    &self.invocation_id,
+                    &self.origin_unit,
+                    &self.origin_invocation_id
                 ) || (self.unit == super::cohort_finalization::CONTROLLER
                     && self.invocation_id == super::cohort_finalization::CONTROLLER_INVOCATION
                     && self.origin_unit == super::cohort_finalization::UNIT
@@ -180,13 +185,17 @@ fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
     if requested != 0 {
         ensure!(
             requested == 1001
-                && ((plan.epoch == 198
-                    && plan.binding.origin_unit == super::cohort198_finalization::UNIT
-                    && plan.binding.origin_invocation_id == "e5612ef00a5b4fcab04df2c13a6b35b0")
+                && ((plan.epoch == 160
+                    && plan.binding.origin_unit == super::cohort160_finalization::UNIT
+                    && plan.binding.origin_invocation_id == super::cohort160_finalization::IID)
+                    || (plan.epoch == 198
+                        && plan.binding.origin_unit == super::cohort198_finalization::UNIT
+                        && plan.binding.origin_invocation_id
+                            == "e5612ef00a5b4fcab04df2c13a6b35b0")
                     || exact144_binding(plan))
                 && plan.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
-            "foreign-owned pipeline receipt directory is not an exact198/144 profile"
+            "foreign-owned pipeline receipt directory is not an exact160/198/144 profile"
         );
     }
     Ok(requested)
@@ -353,6 +362,9 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                             && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
                             || (unit == super::cohort198_handoff::CONTROLLER
                                 && invocation == super::cohort198_handoff::CONTROLLER_INVOCATION
+                                && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                            || (unit == super::cohort160_handoff::CONTROLLER
+                                && invocation == super::cohort160_handoff::IID
                                 && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"))
                             && s.starts_with("Started "))
                 })
@@ -733,6 +745,22 @@ pub(super) async fn run() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn exact160_controller_started_event_keeps_actual_handoff_clock() {
+        let unit = super::super::cohort160_handoff::CONTROLLER;
+        let invocation = super::super::cohort160_handoff::IID;
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started exact160 controller.","__REALTIME_TIMESTAMP":"1792592033951013"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1792592033951
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("foreign");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
+    #[test]
     fn exact198_recovered_controller_started_event_keeps_real_clock() {
         let unit = super::super::cohort198_handoff::CONTROLLER;
         let invocation = super::super::cohort198_handoff::CONTROLLER_INVOCATION;
@@ -777,6 +805,29 @@ mod tests {
             receipt_directory: "/home/sol/.jetstreamer-private/r2-status-receipts".into(),
             receipt_directory_uid: Some(1001),
         }
+    }
+    #[test]
+    fn epoch160_directory_and_finalization_scope_preserve_original_owner() {
+        let mut p = directory_plan();
+        p.epoch = 160;
+        p.binding.unit = super::super::cohort160_finalization::UNIT.into();
+        p.binding.invocation_id = super::super::cohort160_finalization::IID.into();
+        p.binding.origin_unit = p.binding.unit.clone();
+        p.binding.origin_invocation_id = p.binding.invocation_id.clone();
+        assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
+        p.binding.validate(160, "finalization").unwrap();
+        assert!(p.binding.validate(159, "finalization").is_err());
+        assert!(p.binding.validate(161, "finalization").is_err());
+        assert!(p.binding.validate(160, "replay").is_err());
+        p.binding.unit = super::super::cohort160_handoff::CONTROLLER.into();
+        p.binding.invocation_id = super::super::cohort160_handoff::IID.into();
+        p.binding.claim_phase = "controller-import-handoff".into();
+        p.binding.validate(160, "publication").unwrap();
+        assert!(p.binding.validate(161, "publication").is_err());
+        assert!(p.binding.validate(160, "finalization").is_err());
+        p.binding.origin_invocation_id = "b".repeat(32);
+        assert!(receipt_directory_owner(&p).is_err());
+        assert!(p.binding.validate(160, "finalization").is_err());
     }
     #[test]
     fn foreign_directory_policy_is_exact198_only_and_defaults_to_root() {
