@@ -1,11 +1,11 @@
 //! Closed observational contract for a 477-slot private comparison, never publication.
 use super::*;
-pub(super) const SCHEMA: &str = "jetstreamer-private-epoch223-v1625-tail-launch-v1";
+pub(super) const SCHEMA: &str = "jetstreamer-private-epoch223-v1625-tail-launch-v2";
 pub(super) const GUARD_SHA: &str =
     "d039ddf0b161bc554614a862bd12987bd6a3474549a22d066ebefa5584e5dd98";
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-bd60006d-v1";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-d2507ee8-v2";
 const SNAPSHOT: &str = "snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst";
-const NODE: &str = "ad7204ff573ce552df57125fb82f984575585378958c9232d6c13afea2f34b01";
+const NODE: &str = "b859bce6efc54f8f31b8eb4963f7996f8cdda1b136b79b8566bb5e032d5c26df";
 const WORKER: &str = "fde3ba53cc52012b894bac29bd7889b4cfd326fff75f4f67ec4cbdbf2ac7136c";
 fn suffix(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
@@ -23,7 +23,7 @@ fn command(v: &Value) -> Option<&str> {
 fn expected(c: &DiagnosticClaim) -> String {
     let root = c.scratch_path.display();
     format!(
-        "{{ path={PACKAGE}/jetstreamer-node ; argv[]={PACKAGE}/jetstreamer-node 223 {root}/ledger --verify --qualification-end-slot=96767999 --snapshot-archive={PACKAGE}/{SNAPSHOT} --epoch-hashes={PACKAGE}/epoch-hashes-223-qualification.txt --horizon-output={root}/output/epoch-223.jet --replay-scratch={root}/scratch"
+        "{{ path={PACKAGE}/jetstreamer-node ; argv[]={PACKAGE}/jetstreamer-node 223 {root}/ledger --verify --qualification-end-slot=96767999 --snapshot-archive={PACKAGE}/{SNAPSHOT} --epoch-hashes={PACKAGE}/epoch-hashes-223-qualification.txt --horizon-output={root}/output/epoch-223.jet --replay-scratch={root}/scratch --epoch223-tail-comparison"
     )
 }
 pub(super) fn same_command(c: &DiagnosticClaim, live: &Value, launch: &Value) -> bool {
@@ -45,7 +45,7 @@ pub(super) fn launch_matches(c: &DiagnosticClaim, r: &Value) -> bool {
         && r["node_sha256"] == NODE
         && r["worker_sha256"] == WORKER
         && r["package_seal_sha256"]
-            == "4ab0f74e4fc69d3bb0382242bf9c862c5274532cb991e3843258981f264b5ba3"
+            == "66c92353066ef0c4920f945b095ac6ae955f8bfc09ce60e30c7042f1e4bd5da7"
         && r["runtime"] == "solana-v1.6.25"
         && r["feature"] == "epoch223-v1-6-25-qualification"
         && r["restart_policy"] == "no"
@@ -96,11 +96,11 @@ pub(super) fn guard_matches(c: &DiagnosticClaim, r: &Value, p: &Value) -> bool {
 }
 pub(super) fn capability(v: &Value) -> Result<()> {
     ensure!(
-        v["schema"] == "jetstreamer-private-epoch223-tail-package-capability-v1"
+        v["schema"] == "jetstreamer-private-epoch223-tail-package-capability-v2"
             && v["epoch"] == 223
             && v["package"] == PACKAGE
             && v["self_sha256"]
-                == "40db4557b0b9eb3b9805e8698db47f6a6bd7e9775f4072c7b9373e2f054657a3"
+                == "ad4959ced9e2b161f8fe82c7b4feabd4d0d5b380cbe48ae733aa13a588330831"
             && v["members"]["jetstreamer-node"]["sha256"] == NODE
             && v["members"]["jetstreamer-historical-worker-v1-6-25"]["sha256"] == WORKER
             && v["members"][SNAPSHOT]["sha256"]
@@ -115,6 +115,10 @@ pub(super) fn capability(v: &Value) -> Result<()> {
         "complete_epoch_span_covered",
         "snapshot_schema_or_contents_tested",
         "fresh_resource_admission_passed",
+        "canonical_prefix_qualified",
+        "full_cold_epoch_peak_qualified",
+        "runtime_promotion_authorized",
+        "canonical_sidecar_authorized",
         "replay_launch_authorized",
         "publication_authorized",
         "remote_mutations",
@@ -126,13 +130,59 @@ pub(super) fn capability(v: &Value) -> Result<()> {
         );
     }
     let probes = v["probes"].as_array().context("tail223 probes")?;
-    ensure!(probes.len() == 3, "tail223 probe census");
+    ensure!(probes.len() == 4, "tail223 probe census");
     for (i, p) in probes.iter().enumerate() {
         ensure!(
             p["mode"] == json!(i)
-                && p["exit_code"] == if i == 2 { 1 } else { 2 }
+                && p["exit_code"]
+                    == match i {
+                        2 => 1,
+                        3 => 0,
+                        _ => 2,
+                    }
                 && canonical_digest(&p["log_sha256"]),
             "tail223 capability probe binding"
+        );
+    }
+    planning_preflight(&probes[3]["planning_preflight"])?;
+    Ok(())
+}
+fn planning_preflight(v: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == "jetstreamer-private-epoch223-tail-planning-preflight-v1"
+            && v["epoch"] == 223
+            && v["bootstrap_slot"] == 96_767_522u64
+            && v["output_slot_start"] == 96_767_523u64
+            && v["terminal_slot"] == 96_767_999u64
+            && v["output_slot_count"] == 477
+            && v["runtime_profile"] == "solana-v1.6.25"
+            && v["runtime_revision"] == "7de8a55b54d3e11058b82f9483bb405d143b455c"
+            && v["worker_identity"] == "jetstreamer-historical-worker-v1-6-25"
+            && v["worker_environment_override"] == "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
+            && v["canonical_bootstrap_bound"] == true
+            && v["tail_comparison_only"] == true,
+        "tail223 post-bootstrap planning differs"
+    );
+    for key in [
+        "canonical_terminal_required",
+        "terminal_canonical_root_independently_known",
+        "complete_epoch_span_covered",
+        "worker_spawned",
+        "archive_created",
+        "snapshot_schema_or_contents_tested",
+        "fresh_resource_admission_passed",
+        "canonical_prefix_qualified",
+        "full_cold_epoch_peak_qualified",
+        "replay_launch_authorized",
+        "runtime_promotion_authorized",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(
+            v[key] == false,
+            "tail223 planning grants foreign authority: {key}"
         );
     }
     Ok(())
@@ -155,7 +205,7 @@ mod tests {
         };
         let mut r = json!({"schema":SCHEMA,"launched":true,"epoch":223,"private_run_root":c.scratch_path,
             "snapshot_slot":96767522,"snapshot_sha256":"dc7f2ac03813bc609629885af82222ac5af070cc6187b7bce08e10944fd214e1",
-            "node_sha256":NODE,"worker_sha256":WORKER,"package_seal_sha256":"4ab0f74e4fc69d3bb0382242bf9c862c5274532cb991e3843258981f264b5ba3",
+            "node_sha256":NODE,"worker_sha256":WORKER,"package_seal_sha256":"66c92353066ef0c4920f945b095ac6ae955f8bfc09ce60e30c7042f1e4bd5da7",
             "runtime":"solana-v1.6.25","feature":"epoch223-v1-6-25-qualification","restart_policy":"no","solana_rayon_threads":16,
             "output_slot_start":96767523,"terminal_slot":96767999,"output_slot_count":477,"maximum_runtime_seconds":7200,
             "experimental_envelope_bytes":416u64<<30,"required_initial_free_bytes":3437045427597u64,"guard_minimum_free_bytes":3024728567181u64,
@@ -207,6 +257,16 @@ mod tests {
             &json!(format!("{} --extra ; ignore_errors=no }}", expected(&c))),
             &r["expected_exec_start"]
         ));
+        for command in [
+            expected(&c).replace(" --epoch223-tail-comparison", ""),
+            format!("{} --epoch223-tail-preflight", expected(&c)),
+        ] {
+            assert!(!same_command(
+                &c,
+                &json!(format!("{command} ; ignore_errors=no }}")),
+                &r["expected_exec_start"]
+            ));
+        }
     }
     #[test]
     fn ordinary_drainage_guard_has_no_target_stop_exemption() {
@@ -226,11 +286,11 @@ mod tests {
     }
 
     #[test]
-    fn capability_binds_exact_package_all_three_probes_and_denied_authority() {
+    fn capability_binds_exact_package_all_four_probes_and_denied_authority() {
         let mut v = json!({
-            "schema":"jetstreamer-private-epoch223-tail-package-capability-v1",
+            "schema":"jetstreamer-private-epoch223-tail-package-capability-v2",
             "epoch":223,"package":PACKAGE,
-            "self_sha256":"40db4557b0b9eb3b9805e8698db47f6a6bd7e9775f4072c7b9373e2f054657a3",
+            "self_sha256":"ad4959ced9e2b161f8fe82c7b4feabd4d0d5b380cbe48ae733aa13a588330831",
             "members":{
                 "jetstreamer-node":{"sha256":NODE},
                 "jetstreamer-historical-worker-v1-6-25":{"sha256":WORKER}
@@ -244,6 +304,10 @@ mod tests {
             "complete_epoch_span_covered",
             "snapshot_schema_or_contents_tested",
             "fresh_resource_admission_passed",
+            "canonical_prefix_qualified",
+            "full_cold_epoch_peak_qualified",
+            "runtime_promotion_authorized",
+            "canonical_sidecar_authorized",
             "replay_launch_authorized",
             "publication_authorized",
             "remote_mutations",
@@ -255,7 +319,8 @@ mod tests {
         v["probes"] = json!([
             {"mode":0,"exit_code":2,"log_sha256":"a".repeat(64)},
             {"mode":1,"exit_code":2,"log_sha256":"b".repeat(64)},
-            {"mode":2,"exit_code":1,"log_sha256":"c".repeat(64)}
+            {"mode":2,"exit_code":1,"log_sha256":"c".repeat(64)},
+            {"mode":3,"exit_code":0,"log_sha256":"d".repeat(64),"planning_preflight":preflight_fixture()}
         ]);
         capability(&v).unwrap();
         for key in denied {
@@ -274,11 +339,22 @@ mod tests {
             bad.as_object_mut().unwrap().remove(key);
             assert!(capability(&bad).is_err(), "{key}");
         }
-        for index in 0..3 {
+        for index in 0..4 {
             for key in ["mode", "exit_code", "log_sha256"] {
                 let mut bad = v.clone();
                 bad["probes"][index][key] = Value::Null;
                 assert!(capability(&bad).is_err(), "{index}/{key}");
+            }
+        }
+        for key in preflight_fixture().as_object().unwrap().keys() {
+            let mut bad = v.clone();
+            bad["probes"][3]["planning_preflight"][key] = Value::Null;
+            assert!(capability(&bad).is_err(), "planning/{key}");
+            let mut bad = v.clone();
+            if v["probes"][3]["planning_preflight"][key].is_boolean() {
+                bad["probes"][3]["planning_preflight"][key] =
+                    json!(!v["probes"][3]["planning_preflight"][key].as_bool().unwrap());
+                assert!(capability(&bad).is_err(), "planning authority/{key}");
             }
         }
         let mut bad = v.clone();
@@ -293,5 +369,34 @@ mod tests {
             bad["members"][name]["sha256"] = json!("0".repeat(64));
             assert!(capability(&bad).is_err(), "{name}");
         }
+    }
+    fn preflight_fixture() -> Value {
+        let mut v = json!({"schema":"jetstreamer-private-epoch223-tail-planning-preflight-v1",
+            "epoch":223,"bootstrap_slot":96767522,"output_slot_start":96767523,
+            "terminal_slot":96767999,"output_slot_count":477,"runtime_profile":"solana-v1.6.25",
+            "runtime_revision":"7de8a55b54d3e11058b82f9483bb405d143b455c",
+            "worker_identity":"jetstreamer-historical-worker-v1-6-25",
+            "worker_environment_override":"JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
+            "canonical_bootstrap_bound":true,"tail_comparison_only":true});
+        for key in [
+            "canonical_terminal_required",
+            "terminal_canonical_root_independently_known",
+            "complete_epoch_span_covered",
+            "worker_spawned",
+            "archive_created",
+            "snapshot_schema_or_contents_tested",
+            "fresh_resource_admission_passed",
+            "canonical_prefix_qualified",
+            "full_cold_epoch_peak_qualified",
+            "replay_launch_authorized",
+            "runtime_promotion_authorized",
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            v[key] = json!(false);
+        }
+        v
     }
 }
