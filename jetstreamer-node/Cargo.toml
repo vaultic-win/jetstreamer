@@ -20,6 +20,8 @@ epoch205-native-restore-diagnostic = ["dep:chrono"]
 epoch213-checkpoint-continuation-diagnostic = []
 # Exact private epoch144 prefix/native-checkpoint continuation, never publication.
 epoch144-checkpoint-continuation-diagnostic = []
+# Private epoch223 cold/tail comparison, never the ordinary runtime route.
+epoch223-v1-6-25-qualification = []
 # Build-bound, non-production epoch-224 diagnostic. It compares the historical
 # worker's transaction-attributed lamport writes with canonical source metadata
 # and records the exact freeze-time writes at the first divergent boundary.

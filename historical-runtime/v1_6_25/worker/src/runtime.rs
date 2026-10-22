@@ -12,6 +12,8 @@ use solana_runtime::{
     bank::{Bank, Builtin, Builtins, ExecuteTimings, NonceRollbackInfo},
     builtins::ActivationType,
 };
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+use solana_sdk::hard_forks::HardForks;
 use solana_sdk::{
     account::from_account,
     clock::{MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES},
@@ -42,6 +44,20 @@ const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 100_656_000;
 // vote in slot 96,767,526.  Refuse the following slot before accepting any of
 // its entries so this diagnostic can never turn into an unbounded epoch replay.
 const DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE: u64 = 96_767_527;
+const EPOCH223_COLD_SNAPSHOT_SLOT: u64 = 96_335_538;
+const EPOCH223_TAIL_SNAPSHOT_SLOT: u64 = 96_767_522;
+const EPOCH223_END_EXCLUSIVE: u64 = 96_768_000;
+#[cfg(all(
+    feature = "epoch223-v1-6-25-qualification",
+    any(
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch223 qualification cannot combine unrelated diagnostic modes");
 const EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 96_767_522;
 const EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 97_199_617;
 const EPOCH225_DIAGNOSTIC_END_EXCLUSIVE: u64 = 97_202_600;
@@ -166,6 +182,43 @@ impl ExecutionWaveMetrics {
     }
 }
 
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+const MAINNET_HARD_FORK_SLOTS: [u64; 4] = [13_334_463, 53_180_900, 96_542_804, 96_542_805];
+
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+fn restore_mainnet_hard_fork_markers(slot: u64, hard_forks: &mut HardForks) -> Result<(), String> {
+    // Validate everything before mutation, including missing already-applied
+    // markers. Such a snapshot cannot be repaired by registering its past fork.
+    for &(marker, count) in hard_forks.iter() {
+        if !MAINNET_HARD_FORK_SLOTS.contains(&marker) {
+            return Err(format!(
+                "snapshot contains unsupported mainnet hard fork {}",
+                marker
+            ));
+        }
+        if count != 1 {
+            return Err(format!(
+                "snapshot mainnet hard fork {} has count {}, expected 1",
+                marker, count
+            ));
+        }
+    }
+    for &marker in &MAINNET_HARD_FORK_SLOTS {
+        if slot >= marker && !hard_forks.iter().any(|&(present, _)| present == marker) {
+            return Err(format!(
+                "snapshot at slot {} is missing applied mainnet hard fork {}",
+                slot, marker
+            ));
+        }
+    }
+    for &marker in &MAINNET_HARD_FORK_SLOTS {
+        if !hard_forks.iter().any(|&(present, _)| present == marker) {
+            hard_forks.register(marker);
+        }
+    }
+    Ok(())
+}
+
 pub enum ProcessEntriesError<E> {
     Runtime(String),
     Emit(E),
@@ -232,6 +285,8 @@ impl RuntimeState {
                 ));
             }
         };
+        #[cfg(feature = "epoch223-v1-6-25-qualification")]
+        restore_mainnet_hard_fork_markers(bank.slot(), &mut bank.hard_forks().write().unwrap())?;
         let write_cursor = bank.accounts().accounts_db.next_write_version();
         let last_entry_hash = bank.last_blockhash();
         let initialized = Initialized {
@@ -845,6 +900,11 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(feature = "epoch223-v1-6-25-qualification")
+        && ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot)
+    {
+        return Err("epoch223 qualification requires the exact cold or tail snapshot".into());
+    }
     if cfg!(any(
         feature = "epoch225-v1-6-25-diagnostic",
         feature = "epoch225-v1-6-25-qualification"
@@ -865,7 +925,7 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
             EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT
         ));
     }
-    if slot < MIN_SUPPORTED_SNAPSHOT_SLOT || slot >= MAX_SUPPORTED_SLOT_EXCLUSIVE {
+    if !(MIN_SUPPORTED_SNAPSHOT_SLOT..MAX_SUPPORTED_SLOT_EXCLUSIVE).contains(&slot) {
         return Err(format!(
             "Solana v1.6.25 candidate snapshot slot {} is outside {}..{}",
             slot, MIN_SUPPORTED_SNAPSHOT_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE
@@ -879,7 +939,14 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
 // does not extend any runtime snapshot or entry envelope.
 #[cfg(test)]
 pub(crate) fn boundary_snapshot_test_slot() -> u64 {
-    if cfg!(any(
+    if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        epoch223_snapshot_test_anchor(
+            env::var("JETSTREAMER_V1_6_25_EPOCH223_TEST_ANCHOR")
+                .ok()
+                .as_deref(),
+        )
+        .expect("epoch223 integration-test anchor must be one exact admitted snapshot")
+    } else if cfg!(any(
         feature = "epoch225-v1-6-25-diagnostic",
         feature = "epoch225-v1-6-25-qualification"
     )) {
@@ -892,6 +959,20 @@ pub(crate) fn boundary_snapshot_test_slot() -> u64 {
     } else {
         MIN_SUPPORTED_SNAPSHOT_SLOT
     }
+}
+
+#[cfg(test)]
+fn epoch223_snapshot_test_anchor(value: Option<&str>) -> Result<u64, String> {
+    let slot = match value {
+        None => EPOCH223_COLD_SNAPSHOT_SLOT,
+        Some(text) => text
+            .parse::<u64>()
+            .map_err(|_| "invalid epoch223 test anchor")?,
+    };
+    if ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot) {
+        return Err("unsupported epoch223 test anchor".into());
+    }
+    Ok(slot)
 }
 
 fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
@@ -907,7 +988,9 @@ fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
 }
 
 fn effective_min_supported_entry_slot() -> u64 {
-    if cfg!(any(
+    if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        EPOCH223_COLD_SNAPSHOT_SLOT + 1
+    } else if cfg!(any(
         feature = "epoch225-v1-6-25-diagnostic",
         feature = "epoch225-v1-6-25-qualification"
     )) {
@@ -920,7 +1003,9 @@ fn effective_min_supported_entry_slot() -> u64 {
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "epoch225-v1-6-25-qualification") {
+    if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        EPOCH223_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch225-v1-6-25-qualification") {
         EPOCH225_QUALIFICATION_END_EXCLUSIVE
     } else if cfg!(feature = "epoch225-v1-6-25-diagnostic") {
         EPOCH225_DIAGNOSTIC_END_EXCLUSIVE
@@ -1459,6 +1544,99 @@ mod tests {
     use super::*;
 
     #[test]
+    fn epoch223_test_anchor_is_explicit_and_strict() {
+        assert_eq!(epoch223_snapshot_test_anchor(None).unwrap(), 96_335_538);
+        assert_eq!(
+            epoch223_snapshot_test_anchor(Some("96767522")).unwrap(),
+            96_767_522
+        );
+        for value in &["", "96767521", "96767523", "97199617", "abc"] {
+            assert!(epoch223_snapshot_test_anchor(Some(value)).is_err());
+        }
+    }
+
+    #[cfg(feature = "epoch223-v1-6-25-qualification")]
+    #[test]
+    fn epoch223_restores_both_observed_restart_markers_exactly_once() {
+        let mut forks = HardForks::default();
+        forks.register(13_334_463);
+        forks.register(53_180_900);
+        restore_mainnet_hard_fork_markers(96_335_538, &mut forks).unwrap();
+        restore_mainnet_hard_fork_markers(96_335_538, &mut forks).unwrap();
+        assert_eq!(
+            forks.iter().copied().collect::<Vec<_>>(),
+            vec![
+                (13_334_463, 1),
+                (53_180_900, 1),
+                (96_542_804, 1),
+                (96_542_805, 1),
+            ]
+        );
+        assert_eq!(forks.get_hash_data(96_542_803, 96_542_802), None);
+        assert_eq!(
+            forks.get_hash_data(96_542_804, 96_542_803),
+            Some(1u64.to_le_bytes())
+        );
+        assert_eq!(
+            forks.get_hash_data(96_542_805, 96_542_804),
+            Some(1u64.to_le_bytes())
+        );
+        assert_eq!(
+            forks.get_hash_data(96_542_805, 96_542_803),
+            Some(2u64.to_le_bytes())
+        );
+        assert_eq!(forks.get_hash_data(96_542_806, 96_542_805), None);
+        let before = forks.clone();
+        restore_mainnet_hard_fork_markers(97_199_617, &mut forks).unwrap();
+        assert_eq!(forks, before);
+    }
+
+    #[cfg(feature = "epoch223-v1-6-25-qualification")]
+    #[test]
+    fn epoch223_rejects_bad_snapshot_markers_without_partial_mutation() {
+        for missing in &MAINNET_HARD_FORK_SLOTS {
+            let mut forks = HardForks::default();
+            for &slot in &MAINNET_HARD_FORK_SLOTS {
+                if slot != *missing {
+                    forks.register(slot);
+                }
+            }
+            let before = forks.clone();
+            assert!(restore_mainnet_hard_fork_markers(97_199_617, &mut forks)
+                .unwrap_err()
+                .contains("missing applied"));
+            assert_eq!(forks, before);
+        }
+        for duplicate in &MAINNET_HARD_FORK_SLOTS {
+            let mut forks = HardForks::default();
+            for &slot in &MAINNET_HARD_FORK_SLOTS {
+                forks.register(slot);
+            }
+            forks.register(*duplicate);
+            let before = forks.clone();
+            assert!(restore_mainnet_hard_fork_markers(96_335_538, &mut forks)
+                .unwrap_err()
+                .contains("count 2"));
+            assert_eq!(forks, before);
+        }
+        let mut forks = HardForks::default();
+        forks.register(42);
+        let before = forks.clone();
+        assert!(restore_mainnet_hard_fork_markers(96_335_538, &mut forks)
+            .unwrap_err()
+            .contains("unsupported"));
+        assert_eq!(forks, before);
+        // At the first boundary its applied marker is mandatory, whereas the
+        // following boundary may still be scheduled from this snapshot.
+        let mut forks = HardForks::default();
+        for &slot in &MAINNET_HARD_FORK_SLOTS[..3] {
+            forks.register(slot);
+        }
+        restore_mainnet_hard_fork_markers(96_542_804, &mut forks).unwrap();
+        assert_eq!(forks.iter().count(), 4);
+    }
+
+    #[test]
     fn epoch225_wire_fixture_called_program_writability() {
         let wire = bs58::decode(
             include_str!("../../../fixtures/epoch225-writable-token-program.base58").trim(),
@@ -1613,7 +1791,13 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        if cfg!(any(
+        if cfg!(feature = "epoch223-v1-6-25-qualification") {
+            for slot in &[EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT] {
+                assert!(validate_candidate_snapshot_slot(*slot).is_ok());
+                assert!(validate_candidate_snapshot_slot(*slot - 1).is_err());
+                assert!(validate_candidate_snapshot_slot(*slot + 1).is_err());
+            }
+        } else if cfg!(any(
             feature = "epoch225-v1-6-25-diagnostic",
             feature = "epoch225-v1-6-25-qualification"
         )) {
@@ -1654,7 +1838,9 @@ mod tests {
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "epoch225-v1-6-25-qualification") {
+            if cfg!(feature = "epoch223-v1-6-25-qualification") {
+                EPOCH223_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch225-v1-6-25-qualification") {
                 EPOCH225_QUALIFICATION_END_EXCLUSIVE
             } else if cfg!(feature = "epoch225-v1-6-25-diagnostic") {
                 EPOCH225_DIAGNOSTIC_END_EXCLUSIVE
@@ -2687,7 +2873,9 @@ mod tests {
     fn boundary_snapshot_test_anchor_matches_the_strict_build_profile() {
         let slot = boundary_snapshot_test_slot();
         validate_candidate_snapshot_slot(slot).unwrap();
-        if cfg!(any(
+        if cfg!(feature = "epoch223-v1-6-25-qualification") {
+            assert_eq!(slot, 96_335_538);
+        } else if cfg!(any(
             feature = "epoch225-v1-6-25-diagnostic",
             feature = "epoch225-v1-6-25-qualification"
         )) {
