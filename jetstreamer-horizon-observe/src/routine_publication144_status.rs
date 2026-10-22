@@ -94,6 +94,9 @@ pub(crate) fn publish(p: &Plan, prior_pipeline: &Value, observer: &Bound) -> Res
         return Ok(json!({"enabled":false}));
     };
     validate(p)?;
+    if uploading(p) {
+        return upload::publish(p, prior_pipeline, observer);
+    }
     let provisional: Bound = serde_json::from_value(prior_pipeline["provisional_fleet"].clone())?;
     let ledger = bound_json(&provisional, false)?;
     ensure!(
@@ -220,6 +223,9 @@ fn validate_publication(sample: &str, model: &Bound, v: &Value, r: &Value) -> Re
 pub(crate) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     if p.publication144.is_none() {
         return Ok(());
+    }
+    if uploading(p) {
+        return upload::validate_completed(p, c);
     }
     let d = &c["epoch144_delivery"];
     ensure!(

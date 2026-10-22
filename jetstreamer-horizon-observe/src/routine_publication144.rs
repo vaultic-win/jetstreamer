@@ -2,6 +2,8 @@
 use super::*;
 #[path = "routine_publication144_status.rs"]
 mod status;
+#[path = "routine_publication144_upload.rs"]
+mod upload;
 pub(super) use status::{publish, validate_completed};
 const UNIT: &str = "horizon-publish-144-v4-20261022-v1.service";
 const LAUNCH: &str = "/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1/launch.json";
@@ -32,6 +34,13 @@ const FAILED: &str = "Exact144 publisher terminated unsuccessfully; capture term
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
     launch: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    upload: Option<Bound>,
+}
+pub(super) fn uploading(p: &Plan) -> bool {
+    p.publication144
+        .as_ref()
+        .is_some_and(|s| s.upload.is_some())
 }
 pub(super) fn reader(p: &Plan) -> bool {
     p.publication144.is_some()
@@ -115,6 +124,13 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             "publisher cannot borrow replay or another reader"
         );
         checked(&s.launch, &bound_json(&s.launch, true)?)?;
+        if s.upload.is_some() {
+            ensure!(
+                composite_reader(p),
+                "144 upload must retain complete composite history"
+            );
+            upload::checked(s)?;
+        }
     }
     Ok(())
 }
@@ -123,6 +139,9 @@ pub(super) fn retained_gate(p: &Plan, f: &Value) -> Result<Option<(Value, Value)
         return Ok(None);
     };
     let claim = checked(&s.launch, &bound_json(&s.launch, true)?)?;
+    if s.upload.is_some() {
+        return upload::retained(s, f, &claim);
+    }
     retained_gate_from(f, &claim, &s.launch)
 }
 fn retained_gate_from(f: &Value, claim: &Value, launch: &Bound) -> Result<Option<(Value, Value)>> {
@@ -154,10 +173,12 @@ pub(super) fn enable(p: &mut Plan, spec: &Bound) -> Result<()> {
     struct Spec {
         schema: String,
         launch: Bound,
+        #[serde(default)]
+        upload: Option<Bound>,
     }
     ensure!(
-        p.publication144.is_none() && native141::acquisition_enabled(p),
-        "publisher adoption already present or missing prior history"
+        native141::acquisition_enabled(p),
+        "publisher adoption missing prior history"
     );
     let s: Spec = serde_json::from_value(bound_json(spec, true)?)?;
     ensure!(
@@ -165,7 +186,19 @@ pub(super) fn enable(p: &mut Plan, spec: &Bound) -> Result<()> {
         "foreign publisher handoff"
     );
     checked(&s.launch, &bound_json(&s.launch, true)?)?;
-    p.publication144 = Some(Profile { launch: s.launch });
+    if let Some(prior) = &p.publication144 {
+        ensure!(
+            prior.launch.path == s.launch.path
+                && prior.launch.sha256 == s.launch.sha256
+                && prior.upload.is_none()
+                && s.upload.is_some(),
+            "144 handoff cannot replace origin or existing upload history"
+        );
+    }
+    p.publication144 = Some(Profile {
+        launch: s.launch,
+        upload: s.upload,
+    });
     p.tools.r2 = if p.census141_poh.is_some() {
         Bound {
             path: COMPOSITE_READER.into(),
@@ -228,6 +261,10 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         && current["Result"] == "success"
         && current["ExecMainStatus"] == "0";
     ensure!(
+        s.upload.is_none() || success,
+        "144 upload requires unchanged terminal-success publisher"
+    );
+    ensure!(
         live || success
             || current["ActiveState"] == "failed"
             || current["ActiveState"] == "inactive",
@@ -252,6 +289,9 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     let b = serde_json::to_value(&s.launch)?;
     if !e.contains(&b) {
         e.push(b);
+    }
+    if s.upload.is_some() {
+        upload::derive(s, f)?;
     }
     Ok(())
 }
