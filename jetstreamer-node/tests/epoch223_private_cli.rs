@@ -1,4 +1,3 @@
-#![cfg(feature = "epoch223-v1-6-25-qualification")]
 use std::process::Command;
 
 fn rejected(args: &[&str], expected: &str) {
@@ -16,6 +15,7 @@ fn rejected(args: &[&str], expected: &str) {
 }
 
 #[test]
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
 fn actual_entrypoint_rejects_maintenance_before_accessing_the_plan() {
     rejected(
         &[
@@ -46,6 +46,7 @@ fn actual_entrypoint_rejects_maintenance_before_accessing_the_plan() {
 }
 
 #[test]
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
 fn actual_focused_gate_precedes_destination_creation_and_snapshot_access() {
     let t = tempfile::tempdir().unwrap();
     let ledger = t.path().join("ledger");
@@ -77,4 +78,20 @@ fn actual_focused_gate_precedes_destination_creation_and_snapshot_access() {
         "epoch223 paths require one isolated qualification-223-v1625 private root",
     );
     assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 0);
+}
+
+#[test]
+#[cfg(not(feature = "epoch223-v1-6-25-qualification"))]
+fn default_binary_cannot_enable_comparison_or_preflight() {
+    for flag in ["--epoch223-tail-comparison", "--epoch223-tail-preflight"] {
+        rejected(&["223", flag], "tail flags require the isolated");
+    }
+}
+
+#[test]
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+fn comparison_flags_are_not_repeatable() {
+    for flag in ["--epoch223-tail-comparison", "--epoch223-tail-preflight"] {
+        rejected(&["223", flag, flag], "duplicate");
+    }
 }

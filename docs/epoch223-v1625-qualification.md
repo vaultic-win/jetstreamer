@@ -28,6 +28,27 @@ Two exact snapshot slots are admitted:
   96,767,522 root account hash in the checkpoint file and independently verify
   its reproduction, the remaining tail, and every canonical transaction outcome.
 
+The initial parent attempt stopped before worker spawn because ordinary
+focused qualification correctly requires an independently known terminal root;
+none is supplied at 96,767,999. Keep that gate unchanged. The separate explicit
+`--epoch223-tail-comparison` mode is restricted to the 477-slot tail and its
+private `qualification-223-v1625-tail-*` namespace. It binds the canonical
+bootstrap, rejects invented post-bootstrap expectations, retains SourceExact
+transaction checks, and records an unqualified terminal checkpoint. It does
+not qualify a cold prefix or authorize publication. Cold focused qualification
+still requires a trusted terminal root or a separately reviewed later-root
+verification/continuation route; this flag cannot make a cold run pass.
+
+Before replay, use the same tail arguments plus `--epoch223-tail-preflight`
+against the exact sealed parent. It must reach the post-bootstrap planning
+stage, report the actual v1.6.25 descriptor/revision/worker and the explicit
+partial policy, then return without spawning a worker or creating an archive.
+Preflight requires preseeded regular genesis, forbids ledger extraction and
+performs no download. It is not snapshot-content verification or admission.
+Capability probes that stop at a missing snapshot do not prove this later gate.
+The old static era label includes v1.6.20; the selected descriptor is v1.6.25,
+as asserted by the actual bootstrap-selector regression and new preflight.
+
 The new worker feature restores the two future restart markers 96,542,804 and
 96,542,805 using the same native algorithm tested in the v1.6.20 correction.
 It validates the full four-marker list before mutation, requires every already

@@ -19167,6 +19167,8 @@ async fn main() {
     let mut verify_option_count = 0usize;
     let mut horizon_output: Option<PathBuf> = None;
     let mut qualification_end_slot: Option<Slot> = None;
+    let mut epoch223_tail_comparison = false;
+    let mut epoch223_tail_preflight = false;
     // Internal flags set by the range supervisor when spawning per-epoch
     // children: pre-fetched snapshot hashes (so the child never touches
     // gcloud) and the overall range for the child's overall-progress line.
@@ -19186,7 +19188,23 @@ async fn main() {
     let mut continuation_plan: Option<PathBuf> = None;
     let mut continuation_plan_sha256: Option<String> = None;
     for arg in args {
-        if let Some(path) = arg.strip_prefix("--checkpoint-continuation-plan=") {
+        if arg == "--epoch223-tail-comparison" || arg == "--epoch223-tail-preflight" {
+            if !cfg!(feature = "epoch223-v1-6-25-qualification") {
+                eprintln!(
+                    "epoch223 tail flags require the isolated epoch223-v1-6-25-qualification build"
+                );
+                exit(2);
+            }
+            let flag = if arg == "--epoch223-tail-comparison" {
+                &mut epoch223_tail_comparison
+            } else {
+                &mut epoch223_tail_preflight
+            };
+            if std::mem::replace(flag, true) {
+                eprintln!("duplicate {arg}");
+                exit(2);
+            }
+        } else if let Some(path) = arg.strip_prefix("--checkpoint-continuation-plan=") {
             if continuation_plan.replace(PathBuf::from(path)).is_some() {
                 eprintln!("duplicate --checkpoint-continuation-plan");
                 exit(2);
@@ -19563,6 +19581,21 @@ async fn main() {
                 .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
         )
         .and_then(|_| epoch223_qualification::validate_filesystem(dest_dir.as_path()))
+        .and_then(|_| {
+            epoch223_qualification::validate_tail_mode(
+                epoch223_tail_comparison,
+                epoch223_tail_preflight,
+                qualification.map(|p| (p.bootstrap_slot, p.end_inclusive)),
+                &dest_dir,
+            )
+        })
+        .and_then(|_| {
+            epoch223_qualification::validate_preflight_io(
+                epoch223_tail_preflight,
+                env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+                &dest_dir,
+            )
+        })
     {
         eprintln!("error: {error}");
         exit(2);
@@ -20112,6 +20145,12 @@ async fn main() {
         qualification.is_some(),
     )
     .expect("requested range was preflighted above");
+    if epoch223_tail_comparison
+        && let Err(error) = epoch223_qualification::validate_tail_runtime(&effective_runtime)
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     let effective_archive_extensions = effective_runtime.descriptor.bootstrap.archive_extensions;
 
     let total_epochs = end_epoch - effective_start + 1;
@@ -20602,12 +20641,22 @@ async fn main() {
                         let snapshot_path = bootstrap.snapshot_archive().expect(
                             "qualification validation requires an explicit snapshot archive",
                         );
-                        match qualification_expectations(
-                            expected,
-                            plan,
-                            snapshot_path,
-                            effective_runtime.descriptor.bootstrap,
-                        ) {
+                        let expectations = if epoch223_tail_comparison {
+                            epoch223_qualification::tail_expectations(
+                                expected,
+                                plan,
+                                snapshot_path,
+                                effective_runtime.descriptor.bootstrap,
+                            )
+                        } else {
+                            qualification_expectations(
+                                expected,
+                                plan,
+                                snapshot_path,
+                                effective_runtime.descriptor.bootstrap,
+                            )
+                        };
+                        match expectations {
                             Ok(expected) => expected,
                             Err(err) => {
                                 eprintln!("error: {err}");
@@ -20799,6 +20848,41 @@ async fn main() {
         qualification.is_some(),
     )
     .expect("requested range was preflighted above");
+    if epoch223_tail_preflight {
+        let plan = qualification.expect("explicit tail mode validated");
+        if effective_epoch_spans.len() != 1
+            || !snapshot_expectations.get(&223).is_some_and(|e| {
+                e.len() == 1 && e.contains_key(&epoch223_qualification::TAIL_BOOTSTRAP)
+            })
+        {
+            eprintln!("error: tail preflight did not bind its exact runtime and sole bootstrap");
+            exit(1);
+        }
+        let worker = effective_runtime
+            .descriptor
+            .worker
+            .as_ref()
+            .expect("tail runtime validated");
+        println!(
+            "{}",
+            serde_json::json!({
+                "schema":"jetstreamer-private-epoch223-tail-planning-preflight-v1",
+                "epoch":223,"bootstrap_slot":plan.bootstrap_slot,"output_slot_start":plan.output_slot_start,
+                "terminal_slot":plan.end_inclusive,"output_slot_count":477,
+                "runtime_profile":effective_runtime.descriptor.identity.name,
+                "runtime_revision":effective_runtime.descriptor.identity.revision,
+                "worker_identity":worker.identity,"worker_environment_override":worker.environment_override,
+                "canonical_bootstrap_bound":true,"canonical_terminal_required":false,
+                "terminal_canonical_root_independently_known":false,"tail_comparison_only":true,
+                "complete_epoch_span_covered":false,"worker_spawned":false,"archive_created":false,
+            "snapshot_schema_or_contents_tested":false,"fresh_resource_admission_passed":false,
+            "canonical_prefix_qualified":false,"full_cold_epoch_peak_qualified":false,
+                "replay_launch_authorized":false,"runtime_promotion_authorized":false,
+                "canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false
+            })
+        );
+        return;
+    }
     if qualification.is_none() && effective_start == end_epoch && effective_epoch_spans.len() > 1 {
         if !verify_snapshots {
             eprintln!("error: multi-runtime epoch assembly requires --verify");
