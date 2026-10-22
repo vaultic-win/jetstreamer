@@ -34,6 +34,14 @@ or corruption verdict. Preserve the original bytes. Any diagnostic bucket
 recovery or restarted prefix/suffix assembly needs a separate reviewed path;
 do not synthesize a canonical footer or segment manifest to make it publishable.
 
+The first immutable metadata audit failed closed at the original 128-MiB bank
+member bound. A separate bounded tar-header inspection found the retained
+pre-223 bank member is 209,733,719 bytes; the corresponding retained post-restart
+member is 222,117,899 bytes. The diagnostic-only cap is therefore 256 MiB,
+with the one-past-cap rejection regression retained. This changes no
+ordinary snapshot restoration limit or replay semantics; qualify a new auditor
+generation and preserve the initial failed audit.
+
 On high-core hosts, run legacy tests serially with explicit bounded Rayon and
 PoH thread settings. Parallel synthetic Bank tests can exhaust a test unit's
 task ceiling; preserve such failures and diagnose their actual thread-pool

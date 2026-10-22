@@ -77,7 +77,7 @@ pub fn snapshot_hard_forks<R: Read>(
             continue;
         }
         if !entry.header().entry_type().is_file()
-            || entry.header().size().map_err(|e| e.to_string())? > 128 * 1024 * 1024
+            || entry.header().size().map_err(|e| e.to_string())? > 256 * 1024 * 1024
         {
             return Err("unsafe or oversized bank metadata member".to_string());
         }
@@ -1234,7 +1234,7 @@ mod tests {
         header.set_mode(0o600);
         header.set_entry_type(tar::EntryType::Regular);
         header.set_path("snapshots/7/7").unwrap();
-        header.set_size(128 * 1024 * 1024 + 1);
+        header.set_size(256 * 1024 * 1024 + 1);
         header.set_cksum();
         let error = snapshot_hard_forks(Cursor::new(header.as_bytes()), 7).unwrap_err();
         assert!(error.contains("oversized bank metadata"));
