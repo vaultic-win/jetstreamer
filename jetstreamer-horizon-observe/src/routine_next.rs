@@ -311,6 +311,14 @@ pub(super) fn prepare(
     native144_recovery::consume(&mut next, &completion)?;
     public160_recovery::consume(&mut next, &completion)?;
     delivery160::consume(&mut next)?;
+    if mode == "--prepare-next-public160-timing" {
+        ensure!(
+            handoff_spec.is_none(),
+            "160 timing consumes exact existing calibration only"
+        );
+        public160_timing::enable(&mut next)?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
     if mode == "--prepare-next-public160" {
         ensure!(
             handoff_spec.is_none(),

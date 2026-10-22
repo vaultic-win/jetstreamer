@@ -31,6 +31,8 @@ pub(super) struct Profile {
     delayed_recovery: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) public_observation: Option<Bound>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(super) timed_upload: bool,
 }
 pub(super) fn reader(p: &Plan) -> bool {
     p.epoch160_delivery.is_some()
@@ -302,6 +304,7 @@ pub(super) fn enable(
         origin_observer: p.previous_observer.clone(),
         delayed_recovery: true,
         public_observation: None,
+        timed_upload: false,
     });
     p.expected_epochs.retain(|e| *e != 160);
     p.tools.r2 = Bound {
@@ -628,6 +631,7 @@ mod tests {
             origin_observer: binding(),
             delayed_recovery: true,
             public_observation: None,
+            timed_upload: false,
         });
         p.sample_target_utc = "2026-10-22T15:58:00Z".into();
         p.previous_observer=Bound{path:"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261022T145800Z.json".into(),sha256:"50ac2a4f84f258c709b8cff4d333488e6a2cf483f85edc4dc2901dba2fb53c21".into()};
