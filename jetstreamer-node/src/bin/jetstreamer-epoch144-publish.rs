@@ -478,6 +478,24 @@ fn assign(f: &File) -> Result<()> {
     );
     Ok(())
 }
+fn finish_copy_permissions(file: &File, destination: &Path) -> Result<()> {
+    // Set mode while root still owns the newly created copy. After chown,
+    // root deliberately lacks CAP_FOWNER and must not chmod the sol-owned file.
+    prepare_archive_permissions(file, destination)
+        .context("prepare root-owned copy permissions before handoff")?;
+    assign(file)?;
+    let m = file.metadata()?;
+    ensure!(
+        m.is_file()
+            && m.uid() == UID
+            && m.gid() == GID
+            && m.mode() & 0o7777 == 0o440
+            && m.nlink() == 1,
+        "copy permission handoff differs"
+    );
+    file.sync_all()?;
+    Ok(())
+}
 fn copy_checked(
     input: &mut impl Read,
     output: &mut impl Write,
@@ -607,9 +625,7 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
             && current_work.metadata()?.ino() == work.metadata()?.ino(),
         "work root replaced during copy"
     );
-    assign(&output)?;
-    prepare_archive_permissions(&output, dest)?;
-    output.sync_all()?;
+    finish_copy_permissions(&output, dest)?;
     assign(&stage_dir)?;
     stage_dir.sync_all()?;
     let measured = measure_open_archive(&output)?;
@@ -674,9 +690,10 @@ fn capability(root: &Path, self_sha: &str) -> Result<()> {
     let mut sink = Sink::create(&receipts, "capability.json")?;
     let stage_dir = directory(&stage, 0, 0o700)?;
     let destination = directory(&dest, 0, 0o700)?;
+    fs::set_permissions(&dest, fs::Permissions::from_mode(0o3770))
+        .context("prepare root-owned fixture directory mode")?;
     assign(&stage_dir)?;
     assign(&destination)?;
-    fs::set_permissions(&dest, fs::Permissions::from_mode(0o3770))?;
     let copied = stage.join("epoch-144.jet");
     let mut f = OpenOptions::new()
         .read(true)
@@ -686,9 +703,7 @@ fn capability(root: &Path, self_sha: &str) -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(&copied)?;
     f.write_all(b"private filesystem capability only; NOT a Horizon archive\n")?;
-    assign(&f)?;
-    prepare_archive_permissions(&f, &dest)?;
-    f.sync_all()?;
+    finish_copy_permissions(&f, &dest)?;
     stage_dir.sync_all()?;
     destination.sync_all()?;
     File::open(root)?.sync_all()?;
@@ -700,6 +715,11 @@ fn capability(root: &Path, self_sha: &str) -> Result<()> {
         "write confinement failed"
     );
     drop_owner()?;
+    // chown may clear directory SGID. Only this disposable fixture's permanent
+    // owner restores its mode; production never chmods the real public folder.
+    destination
+        .set_permissions(fs::Permissions::from_mode(0o3770))
+        .context("fixture owner restores SGID")?;
     preflight_archive_publication(&stage, &dest)?;
     let context = b"exact144 disposable filesystem capability, no campaign admission";
     let publication = publish_verified_archive_batch_if_absent_with_context_and_lock_timeout(
