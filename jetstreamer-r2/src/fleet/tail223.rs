@@ -1,11 +1,11 @@
 //! Closed observational contract for a 477-slot private comparison, never publication.
 use super::*;
-pub(super) const SCHEMA: &str = "jetstreamer-private-epoch223-v1625-tail-launch-v2";
+pub(super) const SCHEMA: &str = "jetstreamer-private-epoch223-v1625-tail-launch-v3";
 pub(super) const GUARD_SHA: &str =
     "d039ddf0b161bc554614a862bd12987bd6a3474549a22d066ebefa5584e5dd98";
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-d2507ee8-v2";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon-focused-223-v1625-tail-b364126a-v3";
 const SNAPSHOT: &str = "snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst";
-const NODE: &str = "b859bce6efc54f8f31b8eb4963f7996f8cdda1b136b79b8566bb5e032d5c26df";
+const NODE: &str = "4449d7e3ba116c346567996ac5205bd20b05c67bb2c1625f353555a7c0ce445c";
 const WORKER: &str = "fde3ba53cc52012b894bac29bd7889b4cfd326fff75f4f67ec4cbdbf2ac7136c";
 fn suffix(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
@@ -45,7 +45,7 @@ pub(super) fn launch_matches(c: &DiagnosticClaim, r: &Value) -> bool {
         && r["node_sha256"] == NODE
         && r["worker_sha256"] == WORKER
         && r["package_seal_sha256"]
-            == "66c92353066ef0c4920f945b095ac6ae955f8bfc09ce60e30c7042f1e4bd5da7"
+            == "4b9f0b3e527c33b2f005a1d1a850b594b2ddf75bb4158dc2a96e202dc2b253d0"
         && r["runtime"] == "solana-v1.6.25"
         && r["feature"] == "epoch223-v1-6-25-qualification"
         && r["restart_policy"] == "no"
@@ -100,7 +100,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
             && v["epoch"] == 223
             && v["package"] == PACKAGE
             && v["self_sha256"]
-                == "ad4959ced9e2b161f8fe82c7b4feabd4d0d5b380cbe48ae733aa13a588330831"
+                == "5bc004fff70ee5575b993b83300144de5a640c061432c66575f9bb5a8b3e1908"
             && v["members"]["jetstreamer-node"]["sha256"] == NODE
             && v["members"]["jetstreamer-historical-worker-v1-6-25"]["sha256"] == WORKER
             && v["members"][SNAPSHOT]["sha256"]
@@ -149,7 +149,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
 }
 fn planning_preflight(v: &Value) -> Result<()> {
     ensure!(
-        v["schema"] == "jetstreamer-private-epoch223-tail-planning-preflight-v1"
+        v["schema"] == "jetstreamer-private-epoch223-tail-planning-preflight-v2"
             && v["epoch"] == 223
             && v["bootstrap_slot"] == 96_767_522u64
             && v["output_slot_start"] == 96_767_523u64
@@ -160,7 +160,11 @@ fn planning_preflight(v: &Value) -> Result<()> {
             && v["worker_identity"] == "jetstreamer-historical-worker-v1-6-25"
             && v["worker_environment_override"] == "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
             && v["canonical_bootstrap_bound"] == true
-            && v["tail_comparison_only"] == true,
+            && v["tail_comparison_only"] == true
+            && v["runtime_checkpoint_policy_validated"] == true
+            && v["pre_worker_barrier_reached"] == true
+            && v["worker_profile_validated"] == true
+            && v["worker_executable"] == format!("{PACKAGE}/jetstreamer-historical-worker-v1-6-25"),
         "tail223 post-bootstrap planning differs"
     );
     for key in [
@@ -205,7 +209,7 @@ pub(super) mod tests {
         };
         let mut r = json!({"schema":SCHEMA,"launched":true,"epoch":223,"private_run_root":c.scratch_path,
             "snapshot_slot":96767522,"snapshot_sha256":"dc7f2ac03813bc609629885af82222ac5af070cc6187b7bce08e10944fd214e1",
-            "node_sha256":NODE,"worker_sha256":WORKER,"package_seal_sha256":"66c92353066ef0c4920f945b095ac6ae955f8bfc09ce60e30c7042f1e4bd5da7",
+            "node_sha256":NODE,"worker_sha256":WORKER,"package_seal_sha256":"4b9f0b3e527c33b2f005a1d1a850b594b2ddf75bb4158dc2a96e202dc2b253d0",
             "runtime":"solana-v1.6.25","feature":"epoch223-v1-6-25-qualification","restart_policy":"no","solana_rayon_threads":16,
             "output_slot_start":96767523,"terminal_slot":96767999,"output_slot_count":477,"maximum_runtime_seconds":7200,
             "experimental_envelope_bytes":416u64<<30,"required_initial_free_bytes":3437045427597u64,"guard_minimum_free_bytes":3024728567181u64,
@@ -290,7 +294,7 @@ pub(super) mod tests {
         let mut v = json!({
             "schema":"jetstreamer-private-epoch223-tail-package-capability-v2",
             "epoch":223,"package":PACKAGE,
-            "self_sha256":"ad4959ced9e2b161f8fe82c7b4feabd4d0d5b380cbe48ae733aa13a588330831",
+            "self_sha256":"5bc004fff70ee5575b993b83300144de5a640c061432c66575f9bb5a8b3e1908",
             "members":{
                 "jetstreamer-node":{"sha256":NODE},
                 "jetstreamer-historical-worker-v1-6-25":{"sha256":WORKER}
@@ -371,13 +375,15 @@ pub(super) mod tests {
         }
     }
     fn preflight_fixture() -> Value {
-        let mut v = json!({"schema":"jetstreamer-private-epoch223-tail-planning-preflight-v1",
+        let mut v = json!({"schema":"jetstreamer-private-epoch223-tail-planning-preflight-v2",
             "epoch":223,"bootstrap_slot":96767522,"output_slot_start":96767523,
             "terminal_slot":96767999,"output_slot_count":477,"runtime_profile":"solana-v1.6.25",
             "runtime_revision":"7de8a55b54d3e11058b82f9483bb405d143b455c",
             "worker_identity":"jetstreamer-historical-worker-v1-6-25",
             "worker_environment_override":"JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
-            "canonical_bootstrap_bound":true,"tail_comparison_only":true});
+            "canonical_bootstrap_bound":true,"tail_comparison_only":true,
+            "runtime_checkpoint_policy_validated":true,"pre_worker_barrier_reached":true,
+            "worker_profile_validated":true,"worker_executable":format!("{PACKAGE}/jetstreamer-historical-worker-v1-6-25")});
         for key in [
             "canonical_terminal_required",
             "terminal_canonical_root_independently_known",
