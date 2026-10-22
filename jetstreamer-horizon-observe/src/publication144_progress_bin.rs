@@ -1,4 +1,6 @@
-//! Read-only exact144 client-child progress; does not issue an ETA or call R2.
+//! Read-only exact144 client-child progress/forecast; no status write or R2 call.
+#[path = "publication144_progress_eta.rs"]
+mod eta;
 #[path = "publication144_progress_events.rs"]
 mod events;
 #[allow(dead_code)]
@@ -20,6 +22,9 @@ const WORKER: &str = "/usr/local/lib/jetstreamer/horizon-publication144-single-d
 const WORKER_SHA: &str = "506b054c3e644f619df4049d935a75264f0ce1577a98235861d4f725ba86a49a";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1";
 const PUB: &str = "horizon-publish-144-v4-20261022-v1.service";
+const CALIBRATION: &str =
+    "/var/lib/jetstreamer/horizon-publication144-calibration-20261022-v1/eta.json";
+const CALIBRATION_SHA: &str = "bc2c99fc95e795424cfa9a1f383765d37d34dcc35b35945d7e9cb2943b135dd7";
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -360,6 +365,11 @@ fn run() -> Result<()> {
         .context("delivery invocation")?;
     let journal = journal(iid, pid, spawned, p.sample_unix_millis)?;
     let summary = events::summarize(&journal, iid, pid, spawned, p.sample_unix_millis)?;
+    let calibration = Bound {
+        path: CALIBRATION.into(),
+        sha256: CALIBRATION_SHA.into(),
+    };
+    let forecast = eta::estimate(&summary, &read(&calibration, false)?)?;
     ensure!(
         proc_identity(pid, parent, group)? == proc_before && fields()? == before,
         "delivery child changed during progress observation"
@@ -377,14 +387,15 @@ fn run() -> Result<()> {
     }
     evidence::write_receipt(
         &p.output_receipt,
-        &json!({"schema":"jetstreamer-exact144-authenticated-child-progress-v1","epoch":144,
+        &json!({"schema":"jetstreamer-exact144-authenticated-child-progress-v2","epoch":144,
         "plan":pb,"self_sha256":a[5],"observer":p.observer,"delivery_launch":p.delivery_launch,"child_launch":p.child_launch,
         "owner":before,"child_identity":proc_before,"trusted_journal_events":journal,"progress":summary,
+        "calibration":calibration,"forecast":forecast,
         "resource_samples_taken":0,"current_sidecar_eta_valid":false,"status_publication_authorized":false,
         "archive_ready_pair_proven":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     println!(
-        "exact144 client progress recorded; no resource sample, ETA, archive hash or remote access"
+        "exact144 client progress/forecast recorded; no resource sample, status publication, archive hash or remote access"
     );
     Ok(())
 }
