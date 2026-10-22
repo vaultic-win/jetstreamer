@@ -6,6 +6,39 @@ const RUNNER_SHA: &str = "7dfe0fdabbee8e5f79b131c2b7cece49dbebe489168fe195a9086a
 const READER: &str =
     "/usr/local/lib/jetstreamer/horizon-assembly144-scans-fleet-reader-20261022-v1/jetstreamer-r2";
 const READER_SHA: &str = "b67f113c2e54ec42751583bd3a4fdd0ab56e393de7b25e845973737c93926115";
+const SCAN_ACTION: &str = "Preserve successful private144 assembly and captured independent full/plugin scanners. Inspect actual terminal receipts/logs; a plan, capture or assembly is not scan success. V4-specific canonical import, full/plugin digest agreement and normal R2 ready-pair gates remain separate; no ordinary ETA or canonical sidecar from private scans.";
+pub(super) fn retained_action(p: &Plan, f: &Value) -> Result<Option<Value>> {
+    let Some(s) = &p.assembly144_scans else {
+        return Ok(None);
+    };
+    if f["gates"]["144"]["next_action"] != SCAN_ACTION {
+        return Ok(None);
+    }
+    validate(p)?;
+    ensure!(
+        f["gates"]["144"]["state"] == "blocked-qualification",
+        "scan action cannot borrow another gate"
+    );
+    for (stage, b) in [("full", &s.full), ("plugin", &s.plugin)] {
+        let expected = checked(stage, b, &bound_json(b, true)?)?;
+        let rows = f["pipeline_claims"].as_array().context("scan history")?;
+        ensure!(
+            rows.iter()
+                .filter(|c| c["unit"] == expected["unit"])
+                .count()
+                == 1
+                && rows.contains(&expected)
+                && f["tracked_units"]
+                    .as_array()
+                    .is_some_and(|u| u.contains(&expected["unit"]))
+                && f["gates"]["144"]["evidence"]
+                    .as_array()
+                    .is_some_and(|e| e.contains(&serde_json::to_value(b).unwrap())),
+            "retained scan action lacks exact history"
+        );
+    }
+    Ok(Some(json!(SCAN_ACTION)))
+}
 pub(super) fn coexistence_reader() -> Bound {
     Bound {
     path:"/usr/local/lib/jetstreamer/horizon-assembly144-scans-fleet-reader-20261022-v2/jetstreamer-r2".into(),
@@ -153,9 +186,7 @@ fn fold(f: &mut Value, c: Value) -> Result<()> {
         gate["state"] == "blocked-qualification",
         "private scans cannot close144 qualification"
     );
-    gate["next_action"] = json!(
-        "Preserve successful private144 assembly and captured independent full/plugin scanners. Inspect actual terminal receipts/logs; a plan, capture or assembly is not scan success. V4-specific canonical import, full/plugin digest agreement and normal R2 ready-pair gates remain separate; no ordinary ETA or canonical sidecar from private scans."
-    );
+    gate["next_action"] = json!(SCAN_ACTION);
     let evidence = gate["evidence"]
         .as_array_mut()
         .context("scan repair evidence")?;

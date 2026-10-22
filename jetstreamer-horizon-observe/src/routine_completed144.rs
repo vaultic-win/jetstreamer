@@ -203,14 +203,25 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         .chain(continuation.iter())
         .chain(assembly.iter())
         .collect();
+    // Revalidate retained scan ownership before folding older prefix history.
+    // Preserve its newer repair action; generic unknown actions still fail.
+    let retained_action = assembly144_scans::retained_action(p, f)?;
+    let mut history = f.clone();
+    if retained_action.is_some() {
+        history["gates"]["144"]["next_action"] = json!(ACTION);
+    }
     fold_history(
-        f,
+        &mut history,
         &json!({"epoch":144,"unit":UNIT,"invocation_id":IID,"scratch_path":launch["private_run_root"],"launch_receipt":lb}),
         &profile.proof,
         &vb,
         &profile.prior_action_sha256,
         &transitions,
     )?;
+    if let Some(action) = retained_action {
+        history["gates"]["144"]["next_action"] = action;
+    }
+    *f = history;
     ensure!(
         proof["prior_admission_event_accepted"] == false,
         "completed144 must not invent event acceptance"
@@ -252,6 +263,20 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root exact sealed10:58 scans successor regression; read-only no sampling or remote access"]
+    fn actual_scans_successor_preserves_newer_action_and_history_idempotently() {
+        let pb=Bound{path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261022T105800Z-native141-rejection-assembly144-scans-upload198-refresh-completed144-v1/cycle-plan.json".into(),sha256:"068340c662fce8b48356fa05c15d1fa0054186693db750752814d18f9d2e24b8".into()};
+        let p: Plan = serde_json::from_value(bound_json(&pb, true).unwrap()).unwrap();
+        let mut f = bound_json(&p.fleet_template, true).unwrap();
+        let old = f.clone();
+        derive_fleet(&p, &mut f).unwrap();
+        assert_eq!(old, f);
+        derive_fleet(&p, &mut f).unwrap();
+        assert_eq!(old, f);
+        f["gates"]["144"]["next_action"] = json!("unknown newer action");
+        assert!(derive_fleet(&p, &mut f).is_err());
+    }
     #[test]
     fn completed_prefix_keeps_all_three_exact_later_histories() {
         let b = Bound {
