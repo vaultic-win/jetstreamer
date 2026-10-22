@@ -3,6 +3,8 @@
 #[allow(dead_code)]
 #[path = "../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
 mod evidence;
+#[path = "publication144_delivery_track.rs"]
+mod tracking;
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -198,7 +200,7 @@ fn configuration(p: &Plan) -> Result<Value> {
     Ok(v)
 }
 fn fields(unit: &str) -> Result<Value> {
-    let o=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,InvocationID,MainPID,NRestarts,Result,ExecMainStatus,ActiveState,SubState,ExecStart,Restart,Type"]).output()?;
+    let o=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,InvocationID,MainPID,NRestarts,Result,ExecMainStatus,ActiveState,SubState,ExecStart,Restart,Type,RemainAfterExit"]).output()?;
     ensure!(
         o.status.success() && o.stdout.len() < 32768,
         "144 service identity unreadable"
@@ -453,6 +455,9 @@ fn now() -> Result<u64> {
         .try_into()?)
 }
 fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
+    if matches!(mode, "--capture" | "--terminal") {
+        return tracking::run(p, pb, self_sha, mode == "--terminal");
+    }
     let v = configuration(p)?;
     if mode == "--check-staged" {
         ensure!(
@@ -483,6 +488,7 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
             && owner["NRestarts"] == "0"
             && owner["Restart"] == "no"
             && owner["Type"] == "oneshot"
+            && owner["RemainAfterExit"] == "yes"
             && owner["ActiveState"] == "activating"
             && owner["SubState"] == "start",
         "144 delivery requires exact nonrestarting oneshot"
@@ -492,6 +498,9 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
         &json!({"schema":"horizon-exact144-delivery-intent-v1","plan":pb,"self_sha256":self_sha,"owner":owner,"publisher":before,
         "shared_mutation_lock":LOCK,"lock_wait_started_millis":now()?,"another_progressive_coordinator":false,"local_retirement_authorized":false}),
     )?;
+    // Capture while this exact worker is live, even when an idempotent sync
+    // could finish before an external observer has time to query the unit.
+    tracking::run(p, pb, self_sha, false)?;
     let _lock = MutationLock::acquire(Path::new(LOCK))?;
     let lock_meta = _lock.0.metadata()?;
     ensure!(
@@ -562,9 +571,12 @@ fn main() -> Result<()> {
         a.len() == 7
             && a[2] == "--plan-sha256"
             && a[4] == "--self-sha256"
-            && matches!(a[6].as_str(), "--check-staged" | "--check-only" | "--run")
+            && matches!(
+                a[6].as_str(),
+                "--check-staged" | "--check-only" | "--run" | "--capture" | "--terminal"
+            )
             && unsafe { libc::geteuid() } == 0,
-        "usage: exact144-deliver PLAN --plan-sha256 SHA --self-sha256 SHA --check-staged|--check-only|--run"
+        "usage: exact144-deliver PLAN --plan-sha256 SHA --self-sha256 SHA --check-staged|--check-only|--run|--capture|--terminal"
     );
     evidence::bound_file(&fs::read_link("/proc/self/exe")?, &a[5], 128 << 20, true)?;
     let pb = Bound {
