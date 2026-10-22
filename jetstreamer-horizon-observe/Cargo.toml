@@ -112,6 +112,10 @@ path = "src/publication144_track_bin.rs"
 name = "jetstreamer-publication144-calibrate"
 path = "src/publication144_calibrate_bin.rs"
 
+[[bin]]
+name = "jetstreamer-publication144-deliver"
+path = "src/publication144_deliver_bin.rs"
+
 [dependencies]
 anyhow.workspace = true
 libc.workspace = true

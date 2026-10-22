@@ -229,9 +229,9 @@ fn validate144_origin(p: &Plan, origin: &Value) -> Result<()> {
             && origin["claim"]["phase"] == "local-publication"
             && origin["claim"]["invocation_id"] == p.binding.origin_invocation_id
             && origin["publisher_sha256"]
-                == "1b5e71ad4d7fb3ed7b5ac3143fabaad110dfeca7d978e186d6b86264bcbc17eb"
+                == "4274f83c6d84a2bc2014b30122a38406b6498045f543ba170598baa8369a7efa"
             && origin["tracker_sha256"]
-                == "0c2dc05018a46c7054790130565b13f83c8e235934e172730370d660c681ca0d",
+                == "b85dc978377f20036ecd40cb4495729f27c2e8dc906c3cb2576463d9adf1dc75",
         "144 pipeline origin is not the exact captured canonical-artifact producer"
     );
     for flag in [
@@ -879,7 +879,7 @@ mod tests {
         p.binding.origin_invocation_id = "a".repeat(32);
         p.origin_launch.path = ORIGIN144.into();
         assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
-        let mut origin = json!({"schema":"jetstreamer-exact144-publication-launch-v1","epoch":144,"launched":true,"claim":{"unit":PUB144,"phase":"local-publication","invocation_id":"a".repeat(32)},"publisher_sha256":"1b5e71ad4d7fb3ed7b5ac3143fabaad110dfeca7d978e186d6b86264bcbc17eb","tracker_sha256":"0c2dc05018a46c7054790130565b13f83c8e235934e172730370d660c681ca0d"});
+        let mut origin = json!({"schema":"jetstreamer-exact144-publication-launch-v1","epoch":144,"launched":true,"claim":{"unit":PUB144,"phase":"local-publication","invocation_id":"a".repeat(32)},"publisher_sha256":"4274f83c6d84a2bc2014b30122a38406b6498045f543ba170598baa8369a7efa","tracker_sha256":"b85dc978377f20036ecd40cb4495729f27c2e8dc906c3cb2576463d9adf1dc75"});
         for flag in [
             "ordinary_replay_claim",
             "current_sidecar_eta_valid",

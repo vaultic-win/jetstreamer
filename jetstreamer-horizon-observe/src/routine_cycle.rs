@@ -236,6 +236,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.publication144.is_some() && public160_timing::enabled(p) {
+        return "publication144-public160-timed-native141-acquisition-scans-upload198-v1";
+    }
     if public160_timing::enabled(p) {
         return "public160-timed-native141-acquisition-scans-upload198-v1";
     }
