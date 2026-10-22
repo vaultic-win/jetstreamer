@@ -33,18 +33,20 @@ struct Spec {
     r2_mutations: bool,
 }
 pub(super) fn owner(p: &Plan, d: &DiagnosticClaim) -> bool {
-    p.native144_restore.as_ref().is_some_and(|profile| {
-        d.range == "144"
-            && d.controller_unit == UNIT
-            && d.producer_unit == UNIT
-            && d.expected_controller_invocation_id == profile.invocation_id
-            && d.expected_producer_invocation_id == profile.invocation_id
-    })
+    p.continuation144.is_none()
+        && p.native144_restore.as_ref().is_some_and(|profile| {
+            d.range == "144"
+                && d.controller_unit == UNIT
+                && d.producer_unit == UNIT
+                && d.expected_controller_invocation_id == profile.invocation_id
+                && d.expected_producer_invocation_id == profile.invocation_id
+        })
 }
 pub(super) fn writer(p: &Plan) -> bool {
     p.native144_restore.is_some()
         && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
             || public198::upload_writer(p))
+        || continuation144::writer(p)
 }
 fn read(profile: &Profile) -> Result<(Value, Value)> {
     let launch = bound_json(&profile.launch, true)?;
@@ -193,7 +195,8 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 .as_ref()
                 .is_some_and(|s| s.private144_observer
                     && s.diagnostic_ranges.len() == 1
-                    && owner(p, &s.diagnostic_ranges[0])),
+                    && (owner(p, &s.diagnostic_ranges[0])
+                        || continuation144::owner(p, &s.diagnostic_ranges[0]))),
         "foreign native144 routine profile"
     );
     read(profile)?;
@@ -223,6 +226,7 @@ fn fold(f: &mut Value, expected: &Value, guard: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
+    continuation144::derive_fleet(p, f)?;
     if let Some((expected, guard)) = completed_transition(p)? {
         fold(f, &expected, &guard)?;
     }
