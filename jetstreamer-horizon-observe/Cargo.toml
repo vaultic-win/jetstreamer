@@ -52,6 +52,10 @@ name = "jetstreamer-epoch157-incident"
 path = "src/incident157.rs"
 
 [[bin]]
+name = "jetstreamer-epoch223-incident"
+path = "src/incident223.rs"
+
+[[bin]]
 name = "jetstreamer-epoch220-prefix-evidence"
 path = "src/incident220.rs"
 
