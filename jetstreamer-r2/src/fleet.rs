@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
+mod assembly144_admission;
 mod bounded205;
 mod continuation144;
 mod continuation144_admission;
@@ -49,6 +50,9 @@ pub(super) fn capture_continuation144_launch() -> Result<()> {
 }
 pub(super) fn prepare_continuation144_fleet() -> Result<()> {
     continuation144_prepare::run()
+}
+pub(super) async fn admit_assembly144() -> Result<()> {
+    assembly144_admission::run().await
 }
 
 #[derive(Deserialize, Eq, PartialEq)]

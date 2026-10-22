@@ -128,7 +128,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, p: &Value, now: u64) -> Result<()> {
     Ok(())
 }
 
-fn clean_replays(o: &Value) -> Result<()> {
+pub(super) fn clean_replays(o: &Value) -> Result<()> {
     let rows = o["replays"].as_array().context("ordinary replay census")?;
     let ranges: BTreeSet<_> = rows.iter().filter_map(|v| v["range"].as_str()).collect();
     ensure!(
