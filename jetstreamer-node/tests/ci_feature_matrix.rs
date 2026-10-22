@@ -137,3 +137,34 @@ fn observer_feature_families_are_complete_and_epoch223_remains_isolated() {
         "exclusive snapshot profiles must not be combined"
     );
 }
+
+#[test]
+fn archive_example_features_cannot_be_borrowed_from_another_package() {
+    let workflow = include_str!("../../.github/workflows/rust.yaml");
+    let matrix = workflow
+        .split_once("matrix: &rust-feature-matrix\n")
+        .unwrap()
+        .1
+        .split_once("    steps:")
+        .unwrap()
+        .0;
+    let mut example_entries = 0;
+    for entry in matrix.split("          - name: ").skip(1) {
+        if !entry.lines().any(|line| line.trim() == "examples: true") {
+            continue;
+        }
+        example_entries += 1;
+        let scope = entry
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("scope: \"")?.strip_suffix('"'))
+            .unwrap();
+        assert!(
+            scope.starts_with("--workspace"),
+            "archive example job cannot inherit package-specific features: {entry}"
+        );
+    }
+    assert_eq!(
+        example_entries, 2,
+        "default and all-compatible archive regressions must remain enabled"
+    );
+}

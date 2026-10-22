@@ -93,3 +93,11 @@ progress client. Both original captures, private scan evidence and the full
 native141 retry history remain mandatory. Neither older single-profile reader
 can be substituted for this combined profile; adding a profile grants no new
 replay, publication or mutation authority.
+
+The follow-up delivery gate comparator tolerates only the display timestamps
+and PID in systemd's `ExecStart` rendering. Executable/argv, `ignore_errors`,
+rendered exit code/status, invocation ID, restart count, every other service
+field and all artifact/receipt identities must remain equal. The original raw
+receipts stay unchanged. This prevents a daemon reload from falsely rejecting
+an otherwise unchanged long-running handoff, without accepting a new owner or
+a changed publication gate.

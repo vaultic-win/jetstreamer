@@ -41,11 +41,11 @@ jobs:
           - name: observer-existing-compatible-features
             scope: "-p jetstreamer-horizon-observe"
             flags: "--features ram-snapshot-eight-core-stopped225,epoch225-shrink-snapshot-tests,epoch203-ram-resource-supervisor,epoch203-ram-shrink-candidate"
-            examples: true
+            examples: false
           - name: observer-epoch223-tail-snapshot
             scope: "-p jetstreamer-horizon-observe"
             flags: "--features epoch223-tail-snapshot-tests"
-            examples: true
+            examples: false
           - name: node-epoch213-continuation
             scope: "-p jetstreamer-node"
             flags: "--features epoch213-checkpoint-continuation-diagnostic"
