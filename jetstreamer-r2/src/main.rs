@@ -76,6 +76,7 @@ mod resource_audit;
 mod resource_verify;
 mod status_inactive;
 mod transport_probe;
+mod upload_progress;
 
 #[derive(Debug)]
 struct Config {
@@ -1493,7 +1494,7 @@ fn validate_epoch_status(status: &EpochStatus, expected_epoch: u64) -> Result<()
         matches!(
             status.phase.as_str(),
             "replay" | "verification" | "publication" | "upload" | "readback" | "finalization"
-        ),
+        ) || (status.epoch == 144 && status.phase == "queued-upload"),
         "status object phase is invalid"
     );
     Ok(())
@@ -2140,6 +2141,16 @@ async fn upload_archive(
         let mut tasks = tokio::task::JoinSet::new();
         let mut next_part = 0u64;
         let mut uploaded = Vec::with_capacity(usize::try_from(part_count)?);
+        let started = Instant::now();
+        let mut progress = upload_progress::UploadProgress::new(local.length, part_size)?;
+        eprintln!(
+            "{}",
+            serde_json::json!({
+                "event": "r2-upload-start", "epoch": local.epoch, "key": key,
+                "total_bytes": local.length, "acknowledged_bytes": 0,
+                "elapsed_millis": 0, "whole_file_sha256_verified": false
+            })
+        );
         while next_part < part_count || !tasks.is_empty() {
             while next_part < part_count && tasks.len() < concurrency {
                 let part_index = next_part;
@@ -2205,7 +2216,19 @@ async fn upload_archive(
                 });
             }
             if let Some(result) = tasks.join_next().await {
-                uploaded.push(result??);
+                let part = result??;
+                if let Some(bytes) = progress.acknowledge(part.0)? {
+                    eprintln!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "r2-upload-progress", "epoch": local.epoch, "key": key,
+                            "total_bytes": local.length, "acknowledged_bytes": bytes,
+                            "elapsed_millis": started.elapsed().as_millis(),
+                            "whole_file_sha256_verified": false
+                        })
+                    );
+                }
+                uploaded.push(part);
             }
         }
         uploaded.sort_by_key(|item| item.0);
@@ -2255,6 +2278,15 @@ async fn upload_archive(
         ensure!(
             normalize_etag(actual) == expected_etag,
             "completed multipart ETag mismatch"
+        );
+        eprintln!(
+            "{}",
+            serde_json::json!({
+                "event": "r2-upload-committed", "epoch": local.epoch, "key": key,
+                "total_bytes": local.length, "acknowledged_bytes": local.length,
+                "elapsed_millis": started.elapsed().as_millis(),
+                "whole_file_sha256_verified": false
+            })
         );
         Ok::<_, anyhow::Error>((expected_etag, expected_composite_sha256))
     }
@@ -3545,6 +3577,11 @@ mod tests {
         let mut invalid_status = status.clone();
         invalid_status.phase = "unknown".to_owned();
         assert!(validate_epoch_status(&invalid_status, 218).is_err());
+        invalid_status.phase = "queued-upload".to_owned();
+        assert!(validate_epoch_status(&invalid_status, 218).is_err());
+        invalid_status.epoch = 144;
+        validate_epoch_status(&invalid_status, 144).unwrap();
+        assert!(validate_epoch_status(&invalid_status, 145).is_err());
         invalid_status = status.clone();
         invalid_status.sampled_at_utc = "2026-10-17 01:10:00Z".to_owned();
         assert!(validate_epoch_status(&invalid_status, 218).is_err());

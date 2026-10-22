@@ -18,8 +18,10 @@ pub(super) struct Profile {
 pub(super) fn reader(p: &Plan) -> bool {
     p.census141_poh.is_some()
         && native141::all_retry_enabled(p)
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.publication144.is_none()
+            && p.tools.r2.path == Path::new(READER)
+            && p.tools.r2.sha256 == READER_SHA)
+            || publication144::composite_reader(p))
 }
 fn claim(b: &Bound, v: &Value) -> Result<Value> {
     ensure!(
@@ -112,10 +114,7 @@ fn evidence(b: &Bound) -> Result<Value> {
 pub(super) fn validate(p: &Plan) -> Result<()> {
     if let Some(s) = &p.census141_poh {
         ensure!(
-            reader(p)
-                && is_101(p)?
-                && !p.expected_epochs.contains(&141)
-                && p.publication144.is_none(),
+            reader(p) && is_101(p)? && !p.expected_epochs.contains(&141),
             "PoH profile cannot replace replay/publication"
         );
         evidence(&s.launch)?;
@@ -130,7 +129,7 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
         launch: Bound,
     }
     ensure!(
-        p.census141_poh.is_none() && native141::all_retry_enabled(p) && p.publication144.is_none(),
+        p.census141_poh.is_none() && native141::all_retry_enabled(p),
         "PoH adoption needs exact retained native history"
     );
     let s: Spec = serde_json::from_value(bound_json(b, true)?)?;
@@ -140,9 +139,16 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
     );
     evidence(&s.launch)?;
     p.census141_poh = Some(Profile { launch: s.launch });
-    p.tools.r2 = Bound {
-        path: READER.into(),
-        sha256: READER_SHA.into(),
+    p.tools.r2 = if p.publication144.is_some() {
+        Bound {
+            path: publication144::COMPOSITE_READER.into(),
+            sha256: publication144::COMPOSITE_READER_SHA.into(),
+        }
+    } else {
+        Bound {
+            path: READER.into(),
+            sha256: READER_SHA.into(),
+        }
     };
     validate(p)
 }

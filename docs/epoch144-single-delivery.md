@@ -61,3 +61,35 @@ capture writers; canonical complete JSON, fsync, owner-only final permissions
 and no-clobber writes prevent partial or foreign receipts from being adopted.
 Existing genuine captures are revalidated without overwriting their bytes.
 No actual144capture or terminal event is claimed until a real worker exists.
+
+The candidate archive client emits `r2-upload-start`, `r2-upload-progress` and
+`r2-upload-committed` JSON events. Progress counts distinct successful part
+acknowledgements only after each returned ETag matches the local part MD5;
+retries do not count twice, and a short final part contributes its actual size.
+Checkpoints cover the first acknowledgement, each additional GiB and the final
+acknowledgement. These observations are not integrity receipts: even multipart
+commit explicitly leaves `whole_file_sha256_verified` false. The independent
+whole-object readback and canonical sidecar gates remain unchanged.
+
+The status parser accepts `queued-upload` only for epoch144, and pipeline
+publication further requires the exact144 upload unit and original publisher
+binding. The legacy replay status CLI does not gain this phase. Parser support
+alone does not qualify the queue ETA, prove an active worker or authorize a
+status publication. The delivery worker and composite fleet/status reader must
+still bind the separately sealed client before actual use.
+
+The next candidate worker pins the separate progress client and writes
+`upload-child-launch.json` (or the distinct status-cleanup counterpart) with the
+actual spawned PID, exact client/arguments, owner, plan and spawn timestamp.
+This is historical process linkage, not current liveness or archive readiness;
+the status consumer must authenticate current process identity and progress.
+The worker always waits for its child even if writing that receipt fails, so a
+metadata error cannot leave the child unobserved. A regression exercises this
+error path and requires the child to have been reaped.
+
+The candidate routine helper supports simultaneous private141 PoH and local144
+publication profiles only through the separately pinned composite-capable
+progress client. Both original captures, private scan evidence and the full
+native141 retry history remain mandatory. Neither older single-profile reader
+can be substituted for this combined profile; adding a profile grants no new
+replay, publication or mutation authority.

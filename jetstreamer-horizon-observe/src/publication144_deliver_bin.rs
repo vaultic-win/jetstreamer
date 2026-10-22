@@ -30,8 +30,8 @@ const R2: &str = "/home/sol/.jetstreamer-private/r2-receipts";
 const STATUS: &str = "/home/sol/.jetstreamer-private/r2-status-receipts";
 const LOCK: &str = "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const CLIENT: &str =
-    "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261022-v3/jetstreamer-r2";
-const CLIENT_SHA: &str = "26fa2fddce3ddaa42753525bda6ef140380555ea055d42ab633aed8879d632f4";
+    "/usr/local/lib/jetstreamer/horizon-publication144-progress-client-20261022-v1/jetstreamer-r2";
+const CLIENT_SHA: &str = "c91b5ab379e876c6426be82adb381644927e7b5a199e3709dc9ce59dc2a6d96a";
 const PUBLISHER_SHA: &str = "4274f83c6d84a2bc2014b30122a38406b6498045f543ba170598baa8369a7efa";
 const TRACKER_SHA: &str = "b85dc978377f20036ecd40cb4495729f27c2e8dc906c3cb2576463d9adf1dc75";
 const DIGEST: &str = "153d3e5e5b7cbdc31bb4229315786000b84442a75b3b83cf4a50184b20b84a33";
@@ -419,10 +419,16 @@ fn archive_child(args: &[String]) -> Result<bool> {
     );
     Ok(false)
 }
-fn child(p: &Plan, args: &[String]) -> Result<std::process::ExitStatus> {
+fn child(
+    p: &Plan,
+    args: &[String],
+    owner: &Value,
+    plan: &Bound,
+) -> Result<std::process::ExitStatus> {
     let mut c = Command::new(&p.client.path);
     c.args(args);
-    if archive_child(args)? {
+    let archive = archive_child(args)?;
+    if archive {
         unsafe {
             c.pre_exec(child_identity);
         }
@@ -430,7 +436,33 @@ fn child(p: &Plan, args: &[String]) -> Result<std::process::ExitStatus> {
     // Metadata publications are root-owned0600, even beneath the UID1001
     //directory. Only the fixed completion-only status command keeps root;
     //the payload upload always permanently drops IDs and capabilities.
-    Ok(c.status()?)
+    let spawned_millis = now()?;
+    let child = c.spawn()?;
+    // Record the actual spawned PID, not the worker's PID or a guessed future
+    // process. Consumers must still prove current command, cgroup, executable
+    // and start identity: this historical receipt alone is never liveness.
+    // Always wait/reap even if receipt persistence fails after spawn.
+    let recorded = evidence::write_receipt(
+        &p.output_directory.join(if archive {
+            "upload-child-launch.json"
+        } else {
+            "status-cleanup-child-launch.json"
+        }),
+        &json!({"schema":"horizon-exact144-delivery-child-launch-v1",
+            "owner":owner,"plan":plan,"client":p.client,"arguments":args,
+            "child_pid":child.id(),"spawned_millis":spawned_millis,
+            "archive_sync":archive,"current_liveness_proven":false,
+            "archive_ready":false,"local_retirement_authorized":false}),
+    );
+    reap_child(child, recorded)
+}
+fn reap_child(
+    mut child: std::process::Child,
+    recorded: Result<()>,
+) -> Result<std::process::ExitStatus> {
+    let status = child.wait();
+    recorded?;
+    Ok(status?)
 }
 fn ready(r: &Value) -> Result<()> {
     ensure!(
@@ -516,7 +548,7 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
         &p.output_directory.join("lock-acquired.json"),
         &json!({"schema":"horizon-exact144-delivery-lock-v1","owner":owner,"plan":pb,"acquired_millis":now()?,"shared_mutation_lock":LOCK,"gates":locked}),
     )?;
-    let status = child(p, &sync_args())?;
+    let status = child(p, &sync_args(), &owner, pb)?;
     evidence::write_receipt(
         &p.output_directory.join("upload-child.json"),
         &json!({"client":p.client,"arguments":sync_args(),"exit_code":status.code(),"success":status.success()}),
@@ -549,7 +581,7 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
     }
     if known {
         let args = status_args();
-        let status = child(p, &args)?;
+        let status = child(p, &args, &owner, pb)?;
         evidence::write_receipt(
             &p.output_directory.join("status-cleanup-child.json"),
             &json!({"client":p.client,"exit_code":status.code(),"success":status.success()}),
@@ -590,6 +622,22 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn child_is_reaped_even_when_launch_receipt_fails() {
+        let child = Command::new("/usr/bin/true").spawn().unwrap();
+        let pid = child.id();
+        assert!(reap_child(child, Err(anyhow::anyhow!("receipt failed"))).is_err());
+        assert_eq!(
+            unsafe { libc::waitpid(pid as i32, std::ptr::null_mut(), libc::WNOHANG) },
+            -1
+        );
+        assert_eq!(
+            std::io::Error::last_os_error().raw_os_error(),
+            Some(libc::ECHILD)
+        );
+        let child = Command::new("/usr/bin/false").spawn().unwrap();
+        assert!(!reap_child(child, Ok(())).unwrap().success());
+    }
     #[test]
     #[ignore = "root exact sandbox UID/GID/capability-drop proof; invokes only /usr/bin/id in disposable children"]
     fn child_identity_is_permanently_unprivileged_before_exec() {

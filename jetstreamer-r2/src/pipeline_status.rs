@@ -93,6 +93,10 @@ impl Binding {
             | ("producer-finalization", "finalization")
             | ("controller-import-handoff", "publication")
             | ("upload-readback", "upload" | "readback") => (),
+            ("upload-readback", "queued-upload") => ensure!(
+                epoch == 144 && self.unit == UPLOAD144 && self.origin_unit == PUB144,
+                "queued upload requires the exact144 delivery owner"
+            ),
             _ => bail!("pipeline and status phases disagree"),
         };
         if self.claim_phase == "producer-finalization" {
@@ -216,7 +220,11 @@ fn exact144_binding(p: &Plan) -> bool {
                 p.phase.as_str()
             ),
             (PUB144, "local-publication", "publication")
-                | (UPLOAD144, "upload-readback", "upload" | "readback")
+                | (
+                    UPLOAD144,
+                    "upload-readback",
+                    "queued-upload" | "upload" | "readback"
+                )
         )
 }
 fn validate144_origin(p: &Plan, origin: &Value) -> Result<()> {
@@ -902,6 +910,17 @@ mod tests {
         p.phase = "upload".into();
         assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
         validate144_origin(&p, &origin).unwrap();
+        p.phase = "queued-upload".into();
+        assert_eq!(receipt_directory_owner(&p).unwrap(), 1001);
+        validate144_origin(&p, &origin).unwrap();
+        p.binding.validate(144, "queued-upload").unwrap();
+        assert!(p.binding.validate(145, "queued-upload").is_err());
+        let mut foreign = p.binding.clone();
+        foreign.origin_unit = "horizon-publish-145-test.service".into();
+        assert!(foreign.validate(144, "queued-upload").is_err());
+        foreign = p.binding.clone();
+        foreign.unit = "horizon-upload-144-foreign.service".into();
+        assert!(foreign.validate(144, "queued-upload").is_err());
         p.binding.unit = "horizon-upload-145-v4-20261022-v1.service".into();
         assert!(receipt_directory_owner(&p).is_err());
         p.binding.unit = UPLOAD144.into();
