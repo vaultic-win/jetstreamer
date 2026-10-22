@@ -302,6 +302,7 @@ pub(super) fn prepare(
     let (mut next, mut next_config, mut observer_package, mut cycle_package) =
         derive_next(p, pb, &completion, &config)?;
     native144_recovery::consume(&mut next, &completion)?;
+    assembly144_scans_recover::consume(&mut next, &completion)?;
     if completion.get("public198_promotion").is_some() {
         public198::consume(&mut next, &completion, &mut next_config)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;

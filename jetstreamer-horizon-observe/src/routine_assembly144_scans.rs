@@ -6,10 +6,17 @@ const RUNNER_SHA: &str = "7dfe0fdabbee8e5f79b131c2b7cece49dbebe489168fe195a9086a
 const READER: &str =
     "/usr/local/lib/jetstreamer/horizon-assembly144-scans-fleet-reader-20261022-v1/jetstreamer-r2";
 const READER_SHA: &str = "b67f113c2e54ec42751583bd3a4fdd0ab56e393de7b25e845973737c93926115";
+pub(super) fn coexistence_reader() -> Bound {
+    Bound {
+    path:"/usr/local/lib/jetstreamer/horizon-assembly144-scans-fleet-reader-20261022-v2/jetstreamer-r2".into(),
+    sha256:"34f001c948450f3a3cfbdf2bc492cbf212d9e82382389c5719375b6651acca4a".into(),
+}
+}
 pub(super) fn reader(p: &Plan) -> bool {
     p.assembly144_scans.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+            || (p.tools.r2.path == coexistence_reader().path
+                && p.tools.r2.sha256 == coexistence_reader().sha256))
         && is_sha(READER_SHA)
 }
 #[derive(Debug, Deserialize, Serialize)]

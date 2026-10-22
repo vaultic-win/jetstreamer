@@ -146,6 +146,15 @@ through the qualified scanner-aware reader. Original failed receipts remain
 untouched. Only genuine completion permits ordinary successor preparation; this
 path does not authorize replay, archive/sidecar changes, or scanner restarts.
 
+If that fixed recovery reaches the preserved `2753d572…` failure at the legacy
+observer/private-pipeline coexistence check, the separately named `-tail` check
+and recovery modes bind its exact intent and failed child hashes. They retain
+the already-sealed model/fleet, reopen the original nine status receipts, and
+perform read-only provisional/canonical reconciliation through the corrected
+immutable reader. Both ledgers must show epoch198 ready with no status object;
+there is no status republication or deletion. The genuine completion binds the
+new reader for successor preparation; original failure evidence stays intact.
+
 Fleet rendering keeps a private resource observation in `observer_diagnostics`
 without adding a second active job when an exact captured diagnostic already
 binds the same epoch, unit, invocation and scratch path. Different owners remain

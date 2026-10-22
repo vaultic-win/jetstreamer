@@ -5,6 +5,13 @@ const IID: &str = "ea4a806906ba493e9af49e2a9c71c9e7";
 const SCRATCH: &str =
     "/home/sol/.jetstreamer-private/epoch144-upgradeable-loader-focus-20261016-v1/scratch";
 
+fn private_pipeline_shape(claim: &PipelineClaim, assembly_observer: bool) -> bool {
+    claim.epoch != 144
+        || (assembly_observer
+            && private144_scan::recovery(&claim.unit)
+            && private144_scan::scope(&claim.phase, &claim.unit))
+}
+
 fn classify(row: &Value, current: &Value, sample: &str) -> Result<Value> {
     classify_owner(
         row,
@@ -181,7 +188,11 @@ pub(super) fn observe(
                 g.state.as_str(),
                 "blocked-qualification" | "failed-needs-repair"
             ))
-            && !plan.pipeline_claims.iter().any(|c| c.epoch == 144)
+            && plan.pipeline_claims.iter().all(|c| private_pipeline_shape(
+                c,
+                rows[0]["producer_unit"] == assembly144::UNIT
+                    && overlaps.iter().any(|d| assembly144::namespace(d))
+            ))
             && !observer["replays"]
                 .as_array()
                 .context("ordinary replay census")?
@@ -189,6 +200,12 @@ pub(super) fn observe(
                 .any(|r| r["range"] == "144"),
         "private144 fleet scope, gate, tracking or overlapping owner differs"
     );
+    // These are independent, captured scans of the successful assembly, not
+    // ordinary delivery or a second replay. Reopen their immutable provenance;
+    // the main census independently checks live invocation and sandbox later.
+    for claim in plan.pipeline_claims.iter().filter(|c| c.epoch == 144) {
+        private144_scan::validate(claim)?;
+    }
     if rows[0]["producer_unit"] == assembly144::UNIT {
         let claim = overlaps
             .iter()
@@ -268,6 +285,56 @@ pub(super) fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn assembly_observation_coexists_only_with_exact_private_scan_shapes() {
+        let mut c: PipelineClaim=serde_json::from_value(json!({"epoch":144,
+            "phase":"private-full-verification","unit":"horizon-assembly144-full-verification-20261022-v1.service",
+            "invocation_id":"a".repeat(32),"expected_exec_start":"exact","evidence":[]})).unwrap();
+        assert!(private_pipeline_shape(&c, true));
+        assert!(!private_pipeline_shape(&c, false));
+        c.phase = "upload-readback".into();
+        assert!(!private_pipeline_shape(&c, true));
+        c.phase = "private-full-verification".into();
+        c.unit = "horizon-private144-full-verification-20261022-v1.service".into();
+        assert!(!private_pipeline_shape(&c, true));
+        c.unit = "foreign.service".into();
+        assert!(!private_pipeline_shape(&c, true));
+        c.epoch = 160;
+        assert!(private_pipeline_shape(&c, false));
+    }
+    #[test]
+    #[ignore = "root exact10:28 assembly/scans observation; read-only no resource sample or remote access"]
+    fn actual_assembly_observation_accepts_bound_scans_without_live_replay_claim() {
+        let path = Path::new(
+            "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261022T102800Z-native141-rejection-assembly144-scans-upload198-refresh-completed144-v1/sealed/fleet-plan.json",
+        );
+        let p: Plan = serde_json::from_value(
+            bound_json(&BoundFile {
+                path: path.into(),
+                sha256: "c9453aed02d77f15e740540a469b1de24d8a1175aca7bfb01f7886e9dc4024be".into(),
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        let observer = bound_json(&p.observer).unwrap();
+        let names = p
+            .tracked_units
+            .iter()
+            .cloned()
+            .chain(p.pipeline_claims.iter().map(|c| c.unit.clone()))
+            .collect();
+        let census = census(&names, 101, 200).unwrap();
+        let value = observe(&p, &observer, &census, "2026-10-22T10:28:00Z")
+            .unwrap()
+            .unwrap();
+        assert_eq!(value["live"], false);
+        assert_eq!(value["ordinary_replay_claim"], false);
+        assert_eq!(value["current_sidecar_eta_valid"], false);
+        assert_eq!(
+            value["expected_invocation_id"],
+            "00ca9bfb862549f6b99117b1ce590365"
+        );
+    }
     #[test]
     fn continuation_envelope_is_private_and_requires_its_own_terminal_receipt() {
         let iid = "d".repeat(32);

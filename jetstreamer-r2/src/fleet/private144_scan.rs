@@ -9,7 +9,7 @@ const ASSEMBLY_PLUGIN_UNIT: &str = "horizon-assembly144-plugin-verification-2026
 const ASSEMBLY_RUNNER: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-assembly-scan-tools-20261022-v1/jetstreamer-epoch144-private-verify";
 const ASSEMBLY_RUNNER_SHA: &str =
     "7dfe0fdabbee8e5f79b131c2b7cece49dbebe489168fe195a9086ab25f0b8810";
-fn recovery(unit: &str) -> bool {
+pub(super) fn recovery(unit: &str) -> bool {
     matches!(unit, ASSEMBLY_FULL_UNIT | ASSEMBLY_PLUGIN_UNIT)
 }
 fn stage(unit: &str) -> &'static str {

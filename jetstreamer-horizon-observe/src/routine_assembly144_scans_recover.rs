@@ -66,16 +66,23 @@ fn successful_child(value: &Value) -> Result<()> {
     );
     Ok(())
 }
-pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<()> {
+pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool, tail: bool) -> Result<()> {
     scope(p, pb)?;
-    let check_unit = format!("{}-check.service", UNIT.strip_suffix(".service").unwrap());
-    let invocation = authenticate_named_service(if check { &check_unit } else { UNIT })?;
+    let unit = if tail {
+        "horizon-routine-recover-assembly144-scans-1028-20261022-v2.service"
+    } else {
+        UNIT
+    };
+    let check_unit = format!("{}-check.service", unit.strip_suffix(".service").unwrap());
+    let invocation = authenticate_named_service(if check { &check_unit } else { unit })?;
     failed(
         "horizon-routine-cycle-101-200-20261022T102800Z-native141-rejection-assembly144-upload198-refresh-completed144-v1.service",
         "c8ea97c1295149c8a4d8eaf5fe42d80d",
     )?;
     failed(&p.cycle_unit, "5699853378bd403ba44d6e99f2b09e8b")?;
-    absent(&p.cycle_directory)?;
+    if !tail {
+        absent(&p.cycle_directory)?;
+    }
     absent(&p.fleet_output)?;
     let old = Path::new(OLD);
     let failure = file(old.join("failure.json"), false)?;
@@ -159,6 +166,21 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     }
     for tool in [&p.tools.r2, &p.tools.sealer, &p.tools.estimator] {
         tool_ok(tool)?;
+    }
+    if tail {
+        return finish_tail(
+            p,
+            pb,
+            self_sha,
+            check,
+            &invocation,
+            &observer,
+            &original_model,
+            &expected_model,
+            &expected_fleet,
+            &estimates,
+            &statuses,
+        );
     }
     ensure!(
         sha(env::var("HORIZON_S3_ENDPOINT")
@@ -254,9 +276,160 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     );
     Ok(())
 }
+
+#[allow(clippy::too_many_arguments)]
+fn finish_tail(
+    p: &Plan,
+    pb: &Bound,
+    self_sha: &str,
+    check: bool,
+    invocation: &str,
+    observer: &Bound,
+    original_model: &Bound,
+    expected_model: &Value,
+    expected_fleet: &Value,
+    estimates: &Bound,
+    statuses: &[Bound],
+) -> Result<()> {
+    failed(UNIT, "2753d572a34748029a0f4eeda01e44e8")?;
+    let intent = file(p.cycle_directory.join("intent.json"), false)?;
+    let failure = file(p.cycle_directory.join("child-public198-fleet.json"), false)?;
+    ensure!(
+        intent.sha256 == "b4f469885e14eadd5b6974ae76b3d7be3984c09b7b8b93208bc52472c8671a29"
+            && failure.sha256 == "ff36f6fca312c9071f6cb7222bc0d21085ec0d5111f41eabb71112aa29b621f8",
+        "foreign interrupted recovery"
+    );
+    let model = file(p.cycle_directory.join("sealed/eta-model.json"), true)?;
+    let fleet_plan = file(p.cycle_directory.join("sealed/fleet-plan.json"), true)?;
+    ensure!(
+        model.sha256 == original_model.sha256
+            && bound_json(&model, true)? == *expected_model
+            && bound_json(&fleet_plan, true)? == *expected_fleet,
+        "interrupted sealed model or fleet changed"
+    );
+    let provisional_path = p.cycle_directory.join("public198-provisional-fleet.json");
+    let provisional_plan = file(
+        p.cycle_directory
+            .join("public198-stage/sealed/fleet-plan.json"),
+        true,
+    )?;
+    let mut provisional_expected = expected_fleet.clone();
+    provisional_expected["output"] = json!(provisional_path);
+    ensure!(
+        bound_json(&provisional_plan, true)? == provisional_expected,
+        "interrupted provisional scope changed"
+    );
+    let root = p.cycle_directory.join("recovery-tail-v2");
+    absent(&root)?;
+    absent(&provisional_path)?;
+    absent(&p.cycle_directory.join("completion.json"))?;
+    let reader = assembly144_scans::coexistence_reader();
+    tool_ok(&reader)?;
+    ensure!(
+        sha(env::var("HORIZON_S3_ENDPOINT")
+            .context("endpoint missing")?
+            .as_bytes())
+            == p.endpoint_sha256,
+        "tail endpoint differs"
+    );
+    if check {
+        println!("exact interrupted recovery tail passed; no writes, samples or remote access");
+        return Ok(());
+    }
+    fs::create_dir(&root)?;
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
+    File::open(&p.cycle_directory)?.sync_all()?;
+    let recovery = write_new(
+        &root.join("intent.json"),
+        &json!({"schema":"jetstreamer-assembly144-scans-tail-intent-v1","original_intent":intent,"failed_child":failure,"reader":reader,"plan":pb,"invocation_id":invocation,"self_sha256":self_sha,"new_resource_samples":0,"status_republications":0}),
+    )?;
+    for (name, plan, output) in [
+        ("provisional", &provisional_plan, &provisional_path),
+        ("canonical", &fleet_plan, &p.fleet_output),
+    ] {
+        latest_fleet_unchanged(p, &bound_json(&p.previous_fleet, false)?)?;
+        child(
+            &reader,
+            &[
+                "fleet-reconcile".into(),
+                plan.path.display().to_string(),
+                "--plan-sha256".into(),
+                plan.sha256.clone(),
+            ],
+            true,
+            &root.join(format!("child-{name}.json")),
+        )?;
+        let ledger = bound_json(&file(output.clone(), false)?, false)?;
+        let e = ledger["epochs"]
+            .as_array()
+            .context("epochs missing")?
+            .iter()
+            .find(|e| e["epoch"] == 198)
+            .context("198 missing")?;
+        ensure!(
+            ledger["inventory"]["anomalies"] == 0
+                && ledger["observer_sha256"] == observer.sha256
+                && ledger["plan_sha256"] == plan.sha256
+                && e["state"] == "remote-ready"
+                && e["status"].is_null(),
+            "tail ready-pair/status gate differs"
+        );
+    }
+    let ledger = file(p.fleet_output.clone(), false)?;
+    let lv = bound_json(&ledger, false)?;
+    let completion = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":pb,"self_sha256":self_sha,"invocation_id":invocation,"sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model,"estimates":estimates,"fleet_plan":fleet_plan,"fleet":ledger,"inventory":lv["inventory"],"status_publications":statuses,
+        "epoch198_delivery":{"provisional_fleet":file(provisional_path,false)?,"publication_skipped":true,"reason":"Authenticated198 ready pair; status already conditionally deleted"},
+        "assembly144_scans_tail":{"intent":recovery,"reader":reader,"failed_child":failure,"original_invocation_id":"2753d572a34748029a0f4eeda01e44e8","new_resource_samples":0,"status_republications":0},
+        "new_resource_samples":0,"archive_mutations":false,"sidecar_mutations":false,"replay_launch_authorized":false,"deletions":false});
+    next_preparation::completion_bindings(p, pb, &completion)?;
+    write_new(&p.cycle_directory.join("completion.json"), &completion)?;
+    println!(
+        "exact10:28 recovery complete; all original failures/sample/estimates/statuses preserved"
+    );
+    Ok(())
+}
+pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
+    let Some(t) = c.get("assembly144_scans_tail") else {
+        return Ok(());
+    };
+    ensure!(
+        c["sampled_at_utc"] == "2026-10-22T10:28:00Z"
+            && c["plan"]["sha256"]
+                == "fbd6a7d2a18e4cf753f45f3fbaea062fba54344c894aa6d650288dcdcc681940"
+            && t["reader"] == serde_json::to_value(assembly144_scans::coexistence_reader())?
+            && t["failed_child"]["sha256"]
+                == "ff36f6fca312c9071f6cb7222bc0d21085ec0d5111f41eabb71112aa29b621f8"
+            && t["original_invocation_id"] == "2753d572a34748029a0f4eeda01e44e8"
+            && t["new_resource_samples"] == 0
+            && t["status_republications"] == 0,
+        "foreign scanner tail completion"
+    );
+    p.tools.r2 = assembly144_scans::coexistence_reader();
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn tail_successor_changes_only_reader_and_rejects_foreign_failure() {
+        let (mut p, ..) = crate::tests::fixture101();
+        let before = serde_json::to_value(&p).unwrap();
+        let c = json!({"sampled_at_utc":"2026-10-22T10:28:00Z","plan":{"sha256":"fbd6a7d2a18e4cf753f45f3fbaea062fba54344c894aa6d650288dcdcc681940"},
+            "assembly144_scans_tail":{"reader":assembly144_scans::coexistence_reader(),"failed_child":{"sha256":"ff36f6fca312c9071f6cb7222bc0d21085ec0d5111f41eabb71112aa29b621f8"},"original_invocation_id":"2753d572a34748029a0f4eeda01e44e8","new_resource_samples":0,"status_republications":0}});
+        consume(&mut p, &c).unwrap();
+        let mut after = serde_json::to_value(&p).unwrap();
+        after["tools"]["r2"] = before["tools"]["r2"].clone();
+        assert_eq!(before, after);
+        for (key, value) in [
+            ("new_resource_samples", json!(1)),
+            ("status_republications", json!(1)),
+            ("original_invocation_id", json!("f".repeat(32))),
+        ] {
+            let mut bad = c.clone();
+            bad["assembly144_scans_tail"][key] = value;
+            assert!(consume(&mut p, &bad).is_err());
+        }
+    }
     #[test]
     fn original_model_requires_exact_bytes_not_just_equivalent_json() {
         let value = json!({"n":9007199254740993u64});

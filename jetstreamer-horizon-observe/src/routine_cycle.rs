@@ -1628,6 +1628,8 @@ fn main() {
                         "--check-only"
                             | "--check-assembly144-scans-recovery"
                             | "--recover-assembly144-scans"
+                            | "--check-assembly144-scans-tail"
+                            | "--recover-assembly144-scans-tail"
                             | "--recover-delivery198"
                             | "--promote-partial2018"
                             | "--prepare-next"
@@ -1660,13 +1662,21 @@ fn main() {
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
         if args.get(6).is_some_and(|a| {
-            a == "--recover-assembly144-scans" || a == "--check-assembly144-scans-recovery"
+            matches!(
+                a.as_str(),
+                "--recover-assembly144-scans"
+                    | "--check-assembly144-scans-recovery"
+                    | "--check-assembly144-scans-tail"
+                    | "--recover-assembly144-scans-tail"
+            )
         }) {
             return assembly144_scans_recover::run(
                 &plan,
                 &bound,
                 &args[5],
-                args[6] == "--check-assembly144-scans-recovery",
+                args[6] == "--check-assembly144-scans-recovery"
+                    || args[6] == "--check-assembly144-scans-tail",
+                args[6].ends_with("-tail"),
             );
         }
         if args.get(6).is_some_and(|a| {
