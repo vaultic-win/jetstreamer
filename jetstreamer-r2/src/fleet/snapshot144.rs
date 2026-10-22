@@ -213,7 +213,7 @@ pub(super) fn check_owners(previous: &Value, current: &BTreeMap<String, Value>) 
     Ok(())
 }
 
-fn free_bytes() -> Result<u64> {
+pub(super) fn free_bytes() -> Result<u64> {
     let path = CString::new("/home/sol")?;
     let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     // SAFETY: valid NUL-terminated input and output buffer; read only on success.

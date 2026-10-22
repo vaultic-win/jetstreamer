@@ -33,7 +33,8 @@ const WORKER_SHA: &str = "2cca500106d274ebfbbc8c5bfa0e6e8343cd5e41003f9e82c93282
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 const SNAPSHOT_SIZE: u64 = 2_569_233_422;
 const PREFIX_SIZE: u64 = 109_159_726_722;
-const PROTECTED: u64 = 4_740_696_923_590;
+const PROTECTED: u64 = 3_916_063_202_758;
+const PROTECTION_SHA: &str = "2e0aec223a30d9af4ada3b4ef5feb82996c718ca1b951dbe04b62d0d5bfbf3e6";
 // A minimum experimental envelope, not a qualified peak estimate. A separately
 // sealed fresh full-path admission is mandatory and may require a larger peak.
 const MINIMUM_PEAK: u64 = 192 << 30;
@@ -53,12 +54,15 @@ struct Plan {
     worker: Evidence,
     genesis_archive: Evidence,
     admission_receipt: Evidence,
+    protection_release: Evidence,
     run_root: PathBuf,
     minimum_free_bytes: u64,
 }
 struct ValidatedPrefix {
     manifest: HistoricalSegmentManifest,
     snapshot: PathBuf,
+    runner_started: std::time::Instant,
+    native_barrier_millis: std::sync::atomic::AtomicU64,
 }
 
 pub(crate) fn validate_cli(
@@ -101,6 +105,7 @@ fn validate_plan(p: &Plan, destination: &Path) -> Result<(), String> {
         (&p.restart_snapshot, SNAPSHOT_SHA),
         (&p.worker, WORKER_SHA),
         (&p.genesis_archive, GENESIS_SHA),
+        (&p.protection_release, PROTECTION_SHA),
     ] {
         require(
             input.sha256 == digest
@@ -153,8 +158,14 @@ fn admission(p: &Plan, v: &Value, now: u64) -> Result<(), String> {
             && v["native_result_sha256"] == NATIVE_SHA
             && v["worker_sha256"] == WORKER_SHA
             && v["remaining_slots"] == END - ROOT
+            && v["protection_release"]
+                == json!({"path":p.protection_release.path,"sha256":PROTECTION_SHA})
             && peak >= MINIMUM_PEAK
             && floor >= PROTECTED
+            && v["required_guard_minimum_free_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= floor)
+            && v["experimental_peak_guard_includes_other_fleet_allocations"] == true
             && floor.checked_add(peak) == Some(p.minimum_free_bytes)
             && v["recorded_unix_seconds"]
                 .as_u64()
@@ -173,6 +184,22 @@ fn admission(p: &Plan, v: &Value, now: u64) -> Result<(), String> {
         )?;
     }
     Ok(())
+}
+
+fn protection_release(v: &Value) -> Result<(), String> {
+    require(
+        v["schema"] == "jetstreamer-continuation144-protection-release-v1"
+            && v["authenticated198_ready_pair_revalidated"] == true
+            && v["protection"]["original_protected_free_bytes"] == 4_740_696_923_590u64
+            && v["protection"]["released_epoch"] == 198
+            && v["protection"]["released_future_growth_bytes"] == 768u64 << 30
+            && v["protection"]["protected_free_bytes"] == PROTECTED
+            && v["admission_authorized"] == false
+            && v["replay_launch_authorized"] == false
+            && v["local_retirement_authorized"] == false
+            && v["r2_mutations"] == false,
+        "144 needs exact completed198 accounting release, not an arbitrary lower floor",
+    )
 }
 
 fn scope(m: &HistoricalSegmentManifest) -> bool {
@@ -256,7 +283,20 @@ impl RestartProof for ValidatedPrefix {
         let summary = segment_checkpoint_summary(
             &historical_replay::HistoricalCheckpointSummary::try_from(a)?,
         );
-        self.check_native(&summary, w, cursor, ticks)
+        self.check_native(&summary, w, cursor, ticks)?;
+        let elapsed: u64 = self
+            .runner_started
+            .elapsed()
+            .as_millis()
+            .try_into()
+            .map_err(|_| "144 native timing overflow")?;
+        self.native_barrier_millis
+            .compare_exchange(u64::MAX, elapsed, Ordering::SeqCst, Ordering::SeqCst)
+            .map_err(|_| "144 native restart barrier was attempted twice")?;
+        info!(
+            "private144 native restart barrier passed before any suffix entry; initialized cursor preserved, bootstrap writes=0, runner_to_native_barrier_millis={elapsed}"
+        );
+        Ok(())
     }
 }
 fn native_proof(v: &Value, m: &HistoricalSegmentManifest) -> Result<(), String> {
@@ -298,6 +338,8 @@ fn native_proof(v: &Value, m: &HistoricalSegmentManifest) -> Result<(), String> 
     ValidatedPrefix {
         manifest: m.clone(),
         snapshot: "/unused".into(),
+        runner_started: std::time::Instant::now(),
+        native_barrier_millis: std::sync::atomic::AtomicU64::new(u64::MAX),
     }
     .check_native(&checkpoint, sha(WORKER_SHA)?, cursor, ticks)
 }
@@ -420,6 +462,9 @@ pub(crate) async fn run(
         "144 continuation requires isolated UID1001",
     )?;
     let invocation = authenticate_service(&p.producer_unit)?;
+    let release: Value = serde_json::from_slice(&sealed_bytes(&p.protection_release, 4 << 20)?)
+        .map_err(|e| e.to_string())?;
+    protection_release(&release)?;
     let admitted: Value = serde_json::from_slice(&sealed_bytes(&p.admission_receipt, 4 << 20)?)
         .map_err(|e| e.to_string())?;
     admission(
@@ -483,6 +528,7 @@ pub(crate) async fn run(
     )?;
     let archive = p.prefix_archive.path.clone();
     let manifest = p.prefix_manifest.path.clone();
+    let prefix_started = std::time::Instant::now();
     info!("independently rereading complete retained144prefix before private continuation");
     let manifest = tokio::task::spawn_blocking(move || {
         read_and_validate_segment_manifest_from(archive, manifest).map_err(|e| e.to_string())
@@ -496,7 +542,23 @@ pub(crate) async fn run(
         "144 independently validated prefix changed",
     )?;
     native_proof(&native, &manifest)?;
+    let prefix_validation_millis: u64 = prefix_started
+        .elapsed()
+        .as_millis()
+        .try_into()
+        .map_err(|_| "144 prefix timing overflow")?;
+    info!(
+        "private144 complete retained prefix reread passed; prefix_validation_millis={prefix_validation_millis}"
+    );
     require_no_checksum(&p.prefix_archive.path)?;
+    admission(
+        &p,
+        &admitted,
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_secs(),
+    )?;
     require(
         !shutdown.load(Ordering::SeqCst) && available_bytes(&p.run_root)? >= p.minimum_free_bytes,
         "144 admission changed during prefix reread",
@@ -508,6 +570,8 @@ pub(crate) async fn run(
     let validated = ValidatedPrefix {
         manifest,
         snapshot: p.restart_snapshot.path.clone(),
+        runner_started: std::time::Instant::now(),
+        native_barrier_millis: std::sync::atomic::AtomicU64::new(u64::MAX),
     };
     let suffix = p.run_root.join("output/epoch-144-suffix.jet");
     let output = p
@@ -558,11 +622,28 @@ pub(crate) async fn run(
         Some(&validated),
     )
     .await?;
+    let suffix_runner_millis: u64 = validated
+        .runner_started
+        .elapsed()
+        .as_millis()
+        .try_into()
+        .map_err(|_| "144 suffix timing overflow")?;
+    let native_barrier_millis = validated.native_barrier_millis.load(Ordering::SeqCst);
+    let suffix_after_native_barrier_millis = suffix_runner_millis
+        .checked_sub(native_barrier_millis)
+        .ok_or("144 missing native barrier timing")?;
+    info!(
+        "private144 suffix replay returned; suffix_after_native_barrier_millis={suffix_after_native_barrier_millis}"
+    );
     require(
         !shutdown.load(Ordering::SeqCst),
         "144 continuation interrupted",
     )?;
     verifier.finish()?;
+    require(
+        fs::metadata(&suffix).map_err(|e| e.to_string())?.len() <= 8u64 << 30,
+        "144 suffix exceeded experimental8GiB reservation; preserve output and requalify peak before assembly",
+    )?;
     publish_historical_segment_manifest(EPOCH, q, &suffix, &result, candidate)?;
     require_no_checksum(&suffix)?;
     let suffix_manifest = read_and_validate_segment_manifest(&suffix).map_err(|e| e.to_string())?;
@@ -571,6 +652,7 @@ pub(crate) async fn run(
         available_bytes(&p.run_root)? >= PROTECTED + PREFIX_SIZE + (32 << 30),
         "144 assembly output reserve unavailable; preserve complete suffix",
     )?;
+    let assembly_started = std::time::Instant::now();
     let assembled = assemble_sources(
         &p.prefix_archive.path,
         &validated.manifest,
@@ -579,6 +661,11 @@ pub(crate) async fn run(
         &output,
         &provenance,
     )?;
+    let assembly_millis: u64 = assembly_started
+        .elapsed()
+        .as_millis()
+        .try_into()
+        .map_err(|_| "144 assembly timing overflow")?;
     require_no_checksum(&p.prefix_archive.path)?;
     require_no_checksum(&suffix)?;
     require_no_checksum(&output)?;
@@ -587,6 +674,8 @@ pub(crate) async fn run(
         "prefix_archive_sha256":PREFIX_SHA,"restart_snapshot_sha256":SNAPSHOT_SHA,"prior_native_result_sha256":NATIVE_SHA,
         "suffix_archive_sha256":jetstreamer_node::segment_manifest::sha256_hex_string(&suffix_manifest.archive_sha256),
         "private_output":output,"assembly":assembled,"fresh_prefix_full_validation_passed":true,"fresh_native_checkpoint_matches":true,
+        "timings":{"prefix_validation_millis":prefix_validation_millis,"suffix_runner_to_native_barrier_millis":native_barrier_millis,
+            "suffix_after_native_barrier_millis":suffix_after_native_barrier_millis,"assembly_millis":assembly_millis},
         "canonical_root_slot":ROOT,"remaining_slots":END-ROOT,"independent_final_archive_verification_passed":false,
         "current_plugin_verification_passed":false,"initial_boundary_requires_separate_adjacent_evidence":true,
         "canonical_sidecar_authorized":false,"publication_authorized":false,"retirement_authorized":false,"r2_mutations":false});
@@ -600,6 +689,31 @@ pub(crate) async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn lower_floor_requires_the_exact_completed198_accounting_proof() {
+        let good = json!({"schema":"jetstreamer-continuation144-protection-release-v1",
+            "authenticated198_ready_pair_revalidated":true,"protection":{"original_protected_free_bytes":4740696923590u64,
+            "released_epoch":198,"released_future_growth_bytes":768u64<<30,"protected_free_bytes":PROTECTED},
+            "admission_authorized":false,"replay_launch_authorized":false,"local_retirement_authorized":false,"r2_mutations":false});
+        protection_release(&good).unwrap();
+        let mut bad = good.clone();
+        bad["protection"]["released_epoch"] = json!(197);
+        assert!(protection_release(&bad).is_err());
+        let mut bad = good.clone();
+        bad["protection"]["protected_free_bytes"] = json!(PROTECTED - 1);
+        assert!(protection_release(&bad).is_err());
+        let mut bad = good.clone();
+        bad["replay_launch_authorized"] = json!(true);
+        assert!(protection_release(&bad).is_err());
+    }
+    #[test]
+    #[ignore = "exact host sealed accounting release; read-only, no service/resource/remote observation"]
+    fn actual_sealed_accounting_release_passes() {
+        let value:Value=serde_json::from_slice(&sealed_bytes(&Evidence{
+            path:"/usr/local/lib/jetstreamer/horizon-continuation144-protection-release-20261021-v1/release.json".into(),
+            sha256:PROTECTION_SHA.into()},4<<20).unwrap()).unwrap();
+        protection_release(&value).unwrap();
+    }
     fn prefix() -> HistoricalSegmentManifest {
         let bytes = include_bytes!("../tests/fixtures/epoch144-prefix-segment.json");
         assert_eq!(
@@ -612,6 +726,8 @@ mod tests {
         ValidatedPrefix {
             manifest: prefix(),
             snapshot: "/snapshot".into(),
+            runner_started: std::time::Instant::now(),
+            native_barrier_millis: std::sync::atomic::AtomicU64::new(u64::MAX),
         }
     }
     fn plan() -> Plan {
@@ -634,6 +750,7 @@ mod tests {
             worker: b("worker", WORKER_SHA),
             genesis_archive: b("genesis.tar.bz2", GENESIS_SHA),
             admission_receipt: b("admission.json", &"b".repeat(64)),
+            protection_release: b("release.json", PROTECTION_SHA),
             run_root: PathBuf::from(PRIVATE_ROOT).join("checkpoint-continuation-144-test"),
             minimum_free_bytes: PROTECTED + MINIMUM_PEAK,
         }
@@ -699,6 +816,38 @@ mod tests {
         );
     }
     #[test]
+    fn executing_native_barrier_records_one_distinct_phase_only_after_validation() {
+        let p = proof();
+        let s = &p.manifest.terminal;
+        let hash = |v: &str| v.parse::<Hash>().unwrap().to_bytes();
+        let mut actual = historical::HistoricalCheckpoint {
+            slot: s.slot,
+            bank_hash: hash(&s.bank_hash),
+            accounts_hash: hash(&s.accounts_hash),
+            last_blockhash: hash(&s.last_blockhash),
+            capitalization: s.capitalization,
+            transaction_count: s.transaction_count,
+            tick_height: s.tick_height,
+            slot_complete: s.slot_complete,
+            writes: vec![],
+            next_write_version: 31418315426,
+        };
+        actual.slot += 1;
+        assert!(
+            p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), 31418315426, 64)
+                .is_err()
+        );
+        assert_eq!(p.native_barrier_millis.load(Ordering::SeqCst), u64::MAX);
+        actual.slot -= 1;
+        p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), 31418315426, 64)
+            .unwrap();
+        assert_ne!(p.native_barrier_millis.load(Ordering::SeqCst), u64::MAX);
+        assert!(
+            p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), 31418315426, 64)
+                .is_err()
+        );
+    }
+    #[test]
     fn full_path_admission_cannot_borrow_native_only_peak_or_expired_proof() {
         let p = plan();
         validate_plan(&p, &p.run_root.join("ledger")).unwrap();
@@ -706,6 +855,8 @@ mod tests {
             "epoch":EPOCH,"node_sha256":p.node_sha256,"prefix_sha256":PREFIX_SHA,"snapshot_sha256":SNAPSHOT_SHA,
             "native_result_sha256":NATIVE_SHA,"worker_sha256":WORKER_SHA,"remaining_slots":509,
             "candidate_incremental_peak_bytes":MINIMUM_PEAK,"protected_existing_floor_bytes":PROTECTED,"recorded_unix_seconds":1000,
+            "protection_release":{"path":p.protection_release.path,"sha256":PROTECTION_SHA},
+            "required_guard_minimum_free_bytes":PROTECTED,"experimental_peak_guard_includes_other_fleet_allocations":true,
             "ordinary_replay_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,"r2_mutations":false});
         admission(&p, &v, 1900).unwrap();
         assert!(admission(&p, &v, 1901).is_err());

@@ -62,9 +62,27 @@ the old 768-GiB epoch-198 future-growth claim is subtracted; all other claims,
 floor, margin and original slack remain. It does not sample resources, mutate
 R2, delete local files, change guards or authorize admission. Its `--check-only`
 mode reads bound evidence without service or remote observations or output.
-This accounting proposal must still be consumed by a reviewed full-path admission
-and launch generation; it does not lower the current runner's fixed protection
-threshold automatically.
+The revised runner additionally binds the exact successful accounting release as
+`protection_release: {path, sha256}` in its sealed plan. It requires that same
+binding in the full-path admission, and does not accept a different released epoch
+or arbitrary lower floor. The released baseline is 3,916,063,202,758 bytes.
+
+`admit-continuation144` consumes a fresh accepted four-lane sample, the exact
+accounting release, native result, immutable node and full-path resource policy.
+Its 192-GiB experimental envelope reserves 40 GiB for native copy/restore/indexes,
+8 GiB for suffix output/growth, 112 GiB for assembly output, 16 GiB for independent
+verification scratch and 16 GiB of incremental margin. This is not a full-cold
+peak qualification. Admission revalidates the epoch-198 and audited epoch-201
+ready pairs, stable current owners, actual free bytes, memory reserve and host
+VMA ceiling. Existing lanes must be advancing with zero new OOM/max events and
+remain below their VMA bound. Exact-node capability and the actual bound guard
+remain separate launch prerequisites; the writer never launches a service.
+The runner checks admission freshness both before and after its prefix reread.
+The actual guard must protect the greater of the retained baseline and sampled
+actual free bytes minus the complete 192-GiB experimental envelope. This deliberately
+counts other fleet allocations against the experiment too, so a mistaken peak
+cannot consume older claims. An oversized suffix stays private and must be
+requalified rather than assembled under the smaller reservation.
 
 ## Gates that remain separate
 

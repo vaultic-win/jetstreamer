@@ -132,7 +132,7 @@ fn accepted(s: &Spec, observer: &Value, fleet: &Value, plan: &Value, now: u64) -
     Ok(())
 }
 
-fn owners(fleet: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+pub(super) fn owners(fleet: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     snapshot144::check_owners(fleet, current)?;
     // A dormant tracked lane becoming live is just as material as a newly
     // discovered unit. Do not rely only on the prior active-list subset.
