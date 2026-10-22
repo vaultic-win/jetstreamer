@@ -258,6 +258,7 @@ pub(super) fn prepare(
             | "--prepare-next-prefix144"
             | "--prepare-next-completed144"
             | "--prepare-next-native144"
+            | "--prepare-next-continuation144"
     ) {
         handoff_spec
     } else {
@@ -366,7 +367,9 @@ pub(super) fn prepare(
             !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,
             "prefix157 migration must be separate"
         );
-        if mode == "--prepare-next-native144" {
+        if mode == "--prepare-next-continuation144" {
+            continuation144::enable(&mut next, &mut next_config, spec)?;
+        } else if mode == "--prepare-next-native144" {
             native144::enable(&mut next, &mut next_config, spec)?;
         } else if mode == "--prepare-next-completed144" {
             completed144::enable(&mut next, spec)?;
