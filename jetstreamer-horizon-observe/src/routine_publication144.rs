@@ -12,6 +12,19 @@ pub(super) const READER: &str =
     "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261022-v3/jetstreamer-r2";
 pub(super) const READER_SHA: &str =
     "26fa2fddce3ddaa42753525bda6ef140380555ea055d42ab633aed8879d632f4";
+pub(super) const COMPOSITE_READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-publication144-progress-client-20261022-v1/jetstreamer-r2";
+pub(super) const COMPOSITE_READER_SHA: &str =
+    "c91b5ab379e876c6426be82adb381644927e7b5a199e3709dc9ce59dc2a6d96a";
+pub(super) fn composite_reader(p: &Plan) -> bool {
+    p.publication144.is_some()
+        && p.census141_poh.is_some()
+        && native141::all_retry_enabled(p)
+        && native141::acquisition_enabled(p)
+        && p.assembly144_scans.is_some()
+        && p.tools.r2.path == Path::new(COMPOSITE_READER)
+        && p.tools.r2.sha256 == COMPOSITE_READER_SHA
+}
 const ACTIVE: &str = "Track exact144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
 const SUCCESS: &str = "Exact144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
 const FAILED: &str = "Exact144 publisher terminated unsuccessfully; capture terminal evidence immediately, preserve original and partial/copy/transaction receipts, remove any owned stale countdown through qualified lifecycle, and diagnose/recover the exact no-clobber transaction. Never blindly restart or discard valid artifacts.";
@@ -24,8 +37,10 @@ pub(super) fn reader(p: &Plan) -> bool {
     p.publication144.is_some()
         && native141::acquisition_enabled(p)
         && p.assembly144_scans.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.census141_poh.is_none()
+            && p.tools.r2.path == Path::new(READER)
+            && p.tools.r2.sha256 == READER_SHA)
+            || composite_reader(p))
 }
 fn checked(b: &Bound, r: &Value) -> Result<Value> {
     ensure!(
@@ -151,9 +166,16 @@ pub(super) fn enable(p: &mut Plan, spec: &Bound) -> Result<()> {
     );
     checked(&s.launch, &bound_json(&s.launch, true)?)?;
     p.publication144 = Some(Profile { launch: s.launch });
-    p.tools.r2 = Bound {
-        path: READER.into(),
-        sha256: READER_SHA.into(),
+    p.tools.r2 = if p.census141_poh.is_some() {
+        Bound {
+            path: COMPOSITE_READER.into(),
+            sha256: COMPOSITE_READER_SHA.into(),
+        }
+    } else {
+        Bound {
+            path: READER.into(),
+            sha256: READER_SHA.into(),
+        }
     };
     validate(p)
 }
@@ -236,6 +258,43 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn composite_reader_preserves_both_profiles_and_all_native_history() {
+        let (p, ..) = crate::tests::fixture101();
+        let mut v = serde_json::to_value(p).unwrap();
+        let b = json!({"path":"/proof","sha256":"a".repeat(64)});
+        v["native141_audit"] = json!({"first_guard":b,"rejection":b,"acquisition":b,
+            "all_acquisition":{"path":"/home/sol/.jetstreamer-private/epoch141-native-acquisition-all-20261022-v1/results/initial-guard.json","sha256":"259ef91d98fac5e50704a349b08761365033b0a62df67140484ff682369f716c"},"all_retry":b});
+        v["assembly144_scans"] = json!({"full":b,"plugin":b});
+        v["publication144"] = json!({"launch":b});
+        v["census141_poh"] = json!({"launch":b});
+        v["tools"]["r2"] = json!({"path":COMPOSITE_READER,"sha256":COMPOSITE_READER_SHA});
+        let p: Plan = serde_json::from_value(v.clone()).unwrap();
+        assert!(composite_reader(&p));
+        assert!(reader(&p));
+        assert!(census141_poh::reader(&p));
+        assert!(native141::all_acquisition_reader(&p));
+        assert!(native141::acquisition_reader(&p));
+        assert!(crate::generation_101(&p).starts_with("publication144-census141-poh-"));
+        for pointer in [
+            "/publication144",
+            "/census141_poh",
+            "/native141_audit/all_retry",
+            "/native141_audit/acquisition",
+            "/assembly144_scans",
+        ] {
+            let mut bad = v.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(
+                !composite_reader(&serde_json::from_value(bad).unwrap()),
+                "{pointer}"
+            );
+        }
+        v["tools"]["r2"] = json!({"path":READER,"sha256":READER_SHA});
+        let p: Plan = serde_json::from_value(v).unwrap();
+        assert!(!reader(&p));
+        assert!(!census141_poh::reader(&p));
+    }
     #[test]
     fn retained_delivery_gate_requires_identical_capture_and_known_action() {
         let b = Bound {

@@ -77,3 +77,19 @@ binding. The legacy replay status CLI does not gain this phase. Parser support
 alone does not qualify the queue ETA, prove an active worker or authorize a
 status publication. The delivery worker and composite fleet/status reader must
 still bind the separately sealed client before actual use.
+
+The next candidate worker pins the separate progress client and writes
+`upload-child-launch.json` (or the distinct status-cleanup counterpart) with the
+actual spawned PID, exact client/arguments, owner, plan and spawn timestamp.
+This is historical process linkage, not current liveness or archive readiness;
+the status consumer must authenticate current process identity and progress.
+The worker always waits for its child even if writing that receipt fails, so a
+metadata error cannot leave the child unobserved. A regression exercises this
+error path and requires the child to have been reaped.
+
+The candidate routine helper supports simultaneous private141 PoH and local144
+publication profiles only through the separately pinned composite-capable
+progress client. Both original captures, private scan evidence and the full
+native141 retry history remain mandatory. Neither older single-profile reader
+can be substituted for this combined profile; adding a profile grants no new
+replay, publication or mutation authority.
