@@ -1,6 +1,7 @@
 //! Fixed epoch227 compressed input staging only; never restore/replay/publication.
 mod profile {
     pub(super) const EPOCH: u64 = 227;
+    pub(super) const PROTECTED_FLEET: bool = true;
     pub(super) const PLAN_SCHEMA: &str = "horizon-epoch227-bootstrap-prepare-plan-v1";
     pub(super) const RECEIPT_SCHEMA: &str = "horizon-epoch227-bootstrap-prepared-v1";
     // Full older203/223/225 future-growth protection plus thirteen-sample century floor.

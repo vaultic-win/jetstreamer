@@ -24,7 +24,9 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use profile::{EPOCH, FILENAME, MINIMUM_PROTECTED_FREE, OBJECT, PLAN_SCHEMA, RECEIPT_SCHEMA};
+use profile::{
+    EPOCH, FILENAME, MINIMUM_PROTECTED_FREE, OBJECT, PLAN_SCHEMA, PROTECTED_FLEET, RECEIPT_SCHEMA,
+};
 mod bootstrap227_protection;
 
 const GCLOUD: &str = "/home/linuxbrew/.linuxbrew/share/google-cloud-sdk/bin/gcloud";
@@ -201,12 +203,12 @@ fn admission(observer: &Value, plan: &Plan, time: u64) -> Result<()> {
         observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2",
         "wrong observer schema"
     );
-    if EPOCH == 227 {
+    if PROTECTED_FLEET {
         bootstrap227_protection::validate_observer(observer)?;
     } else {
         ensure!(
             plan.fleet.is_none(),
-            "legacy223 does not accept a227 fleet extension"
+            "legacy223 does not accept a protected fleet extension"
         );
     }
     let timestamp = utc_seconds(
@@ -330,25 +332,25 @@ fn hashes(
     ))
 }
 fn validate_fleet_binding(p: &Plan, observer: &Value) -> Result<()> {
-    if EPOCH != 227 {
+    if !PROTECTED_FLEET {
         ensure!(
             p.fleet.is_none(),
-            "legacy223 does not accept a227 fleet extension"
+            "legacy223 does not accept a protected fleet extension"
         );
         return Ok(());
     }
     let bound = p
         .fleet
         .as_ref()
-        .context("227 requires complete protected fleet evidence")?;
+        .context("protected input requires complete fleet evidence")?;
     let fleet: Value =
         serde_json::from_slice(&bound_file(&bound.path, &bound.sha256, 8 << 20, true)?)?;
     bootstrap227_protection::validate_fleet(&fleet, observer, &p.observer, &p.observer_sha256)
 }
 fn check_only(args: &[String]) -> Result<bool> {
     ensure!(
-        args.len() == 3 || (EPOCH == 227 && args.len() == 4 && args[3] == "--check-only"),
-        "usage: PLAN PLAN_SHA256 SELF_SHA256 [--check-only (227 only)]"
+        args.len() == 3 || (PROTECTED_FLEET && args.len() == 4 && args[3] == "--check-only"),
+        "usage: PLAN PLAN_SHA256 SELF_SHA256 [--check-only (protected profiles only)]"
     );
     Ok(args.len() == 4)
 }
@@ -396,7 +398,9 @@ fn run() -> Result<()> {
         "receipt overlaps staging"
     );
     validate_fleet_binding(&p, &observer)?;
-    let _lease = if EPOCH == 227 {
+    // Both protected fixed inputs share this immutable lease and the same
+    // older-producer growth reservation; they must never spend it concurrently.
+    let _lease = if PROTECTED_FLEET {
         Some(bootstrap227_protection::lease(Path::new(
             "/var/lib/jetstreamer/horizon-bootstrap227-transfer-lease-v1/transfer.lock",
         ))?)
@@ -506,7 +510,7 @@ mod tests {
         let mut args = vec!["plan".to_owned(), "hash".to_owned(), "self".to_owned()];
         assert!(!check_only(&args).unwrap());
         args.push("--check-only".to_owned());
-        if EPOCH == 227 {
+        if PROTECTED_FLEET {
             assert!(check_only(&args).unwrap());
         } else {
             assert!(check_only(&args).is_err());
@@ -535,6 +539,52 @@ mod tests {
         assert!(validate_object_metadata(&m, &OBJECT).is_err());
     }
     #[test]
+    fn metadata_rejects_other_objects_missing_hashes_and_conflicting_aliases() {
+        let correct = json!({"bucket":OBJECT.bucket,"name":OBJECT.name,"generation":OBJECT.generation,"size":OBJECT.size,"crc32c_hash":OBJECT.crc,"md5_hash":OBJECT.md5,"storage_url":OBJECT.uri});
+        for (key, value) in [
+            ("bucket", json!("other-bucket")),
+            ("name", json!("other-snapshot.tar.zst")),
+            ("size", json!(OBJECT.size + 1)),
+            ("crc32c_hash", json!("AAAAAA==")),
+            ("md5_hash", json!("AAAAAAAAAAAAAAAAAAAAAA==")),
+            ("storage_url", json!(format!("{}0", OBJECT.uri))),
+            ("crc32c", json!("AAAAAA==")),
+            ("md5Hash", json!("AAAAAAAAAAAAAAAAAAAAAA==")),
+        ] {
+            let mut wrong = correct.clone();
+            wrong[key] = value;
+            assert!(validate_object_metadata(&wrong, &OBJECT).is_err(), "{key}");
+        }
+        for key in ["crc32c_hash", "md5_hash", "generation", "storage_url"] {
+            let mut missing = correct.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(validate_object_metadata(&missing, &OBJECT).is_err(), "{key}");
+        }
+    }
+    #[test]
+    fn protected_profile_requires_fleet_and_legacy_cannot_opt_in() {
+        let mut p = Plan {
+            fleet: None,
+            schema: String::new(),
+            gcloud_sha256: String::new(),
+            observer: PathBuf::new(),
+            observer_sha256: String::new(),
+            minimum_free_bytes: MINIMUM_PROTECTED_FREE,
+            staging_directory: PathBuf::new(),
+            receipt: PathBuf::new(),
+        };
+        if PROTECTED_FLEET {
+            assert!(validate_fleet_binding(&p, &Value::Null).is_err());
+        } else {
+            validate_fleet_binding(&p, &Value::Null).unwrap();
+            p.fleet = Some(Bound {
+                path: PathBuf::from("/unread/foreign-fleet.json"),
+                sha256: "a".repeat(64),
+            });
+            assert!(validate_fleet_binding(&p, &Value::Null).is_err());
+        }
+    }
+    #[test]
     fn admission_requires_fresh_v2_complete_transfer_headroom() {
         let mut p = Plan {
             fleet: None,
@@ -547,7 +597,7 @@ mod tests {
             receipt: PathBuf::new(),
         };
         let mut v = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":"1970-01-01T02:46:40Z","filesystem":{"conservative_available_bytes":p.minimum_free_bytes+OBJECT.size+SLACK}});
-        if EPOCH == 227 {
+        if PROTECTED_FLEET {
             v = bootstrap227_protection::observer_fixture(v);
         }
         admission(&v, &p, 10000).unwrap();
