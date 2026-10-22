@@ -39,6 +39,17 @@ observer/metadata timers before arming this transition; never let two generation
 race to write the same sample. Full/plugin and canonical V4 import acceptance
 are separate and are not granted by this metadata support.
 
+The dedicated `jetstreamer-epoch144-assembly-expectation` collector derives the
+fallback's distinct V4 expectation from the two exact sealed source manifests,
+without opening the assembled target. Actual collection additionally requires
+the frozen assembly-only launch/outcome, the original exact timeout and the new
+assembler's exact clean terminal success. Its `--check-only` mode validates only
+source scope and writes nothing. The resulting private receipt is a provenance
+expectation, not final/plugin verification or canonical import authority. Never
+feed it to the original-success-only private scan runner as an alias: that runner
+must continue to reject this different profile until its explicit replacement is
+independently qualified.
+
 ## Exact epoch193 to epoch194 ETA handoff
 
 The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.
