@@ -117,6 +117,10 @@ name = "jetstreamer-epoch223-bootstrap-prepare"
 path = "src/epoch223_bootstrap_prepare_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch227-bootstrap-prepare"
+path = "src/epoch227_bootstrap_prepare_bin.rs"
+
+[[bin]]
 name = "jetstreamer-horizon-boundary-bridge"
 path = "src/horizon_boundary_bridge_bin.rs"
 
