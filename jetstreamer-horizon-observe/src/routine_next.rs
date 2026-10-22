@@ -290,6 +290,7 @@ pub(super) fn prepare(
         || rejection_spec.is_some()
         || scans_spec.is_some()
         || acquisition_spec.is_some()
+        || mode == "--prepare-next-publication144"
     {
         None
     } else {
@@ -416,6 +417,16 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         native141::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-publication144" {
+        publication144::enable(
+            &mut next,
+            handoff_spec.context("publisher handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        tool_ok(&next.tools.r2)?;
+        validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
+        publication144::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     if mode == "--prepare-next-upload198" {
         ensure!(

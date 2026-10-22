@@ -206,9 +206,13 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     // Revalidate retained scan ownership before folding older prefix history.
     // Preserve its newer repair action; generic unknown actions still fail.
     let retained_action = assembly144_scans::retained_action(p, f)?;
+    let retained_delivery = publication144::retained_gate(p, f)?;
     let mut history = f.clone();
-    if retained_action.is_some() {
+    if retained_action.is_some() || retained_delivery.is_some() {
         history["gates"]["144"]["next_action"] = json!(ACTION);
+    }
+    if retained_delivery.is_some() {
+        history["gates"]["144"]["state"] = json!("blocked-qualification");
     }
     fold_history(
         &mut history,
@@ -219,6 +223,10 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         &transitions,
     )?;
     if let Some(action) = retained_action {
+        history["gates"]["144"]["next_action"] = action;
+    }
+    if let Some((state, action)) = retained_delivery {
+        history["gates"]["144"]["state"] = state;
         history["gates"]["144"]["next_action"] = action;
     }
     *f = history;

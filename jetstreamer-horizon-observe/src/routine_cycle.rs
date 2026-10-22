@@ -66,6 +66,8 @@ mod native144_recovery;
 mod prefix144;
 #[path = "routine_prefix157.rs"]
 mod prefix157;
+#[path = "routine_publication144.rs"]
+mod publication144;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -132,6 +134,8 @@ struct Plan {
     native141_audit: Option<native141::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_scans: Option<assembly144_scans::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    publication144: Option<publication144::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -222,6 +226,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.publication144.is_some() {
+        return "publication144-native141-acquisition-scans-upload198-v1";
+    }
     if native141::acquisition_enabled(p) {
         return "native141-acquisition-assembly144-scans-upload198-refresh-completed144-v1";
     }
@@ -676,6 +683,7 @@ fn validate_templates(
     assembly144::validate(p)?;
     native141::validate(p)?;
     assembly144_scans::validate(p)?;
+    publication144::validate(p)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1099,6 +1107,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     continuation144::derive_fleet(p, &mut fleet)?;
     native141::derive_fleet(p, &mut fleet)?;
     assembly144_scans::derive_fleet(p, &mut fleet)?;
+    publication144::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1316,6 +1325,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     continuation144::derive_fleet(p, &mut fleet.clone())?;
     native141::derive_fleet(p, &mut fleet.clone())?;
     assembly144_scans::derive_fleet(p, &mut fleet.clone())?;
+    publication144::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1612,6 +1622,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-publication144"
                             | "--prepare-next-native141-rejection"
                             | "--prepare-next-native141-acquisition"
                             | "--prepare-next-assembly144-scans"
@@ -1739,6 +1750,7 @@ fn main() {
         }
         if args.get(6).is_some_and(|arg| {
             arg == "--prepare-next"
+                || arg == "--prepare-next-publication144"
                 || arg == "--prepare-next-upload198"
                 || arg == "--prepare-next-assembly144-reader"
                 || arg == "--prepare-next-native141"

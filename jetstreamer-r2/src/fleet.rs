@@ -415,6 +415,14 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
     Ok(live)
 }
 
+// RemainAfterExit retains a completed diagnostic as active/exited evidence.
+// It is not a live owner and must not block its independently qualified delivery.
+// A queued/activating diagnostic still owns the epoch and remains a conflict.
+fn diagnostic_stage_running(current: &Value) -> bool {
+    (current["ActiveState"] == "active" && current["SubState"] == "running")
+        || current["ActiveState"] == "activating"
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Plan {
@@ -1985,8 +1993,7 @@ pub(super) async fn run() -> Result<()> {
                     .diagnostics
                     .iter()
                     .any(|d| diagnostic_scope(d).contains(&claim.epoch)
-                        && before[&d.unit]["ActiveState"] == "active"
-                        && (!private_scan || before[&d.unit]["SubState"] == "running")),
+                        && diagnostic_stage_running(&before[&d.unit])),
                 "live delivery overlaps private diagnostic work"
             );
             for replay in replays {
@@ -2284,6 +2291,23 @@ pub(super) async fn run() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn retained_terminal_diagnostic_does_not_own_a_delivery_lane() {
+        use serde_json::json;
+        for (active, sub, conflict) in [
+            ("active", "exited", false),
+            ("inactive", "dead", false),
+            ("failed", "failed", false),
+            ("active", "running", true),
+            ("activating", "start", true),
+            ("activating", "auto-restart", true),
+        ] {
+            assert_eq!(
+                super::diagnostic_stage_running(&json!({"ActiveState":active,"SubState":sub})),
+                conflict
+            );
+        }
+    }
     #[test]
     fn exact_private_observation_is_not_a_second_captured_job() {
         let c = DiagnosticClaim {

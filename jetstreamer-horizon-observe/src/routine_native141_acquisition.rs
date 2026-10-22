@@ -9,8 +9,8 @@ pub(super) fn reader(p: &Plan) -> bool {
         .as_ref()
         .is_some_and(|s| s.acquisition.is_some() && s.rejection.is_some())
         && p.assembly144_scans.is_some()
-        && p.tools.r2.path == Path::new(READER)
-        && p.tools.r2.sha256 == READER_SHA
+        && ((p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA)
+            || publication144::reader(p))
         && is_sha(READER_SHA)
 }
 pub(super) fn evidence(b: &Bound) -> Result<Value> {

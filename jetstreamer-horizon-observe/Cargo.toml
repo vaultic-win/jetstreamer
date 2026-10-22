@@ -104,6 +104,10 @@ name = "jetstreamer-epoch203-ram-resource"
 path = "src/epoch203_ram_resource.rs"
 required-features = ["epoch203-ram-resource-supervisor"]
 
+[[bin]]
+name = "jetstreamer-publication144-track"
+path = "src/publication144_track_bin.rs"
+
 [dependencies]
 anyhow.workspace = true
 libc.workspace = true
