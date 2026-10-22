@@ -21,6 +21,8 @@ pub(super) struct Refresh {
     pub(super) growth_claims: Vec<Bound>,
     #[serde(default)]
     pub(super) epoch160_handoff: Option<Bound>,
+    #[serde(default)]
+    pub(super) epoch160_public_delivery: Option<Bound>,
 }
 const RETAINED_PROTECTION: u64 = 3984782679494;
 const DELIVERY160_GIB: u64 = 768;
@@ -31,13 +33,107 @@ pub(super) fn replay_count(p: &Plan) -> Result<usize> {
     };
     match (
         s.schema.as_str(),
-        s.epoch160_handoff.is_some(),
+        (
+            s.epoch160_handoff.is_some(),
+            s.epoch160_public_delivery.is_some(),
+        ),
         s.growth_claims.len(),
     ) {
-        ("jetstreamer-exact144-delivery-capacity-refresh-v1", false, 4) => Ok(4),
-        ("jetstreamer-exact144-delivery-capacity-refresh-v2", true, 3) => Ok(3),
+        ("jetstreamer-exact144-delivery-capacity-refresh-v1", (false, false), 4) => Ok(4),
+        ("jetstreamer-exact144-delivery-capacity-refresh-v2", (true, false), 3) => Ok(3),
+        ("jetstreamer-exact144-delivery-capacity-refresh-v3", (false, true), 3) => Ok(3),
         _ => anyhow::bail!("wrong capacity schema/claim/handoff census"),
     }
+}
+fn public_census(fleet: &Value, proof: &Value) -> Result<()> {
+    let active = fleet["active"]
+        .as_array()
+        .context("public delivery active census")?;
+    let replay: Vec<_> = active.iter().filter(|a| a["phase"] == "replay").collect();
+    let replay_epochs: BTreeSet<_> = replay
+        .iter()
+        .map(|a| a["epoch"].as_u64().context("replay epoch"))
+        .collect::<Result<_>>()?;
+    ensure!(
+        replay.len() == 8
+            && replay_epochs == BTreeSet::from([152, 153, 155, 156, 191, 192, 193, 194]),
+        "public delivery replay census changed"
+    );
+    let live: Vec<_> = fleet["pipelines"]
+        .as_array()
+        .context("public pipeline census")?
+        .iter()
+        .filter(|a| a["live"] == true)
+        .collect();
+    ensure!(
+        active.len() == 8 + live.len() && live.len() <= 3,
+        "unbudgeted active public delivery"
+    );
+    let mut stages = BTreeSet::new();
+    for row in live {
+        ensure!(
+            row["epoch"] == 160
+                && stages.insert(row["phase"].as_str().context("delivery phase")?)
+                && active.iter().any(|a| a == row)
+                && proof["owners"]
+                    .as_array()
+                    .context("public160 owners")?
+                    .iter()
+                    .any(|o| row["phase"] == o["phase"]
+                        && row["unit"]["Id"] == o["unit"]["Id"]
+                        && row["unit"]["InvocationID"] == o["unit"]["InvocationID"]
+                        && row["unit"]["NRestarts"] == "0"
+                        && row["unit"]["ActiveState"] == "active"
+                        && row["unit"]["SubState"] == "running"
+                        && row["unit"]["ExecStart"] == o["unit"]["ExecStart"]),
+            "unbudgeted or changed public160 owner"
+        );
+    }
+    // No active child is acceptable only with the independently reconciled
+    //ready outcome. An idle coordinator or missing phase is not delivery proof.
+    ensure!(
+        !stages.is_empty()
+            || fleet["epochs"]
+                .as_array()
+                .context("public epoch census")?
+                .iter()
+                .any(|e| e["epoch"] == 160 && e["state"] == "remote-ready"),
+        "160 delivery disappeared without readiness"
+    );
+    Ok(())
+}
+fn public_delivery(b: &Bound, fleet: &Value) -> Result<Value> {
+    ensure!(
+        b.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json"
+            )
+            && b.sha256 == "c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008",
+        "foreign160 public proof"
+    );
+    let proof = read(b, false)?;
+    ensure!(
+        proof["schema"] == "jetstreamer-epoch160-public-observation-v1"
+            && proof["archive_path"] == "/home/sol/horizon/epoch-160.jet"
+            && proof["archive_bytes"] == 148095631232u64
+            && proof["archive_inode"] == 99942496u64
+            && proof["import_receipt_sha256"]
+                == "628e3525ec55ecaf7bcbade1c5a26d4afe6fe948a203f73de28a571a6bf40815"
+            && proof["new_resource_samples"] == 0
+            && proof["r2_mutations"] == false
+            && proof["replay_launch_authorized"] == false
+            && proof["publication_authorized"] == false,
+        "160 public import lineage changed"
+    );
+    public_census(fleet, &proof)?;
+    ensure!(
+        148095631232u64 * 5 + 8 * GIB <= DELIVERY160_GIB * GIB,
+        "160 public copy debt insufficient"
+    );
+    Ok(
+        json!({"binding":b,"current_pipeline_claims":fleet["pipelines"],"reserved_delivery_bytes":DELIVERY160_GIB*GIB,
+        "replay_claim":false,"old_guard_counted_as_live":false,"ready_outcome_does_not_reduce_debt":true}),
+    )
 }
 fn census(fleet: &Value, handoff: bool) -> Result<()> {
     let active = fleet["active"].as_array().context("active epoch census")?;
@@ -227,9 +323,13 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
     let s = p.refreshed_capacity.as_ref().context("refresh missing")?;
     let handoff = replay_count(p)? == 3;
     ensure!(floor == 205211459014, "wrong capacity profile");
-    census(fleet, handoff)?;
+    if s.epoch160_public_delivery.is_none() {
+        census(fleet, handoff)?;
+    }
     let active = fleet["active"].as_array().context("active epoch census")?;
-    let delivery = if let Some(b) = &s.epoch160_handoff {
+    let delivery = if let Some(b) = &s.epoch160_public_delivery {
+        public_delivery(b, fleet)?
+    } else if let Some(b) = &s.epoch160_handoff {
         ensure!(
             b.path
                 == Path::new(
@@ -429,7 +529,7 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
     };
     Ok((
         protected,
-        json!({"schema":if handoff {"jetstreamer-exact144-delivery-capacity-refresh-result-v2"} else {"jetstreamer-exact144-delivery-capacity-refresh-result-v1"},
+        json!({"schema":if s.epoch160_public_delivery.is_some() {"jetstreamer-exact144-delivery-capacity-refresh-result-v3"} else if handoff {"jetstreamer-exact144-delivery-capacity-refresh-result-v2"} else {"jetstreamer-exact144-delivery-capacity-refresh-result-v1"},
         "growth_claims":claims,"unchanged_guards":guards,"sum_growth_claims_bytes":sum,"epoch160_delivery":delivery,
         "extra_five_epoch_delivery_debt_bytes":debt,"additional_staging_margin_bytes":64*GIB,
         "century_floor_bytes":floor,"maximum_unchanged_live_guard_bytes":max_guard,
@@ -439,6 +539,47 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn public160_census_requires_all_replays_and_exact_delivery_or_ready_outcome() {
+        let owner = json!({"Id":"sole-upload.service","InvocationID":"a".repeat(32),"NRestarts":"0","ActiveState":"active","SubState":"running","ExecStart":"exact command"});
+        let stage = json!({"epoch":160,"phase":"upload-readback","unit":owner,"live":true});
+        let mut active: Vec<_> = [152, 153, 155, 156, 191, 192, 193, 194]
+            .map(|epoch| json!({"epoch":epoch,"phase":"replay"}))
+            .into();
+        active.push(stage.clone());
+        let proof = json!({"owners":[{"phase":"upload-readback","unit":owner}]});
+        let f = json!({"active":active,"pipelines":[stage],"epochs":[{"epoch":160,"state":"post-replay-pipeline"}]});
+        public_census(&f, &proof).unwrap();
+        for pointer in [
+            "/active/0/epoch",
+            "/active/8/epoch",
+            "/pipelines/0/epoch",
+            "/pipelines/0/unit/InvocationID",
+            "/pipelines/0/phase",
+            "/pipelines/0/unit/ExecStart",
+        ] {
+            let mut bad = f.clone();
+            *bad.pointer_mut(pointer).unwrap() = json!("foreign");
+            assert!(public_census(&bad, &proof).is_err(), "{pointer}");
+        }
+        let mut terminal = f;
+        terminal["active"].as_array_mut().unwrap().pop();
+        terminal["pipelines"] = json!([]);
+        assert!(public_census(&terminal, &proof).is_err());
+        terminal["epochs"][0]["state"] = json!("remote-ready");
+        public_census(&terminal, &proof).unwrap();
+        terminal["active"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"epoch":144,"phase":"local-publication"}));
+        assert!(public_census(&terminal, &proof).is_err());
+        assert_eq!(
+            post_replay_protection(3 * 512 * GIB, 205211459014, 3264175144960)
+                .unwrap()
+                .0,
+            RETAINED_PROTECTION
+        );
+    }
     #[test]
     fn completed160_keeps_its_entire_old_reservation_as_delivery_debt() {
         let floor = 205211459014;

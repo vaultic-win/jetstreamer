@@ -84,6 +84,23 @@ before import. This source path is not deployment, fleet-monitor integration,
 kernel capability proof, fresh admission, or permission to launch an
 unmonitored publisher. Qualify those separately before a real canonical copy.
 
+Capacity refresh v2 describes the ended epoch160 replay's controller/import
+handoff with three remaining growth claims. It retains the entire prior
+3984782679494-byte protection, including768GiB of explicit160 delivery debt;
+the old160 reserve guard is not counted as live. That admission cannot be reused
+after the controller finishes and canonical verification begins.
+
+Capacity refresh v3 instead binds `epoch160_public_delivery` to the exact sealed
+canonical-import/watcher proof. It requires all eight still-claimed replay
+epochs and only exact160 full/plugin/upload owners from that proof. Missing,
+changed or additional owners fail closed. No160 live child is allowed only with
+an independently reconciled `remote-ready` outcome. Readiness still does not
+reduce the retained768GiB debt or total protection. The growth observations must
+end at the publisher's current coordinated observer; all current guard, memory,
+VMA, identity, copy and century-floor gates remain unchanged. V1, v2 and v3
+capacity schemas reject mixed handoff/public-delivery fields. Source support
+alone does not qualify a new publisher, tracker, uploader or production launch.
+
 The intended work root is a precreated root-owned mode0755 direct child of
 `/home/sol/.jetstreamer-private` named `epoch144-publication-work-UNIQUE`.
 `stage/` must be absent. A root-owned mode0700 receipt root beneath
