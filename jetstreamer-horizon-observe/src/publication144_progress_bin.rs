@@ -18,8 +18,8 @@ use std::{
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
-const WORKER: &str = "/usr/local/lib/jetstreamer/horizon-publication144-single-delivery-20261022-v6/jetstreamer-publication144-deliver";
-const WORKER_SHA: &str = "506b054c3e644f619df4049d935a75264f0ce1577a98235861d4f725ba86a49a";
+const WORKER: &str = "/usr/local/lib/jetstreamer/horizon-publication144-single-delivery-20261022-v7/jetstreamer-publication144-deliver";
+const WORKER_SHA: &str = "9fdca9475356c3f8c82c8dbdd55d57476116771be2e3ca6b8914c40c8f41e08e";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1";
 const PUB: &str = "horizon-publish-144-v4-20261022-v1.service";
 const CALIBRATION: &str =
@@ -130,6 +130,15 @@ fn identity(
             && launch["schema"] == "jetstreamer-exact144-delivery-launch-v1"
             && launch["epoch"] == 144
             && launch["plan"] == pb
+            && launch["initial_delivery_phase"] == "upload-readback"
+            && launch["lock_acquisition"]["path"]
+                == root
+                    .join("lock-acquired.json")
+                    .to_str()
+                    .context("lock path")?
+            && launch["lock_acquisition"]["sha256"]
+                .as_str()
+                .is_some_and(evidence::is_sha)
             && launch["self_sha256"] == WORKER_SHA
             && launch["claim"]["unit"] == events::UNIT
             && launch["claim"]["phase"] == "upload-readback"
@@ -324,6 +333,20 @@ fn run() -> Result<()> {
     let child = read(&p.child_launch, false)?;
     let observer = read(&p.observer, false)?;
     identity(&p, &delivery, &launch, &child, &observer)?;
+    let lock_bound: Bound = serde_json::from_value(launch["lock_acquisition"].clone())?;
+    let lock = read(&lock_bound, false)?;
+    ensure!(
+        lock["schema"] == "horizon-exact144-delivery-lock-v1"
+            && lock["owner"] == launch["owner"]
+            && lock["plan"] == serde_json::to_value(&p.delivery_plan)?
+            && lock["shared_mutation_lock"]
+                == "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock"
+            && lock["acquired_millis"]
+                .as_u64()
+                .zip(child["spawned_millis"].as_u64())
+                .is_some_and(|(a, b)| a <= b),
+        "client progress lacks exact prior exclusive lock receipt"
+    );
     let now = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
     ensure!(
         p.sample_unix_millis <= now && now - p.sample_unix_millis <= 300000,
@@ -379,6 +402,7 @@ fn run() -> Result<()> {
         &p.delivery_launch,
         &p.child_launch,
         &p.observer,
+        &lock_bound,
     ] {
         read(
             b,
@@ -390,7 +414,7 @@ fn run() -> Result<()> {
         &json!({"schema":"jetstreamer-exact144-authenticated-child-progress-v2","epoch":144,
         "plan":pb,"self_sha256":a[5],"observer":p.observer,"delivery_launch":p.delivery_launch,"child_launch":p.child_launch,
         "owner":before,"child_identity":proc_before,"trusted_journal_events":journal,"progress":summary,
-        "calibration":calibration,"forecast":forecast,
+        "calibration":calibration,"forecast":forecast,"lock_acquisition":lock_bound,
         "resource_samples_taken":0,"current_sidecar_eta_valid":false,"status_publication_authorized":false,
         "archive_ready_pair_proven":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
@@ -499,6 +523,7 @@ mod tests {
         let d = json!({"schema":"jetstreamer-exact144-single-delivery-plan-v1","output_directory":"/var/lib/jetstreamer/horizon-epoch144-delivery-fixture",
             "client":{"path":events::CLIENT,"sha256":events::CLIENT_SHA},"r2_create_missing_pair_authorized":true,"r2_overwrite_authorized":false,"local_retirement_authorized":false});
         let l = json!({"schema":"jetstreamer-exact144-delivery-launch-v1","epoch":144,"plan":p.delivery_plan,"self_sha256":WORKER_SHA,
+            "initial_delivery_phase":"upload-readback","lock_acquisition":{"path":"/var/lib/jetstreamer/horizon-epoch144-delivery-fixture/lock-acquired.json","sha256":"f".repeat(64)},
             "claim":{"unit":events::UNIT,"phase":"upload-readback","origin_unit":PUB,"invocation_id":"b".repeat(32),"origin_invocation_id":"c".repeat(32)},
             "owner":{"InvocationID":"b".repeat(32)},"ordinary_replay_claim":false,"current_sidecar_eta_valid":false,"publication_authorized":false,"retirement_authorized":false,"remote_mutations":false,"r2_mutations":false});
         let c = json!({"schema":"horizon-exact144-delivery-child-launch-v1","plan":p.delivery_plan,"owner":l["owner"],"client":d["client"],"archive_sync":true,"arguments":sync_args(),"current_liveness_proven":false,"archive_ready":false,"local_retirement_authorized":false});

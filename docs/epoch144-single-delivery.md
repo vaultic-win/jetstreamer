@@ -111,8 +111,9 @@ strict `jetstreamer-exact144-child-progress-plan-v1` binds `delivery_plan`,
 `sample_unix_millis`, and a no-clobber `output_receipt` under the precreated
 root-owned0700 `/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1`.
 The filename is exactly `progress-SAMPLE_MILLIS.json`. Seal both executable and
-plan before operational use. It accepts the pinned v6 delivery worker and
-progress client only; a replacement worker requires separate qualification.
+plan before operational use. The initial sealed readers accept the pinned v6
+delivery worker and progress client only. The nonblocking successor binds v7
+and its prior lock receipt; a different worker requires separate qualification.
 
 The reader checks the coordinated v2 sample time, exact live zero-restart
 oneshot, historical capture and archive child command. Before and after its
@@ -154,3 +155,21 @@ retroactively change the sealed v1 reader. Queue handling, the fleet/status
 consumer and the exact inactive/failure lifecycle remain separate real gates
 before starting144 delivery. Use the existing coordinated cadence; do not create
 a second progress polling loop.
+
+## Nonblocking delivery candidate
+
+The successor candidate removes the unmodeled queue: it tries the same bound
+global lock once with `LOCK_EX|LOCK_NB`. A busy result creates a private,
+no-clobber `lock-declined.json` and exits without a delivery capture, client,
+archive/status mutation, retry, or queued claim. It neither unlocks nor stops
+the existing owner. Exact terminal capture preserves that declined outcome;
+later work requires an authenticated release and fresh, uniquely bound attempt.
+
+Successful acquisition still protects the complete sync/readback/sidecar and
+owned-status cleanup operation. The lock receipt must be durable before launch
+capture and before the first client. Manual capture rejects the pre-lock state.
+This supersedes queue behavior only for the new immutable worker; it does not
+change the dormant sealed v6 worker or any running global uploader. The active
+child forecast reader must be separately rebound to the new worker digest.
+Nonblocking behavior removes a queue-ETA requirement, not the full/plugin,
+fleet/status handoff, failure lifecycle, fresh admission or ready-pair gates.
