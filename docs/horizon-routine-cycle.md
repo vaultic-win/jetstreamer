@@ -19,6 +19,26 @@ execution still checks actual free space before work and throughout output.
 Retain old sealed v1 packages as history, not launch candidates. Do not create a
 bind mount or relax private ancestry to make an obsolete path appear admissible.
 
+`prepare-assembly-only144-fleet SPEC --spec-sha256 SHA --self-sha256 SHA --fleet`
+preserves the entire predecessor plan and adds only the authenticated assembler,
+its launch/guard evidence and one same-sample admission marker. It requires the
+real clean zero-worker guard first fire, exact guard sandbox and original timeout,
+and rechecks all older live/dormant owners. It authors a no-clobber seal plan,
+not a launch. Seal it and reconcile through the separately qualified fleet reader.
+The same command's `--routine-spec` mode binds that actual accepted event.
+
+The routine helper's `--prepare-next-assembly144 SPEC --handoff-sha256 SHA` consumes
+only a genuinely completed predecessor cycle plus that sealed event spec. It
+keeps the original continuation/native/prefix profiles and histories, changes
+only the private diagnostic owner and pinned fleet reader, and gives the new
+cycle distinct namespaces. The assembly stage never supplies an ETA or replay
+rate; fleet ownership and its invocation-bound guard remain authoritative when
+the worker-only diagnostic sample correctly reports unavailable. An unexpected
+historical worker is not acceptable assembly evidence. Stop any older pending
+observer/metadata timers before arming this transition; never let two generations
+race to write the same sample. Full/plugin and canonical V4 import acceptance
+are separate and are not granted by this metadata support.
+
 ## Exact epoch193 to epoch194 ETA handoff
 
 The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.

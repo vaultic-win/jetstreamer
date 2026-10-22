@@ -110,19 +110,19 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     );
     Ok(())
 }
-fn fold(
+fn fold_history(
     f: &mut Value,
     claim: &Value,
     proof: &Bound,
     validation: &Bound,
     prior_action_sha: &str,
-    native: Option<&(Value, Value)>,
-    continuation: Option<&(Value, Value)>,
+    transitions: &[&(Value, Value)],
 ) -> Result<()> {
     ensure!(
         f["admission_transition_guard"].is_null()
-            || native.is_some_and(|(_, guard)| f["admission_transition_guard"] == *guard)
-            || continuation.is_some_and(|(_, guard)| f["admission_transition_guard"] == *guard),
+            || transitions
+                .iter()
+                .any(|(_, guard)| f["admission_transition_guard"] == *guard),
         "completed144 cannot create/consume a live admission"
     );
     let rows = f["diagnostics"]
@@ -130,11 +130,7 @@ fn fold(
         .context("completed144 diagnostic history")?;
     let found: Vec<_> = rows
         .iter()
-        .filter(|d| {
-            d["epoch"] == 144
-                && !native.is_some_and(|(claim, _)| *d == claim)
-                && !continuation.is_some_and(|(claim, _)| *d == claim)
-        })
+        .filter(|d| d["epoch"] == 144 && !transitions.iter().any(|(claim, _)| *d == claim))
         .collect();
     ensure!(
         found.is_empty() || (found.len() == 1 && found[0] == claim),
@@ -173,6 +169,25 @@ fn fold(
     }
     Ok(())
 }
+#[cfg(test)]
+fn fold(
+    f: &mut Value,
+    claim: &Value,
+    proof: &Bound,
+    validation: &Bound,
+    prior_action_sha: &str,
+    native: Option<&(Value, Value)>,
+    continuation: Option<&(Value, Value)>,
+) -> Result<()> {
+    fold_history(
+        f,
+        claim,
+        proof,
+        validation,
+        prior_action_sha,
+        &native.into_iter().chain(continuation).collect::<Vec<_>>(),
+    )
+}
 pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     let Some(profile) = &p.completed144_prefix else {
         return Ok(());
@@ -182,14 +197,19 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     let launch = bound_json(&lb, true)?;
     let native = native144::completed_transition(p)?;
     let continuation = continuation144::completed_transition(p)?;
-    fold(
+    let assembly = assembly144::completed_transition(p)?;
+    let transitions: Vec<_> = native
+        .iter()
+        .chain(continuation.iter())
+        .chain(assembly.iter())
+        .collect();
+    fold_history(
         f,
         &json!({"epoch":144,"unit":UNIT,"invocation_id":IID,"scratch_path":launch["private_run_root"],"launch_receipt":lb}),
         &profile.proof,
         &vb,
         &profile.prior_action_sha256,
-        native.as_ref(),
-        continuation.as_ref(),
+        &transitions,
     )?;
     ensure!(
         proof["prior_admission_event_accepted"] == false,
@@ -232,6 +252,54 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn completed_prefix_keeps_all_three_exact_later_histories() {
+        let b = Bound {
+            path: "/proof".into(),
+            sha256: "a".repeat(64),
+        };
+        let c = json!({"epoch":144,"unit":UNIT,"invocation_id":IID});
+        let native = (
+            json!({"epoch":144,"unit":"native","counter":u64::MAX}),
+            json!({"guard":"native"}),
+        );
+        let original = (
+            json!({"epoch":144,"unit":"original","counter":u64::MAX-1}),
+            json!({"guard":"original"}),
+        );
+        let assembly = (
+            json!({"epoch":144,"unit":"assembly","counter":u64::MAX-2}),
+            json!({"guard":"assembly"}),
+        );
+        let mut f = json!({"admission_transition_guard":assembly.1,"diagnostics":[c,native.0,original.0,assembly.0],"tracked_units":[UNIT],
+            "gates":{"144":{"state":"blocked-qualification","next_action":ACTION,"evidence":[]}}});
+        let before = f.clone();
+        fold_history(
+            &mut f,
+            &c,
+            &b,
+            &b,
+            &sha(b"old"),
+            &[&native, &original, &assembly],
+        )
+        .unwrap();
+        assert_eq!(f["diagnostics"], before["diagnostics"]);
+        assert_eq!(
+            f["admission_transition_guard"],
+            before["admission_transition_guard"]
+        );
+        assert!(
+            fold_history(
+                &mut before.clone(),
+                &c,
+                &b,
+                &b,
+                &sha(b"old"),
+                &[&native, &assembly]
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn completed_prefix_preserves_exact_native_and_continuation_histories() {
         let b = Bound {

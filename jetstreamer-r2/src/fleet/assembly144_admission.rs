@@ -152,7 +152,7 @@ pub(super) fn check_timeout(v: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn protected_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+pub(super) fn protected_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     let mut filtered = f.clone();
     let old = filtered["unit_census"][continuation144::UNIT].clone();
     ensure!(

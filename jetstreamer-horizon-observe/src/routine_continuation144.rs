@@ -36,10 +36,11 @@ pub(super) fn owner(p: &Plan, d: &DiagnosticClaim) -> bool {
     })
 }
 pub(super) fn writer(p: &Plan) -> bool {
-    p.continuation144.is_some()
+    (p.continuation144.is_some()
         && p.tools.r2.path == Path::new(READER)
         && p.tools.r2.sha256 == READER_SHA
-        && is_sha(READER_SHA)
+        && is_sha(READER_SHA))
+        || assembly144::writer(p)
 }
 fn claim(p: &Profile) -> Value {
     json!({"epoch":144,"unit":UNIT,"invocation_id":p.invocation_id,"scratch_path":SCRATCH,"launch_receipt":p.launch})
@@ -188,7 +189,8 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 .as_ref()
                 .is_some_and(|s| s.private144_observer
                     && s.diagnostic_ranges.len() == 1
-                    && owner(p, &s.diagnostic_ranges[0])),
+                    && (owner(p, &s.diagnostic_ranges[0])
+                        || assembly144::owner(p, &s.diagnostic_ranges[0]))),
         "foreign continuation144 routine profile"
     );
     read(profile)?;
@@ -219,6 +221,7 @@ fn fold(f: &mut Value, c: &Value, g: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
+    assembly144::derive_fleet(p, f)?;
     if let Some(profile) = &p.continuation144 {
         let (c, g) = read(profile)?;
         fold(f, &c, &g)?;

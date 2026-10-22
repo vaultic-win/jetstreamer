@@ -50,13 +50,43 @@ fn owners(previous: &Value) -> Result<()> {
     Ok(())
 }
 fn first_fire(gu: &Value, g: &Value, gp: &BoundFile, r: &Value, now: u64) -> Result<()> {
+    first_fire_for(gu, g, gp, r, now, false)
+}
+pub(super) fn assembly_first_fire(
+    gu: &Value,
+    g: &Value,
+    gp: &BoundFile,
+    r: &Value,
+    now: u64,
+) -> Result<()> {
+    ensure!(
+        r["schema"] == assembly144::SCHEMA
+            && r["unit"] == assembly144::UNIT
+            && r["assembly_only_no_replay"] == true,
+        "zero-worker first fire requires exact no-replay launch"
+    );
+    first_fire_for(gu, g, gp, r, now, true)
+}
+fn first_fire_for(
+    gu: &Value,
+    g: &Value,
+    gp: &BoundFile,
+    r: &Value,
+    now: u64,
+    assembly: bool,
+) -> Result<()> {
     let expected = format!(
         "{{ path={GUARD} ; argv[]={GUARD} {} --plan-sha256 {} --self-sha256 {GUARD_SHA}",
         gp.path.display(),
         gp.sha256
     );
     ensure!(
-        gu["Id"] == GUARD_UNIT
+        gu["Id"]
+            == if assembly {
+                assembly144_prepare::GUARD_UNIT
+            } else {
+                GUARD_UNIT
+            }
             && gu["LoadState"] == "loaded"
             && gu["InvocationID"] == g["guard_invocation_id"]
             && gu["NRestarts"] == "0"
@@ -77,10 +107,14 @@ fn first_fire(gu: &Value, g: &Value, gp: &BoundFile, r: &Value, now: u64) -> Res
             && g["trip_reason"].is_null()
             && g["worker_observation_error"].is_null()
             && g["minimum_free_bytes"] == r["required_guard_minimum_free_bytes"]
-            && g["workers"].as_array().is_some_and(|w| w.len() == 1
-                && w[0][0].as_u64().is_some_and(|n| n > 0)
-                && w[0][1].as_u64().is_some_and(|n| n > 0 && n <= 3500000)),
-        "private144 requires actual clean one-worker sandboxed first fire"
+            && g["workers"].as_array().is_some_and(|w| if assembly {
+                w.is_empty()
+            } else {
+                w.len() == 1
+                    && w[0][0].as_u64().is_some_and(|n| n > 0)
+                    && w[0][1].as_u64().is_some_and(|n| n > 0 && n <= 3500000)
+            }),
+        "private144 requires actual clean exact-worker sandboxed first fire"
     );
     Ok(())
 }
@@ -269,5 +303,18 @@ mod tests {
         let mut bad = gu.clone();
         bad["InvocationID"] = json!("d".repeat(32));
         assert!(first_fire(&bad, &g, &p, &r, 1000).is_err());
+        let mut ar = r.clone();
+        ar["schema"] = json!(assembly144::SCHEMA);
+        ar["unit"] = json!(assembly144::UNIT);
+        ar["assembly_only_no_replay"] = json!(true);
+        let mut ag = g.clone();
+        ag["workers"] = json!([]);
+        let mut au = gu.clone();
+        au["Id"] = json!(assembly144_prepare::GUARD_UNIT);
+        assembly_first_fire(&au, &ag, &p, &ar, 1000).unwrap();
+        assert!(assembly_first_fire(&au, &g, &p, &ar, 1000).is_err());
+        assert!(assembly_first_fire(&gu, &ag, &p, &ar, 1000).is_err());
+        ar["unit"] = json!(UNIT);
+        assert!(assembly_first_fire(&au, &ag, &p, &ar, 1000).is_err());
     }
 }

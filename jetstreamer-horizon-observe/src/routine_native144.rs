@@ -196,7 +196,8 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 .is_some_and(|s| s.private144_observer
                     && s.diagnostic_ranges.len() == 1
                     && (owner(p, &s.diagnostic_ranges[0])
-                        || continuation144::owner(p, &s.diagnostic_ranges[0]))),
+                        || continuation144::owner(p, &s.diagnostic_ranges[0])
+                        || assembly144::owner(p, &s.diagnostic_ranges[0]))),
         "foreign native144 routine profile"
     );
     read(profile)?;

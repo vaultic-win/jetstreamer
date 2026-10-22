@@ -7,6 +7,7 @@ const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
 mod assembly144_admission;
+mod assembly144_prepare;
 mod bounded205;
 mod continuation144;
 mod continuation144_admission;
@@ -57,6 +58,9 @@ pub(super) async fn admit_assembly144() -> Result<()> {
 }
 pub(super) fn capture_assembly144_launch() -> Result<()> {
     assembly144::capture_launch()
+}
+pub(super) fn prepare_assembly144_fleet() -> Result<()> {
+    assembly144_prepare::run()
 }
 
 #[derive(Deserialize, Eq, PartialEq)]

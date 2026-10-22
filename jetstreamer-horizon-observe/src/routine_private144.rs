@@ -113,6 +113,9 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, model: &Value) -> Result<
 pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -> Result<()> {
     ensure!(is_101(p)? && enabled(p), "private144 profile missing");
     effective_model(p, model)?;
+    if p.assembly144_recovery.is_some() {
+        return assembly144::observer(p, value, observed);
+    }
     if p.continuation144.is_some() {
         return continuation144::observer(p, value, observed);
     }

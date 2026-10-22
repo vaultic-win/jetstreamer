@@ -3172,6 +3172,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("prepare-assembly-only144-fleet") {
+        return fleet::prepare_assembly144_fleet();
+    }
     if env::args().nth(1).as_deref() == Some("capture-assembly-only144-launch") {
         return fleet::capture_assembly144_launch();
     }

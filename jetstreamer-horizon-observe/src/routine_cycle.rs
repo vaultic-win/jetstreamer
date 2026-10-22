@@ -44,6 +44,8 @@ mod controller_recovery;
 #[path = "routine_runtime157.rs"]
 mod runtime157;
 
+#[path = "routine_assembly144.rs"]
+mod assembly144;
 #[path = "routine_cohort191.rs"]
 mod cohort191;
 #[path = "routine_completed144.rs"]
@@ -118,6 +120,8 @@ struct Plan {
     native144_restore: Option<native144::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     continuation144: Option<continuation144::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    assembly144_recovery: Option<assembly144::Profile>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -167,7 +171,8 @@ fn is_101(p: &Plan) -> Result<bool> {
                             == "horizon-qualify-epoch144-loader-focus-20261016-v1.service"
                             && p.native144_restore.is_none()
                             || native144::owner(p, d)
-                            || continuation144::owner(p, d))
+                            || continuation144::owner(p, d)
+                            || assembly144::owner(p, d))
                         && d.producer_unit == d.controller_unit
                         && d.expected_controller_invocation_id == d.expected_producer_invocation_id,
                     "unsupported private diagnostic owner/scope"
@@ -192,7 +197,8 @@ fn is_101(p: &Plan) -> Result<bool> {
                             == private144::INVOCATION
                             && p.native144_restore.is_none()
                             || native144::owner(p, &scope.diagnostic_ranges[0])
-                            || continuation144::owner(p, &scope.diagnostic_ranges[0])),
+                            || continuation144::owner(p, &scope.diagnostic_ranges[0])
+                            || assembly144::owner(p, &scope.diagnostic_ranges[0])),
                     "private144 observer requires exact retained diagnostic owner"
                 );
             }
@@ -206,7 +212,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
-    if p.continuation144.is_some() {
+    if p.assembly144_recovery.is_some() {
+        "assembly144-upload198-refresh-completed144-v1"
+    } else if p.continuation144.is_some() {
         "continuation144-upload198-refresh-completed144-v2"
     } else if p.native144_restore.is_some() && public198::upload(p) {
         "native144-upload198-refresh-completed144-v1"
@@ -598,7 +606,8 @@ fn validate_templates(
                 || prefix157::transition_template(p, fleet)?
                 || prefix144::transition_template(p, fleet)?
                 || native144::transition_template(p, fleet)?
-                || continuation144::transition_template(p, fleet)?),
+                || continuation144::transition_template(p, fleet)?
+                || assembly144::transition_template(p, fleet)?),
         "fleet template scope or transition mismatch"
     );
     ensure!(
@@ -638,6 +647,7 @@ fn validate_templates(
     completed144::validate(p)?;
     native144::validate(p)?;
     continuation144::validate(p)?;
+    assembly144::validate(p)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1573,6 +1583,7 @@ fn main() {
                             | "--prepare-next-native198"
                             | "--prepare-next-native144"
                             | "--prepare-next-continuation144"
+                            | "--prepare-next-assembly144"
                             | "--publish-native198-event"
                             | "--refresh-native198-launches"
                             | "--prepare-next-prefix157"
@@ -1675,6 +1686,7 @@ fn main() {
                 || arg == "--prepare-next-native198"
                 || arg == "--prepare-next-native144"
                 || arg == "--prepare-next-continuation144"
+                || arg == "--prepare-next-assembly144"
                 || arg == "--prepare-next-private144"
                 || arg == "--prepare-package-recovery"
                 || arg == "--prepare-runtime157-pause"
