@@ -84,6 +84,10 @@ name = "jetstreamer-epoch141-ledger-census"
 path = "src/epoch141_ledger_census_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch141-census-poh-diagnostic"
+path = "src/epoch141_census_poh_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch141-ledger-collect"
 path = "src/epoch141_ledger_collect_bin.rs"
 
