@@ -2368,7 +2368,27 @@ pub(super) async fn run() -> Result<()> {
     warmup223::event_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
-    singleton227_event::event_census(&plan, &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native227 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| {
+                singleton227::native_scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding)
+            })
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native227 event requires exactly one bound new owner"
+        );
+        singleton227_event::event_census(&previous, &before, claims[0])?;
+    }
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
