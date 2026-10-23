@@ -16,6 +16,9 @@ poh-force-soft = ["sha2-fast/force-soft"]
 diagnostic-singleton = []
 # Private epoch223 candidate: two exact bootstraps, never beyond that epoch.
 epoch223-v1-6-25-qualification = []
+# Isolated fee/load reproduction: exact cold bootstrap and first16warmup slots.
+# Keeps native execution semantics; cannot reach epoch223 recording or its tail.
+epoch223-fee-load-warmup-diagnostic = ["epoch223-v1-6-25-qualification"]
 # Build-bound epoch-224 v1.6.25 comparison. It keeps ordinary conflict-wave
 # execution but refuses input after the first previously observed downstream
 # mismatch, so the candidate cannot become an unbounded replay accidentally.

@@ -112,6 +112,10 @@ launch, record the missing bound and stage the smallest useful bounded experimen
 Do not leave an indefinite hold with no evidence-gathering next action. The experiment itself must
 fit fresh admission, use isolated private output and scratch, and have a sealed work/time bound,
 invocation-bound reserve/VMA guard, and terminal evidence capture. Do not disturb healthy replays.
+For a failure before archive recording begins, prefer an explicit bounded warmup reproduction.
+Bind the cold bootstrap and enforce its entry limit in the worker when parent progress can run
+ahead of execution. Retain the native fatal result and trace; a bounded diagnostic is neither a
+repaired epoch nor authority to relax its runtime or publication gates.
 
 Measure restore baseline separately from settled replay growth: physical and apparent scratch,
 file count, VMAs, CPU, memory peak/events, I/O pressure, transactions and account updates. Bind the

@@ -76,7 +76,7 @@ fn self_check(sha: &str) -> Result<()> {
     );
     Ok(())
 }
-fn parsed_args(command: &str) -> Result<(BoundFile, String)> {
+pub(super) fn parsed_args(command: &str) -> Result<(BoundFile, String)> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",

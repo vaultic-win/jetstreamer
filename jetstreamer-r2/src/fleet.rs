@@ -39,6 +39,7 @@ mod private157;
 mod publication144_history;
 mod publication203;
 mod ram_auxiliary;
+mod readback203_estimate;
 mod retained220;
 mod runtime157;
 mod shrink_budget225;
@@ -51,6 +52,9 @@ pub(crate) mod watch198;
 
 pub(super) async fn admit_original141() -> Result<()> {
     original141::admit().await
+}
+pub(super) fn estimate_readback203() -> Result<()> {
+    readback203_estimate::run()
 }
 pub(super) fn capture_original141() -> Result<()> {
     original141::capture()

@@ -19,6 +19,10 @@ compile_error!("epoch223 snapshot profile cannot be combined with another profil
     feature = "epoch223-tail-snapshot-tests",
     feature = "epoch223-cold-snapshot-tests"
 ))]
+#[cfg_attr(
+    feature = "epoch223-warmup-snapshot-tests",
+    path = "ram_snapshot223_warmup.rs"
+)]
 mod ram_snapshot223;
 #[cfg(any(
     feature = "epoch223-tail-snapshot-tests",
@@ -106,7 +110,9 @@ const SNAPSHOT_SIZE: u64 = if COLD223 {
     8_046_142_592
 };
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const TEST_SHA: &str = if PROFILE223 {
+const TEST_SHA: &str = if cfg!(feature = "epoch223-warmup-snapshot-tests") {
+    "647665f8abc11570f40d0fac45c4e17dbe7c1c86a0a91da5700fe03fc3f4ab67"
+} else if PROFILE223 {
     "d685cbbe8ad720e1bff567ebbcfbd92d92e47f16d798e74783c06e0114c0b92f"
 } else if PROFILE225 {
     "207c0d2d4735eb745570686f7323ed63a8b4caed6536219d0529467e7036329d"
@@ -184,7 +190,9 @@ fn hex(b: &[u8]) -> String {
 fn receipt_schema(kind: &str) -> String {
     format!(
         "jetstreamer-private-{}-ram-snapshot-{kind}-v1",
-        if COLD223 {
+        if cfg!(feature = "epoch223-warmup-snapshot-tests") {
+            "epoch223-warmup-v1625"
+        } else if COLD223 {
             "epoch223-cold-v1625"
         } else if PROFILE223 {
             "epoch223-tail-v1625"
