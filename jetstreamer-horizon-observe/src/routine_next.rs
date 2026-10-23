@@ -39,7 +39,9 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                 == p.cycle_directory.join("sealed/eta-model.json").to_str()
             && (c["fleet_plan"]["path"].as_str()
                 == p.cycle_directory.join("sealed/fleet-plan.json").to_str()
-                || public198::promoted(p, c)? || repair183_fleet_recovery::completed_plan(p, c)? || repair185_fleet_recovery::completed_plan(p, c)?),
+                || public198::promoted(p, c)?
+                || repair183_fleet_recovery::completed_plan(p, c)?
+                || repair185_fleet_recovery::completed_plan(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [
@@ -64,11 +66,18 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
     } else {
         let binding: Bound = serde_json::from_value(c["model"].clone())?;
         let model = bound_json(&binding, true)?;
-        if c["unestimated_bootstrap_epochs"] == json!([183,184]) {
-            ensure!(repair183::bootstrap_model(p, &model), "unbound bootstrap omission");
+        if c["unestimated_bootstrap_epochs"] == json!([183, 184]) {
+            ensure!(
+                repair183::bootstrap_model(p, &model),
+                "unbound bootstrap omission"
+            );
             2
         } else {
-            ensure!(c["unestimated_bootstrap_epochs"] == json!([185]) && repair185::bootstrap_model(p, &model), "foreign bootstrap omission");
+            ensure!(
+                c["unestimated_bootstrap_epochs"] == json!([185])
+                    && repair185::bootstrap_model(p, &model),
+                "foreign bootstrap omission"
+            );
             1
         }
     };

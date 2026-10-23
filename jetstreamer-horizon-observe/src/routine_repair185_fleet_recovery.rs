@@ -187,8 +187,14 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     provisional_value["output"] = json!(provisional_path);
     let mut staging: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     staging.cycle_directory = root.clone();
-    let package = delivery198::seal_values(&staging, "stop-history-correction",
-        &[("fleet-plan.json", corrected), ("provisional-plan.json", provisional_value)])?;
+    let package = delivery198::seal_values(
+        &staging,
+        "stop-history-correction",
+        &[
+            ("fleet-plan.json", corrected),
+            ("provisional-plan.json", provisional_value),
+        ],
+    )?;
     let fleet_plan = file(package.join("fleet-plan.json"), true)?;
     let provisional_plan = file(package.join("provisional-plan.json"), true)?;
     child(
@@ -281,40 +287,67 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
 }
 
 pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
-    if c.get("repair185_fleet_recovery").is_none() { return Ok(false); }
+    if c.get("repair185_fleet_recovery").is_none() {
+        return Ok(false);
+    }
     let mut checked: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     consume(&mut checked, c)?;
     let corrected: Bound = serde_json::from_value(c["fleet_plan"].clone())?;
-    ensure!(corrected.path == Path::new(ROOT).join("repair185-fleet-recovery-v1/stop-history-correction/sealed/fleet-plan.json"),
-        "foreign epoch185 corrected plan");
-    let original = Bound { path: Path::new(ROOT).join("sealed/fleet-plan.json"),
-        sha256: "f4a20b872fd5d99fcd7333d5e9be6a478082519ed4015b58487b2b9d7064c2ff".into() };
-    ensure!(bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
-        "epoch185 correction changed more than the two non-replay guard observations");
+    ensure!(
+        corrected.path
+            == Path::new(ROOT)
+                .join("repair185-fleet-recovery-v1/stop-history-correction/sealed/fleet-plan.json"),
+        "foreign epoch185 corrected plan"
+    );
+    let original = Bound {
+        path: Path::new(ROOT).join("sealed/fleet-plan.json"),
+        sha256: "f4a20b872fd5d99fcd7333d5e9be6a478082519ed4015b58487b2b9d7064c2ff".into(),
+    };
+    ensure!(
+        bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
+        "epoch185 correction changed more than the two non-replay guard observations"
+    );
     Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
- use super::*;
- #[test]
- fn foreign_plan_or_nonmatching_failure_cannot_resume() {
-   let (mut p,_,_,_,_,_,_,_) = crate::tests::fixture101();
-   p.sample_target_utc = "2026-10-23T03:29:58Z".into();
-   p.cycle_directory = ROOT.into();
-   p.repair185_handoff = Some(Bound{path:"/handoff".into(),sha256:"a".repeat(64)});
-   p.public198_delivery=Some(serde_json::from_value(json!({"promotion":{"path":"/promotion","sha256":"a".repeat(64)},
-       "origin":{"path":"/origin","sha256":"a".repeat(64)},"claims":[],"progressive_upload":true})).unwrap());
-   let b=Bound{path:"/plan".into(),sha256:PLAN_SHA.into()};
-   let i=json!({"plan":b,"invocation_id":OLD_IID,"self_sha256":"597fbd87095b5d15a454dc62434263a8a4bb29cf2ea897dc098fd574e0d875d3"});
-   let f=json!({"schema":"jetstreamer-horizon-routine-child-result-v1","success":false,"exit_code":1,"signal":null,
+    use super::*;
+    #[test]
+    fn foreign_plan_or_nonmatching_failure_cannot_resume() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        p.sample_target_utc = "2026-10-23T03:29:58Z".into();
+        p.cycle_directory = ROOT.into();
+        p.repair185_handoff = Some(Bound {
+            path: "/handoff".into(),
+            sha256: "a".repeat(64),
+        });
+        p.public198_delivery = Some(
+            serde_json::from_value(
+                json!({"promotion":{"path":"/promotion","sha256":"a".repeat(64)},
+       "origin":{"path":"/origin","sha256":"a".repeat(64)},"claims":[],"progressive_upload":true}),
+            )
+            .unwrap(),
+        );
+        let b = Bound {
+            path: "/plan".into(),
+            sha256: PLAN_SHA.into(),
+        };
+        let i = json!({"plan":b,"invocation_id":OLD_IID,"self_sha256":"597fbd87095b5d15a454dc62434263a8a4bb29cf2ea897dc098fd574e0d875d3"});
+        let f = json!({"schema":"jetstreamer-horizon-routine-child-result-v1","success":false,"exit_code":1,"signal":null,
        "tool":p.tools.r2,"stderr":{"text":"Error: reserve stop cannot discard another observer claim\n"}});
-   exact(&p,&b,&i,&f).unwrap();
-   for (key,value) in [("success",json!(true)),("exit_code",json!(0)),("signal",json!(9)),("stderr",json!({"text":"another failure"}))] {
-       let mut bad=f.clone(); bad[key]=value;
-       assert!(exact(&p,&b,&i,&bad).is_err());
-   }
-   p.repair185_handoff=None;
-   assert!(exact(&p,&b,&i,&f).is_err());
- }
+        exact(&p, &b, &i, &f).unwrap();
+        for (key, value) in [
+            ("success", json!(true)),
+            ("exit_code", json!(0)),
+            ("signal", json!(9)),
+            ("stderr", json!({"text":"another failure"})),
+        ] {
+            let mut bad = f.clone();
+            bad[key] = value;
+            assert!(exact(&p, &b, &i, &bad).is_err());
+        }
+        p.repair185_handoff = None;
+        assert!(exact(&p, &b, &i, &f).is_err());
+    }
 }

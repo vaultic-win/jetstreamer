@@ -784,6 +784,13 @@ checks only the capped-shrink prefix's frozen restart state after a complete ind
 reread. It remains dormant without fresh protected admission and a proven guard; it sends no
 replay entries and does not qualify the remaining 419 slots, assembly, or publication.
 
+The separate `epoch203-checkpoint-continuation-diagnostic` node build is restricted
+to that exact retained prefix and the remaining 419 slots. Its
+[private continuation contract](docs/horizon-epoch203-native-restore.md#separate-419-slot-continuation)
+requires fresh full-path admission, repeats the native barrier in the executing
+suffix worker, and produces only private V4 assembly. It neither promotes the
+ordinary runtime route nor authorizes canonical sidecars or R2 publication.
+
 The separate [epoch-205 native restore profile](docs/horizon-epoch205-native-restore.md)
 pins its verified terminal snapshot and unchanged store8 worker. It is dormant
 until the exact complete prefix, independent reader and fresh protected admission
