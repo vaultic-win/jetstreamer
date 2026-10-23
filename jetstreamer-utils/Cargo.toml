@@ -66,6 +66,10 @@ name = "jetstreamer-epoch223-tail-attest"
 path = "src/epoch223_tail_attest_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch223-prefix-capability"
+path = "src/epoch223_prefix_capability_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch223-root-prefix-resource"
 path = "src/epoch223_root_prefix_resource_bin.rs"
 required-features = ["epoch223-root-prefix-resource"]

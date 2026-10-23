@@ -2,7 +2,7 @@
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = true;
     pub const ARCHIVE_NAME: &str = "epoch-223.jet";
-    pub const PARENT_SHA: &str = "d2cb8dd811d0abee15e71f8333037e561e2951157d667e156a1712e042fe95a8";
+    pub const PARENT_SHA: &str = "90474659be2a4a7d1cc9d4dfe3d5ab1587adb1b388b83163b2bf16c771624f66";
     pub const RAYON_THREADS: u32 = 2;
     pub const EPOCH: u64 = 223;
     pub const TARGET: u64 = 96_767_522;
