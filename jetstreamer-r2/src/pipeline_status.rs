@@ -387,6 +387,9 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                                 && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                             || (unit == super::cohort160_handoff::CONTROLLER
                                 && invocation == super::cohort160_handoff::IID
+                                && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                            || (unit
+                                == "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service"
                                 && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"))
                             && s.starts_with("Started "))
                 })
@@ -829,6 +832,22 @@ pub(super) fn native_input_matches_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native20_warmup_simple_service_uses_its_exact_pid1_started_clock() {
+        let unit = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";
+        let invocation = "13a5f755a196442e991c6930b410c04f";
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":format!("Started {unit} - Private epoch 223 native20 first16-slot warmup qualification."),"__REALTIME_TIMESTAMP":"1792787565383406"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1792787565383
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("foreign");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
     #[test]
     fn exact160_controller_started_event_keeps_actual_handoff_clock() {
         let unit = super::super::cohort160_handoff::CONTROLLER;
