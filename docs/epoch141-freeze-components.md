@@ -57,3 +57,43 @@ canonical epoch141 sidecar. Its preparation/guard/fleet namespace must be
 distinct from both failed141roots. Fresh protected-growth/floor admission,
 actual invocation-bound guard and first timer proof, and full census handoff
 remain separate requirements before an unattended diagnostic run.
+
+The first actual run on dev-samjohnson used invocation
+`412f43b5db1046a2822efe3aeff95162` from13:10:25 to13:20:35UTC on2026-10-23.
+It terminated with the explicit bounded-stop error before constructing a
+Bank after60912004. Parent prefetch advertised60912045; that was not executed
+progress. The pre-boundary60911999 Bank hash was
+`AYzJ6h8BcyraPHeypjd4uhj4L99y7WdMkmeb1L93id7L`, matching that parent in the
+earlier failed trace. The frozen60912004 Bank hash was
+`GtE6AijvzVgK1UKQ5HyVEZMGisDddVWRQkBnM74sjABf`, matching the later vote's
+expected hash, whereas the old sealed worker produced
+`5TAhovjU9KPhDWsb7Aqugeh2RaACSNkwp7aPMxxe4AGf` there. This is evidence of
+differing executions, not an identified causal fix or full epoch recovery.
+
+The separately sealed Rust `jetstreamer-epoch141-reward-reference` tool issues
+one bounded finalized `getBlock(60912004)` request with rewards. It requires
+the parent slot and both PoH hashes to match the sealed original-entry index,
+retains exact response bytes, and computes the same legacy reward digest.
+RPC uses PascalCase reward types; the first collector retained its successful
+response but rejected those types. The corrected collector analyzed a sealed
+copy of that response in a PrivateNetwork sandbox without another RPC request.
+All2640rewards, including exact signed lamports and unsigned post-balances,
+matched the diagnostic digest
+`23o38tWzJYjLEqcwtGeKRRC1HmeBqGqMHcAHQWDb4AGL`. Totals were fee485000,
+staking226821948373 and voting40720061049lamports. RPC does not supply a Bank
+hash, and rewards equivalence alone cannot qualify the runtime.
+
+The collector requires a hash-bound immutable plan and separately supplied
+self digest. Plans use schema`jetstreamer-epoch141-reward-reference-plan-v2`
+and bind curl, an empty root-private output directory beneath
+`/var/lib/jetstreamer/horizon-epoch141-reward-reference-*`, and an optional
+`retained_response` path/digest. The retained-response path authenticates both
+the wrapper and its raw response digest; it performs no network request.
+Three tests cover anchored metadata, legacy reward bytes and integers above
+2^53, and retained-response corruption. Strict clippy also passed.
+
+Capture native journals with `journalctl --all -o json`: without`--all`, a
+large vote/SlotHashes message can be represented as null. Preserve complete
+native MESSAGE strings before extracting evidence, and keep consensus counters
+as exact Rust integers or original strings. The full earlier trace was
+recaptured separately; its original sealed journal remains unchanged.
