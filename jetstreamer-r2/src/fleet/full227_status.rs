@@ -1,10 +1,12 @@
 //! Status metadata for the real full227 diagnostic; never a pipeline impersonation.
 use super::singleton227 as c;
 use super::*;
+mod jet;
 const PLAN_SCHEMA: &str = "jetstreamer-full227-status-plan-v1";
 const ESTIMATE_SCHEMA: &str = "jetstreamer-full227-status-observation-v1";
 const TERMINAL: u64 = 98_495_999;
 const FIRST: u64 = 98_064_000;
+const WARMUP_FIRST: u64 = 98_063_465;
 const STAGES: [&str; 7] = [
     "archive_close",
     "boundary",
@@ -221,25 +223,6 @@ fn elapsed(sample: u64, launch: &Value) -> Result<u64> {
         .and_then(|n| n.checked_sub(u64::try_from(age).ok()?))
         .context("full227 sample predates invocation")
 }
-fn jet() -> Result<u64> {
-    let path = Path::new(c::ROOT).join("output/epoch-227.jet");
-    match fs::symlink_metadata(&path) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(0),
-        Err(e) => Err(e.into()),
-        Ok(a) => {
-            ensure!(
-                a.is_file() && a.uid() == 1000 && a.nlink() == 1,
-                "full227 unsafe partial jet"
-            );
-            let b = fs::symlink_metadata(path)?;
-            ensure!(
-                b.is_file() && a.dev() == b.dev() && a.ino() == b.ino() && b.len() >= a.len(),
-                "full227 partial jet replaced or shrank"
-            );
-            Ok(a.len())
-        }
-    }
-}
 fn decimal(message: &str, key: &str) -> Option<u64> {
     let tail = message.split_once(key)?.1;
     let n = tail.bytes().take_while(u8::is_ascii_digit).count();
@@ -328,15 +311,16 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
     );
     let slot = progress["last"]["slot"].as_u64();
     let replay = slot.is_some_and(|n| n >= FIRST);
-    let current = slot.unwrap_or(FIRST - 1);
+    let observed_slot = slot.unwrap_or(FIRST - 1);
     ensure!(
-        (FIRST - 1..=TERMINAL).contains(&current),
+        (WARMUP_FIRST..=TERMINAL).contains(&observed_slot),
         "full227 progress outside exact epoch"
     );
+    let current = observed_slot.max(FIRST - 1);
     if current == TERMINAL {
         return Ok(("verification".into(), downstream));
     }
-    let rate = if progress["sufficient_for_rates"] == true {
+    let rate = if replay && progress["sufficient_for_rates"] == true {
         let r = progress["slots_per_second"]
             .as_f64()
             .context("full227 rate missing")?;
@@ -561,15 +545,23 @@ pub(super) async fn run() -> Result<()> {
         };
         let elapsed = elapsed(seconds, &launch)?;
         let (phase, remaining) = estimate(&progress, elapsed, &p)?;
+        let measurement = jet::measure(
+            Path::new(c::ROOT),
+            launch["evidence"]["units"][0]["main_pid"]
+                .as_u64()
+                .context("full227 original PID")?,
+            c::FINGERPRINT,
+            1000,
+        )?;
         let status = EpochStatus {
             epoch: 227,
-            jet_size_bytes: jet()?,
+            jet_size_bytes: measurement.jet_size_bytes,
             elapsed_execution_millis: elapsed,
             estimated_remaining_millis: remaining,
             sampled_at_utc: publication203::utc(seconds)?,
             phase,
         };
-        let v = json!({"schema":ESTIMATE_SCHEMA,"plan":private157::binding(&binding),"plan_sha256":binding.sha256,"launch":private157::binding(&p.launch),"observer":private157::binding(&p.observer),"fleet":private157::binding(&p.fleet),"mode":p.mode,"progress":progress,"status":status,"producer_start_monotonic_microseconds":launch["sandbox"]["ExecMainStartTimestampMonotonic"],"estimate_basis":p.estimate_basis,"estimate_evidence":p.estimate_evidence,"downstream_allowance_millis":p.downstream_allowance_millis,"initialization_allowance_millis":p.initialization_allowance_millis,"fallback_slots_per_second":p.fallback_slots_per_second,"resource_samples_taken":0,"archive_or_sidecar_mutation_authorized":false});
+        let v = json!({"schema":ESTIMATE_SCHEMA,"plan":private157::binding(&binding),"plan_sha256":binding.sha256,"launch":private157::binding(&p.launch),"observer":private157::binding(&p.observer),"fleet":private157::binding(&p.fleet),"mode":p.mode,"progress":progress,"status":status,"jet_measurement":measurement,"producer_start_monotonic_microseconds":launch["sandbox"]["ExecMainStartTimestampMonotonic"],"estimate_basis":p.estimate_basis,"estimate_evidence":p.estimate_evidence,"downstream_allowance_millis":p.downstream_allowance_millis,"initialization_allowance_millis":p.initialization_allowance_millis,"fallback_slots_per_second":p.fallback_slots_per_second,"resource_samples_taken":0,"archive_or_sidecar_mutation_authorized":false});
         if args.len() == 7 {
             validate_output_destination(&p.estimate_receipt)?;
             private157::immutable_receipt(&p.estimate_receipt, &v)?;
@@ -678,6 +670,21 @@ mod tests {
             estimate(&progress, 1_200_000, &p).unwrap().1
                 > estimate(&progress, 600_000, &p).unwrap().1
         );
+    }
+    #[test]
+    fn pre_epoch_warmup_keeps_the_full_epoch_estimate_and_verification_phase() {
+        let p = model();
+        for slot in [WARMUP_FIRST, FIRST - 1] {
+            let progress = json!({"counter_resets":0,"last":{"slot":slot},
+                "sufficient_for_rates":true,"slots_per_second":100000.0});
+            assert_eq!(
+                estimate(&progress, 100_000, &p).unwrap(),
+                ("verification".into(), 500_000 + 216_000_000 + 7000)
+            );
+        }
+        let foreign = json!({"counter_resets":0,"last":{"slot":WARMUP_FIRST-1},
+            "sufficient_for_rates":false});
+        assert!(estimate(&foreign, 0, &p).is_err());
     }
     #[test]
     fn real_progress_switches_phase_and_includes_full_tail_and_delivery() {
