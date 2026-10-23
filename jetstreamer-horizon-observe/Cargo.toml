@@ -19,6 +19,8 @@ epoch225-shrink-snapshot-tests = []
 epoch223-tail-snapshot-tests = []
 # Separate exact cold snapshot; cannot borrow the tail's input/anchor contract.
 epoch223-cold-snapshot-tests = []
+# Exact cold input qualification of the entry-bounded fee/load candidate.
+epoch223-warmup-snapshot-tests = ["epoch223-cold-snapshot-tests"]
 # Dormant private same-input RAM comparison; no ordinary replay or publication.
 epoch203-ram-resource-supervisor = []
 epoch203-ram-shrink-candidate = ["epoch203-ram-resource-supervisor"]
