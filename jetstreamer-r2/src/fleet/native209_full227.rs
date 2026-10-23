@@ -238,6 +238,41 @@ pub(super) fn split(
     Ok((reduced, reduced_guards, growth, measurements))
 }
 
+fn memory_limits(
+    plan: &Value,
+    launch: &Value,
+    cap: u64,
+    high: u64,
+    charge: u64,
+    swap: u64,
+    page: u64,
+) -> Result<u64> {
+    let requested_max = 225_000_000_000u64;
+    let requested_high = 150_000_000_000u64;
+    ensure!(
+        page > 0 && page.is_power_of_two(),
+        "209 invalid host page size"
+    );
+    ensure!(
+        plan["schema"] == "jetstreamer-private-epoch227-singleton-resource-plan-v1"
+            && plan["mode"] == "replay"
+            && plan["unit"] == c::UNIT
+            && plan["memory_max_bytes"] == requested_max
+            && plan["memory_high_bytes"] == requested_high
+            && launch["sandbox"]["MemoryMax"] == requested_max.to_string()
+            && launch["sandbox"]["MemoryHigh"] == requested_high.to_string()
+            && launch["sandbox"]["MemorySwapMax"] == "0"
+            && cap > 0
+            && high > 0
+            && cap == requested_max / page * page
+            && high == requested_high / page * page
+            && swap == 0
+            && charge <= cap,
+        "209 full227 requested or kernel-rounded hard memory envelope changed"
+    );
+    Ok(cap - charge)
+}
+
 pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut total = 0u64;
     let mut evidence = Vec::new();
@@ -262,24 +297,27 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         };
         let plan = bound_json(&serde_json::from_value(launch["resource_plan"].clone())?)?;
         let cap = read("memory.max")?;
+        let high = read("memory.high")?;
         let charge = read("memory.current")?;
-        ensure!(
-            plan["schema"] == "jetstreamer-private-epoch227-singleton-resource-plan-v1"
-                && plan["mode"] == "replay"
-                && plan["unit"] == c::UNIT
-                && plan["memory_max_bytes"] == cap
-                && plan["memory_high_bytes"] == read("memory.high")?
-                && cap == 225000000000u64
-                && read("memory.swap.max")? == 0
-                && charge <= cap,
-            "209 full227 hard memory envelope changed"
-        );
+        let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })
+            .context("209 host page size unavailable")?;
+        let remaining = memory_limits(
+            &plan,
+            &launch,
+            cap,
+            high,
+            charge,
+            read("memory.swap.max")?,
+            page,
+        )?;
         total = total
-            .checked_add(cap - charge)
+            .checked_add(remaining)
             .context("209 full227 memory overflow")?;
         evidence.push(json!({"epoch":227,"unit":d.unit,"invocation_id":d.invocation_id,
             "hard_memory_cap_bytes":cap,"current_cgroup_charge_bytes":charge,
-            "remaining_hard_memory_growth_bytes":cap-charge,"resource_plan":launch["resource_plan"]}));
+            "remaining_hard_memory_growth_bytes":remaining,"resource_plan":launch["resource_plan"],
+            "requested_memory_max_bytes":plan["memory_max_bytes"],"requested_memory_high_bytes":plan["memory_high_bytes"],
+            "kernel_memory_high_bytes":high,"host_page_size_bytes":page}));
     }
     Ok((total, evidence))
 }
@@ -287,6 +325,48 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn decimal_requested_limits_accept_only_exact_kernel_page_rounding() {
+        let p = json!({"schema":"jetstreamer-private-epoch227-singleton-resource-plan-v1","mode":"replay","unit":c::UNIT,
+            "memory_max_bytes":225000000000u64,"memory_high_bytes":150000000000u64});
+        let l = json!({"sandbox":{"MemoryMax":"225000000000","MemoryHigh":"150000000000","MemorySwapMax":"0"}});
+        let cap = 224999997440u64;
+        let high = 149999996928u64;
+        let charge = 80000000000u64;
+        assert_eq!(
+            memory_limits(&p, &l, cap, high, charge, 0, 4096).unwrap(),
+            cap - charge
+        );
+        for (max, watermark, used, swap, page) in [
+            (cap - 4096, high, charge, 0, 4096),
+            (cap + 4096, high, charge, 0, 4096),
+            (cap, high - 4096, charge, 0, 4096),
+            (cap, high + 4096, charge, 0, 4096),
+            (225000000000, high, charge, 0, 4096),
+            (cap, high, cap + 1, 0, 4096),
+            (cap, high, charge, 1, 4096),
+            (cap, high, charge, 0, 0),
+            (cap, high, charge, 0, 5000),
+            (cap, high, charge, 0, 8192),
+            (cap, high, charge, 0, 1),
+        ] {
+            assert!(memory_limits(&p, &l, max, watermark, used, swap, page).is_err());
+        }
+        for pointer in ["/memory_max_bytes", "/memory_high_bytes"] {
+            let mut bad = p.clone();
+            *bad.pointer_mut(pointer).unwrap() = json!(1);
+            assert!(memory_limits(&bad, &l, cap, high, charge, 0, 4096).is_err());
+        }
+        for pointer in [
+            "/sandbox/MemoryMax",
+            "/sandbox/MemoryHigh",
+            "/sandbox/MemorySwapMax",
+        ] {
+            let mut bad = l.clone();
+            *bad.pointer_mut(pointer).unwrap() = json!("1");
+            assert!(memory_limits(&p, &bad, cap, high, charge, 0, 4096).is_err());
+        }
+    }
     #[test]
     fn whole_root_credit_uses_the_smaller_bound_and_rejects_wrong_scope_or_invocation() {
         let iid = "a".repeat(32);
