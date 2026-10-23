@@ -554,7 +554,8 @@ pub(super) fn run() -> Result<()> {
     result["sampled_at_utc"] = json!(publication203::utc(now)?);
     if s.mode == "native-cold" {
         result["entry_replay"] = json!(false);
-        let start = sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()?;
+        let start = if terminal_native { origin.as_ref().context("227 terminal start origin")?["producer_start_monotonic_microseconds"].as_u64().context("227 original monotonic start")? }
+            else { sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()? };
         let mut mono = std::mem::MaybeUninit::<libc::timespec>::uninit();
         ensure!(
             unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, mono.as_mut_ptr()) } == 0,
@@ -565,19 +566,22 @@ pub(super) fn run() -> Result<()> {
             .checked_mul(1_000_000)
             .and_then(|s| s.checked_add(u64::try_from(mono.tv_nsec).ok()? / 1000))
             .context("227 monotonic clock overflow")?;
-        let elapsed = micros
+        let elapsed = if terminal_native {
+            (result["terminal_unix_microseconds"].as_u64().context("227 terminal stop clock")? / 1000)
+                .checked_sub(origin.as_ref().unwrap()["producer_started_unix_millis"].as_u64().context("227 original wall start")?).context("227 stop before start")?
+        } else { micros
             .checked_sub(start)
             .context("227 producer start is future-dated")?
-            / 1000;
+            / 1000 };
         let wall: u64 = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
             .as_millis()
             .try_into()?;
         result["producer_start_monotonic_microseconds"] = json!(start);
-        result["producer_started_unix_millis"] = json!(
+        result["producer_started_unix_millis"] = if terminal_native { origin.as_ref().unwrap()["producer_started_unix_millis"].clone() } else { json!(
             wall.checked_sub(elapsed)
                 .context("227 execution start underflow")?
-        );
+        ) };
         result["elapsed_execution_millis_at_capture"] = json!(elapsed);
     }
     result["admission"] = private157::binding(&s.admission);
