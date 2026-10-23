@@ -1126,6 +1126,9 @@ pub(super) async fn run() -> Result<()> {
     let map: Bound = serde_json::from_value(v["mapping"].clone())?;
     let m: Mapping = serde_json::from_value(bound(&map)?)?;
     mapping(&m)?; // Must pass before credentials, listing or first remote write.
+    if args[1] == "holding-admit136-framing" {
+        return framing136::admit(&m, &spec, &args[6], v);
+    }
     if args[1] == "holding-probe136-framing" {
         return framing136::run(&m, &spec, &args[6], v).await;
     }

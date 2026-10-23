@@ -3348,6 +3348,7 @@ async fn main() -> Result<()> {
         Some(
             "holding-park"
                 | "holding-probe136-framing"
+                | "holding-admit136-framing"
                 | "holding-restore"
                 | "holding-admit-restore"
                 | "holding-restore-genesis-probe"

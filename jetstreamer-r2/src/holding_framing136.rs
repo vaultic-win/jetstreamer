@@ -21,6 +21,18 @@ const SMALL_CAP: usize = 64 * 1024;
 const OUTPUT_CAP: usize = 4 * 1024 * 1024;
 const OS_ALLOWANCE: u64 = 8 * 1024 * 1024;
 const PREFIX: u64 = 65_536;
+const OS_DEVICE: u64 = 2304;
+const RETAINED_FLOOR: u64 = 205_211_459_014;
+const MODERN_RESERVATION: u64 = 4 << 30;
+const LEGACY_RESERVATION: u64 = 8 << 30;
+const FIXTURE_RESERVATION: u64 = 10 << 30;
+const PROTECTED_OS: u64 = 228_833_779_142;
+const REQUIRED_OS: u64 = 228_842_167_750;
+const BUDGET_PATH: &str =
+    "/usr/local/lib/jetstreamer/horizon-v1425-portability-os-budget-20261023-v2/budget.json";
+const BUDGET_SHA: &str = "2e95927a3c49972630c9de458e32359a859b90de7b0fa9b195d6dbb1083ed620";
+const ADMISSION_PATH: &str =
+    "/var/lib/jetstreamer/horizon-epoch136-held-framing-probe-20261023-v1/admission.json";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -71,31 +83,361 @@ fn scope(m: &Mapping, p: &Plan, c: &Value, own: &str) -> Result<(String, String)
     ))
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdmissionPlan {
+    schema: String,
+    mapping: Bound,
+    custody: Bound,
+    os_budget: Bound,
+    self_sha256: String,
+    receipt: PathBuf,
+    not_before_unix_seconds: u64,
+    not_after_unix_seconds: u64,
+    remote_mutations: bool,
+    r2_mutations: bool,
+    replay_launch_authorized: bool,
+    restore_authorized: bool,
+}
+#[derive(Clone, Serialize)]
+struct StatfsSample {
+    device: u64,
+    directory_inode: u64,
+    bavail: u64,
+    block_size: u64,
+    statfs_available_bytes: u64,
+    recorded_unix_seconds: u64,
+}
+fn now_seconds() -> Result<u64> {
+    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
+}
+fn invocation(value: &str) -> Result<()> {
+    ensure!(
+        value.len() == 32
+            && value
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            && value != "0".repeat(32),
+        "framing admission requires exact nonzero manager invocation ID"
+    );
+    Ok(())
+}
+fn validate_budget(b: &Value) -> Result<()> {
+    ensure!(
+        b["schema"] == "jetstreamer-v1425-portability-os-experiment-budget-v2"
+            && b["host"] == HOST
+            && b["filesystem"] == "/var/lib"
+            && b["device"] == OS_DEVICE
+            && b["minimum_retained_free_bytes"] == RETAINED_FLOOR
+            && b["reservations"]["modern_builder_remaining_bytes"] == MODERN_RESERVATION
+            && b["reservations"]["legacy_build_and_artifact_staging_increment_bytes"]
+                == LEGACY_RESERVATION
+            && b["reservations"]["fixture_maximum_physical_bytes"] == FIXTURE_RESERVATION
+            && b["required_initial_free_bytes"] == PROTECTED_OS
+            && RETAINED_FLOOR + MODERN_RESERVATION + LEGACY_RESERVATION + FIXTURE_RESERVATION
+                == PROTECTED_OS
+            && PROTECTED_OS + OS_ALLOWANCE == REQUIRED_OS,
+        "framing admission must preserve every exact sealed OS reservation"
+    );
+    Ok(())
+}
+fn validate_statfs(s: &StatfsSample, now: u64) -> Result<()> {
+    ensure!(
+        s.device == OS_DEVICE
+            && s.directory_inode > 0
+            && s.block_size > 0
+            && s.bavail.checked_mul(s.block_size) == Some(s.statfs_available_bytes)
+            && s.statfs_available_bytes >= REQUIRED_OS
+            && now
+                .checked_sub(s.recorded_unix_seconds)
+                .is_some_and(|age| age <= 30),
+        "framing actual statfs device/freshness/full reservation floor differs"
+    );
+    Ok(())
+}
+fn actual_statfs() -> Result<StatfsSample> {
+    private(Path::new(ROOT))?;
+    let before = fs::symlink_metadata(ROOT)?;
+    ensure!(
+        before.dev() == OS_DEVICE,
+        "framing root is not exact OS device2304"
+    );
+    let path = std::ffi::CString::new(ROOT)?;
+    let mut output = std::mem::MaybeUninit::<libc::statfs>::uninit();
+    // SAFETY: fixed NUL-terminated path and correctly sized output storage.
+    ensure!(
+        unsafe { libc::statfs(path.as_ptr(), output.as_mut_ptr()) } == 0,
+        "framing actual statfs syscall failed"
+    );
+    // SAFETY: successful statfs initialized the output structure.
+    let output = unsafe { output.assume_init() };
+    let after = fs::symlink_metadata(ROOT)?;
+    ensure!(
+        before.dev() == after.dev() && before.ino() == after.ino(),
+        "framing root changed during statfs"
+    );
+    let block_size = u64::try_from(output.f_bsize).context("statfs negative block size")?;
+    let bytes = output
+        .f_bavail
+        .checked_mul(block_size)
+        .context("statfs available byte overflow")?;
+    Ok(StatfsSample {
+        device: after.dev(),
+        directory_inode: after.ino(),
+        bavail: output.f_bavail,
+        block_size,
+        statfs_available_bytes: bytes,
+        recorded_unix_seconds: now_seconds()?,
+    })
+}
+fn identity_fact(b: &Bound) -> Result<Value> {
+    let md = fs::symlink_metadata(&b.path)?;
+    Ok(
+        json!({"path":b.path,"sha256":b.sha256,"device":md.dev(),"inode":md.ino(),
+        "length":md.len(),"uid":md.uid(),"gid":md.gid(),"mode":md.mode(),"links":md.nlink(),
+        "mtime_seconds":md.mtime(),"mtime_nanoseconds":md.mtime_nsec(),
+        "ctime_seconds":md.ctime(),"ctime_nanoseconds":md.ctime_nsec()}),
+    )
+}
+fn admission_receipt(
+    p: &AdmissionPlan,
+    spec: &Bound,
+    own: &str,
+    iid: &str,
+    samples: [&StatfsSample; 2],
+    identities: &Value,
+    now: u64,
+) -> Result<Value> {
+    invocation(iid)?;
+    ensure!(
+        digest(&spec.sha256)
+            && spec.path.is_absolute()
+            && identities.as_array().is_some_and(|v| v.len() == 4),
+        "admission requires exact bound plan and four-input identity census"
+    );
+    ensure!(
+        p.schema == "jetstreamer-private-epoch136-held-framing-admission-plan-v1"
+            && p.self_sha256 == own
+            && digest(own)
+            && p.mapping.sha256 == MAP_SHA
+            && p.mapping.path.as_os_str()
+                == Path::new(
+                    "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
+                )
+                .as_os_str()
+            && p.custody.sha256 == CUSTODY_SHA
+            && p.custody.path.as_os_str() == Path::new(CUSTODY_PATH).as_os_str()
+            && p.os_budget.sha256 == BUDGET_SHA
+            && p.os_budget.path.as_os_str() == Path::new(BUDGET_PATH).as_os_str()
+            && p.receipt.as_os_str() == Path::new(ADMISSION_PATH).as_os_str()
+            && now >= p.not_before_unix_seconds
+            && now <= p.not_after_unix_seconds
+            && p.not_after_unix_seconds
+                .checked_sub(p.not_before_unix_seconds)
+                .is_some_and(|span| span <= 1800)
+            && !p.remote_mutations
+            && !p.r2_mutations
+            && !p.replay_launch_authorized
+            && !p.restore_authorized,
+        "framing admission plan scope/age/authority differs"
+    );
+    for sample in samples {
+        validate_statfs(sample, now)?;
+    }
+    ensure!(
+        samples[1].recorded_unix_seconds >= samples[0].recorded_unix_seconds
+            && samples[0].directory_inode == samples[1].directory_inode,
+        "framing statfs samples reversed"
+    );
+    Ok(
+        json!({"schema":"jetstreamer-private-epoch136-held-framing-os-admission-v1",
+        "host":HOST,"self_sha256":own,"custody_sha256":CUSTODY_SHA,"mapping_sha256":MAP_SHA,
+        "admission_plan":{"path":spec.path,"sha256":spec.sha256},"invocation_id":iid,
+        "sealed_os_budget":{"path":p.os_budget.path,"sha256":p.os_budget.sha256},
+        "input_identities":identities,"recorded_unix_seconds":now,"root":ROOT,"device":OS_DEVICE,
+        "reserved_bytes":OS_ALLOWANCE,"protected_free_bytes":PROTECTED_OS,
+        "required_initial_free_bytes":REQUIRED_OS,"statfs_available_bytes":samples[0].statfs_available_bytes.min(samples[1].statfs_available_bytes),
+        "statfs_samples":samples,"reservation_release_assumed":false,
+        "remote_mutations":false,"r2_mutations":false,"network_access_performed":false,
+        "restore_authorized":false,"replay_launch_authorized":false,"publication_authorized":false,
+        "r2_reads_authorized":false,"full_growth_admission":false,
+        "runtime_checkpoint_qualified":false,"job_resume_authorized":false}),
+    )
+}
+pub(super) fn admit(m: &Mapping, spec: &Bound, own: &str, value: Value) -> Result<()> {
+    ensure!(
+        env::var("TOKIO_WORKER_THREADS").as_deref() == Ok("2"),
+        "framing admission requires2Tokio workers"
+    );
+    let p: AdmissionPlan = serde_json::from_value(value)?;
+    let iid = env::var("INVOCATION_ID").context("framing admission manager invocation ID")?;
+    invocation(&iid)?;
+    private(Path::new(ROOT))?;
+    ensure!(
+        !p.receipt.try_exists()?,
+        "framing admission receipt already exists"
+    );
+    let first = actual_statfs()?;
+    let inputs = [spec, &p.mapping, &p.custody, &p.os_budget];
+    let mut identities = Vec::new();
+    for input in inputs {
+        bound(input)?;
+        identities.push(identity_fact(input)?);
+    }
+    let c = bound(&p.custody)?;
+    let (key, etag, sha, length) = custody(&c, m)?;
+    ensure!(
+        m.prefix == "node_02/"
+            && key == object_key(m, SHA)?
+            && etag == ETAG
+            && sha == SHA
+            && length == LENGTH,
+        "framing admission custody scope differs"
+    );
+    validate_budget(&bound(&p.os_budget)?)?;
+    let second = actual_statfs()?;
+    for (input, previous) in inputs.into_iter().zip(&identities) {
+        bound(input)?;
+        ensure!(
+            &identity_fact(input)? == previous,
+            "framing admission input identity changed"
+        );
+    }
+    let receipt = admission_receipt(
+        &p,
+        spec,
+        own,
+        &iid,
+        [&first, &second],
+        &json!(identities),
+        now_seconds()?,
+    )?;
+    write_new_receipt(&p.receipt, &receipt)
+}
 fn admission(a: &Value, own: &str, now: u64) -> Result<()> {
     let recorded = a["recorded_unix_seconds"]
         .as_u64()
         .context("admission clock")?;
-    let protected = a["protected_free_bytes"]
-        .as_u64()
-        .context("protected OS budget")?;
-    let available = a["available_after_existing_reservations_bytes"]
-        .as_u64()
-        .context("available OS budget")?;
+    let iid = a["invocation_id"]
+        .as_str()
+        .context("admission invocation")?;
+    invocation(iid)?;
     ensure!(
         a["schema"] == "jetstreamer-private-epoch136-held-framing-os-admission-v1"
             && a["host"] == HOST
             && a["self_sha256"] == own
             && a["custody_sha256"] == CUSTODY_SHA
+            && a["mapping_sha256"] == MAP_SHA
             && a["root"] == ROOT
+            && a["device"] == OS_DEVICE
             && a["reserved_bytes"] == OS_ALLOWANCE
+            && a["protected_free_bytes"] == PROTECTED_OS
+            && a["required_initial_free_bytes"] == REQUIRED_OS
+            && a["statfs_available_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= REQUIRED_OS)
+            && a["sealed_os_budget"]["path"] == BUDGET_PATH
+            && a["sealed_os_budget"]["sha256"] == BUDGET_SHA
+            && a["admission_plan"]["sha256"].as_str().is_some_and(digest)
+            && a["input_identities"]
+                .as_array()
+                .is_some_and(|v| v.len() == 4)
             && now.checked_sub(recorded).is_some_and(|age| age <= 1800)
-            && available
-                >= protected
-                    .checked_add(OS_ALLOWANCE)
-                    .context("OS budget overflow")?
+            && a["reservation_release_assumed"] == false
+            && a["network_access_performed"] == false
             && a["remote_mutations"] == false
-            && a["replay_launch_authorized"] == false,
-        "framing needs fresh tiny OS admission"
+            && a["r2_mutations"] == false
+            && a["replay_launch_authorized"] == false
+            && a["restore_authorized"] == false
+            && a["publication_authorized"] == false
+            && a["job_resume_authorized"] == false
+            && a["r2_reads_authorized"] == false
+            && a["full_growth_admission"] == false,
+        "framing needs emitted fresh exact OS admission"
+    );
+    let samples = a["statfs_samples"]
+        .as_array()
+        .context("admission statfs samples")?;
+    ensure!(
+        samples.len() == 2,
+        "admission requires exactly two actual statfs samples"
+    );
+    let samples = samples
+        .iter()
+        .map(parse_statfs)
+        .collect::<Result<Vec<_>>>()?;
+    for sample in &samples {
+        validate_statfs(sample, recorded)?;
+    }
+    ensure!(
+        samples[0].directory_inode == samples[1].directory_inode
+            && samples[1].recorded_unix_seconds >= samples[0].recorded_unix_seconds
+            && a["statfs_available_bytes"]
+                == samples[0]
+                    .statfs_available_bytes
+                    .min(samples[1].statfs_available_bytes),
+        "admission sample identity/ordering/minimum differs"
+    );
+    Ok(())
+}
+
+fn parse_statfs(s: &Value) -> Result<StatfsSample> {
+    Ok(StatfsSample {
+        device: s["device"].as_u64().context("statfs device")?,
+        directory_inode: s["directory_inode"]
+            .as_u64()
+            .context("statfs directory inode")?,
+        bavail: s["bavail"].as_u64().context("statfs bavail")?,
+        block_size: s["block_size"].as_u64().context("statfs block size")?,
+        statfs_available_bytes: s["statfs_available_bytes"]
+            .as_u64()
+            .context("statfs bytes")?,
+        recorded_unix_seconds: s["recorded_unix_seconds"]
+            .as_u64()
+            .context("statfs clock")?,
+    })
+}
+fn verify_admission_sources(a: &Value, own: &str) -> Result<()> {
+    let spec: Bound = serde_json::from_value(a["admission_plan"].clone())?;
+    let p: AdmissionPlan = serde_json::from_value(bound(&spec)?)?;
+    let inputs = [&spec, &p.mapping, &p.custody, &p.os_budget];
+    let identities = a["input_identities"]
+        .as_array()
+        .context("admission identities")?;
+    ensure!(
+        identities.len() == inputs.len(),
+        "admission input census differs"
+    );
+    for (input, old) in inputs.into_iter().zip(identities) {
+        bound(input)?;
+        ensure!(
+            &identity_fact(input)? == old,
+            "admission input changed after emission"
+        );
+    }
+    validate_budget(&bound(&p.os_budget)?)?;
+    let samples = a["statfs_samples"]
+        .as_array()
+        .context("admission statfs samples")?;
+    ensure!(samples.len() == 2, "admission sample count differs");
+    let first = parse_statfs(&samples[0])?;
+    let second = parse_statfs(&samples[1])?;
+    let expected = admission_receipt(
+        &p,
+        &spec,
+        own,
+        a["invocation_id"]
+            .as_str()
+            .context("admission invocation")?,
+        [&first, &second],
+        &a["input_identities"],
+        a["recorded_unix_seconds"]
+            .as_u64()
+            .context("admission clock")?,
+    )?;
+    ensure!(
+        &expected == a,
+        "admission receipt does not reproduce exact emitter inputs"
     );
     Ok(())
 }
@@ -499,7 +841,14 @@ pub(super) async fn run(m: &Mapping, spec: &Bound, own: &str, value: Value) -> R
     );
     private(Path::new(ROOT))?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    admission(&bound(&p.os_admission)?, own, now)?;
+    ensure!(
+        p.os_admission.path.as_os_str() == Path::new(ADMISSION_PATH).as_os_str(),
+        "framing admission receipt alias differs"
+    );
+    let emitted_admission = bound(&p.os_admission)?;
+    admission(&emitted_admission, own, now)?;
+    verify_admission_sources(&emitted_admission, own)?;
+    validate_statfs(&actual_statfs()?, now_seconds()?)?;
     fs::create_dir(&p.output_directory)?;
     fs::set_permissions(&p.output_directory, fs::Permissions::from_mode(0o700))?;
     private(&p.output_directory)?;
@@ -841,19 +1190,177 @@ mod tests {
         p.remote_mutations = true;
         assert!(scope(&m, &p, &c, &own).is_err());
     }
+    fn fixture_admission() -> (AdmissionPlan, Bound, String, Value, StatfsSample, Value) {
+        let (_, p, _, own) = fixture_scope();
+        let plan = AdmissionPlan {
+            schema: "jetstreamer-private-epoch136-held-framing-admission-plan-v1".into(),
+            mapping: p.mapping,
+            custody: p.custody,
+            os_budget: Bound {
+                path: BUDGET_PATH.into(),
+                sha256: BUDGET_SHA.into(),
+            },
+            self_sha256: own.clone(),
+            receipt: ADMISSION_PATH.into(),
+            not_before_unix_seconds: 900,
+            not_after_unix_seconds: 1100,
+            remote_mutations: false,
+            r2_mutations: false,
+            replay_launch_authorized: false,
+            restore_authorized: false,
+        };
+        let spec = Bound {
+            path: "/sealed/admit-plan.json".into(),
+            sha256: "b".repeat(64),
+        };
+        let budget = json!({"schema":"jetstreamer-v1425-portability-os-experiment-budget-v2","host":HOST,
+            "filesystem":"/var/lib","device":OS_DEVICE,"minimum_retained_free_bytes":RETAINED_FLOOR,
+            "reservations":{"modern_builder_remaining_bytes":MODERN_RESERVATION,
+                "legacy_build_and_artifact_staging_increment_bytes":LEGACY_RESERVATION,
+                "fixture_maximum_physical_bytes":FIXTURE_RESERVATION},"required_initial_free_bytes":PROTECTED_OS});
+        let sample = StatfsSample {
+            device: OS_DEVICE,
+            directory_inode: 42,
+            bavail: REQUIRED_OS,
+            block_size: 1,
+            statfs_available_bytes: REQUIRED_OS,
+            recorded_unix_seconds: 1000,
+        };
+        let identities = json!([{"fixture":"admission-plan"},{"fixture":"mapping"},{"fixture":"custody"},{"fixture":"budget"}]);
+        (plan, spec, own, budget, sample, identities)
+    }
     #[test]
-    fn admission_is_acyclic_fresh_and_reserves_exact_tiny_os_allowance() {
-        let own = "a".repeat(64);
-        let a = json!({"schema":"jetstreamer-private-epoch136-held-framing-os-admission-v1",
-            "host":HOST,"self_sha256":own,"custody_sha256":CUSTODY_SHA,"root":ROOT,
-            "recorded_unix_seconds":1000,"reserved_bytes":OS_ALLOWANCE,"protected_free_bytes":100,
-            "available_after_existing_reservations_bytes":100+OS_ALLOWANCE,"remote_mutations":false,"replay_launch_authorized":false});
-        admission(&a, &own, 1000).unwrap();
-        assert!(admission(&a, &own, 2801).is_err());
-        assert!(admission(&a, &own, 999).is_err());
-        let mut bad = a;
-        bad["available_after_existing_reservations_bytes"] = json!(OS_ALLOWANCE);
-        assert!(admission(&bad, &own, 1000).is_err());
+    fn emitter_fixture_is_acyclic_fresh_and_preserves_all_reservations() {
+        let (p, spec, own, budget, sample, identities) = fixture_admission();
+        validate_budget(&budget).unwrap();
+        let receipt = admission_receipt(
+            &p,
+            &spec,
+            &own,
+            &"c".repeat(32),
+            [&sample, &sample],
+            &identities,
+            1000,
+        )
+        .unwrap();
+        admission(&receipt, &own, 1000).unwrap();
+        assert_eq!(receipt["protected_free_bytes"], 228_833_779_142u64);
+        assert_eq!(receipt["required_initial_free_bytes"], 228_842_167_750u64);
+        assert_eq!(receipt["statfs_available_bytes"], REQUIRED_OS);
+        assert_eq!(receipt["admission_plan"]["sha256"], spec.sha256);
+        assert_eq!(receipt["network_access_performed"], false);
+        for key in [
+            "restore_authorized",
+            "replay_launch_authorized",
+            "publication_authorized",
+            "job_resume_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            assert_eq!(receipt[key], false);
+        }
+        assert!(admission(&receipt, &own, 2801).is_err());
+        assert!(admission(&receipt, &own, 999).is_err());
+    }
+    #[test]
+    fn emitter_rejects_either_low_sample_wrong_device_changed_root_and_stale_plan() {
+        let (mut p, spec, own, _, sample, identities) = fixture_admission();
+        let iid = "c".repeat(32);
+        for bad in [
+            StatfsSample {
+                statfs_available_bytes: REQUIRED_OS - 1,
+                bavail: REQUIRED_OS - 1,
+                ..sample.clone()
+            },
+            StatfsSample {
+                device: 64512,
+                ..sample.clone()
+            },
+            StatfsSample {
+                block_size: 2,
+                ..sample.clone()
+            },
+            StatfsSample {
+                recorded_unix_seconds: 969,
+                ..sample.clone()
+            },
+            StatfsSample {
+                directory_inode: 43,
+                ..sample.clone()
+            },
+        ] {
+            assert!(
+                admission_receipt(&p, &spec, &own, &iid, [&sample, &bad], &identities, 1000)
+                    .is_err()
+            );
+            assert!(
+                admission_receipt(&p, &spec, &own, &iid, [&bad, &sample], &identities, 1000)
+                    .is_err()
+            );
+        }
+        assert!(
+            admission_receipt(
+                &p,
+                &spec,
+                &own,
+                &"0".repeat(32),
+                [&sample, &sample],
+                &identities,
+                1000
+            )
+            .is_err()
+        );
+        p.not_after_unix_seconds = 999;
+        assert!(
+            admission_receipt(&p, &spec, &own, &iid, [&sample, &sample], &identities, 1000)
+                .is_err()
+        );
+        p.not_after_unix_seconds = 1100;
+        p.receipt = "/var/lib/alias/admission.json".into();
+        assert!(
+            admission_receipt(&p, &spec, &own, &iid, [&sample, &sample], &identities, 1000)
+                .is_err()
+        );
+    }
+    #[test]
+    fn emitter_rejects_reservation_release_foreign_budget_and_extra_authority() {
+        let (mut p, spec, own, budget, sample, identities) = fixture_admission();
+        for field in [
+            "modern_builder_remaining_bytes",
+            "legacy_build_and_artifact_staging_increment_bytes",
+            "fixture_maximum_physical_bytes",
+        ] {
+            let mut released = budget.clone();
+            released["reservations"][field] = json!(0);
+            assert!(validate_budget(&released).is_err());
+        }
+        p.os_budget.sha256 = "0".repeat(64);
+        assert!(
+            admission_receipt(
+                &p,
+                &spec,
+                &own,
+                &"c".repeat(32),
+                [&sample, &sample],
+                &identities,
+                1000
+            )
+            .is_err()
+        );
+        p.os_budget.sha256 = BUDGET_SHA.into();
+        p.restore_authorized = true;
+        assert!(
+            admission_receipt(
+                &p,
+                &spec,
+                &own,
+                &"c".repeat(32),
+                [&sample, &sample],
+                &identities,
+                1000
+            )
+            .is_err()
+        );
     }
     fn mock_probe(endpoint: String) -> Probe {
         let client = Client::from_conf(
