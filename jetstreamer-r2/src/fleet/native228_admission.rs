@@ -9,6 +9,8 @@ struct Spec {
     observer: BoundFile,
     fleet: BoundFile,
     cold_plan: BoundFile,
+    terminal223: Option<BoundFile>,
+    terminal209: Option<BoundFile>,
     resource_plan: BoundFile,
     protected_guards: BTreeMap<String, BoundFile>,
     output: PathBuf,
@@ -83,7 +85,14 @@ fn candidate(p: &Value, protected: u64, required: u64) -> Result<()> {
     );
     c::no_authority(p)
 }
-fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u64, u64)> {
+fn sample(
+    s: &Spec,
+    o: &Value,
+    f: &Value,
+    terminal209: Option<&Value>,
+    now: u64,
+    required: u64,
+) -> Result<(u64, u64)> {
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("228 sample time")?)?;
     ensure!(
         s.mode == "native-cold"
@@ -156,6 +165,32 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
         .as_array()
         .context("228 diagnostic census")?
     {
+        if diagnostic["producer_unit"] == native209::UNIT && terminal209.is_some() {
+            let proof = terminal209.context("228 terminal209 proof")?;
+            let iid = proof["invocation_id"]
+                .as_str()
+                .context("228 terminal209 IID")?;
+            native209_terminal::terminal_shape(&f["unit_census"][native209::UNIT], iid)?;
+            ensure!(
+                !f["active"]
+                    .as_array()
+                    .context("228209 active census")?
+                    .iter()
+                    .any(|r| singleton227_admission::active_owner(r)
+                        .map_or(true, |u| u["Id"] == native209::UNIT))
+                    && (diagnostic["status"] == "unavailable"
+                        || (diagnostic["status"] == "observed"
+                            && diagnostic["observation"]["invocation_binding_stable"] == true
+                            && diagnostic["observation"]["producer_before"]["invocation_id"]
+                                == iid
+                            && diagnostic["observation"]["producer_after"]["invocation_id"]
+                                == iid
+                            && diagnostic["observation"]["scratch_path"]
+                                == format!("{}/scratch", native209::ROOT))),
+                "228 obsolete native209 sample has no exact terminal owner"
+            );
+            continue;
+        }
         if diagnostic["status"] != "observed" {
             unavailable_is_inactive(diagnostic, f)?;
             continue;
@@ -231,8 +266,46 @@ fn actual_memory() -> Result<u64> {
         .checked_mul(1024)
         .context("228 actual memory overflow")
 }
+fn without_full209(f: &Value) -> Result<Value> {
+    let mut reduced = f.clone();
+    reduced["active"]
+        .as_array_mut()
+        .context("228 derived209 memory census")?
+        .retain(|r| {
+            singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] != singleton209::UNIT)
+        });
+    Ok(reduced)
+}
+fn terminal209(binding: Option<&BoundFile>) -> Result<Option<Value>> {
+    binding
+        .map(|b| {
+            singleton209::native(b)?;
+            native209::immutable_json(b)
+        })
+        .transpose()
+}
+fn terminal209_current(current: &BTreeMap<String, Value>, proof: Option<&Value>) -> Result<()> {
+    if let Some(p) = proof {
+        native209_terminal::terminal_shape(
+            current
+                .get(native209::UNIT)
+                .context("228 terminal209 current owner omitted")?,
+            p["invocation_id"]
+                .as_str()
+                .context("228 terminal209 original IID")?,
+        )?;
+    }
+    Ok(())
+}
 fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
-    super::native228_peer209::memory(f)
+    let (extra, mut evidence) = super::native228_full209::memory(f)?;
+    let (base, rest) = super::native228_peer209::memory(&without_full209(f)?)?;
+    evidence.extend(rest);
+    Ok((
+        base.checked_add(extra)
+            .context("228 full209 memory overflow")?,
+        evidence,
+    ))
 }
 fn protected_growth(
     f: &Value,
@@ -241,7 +314,39 @@ fn protected_growth(
     sample: u64,
     now: u64,
 ) -> Result<(u64, Vec<Value>)> {
-    super::native228_peer209::disk(f, o, guards, sample, now)
+    let (reduced, remaining, extra, mut evidence) =
+        super::native228_full209::split(f, o, guards, sample, now)?;
+    let (base, rest) = super::native228_peer209::disk(&reduced, o, &remaining, sample, now)?;
+    evidence.extend(rest);
+    Ok((
+        base.checked_add(extra)
+            .context("228 full209 disk overflow")?,
+        evidence,
+    ))
+}
+fn protected_floor(
+    floor: u64,
+    growth: u64,
+    guards: &BTreeMap<String, BoundFile>,
+) -> Result<(u64, u64)> {
+    let mut bound_minimum = 0;
+    // Call only after protected_growth has validated the complete active guard map.
+    // Existing guards remain armed against their old floors during this admission.
+    for binding in guards.values() {
+        let g = bound_json(binding)?;
+        let minimum = g["minimum_free_bytes"]
+            .as_u64()
+            .filter(|n| *n > 0)
+            .context("228 protected guard floor missing or zero")?;
+        bound_minimum = bound_minimum.max(minimum);
+    }
+    Ok((
+        floor
+            .checked_add(growth)
+            .context("228 floor overflow")?
+            .max(bound_minimum),
+        bound_minimum,
+    ))
 }
 pub(super) fn run() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("admit-native228-input")?;
@@ -307,13 +412,25 @@ pub(super) fn run() -> Result<()> {
     );
     let o = bound_json(&s.observer)?;
     let f = bound_json(&s.fleet)?;
+    let peer223 =
+        singleton209_peer223::prepare(s.terminal223.as_ref(), &f, &o, &s.observer, &s.fleet)?;
+    let terminal209 = terminal209(s.terminal209.as_ref())?;
+    let (arithmetic_fleet, arithmetic_observer) =
+        singleton209_peer223::arithmetic(&f, &o, peer223.as_ref())?;
+    let arithmetic_guards = singleton209_peer223::guards(&s.protected_guards, peer223.as_ref());
     let p = bound_json(&s.resource_plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("228 sample clock")?)?;
     let floor = singleton227_admission::century_floor_for(&f, 228)?;
     let free_before = singleton227_admission::disk_free()?;
-    let (growth, measurements) = protected_growth(&f, &o, &s.protected_guards, t, now)?;
-    let computed = floor.checked_add(growth).context("228 floor overflow")?;
+    let (growth, measurements) = protected_growth(
+        &arithmetic_fleet,
+        &arithmetic_observer,
+        &arithmetic_guards,
+        t,
+        now,
+    )?;
+    let (computed, existing_guard_floor) = protected_floor(floor, growth, &arithmetic_guards)?;
     let protected = p["guard_minimum_free_bytes"]
         .as_u64()
         .context("228 guard floor")?;
@@ -325,8 +442,15 @@ pub(super) fn run() -> Result<()> {
         .checked_add(c::SCRATCH)
         .context("228 free overflow")?;
     candidate(&p, protected, required)?;
-    let (_, memory_required) = sample(&s, &o, &f, now, required)?;
-    let (auxiliary_growth, auxiliary_measurements) = auxiliary_memory(&f)?;
+    let (_, memory_required) = sample(
+        &s,
+        &arithmetic_observer,
+        &arithmetic_fleet,
+        terminal209.as_ref(),
+        now,
+        required,
+    )?;
+    let (auxiliary_growth, auxiliary_measurements) = auxiliary_memory(&arithmetic_fleet)?;
     let memory_required = memory_required
         .checked_add(auxiliary_growth)
         .context("228 memory claim overflow")?;
@@ -345,14 +469,15 @@ pub(super) fn run() -> Result<()> {
         .collect::<BTreeSet<_>>();
     names.insert(c::UNIT.into());
     let before = census(&names, 201, 300)?;
-    singleton227_admission::owners(&f, &before)?;
+    singleton209_peer223::owners(&f, &before, peer223.as_ref())?;
+    terminal209_current(&before, terminal209.as_ref())?;
     ensure!(
         before
             .get(c::UNIT)
             .is_some_and(|u| !diagnostic_stage_running(u)),
         "228 native owner already live"
     );
-    let caps = singleton227_admission::limits(&f)?;
+    let caps = singleton227_admission::limits(&arithmetic_fleet)?;
     let memory = actual_memory()?;
     let free = free_before.min(singleton227_admission::disk_free()?);
     ensure!(
@@ -365,15 +490,29 @@ pub(super) fn run() -> Result<()> {
         "228 actual envelope unavailable"
     );
     let after = census(&names, 201, 300)?;
-    singleton227_admission::owners(&f, &after)?;
+    singleton209_peer223::owners(&f, &after, peer223.as_ref())?;
+    terminal209_current(&after, terminal209.as_ref())?;
     ensure!(
-        before == after && caps == singleton227_admission::limits(&f)?,
+        before == after && caps == singleton227_admission::limits(&arithmetic_fleet)?,
         "228 owners/caps changed during admission"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    sample(&s, &o, &f, now, required)?;
-    let (after_growth, after_measurements) = protected_growth(&f, &o, &s.protected_guards, t, now)?;
-    let (after_auxiliary, after_auxiliary_measurements) = auxiliary_memory(&f)?;
+    sample(
+        &s,
+        &arithmetic_observer,
+        &arithmetic_fleet,
+        terminal209.as_ref(),
+        now,
+        required,
+    )?;
+    let (after_growth, after_measurements) = protected_growth(
+        &arithmetic_fleet,
+        &arithmetic_observer,
+        &arithmetic_guards,
+        t,
+        now,
+    )?;
+    let (after_auxiliary, after_auxiliary_measurements) = auxiliary_memory(&arithmetic_fleet)?;
     ensure!(
         after_growth <= growth
             && after_auxiliary <= auxiliary_growth
@@ -392,6 +531,10 @@ pub(super) fn run() -> Result<()> {
         "fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"all_immutable_inputs_rehashed":true,"snapshot_restored":false,
         "producer_started":false,"resource_samples_taken":0,"recorded_unix_seconds":now,"maximum_launch_delay_seconds":900,
         "spec_sha256":binding.sha256,"self_sha256":self_sha});
+    r["terminal223"] = json!(s.terminal223.as_ref().map(private157::binding));
+    r["terminal223_accounting"] = singleton209_peer223::evidence(peer223.as_ref());
+    r["terminal209"] = json!(s.terminal209.as_ref().map(private157::binding));
+    r["maximum_existing_bound_guard_floor_bytes"] = json!(existing_guard_floor);
     for flag in [
         "entry_replay",
         "replay_launch_authorized",
@@ -410,6 +553,113 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn every_already_bound_guard_floor_survives_admission_arithmetic() {
+        let root = tempfile::tempdir().unwrap();
+        let mut guards = BTreeMap::new();
+        for (unit, minimum) in [
+            ("old-a", 2_000_000_000_000u64),
+            ("old-b", 1_000_000_000_000),
+        ] {
+            let path = root.path().join(unit);
+            let bytes = serde_json::to_vec(&json!({"minimum_free_bytes":minimum})).unwrap();
+            fs::write(&path, &bytes).unwrap();
+            guards.insert(
+                unit.into(),
+                BoundFile {
+                    path,
+                    sha256: hex_lower(&Sha256::digest(bytes)),
+                },
+            );
+        }
+        assert_eq!(
+            protected_floor(100, 200, &guards).unwrap(),
+            (2_000_000_000_000, 2_000_000_000_000)
+        );
+        assert_eq!(
+            protected_floor(2_000_000_000_000, 200, &guards).unwrap().0,
+            2_000_000_000_200
+        );
+        assert!(protected_floor(u64::MAX, 1, &guards).is_err());
+        let binding = guards.get_mut("old-b").unwrap();
+        let bytes = br#"{"minimum_free_bytes":0}"#;
+        fs::write(&binding.path, bytes).unwrap();
+        binding.sha256 = hex_lower(&Sha256::digest(bytes));
+        assert!(protected_floor(100, 200, &guards).is_err());
+    }
+    #[test]
+    #[ignore = "root immutable334 metadata only; no resource poll, process launch, Bank, archive or network"]
+    fn root_saved334_terminal_peers_preserve_the_complete_old_live_census() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let fleet = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-campaign-fleet/20261023T225300Z-v334/fleet-ledger.json".into(),
+            sha256: "cbb5d8ef13b2f458203b5d2513271483a60c1f8e94cb83616252a137516f029f".into(),
+        };
+        let observer = BoundFile {
+            path: "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/horizon-live-resource-sample-20261023T225300Z-diagnostics-v334.json".into(),
+            sha256: "8feba0f946418de1e67959fc97148333b467348e256101a02a571af0aef614d8".into(),
+        };
+        let t223 = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-warmup223-native20-terminal-58ab-v2/proof.json"
+                .into(),
+            sha256: "6790592b9188e7c4a3d32171a326b743f84fc6c5b5ad07f94182c104876b7028".into(),
+        };
+        let t209 = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-native209-terminal-proof-v1/proof.json".into(),
+            sha256: singleton209::NATIVE_PROOF_SHA.into(),
+        };
+        let f = bound_json(&fleet).unwrap();
+        let o = bound_json(&observer).unwrap();
+        let peer = singleton209_peer223::prepare(Some(&t223), &f, &o, &observer, &fleet).unwrap();
+        let (view, observation) = singleton209_peer223::arithmetic(&f, &o, peer.as_ref()).unwrap();
+        assert_eq!(f["active"].as_array().unwrap().len(), 5);
+        assert_eq!(view["active"].as_array().unwrap().len(), 4);
+        let terminal = terminal209(Some(&t209)).unwrap();
+        let empty = || BoundFile {
+            path: "/unused-metadata-only".into(),
+            sha256: "0".repeat(64),
+        };
+        let s = Spec {
+            schema: "jetstreamer-private-epoch228-native-admission-spec-v1".into(),
+            mode: "native-cold".into(),
+            observer,
+            fleet,
+            cold_plan: empty(),
+            terminal223: Some(t223),
+            terminal209: Some(t209),
+            resource_plan: empty(),
+            protected_guards: BTreeMap::new(),
+            output: "/unused-metadata-only".into(),
+        };
+        sample(
+            &s,
+            &observation,
+            &view,
+            terminal.as_ref(),
+            utc_seconds(o["recorded_at_utc"].as_str().unwrap()).unwrap(),
+            1,
+        )
+        .unwrap();
+        let native_sample = observation["diagnostic_replays"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["producer_unit"] == native209::UNIT);
+        assert_eq!(
+            sample(
+                &s,
+                &observation,
+                &view,
+                None,
+                utc_seconds(o["recorded_at_utc"].as_str().unwrap()).unwrap(),
+                1
+            )
+            .is_ok(),
+            native_sample.is_none_or(|r| r["status"] == "unavailable")
+        );
+        assert_eq!(view["unit_census"], f["unit_census"]);
+        assert_eq!(view["gates"], f["gates"]);
+    }
     #[test]
     fn unavailable_terminal_diagnostic_is_ignored_only_outside_the_complete_live_census() {
         let d = json!({"producer_unit":singleton227_admission::NATIVE_UNIT,"status":"unavailable","observation":null});

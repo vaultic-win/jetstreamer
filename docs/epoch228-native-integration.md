@@ -67,3 +67,30 @@ not against when the operator later captures the journal. Central terminal event
 status-only cleanup preserve unrelated owners and require real loaded inactive state;
 no synthetic unit state or sidecar is accepted. No228 producer/guard unit has been
 installed or started by this preparation.
+
+The native admission now additionally recognizes the exact full209 singleton
+`horizon-singleton-209-capped-4aeca563-v1.service`. Its immutable launch, node,
+worker, native qualification and resource-plan bindings must all validate through
+that owner's existing closed contract. The separate full209 guard must bind the
+same IID/PID, whole-root cap471798691840, VMA limit3500000 and exact guard digest.
+Scratch credit is the smaller of the coordinated same-IID whole-root allocation
+and current whole-root guard allocation; memory reserves the remaining kernel
+page-rounded hard cgroup cap. A differently scoped or duplicate owner is rejected.
+
+Optional `terminal223` and `terminal209` spec bindings support already completed
+peers. The223 binding must be the exact actualv2 proof and bind the same original
+observer/predecessor fleet. Its old row is removed only from a derived arithmetic
+view after independent terminal proof validation; accepted history stays intact.
+The209 binding uses its actual independently qualified cold-input proof. An old
+observed native209 row may be excluded only for that exact terminal invocation;
+current before/after census checks still reject a replacement or live owner.
+Unavailable diagnostics are excluded only when the complete fleet proves they
+have no active owner. This never fabricates resource telemetry for a newly joined
+full209 job: a later launch requires a fresh complete coordinated observation.
+
+The protected floor is the larger of century floor plus all remaining growth and
+every existing active guard's bound minimum-free threshold. All existing guards
+remain armed throughout admission, so a lower arithmetic estimate cannot release
+their reserve. The original334 observer/fleet plus actual terminal223v2 proof are
+covered by a separate root-only metadata regression test; it creates no sample,
+Bank, producer, archive or remote operation.
