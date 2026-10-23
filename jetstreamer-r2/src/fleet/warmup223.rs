@@ -1,13 +1,13 @@
 //! Closed admission/ownership for the first16-slot failure-context experiment.
 use super::*;
-const UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v2.service";
+const UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
 const ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v2";
-const RUNNER: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/jetstreamer-epoch223-warmup-resource";
-const RUNNER_SHA: &str = "891dda987434bfe9435d23985c764c9a940be32d34f9c552bebd0a16b5caa6fa";
-const PLAN: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/actual-plan.json";
-const PLAN_SHA: &str = "773679ba1d76444a0f8783d61c40c4ed1844773211ddaa5d48d64a0eea2e6682";
-const STATE: &str = "/var/lib/jetstreamer/horizon-warmup223-admission-v2";
+    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v3";
+const RUNNER: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-live-scan-v3/jetstreamer-epoch223-warmup-resource";
+const RUNNER_SHA: &str = "0e22b8d8c01bdd56cd8698e08b30c79c8ecd0a76ff349d2aba86271870944461";
+const PLAN: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-live-scan-v3/actual-plan.json";
+const PLAN_SHA: &str = "df9ff8b138310609bc2e8bbf1058572b92e3ac534720f82a25012ccef66290e9";
+const STATE: &str = "/var/lib/jetstreamer/horizon-warmup223-admission-v3";
 const OWNERS: [(&str, &str); 4] = [
     (
         "horizon-upload-203-v4-20261023-v1.service",
@@ -184,8 +184,8 @@ fn inputs(f: &Value) -> Result<()> {
         "warmup native input proof differs"
     );
     let cap = bound_json(&BoundFile {
-        path: "/var/lib/jetstreamer/horizon-warmup223-parent-capability-v2/capability.json".into(),
-        sha256: "bec274c5f27d0a79a8e13dfcd1f5b3beaef82447721f6cb5e24ec45e49d55707".into(),
+        path: "/var/lib/jetstreamer/horizon-warmup223-parent-capability-v3/capability.json".into(),
+        sha256: "e80ef1a65923617981979afb3623d37d353fdaeb384c54e3d7ea7b07436da24b".into(),
     })?;
     ensure!(
         cap["bindings"]["self_sha256"] == RUNNER_SHA
@@ -479,7 +479,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
     sandbox(c, current)?;
-    let gu = unit("horizon-warmup223-protective-v2.service")?;
+    let gu = unit("horizon-warmup223-protective-v3.service")?;
     let iid = gu["InvocationID"]
         .as_str()
         .context("warmup protective invocation")?;
@@ -488,12 +488,12 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
         "warmup protective iid"
     );
     let binding: BoundFile = serde_json::from_value(private157::file_binding(
-        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v2")
+        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v3")
             .join(format!("sample-{iid}.json")),
     )?)?;
     let g = bound_json(&binding)?;
     let pb: BoundFile = serde_json::from_value(private157::file_binding(Path::new(
-        "/var/lib/jetstreamer/horizon-warmup223-guard-v2/guard-plan.json",
+        "/var/lib/jetstreamer/horizon-warmup223-guard-v3/guard-plan.json",
     ))?)?;
     let p = bound_json(&pb)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -523,7 +523,7 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     let out = ProcessCommand::new("systemctl")
         .args([
             "show",
-            "horizon-warmup223-protective-v2.timer",
+            "horizon-warmup223-protective-v3.timer",
             "--property=ActiveState",
             "--value",
         ])
