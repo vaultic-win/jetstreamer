@@ -3291,6 +3291,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("admit-continuation203") {
+        return fleet::admit_continuation203();
+    }
     if env::args().nth(1).as_deref() == Some("capture-assembly144-scan-launch") {
         return fleet::capture_assembly144_scan_launch();
     }

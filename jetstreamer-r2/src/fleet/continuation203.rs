@@ -9,15 +9,20 @@ const UNIT: &str = "horizon-qualify-203-checkpoint-continuation-ed66145-v1.servi
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1";
 const NODE: &str =
     "/var/lib/jetstreamer/horizon-continuation203-parent-ed66145-v1/jetstreamer-node";
-const NODE_SHA: &str = "1a299ad19472906b0721555ae3bd01840cbd249724ece9c0f61e086b8ace8716";
+pub(super) const NODE_SHA: &str =
+    "1a299ad19472906b0721555ae3bd01840cbd249724ece9c0f61e086b8ace8716";
 const PLAN: &str = "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/plan.json";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-v1616-shrink-budget-worker-003fe15-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";
-const PREFIX_SHA: &str = "ba191cf1918cac8b67cb7512bd07cc1eeccb16e525e4c15c27fd7c325f6993ce";
-const NATIVE_SHA: &str = "5260d7af71ab802ca711fce706020312212d0c8cdfc01c473398b0a9a0108420";
-const SNAPSHOT_SHA: &str = "d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6";
-const WORKER_SHA: &str = "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc";
-const FLOOR_LOWER_BOUND: u64 = 2_687_830_606_739;
-const PEAK: u64 = 256 << 30;
+pub(super) const PREFIX_SHA: &str =
+    "ba191cf1918cac8b67cb7512bd07cc1eeccb16e525e4c15c27fd7c325f6993ce";
+pub(super) const NATIVE_SHA: &str =
+    "5260d7af71ab802ca711fce706020312212d0c8cdfc01c473398b0a9a0108420";
+pub(super) const SNAPSHOT_SHA: &str =
+    "d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6";
+pub(super) const WORKER_SHA: &str =
+    "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc";
+pub(super) const FLOOR_LOWER_BOUND: u64 = 2_687_830_606_739;
+pub(super) const PEAK: u64 = 256 << 30;
 const NO_AUTHORITY: &[&str] = &[
     "ordinary_replay_claim",
     "current_sidecar_eta_valid",
