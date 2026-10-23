@@ -96,3 +96,15 @@ the immutable failed worker make it necessary to inspect its actual bootstrap
 clock before borrowing the separate epoch208 reconstruction explanation.
 Native restore, exact source/Bank differential, root, plugin and publication
 gates remain independent regardless of the observed value.
+
+The epoch141 PoH clock consumer preserves the original reviewed worker source
+as an exact repository fixture from commit `a6e0d6ab`, with SHA-256
+`ae01b0813fa1564511e450acc693941268076659e4d741aae085fb288d0fd2ac`.
+`worker_runtime_source_sha256` continues to identify that reviewed source.
+The current trace/capped-storage candidate is pinned separately as
+`current_worker_runtime_source_sha256`; neither source may set hashes per tick,
+and the vendor Bank must still inherit both clock values from its parent.
+Future worker changes require a reviewed current-source pin update. Do not
+replace the historical fixture, rewrite the old native receipt, or relabel a
+new candidate as the source measured by the old proof. This repair changes no
+clock value or deployed worker and keeps both full-source hash gates active.
