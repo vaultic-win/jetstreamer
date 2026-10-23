@@ -98,6 +98,13 @@ double-counting an already protected allocation. The twice-average-`.jet` centur
 separate host reserve. Record the memory-selected target, actual executing count, local disk
 headroom and any checkpoint/offload transition needed to reach that target. CPU/I/O statistics
 inform sharing and useful throughput; compatibility and guards still have to qualify each job.
+
+Use the descriptor-based live root-budget scanner for a running scratch tree. Snapshot loading
+and AccountsDb maintenance rename and remove files while a scan runs; a walker intended for a
+frozen capture can turn a normal vanished path into `ENOENT` and kill otherwise valid work.
+Keep the physical-byte limit enforced with the reviewed churn-tolerant scanner, and retain the
+stricter capture walk for an actually frozen process group. Preserve a monitoring failure's
+receipt and journal before correcting it; do not restart unrelated healthy producers.
 A directory name or unused R2 holding prefix has freed no local capacity.
 
 Reassess the estimate with each existing coordinated observation. If measured scratch approaches or
