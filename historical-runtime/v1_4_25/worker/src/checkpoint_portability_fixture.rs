@@ -9,7 +9,7 @@ use solana_runtime::{
     snapshot_utils::{add_snapshot, serialize_status_cache, SnapshotVersion},
 };
 use solana_sdk::{
-    signature::{Signature, Signer},
+    signature::Signature,
     system_program, system_transaction,
 };
 use std::{
@@ -275,7 +275,7 @@ fn native_export(root: &Path, state: &RuntimeState) -> (Member, Vec<Member>) {
         .mode(0o600)
         .open(&archive)
         .unwrap();
-    let encoder = BzEncoder::new(BufWriter::new(output), Compression::Fast);
+    let encoder = BzEncoder::new(BufWriter::new(output), Compression::Fastest);
     let mut tar = tar::Builder::new(encoder);
     for member in &members {
         let path = checked_member(&staging, member);
