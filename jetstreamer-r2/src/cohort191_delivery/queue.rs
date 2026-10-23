@@ -57,6 +57,122 @@ fn process(pid: u64, start: u64, unit: &str, program: &Bound) -> Result<()> {
     );
     Ok(())
 }
+fn metadata_client_argv(argv: &[String], state: &Value, head: &Value) -> bool {
+    let units: BTreeSet<_> = (191..=194)
+        .flat_map(|e| {
+            [
+                format!("horizon-full-verify-{e}-native191-20261023-v1.service"),
+                format!("horizon-plugin-verify-{e}-native191-20261023-v1.service"),
+                format!("horizon-r2-sync-{e}-native191-20261023-v1.service"),
+            ]
+        })
+        .chain([UNIT.into()])
+        .collect();
+    if argv.len() == 4
+        && argv[0] == "/usr/bin/systemctl"
+        && argv[1] == "show"
+        && units.contains(&argv[2])
+    {
+        return argv[3]
+            == "--property=Id,LoadState,ActiveState,SubState,Type,InvocationID,MainPID,NRestarts,Job,ExecStart,ControlGroup,Result,ExecMainStatus,PrivateNetwork,EnvironmentFiles,Restart";
+    }
+    if argv.len() == 7
+        && argv[0] == "/usr/bin/journalctl"
+        && argv[1] == "--no-pager"
+        && argv[2] == "--output=json"
+        && argv[3] == "--lines=1024"
+        && argv[4] == "-u"
+        && sync_epoch("upload-readback", &argv[5]).is_some()
+    {
+        return [state, head].iter().any(|v| {
+            v["epochs"].as_array().is_some_and(|rs| {
+                rs.iter().any(|r| {
+                    r["task_owner"]["unit"] == argv[5]
+                        && r["task_owner"]["invocation_id"]
+                            .as_str()
+                            .is_some_and(|iid| {
+                                is_lower_hex(iid, 32)
+                                    && argv[6] == format!("_SYSTEMD_INVOCATION_ID={iid}")
+                            })
+                })
+            })
+        });
+    }
+    false
+}
+fn manager_clients(pid: u64, state: &Value, head: &Value) -> Result<Value> {
+    let path = format!("/sys/fs/cgroup/system.slice/{UNIT}/cgroup.procs");
+    let mut known = BTreeMap::new();
+    // Recheck the bounded membership once; disappearing short read-only clients
+    // are accepted only after positively re-observing their cgroup absence.
+    for _ in 0..2 {
+        let ids = fs::read_to_string(&path)?
+            .split_whitespace()
+            .map(str::parse::<u64>)
+            .collect::<std::result::Result<BTreeSet<_>, _>>()?;
+        ensure!(
+            ids.contains(&pid) && ids.len() <= 4,
+            "191 queue manager or short-client cgroup scope changed"
+        );
+        for child in ids.into_iter().filter(|n| *n != pid) {
+            let result = (|| -> Result<Value> {
+                let before = fs::read_to_string(format!("/proc/{child}/stat"))?;
+                let tail = before
+                    .rsplit_once(") ")
+                    .context("191 metadata client stat")?
+                    .1;
+                let fields: Vec<_> = tail.split_whitespace().collect();
+                ensure!(
+                    fields.len() > 19 && fields[1].parse::<u64>()? == pid,
+                    "191 unknown child is not a direct metadata client"
+                );
+                let start: u64 = fields[19].parse()?;
+                let executable = fs::read_link(format!("/proc/{child}/exe"))?;
+                let m = fs::symlink_metadata(&executable)?;
+                ensure!(
+                    fs::symlink_metadata(format!("/proc/{child}"))?.uid() == 0
+                        && m.is_file()
+                        && m.uid() == 0
+                        && m.mode() & 0o022 == 0,
+                    "191 metadata client is not a trusted root system tool"
+                );
+                let bytes = fs::read(format!("/proc/{child}/cmdline"))?;
+                ensure!(
+                    !bytes.is_empty() && bytes.len() <= 8192 && bytes.last() == Some(&0),
+                    "191 metadata client argv framing"
+                );
+                let argv = bytes[..bytes.len() - 1]
+                    .split(|b| *b == 0)
+                    .map(|b| std::str::from_utf8(b).map(str::to_owned))
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                ensure!(
+                    metadata_client_argv(&argv, state, head)
+                        && executable == Path::new(&argv[0])
+                        && stat(child)? == start,
+                    "191 queue has an unknown/admission/changed child; no active verifier is inferred"
+                );
+                Ok(
+                    json!({"pid":child,"start_ticks":start,"executable":executable,"argv":argv,"read_only_client":true}),
+                )
+            })();
+            match result {
+                Ok(v) => {
+                    known.insert(child, v);
+                }
+                Err(error) => {
+                    let after = fs::read_to_string(&path)?
+                        .split_whitespace()
+                        .map(str::parse::<u64>)
+                        .collect::<std::result::Result<BTreeSet<_>, _>>()?;
+                    if after.contains(&child) {
+                        return Err(error);
+                    }
+                }
+            }
+        }
+    }
+    Ok(json!(known))
+}
 fn rows<'a>(v: &'a Value, name: &str) -> Result<&'a Vec<Value>> {
     v[name]
         .as_array()
@@ -146,7 +262,12 @@ fn selected_state(anchor: &Bound, cutoff: u64) -> Result<(Bound, Value, Bound, V
         .context("191 no real queue revision exists at/before cutoff")?;
     // The sealed capture anchor names a real native snapshot or the actual
     // mutable head namespace; selection is independently performed at cutoff.
-    if anchor.path != head_bound.path {
+    if anchor.path == head_bound.path {
+        ensure!(
+            snapshots.iter().any(|(b, _)| b.sha256 == anchor.sha256),
+            "191 mutable-head anchor is not a real persisted native snapshot"
+        );
+    } else {
         ensure!(
             snapshots
                 .iter()
@@ -583,15 +704,7 @@ pub(super) fn observe(
         "191 queue main PID changed"
     );
     process(pid, start, UNIT, owner.program.as_ref().unwrap())?;
-    let procs = fs::read_to_string(format!("/sys/fs/cgroup/system.slice/{UNIT}/cgroup.procs"))?;
-    let members = procs
-        .split_whitespace()
-        .map(str::parse::<u64>)
-        .collect::<std::result::Result<BTreeSet<_>, _>>()?;
-    ensure!(
-        members == BTreeSet::from([pid]),
-        "191 queue has an unknown/unqualified child"
-    );
+    let metadata_clients = manager_clients(pid, &state, &head)?;
     let entries = rows(&state, "epochs")?;
     ensure!(
         entries
@@ -660,7 +773,7 @@ pub(super) fn observe(
     Ok(Some(
         json!({"schema":"jetstreamer-cohort191-delivery-queue-observation-v2","plan":b.plan,"state":selected_bound,"current_head":head_bound,
         "post_cutoff_transition":if head["revision"] != state["revision"] {json!({"state":head,"backdated":false})} else {Value::Null},
-        "revision":state["revision"],"manager":u,"manager_start_ticks":start,"epochs":entries,
+        "revision":state["revision"],"manager":u,"metadata_clients":metadata_clients,"manager_start_ticks":start,"epochs":entries,
         "sync_observations":observations,"resource_samples":0,"publication_authorized":false,"r2_mutations":false}),
     ))
 }
@@ -810,6 +923,36 @@ mod tests {
         let mut invalid = valid;
         invalid.push(json!({"stage":"source-revalidation"}));
         assert!(task_limits(&invalid).is_err());
+    }
+    #[test]
+    fn manager_metadata_clients_cannot_hide_unknown_commands_or_other_epoch_progress() {
+        let properties = "--property=Id,LoadState,ActiveState,SubState,Type,InvocationID,MainPID,NRestarts,Job,ExecStart,ControlGroup,Result,ExecMainStatus,PrivateNetwork,EnvironmentFiles,Restart";
+        let mut show: Vec<String> = vec!["/usr/bin/systemctl", "show", UNIT, properties]
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        let empty = json!({"epochs":[]});
+        assert!(metadata_client_argv(&show, &empty, &empty));
+        show[1] = "restart".into();
+        assert!(!metadata_client_argv(&show, &empty, &empty));
+        show[1] = "show".into();
+        show[2] = "horizon-full-verify-198-native191-20261023-v1.service".into();
+        assert!(!metadata_client_argv(&show, &empty, &empty));
+        let unit = "horizon-r2-sync-191-native191-20261023-v1.service";
+        let iid = "a".repeat(32);
+        let state = json!({"epochs":[{"task_owner":{"unit":unit,"invocation_id":iid}}]});
+        let mut journal = vec![
+            "/usr/bin/journalctl".into(),
+            "--no-pager".into(),
+            "--output=json".into(),
+            "--lines=1024".into(),
+            "-u".into(),
+            unit.into(),
+            format!("_SYSTEMD_INVOCATION_ID={iid}"),
+        ];
+        assert!(metadata_client_argv(&journal, &state, &empty));
+        journal[6] = format!("_SYSTEMD_INVOCATION_ID={}", "b".repeat(32));
+        assert!(!metadata_client_argv(&journal, &state, &empty));
     }
     #[test]
     fn selects_real_cutoff_revision_and_never_backdates_later_native_state() {

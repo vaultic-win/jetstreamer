@@ -1299,7 +1299,7 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
         if key == "queue_observation" && !expected.is_null() {
             let mut actual = expected.clone();
             let mut prior = v[key].clone();
-            for name in ["current_head", "post_cutoff_transition"] {
+            for name in ["current_head", "post_cutoff_transition", "metadata_clients"] {
                 actual
                     .as_object_mut()
                     .context("191 current queue proof")?
