@@ -3,13 +3,15 @@
 //! The legacy profile accepts only its two known disposable subtrees. An explicit
 //! restore-only epoch213 profile accepts only its isolated scratch directory and
 //! requires a zero-entry stopped probe with retained inputs and no archive.
-//! Both profiles prove terminal identity, revalidate sealed outcome evidence, and
+//! A closed epoch223 v3 profile retires only its failed restore scratch, retaining
+//! and rehashing the immutable inputs and original failure evidence.
+//! All profiles prove terminal identity, revalidate sealed outcome evidence, and
 //! scan command/maps/cwd/root/exe/fd references before deletion.
 
 use {
-    anyhow::{Context, Result, anyhow, ensure},
+    anyhow::{anyhow, ensure, Context, Result},
     serde::{Deserialize, Serialize},
-    serde_json::{Value, json},
+    serde_json::{json, Value},
     sha2::{Digest as _, Sha256},
     std::{
         collections::{BTreeMap, BTreeSet},
@@ -39,6 +41,8 @@ struct Plan {
     schema: String,
     #[serde(default)]
     restore_only_probe: bool,
+    #[serde(default)]
+    warmup223_v3: bool,
     private_root: PathBuf,
     run_root: PathBuf,
     targets: Vec<PathBuf>,
@@ -234,8 +238,107 @@ fn path_or_descendant(candidate: &Path, root: &Path) -> bool {
     candidate == root || candidate.starts_with(root)
 }
 
+const WARMUP223_ROOT: &str =
+    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v3";
+const WARMUP223_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
+const WARMUP223_IID: &str = "1fffc79d92ad458a9a4d334a48b40dfc";
+
+fn validate_warmup223_profile(plan: &Plan) -> Result<()> {
+    ensure!(
+        !plan.restore_only_probe
+            && plan.run_root == Path::new(WARMUP223_ROOT)
+            && plan.producer.unit == WARMUP223_UNIT
+            && plan.producer.invocation_id == WARMUP223_IID
+            && plan.producer.active_state == "failed"
+            && plan.producer.sub_state == "failed"
+            && plan.producer.result == "exit-code"
+            && plan.producer.exec_main_status == 1
+            && plan.guard.unit == "horizon-warmup223-protective-v3.service"
+            && plan.inactive_units == ["horizon-warmup223-protective-v3.timer"]
+            && plan.outcome.path
+                == Path::new("/var/lib/jetstreamer/horizon-warmup223-terminal-v3/failure.json")
+            && plan.outcome.sha256
+                == "7f1671b6f74946f2fc4f2b2fd13569b59c4015739889080dc395db2191c18c73",
+        "warmup cleanup must bind the exact failed v3 attempt"
+    );
+    for (path, sha) in [
+        (
+            "/var/lib/jetstreamer/horizon-warmup223-terminal-v3/launch.json",
+            "742656ca51cc60e14800ab76b379de384d3341d26696f33c7c992de772eeba6d",
+        ),
+        (
+            "/var/lib/jetstreamer/horizon-warmup223-terminal-v3/guard-stop.json",
+            "27eb179b252aaeae09d39c0242c6306da3f3cb87adc53ca1e308699b0b5ba1b8",
+        ),
+        (
+            "/var/lib/jetstreamer/horizon-cold223-input-proof-v1/input-proof.json",
+            "b0ee9a5136e075d0c1605573cc78e154a3059351e0e0f961068211f344c5387f",
+        ),
+    ] {
+        ensure!(
+            plan.evidence
+                .iter()
+                .any(|e| e.path == Path::new(path) && e.sha256 == sha),
+            "warmup retained lineage missing:{path}"
+        );
+    }
+    Ok(())
+}
+
+fn validate_warmup223_outcome(plan: &Plan, outcome: &Value) -> Result<()> {
+    validate_warmup223_profile(plan)?;
+    ensure!(
+        outcome["invocation_id"] == WARMUP223_IID
+            && outcome["unit"] == WARMUP223_UNIT
+            && outcome["success"] == false
+            && outcome["target_reached"] == false
+            && outcome["observed_slot"].is_null()
+            && outcome["first_progress"].is_null()
+            && outcome["last_progress"].is_null()
+            && outcome["capture"].is_null()
+            && outcome["error"] == "physical scan time bound exceeded"
+            && outcome["authority"]["r2_mutations"] == false
+            && outcome["authority"]["publication_authorized"] == false,
+        "warmup failure is not an unexecuted failed restore"
+    );
+    ensure!(
+        fs::read_dir(plan.run_root.join("output"))?.next().is_none(),
+        "warmup output must be retained and reviewed separately"
+    );
+    for name in [
+        "target-capture.json",
+        "target-stop.json",
+        "native-checkpoint.json",
+        "result.json",
+    ] {
+        ensure!(
+            matches!(fs::symlink_metadata(plan.run_root.join("receipts").join(name)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound),
+            "warmup has a successful/checkpoint artifact:{name}"
+        );
+    }
+    // Reproducibility must survive scratch deletion, independent of a stale
+    // receipt saying that the source existed earlier. These inputs are sealed.
+    for (path, sha) in [
+        ("/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst", "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"),
+        ("/var/lib/jetstreamer/horizon-223-warmup-e3d48954-v1/historical-worker", "b99691fd5995fe5f06e508cfd8f156b8e5cb7342ddab503fb2383e42e712d025"),
+        ("/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1/jetstreamer-node", "90474659be2a4a7d1cc9d4dfe3d5ab1587adb1b388b83163b2bf16c771624f66"),
+        ("/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1/epoch-hashes-223-prefix.txt", "9ce886d556f70e84386dbf1b2c4abc4b4fb7ea57064b903e50ff6b34479a0c15"),
+        ("/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2", "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"),
+    ] {
+        let path = Path::new(path);
+        let m = fs::symlink_metadata(path)?;
+        ensure!(m.is_file() && m.uid() == 0 && m.mode() & 0o222 == 0
+            && file_sha256(path)? == sha, "warmup retained input differs:{}", path.display());
+    }
+    Ok(())
+}
+
 fn disposable_targets(plan: &Plan) -> Result<BTreeSet<PathBuf>> {
-    if plan.restore_only_probe {
+    if plan.warmup223_v3 {
+        validate_warmup223_profile(plan)?;
+        Ok(BTreeSet::from([plan.run_root.join("scratch")]))
+    } else if plan.restore_only_probe {
         let name = plan
             .run_root
             .file_name()
@@ -329,7 +432,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         ensure!(
             item.path.is_absolute()
                 && (item.path.starts_with(&plan.private_root)
-                    || (plan.restore_only_probe
+                    || ((plan.restore_only_probe || plan.warmup223_v3)
                         && item.path.starts_with(Path::new("/var/lib/jetstreamer"))))
                 && valid_sha256(&item.sha256),
             "invalid evidence binding"
@@ -429,8 +532,8 @@ fn sample_unit(expectation: &UnitExpectation, allow_collected_guard: bool) -> Re
         exec_main_code: signed("ExecMainCode")?,
         exec_main_status: signed("ExecMainStatus")?,
     };
-    // Only the restore-only guard may be collected, after its exact durable
-    // stop chain was verified. Never synthesize its old invocation as live state.
+    // A qualified restore-only/warmup guard may be collected. Never synthesize
+    // its old invocation as live state; independently require its timer inactive.
     if allow_collected_guard && collected_guard(&state) {
         return Ok(state);
     }
@@ -792,7 +895,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let outcome: Value = serde_json::from_slice(&outcome_bytes)?;
     ensure!(
         outcome.pointer("/schema").and_then(Value::as_str)
-            == Some(if plan.restore_only_probe {
+            == Some(if plan.warmup223_v3 {
+                "jetstreamer-private-epoch223-warmup-resource-v1"
+            } else if plan.restore_only_probe {
                 RESTORE_OUTCOME_SCHEMA
             } else {
                 OUTCOME_SCHEMA
@@ -818,27 +923,33 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
             "failed restore probe has a checkpoint receipt; review its successful result separately"
         );
     }
-    ensure!(
-        outcome
-            .pointer("/authority/scratch_retirement_authorized_after_clean_process_reference_scan")
-            .and_then(Value::as_bool)
-            == Some(true),
-        "outcome does not authorize cleanup"
-    );
-    ensure!(
-        outcome
-            .pointer("/authority/r2_mutations")
-            .and_then(Value::as_bool)
-            == Some(false),
-        "outcome permits R2 mutation"
-    );
-    ensure!(
-        outcome
-            .pointer("/producer/invocation_id")
-            .and_then(Value::as_str)
-            == Some(&plan.producer.invocation_id),
-        "outcome producer mismatch"
-    );
+    if plan.warmup223_v3 {
+        validate_warmup223_outcome(plan, &outcome)?;
+    } else {
+        ensure!(
+            outcome
+                .pointer(
+                    "/authority/scratch_retirement_authorized_after_clean_process_reference_scan"
+                )
+                .and_then(Value::as_bool)
+                == Some(true),
+            "outcome does not authorize cleanup"
+        );
+        ensure!(
+            outcome
+                .pointer("/authority/r2_mutations")
+                .and_then(Value::as_bool)
+                == Some(false),
+            "outcome permits R2 mutation"
+        );
+        ensure!(
+            outcome
+                .pointer("/producer/invocation_id")
+                .and_then(Value::as_str)
+                == Some(&plan.producer.invocation_id),
+            "outcome producer mismatch"
+        );
+    }
     let mut evidence = Vec::new();
     let mut seen = BTreeSet::new();
     for item in bound_evidence(plan) {
@@ -853,7 +964,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
         evidence.push(json!({"path": item.path, "sha256": observed}));
     }
     let producer = sample_unit(&plan.producer, false)?;
-    let guard = sample_unit(&plan.guard, plan.restore_only_probe)?;
+    let guard = sample_unit(&plan.guard, plan.restore_only_probe || plan.warmup223_v3)?;
     let mut inactive = Vec::new();
     for unit in &plan.inactive_units {
         inactive.push(require_inactive_unit(unit)?);
@@ -961,6 +1072,88 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
 
+    fn warmup_plan() -> Plan {
+        let mut plan = restore_plan();
+        plan.restore_only_probe = false;
+        plan.warmup223_v3 = true;
+        plan.run_root = WARMUP223_ROOT.into();
+        plan.targets = vec![plan.run_root.join("scratch")];
+        plan.producer = UnitExpectation {
+            unit: WARMUP223_UNIT.into(),
+            invocation_id: WARMUP223_IID.into(),
+            active_state: "failed".into(),
+            sub_state: "failed".into(),
+            result: "exit-code".into(),
+            exec_main_status: 1,
+        };
+        plan.guard.unit = "horizon-warmup223-protective-v3.service".into();
+        plan.inactive_units = vec!["horizon-warmup223-protective-v3.timer".into()];
+        plan.guard_stop_intent = None;
+        plan.guard_stop_completion = None;
+        plan.outcome = Evidence {
+            path: "/var/lib/jetstreamer/horizon-warmup223-terminal-v3/failure.json".into(),
+            sha256: "7f1671b6f74946f2fc4f2b2fd13569b59c4015739889080dc395db2191c18c73".into(),
+        };
+        plan.evidence = [
+            (
+                "/var/lib/jetstreamer/horizon-warmup223-terminal-v3/launch.json",
+                "742656ca51cc60e14800ab76b379de384d3341d26696f33c7c992de772eeba6d",
+            ),
+            (
+                "/var/lib/jetstreamer/horizon-warmup223-terminal-v3/guard-stop.json",
+                "27eb179b252aaeae09d39c0242c6306da3f3cb87adc53ca1e308699b0b5ba1b8",
+            ),
+            (
+                "/var/lib/jetstreamer/horizon-cold223-input-proof-v1/input-proof.json",
+                "b0ee9a5136e075d0c1605573cc78e154a3059351e0e0f961068211f344c5387f",
+            ),
+        ]
+        .into_iter()
+        .map(|(path, sha256)| Evidence {
+            path: path.into(),
+            sha256: sha256.into(),
+        })
+        .collect();
+        plan
+    }
+
+    #[test]
+    fn failed_warmup_cleanup_cannot_borrow_a_live_or_different_attempt() {
+        let mut plan = warmup_plan();
+        validate_plan(&plan).unwrap();
+        plan.run_root =
+            "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-5072b7ba-v4"
+                .into();
+        plan.targets = vec![plan.run_root.join("scratch")];
+        assert!(validate_plan(&plan).is_err());
+        let mut plan = warmup_plan();
+        plan.producer.invocation_id = "a".repeat(32);
+        assert!(validate_plan(&plan).is_err());
+        let mut plan = warmup_plan();
+        plan.restore_only_probe = true;
+        assert!(validate_plan(&plan).is_err());
+        let mut plan = warmup_plan();
+        plan.outcome.sha256 = "a".repeat(64);
+        assert!(validate_plan(&plan).is_err());
+        let mut plan = warmup_plan();
+        plan.evidence.pop();
+        assert!(validate_plan(&plan).is_err());
+    }
+
+    #[test]
+    fn failed_warmup_retains_receipts_output_and_run_root() {
+        for name in ["", "receipts", "output", "scratch/child"] {
+            let mut plan = warmup_plan();
+            plan.targets = vec![plan.run_root.join(name)];
+            assert!(validate_plan(&plan).is_err());
+        }
+        let mut plan = warmup_plan();
+        plan.inactive_units.clear();
+        assert!(validate_plan(&plan).is_err());
+        let plan = warmup_plan();
+        assert!(validate_warmup223_outcome(&plan, &json!({"success":true})).is_err());
+    }
+
     fn restore_plan() -> Plan {
         let root = PathBuf::from(
             "/home/ubuntu/.jetstreamer-private/checkpoint-restore-probe-213-example-v1",
@@ -968,6 +1161,7 @@ mod tests {
         Plan {
             schema: PLAN_SCHEMA.into(),
             restore_only_probe: true,
+            warmup223_v3: false,
             private_root: "/home/ubuntu/.jetstreamer-private".into(),
             targets: vec![root.join("scratch")],
             producer: UnitExpectation {

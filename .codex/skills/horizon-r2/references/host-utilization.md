@@ -110,6 +110,12 @@ them expensive. A scan deadline is unavailable metering, not evidence that the b
 exceeded. For a separately admitted diagnostic, enforce its reserved filesystem free-space floor
 directly, alongside hard memory and VMA controls; label the per-lane scratch amount as a planning
 estimate. Do not claim an exact own-tree cap without a working qualified measurement or quota.
+Retire failed preparation scratch only through a cleanup profile that accepts its actual evidence
+schema. The Rust failed-diagnostic retirement tool's `warmup223_v3` profile binds that exact failed
+attempt, preserves its run root/output/receipts, rehashes retained inputs, requires the old guard
+timer inactive and checks live process references before deleting only scratch. It cannot retire
+the current attempt or close the original replay failure. Never substitute another epoch's cleanup
+schema or treat a failed restore as a resumable checkpoint.
 A directory name or unused R2 holding prefix has freed no local capacity.
 
 Reassess the estimate with each existing coordinated observation. If measured scratch approaches or
