@@ -3,8 +3,8 @@ use super::*;
 const UNIT: &str = "horizon-qualify-141-original-entry-root-20261023-v1.service";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-original-entry-root-20261023-v1";
 const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-original141-fleet-reader-20261023-v2/jetstreamer-r2";
-const READER_SHA: &str = "97b65c2fe933d6f765dcbbd3e781626d12021f5ec21eb162b2fe20df3210fef8";
+    "/usr/local/lib/jetstreamer/horizon-original141-fleet-reader-20261023-v3/jetstreamer-r2";
+const READER_SHA: &str = "2c9c11201c192a521fa0225447568b35033b7875c389304f6bd0ca092e07e6f2";
 const NODE_SHA: &str = "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0";
 const FIRST_GUARD: &str = "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194";
 #[derive(Debug, Deserialize, Serialize)]

@@ -21,7 +21,7 @@ const SNAPSHOT: &str = "/usr/local/lib/jetstreamer/horizon-epoch140-native-resto
 const CHECKPOINTS: &str =
     "/usr/local/lib/jetstreamer/horizon-original141-checkpoints-20261023-v1/epoch-hashes.txt";
 const CHECKPOINTS_SHA: &str = "28ff603d15cd7ff653af314887b102697403489ab31cea83708f9676fead9699";
-const PLAN: &str = "/usr/local/lib/jetstreamer/horizon-original141-root-plan-20261023-v1/plan.json";
+const PLAN: &str = "/usr/local/lib/jetstreamer/horizon-original141-root-plan-20261023-v2/plan.json";
 const ADMISSION: &str =
     "/var/lib/jetstreamer/horizon-original141-admission-20261023-v1/admission.json";
 fn admission_path(path: &Path) -> bool {
@@ -317,7 +317,8 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
             "original141 sandbox differs:{key}"
         );
     }
-    let writable = format!("{ROOT}/destination {ROOT}/output {ROOT}/scratch");
+    let writable =
+        format!("{ROOT}/destination {ROOT}/output {ROOT}/scratch {ROOT}/.jetstreamer-private");
     ensure!(
         p.get("ReadWritePaths") == Some(&writable.as_str()),
         "original141 writable roots differ"
@@ -498,7 +499,8 @@ mod tests {
             bad[key] = Value::Null;
             assert!(live_shape(&c, &bad).is_err(), "live {key}");
         }
-        let writable = format!("{ROOT}/destination {ROOT}/output {ROOT}/scratch");
+        let writable =
+            format!("{ROOT}/destination {ROOT}/output {ROOT}/scratch {ROOT}/.jetstreamer-private");
         let env = format!(
             "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1 JETSTREAMER_HISTORICAL_WORKER_V1_4_25={PACKAGE}/jetstreamer-historical-worker-v1-4-25 SOLANA_RAYON_THREADS=2"
         );
