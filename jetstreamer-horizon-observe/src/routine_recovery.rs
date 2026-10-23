@@ -122,6 +122,9 @@ fn evidence(binding: &Bound) -> Result<Value> {
 }
 
 pub(super) fn interval(p: &Plan) -> Result<u64> {
+    if p.controller_rebind.is_some() {
+        return controller_rebind::interval(p);
+    }
     if let Some(interval) = delivery160::interval(p)? {
         return Ok(interval);
     }

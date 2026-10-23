@@ -58,6 +58,8 @@ mod original141;
 #[path = "routine_private144.rs"]
 mod private144;
 
+#[path = "routine_controller_rebind.rs"]
+mod controller_rebind;
 #[path = "routine_recovery.rs"]
 mod controller_recovery;
 
@@ -150,6 +152,8 @@ struct Plan {
     public198_delivery: Option<public198::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     package_controller_recovery: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    controller_rebind: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     census141_poh: Option<census141_poh::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -283,6 +287,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.controller_rebind.is_some() {
+        return "controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if original141::enabled(p) {
         return "original141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -1896,6 +1903,7 @@ fn main() {
                             | "--recover-delivery198"
                             | "--promote-partial2018"
                             | "--prepare-next"
+                            | "--prepare-next-controller-rebind"
                             | "--prepare-next-upload198"
                             | "--prepare-next-delivery160"
                             | "--prepare-next-public160"

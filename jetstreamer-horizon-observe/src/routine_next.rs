@@ -528,6 +528,21 @@ pub(super) fn prepare(
         validate_observer_config(&next, &effective, &next_config)?;
         original141::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
+    if mode == "--prepare-next-controller-rebind" {
+        ensure!(
+            handoff_spec.is_none(),
+            "controller recovery consumes only exact sealed host proof"
+        );
+        controller_rebind::enable(
+            &mut next,
+            &mut next_config,
+            &mut observer_package,
+            &mut cycle_package,
+        )?;
+        let model =
+            repair185::effective_model(&next, &repair183::effective_model(&next, &effective)?)?;
+        validate_observer_config(&next, &model, &next_config)?;
+    }
     if mode == "--prepare-next-upload198" {
         ensure!(
             handoff_spec.is_none(),
