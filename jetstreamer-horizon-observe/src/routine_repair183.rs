@@ -1,9 +1,9 @@
 //! Exact admitted repair183-184 observer/model adoption; never replay authority.
 use super::*;
 const CONTROLLER: &str =
-    "jetstreamer-epochs183-184-readerfix-full-20261023-controller-v1-r2.service";
+    "jetstreamer-epochs183-184-readerfix-full-20261023-controller-v2-r2.service";
 const PRODUCER: &str =
-    "jetstreamer-root-sweep-e183-184-readerfix-full-20261023-v1-r2-e183-184-lane-a-1.service";
+    "jetstreamer-root-sweep-e183-184-full-20261023-v2-r2-e183-184-lane-a-1.service";
 const GUARD: &str = "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.service";
 const GUARD_SCRIPT: &str = "/usr/local/lib/jetstreamer/adaptive-reserve-epochs191-194-20261016-v1/guard-adaptive-replay-reserve.py";
 const GUARD_SHA: &str = "b62e58f5be764935a679408e1fcc446a9768170109a6639c87fd01571b9f2b62";
@@ -445,6 +445,16 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn producer_namespace_fits_the_pinned_controller_id_limit() {
+        let id = PRODUCER
+            .strip_prefix("jetstreamer-root-sweep-")
+            .unwrap()
+            .strip_suffix("-e183-184-lane-a-1.service")
+            .unwrap();
+        assert!(id.len() <= 32);
+        assert!(id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-'));
+    }
     fn h() -> Handoff {
         serde_json::from_value(json!({"schema":"jetstreamer-horizon-repair183-live-monitor-handoff-v1","controller_invocation_id":"a".repeat(32),"producer_invocation_id":"b".repeat(32),"archive_directory":format!("{ROOT}/destination-x/work/root-cohort-183-184/run-1/archives"),"scratch_path":format!("{ROOT}/destination-x/work/root-cohort-183-184/run-1/scratch"),"observer_before_launch":{"path":"/sample","sha256":"c".repeat(64)},"admission":{"path":"/admit","sha256":"d".repeat(64)},"guard_first_fire":{"path":"/guard","sha256":"e".repeat(64)},"capability":{"path":"/usr/local/lib/jetstreamer/horizon-epochs183-184-package-capability-20261020-v1/capability.json","sha256":"b98120a9a2697fd4bb004df8ebae67594222185db5e4f3cfe2474ce42333ca45"},"new_resource_samples":0,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false})).unwrap()
     }
