@@ -5,6 +5,49 @@ const PLAN_SHA: &str = "9bba35ef4f99d79127f348ea8f99f7a4279f61d4a1360f84a825c8c1
 const IID: &str = "ff971af797604a5da583e247bc4f0779";
 const UNIT: &str = "horizon-final-fleet-recovery-20261022T202800Z-v1.service";
 const FAILURE_SHA: &str = "0bf835db23990ba62a3eaefbaf563bd7b215b1cfb3c90dde105d09011572b4b8";
+struct Profile {
+    root: &'static str,
+    plan_sha: &'static str,
+    iid: &'static str,
+    unit: &'static str,
+    failure_sha: &'static str,
+    observer_sha: &'static str,
+    original_helper_sha: &'static str,
+    failed_operation: &'static str,
+    sample: &'static str,
+}
+const OLD: Profile = Profile {
+    root: ROOT,
+    plan_sha: PLAN_SHA,
+    iid: IID,
+    unit: UNIT,
+    failure_sha: FAILURE_SHA,
+    observer_sha: "a8774a03053f603a61e3078b5a6a2fb6e8f123f7c4444701b84c50196958d1a1",
+    original_helper_sha: "db62a44643c8501d497fad1d94ef5f1d26b4da93b5a3e7e3e498a49b0aef211b",
+    failed_operation: "fetch remote sidecar",
+    sample: "2026-10-22T20:28:00Z",
+};
+const LATE: Profile = Profile {
+    root: "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261022T235800Z-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1",
+    plan_sha: "c07f8ad094386a5a3ee9853b183e5380651df4ba1cb9066884fc985c7675ad15",
+    iid: "aa7553e84fe8403faa1c6585388b6361",
+    unit: "horizon-final-fleet-recovery-20261022T235800Z-v1.service",
+    failure_sha: "2eebb70f6307d99373f4826f8b75a88994806afa25665cb2555b1c8e8fee504c",
+    observer_sha: "3400fdf69e95e399230759361d6dcc457a75c77091d4ec08ca91ce46b7946dc7",
+    original_helper_sha: "deff1dae86d86f80754ff602d181c3363c3aeb6ac1ad0988f3452b30fdfb5bfc",
+    failed_operation: "stat remote archive",
+    sample: "2026-10-22T23:58:00Z",
+};
+fn profile(p: &Plan, pb: &Bound) -> Result<&'static Profile> {
+    [&OLD, &LATE]
+        .into_iter()
+        .find(|s| {
+            p.sample_target_utc == s.sample
+                && p.cycle_directory == Path::new(s.root)
+                && pb.sha256 == s.plan_sha
+        })
+        .context("not an exact reviewed final-fleet read failure profile")
+}
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     let bytes = read_checked(&path, LIMIT, 0, immutable)?;
     Ok(Bound {
@@ -24,33 +67,34 @@ fn successful(v: &Value, tool: &Bound) -> Result<()> {
     Ok(())
 }
 fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
+    let s = profile(p, pb)?;
     ensure!(
         is_101(p)?
-            && p.sample_target_utc == "2026-10-22T20:28:00Z"
-            && p.cycle_directory == Path::new(ROOT)
-            && pb.sha256 == PLAN_SHA
             && native141::all_retry_enabled(p)
             && p.publication144.is_none()
             && i["plan"] == serde_json::to_value(pb)?
-            && i["invocation_id"] == IID
-            && i["self_sha256"]
-                == "db62a44643c8501d497fad1d94ef5f1d26b4da93b5a3e7e3e498a49b0aef211b"
+            && i["invocation_id"] == s.iid
+            && i["self_sha256"] == s.original_helper_sha
             && f["schema"] == "jetstreamer-horizon-routine-child-result-v1"
             && f["success"] == false
             && f["exit_code"] == 1
             && f["signal"].is_null()
             && f["tool"] == serde_json::to_value(&p.tools.r2)?
             && f["stderr"]["text"]
-                == "Error: failed to fetch remote sidecar\n\nCaused by:\n    0: service error\n    1: unhandled error\n    2: Error\n",
-        "not the exact2028 final read-only inventory failure"
+                == format!(
+                    "Error: failed to {}\n\nCaused by:\n    0: service error\n    1: unhandled error\n    2: Error\n",
+                    s.failed_operation
+                ),
+        "not the exact reviewed final read-only inventory failure"
     );
     Ok(())
 }
 pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<()> {
+    let s = profile(p, pb)?;
     let intent = file(p.cycle_directory.join("intent.json"), false)?;
     let rejected = Bound {
         path: p.cycle_directory.join("child-fleet.json"),
-        sha256: FAILURE_SHA.into(),
+        sha256: s.failure_sha.into(),
     };
     let i = bound_json(&intent, false)?;
     exact(p, pb, &i, &bound_json(&rejected, false)?)?;
@@ -65,7 +109,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     let text = std::str::from_utf8(&o.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
     for (k, v) in [
-        ("InvocationID", IID),
+        ("InvocationID", s.iid),
         ("NRestarts", "0"),
         ("MainPID", "0"),
         ("ActiveState", "failed"),
@@ -77,7 +121,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     }
     let observer = Bound {
         path: p.observer.clone(),
-        sha256: "a8774a03053f603a61e3078b5a6a2fb6e8f123f7c4444701b84c50196958d1a1".into(),
+        sha256: s.observer_sha.into(),
     };
     ensure!(
         i["observer"] == serde_json::to_value(&observer)?,
@@ -142,8 +186,13 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
             &p.tools.r2,
         )?;
         let b = file(
-            Path::new("/home/sol/.jetstreamer-private/r2-status-receipts")
-                .join(format!("epoch-{epoch}.status-20261022202800.json")),
+            Path::new("/home/sol/.jetstreamer-private/r2-status-receipts").join(format!(
+                "epoch-{epoch}.status-{}.json",
+                p.sample_target_utc
+                    .chars()
+                    .filter(char::is_ascii_digit)
+                    .collect::<String>()
+            )),
             false,
         )?;
         next_preparation::validate_status(&bound_json(&b, false)?, p, &observer, &e)?;
@@ -205,13 +254,13 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         );
         return Ok(());
     }
-    let iid = authenticate_named_service(UNIT)?;
+    let iid = authenticate_named_service(s.unit)?;
     fs::create_dir(&root)?;
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
     File::open(&p.cycle_directory)?.sync_all()?;
     let recovery = write_new(
         &root.join("intent.json"),
-        &json!({"schema":"horizon-exact2028-final-fleet-recovery-v1","original_intent":intent,"failed_child":rejected,"original_invocation_id":IID,"recovery_invocation_id":iid,"observer":observer,"new_resource_samples":0,"status_writes":0,"archive_mutations":false,"sidecar_mutations":false,"r2_mutations":false}),
+        &json!({"schema":"horizon-exact-final-fleet-recovery-v2","original_intent":intent,"failed_child":rejected,"original_invocation_id":s.iid,"recovery_invocation_id":iid,"observer":observer,"new_resource_samples":0,"status_writes":0,"archive_mutations":false,"sidecar_mutations":false,"r2_mutations":false}),
     )?;
     child(
         &p.tools.r2,
@@ -246,6 +295,38 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn late_head_failure_is_a_separate_exact_profile_not_a_generic_retry() {
+        let (mut p, ..) = crate::tests::fixture101();
+        p.sample_target_utc = LATE.sample.into();
+        p.cycle_directory = LATE.root.into();
+        let b = json!({"path":"/proof","sha256":"a".repeat(64)});
+        p.native141_audit =
+            Some(serde_json::from_value(json!({"first_guard":b,"all_retry":b})).unwrap());
+        let mut pb = Bound {
+            path: "/plan".into(),
+            sha256: LATE.plan_sha.into(),
+        };
+        let i = json!({"plan":pb,"invocation_id":LATE.iid,"self_sha256":LATE.original_helper_sha});
+        let f = json!({"schema":"jetstreamer-horizon-routine-child-result-v1","success":false,"exit_code":1,"signal":null,"tool":p.tools.r2,
+            "stderr":{"text":format!("Error: failed to {}\n\nCaused by:\n    0: service error\n    1: unhandled error\n    2: Error\n",LATE.failed_operation)}});
+        exact(&p, &pb, &i, &f).unwrap();
+        for key in ["invocation_id", "self_sha256"] {
+            let mut bad = i.clone();
+            bad[key] = json!("foreign");
+            assert!(exact(&p, &pb, &bad, &f).is_err());
+        }
+        let mut old_error = f.clone();
+        old_error["stderr"]["text"] = json!(format!(
+            "Error: failed to {}\n\nCaused by:\n    0: service error\n    1: unhandled error\n    2: Error\n",
+            OLD.failed_operation
+        ));
+        assert!(exact(&p, &pb, &i, &old_error).is_err());
+        pb.sha256 = OLD.plan_sha.into();
+        assert!(exact(&p, &pb, &i, &f).is_err());
+        p.sample_target_utc = "2026-10-23T00:28:00Z".into();
+        assert!(profile(&p, &pb).is_err());
+    }
     #[test]
     fn recovery_rejects_another_cycle_attempt_success_or_failure_cause() {
         let (mut p, ..) = crate::tests::fixture101();
