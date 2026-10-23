@@ -32,6 +32,10 @@ jobs:
             scope: "-p jetstreamer-node"
             flags: "--features epoch140-native-restore-diagnostic"
             examples: false
+          - name: node-epoch141-original-entry-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch141-original-entry-qualification"
+            examples: false
           - name: all-compatible-features
             scope: "--workspace --exclude jetstreamer-node --exclude jetstreamer-horizon-observe"
             flags: "--all-features"
