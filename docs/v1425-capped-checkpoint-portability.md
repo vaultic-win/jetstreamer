@@ -1,0 +1,177 @@
+# Corrected/capped v1.4.25 checkpoint portability: source audit
+
+This is a source audit and a bounded experiment plan, not a checkpoint, export,
+resume, runtime-promotion, publication or retirement receipt. No running worker
+was contacted, stopped, restarted or changed. No resource observation, build or
+remote mutation was performed for this audit.
+
+The exact current candidate is worker SHA-256
+`fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759`,
+compiled from the corrected v1.4.25 source with `capped-shrink-candidate` using
+Rust1.46.0. The healthy141 root qualification and the prepared136 route remain
+separate and retain their existing admission and runtime authority.
+
+## Actual export and restore path
+
+`historical-runtime/v1_4_25/worker/src/main.rs`, `Worker::handle_body`, explicitly
+returns `UnsupportedOperation` for `RequestBody::ExportSnapshot`. It does not
+dispatch to a native serializer. `FreezeCheckpoint` calls
+`RuntimeState::freeze_checkpoint` in `worker/src/runtime.rs`; that requires a
+complete Bank and zero uncommitted tick hash count, freezes/roots/squashes it,
+drains freeze-time account writes, performs account-storage maintenance, and
+returns the bank/accounts hashes, last blockhash, capitalization, transaction
+count, tick height, writes and next raw write version. This is a logical tuple,
+not a restorable artifact.
+
+There is a real pinned native serializer. Under
+`historical-runtime/v1_4_25/vendor/solana-runtime-1.4.25/src/`:
+
+- `snapshot_utils.rs::add_snapshot` calls
+  `serde_snapshot::bank_to_stream(SerdeStyle::NEWER, ...)` with selected snapshot
+  storage Arcs. This is schema `1.2.0`, not the v1.0.7 worker's `1.0.0` layout.
+- `serde_snapshot/future.rs::Context::serialize_bank_and_storage` serializes the
+  typed native Bank and AccountsDB. Its Bank fields include blockhash queue,
+  bank/parent hash, parent slot, transaction/signature counts, tick heights,
+  capitalization, rent/fee/epoch state and builtin/message-processor data.
+  `serialize_accounts_db_fields` includes the raw global `write_version`, slot,
+  selected AppendVec identities/current lengths and bank-hash information.
+- `serde_snapshot.rs` restores the raw write version into the new AccountsDB;
+  this must still be compared explicitly with the exported cursor. The selected
+  AppendVec bytes and rooted status-cache deltas are separate mandatory members.
+- `serde_snapshot/tests.rs::test_bank_serialize_style` already constructs rooted
+  and non-root forks, serializes/copies their storage, restores a Bank, checks
+  balances including excluded fork/dead accounts, and asserts Bank equality.
+  These source tests are evidence that the layout exists; this audit did not
+  rerun them or establish fresh-process continuation equivalence.
+
+The worker's `snapshot.rs::load_archive` already admits `1.2.0`, calls the pinned
+`bank_from_stream(NEWER, ...)` with the corrected additional-builtin table,
+rejects unreferenced AppendVecs, restores and validates rooted status-cache
+deltas, and verifies filename accounts hash and `verify_snapshot_bank()`.
+`RuntimeState::initialize` then sets `write_cursor` from the restored AccountsDB,
+`last_entry_hash` from `Bank::last_blockhash`, and entry/tick counters to zero.
+That initialization is suitable only for a fully completed slot boundary and
+next-slot continuation, after an explicit equality check. It cannot express a
+mid-entry or mid-slot checkpoint. Source lineage must remain separately bound:
+the new initialized source names the exported snapshot instead of the original
+bootstrap. Account-maintenance counters and leader-cache contents reset too;
+their effect on subsequent consensus/output must be tested, not assumed harmless.
+
+Do not call `snapshot_utils::archive_snapshot_package` against a campaign or
+holding output directory. It renames its archive and invokes
+`purge_old_snapshot_archives` on that archive's parent. It also launches host
+`tar`; merely hashing the worker would not bind that producer implementation.
+The v1.0.7 worker's `snapshot.rs::export_archive` is useful packaging precedent
+for in-process compression, isolated staging, descriptor hashing and
+`persist_noclobber`, but its Bank serialization and cleaning API are different.
+It cannot be copied verbatim into v1.4.25.
+
+## Output continuity is independently missing
+
+`jetstreamer-horizon/src/archive/writer.rs::ArchiveWriter` keeps the open bucket,
+index, file offset, dedupe/encoder context, diff state, last blockhash and staged
+slot sections in RAM. It has no recovery/open-append constructor. Its public
+constructors immediately write a new header. `jetstreamer-node/src/horizon.rs`
+also retains slot assemblies, metadata, emitted-slot/hash anchors and pending
+account updates; `HorizonRecorder::create` uses `File::create`. Reopening a
+partial through this constructor truncates it. A Bank snapshot preserves none
+of these writer states, and a copied partial does not recreate them.
+
+Use a separately finalized V2 prefix and a new V2 suffix. Existing machinery is
+`HistoricalSegmentManifest`,
+`HistoricalReplay::from_restored_checkpoint`, and
+`archive::merge_checkpoint_restart_segments` with explicit V4 provenance. The
+merger binds source digests, decoded events, raw-write ranges and the PoH handoff;
+it grants no canonical root or publication authority. Existing exact144/203/213
+continuation tools demonstrate the shape, not authority for141/136. The141
+original-entry profile additionally fixes bootstrap60911751/terminal61328765
+and rejects partial source resume. A new private bounded profile must preserve
+those checks and independently bind its next-slot source cursor; do not weaken
+the running profile or reuse another epoch's `RestartProof`.
+
+## Smallest safe implementation and next bounded experiment
+
+First implement a test-only native1.2.0 serialization round trip. It requires no
+new production protocol or runtime route, and can use
+`RuntimeState::from_test_bank` plus the existing rooted-bank fixtures. Reserve a
+separate historical build target with the parent before compilation. Proposed
+build bounds are the already-used Rust1.46.0 offline/locked jobs2, CPU200%,
+MemoryHigh12GiB/Max16GiB, no swap, Tasks512, private network and read-only source.
+Use only disposable temporary state, with a distinct10GiB whole-fixture stop and
+30-minute execution deadline; these are experiment limits, not a native141 peak.
+
+1. Create an isolated deterministic Bank with the corrected builtin table,
+   execute fixed successful and failing transactions through a complete slot,
+   freeze/root/drain and record the full checkpoint tuple and raw emitted writes.
+   Include at least one rooted status-cache signature so duplicate detection is
+   exercised. Retain this uninterrupted branch.
+2. In a new empty staging tree, call native `bank_to_stream(NEWER, ...)`, capture
+   only its selected flushed AppendVecs and sorted rooted status-cache deltas,
+   and write version `1.2.0`. Do not invoke the upstream archive packager or any
+   retention helper. Record each member's exact path, length and digest and
+   ensure the Bank tuple and raw write cursor did not change during export.
+3. Re-exec the isolated test executable as a fresh process, with its own private
+   scratch and the test-only synthetic-genesis route. Restore through the same
+   typed `bank_from_stream`/status-cache logic as `load_archive`; compare the
+   complete tuple, raw write cursor and cache roots/signatures before accepting
+   any next-slot entry. Never add synthetic-genesis acceptance to production
+   `RuntimeState::initialize`, which correctly requires mainnet.
+4. Supply exactly the next complete slot's canonical entries to both branches.
+   Compare every raw account write including write version/signature attribution,
+   transaction result, entry hash, and the next checkpoint tuple. Add a replayed
+   signature to test duplicate detection and a skipped-parent transition to test
+   slot/PoH boundary handling. A matching accounts hash alone does not pass.
+
+Only after this passes should a separately gated candidate add native export:
+`RuntimeState` needs a one-use successful-checkpoint export seal, consumed on any
+attempt and invalidated on other requests, following the v1.0.7 protocol pattern.
+Require the same complete frozen rooted slot, exact32-byte expected accounts
+hash and no unconsumed writes. Package the real `NEWER` serializer, selected
+flushed AppendVecs and status cache in-process into an empty private staging
+directory; fsync, publish no-clobber, hash through the persisted descriptor, and
+recheck every consensus/output cursor. Do not change protocol discriminants.
+Missing seal, stale slot/hash, interrupted export, occupied destination and
+changing members must fail closed. Test default and capped builds separately.
+
+The next stage is a private **two-output-segment** equivalence run: close and
+independently read the prefix at the same completed-slot checkpoint, bind its
+full digest/manifest and original source index/data generations, restore in a
+fresh process, start a new output at the first next non-skipped slot and entry0,
+and prove no source transaction is duplicated/skipped. Bind original and
+replacement invocation IDs and worker/parent/source hashes. Compare the merged
+decoded output with uninterrupted execution; byte equality alone is inappropriate
+when headers carry independent creation times or different segment provenance.
+Then require a real bounded native141/136 input sample and later trusted root,
+full/plugin/boundary gates, authenticated holding round trip and interrupted
+transition recovery. No stage authorizes stopping a healthy producer early.
+
+Native serialization and output continuation remain **unqualified**. No capacity
+gain from parking a live141/136 replay is demonstrated by this audit.
+
+## Existing141 deadline evidence
+
+No new poll was taken. The coordinated observer at
+`/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T182600Z.json`
+has SHA-256
+`dde879bd02d342a9879eb21b82766880257c2442a39fa692f56d1f1f7eb67ff8`.
+Its last slot60926156 and rate1.0021996518807004slots/s leave402609slots to
+root61328765. The matching `qualification141-estimate.json` under the
+`20261023T182600Z-controller-rebind-capped141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1`
+routine-cycle directory binds that observer and records elapsed13936388ms,
+remaining546525910ms and129600000ms downstream allowance.
+Its SHA-256 is
+`b1734ae57f99d311005eb265168b206ce82da2b3c14593ec66f20cb63c3b884e`.
+
+The5day runtime cap is432000000ms. At that sample, its remaining execution
+window was418063612ms (4days20hours7minutes43.612seconds). Root replay at the
+observed rate projects401725345ms (4days15hours35minutes25.345seconds), leaving
+only16338267ms (4hours32minutes18.267seconds), before any extra terminal work.
+The minimum sustained remaining rate is0.963032870slots/s: about3.91% below
+the observed rate. The projection currently fits, but has a tight deadline
+margin and is not a guaranteed bound. Do not silently extend that cap.
+
+The dashboard's larger estimate also includes15234suffix slots at the same
+assumed rate and36hours of explicit unmeasured planning allowances:24hours for
+suffix source/restoration/qualification and12hours for delivery. That suffix is
+outside the running root invocation. Its ETA cannot establish that the current
+invocation can execute the suffix, nor imply a qualified native resume path.
