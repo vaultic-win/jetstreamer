@@ -2574,34 +2574,57 @@ pub(super) async fn run() -> Result<()> {
     let mut live_pipeline_stages = BTreeSet::new();
     for claim in &plan.pipeline_claims {
         let current = &before[&claim.unit];
-        let is_active = pipeline_live(claim, current)?;
-        let finalization = if is_active && (191..=194).contains(&claim.epoch) {
-            let mut proofs = Vec::new();
-            for b in &claim.evidence {
-                let value = bound_json(b)?;
-                if let Some(proof) = super::cohort191_delivery::fleet_proof(
-                    claim.epoch,
-                    &claim.phase,
-                    &claim.unit,
-                    &claim.invocation_id,
-                    &value,
-                    &before,
-                    sample_seconds,
-                )? {
-                    proofs.push(proof);
+        let (is_active, finalization) = if (191..=194).contains(&claim.epoch) {
+            // A same-cutoff native custody check can race a genuine importer
+            // or verifier handoff. Preserve the failure in this durable fleet
+            // without suppressing seven ordinary lanes/private141/successors.
+            let result = (|| -> Result<(bool, Value)> {
+                let live = pipeline_live(claim, current)?;
+                if !live {
+                    return Ok((false, Value::Null));
                 }
+                let mut proofs = Vec::new();
+                for b in &claim.evidence {
+                    let value = bound_json(b)?;
+                    if let Some(proof) = super::cohort191_delivery::fleet_proof(
+                        claim.epoch,
+                        &claim.phase,
+                        &claim.unit,
+                        &claim.invocation_id,
+                        &value,
+                        &before,
+                        sample_seconds,
+                    )? {
+                        proofs.push(proof);
+                    }
+                }
+                ensure!(
+                    proofs.len() == 1,
+                    "191 delivery claim needs exactly one native custody event"
+                );
+                Ok((true, proofs.remove(0)))
+            })();
+            match result {
+                Ok(v) => v,
+                Err(e) => (
+                    false,
+                    json!({"schema":"jetstreamer-cohort191-status-incident-v2",
+                    "epoch":claim.epoch,"sampled_at_utc":sample,"error":format!("{e:#}"),
+                    "actual_owner_may_still_be_active":true,"inactivity_not_proven":true,
+                    "status_deletion_authorized":false,"ordinary_lanes_continue":true,
+                    "publication_authorized":false,"r2_mutations":false}),
+                ),
             }
-            ensure!(
-                proofs.len() == 1,
-                "191 delivery claim needs exactly one native custody event"
-            );
-            proofs.remove(0)
-        } else if is_active && claim.phase == "producer-finalization" {
-            super::cohort_finalization::observe(current, sample_seconds)?
-        } else if is_active && claim.phase == "controller-import-handoff" {
-            super::cohort_finalization::observe_handoff(current, sample_seconds)?
         } else {
-            Value::Null
+            let live = pipeline_live(claim, current)?;
+            let proof = if live && claim.phase == "producer-finalization" {
+                super::cohort_finalization::observe(current, sample_seconds)?
+            } else if live && claim.phase == "controller-import-handoff" {
+                super::cohort_finalization::observe_handoff(current, sample_seconds)?
+            } else {
+                Value::Null
+            };
+            (live, proof)
         };
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
             || native207::scope(&claim.phase, &claim.unit)
