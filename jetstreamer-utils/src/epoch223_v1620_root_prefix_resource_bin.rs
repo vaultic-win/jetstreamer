@@ -10,7 +10,7 @@ mod profile {
     pub const INITIAL_REPLAY: u64 = 96_335_539;
     // Century scratch planning only; output/margin and other owners are extra.
     // Fresh whole-fleet admission and an invocation-bound guard are mandatory.
-    pub const MINIMUM_FREE: u64 = 548_289_182_611;
+    pub const MINIMUM_FREE: u64 = 2_471_798_691_840;
     pub const MAX_SCRATCH: u64 = 300_000_000_000;
     pub const MAX_RUNTIME: u64 = 259200;
     pub const SNAPSHOT_SIZE: u64 = 9_815_262_303;
@@ -18,7 +18,7 @@ mod profile {
     pub const RESULT_SCHEMA: &str = "jetstreamer-private-epoch223-v1620-root-prefix-resource-v1";
     pub const STOP_SCHEMA: &str = "jetstreamer-private-epoch223-v1620-root-prefix-stop-v1";
     pub const UNIT_PREFIX: &str = "horizon-qualify-223-v1620-root-prefix-resource-";
-    pub const ROOT_PREFIX: &str = "qualification-223-v1620-prefix-";
+    pub const ROOT_PREFIX: &str = "qualification-223-v1620-prefix-full-root-";
     pub const SNAPSHOT_NAME: &str =
         "snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst";
     pub const TERMINAL_NAME: &str =
@@ -30,8 +30,53 @@ mod profile {
 }
 mod bounded_resource_runner {
     include!("bounded_resource_runner.rs");
-    struct Prefix20;
+    include!("epoch223_native20_prefix_gate.rs");
+    struct Prefix20 {
+        next_guard: std::sync::Mutex<Instant>,
+    }
     impl StorageHooks for Prefix20 {
+        fn prepare(&self, _p: &Plan) -> Result<()> {
+            prefix_prerequisites()?;
+            Ok(())
+        }
+        fn before_spawn(&self, p: &Plan, _iid: &str) -> Result<Value> {
+            prefix_prerequisites()?;
+            prefix_start_resources(p)?;
+            Ok(
+                json!({"warmup_terminal":{"path":WARMUP_PROOF,"sha256":WARMUP_SHA},
+                "native_input":{"path":NATIVE_PROOF,"sha256":NATIVE_SHA},
+                "scratch_planning_bytes":MAX_SCRATCH,"whole_root_envelope_bytes":PREFIX_WHOLE_ROOT,
+                "enforced_filesystem_floor_bytes":PREFIX_FLOOR,"minimum_available_memory_bytes":PREFIX_MEMORY_RESERVE,
+                "candidate_memory_max_bytes":PREFIX_MEMORY_MAX,"canonical_prefix_independently_qualified":false,
+                "full_epoch_qualified":false,"publication_authorized":false,"r2_mutations":false}),
+            )
+        }
+        fn guard(
+            &self,
+            p: &Plan,
+            iid: &str,
+            child: u32,
+            _elapsed: Duration,
+            _draining: bool,
+        ) -> Result<()> {
+            let mut next = self
+                .next_guard
+                .lock()
+                .map_err(|_| anyhow::anyhow!("prefix guard lock poisoned"))?;
+            if Instant::now() < *next {
+                return Ok(());
+            }
+            *next = Instant::now() + Duration::from_secs(15);
+            let check = prefix_runtime_resources(p);
+            if let Err(error) = check {
+                persist(
+                    &p.run_root.join("receipts/guard-stop.json"),
+                    &json!({"schema":"jetstreamer-private-epoch223-v1620-prefix-guard-stop-v1","invocation_id":iid,"child_pid":child,"reason":format!("{error:#}"),"publication_authorized":false,"r2_mutations":false}),
+                )?;
+                return Err(error);
+            }
+            Ok(())
+        }
         fn capability_only(&self) -> bool {
             env::args()
                 .next_back()
@@ -57,6 +102,8 @@ mod bounded_resource_runner {
                 "schema":"jetstreamer-private-epoch223-v1620-root-prefix-capability-v1",
                 "invocation_id":iid,"bindings":bindings,"parent_planning_report":report,
                 "node_sha256":PARENT_SHA,"worker_sha256":WORKER,"snapshot_sha256":SNAPSHOT,
+                "prerequisites":{"warmup_terminal":{"path":WARMUP_PROOF,"sha256":WARMUP_SHA},"native_input":{"path":NATIVE_PROOF,"sha256":NATIVE_SHA}},
+                "canonical_prefix_independently_qualified":false,"native_restart_qualified":false,"assembly_qualified":false,
                 "entry_replay":false,"worker_started":false,"resource_observation_performed":false,
                 "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
             )
@@ -91,7 +138,9 @@ mod bounded_resource_runner {
         Ok(r)
     }
     pub(super) fn entry() {
-        main_with_storage(&Prefix20);
+        main_with_storage(&Prefix20 {
+            next_guard: std::sync::Mutex::new(Instant::now()),
+        });
     }
     #[cfg(test)]
     mod native20_tests {
