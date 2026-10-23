@@ -25,6 +25,14 @@ working sets. The fixed baseline protects the known225and205growth claims and
 century floor; it is a rejection minimum, not authority to omit later admissions.
 The128-GiB archive cap and8-thread scan setting require separate review if changed.
 
+The203 runner also performs fresh scan-only admission before opening the assembled
+archive. It requires the exact225/205 invocations and their current caps, a complete
+campaign service census including itself, fresh untripped protective guard receipts,
+and its actual128-GiB/8-core sandbox. It charges the distinct scan hard cap alongside
+both existing producer caps against90% host memory, checks available memory and
+protected disk space, and repeats the census/identity checks before writing a durable
+private`admission.json`. This does not admit another replay or authorize publication.
+
 Run from a native-sealed immutable package with a separately sealed plan:
 
 ```text

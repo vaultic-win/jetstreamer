@@ -140,6 +140,11 @@ the normal work-conserving backfill path rather than waiting for another status 
 - Overlap independent full verification, plugin verification, authenticated R2 upload, and remote
   readback with replay. Keep their receipt gates independent, and account for their measured I/O,
   CPU, and memory pressure when admitting another replay lane.
+  A completed private assembly releases its producer claim even while its independent scan is
+  being prepared. Record the real terminal event and the pending delivery action; count only an
+  actually launched scanner as active. Admit that scan against the current producer census and
+  current guards, allowing for a complete private archive copy when the verifier needs one. Keep
+  scan/assembly RSS separate from the century's settled replay comparison.
 - Prefer independently replayable and publishable singleton epochs. Keep as many disjoint,
   root-verifiable singletons parallel as fresh admission and the proven operating point allow, and
   promptly fill every safe lane. Reuse sealed snapshot inputs where possible, but do not trade away

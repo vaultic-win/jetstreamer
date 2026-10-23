@@ -16,6 +16,8 @@ use std::{
     time::Instant,
 };
 
+include!("private203_scan_admission.rs");
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Evidence {
@@ -573,6 +575,7 @@ fn run(plan_binding: Evidence, self_sha256: &str) -> Result<()> {
     validate_boundary_metadata(&plan)?;
     checked(&plan.full_verifier)?;
     checked(&plan.plugin)?;
+    admit_private203_scan(&plan, &plan_binding, self_sha256)?;
     let source_path = Path::new(SOURCE);
     let mut source = open_file(source_path, false)?;
     let source_identity = identity(&source.metadata()?);
