@@ -250,10 +250,20 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
         "repair183 admission does not bind the exact prelaunch observer"
     );
     guard(&h, &bound_json(&h.guard_first_fire, true)?)?;
+    let mut h = h;
+    h.controller_invocation_id = controller_rebind::controller(
+        p,
+        "183-184",
+        &h.controller_invocation_id,
+        &h.producer_invocation_id,
+    )?;
     Ok(Some(h))
 }
 pub(super) fn validate_live(p: &Plan) -> Result<()> {
     if let Some(h) = proof(p)? {
+        if p.controller_rebind.is_some() {
+            return controller_rebind::validate_live(p);
+        }
         live_guard(&h)?;
     }
     Ok(())
@@ -339,6 +349,8 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
     Ok(v)
 }
 pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
+    let rebound = controller_rebind::model(p, model)?;
+    let model = &rebound;
     let Some(h) = proof(p)? else {
         return Ok(model.clone());
     };
