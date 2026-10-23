@@ -1,7 +1,7 @@
 //! Capture only real native qualification or an exactly guarded singleton.
 use super::*;
 use super::{singleton227 as c, singleton227_admission as admission};
-const GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-ownroot203-capability-8623b37c-v1/jetstreamer-horizon-standalone-guard";
+const GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-singleton227-guard-80f302b1-v1/jetstreamer-horizon-standalone-guard";
 const NATIVE_GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-native227-main-guard-e53a03e5-v2/jetstreamer-horizon-standalone-guard";
 const TEST: &str = "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test";
 const TEST_SHA: &str = "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3";
@@ -103,7 +103,7 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
     let (guard_bin, guard_sha) = if mode == "native-cold" {
         (NATIVE_GUARD_BIN, c::NATIVE_GUARD_SHA)
     } else {
-        (GUARD_BIN, c::GUARD_SHA)
+        (GUARD_BIN, c::SINGLETON_GUARD_SHA)
     };
     let command = format!(
         "{{ path={guard_bin} ; argv[]={guard_bin} {} --plan-sha256 {} --self-sha256 {}",
@@ -342,7 +342,7 @@ pub(super) fn run() -> Result<()> {
                 == if s.mode == "native-cold" {
                     c::NATIVE_GUARD_SHA
                 } else {
-                    c::GUARD_SHA
+                    c::SINGLETON_GUARD_SHA
                 }
             && g["plan_sha256"] == s.guard_plan.sha256
             && g["producer"]["invocation_id"] == iid
