@@ -813,7 +813,10 @@ fn finish_sync(row: &mut Value) -> Result<()> {
     let e = number(row, "epoch")?;
     let ready_path = receipt_path(Path::new(RECEIPTS), e);
     let ready_uid = fs::symlink_metadata(&ready_path)?.uid();
-    ensure!(matches!(ready_uid, 0 | 1001), "191 ready receipt writer differs");
+    ensure!(
+        matches!(ready_uid, 0 | 1001),
+        "191 ready receipt writer differs"
+    );
     let b = bound_path(&ready_path, 16 << 10, ready_uid)?;
     let r = custody::queue_ready(&b, e, now_ms()? / 1000)?;
     ensure!(
