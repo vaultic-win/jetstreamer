@@ -6,7 +6,7 @@
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-223.jet";
-    pub const PARENT_SHA: &str = "96faec40d52160a06e92b0fd0f9ab1556820bf145c21cecdda5ab00dc0ec3b51";
+    pub const PARENT_SHA: &str = "99f643ff0dbbcd37d1fbc524a1c1088d7273c7fc91330df059d30d51b8b0fcd4";
     pub const WORKER: &str = "52d6c86a8103b8965ca68ead96af471a7899a0a0e6e69c48989b39fd5d922f0c";
     pub const WORKER_ENV: &str = "JETSTREAMER_HISTORICAL_WORKER_V1_6_20";
     pub const RUNTIME: &str = "solana-v1.6.20";
