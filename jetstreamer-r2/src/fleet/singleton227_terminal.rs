@@ -22,7 +22,7 @@ pub(super) fn journal_terminal(rows: &[Value], iid: &str, pid: u64) -> Result<(b
     terminal.context("227 exact PID1 terminal outcome absent")
 }
 fn terminal_shape(current: &Value, iid: &str, success: bool) -> Result<()> {
-    ensure!(current["Id"] == admission::NATIVE_UNIT && current["MainPID"] == "0" && current["NRestarts"] == "0"
+    ensure!(current["Id"] == admission::NATIVE_UNIT && matches!(current["LoadState"].as_str(),Some("loaded")|Some("not-found")) && current["MainPID"] == "0" && current["NRestarts"] == "0"
         && (current["InvocationID"] == iid || current["InvocationID"] == "")
         && matches!((current["ActiveState"].as_str(), current["SubState"].as_str()),
             (Some("inactive"),Some("dead")) | (Some("failed"),Some("failed")))
@@ -102,12 +102,19 @@ pub(super) fn terminal_census(p:&Plan,current:&BTreeMap<String,Value>) -> Result
 }
 pub(super) fn capture() -> Result<()> {
     let args:Vec<_>=env::args().collect();ensure!(args.len()==7 && args[3]=="--spec-sha256" && args[5]=="--self-sha256" && unsafe{libc::geteuid()}==0,"capture-native227-terminal SPEC --spec-sha256 SHA --self-sha256 SHA (root)");
+    let own=fs::symlink_metadata(fs::read_link("/proc/self/exe")?)?;
+    ensure!(own.uid()==0 && own.nlink()==1 && own.mode() & 0o222==0,"227 terminal helper must be sealed");
     ensure!(hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?))==args[6],"227 terminal helper digest differs");
     let spec_binding=BoundFile{path:args[2].clone().into(),sha256:args[4].clone()};let spec:Spec=serde_json::from_value(bound_json(&spec_binding)?)?;
     ensure!(spec.schema=="jetstreamer-private-epoch227-native-terminal-capture-spec-v1"
         && spec.output.parent().and_then(Path::parent)==Some(Path::new("/var/lib/jetstreamer"))
         && spec.output.parent().and_then(Path::file_name).and_then(|n|n.to_str()).is_some_and(|n|n.starts_with("horizon-227-terminal-"))
         && spec.output.file_name().is_some_and(|n|n=="event.json"),"227 terminal capture destination/scope");
+    if spec.output.try_exists()? {
+        let old=bound_json(&serde_json::from_value(private157::file_binding(&spec.output)?)?)?;
+        ensure!(old["capture_spec"]==private157::binding(&spec_binding) && old["capture_helper_sha256"]==args[6],"227 terminal retry conflicts");
+        terminal_proof(&old)?; return Ok(());
+    }
     validate_output_destination(&spec.output)?;
     let origin=bound_json(&spec.running_origin)?;let iid=origin["invocation_id"].as_str().context("227 terminal IID")?;
     let pid=origin["main_pid"].as_u64().context("227 terminal PID")?;
@@ -133,5 +140,5 @@ pub(super) fn capture() -> Result<()> {
     use super::*;
     fn rows()->Vec<Value>{vec![json!({"_PID":"42","_SYSTEMD_UNIT":admission::NATIVE_UNIT,"_SYSTEMD_INVOCATION_ID":"a".repeat(32),"MESSAGE":"real child"}),json!({"_PID":"1","UNIT":admission::NATIVE_UNIT,"INVOCATION_ID":"a".repeat(32),"__REALTIME_TIMESTAMP":"123000000","MESSAGE":format!("{}: Deactivated successfully.",admission::NATIVE_UNIT)})]}
     #[test] fn terminal_journal_needs_exact_iid_pid_and_unique_pid1_outcome(){let r=rows();assert_eq!(journal_terminal(&r,&"a".repeat(32),42).unwrap(),(true,123000000));assert!(journal_terminal(&r,&"b".repeat(32),42).is_err());assert!(journal_terminal(&r,&"a".repeat(32),43).is_err());assert!(journal_terminal(&r[..1],&"a".repeat(32),42).is_err());let mut dup=r.clone();dup.push(r[1].clone());assert!(journal_terminal(&dup,&"a".repeat(32),42).is_err());}
-    #[test] fn terminal_shape_accepts_pid1_cleared_identity_but_rejects_replacement_and_live(){let u=json!({"Id":admission::NATIVE_UNIT,"MainPID":"0","NRestarts":"0","InvocationID":"","ActiveState":"inactive","SubState":"dead","Result":"success"});terminal_shape(&u,&"a".repeat(32),true).unwrap();for(k,v)in[("MainPID",json!("42")),("InvocationID",json!("b".repeat(32))),("NRestarts",json!("1")),("Result",json!("timeout"))]{let mut bad=u.clone();bad[k]=v;assert!(terminal_shape(&bad,&"a".repeat(32),true).is_err());}}
+    #[test] fn terminal_shape_accepts_pid1_cleared_identity_but_rejects_replacement_and_live(){let u=json!({"Id":admission::NATIVE_UNIT,"LoadState":"loaded","MainPID":"0","NRestarts":"0","InvocationID":"","ActiveState":"inactive","SubState":"dead","Result":"success"});terminal_shape(&u,&"a".repeat(32),true).unwrap();for(k,v)in[("MainPID",json!("42")),("InvocationID",json!("b".repeat(32))),("NRestarts",json!("1")),("Result",json!("timeout")),("LoadState",json!("error"))]{let mut bad=u.clone();bad[k]=v;assert!(terminal_shape(&bad,&"a".repeat(32),true).is_err());}}
 }
