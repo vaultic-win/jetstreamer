@@ -89,3 +89,41 @@ its successful tail does not qualify the earlier runtime. Cold-input capability,
 SourceExact outcomes, canonical root, native restart/cursor mapping, assembly,
 independent full/plugin verification and publication gates still apply. No
 runtime promotion or completed-epoch claim follows from this diagnostic.
+
+## Separately built v1.6.20 prefix candidate
+
+The parent feature `epoch223-v1-6-20-prefix-qualification` selects the original
+v1.6.20 descriptor and worker override. It accepts only focused epoch223,
+bootstrap96,335,538 through the known96,767,522 root, and an isolated
+`qualification-223-v1620-prefix-*` root. It rejects full-epoch/tail requests,
+v1.6.25 namespaces, cohorts, inherited leases, maintenance/recovery entrypoints
+and unrelated diagnostic feature combinations. Its planning-only
+`--epoch223-prefix-preflight` traverses the actual no-worker runtime and both
+canonical checkpoint gates. It neither restores a Bank nor authorizes replay.
+
+The historical v1.6.20 worker's separate `epoch223-prefix-qualification`
+feature closes input to that exact bootstrap and prefix. It caps shrink debt at
+the pinned validator background-service bound; native account loading, fees,
+transactions and Bank hash algorithms are unchanged. The narrower
+`epoch223-prefix-warmup-diagnostic` build admits only the first16slots, rejecting
+later input before transaction decoding or Bank mutation. Default historical
+worker builds retain their original range and shrink behavior, and every
+already sealed deployment remains unchanged.
+
+An opt-in ignored test,
+`runtime::tests::native_epoch223_cold_input_matches_canonical_accounts_commitment`,
+loads the exact hash-bound immutable cold snapshot through this native worker,
+restores the independently audited hard-fork markers, freezes at the bootstrap,
+and checks its canonical accounts commitment, unchanged write cursor and zero
+bootstrap writes. It prints the native tuple with integer formatting. Run it
+only in a separately admitted, sealed128-GiB sandbox with an owner-only fresh
+`native-input223-v1620-*/scratch` directory supplied through
+`JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH`. Merely compiling this ignored test is
+not native input qualification. The exact test executable, source/input hashes,
+terminal journal and result still need durable evidence before an entry replay.
+
+Unit and preflight checks are preparation. Actual native cold-input proof,
+fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
+the bounded warmup comparison and eventual canonical-prefix completion remain
+outstanding until their respective invocations succeed. A16-slot result is not
+a measured full-prefix peak or an epoch archive.

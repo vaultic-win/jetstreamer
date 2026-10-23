@@ -9,6 +9,27 @@ mod epoch225_qualification;
 mod failed_prefix220;
 
 #[cfg(all(
+    feature = "epoch223-v1-6-20-prefix-qualification",
+    any(
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("epoch223 v1.6.20 prefix requires its own exclusive qualification build");
+
+#[cfg(all(
     feature = "epoch141-original-entry-qualification",
     any(
         feature = "epoch140-native-restore-diagnostic",
@@ -11775,7 +11796,7 @@ async fn run_geyser_replay(
             | epoch223_qualification::TailMode::PlanningPreflight
     );
     if tail_comparison || prefix_preflight {
-        if !cfg!(feature = "epoch223-v1-6-25-qualification")
+        if !epoch223_qualification::private_build_enabled()
             || carried_state.is_some()
             || audited_cohort_bootstrap.is_some()
             || verification_end_inclusive.is_some()
@@ -14659,7 +14680,7 @@ fn qualification_expectations(
             plan.replay_start, plan.end_inclusive
         ));
     }
-    if cfg!(feature = "epoch223-v1-6-25-qualification")
+    if epoch223_qualification::private_build_enabled()
         && plan.epoch == 223
         && plan.end_inclusive == epoch223_qualification::TAIL_BOOTSTRAP
     {
@@ -19304,7 +19325,7 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
-    if cfg!(feature = "epoch223-v1-6-25-qualification")
+    if epoch223_qualification::private_build_enabled()
         && let Err(error) = epoch223_qualification::validate_entrypoint(&probe_args)
     {
         eprintln!("error: {error}");
@@ -19494,9 +19515,9 @@ async fn main() {
             || arg == "--epoch223-tail-preflight"
             || arg == "--epoch223-prefix-preflight"
         {
-            if !cfg!(feature = "epoch223-v1-6-25-qualification") {
+            if !epoch223_qualification::private_build_enabled() {
                 eprintln!(
-                    "epoch223 tail flags require the isolated epoch223-v1-6-25-qualification build"
+                    "epoch223 planning flags require an isolated epoch223 qualification build"
                 );
                 exit(2);
             }
@@ -19675,7 +19696,7 @@ async fn main() {
             || unreceipted_recovery_evidence.is_some()
             || publish_through_epoch.is_some()
             || inherited_epoch_lease
-            || cfg!(feature = "epoch223-v1-6-25-qualification")
+            || epoch223_qualification::private_build_enabled()
             || cfg!(feature = "epoch224-v1-6-25-qualification")
             || cfg!(feature = "epoch224-v1-6-25-diagnostic")
             || cfg!(feature = "epoch224-account-delta-diagnostic");
@@ -19907,7 +19928,7 @@ async fn main() {
         eprintln!("{error}");
         exit(2);
     }
-    if cfg!(feature = "epoch223-v1-6-25-qualification")
+    if epoch223_qualification::private_build_enabled()
         && let Err(error) = epoch223_qualification::validate_launch(
             start_epoch,
             end_epoch,
