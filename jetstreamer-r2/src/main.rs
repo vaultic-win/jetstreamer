@@ -139,7 +139,7 @@ struct PublicConfig {
     base_url: Url,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 struct FileIdentity {
     device: u64,
     inode: u64,

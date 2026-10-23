@@ -1,5 +1,6 @@
 //! Routine, identity-bound post-replay metadata. No archive or sidecar mutation.
 use super::*;
+use serde_json::json;
 use std::{collections::BTreeMap, process::Command};
 mod event144;
 mod native_input;

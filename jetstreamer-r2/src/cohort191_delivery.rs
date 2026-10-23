@@ -4,6 +4,7 @@ use serde_json::json;
 mod queue;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    os::unix::fs::PermissionsExt,
     process::Command,
 };
 pub(super) const UNIT: &str =
