@@ -148,8 +148,11 @@ fn identity(metadata: &fs::Metadata) -> Identity {
 }
 
 fn validate_member_name(name: &str) -> Result<(), String> {
+    validate_component_name(name, 128)
+}
+fn validate_component_name(name: &str, maximum: usize) -> Result<(), String> {
     if name.is_empty()
-        || name.len() > 128
+        || name.len() > maximum
         || !name
             .as_bytes()
             .first()
@@ -179,7 +182,10 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
         .file_name()
         .and_then(OsStr::to_str)
         .ok_or_else(|| "destination must have a UTF-8 leaf name".to_string())?;
-    validate_member_name(leaf)?;
+    // A destination is a namespace, not a package member. Keep 128-byte
+    // member names unchanged, but allow the reviewed compound campaign names.
+    // 192 leaves enough NAME_MAX room for .LEAF.stage-PID-U128_NONCE.
+    validate_component_name(leaf, 192)?;
     if plan.members.is_empty() {
         return Err("plan has no members".to_string());
     }
@@ -678,6 +684,50 @@ mod tests {
                 sha256: digest,
                 mode: 0o444,
             }],
+        }
+    }
+
+    #[test]
+    fn compound_campaign_destination_still_seals_noclobber_and_keeps_member_bound() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o755)).unwrap();
+        let source = directory.path().join("input");
+        let digest = write_source(&source, b"retained compound namespace", 0o444);
+        for length in [137, 192] {
+            let mut plan = test_plan(directory.path(), &source, digest.clone());
+            plan.destination = directory.path().join("a".repeat(length));
+            validate_plan(&plan).unwrap();
+            seal(
+                &plan,
+                &"a".repeat(64),
+                &"b".repeat(64),
+                unsafe { libc::geteuid() },
+                false,
+            )
+            .unwrap();
+            assert_eq!(
+                fs::read(plan.destination.join("payload.bin")).unwrap(),
+                b"retained compound namespace"
+            );
+            assert!(
+                seal(
+                    &plan,
+                    &"a".repeat(64),
+                    &"b".repeat(64),
+                    unsafe { libc::geteuid() },
+                    false
+                )
+                .is_err()
+            );
+        }
+        let mut plan = test_plan(directory.path(), &source, digest);
+        plan.destination = directory.path().join("a".repeat(193));
+        assert!(validate_plan(&plan).is_err());
+        plan.destination = directory.path().join("safe");
+        plan.members[0].name = "a".repeat(129);
+        assert!(validate_plan(&plan).is_err());
+        for name in ["../escape", "bad/name", ".", "..", "SHA256SUMS"] {
+            assert!(validate_component_name(name, 192).is_err());
         }
     }
 
