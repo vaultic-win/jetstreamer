@@ -2,7 +2,7 @@
 use super::*;
 use std::{
     ffi::CString,
-    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
+    os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
 };
 const FLOOR_SHA: &str = "39673f485b44ffb5c2053e2a553819da0bd0be30dcfc3cb8990553dd4de0f682";
 const GENESIS: &str =
@@ -149,7 +149,7 @@ pub(super) fn prepare() -> Result<()> {
     );
     let bytes = genesis_bytes()?;
     owned_directory(root, 1001, 1003)?;
-    for name in ["destination", "output", "scratch"] {
+    for name in ["destination", "output", "scratch", ".jetstreamer-private"] {
         owned_directory(&root.join(name), 1001, 1003)?;
     }
     owned_directory(&root.join("receipts"), 0, 0)?;
@@ -161,6 +161,9 @@ pub(super) fn prepare() -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(&path)?;
     file.write_all(&bytes)?;
+    // The operational unit uses UMask=0077; OpenOptions::mode alone would
+    // produce0400 and prevent the unprivileged replay from reading genesis.
+    file.set_permissions(fs::Permissions::from_mode(0o444))?;
     file.sync_all()?;
     File::open(path.parent().unwrap())?.sync_all()?;
     ensure!(
@@ -196,14 +199,27 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
         "original141 stale/foreign/unaccepted admission basis"
     );
     if s.output != Path::new(ADMISSION) {
-        let stamp = o["recorded_at_utc"]
-            .as_str()
-            .context("admission sample clock")?
-            .replace(['-', ':'], "");
+        let name = s
+            .output
+            .file_name()
+            .and_then(|s| s.to_str())
+            .context("admission filename")?;
+        let stamp = name
+            .strip_prefix("admission-")
+            .and_then(|s| s.strip_suffix(".json"))
+            .context("admission timestamp")?;
+        let at = utc_seconds(&format!(
+            "{}-{}-{}T{}:{}:{}Z",
+            &stamp[..4],
+            &stamp[4..6],
+            &stamp[6..8],
+            &stamp[9..11],
+            &stamp[11..13],
+            &stamp[13..15]
+        ))?;
         ensure!(
-            s.output.file_name().and_then(|s| s.to_str())
-                == Some(format!("admission-{stamp}.json").as_str()),
-            "admission filename must bind exact sample"
+            at >= t && at <= time && time - at <= 1800,
+            "admission filename must be fresh and no earlier than its sample"
         );
     }
     ensure!(
@@ -305,7 +321,13 @@ fn layout(s: &Spec) -> Result<()> {
             && l["genesis_sha256"] == GENESIS_SHA,
         "original141 layout proof differs"
     );
-    for name in ["", "destination", "output", "scratch"] {
+    for name in [
+        "",
+        "destination",
+        "output",
+        "scratch",
+        ".jetstreamer-private",
+    ] {
         let path = Path::new(ROOT).join(name);
         let m = fs::symlink_metadata(&path)?;
         ensure!(
@@ -317,7 +339,7 @@ fn layout(s: &Spec) -> Result<()> {
             "original141 private writable path differs"
         );
     }
-    for name in ["output", "scratch"] {
+    for name in ["output", "scratch", ".jetstreamer-private"] {
         ensure!(
             fs::read_dir(Path::new(ROOT).join(name))?.next().is_none(),
             "original141 layout is no longer empty"
@@ -805,11 +827,13 @@ mod tests {
         assert!(accepted(&s, &o, &claimed, &p, t).is_err());
     }
     #[test]
-    fn renewed_admission_is_a_new_sample_bound_receipt() {
+    fn renewed_admission_is_a_new_fresh_receipt_bound_to_sample() {
         let (mut s, o, f, p, t) = fixture();
         let parent = Path::new(ADMISSION).parent().unwrap();
         s.output = parent.join("admission-20261023T063958Z.json");
         accepted(&s, &o, &f, &p, t).unwrap();
+        s.output = parent.join("admission-20261023T064058Z.json");
+        accepted(&s, &o, &f, &p, t + 60).unwrap();
         for name in [
             "admission-20261023T070958Z.json",
             "admission-20260230T063958Z.json",

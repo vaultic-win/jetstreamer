@@ -57,8 +57,12 @@ The reviewed Rust operational commands are deliberately separate:
 A fresh sample may require a renewed admission before any producer launches.
 Keep every previous receipt. Write the renewal as
 `admission-YYYYMMDDTHHMMSSZ.json` in the same private admission directory, with
-the timestamp bound to that sample, and bind its exact digest into the launch
+the timestamp at or after that sample and no later than fresh admission, and bind its exact digest into the launch
 plan. Never replace `admission.json` or an earlier sample's receipt.
+The writable layout includes the loader's internal `.jetstreamer-private`
+directory beneath the run root as well as destination, output and scratch;
+private receipts remain outside all writable mounts. Set the cached genesis's
+final mode explicitly to 0444 because the service umask otherwise reduces it to 0400.
 
 Admission requires ordered `growth_extension_observers` linking each retained
 growth receipt's final sample to the current accepted sample. Only the sealed
