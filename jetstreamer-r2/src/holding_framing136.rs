@@ -537,7 +537,7 @@ impl Probe {
                     && key == self.blob_key
                     && ((start == 0 && end == PREFIX)
                         || (start == LENGTH - FOOTER_LEN as u64 && end == LENGTH)
-                        || (start >= 8 && start <= PREFIX && end - start <= 256)),
+                        || ((8..=PREFIX).contains(&start) && end - start <= 256)),
                 "unexpected blob request census"
             );
         } else {
