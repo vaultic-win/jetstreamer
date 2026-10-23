@@ -31,6 +31,8 @@ epoch224-bounded-resource = []
 epoch205-bounded-resource = []
 # Private capped-shrink prefix ending at epoch205's independently known checkpoint.
 epoch205-shrink-root-prefix-resource = []
+# Private capped-shrink204 prefix; publication and638-slot suffix remain closed.
+epoch204-shrink-root-prefix-resource = []
 
 [lib]
 name = "jetstreamer_utils"
@@ -238,6 +240,11 @@ path = "src/epoch203_private_verify_bin.rs"
 name = "jetstreamer-epoch205-shrink-root-prefix-resource"
 path = "src/epoch205_shrink_root_prefix_resource_bin.rs"
 required-features = ["epoch205-shrink-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch204-shrink-root-prefix-resource"
+path = "src/epoch204_shrink_root_prefix_resource_bin.rs"
+required-features = ["epoch204-shrink-root-prefix-resource"]
 
 [[bin]]
 name = "jetstreamer-epoch144-private-verify"

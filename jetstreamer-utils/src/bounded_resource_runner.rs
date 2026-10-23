@@ -598,11 +598,11 @@ fn execute_prepared(storage:&dyn StorageHooks,p:&Plan,invocation:&str,cgroup:&Pa
 
 fn root_manifest_valid(m: &Value) -> Result<()> {
     ensure!(
-        NATURAL_ROOT_FINISH && matches!(EPOCH, 203 | 205 | 223) && TARGET == TERMINAL,
+        NATURAL_ROOT_FINISH && matches!(EPOCH, 203 | 204 | 205 | 223) && TARGET == TERMINAL,
         "root completion is not a target-stop profile"
     );
     // Compile-bound scopes, never plan-selectable runtime/checkpoint policy.
-    // Keep existing203/223 contracts unchanged.205 has its own snapshot/root.
+    // Each epoch has independently bound snapshots and canonical-root coverage.
     let scope_matches = match EPOCH {
         203 => {
             m["output_slot_start"] == 87_696_000u64
@@ -611,6 +611,15 @@ fn root_manifest_valid(m: &Value) -> Result<()> {
                 && m["bootstrap"]["slot"] == 87_695_515u64
                 && m["terminal"]["slot"] == 88_127_580u64
                 && m["terminal"]["accounts_hash"] == "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf"
+        }
+        204 => {
+            m["output_slot_start"] == 88_128_000u64
+                && m["output_slot_count"] == 431_362u64
+                && m["runtime"]["runtime_profile"] == "solana-v1.6.16"
+                && m["bootstrap"]["slot"] == 88_127_580u64
+                && m["bootstrap"]["accounts_hash"] == "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf"
+                && m["terminal"]["slot"] == 88_559_361u64
+                && m["terminal"]["accounts_hash"] == "83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA"
         }
         205 => {
             m["output_slot_start"] == 88_560_000u64
