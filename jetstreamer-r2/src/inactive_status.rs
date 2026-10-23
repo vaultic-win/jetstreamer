@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 mod metadata_cycle;
 mod missing157;
 mod natural144;
+mod preserved144;
 
 pub(super) fn private144_terminal_manager_proof(current: &Value) -> Result<()> {
     natural144::terminal_shape(current)?;
@@ -39,6 +40,8 @@ struct Plan {
     prior_intent: Option<Bound>,
     #[serde(default)]
     metadata_completion: Option<Bound>,
+    #[serde(default)]
+    preserved144_delivery: Option<Bound>,
 }
 
 fn bound_json(bound: &Bound) -> Result<Value> {
@@ -318,6 +321,14 @@ fn fresh_census(
         fleet["last_epoch"].as_u64().context("range missing")?,
     )?;
     metadata_cycle::validate(plan, fleet, &current)?;
+    let preserved_delivery = plan
+        .preserved144_delivery
+        .as_ref()
+        .map(bound_json)
+        .transpose()?;
+    if let Some(delivery) = &preserved_delivery {
+        preserved144::terminal_census(plan, delivery, &current)?;
+    }
     let preserved =
         terminal_fleet["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1";
     if preserved {
@@ -343,7 +354,9 @@ fn fresh_census(
         let value = current
             .get(name)
             .context("owner omitted from complete census")?;
-        if !preserved && !missing157 && !natural144 && reserve.is_none() {
+        if preserved_delivery.is_some() {
+            preserved144::terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
+        } else if !preserved && !missing157 && !natural144 && reserve.is_none() {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
         }
         no_pending_owner_trigger(name, value["LoadState"] == "not-found")?;
@@ -400,6 +413,12 @@ fn validate_recovery_intent(prior: &Value, expected: &Value) -> Result<()> {
             "prior inactive cleanup intent changed {field}"
         );
     }
+    for field in ["preserved144_delivery", "preserved_remote_archive"] {
+        ensure!(
+            prior.get(field) == expected.get(field),
+            "prior inactive cleanup changed preserved artifact binding:{field}"
+        );
+    }
     Ok(())
 }
 
@@ -440,6 +459,9 @@ fn validate_receipt_paths(plan: &Plan) -> Result<()> {
 }
 
 fn no_local_delivery(plan: &Plan) -> Result<()> {
+    if let Some(binding) = &plan.preserved144_delivery {
+        return preserved144::local(plan, &bound_json(binding)?);
+    }
     ensure!(
         plan.public_archive_directory.is_absolute()
             && plan.public_archive_directory.canonicalize()? == plan.public_archive_directory,
@@ -456,6 +478,15 @@ fn no_local_delivery(plan: &Plan) -> Result<()> {
         }
     }
     Ok(())
+}
+
+async fn no_remote_delivery(s3: &Client, r2: &R2Config, plan: &Plan) -> Result<Value> {
+    if let Some(binding) = &plan.preserved144_delivery {
+        preserved144::scope(plan, &bound_json(binding)?)?;
+        return preserved144::remote(s3, r2).await;
+    }
+    status_inactive::no_remote_delivery(s3, r2, plan.epoch).await?;
+    Ok(Value::Null)
 }
 
 pub(super) async fn run() -> Result<()> {
@@ -546,13 +577,16 @@ pub(super) async fn run() -> Result<()> {
         "terminal evidence predates status publication or is future-dated"
     );
     let owners = owner_units(&publication)?;
+    if let Some(binding) = &plan.preserved144_delivery {
+        preserved144::owner(&plan, &bound_json(binding)?, &publication)?;
+    }
     let before = fresh_census(&plan, &fleet, &history, &owners)?;
     if let Some(stop) = reserve_owner_evidence(&history, &owners)? {
         ensure!(stop.epoch == plan.epoch, "reserve stop epoch differs");
         stop.validate(&before, publication.verified_unix_seconds, now)?;
     }
     let s3 = s3_client(&r2);
-    status_inactive::no_remote_delivery(&s3, &r2, plan.epoch).await?;
+    let preserved_remote = no_remote_delivery(&s3, &r2, &plan).await?;
     let key = format!("epoch-{}.epoch-status.json", plan.epoch);
     let current = get_mutable_object(&s3, &r2.bucket, &key).await?;
     if let Some(object) = current.as_ref() {
@@ -565,6 +599,10 @@ pub(super) async fn run() -> Result<()> {
         "terminal_fleet_sha256":plan.terminal_fleet.sha256,"owners":owners,"archive_completion_claimed":false,
         "prior_intent":plan.prior_intent.as_ref().map(|b|json!({"path":b.path,"sha256":b.sha256})),
         "repair_backlog":{"path":plan.repair_backlog.path,"sha256":plan.repair_backlog.sha256}});
+    if let Some(binding) = &plan.preserved144_delivery {
+        intent["preserved144_delivery"] = json!({"path":binding.path,"sha256":binding.sha256});
+        intent["preserved_remote_archive"] = preserved_remote.clone();
+    }
     if missing157::recognized(&history) {
         intent["terminal_manager_journal"] = serde_json::to_value(
             status_inactive::cleared_controller_proof(&owners[0].0, &owners[0].1)?,
@@ -624,7 +662,10 @@ pub(super) async fn run() -> Result<()> {
         "census changed before cleanup"
     );
     no_local_delivery(&plan)?;
-    status_inactive::no_remote_delivery(&s3, &r2, plan.epoch).await?;
+    ensure!(
+        no_remote_delivery(&s3, &r2, &plan).await? == preserved_remote,
+        "preserved remote artifact changed before status cleanup"
+    );
     if let Some(object) = current {
         same_object(&object.bytes, &object.etag, &publication)?;
         ensure!(
@@ -642,7 +683,10 @@ pub(super) async fn run() -> Result<()> {
         "claim appeared after cleanup; repair live status through gated publisher"
     );
     no_local_delivery(&plan)?;
-    status_inactive::no_remote_delivery(&s3, &r2, plan.epoch).await?;
+    ensure!(
+        no_remote_delivery(&s3, &r2, &plan).await? == preserved_remote,
+        "preserved remote artifact changed after status cleanup"
+    );
     let completion = json!({"schema":"jetstreamer-horizon-inactive-status-completion-v1","intent":intent,
         "authenticated_absence":true,"unchanged_claim_census":true,"archive_completion_claimed":false});
     if plan.completion.exists() {
@@ -728,7 +772,7 @@ mod tests {
         assert!(same_object(b"{}", &receipt.object_etag, &receipt).is_err());
     }
 
-    fn plan_fixture() -> (Plan, Value) {
+    pub(super) fn plan_fixture() -> (Plan, Value) {
         let bound = || Bound {
             path: "/sealed/evidence".into(),
             sha256: "a".repeat(64),
@@ -748,6 +792,7 @@ mod tests {
             authenticated_other_host_handoffs: vec![],
             prior_intent: None,
             metadata_completion: None,
+            preserved144_delivery: None,
         };
         let fleet = json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":201,"last_epoch":300,
             "sampled_at_utc":"2026-10-20T04:04:42Z","recorded_unix_seconds":1792469100u64,

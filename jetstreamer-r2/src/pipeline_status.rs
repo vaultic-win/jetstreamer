@@ -1,6 +1,7 @@
 //! Routine, identity-bound post-replay metadata. No archive or sidecar mutation.
 use super::*;
 use std::{collections::BTreeMap, process::Command};
+mod event144;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -183,6 +184,8 @@ struct Plan {
     receipt_directory: PathBuf,
     #[serde(default)]
     receipt_directory_uid: Option<u32>,
+    #[serde(default)]
+    phase_handoff_event: Option<Bound>,
 }
 
 fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
@@ -420,7 +423,10 @@ fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
 
 fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Result<String> {
     ensure!(
-        plan.schema == "jetstreamer-horizon-pipeline-status-plan-v1",
+        (plan.schema == "jetstreamer-horizon-pipeline-status-plan-v1"
+            && plan.phase_handoff_event.is_none())
+            || (plan.schema == "jetstreamer-exact144-pipeline-handoff-event-plan-v1"
+                && plan.phase_handoff_event.is_some()),
         "unsupported pipeline status plan"
     );
     plan.binding.validate(plan.epoch, &plan.phase)?;
@@ -517,6 +523,9 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
             || (name.starts_with(&format!("epoch-{}-", plan.epoch)) && name.ends_with(".jet")),
         "jet filename names another epoch"
     );
+    if let Some(event) = &plan.phase_handoff_event {
+        return event144::sample(plan, observer, &bound_json(event)?, now);
+    }
     Ok(sample.into())
 }
 
@@ -741,7 +750,11 @@ pub(super) async fn run() -> Result<()> {
         "canonical sidecar already exists; reconcile completion instead of publishing a countdown"
     );
     preflight_status_receipt_write(&plan.receipt_directory)?;
-    let (object_etag, previous_object_etag) = publish_epoch_status(&s3, &r2, &status).await?;
+    let (object_etag, previous_object_etag) = if plan.phase_handoff_event.is_some() {
+        publish_initial144_handoff_status(&s3, &r2, &status).await?
+    } else {
+        publish_epoch_status(&s3, &r2, &status).await?
+    };
     let receipt = StatusPublicationReceipt {
         schema: PIPELINE_STATUS_RECEIPT_SCHEMA.into(),
         bucket: r2.bucket,
@@ -801,7 +814,7 @@ mod tests {
         assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
     }
     use serde_json::json;
-    fn directory_plan() -> Plan {
+    pub(super) fn directory_plan() -> Plan {
         let mut b = binding();
         b.unit = super::super::cohort198_finalization::UNIT.into();
         b.origin_unit = b.unit.clone();
@@ -828,6 +841,7 @@ mod tests {
             peer_units: vec![],
             receipt_directory: "/home/sol/.jetstreamer-private/r2-status-receipts".into(),
             receipt_directory_uid: Some(1001),
+            phase_handoff_event: None,
         }
     }
     #[test]
@@ -1407,6 +1421,7 @@ mod tests {
             peer_units: vec![],
             receipt_directory: "/receipts".into(),
             receipt_directory_uid: None,
+            phase_handoff_event: None,
         };
         let observer = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":"2026-10-20T05:04:42Z"});
         let t = fleet::utc_seconds("2026-10-20T05:04:42Z").unwrap();

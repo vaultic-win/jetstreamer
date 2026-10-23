@@ -1676,6 +1676,39 @@ async fn publish_epoch_status(
     r2: &R2Config,
     status: &EpochStatus,
 ) -> Result<(String, Option<String>)> {
+    publish_epoch_status_inner(s3, r2, status, false).await
+}
+
+async fn publish_initial144_handoff_status(
+    s3: &Client,
+    r2: &R2Config,
+    status: &EpochStatus,
+) -> Result<(String, Option<String>)> {
+    publish_epoch_status_inner(s3, r2, status, true).await
+}
+
+fn validate_initial144_handoff(previous: Option<&EpochStatus>, status: &EpochStatus) -> Result<()> {
+    ensure!(
+        status.epoch == 144 && status.phase == "upload",
+        "event is not initial144 upload"
+    );
+    if let Some(previous) = previous {
+        ensure!(
+            previous.epoch == 144
+                && (previous.phase == "publication"
+                    || (epoch_status_bytes(previous)? == epoch_status_bytes(status)?)),
+            "handoff event cannot repeatedly refresh an upload/readback or replace another owner phase"
+        );
+    }
+    Ok(())
+}
+
+async fn publish_epoch_status_inner(
+    s3: &Client,
+    r2: &R2Config,
+    status: &EpochStatus,
+    initial144_handoff: bool,
+) -> Result<(String, Option<String>)> {
     let epoch = status.epoch;
     validate_epoch_status(status, epoch)?;
     let status_bytes = epoch_status_bytes(status)?;
@@ -1684,8 +1717,14 @@ async fn publish_epoch_status(
     let action = if let Some(previous) = &previous {
         let previous_status: EpochStatus =
             serde_json::from_slice(&previous.bytes).context("existing status JSON is invalid")?;
+        if initial144_handoff {
+            validate_initial144_handoff(Some(&previous_status), status)?;
+        }
         status_publication_action(&previous_status, status)?
     } else {
+        if initial144_handoff {
+            validate_initial144_handoff(None, status)?;
+        }
         StatusPublicationAction::Replace
     };
     let checksum_key = format!("epoch-{epoch}.jet.sha256");
