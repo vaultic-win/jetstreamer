@@ -837,10 +837,10 @@ mod tests {
         }
         assert_ne!(native20::UNIT, native20_v2::UNIT);
         assert_ne!(native20::ROOT, native20_v2::ROOT);
-        assert!(status_jet_path(
-            "horizon-qualify-223-v1620-warmup-resource-unregistered-v3.service"
-        )
-        .is_err());
+        assert!(
+            status_jet_path("horizon-qualify-223-v1620-warmup-resource-unregistered-v3.service")
+                .is_err()
+        );
     }
     #[test]
     fn failed_v3_stays_recognized_but_cannot_be_resurrected() {
@@ -854,9 +854,11 @@ mod tests {
             evidence: vec![],
         };
         let error = validate_live(&claim, &json!({})).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("historical warmup cannot become live"));
+        assert!(
+            error
+                .to_string()
+                .contains("historical warmup cannot become live")
+        );
         assert!(validate(&claim).is_err());
     }
     fn fixture() -> (Spec, Value, Value) {

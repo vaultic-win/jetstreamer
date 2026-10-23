@@ -142,7 +142,7 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::{symlink, DirBuilderExt, PermissionsExt};
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt, symlink};
     const PID: u64 = 1234;
     fn fixture() -> (tempfile::TempDir, PathBuf) {
         let root = tempfile::tempdir().unwrap();
@@ -195,10 +195,12 @@ mod tests {
     #[test]
     fn rejects_foreign_or_ambiguous_runs_and_wrong_manifests() {
         let (root, run) = fixture();
-        assert!(measure(root.path(), PID + 1, "sha256:fixture", unsafe {
-            libc::geteuid()
-        })
-        .is_err());
+        assert!(
+            measure(root.path(), PID + 1, "sha256:fixture", unsafe {
+                libc::geteuid()
+            })
+            .is_err()
+        );
         assert!(measure(root.path(), PID, "sha256:wrong", unsafe { libc::geteuid() }).is_err());
         let other = run
             .parent()
