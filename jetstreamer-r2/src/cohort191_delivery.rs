@@ -539,8 +539,12 @@ fn phase_scope(c: &Claim) -> Result<()> {
             );
         } else {
             ensure!(
-                c.program.is_some(),
-                "191 downstream stage lacks pinned native program"
+                c.program.as_ref().is_some_and(|b| {
+                    if matches!(c.phase.as_str(),"full-verification"|"plugin-verification") {
+                        b.path == Path::new("/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-horizon-verify-pair")
+                    } else {b.path.file_name().and_then(|s|s.to_str()) == Some("jetstreamer-r2")}
+                }),
+                "191 downstream stage lacks the pinned native verifier/uploader program"
             );
         }
     }
@@ -639,6 +643,32 @@ fn ready(b: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
     Ok(r)
 }
 fn gate(b: &Bound, epoch: u64, stage: &str, tool: &GateTool, digest: &str) -> Result<()> {
+    let qualified = match stage {
+        "full" => Some((
+            "verify_archive",
+            "5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574",
+        )),
+        "plugin" => Some((
+            "horizon_pipeline",
+            "e20892a111f8e26c8e25561a939eaf171771789753059100510c936d92092137",
+        )),
+        _ => None,
+    };
+    if let Some((name, sha)) = qualified {
+        ensure!(
+            tool.verifier.path
+                == Path::new(
+                    "/usr/local/lib/jetstreamer/horizon-epoch198-compatible-verifiers-20261021-v1"
+                )
+                .join(name)
+                && tool.verifier.sha256 == sha
+                && tool.wrapper.path
+                    == Path::new(
+                        "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-horizon-verify-pair"
+                    ),
+            "191 verification receipt borrows an unqualified reader or native wrapper"
+        );
+    }
     for t in [&tool.verifier, &tool.wrapper] {
         ensure!(
             t.path.starts_with("/usr/local/lib/jetstreamer"),
@@ -1480,7 +1510,7 @@ mod tests {
         c.unit = "horizon-full-verify-191-native191-20261023-v1.service".into();
         assert!(phase_scope(&c).is_err()); // No native-program binding.
         c.program = Some(Bound {
-            path: "/usr/local/lib/jetstreamer/tool".into(),
+            path: "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-horizon-verify-pair".into(),
             sha256: "a".repeat(64),
         });
         phase_scope(&c).unwrap();
