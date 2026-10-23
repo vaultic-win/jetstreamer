@@ -4,6 +4,8 @@ use super::*;
 mod native20_event;
 pub(super) use native20_event::{
     event_census as native20_event_census, event_predecessor as native20_event_predecessor,
+    terminal_census as native20_terminal_census,
+    terminal_predecessor as native20_terminal_predecessor,
 };
 pub(super) const UNIT: &str = "archive-223-cold-snapshot-test-actual-v1.service";
 const BINARY: &str = "/var/lib/jetstreamer/horizon-223-cold-snapshot-supervisor-294d2330-v1/jetstreamer-horizon-ram-snapshot-test";
