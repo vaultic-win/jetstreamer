@@ -3359,6 +3359,8 @@ async fn main() -> Result<()> {
         return holding::run().await;
     }
     match env::args().nth(1).as_deref() {
+        Some("prepare-epoch136-capped-layout") => return fleet::prepare_epoch136_capped(),
+        Some("capture-epoch136-capped-launch") => return fleet::capture_epoch136_capped(),
         Some("prepare-original141-capped-layout") => return fleet::prepare_original141_capped(),
         Some("capture-original141-capped-launch") => return fleet::capture_original141_capped(),
         Some("prepare-original141-vote-prefix-layout") => {
@@ -3377,6 +3379,9 @@ async fn main() -> Result<()> {
         Some("probe-continuation203-inputs") => return fleet::probe_continuation203_inputs(),
         Some("capture-continuation203-launch") => return fleet::capture_continuation203_launch(),
         _ => {}
+    }
+    if env::args().nth(1).as_deref() == Some("admit-epoch136-capped") {
+        return fleet::admit_epoch136_capped().await;
     }
     if env::args().nth(1).as_deref() == Some("admit-original141") {
         return fleet::admit_original141().await;

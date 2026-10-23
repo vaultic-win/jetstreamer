@@ -19,6 +19,7 @@ mod continuation203;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
+mod epoch136;
 mod native141;
 mod native144;
 mod native203;
@@ -57,6 +58,15 @@ pub(crate) mod watch198;
 
 pub(super) async fn admit_original141() -> Result<()> {
     original141::admit().await
+}
+pub(super) async fn admit_epoch136_capped() -> Result<()> {
+    epoch136::admit().await
+}
+pub(super) fn capture_epoch136_capped() -> Result<()> {
+    epoch136::capture()
+}
+pub(super) fn prepare_epoch136_capped() -> Result<()> {
+    epoch136::prepare()
 }
 pub(super) fn estimate_readback203() -> Result<()> {
     readback203_estimate::run()
@@ -718,6 +728,7 @@ fn validate_same_sample_admission(
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
+        136 if epoch136::namespace(claim) => epoch136::GUARD_SHA,
         141 if original141_capped::namespace(claim) => original141_capped::GUARD_SHA,
         141 if original141_vote_prefix::namespace(claim) => original141_vote_prefix::GUARD_SHA,
         141 if original141_freeze::namespace(claim) => original141_freeze::GUARD_SHA,
@@ -813,7 +824,8 @@ fn validate_same_sample_admission(
             && guard
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
-            && if original141_trace::namespace(claim)
+            && if epoch136::namespace(claim)
+                || original141_trace::namespace(claim)
                 || original141_freeze::namespace(claim)
                 || original141_vote_prefix::namespace(claim)
                 || original141_capped::namespace(claim)
@@ -874,7 +886,8 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
-    if original141_trace::namespace(claim)
+    if epoch136::namespace(claim)
+        || original141_trace::namespace(claim)
         || original141_freeze::namespace(claim)
         || original141_vote_prefix::namespace(claim)
         || original141_capped::namespace(claim)
@@ -927,6 +940,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if epoch136::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| epoch136::guard_matches(claim, &r, plan));
+    }
     if original141_capped::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| original141_capped::guard_matches(claim, &r, plan));
@@ -1039,6 +1056,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if epoch136::namespace(claim) || receipt["schema"] == epoch136::SCHEMA {
+        return epoch136::launch(receipt, claim);
+    }
     if original141_capped::namespace(claim) || receipt["schema"] == original141_capped::SCHEMA {
         return original141_capped::launch(receipt, claim);
     }
@@ -2204,6 +2224,14 @@ pub(super) async fn run() -> Result<()> {
     }
     let mut diagnostic_units = BTreeSet::new();
     for claim in &plan.diagnostics {
+        if epoch136::namespace(claim) {
+            ensure!(
+                plan.gates
+                    .get(&136)
+                    .is_some_and(|g| g.state == "failed-needs-repair"),
+                "private136 experiment cannot close or relabel original repair"
+            );
+        }
         if native141::namespace(claim)
             || census141_poh::namespace(claim)
             || original141::namespace(claim)
@@ -2470,6 +2498,9 @@ pub(super) async fn run() -> Result<()> {
             if original141_capped::namespace(claim) {
                 original141_capped::validate_live(claim, current)?;
             }
+            if epoch136::namespace(claim) {
+                epoch136::validate_live(claim, current)?;
+            }
             if census141_poh::namespace(claim) {
                 census141_poh::validate_live(claim, current)?;
             }
@@ -2561,7 +2592,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if original141_capped::namespace(claim) {
+            let phase = if epoch136::namespace(claim) {
+                "private-corrected-worker-root-repair"
+            } else if original141_capped::namespace(claim) {
                 "private-original-entry-capped-root-qualification"
             } else if original141_vote_prefix::namespace(claim) {
                 "private-original-entry-vote-prefix"
@@ -2657,17 +2690,19 @@ pub(super) async fn run() -> Result<()> {
                     .as_u64()
                     .is_some_and(|last| epoch <= last)
         }) {
-            if !(epoch == 141
-                && plan.diagnostics.iter().any(|c| {
-                    native141::namespace(c)
-                        || census141_poh::namespace(c)
-                        || original141::namespace(c)
-                        || original141_trace::namespace(c)
-                        || original141_freeze::namespace(c)
-                        || original141_vote_prefix::namespace(c)
-                        || original141_capped::namespace(c)
-                }))
-            {
+            let retains_open_repair = (epoch == 136
+                && plan.diagnostics.iter().any(epoch136::namespace))
+                || (epoch == 141
+                    && plan.diagnostics.iter().any(|c| {
+                        native141::namespace(c)
+                            || census141_poh::namespace(c)
+                            || original141::namespace(c)
+                            || original141_trace::namespace(c)
+                            || original141_freeze::namespace(c)
+                            || original141_vote_prefix::namespace(c)
+                            || original141_capped::namespace(c)
+                    }));
+            if !retains_open_repair {
                 state = private_qualification_inventory_state(gate.state.as_str());
             }
             if epoch == 226
