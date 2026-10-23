@@ -15,6 +15,7 @@ epoch227-native-main-guard = []
 # must match its full tuple; this remains compatible with utils --all-features.
 epoch207-native-main-guard = ["epoch227-native-main-guard"]
 epoch209-native-main-guard = ["epoch227-native-main-guard"]
+epoch228-native-main-guard = ["epoch227-native-main-guard"]
 epoch227-singleton-guard = []
 epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]

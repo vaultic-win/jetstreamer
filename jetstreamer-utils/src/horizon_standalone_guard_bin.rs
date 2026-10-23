@@ -1030,6 +1030,13 @@ mod tests {
     fn complete_native_plans_pass_the_same_validator_used_before_runtime_observation() {
         for (unit, root, exe, sha, enabled) in [
             (
+                "horizon-native-input-228-capped-1bfa8d51-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1",
+                "/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test",
+                "d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827",
+                cfg!(feature = "epoch228-native-main-guard"),
+            ),
+            (
                 "archive-209-v1616-native-input-actual-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1",
                 "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test",
