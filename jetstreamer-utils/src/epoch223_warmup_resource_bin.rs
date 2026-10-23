@@ -2,6 +2,8 @@
 //! The old parent requires an epoch/root output range, so it retains that request.
 //! The exact worker rejects every entry after96335554 before decoding or mutation.
 //! Neither a target stop nor any produced artifact qualifies an epoch or root.
+#[path = "horizon_standalone_guard_root.rs"]
+mod root_budget;
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-223.jet";
@@ -121,7 +123,11 @@ mod bounded_resource_runner {
                     free_bytes(&p.run_root)? >= 248_289_182_611,
                     "century disk floor"
                 );
-                scratch(&p.run_root.join("scratch"))?;
+                let budget = crate::root_budget::observe(&p.run_root.join("scratch"), MAX_SCRATCH)?;
+                ensure!(
+                    !budget.exceeds_budget,
+                    "scratch exceeds the live physical budget"
+                );
                 Ok(())
             })();
             if let Err(error) = check {
