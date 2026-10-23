@@ -3369,6 +3369,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-retire-inactive") {
         return inactive_status::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("status-prepare-publication144-preservation") {
+        return inactive_status::prepare_publication144_preservation();
+    }
     if env::args().nth(1).as_deref() == Some("reserve-retire-scratch") {
         return reserve_scratch::run();
     }

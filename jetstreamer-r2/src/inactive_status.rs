@@ -7,6 +7,10 @@ mod metadata_cycle;
 mod missing157;
 mod natural144;
 mod preserved144;
+mod publication144;
+pub(super) fn prepare_publication144_preservation() -> Result<()> {
+    publication144::prepare()
+}
 
 pub(super) fn private144_terminal_manager_proof(current: &Value) -> Result<()> {
     natural144::terminal_shape(current)?;
@@ -482,7 +486,12 @@ fn no_local_delivery(plan: &Plan) -> Result<()> {
 
 async fn no_remote_delivery(s3: &Client, r2: &R2Config, plan: &Plan) -> Result<Value> {
     if let Some(binding) = &plan.preserved144_delivery {
-        preserved144::scope(plan, &bound_json(binding)?)?;
+        let proof = bound_json(binding)?;
+        if publication144::recognized(&proof) {
+            publication144::scope(plan, &proof)?;
+        } else {
+            preserved144::scope(plan, &proof)?;
+        }
         return preserved144::remote(s3, r2).await;
     }
     status_inactive::no_remote_delivery(s3, r2, plan.epoch).await?;
