@@ -21,6 +21,7 @@ mod prefix144;
 mod private144;
 mod private144_scan;
 mod private157;
+mod publication144_history;
 mod ram_auxiliary;
 mod retained220;
 mod runtime157;
