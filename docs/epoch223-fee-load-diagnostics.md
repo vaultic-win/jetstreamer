@@ -129,6 +129,15 @@ namespaces cannot borrow the v1.6.25 snapshot profile. Merely compiling this ign
 not native input qualification. The exact test executable, source/input hashes,
 terminal journal and result still need durable evidence before an entry replay.
 
+The separate `jetstreamer-epoch223-v1620-warmup-resource` binary pins the
+v1.6.20 parent and first16-entry worker, its own plan/result/stop namespaces and
+the `qualification-223-v1620-prefix-warmup-*` scratch prefix. Both warmup
+binaries share storage guards and entry-bounded command construction; each
+retains independent runtime, revision, executable hashes and worker override
+checks in the actual planning preflight. The v1.6.20 warmup cannot qualify the
+known root or borrow v1.6.25 evidence. Its compilation and unit tests do not
+replace fresh coordinated admission and invocation-bound VMA protection.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain
