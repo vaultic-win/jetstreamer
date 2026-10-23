@@ -1079,14 +1079,14 @@ mod tests {
             assert!(validate_plan(&serde_json::from_value(bad).unwrap()).is_err(), "{pointer}");
         }
         for (key, replacement) in [
-            ("bounded_measurement", json!({"expected_uid":1000,"maximum_observed_slot":98495999,"target_stop_intent":"/tmp/intent"})),
+            ("bounded_measurement", json!({"producer_uid":1000,"target_slot":98495999,"intent_path":"/tmp/intent","maximum_drain_seconds":180})),
             ("bounded_canary", json!({"expected_uid":1000,"target_stop_intent":"/tmp/intent","maximum_drainage_seconds":180})),
             ("native_main", json!({"executable":"/other","sha256":"a".repeat(64),"main_pid":42})),
         ] {
             let mut bad = value.clone();
             bad[key] = replacement;
-            // A malformed exemption is also a rejection; no loose parse may widen the profile.
-            assert!(serde_json::from_value::<Plan>(bad).map(|p| validate_plan(&p).is_err()).unwrap_or(true), "{key}");
+            let bad: Plan = serde_json::from_value(bad).unwrap();
+            assert!(validate_plan(&bad).is_err(), "{key}");
         }
     }
     #[test]
