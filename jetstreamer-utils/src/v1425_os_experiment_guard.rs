@@ -14,6 +14,8 @@ use std::{
     process::Command,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+#[path = "v1425_fixture_barrier.rs"]
+mod fixture_barrier;
 #[path = "horizon_standalone_guard_root.rs"]
 mod root_budget;
 
@@ -22,9 +24,15 @@ const BUDGET: &str =
 const BUDGET_SHA: &str = "2e95927a3c49972630c9de458e32359a859b90de7b0fa9b195d6dbb1083ed620";
 const BUILD_UNIT: &str = "horizon-v1425-portability-native-build-20261023-v1.service";
 const CANARY_UNIT: &str = "horizon-v1425-os-budget-canary-20261023-v1.service";
+#[cfg(not(barrier_disposable))]
 const FIXTURE_UNIT: &str = "horizon-v1425-native-portability-fixture-20261023-v1.service";
+#[cfg(barrier_disposable)]
+const FIXTURE_UNIT: &str = "horizon-v1425-barrier-disposable-target-20261023-v1.service";
+#[cfg(not(barrier_disposable))]
 const FIXTURE_ROOT: &str =
     "/var/lib/jetstreamer-checkpoint-fixtures/native-v1425-capped-20261023-v1";
+#[cfg(barrier_disposable)]
+const FIXTURE_ROOT: &str = "/var/lib/jetstreamer-v1425-barrier-disposable-20261023-v1/tree";
 const FIXTURE_MIN_FREE: u64 = 209_506_426_310;
 const LEGACY_ROOT: &str =
     "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/legacy-v1-4-25";
@@ -721,6 +729,12 @@ fn profile_flags(options: &[String]) -> Result<(bool, bool, bool)> {
     Ok((check, canary, fixture))
 }
 fn run() -> Result<()> {
+    if std::env::args()
+        .nth(1)
+        .is_some_and(|s| s.starts_with("barrier-"))
+    {
+        return fixture_barrier::run();
+    }
     ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
     let a: Vec<_> = std::env::args().collect();
     ensure!(

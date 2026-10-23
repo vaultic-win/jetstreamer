@@ -196,8 +196,68 @@ writable. Set `JETSTREAMER_HISTORICAL_POH_THREADS=2` and
 
 Do not invoke the child test independently or run all ignored worker tests.
 Repeat with a separately built default profile only after the capped experiment
-has been reviewed and its evidence retained. The staged fixture has not yet
-been compiled or executed; source formatting is not qualification evidence.
+has been reviewed and its evidence retained. Native tempfile3.1.0 follows the
+service umask: the fixture unit must set `UMask=0077`; retain the explicit0700
+assertion for both the initial root and generated child directory.
+
+### 2026-10-23 semantic result and guard limitation
+
+Exact executableSHA256
+`7d0678d3d1edf4f75240bc7d7a800fd1093d61ef3ae7a77fe1348ed74425c539`
+passed the synthetic capped fresh-process test in invocation
+`d71223de47484c3ab6f8faff5e95e764`, exit0. The archive was restored in a new
+process and every unchanged raw-output/checkpoint/cache/signature assertion
+passed. Evidence remains beneath
+`/var/lib/jetstreamer-checkpoint-fixtures/native-v1425-capped-20261023-v1/native-v12-Nr269C`:
+`child-success.bin`SHA256
+`2a9791532aca1d5f857ea5776e7d38a3295fc0741dc13e2b18a1661250f684a8`,
+`plan.bin`SHA256
+`ce20682ec92be91ca440111f207df36fbd8dc3f3823a670bdeff54666a28c230`,
+and snapshotSHA256
+`9a572def77759a46458c3a6e72a4f2b65cc6bed3cdc46b7f2707151c56e89aec`.
+
+This is semantic evidence only. The watcher initially failed because its
+per-invocation private receipt directory had not been created. A later terminal
+receipt and no-trip check do not establish continuous guard coverage. Do not
+describe this invocation as guard-qualified. No live replay stopping/resume,
+writer append recovery, production export, mainnet, publication or R2 lifecycle
+has been qualified by this test.
+
+The closed Rust barrier in `jetstreamer-utils/src/v1425_fixture_barrier.rs`
+prevents a new attempt from executing until a root-owned release token binds
+the exact fixtureIID/PID/startticks, immutable launch/executable hashes, first
+durable no-trip watcher sample, exact live watcherIID/PID/startticks, and a fresh
+floor sample. The launcher waits at most120seconds and execs the unchanged
+fixture in place. Both processes retain the original unit/IID/PID/startticks.
+Root publishes the token by a no-clobber rename after fsync; preexisting paths,
+symlinks, mismatched identities, absent/terminal watchers and timeout fail closed.
+The watcher accepts only the exact sealed launcher command or a release-bound
+transition to the exact fixture command and executable hash. Production and
+disposable builds have separate compile-time unit/path selectors; the disposable
+probe cannot select the real fixture. Real execution still needs separately
+reviewed sealed launch/unit plans and fresh OS admission.
+
+Disposable barrier qualification is retained in
+`/usr/local/lib/jetstreamer/horizon-v1425-barrier-disposable-qualification-20261023-v1`.
+The19ordinary tests passed (one unrelated storage-capability test remained
+ignored). Actual systemd attempts denied release without a first watcher sample,
+with a wrong plan digest, and after the sampled watcher stopped. An unreleased
+launcher timed out after120seconds without executing its probe. The positive
+attempt `19cae858144e40fb8b8cf8266a8f790a` retainedPID1179114 and startticks113521943
+through exec; watcher `4f764aac8ee1439ca288fb832cd6d9c8` recorded the authenticated
+transition and natural completion, both exit0. Root tests also denied symlinks
+and preexisting tokens; identity tests denied changedIID/PID/start/hash and
+unready/terminal watcher shapes. These are disposable-barrier qualifications,
+not a new run of the native fixture.
+
+The proposed real immutable package is
+`/usr/local/lib/jetstreamer/horizon-v1425-fixture-barrier-20261023-v1`;
+its `review.json` and `fixture.service` require separate parent review before
+installation or execution. Before that run, preserve the exact prior successful
+tree through a separate closed custody operation, recreate the empty0700
+fixture root, re-admit the OS floor with all retained allocations, and seal the
+new actualIID/PID/startticks/monotonic watcher plan and exact watcher unit. Neither
+the real barrier package nor its sealed review authorizes production resume.
 
 ## Existing141 deadline evidence
 

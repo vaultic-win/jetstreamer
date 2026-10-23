@@ -1,6 +1,6 @@
 //! Optional own-tree physical budget, independent of other lanes' allocations.
 //! Walk stable directory descriptors without following child symlinks.
-use anyhow::{Context, Result, ensure};
+use anyhow::{ensure, Context, Result};
 use serde::Serialize;
 use std::{
     fs::{self, File, OpenOptions},
