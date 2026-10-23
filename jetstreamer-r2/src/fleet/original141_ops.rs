@@ -178,7 +178,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("sample clock")?)?;
     ensure!(
         s.schema == "jetstreamer-original141-root-admission-spec-v2"
-            && s.output == Path::new(ADMISSION)
+            && admission_path(&s.output)
             && s.floor.sha256 == FLOOR_SHA
             && o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && t <= time
@@ -195,6 +195,17 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
             && f["inventory"]["anomalies"] == 0,
         "original141 stale/foreign/unaccepted admission basis"
     );
+    if s.output != Path::new(ADMISSION) {
+        let stamp = o["recorded_at_utc"]
+            .as_str()
+            .context("admission sample clock")?
+            .replace(['-', ':'], "");
+        ensure!(
+            s.output.file_name().and_then(|s| s.to_str())
+                == Some(format!("admission-{stamp}.json").as_str()),
+            "admission filename must bind exact sample"
+        );
+    }
     ensure!(
         o["filesystem"]["conservative_available_bytes"]
             .as_u64()
@@ -649,7 +660,7 @@ pub(super) fn capture() -> Result<()> {
     ensure!(
         s.schema == "jetstreamer-original141-launch-capture-spec-v2"
             && s.plan.path == Path::new(PLAN)
-            && s.admission.path == Path::new(ADMISSION)
+            && admission_path(&s.admission.path)
             && s.first_guard.path == Path::new(ROOT).join("receipts/first-guard.json"),
         "foreign original141 capture paths"
     );
@@ -792,6 +803,22 @@ mod tests {
         let mut claimed = f.clone();
         claimed["active"] = json!([{"epoch":141}]);
         assert!(accepted(&s, &o, &claimed, &p, t).is_err());
+    }
+    #[test]
+    fn renewed_admission_is_a_new_sample_bound_receipt() {
+        let (mut s, o, f, p, t) = fixture();
+        let parent = Path::new(ADMISSION).parent().unwrap();
+        s.output = parent.join("admission-20261023T063958Z.json");
+        accepted(&s, &o, &f, &p, t).unwrap();
+        for name in [
+            "admission-20261023T070958Z.json",
+            "admission-20260230T063958Z.json",
+            "admission-latest.json",
+            "../admission-20261023T063958Z.json",
+        ] {
+            s.output = parent.join(name);
+            assert!(accepted(&s, &o, &f, &p, t).is_err(), "{name}");
+        }
     }
     #[test]
     fn absence_gate_rejects_occupied_and_dangling_symlink_paths() {

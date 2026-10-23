@@ -54,6 +54,12 @@ The reviewed Rust operational commands are deliberately separate:
 - `capture-original141-launch SPEC --spec-sha256 HEX --self-sha256 HEX`
   records an already running, guarded owner. It never starts the service.
 
+A fresh sample may require a renewed admission before any producer launches.
+Keep every previous receipt. Write the renewal as
+`admission-YYYYMMDDTHHMMSSZ.json` in the same private admission directory, with
+the timestamp bound to that sample, and bind its exact digest into the launch
+plan. Never replace `admission.json` or an earlier sample's receipt.
+
 Admission requires ordered `growth_extension_observers` linking each retained
 growth receipt's final sample to the current accepted sample. Only the sealed
 controller-only recovery mapping may bridge changed controller identities;
