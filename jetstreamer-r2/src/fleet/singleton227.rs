@@ -23,8 +23,10 @@ pub(super) const FINGERPRINT: &str =
     "sha256:99fa3de5ed1da720b76e33196d4ef4da9dda57202f12af90eaab60f84f9ecd31";
 pub(super) const GUARD_SHA: &str =
     "134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be";
+pub(super) const SINGLETON_GUARD_SHA: &str =
+    "77bcac7ea38c5f275df04338dbb717a99b756b3d7a602c3eb87bc3e0b8797b5b";
 pub(super) const NATIVE_GUARD_SHA: &str =
-    "f1e24452d93cf014a7a54ee443e9a1c8266ea94881b57f65203384a72abe4647";
+    "e53a03e5a97ace54439db60ee3776117af68beebb892d03f34cfa8cceef118d9";
 pub(super) fn native_scope(phase: &str, unit: &str) -> bool {
     phase == "private-cold-snapshot-verification"
         && unit == super::singleton227_admission::NATIVE_UNIT

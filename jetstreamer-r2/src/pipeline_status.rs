@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, process::Command};
 mod event144;
 mod native_input;
 mod origin203;
+mod warmup223;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -93,6 +94,7 @@ impl Binding {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
             | ("private-cold-snapshot-verification", "verification")
+            | ("private-warmup-reproduction", "verification")
             | ("local-publication", "verification" | "publication")
             | ("producer-finalization", "verification" | "finalization")
             | ("controller-import-handoff", "verification" | "publication")
@@ -105,7 +107,9 @@ impl Binding {
         };
         if matches!(
             self.claim_phase.as_str(),
-            "producer-finalization" | "private-cold-snapshot-verification"
+            "producer-finalization"
+                | "private-cold-snapshot-verification"
+                | "private-warmup-reproduction"
         ) {
             ensure!(
                 self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
@@ -448,6 +452,9 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
     if native_input::selected(plan) {
         return native_input::sample(plan, observer, fleet, now);
     }
+    if warmup223::selected(plan) {
+        return warmup223::sample(plan, observer, fleet, now);
+    }
     let sample = observer["recorded_at_utc"]
         .as_str()
         .context("observer time missing")?;
@@ -665,6 +672,8 @@ pub(super) async fn run() -> Result<()> {
     }
     if native_input::selected(&plan) {
         native_input::validate_origin(&plan, &origin, &fleet)?;
+    } else if warmup223::selected(&plan) {
+        warmup223::validate_origin(&plan, &origin, &fleet)?;
     } else if origin["schema"] == STATUS_RECEIPT_SCHEMA {
         let receipt: StatusPublicationReceipt = serde_json::from_value(origin)?;
         let prior_observer = bound_bytes(&Bound {
@@ -731,6 +740,8 @@ pub(super) async fn run() -> Result<()> {
     let identity = if native_input::selected(&plan) {
         native_input::zero_jet(&plan)?;
         None
+    } else if warmup223::selected(&plan) {
+        warmup223::jet_identity(&plan)?
     } else {
         Some(regular_identity(&plan.jet_path)?)
     };
@@ -756,6 +767,8 @@ pub(super) async fn run() -> Result<()> {
         census(&plan, &fleet)? == before
             && if native_input::selected(&plan) {
                 native_input::zero_jet(&plan).is_ok()
+            } else if warmup223::selected(&plan) {
+                warmup223::jet_identity(&plan)? == identity
             } else {
                 Some(regular_identity(&plan.jet_path)?) == identity
             },
@@ -810,7 +823,7 @@ pub(super) fn native_input_matches_status(
     epoch: u64,
     census: &BTreeMap<String, Value>,
 ) -> bool {
-    native_input::matches(receipt, epoch, census)
+    native_input::matches(receipt, epoch, census) || warmup223::matches(receipt, epoch, census)
 }
 
 #[cfg(test)]
@@ -1040,6 +1053,19 @@ mod tests {
         wrong.unit = "archive-223-v1620-native-input-unapproved.service".into();
         wrong.origin_unit = wrong.unit.clone();
         assert!(wrong.validate(223, "verification").is_err());
+    }
+    #[test]
+    fn bounded_native20_verification_preserves_real_entry_owner_clock_and_epoch() {
+        let mut b = binding();
+        b.unit = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service".into();
+        b.claim_phase = "private-warmup-reproduction".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        b.validate(223, "verification").unwrap();
+        assert!(b.validate(224, "verification").is_err());
+        assert!(b.validate(223, "replay").is_err());
+        b.origin_invocation_id = "0".repeat(32);
+        assert!(b.validate(223, "verification").is_err());
     }
     #[test]
     fn exact_simple_controller_uses_its_authenticated_started_manager_event() {

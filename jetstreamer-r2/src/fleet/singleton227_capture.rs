@@ -1,8 +1,8 @@
 //! Capture only real native qualification or an exactly guarded singleton.
 use super::*;
 use super::{singleton227 as c, singleton227_admission as admission};
-const GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-ownroot203-capability-8623b37c-v1/jetstreamer-horizon-standalone-guard";
-const NATIVE_GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-native227-main-guard-f1e24452-v1/jetstreamer-horizon-standalone-guard";
+const GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-singleton227-guard-77bcac7e-v2/jetstreamer-horizon-standalone-guard";
+const NATIVE_GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-native227-main-guard-e53a03e5-v2/jetstreamer-horizon-standalone-guard";
 const TEST: &str = "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test";
 const TEST_SHA: &str = "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3";
 #[derive(Deserialize)]
@@ -16,8 +16,12 @@ struct Spec {
     output: PathBuf,
     #[serde(default)]
     native_running: bool,
+    #[serde(default)]
+    running_origin: Option<BoundFile>,
+    #[serde(default)]
+    terminal_fleet: Option<BoundFile>,
 }
-fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+pub(super) fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     let out = ProcessCommand::new("/usr/bin/systemctl")
         .args(["show", unit, "--no-pager", &format!("--property={fields}")])
         .output()?;
@@ -35,7 +39,7 @@ fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     }
     Ok(p)
 }
-fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> Result<()> {
+pub(super) fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> Result<()> {
     for (k, v) in values {
         ensure!(
             p.get(*k).map(String::as_str) == Some(*v),
@@ -44,7 +48,7 @@ fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> Result<()> 
     }
     Ok(())
 }
-fn journal(unit: &str) -> Result<(Vec<Value>, String)> {
+pub(super) fn journal(unit: &str) -> Result<(Vec<Value>, String)> {
     let out = ProcessCommand::new("/usr/bin/journalctl")
         .args([
             "--unit",
@@ -66,7 +70,7 @@ fn journal(unit: &str) -> Result<(Vec<Value>, String)> {
         .collect::<std::result::Result<Vec<Value>, _>>()?;
     Ok((rows, hex_lower(&Sha256::digest(&out.stdout))))
 }
-fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
+fn manager(mode: &str, guard: &Value, plan: &BoundFile, terminal: bool) -> Result<Value> {
     let unit = if mode == "native-cold" {
         "horizon-native227-protective-v1.service"
     } else {
@@ -89,12 +93,19 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
             ("MemoryMax", "1073741824"),
             ("TasksMax", "256"),
             ("CPUQuotaPerSecUSec", "1s"),
-            ("Result", "success"),
-            ("ExecMainStatus", "0"),
-            ("ActiveState", "inactive"),
-            ("SubState", "dead"),
         ],
     )?;
+    if !terminal {
+        require(
+            &p,
+            &[
+                ("Result", "success"),
+                ("ExecMainStatus", "0"),
+                ("ActiveState", "inactive"),
+                ("SubState", "dead"),
+            ],
+        )?;
+    }
     let guard_plan = bound_json(plan)?;
     ensure!(
         p.get("ReadWritePaths").map(String::as_str) == guard_plan["receipt_directory"].as_str(),
@@ -103,7 +114,7 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
     let (guard_bin, guard_sha) = if mode == "native-cold" {
         (NATIVE_GUARD_BIN, c::NATIVE_GUARD_SHA)
     } else {
-        (GUARD_BIN, c::GUARD_SHA)
+        (GUARD_BIN, c::SINGLETON_GUARD_SHA)
     };
     let command = format!(
         "{{ path={guard_bin} ; argv[]={guard_bin} {} --plan-sha256 {} --self-sha256 {}",
@@ -119,10 +130,12 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
         "227 protective command differs"
     );
     let timer = properties(&unit.replace(".service", ".timer"), "ActiveState,SubState")?;
-    require(
-        &timer,
-        &[("ActiveState", "active"), ("SubState", "waiting")],
-    )?;
+    if !terminal {
+        require(
+            &timer,
+            &[("ActiveState", "active"), ("SubState", "waiting")],
+        )?;
+    }
     let (rows, sha) = journal(unit)?;
     let success = rows
         .iter()
@@ -307,12 +320,7 @@ pub(super) fn run() -> Result<()> {
             && guarded >= admitted
             && guarded - admitted <= 900
             && guarded <= now
-            && now - admitted
-                <= if s.mode == "native-cold" && !s.native_running {
-                    3600
-                } else {
-                    900
-                },
+            && ((s.mode == "native-cold" && !s.native_running) || now - admitted <= 900),
         "227 missing/stale launch admission"
     );
     let (unit, root, peak) = if s.mode == "native-cold" {
@@ -342,7 +350,7 @@ pub(super) fn run() -> Result<()> {
                 == if s.mode == "native-cold" {
                     c::NATIVE_GUARD_SHA
                 } else {
-                    c::GUARD_SHA
+                    c::SINGLETON_GUARD_SHA
                 }
             && g["plan_sha256"] == s.guard_plan.sha256
             && g["producer"]["invocation_id"] == iid
@@ -374,8 +382,66 @@ pub(super) fn run() -> Result<()> {
             && g["r2_mutations"] == false,
         "227 actual protection differs"
     );
-    let manager = manager(&s.mode, &g, &s.guard_plan)?;
-    let f = bound_json(&serde_json::from_value(a["fleet"].clone())?)?;
+    let terminal_native = s.mode == "native-cold" && !s.native_running;
+    let origin = if terminal_native {
+        let binding = s
+            .running_origin
+            .as_ref()
+            .context("227 terminal capture needs registered running origin")?;
+        let origin = bound_json(binding)?;
+        ensure!(
+            origin["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
+                && origin["admission"] == private157::binding(&s.admission)
+                && origin["guard"] == private157::binding(&s.guard)
+                && origin["guard_plan"] == private157::binding(&s.guard_plan)
+                && origin["invocation_id"] == iid
+                && origin["main_pid"] == g["producer"]["pid"],
+            "227 terminal origin differs"
+        );
+        terminal_launch_clock(admitted, guarded, now, &origin)?;
+        Some(origin)
+    } else {
+        ensure!(
+            s.running_origin.is_none(),
+            "227 running origin only applies to terminal input capture"
+        );
+        None
+    };
+    let manager = manager(&s.mode, &g, &s.guard_plan, terminal_native)?;
+    let mut f = if terminal_native {
+        let fleet = bound_json(
+            s.terminal_fleet
+                .as_ref()
+                .context("227 terminal capture needs current accepted fleet")?,
+        )?;
+        ensure!(
+            fleet["pipelines"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|row| row["unit"]["Id"] == unit
+                    && row["expected_invocation_id"] == iid
+                    && row["evidence"].as_array().is_some_and(|e| e.first()
+                        == s.running_origin.as_ref().map(private157::binding).as_ref()))),
+            "227 terminal fleet lacks original pipeline history"
+        );
+        fleet
+    } else {
+        ensure!(
+            s.terminal_fleet.is_none(),
+            "227 terminal fleet is terminal-only"
+        );
+        bound_json(&serde_json::from_value(a["fleet"].clone())?)?
+    };
+    if terminal_native {
+        f["active"] = Value::Array(
+            f["active"]
+                .as_array()
+                .context("227 terminal fleet active census")?
+                .iter()
+                .filter(|row| row["epoch"] != 227)
+                .cloned()
+                .collect(),
+        );
+    }
     let mut names = f["unit_census"]
         .as_object()
         .context("227 prior census")?
@@ -461,10 +527,11 @@ pub(super) fn run() -> Result<()> {
                 .split_once(" ; ignore_errors=")
                 .map(|(s, _)| s)
                 == Some(native_command().as_str())
-                && sandbox["ExecMainPID"].parse::<u64>()?
-                    == g["producer"]["pid"]
-                        .as_u64()
-                        .context("227 native guarded PID")?
+                && (terminal_native
+                    || sandbox["ExecMainPID"].parse::<u64>()?
+                        == g["producer"]["pid"]
+                            .as_u64()
+                            .context("227 native guarded PID")?)
                 && g["workers"].as_array().is_some_and(|w| w.len() == 1)
                 && g["workers"][0][0] == g["producer"]["pid"]
                 && g["workers"][0][1]
@@ -481,8 +548,24 @@ pub(super) fn run() -> Result<()> {
                 "replay_entries":0,"native_input_qualified":false,"public_sidecar_countdown_authorized":false})
         } else {
             let (rows, journal_sha) = journal(unit)?;
+            let (success, terminal_micros) = super::singleton227_terminal::journal_terminal(
+                &rows,
+                iid,
+                g["producer"]["pid"].as_u64().context("227 native PID")?,
+            )?;
+            ensure!(success, "227 native manager did not complete successfully");
+            let origin = origin.as_ref().context("227 terminal origin absent")?;
+            let start = origin["producer_started_unix_millis"]
+                .as_u64()
+                .context("227 native start")?;
+            ensure!(
+                terminal_micros / 1000 >= start && terminal_micros / 1000 - start <= 2_701_000,
+                "227 terminal exceeds exact bounded native attempt"
+            );
             let native = marker(&rows, iid)?;
             json!({"schema":"jetstreamer-private-epoch227-native-input-qualified-v1","epoch":227,"test_sha256":TEST_SHA,
+            "unit":unit,"invocation_id":iid,"main_pid":g["producer"]["pid"],"resource_samples_taken":0,
+            "running_origin":private157::binding(s.running_origin.as_ref().unwrap()),"terminal_unix_microseconds":terminal_micros,
             "snapshot_sha256":c::SNAPSHOT_SHA,"bootstrap_slot":98063464u64,"accounts_hash":"4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR",
             "native_marker":native,"journal_sha256":journal_sha,"child_success":true,"child_exit_code":0,"producer_terminal_and_zero_restarts":true,"replay_entries":0,"bootstrap_writes":0})
         }
@@ -532,7 +615,11 @@ pub(super) fn run() -> Result<()> {
     result["sampled_at_utc"] = json!(publication203::utc(now)?);
     if s.mode == "native-cold" {
         result["entry_replay"] = json!(false);
-        let start = sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()?;
+        let start = if terminal_native {
+            origin.as_ref().context("227 terminal start origin")?["producer_start_monotonic_microseconds"].as_u64().context("227 original monotonic start")?
+        } else {
+            sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()?
+        };
         let mut mono = std::mem::MaybeUninit::<libc::timespec>::uninit();
         ensure!(
             unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, mono.as_mut_ptr()) } == 0,
@@ -543,19 +630,36 @@ pub(super) fn run() -> Result<()> {
             .checked_mul(1_000_000)
             .and_then(|s| s.checked_add(u64::try_from(mono.tv_nsec).ok()? / 1000))
             .context("227 monotonic clock overflow")?;
-        let elapsed = micros
-            .checked_sub(start)
-            .context("227 producer start is future-dated")?
-            / 1000;
+        let elapsed = if terminal_native {
+            (result["terminal_unix_microseconds"]
+                .as_u64()
+                .context("227 terminal stop clock")?
+                / 1000)
+                .checked_sub(
+                    origin.as_ref().unwrap()["producer_started_unix_millis"]
+                        .as_u64()
+                        .context("227 original wall start")?,
+                )
+                .context("227 stop before start")?
+        } else {
+            micros
+                .checked_sub(start)
+                .context("227 producer start is future-dated")?
+                / 1000
+        };
         let wall: u64 = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
             .as_millis()
             .try_into()?;
         result["producer_start_monotonic_microseconds"] = json!(start);
-        result["producer_started_unix_millis"] = json!(
-            wall.checked_sub(elapsed)
-                .context("227 execution start underflow")?
-        );
+        result["producer_started_unix_millis"] = if terminal_native {
+            origin.as_ref().unwrap()["producer_started_unix_millis"].clone()
+        } else {
+            json!(
+                wall.checked_sub(elapsed)
+                    .context("227 execution start underflow")?
+            )
+        };
         result["elapsed_execution_millis_at_capture"] = json!(elapsed);
     }
     result["admission"] = private157::binding(&s.admission);
@@ -586,9 +690,38 @@ pub(super) fn run() -> Result<()> {
     Ok(())
 }
 
+fn terminal_launch_clock(admitted: u64, guarded: u64, now: u64, origin: &Value) -> Result<()> {
+    let start = origin["producer_started_unix_millis"]
+        .as_u64()
+        .context("227 origin start")?
+        / 1000;
+    let captured = origin["recorded_unix_seconds"]
+        .as_u64()
+        .context("227 origin clock")?;
+    ensure!(
+        start >= admitted
+            && start - admitted <= 900
+            && guarded >= start
+            && captured >= guarded
+            && captured - admitted <= 900
+            && captured <= now,
+        "227 launch was outside admission validity"
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn terminal_qualification_uses_launch_validity_not_capture_wall_age() {
+        let origin = json!({"producer_started_unix_millis":1_100_000,"recorded_unix_seconds":1110});
+        terminal_launch_clock(1000, 1105, 5000, &origin).unwrap();
+        let mut bad = origin.clone();
+        bad["producer_started_unix_millis"] = json!(1_901_000);
+        assert!(terminal_launch_clock(1000, 1905, 5000, &bad).is_err());
+        assert!(terminal_launch_clock(1200, 1105, 5000, &origin).is_err());
+    }
     fn rows() -> Vec<Value> {
         vec![
             json!({"_SYSTEMD_INVOCATION_ID":"a".repeat(32),"MESSAGE":"epoch227-v1620-native-input slot=98063464 bank_hash=known accounts_hash=4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR last_blockhash=known capitalization=18446744073709551614 transaction_count=1 tick_height=1 next_write_version=1 replay_entries=0 bootstrap_writes=0"}),

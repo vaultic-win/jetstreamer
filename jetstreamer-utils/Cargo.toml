@@ -14,6 +14,7 @@ epoch227-native-main-guard = []
 # Reuse the native observer, with one additional closed 207 tuple. Each plan
 # must match its full tuple; this remains compatible with utils --all-features.
 epoch207-native-main-guard = ["epoch227-native-main-guard"]
+epoch227-singleton-guard = []
 epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]
 # Pins the separate bounded epoch225 upstream-comparison worker, not an era.
@@ -30,6 +31,8 @@ epoch203-root-prefix-resource = []
 epoch203-shrink-root-prefix-resource = ["epoch203-root-prefix-resource"]
 # Closed private cold epoch223 prefix ending at the independently known root.
 epoch223-root-prefix-resource = []
+# Separate native v1.6.20 prefix; not a full epoch or publication route.
+epoch223-v1620-root-prefix-resource = []
 # Private first16-slot worker envelope; never epoch or root qualification.
 epoch223-warmup-resource = []
 # Separate exact v1.6.20 first16-entry qualification; no root promotion.
@@ -54,6 +57,10 @@ path = "src/epoch227_input_capability_bin.rs"
 [[bin]]
 name = "jetstreamer-epoch207-singleton-prepare"
 path = "src/epoch207_singleton_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch227-native-retain"
+path = "src/epoch227_native_retain_bin.rs"
 
 [[bin]]
 name = "clickhouse-server"
@@ -99,6 +106,11 @@ path = "src/epoch223_prefix_capability_bin.rs"
 name = "jetstreamer-epoch223-root-prefix-resource"
 path = "src/epoch223_root_prefix_resource_bin.rs"
 required-features = ["epoch223-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch223-v1620-root-prefix-resource"
+path = "src/epoch223_v1620_root_prefix_resource_bin.rs"
+required-features = ["epoch223-v1620-root-prefix-resource"]
 
 [[bin]]
 name = "jetstreamer-epoch223-warmup-resource"

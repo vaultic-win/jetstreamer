@@ -568,6 +568,19 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    if let Some(native) = &plan.native_main {
+        return plan.filesystem == Path::new("/") && native227::validate(plan, native).is_ok();
+    }
+    if plan.unit == "horizon-singleton-227-capped-710f6523-v1.service" {
+        return cfg!(feature = "epoch227-singleton-guard")
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new("/home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1")
+            && plan.maximum_root_physical_bytes == Some(471_798_691_840)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -584,25 +597,7 @@ fn supported_unit(plan: &Plan) -> bool {
         && plan.maximum_root_physical_bytes.is_none()
 }
 
-fn run() -> Result<()> {
-    ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
-    let args: Vec<_> = env::args().collect();
-    ensure!(
-        (args.len() == 6 || (args.len() == 7 && args[6] == "--root-capability-only"))
-            && args[2] == "--plan-sha256"
-            && args[4] == "--self-sha256",
-        "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX [--root-capability-only]"
-    );
-    let capability_only = args.len() == 7;
-    ensure!(digest(&args[3]) && digest(&args[5]), "invalid digest");
-    let executable = fs::read("/proc/self/exe")?;
-    ensure!(
-        sha(&executable) == args[5],
-        "guard executable digest mismatch"
-    );
-    let bytes = read_private(Path::new(&args[1]))?;
-    ensure!(sha(&bytes) == args[3], "guard plan digest mismatch");
-    let plan: Plan = serde_json::from_slice(&bytes)?;
+fn validate_plan(plan: &Plan) -> Result<()> {
     ensure!(
         plan.bounded_measurement.is_none() || plan.bounded_canary.is_none(),
         "choose exactly one bounded guard profile"
@@ -618,7 +613,7 @@ fn run() -> Result<()> {
     }
     ensure!(
         plan.schema == "jetstreamer-horizon-standalone-guard-plan-v1"
-            && supported_unit(&plan)
+            && supported_unit(plan)
             && plan.unit.ends_with(".service")
             && plan
                 .unit
@@ -634,7 +629,42 @@ fn run() -> Result<()> {
         "root physical budget must be nonzero"
     );
     if let Some(native) = &plan.native_main {
-        native227::validate(&plan, native)?;
+        native227::validate(plan, native)?;
+    }
+    Ok(())
+}
+
+fn run() -> Result<()> {
+    ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
+    let args: Vec<_> = env::args().collect();
+    ensure!(
+        (args.len() == 6
+            || (args.len() == 7
+                && matches!(
+                    args[6].as_str(),
+                    "--root-capability-only" | "--validate-plan-only"
+                )))
+            && args[2] == "--plan-sha256"
+            && args[4] == "--self-sha256",
+        "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX [--root-capability-only]"
+    );
+    let capability_only = args.get(6).is_some_and(|a| a == "--root-capability-only");
+    ensure!(digest(&args[3]) && digest(&args[5]), "invalid digest");
+    let executable = fs::read("/proc/self/exe")?;
+    ensure!(
+        sha(&executable) == args[5],
+        "guard executable digest mismatch"
+    );
+    let bytes = read_private(Path::new(&args[1]))?;
+    ensure!(sha(&bytes) == args[3], "guard plan digest mismatch");
+    let plan: Plan = serde_json::from_slice(&bytes)?;
+    validate_plan(&plan)?;
+    if args.get(6).is_some_and(|a| a == "--validate-plan-only") {
+        println!(
+            "{}",
+            json!({"schema":"jetstreamer-horizon-standalone-static-plan-validation-v1","plan_sha256":args[3],"self_sha256":args[5],"validated":true,"unit":plan.unit,"resource_samples_taken":0,"replay_launch_authorized":false,"protective_guard_proven":false,"producer_signaled":false,"remote_mutations":false,"r2_mutations":false})
+        );
+        return Ok(());
     }
     ensure!(
         !capability_only
@@ -995,6 +1025,101 @@ mod tests {
             })
             .is_err()
         );
+    }
+    #[test]
+    fn complete_native_plans_pass_the_same_validator_used_before_runtime_observation() {
+        for (unit, root, exe, sha, enabled) in [
+            (
+                "archive-207-v1616-native-input-actual-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-v1",
+                "/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test",
+                "3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948",
+                cfg!(feature = "epoch207-native-main-guard"),
+            ),
+            (
+                "horizon-native-input-227-capped-710f6523-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1",
+                "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test",
+                "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3",
+                cfg!(feature = "epoch227-native-main-guard"),
+            ),
+        ] {
+            let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":unit,"invocation_id":"a".repeat(32),
+                "filesystem":"/","minimum_free_bytes":1,"worker_root":root,"maximum_worker_vmas":3500000,
+                "maximum_root_physical_bytes":300_000_000_000u64,"receipt_directory":"/sealed/receipts",
+                "native_main":{"executable":exe,"sha256":sha,"main_pid":42}});
+            let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(validate_plan(&plan).is_ok(), enabled, "{unit}");
+            for (pointer, replacement) in [
+                ("/schema", json!("unknown")),
+                ("/unit", json!("horizon-qualify-unknown.service")),
+                ("/invocation_id", json!("invalid")),
+                ("/filesystem", json!("/other")),
+                ("/minimum_free_bytes", json!(0)),
+                ("/worker_root", json!("/other")),
+                ("/maximum_worker_vmas", json!(1)),
+                ("/maximum_root_physical_bytes", json!(1)),
+                ("/native_main/executable", json!("/other")),
+                ("/native_main/sha256", json!("b".repeat(64))),
+                ("/native_main/main_pid", json!(1)),
+                ("/native_main", Value::Null),
+            ] {
+                let mut bad = value.clone();
+                *bad.pointer_mut(pointer).unwrap() = replacement;
+                let bad: Plan = serde_json::from_value(bad).unwrap();
+                assert!(validate_plan(&bad).is_err(), "{unit}:{pointer}");
+            }
+        }
+    }
+    #[test]
+    fn full227_plan_requires_its_separate_feature_and_complete_resource_tuple() {
+        let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon-singleton-227-capped-710f6523-v1.service","invocation_id":"a".repeat(32),
+            "filesystem":"/","minimum_free_bytes":1,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1",
+            "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":471_798_691_840u64,
+            "receipt_directory":"/sealed/receipts"});
+        let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            validate_plan(&plan).is_ok(),
+            cfg!(feature = "epoch227-singleton-guard")
+        );
+        for (pointer, replacement) in [
+            ("/schema", json!("unknown")),
+            ("/unit", json!("horizon-singleton-228-capped.service")),
+            ("/invocation_id", json!("invalid")),
+            ("/filesystem", json!("/other")),
+            ("/minimum_free_bytes", json!(0)),
+            ("/worker_root", json!("/other")),
+            ("/maximum_worker_vmas", json!(3_500_001)),
+            ("/maximum_root_physical_bytes", json!(300_000_000_000u64)),
+        ] {
+            let mut bad = value.clone();
+            *bad.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{pointer}"
+            );
+        }
+        for (key, replacement) in [
+            (
+                "bounded_measurement",
+                json!({"producer_uid":1000,"target_slot":98495999,"intent_path":"/tmp/intent","maximum_drain_seconds":180}),
+            ),
+            (
+                "bounded_canary",
+                json!({"expected_uid":1000,"target_stop_intent":"/tmp/intent","maximum_drainage_seconds":180}),
+            ),
+            (
+                "native_main",
+                json!({"executable":"/other","sha256":"a".repeat(64),"main_pid":42}),
+            ),
+        ] {
+            let mut bad = value.clone();
+            bad[key] = replacement;
+            let bad: Plan = serde_json::from_value(bad).unwrap();
+            assert!(validate_plan(&bad).is_err(), "{key}");
+        }
     }
     #[test]
     fn native203_guard_namespace_is_exact_and_keeps_all_resource_gates() {

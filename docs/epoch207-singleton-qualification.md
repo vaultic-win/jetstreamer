@@ -33,7 +33,9 @@ bootstrap/terminal MD5s come from the separately bound snapshot-binding receipt.
 The first root's v2metadata has no MD5 field; its explicit v4null follows the
 existing offline v2conversion convention and is recorded as unobserved legacy
 MD5, not a claim that the current GCS object is composite. Re-observe that exact
-generation before admitting a restore or replay; never invent a digest.
+generation before admitting the full singleton cohort restore or replay; never
+invent a digest. This unresolved first-root metadata does not block the separate
+bootstrap-only native check against its exact retained, hash-bound inputs.
 
 Run the sealed helper as root with a fresh output file
 `/var/lib/jetstreamer/horizon-207-singleton-*/preflight207-singleton.json`,
@@ -153,10 +155,82 @@ The private pipeline claim phase is `private-cold-snapshot-verification`.
 The status model sets `origin_launch` to the immutable origin, `peer_units` to
 an empty list and `expected_jet_size_bytes` to zero; its unit, invocation and
 expected `ExecStart` must match the actual launch exactly. Elapsed time comes
-from the unique PID1 producer start, not the later intent capture. The current
-registry helper approves only 223 and 227: the owner must dispatch and approve
-a separate 207 validator binding the exact harness, bootstrap, guard, schema
-and bootstrap-only scope before admitting this origin. Do not borrow another
-epoch's validator or infer approval from the generic reader accepting JSON.
+from the unique PID1 producer start, not the later intent capture. The dedicated
+`fleet::native207` registry binds the exact harness, bootstrap, guard, schema
+and bootstrap-only scope. Do not borrow another epoch's validator or infer
+approval from the generic reader accepting JSON.
 Neither the service template, origin registration, guard success nor status
 publication opens a replay, root-metadata or archive-publication gate.
+
+### Native-only command protocol
+
+Integrate, review and seal the `jetstreamer-r2` helper before calling
+`admit-native207-input` or `capture-native207-input`. Both take
+`SPEC --spec-sha256 SHA --self-sha256 SHA` as root. Neither starts a job,
+refreshes GCloud, takes a routine resource observation, nor contacts R2.
+
+The admission spec schema is `jetstreamer-private-epoch207-native-admission-spec-v1`.
+It contains `mode: "native-cold"`, `observer`, `fleet`, `cold_plan`,
+`resource_plan`, `protected_guards`, and `output`. Every binding is an absolute
+`{ "path": "...", "sha256": "..." }` pair. `protected_guards` maps every
+live replay and native 227 unit to its latest exact guard binding. Native 223
+uses its central registered claim and cgroup memory controls. `cold_plan`
+binds the sealed native plan above. Output is a fresh
+`/var/lib/jetstreamer/horizon-207-native-admission-*/admission.json`.
+
+The fresh resource plan schema is
+`jetstreamer-private-epoch207-native-resource-plan-v1`. Its fields are:
+
+- `epoch: 207`, `mode: "native-cold"`, and the exact profile's `unit`, `run_root`,
+  `test_sha256`, `snapshot_sha256`, `genesis_sha256`, `guard_sha256`, and
+  `cold_plan` binding.
+- `candidate_incremental_peak_bytes: 300000000000`,
+  `maximum_scratch_bytes: 300000000000`, `maximum_memory_bytes: 137438953472`.
+- `guard_minimum_free_bytes`: accepted twice-average century floor plus all
+  protected remaining-growth claims. `required_initial_free_bytes`: that floor
+  plus 300000000000.
+- All eight authority flags false: `entry_replay`, `replay_launch_authorized`,
+  `runtime_promotion_authorized`, `full_epoch_qualified`,
+  `canonical_sidecar_authorized`, `publication_authorized`, `remote_mutations`,
+  `r2_mutations`.
+
+Admission rehashes the actual harness, guard, bootstrap and genesis; requires
+empty owner-private scratch; recomputes the authenticated century floor;
+brackets all live owners and caps; reserves remaining hard cgroup memory for
+native 223/227; and brackets mutable disk accounting with actual free space.
+It rejects unknown profiles, incomplete samples, occupied epoch 207, stale
+receipts, pressure or insufficient capacity. Current native RSS never replaces
+its remaining hard memory claim.
+
+After successful admission the owner may coordinate the exact dormant native
+service, bind its actual invocation/MainPID into the guard plan, and arm
+`horizon-native207-protective-v1.service` and its timer. The protective service
+uses the separately sealed 207 guard, a 1 GiB memory cap, 256 tasks, one CPU,
+no network/restarts, and writes only its private receipt directory. Capture
+requires its first actual sandboxed no-trip fire, the exact plan digest, and
+one successful PID1 completion. The old `ab66` guard package is retained as
+superseded evidence: its generic namespace gate rejected native jobs before
+the specific profile check. Use only the separately sealed corrected guard
+bound by the current `native207` registry; never alter an older sealed package.
+
+The capture spec schema is `jetstreamer-private-epoch207-native-capture-spec-v1`.
+Fields are `mode`, `admission`, `guard`, `guard_plan`, and `output`.
+`running` writes a fresh
+`/var/lib/jetstreamer/horizon-207-native-capture-*/intent.json`; `qualified`
+writes a fresh `native.json` there after clean termination. Capture binds the
+effective native and guard sandboxes, exact owner, invocation and original
+start clock. Qualification additionally requires the ordered exact-IID
+canonical accounts marker, one passed test, and successful PID1 completion;
+large consensus integers remain exact strings in the marker. Both receipts
+retain every full replay, metadata and publication gate.
+
+For initial fleet registration, append only this running pipeline claim and
+tracked unit; set `metadata_event` to its exact origin and keep the same
+observer, bound prior fleet, old owners, diagnostic evidence and gate states.
+Epoch 207 remains `failed-needs-repair` or `blocked-qualification`. Publish
+through `status-publish-pipeline`, with the generic native model described
+above, `verification`, an absent sibling `epoch-207.jet`, and a positive
+evidence-backed estimate through final sidecar commit. Keep the model's reserved
+`model_sha256` slot empty until publication. Further refreshes share the normal
+30-minute replay observation cycle. No extra resource poll or archive object
+is needed merely to register or publish this origin.

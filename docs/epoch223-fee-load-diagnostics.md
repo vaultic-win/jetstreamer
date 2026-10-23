@@ -138,6 +138,70 @@ checks in the actual planning preflight. The v1.6.20 warmup cannot qualify the
 known root or borrow v1.6.25 evidence. Its compilation and unit tests do not
 replace fresh coordinated admission and invocation-bound VMA protection.
 
+The first16-entry v1.6.20 diagnostic also requires the hash-bound cooperative
+parent stop. Only the exact sealed narrow worker enables this stop; the full
+prefix worker does not. The parent splits its transport batch after96,335,554,
+without adding that slot to the canonical checkpoint set. After SourceExact
+outcomes, account writes and the complete-slot response have passed, it requests
+orderly shutdown, emits the private completion marker and stops itself. The
+supervisor freezes the full process group, captures resources, then resumes and
+drains it. Periodic warmup progress alone cannot trigger a successful capture.
+The worker still rejects slot17 before decoding or mutation; neither the stop
+nor the diagnostic resource receipt qualifies the known root or publication.
+
+The separate `epoch223-v1620-root-prefix-resource` utility profile prepares the
+full native20 prefix using the exact long worker and both canonical roots. Its
+300-GB scratch planning allowance is separate from output, host reserve and
+other owners' growth; it does not inherit the older25 worker's shrink-debt
+reservation. A planning-only `--storage-capability` requires the actual parent
+pre-worker barrier. The independent prefix rereader binds the native20 private
+namespace to that full worker and revision and rejects the first16-slot worker
+and native25 substitutions. Neither profile can claim restart, suffix,
+assembly, full-epoch verification or publication. Keep the full prefix dormant
+until the bounded warmup and fresh full-fleet admission/guards pass.
+
+## Native20 bounded warmup registration and dashboard lifecycle
+
+The sealed `horizon-223-v1620-warmup-envelope480-v1` package pins the
+cooperative parent and first16-entry worker. It reserves a 300-GB scratch
+increment, starts only above 2.3-TB free disk and 608-GiB MemAvailable, and stops
+its own group below the protected 2-TB/480-GiB floors. The actual systemd owner
+requires 128-GiB maximum/112-GiB high memory, zero swap, no restart and the exact
+private scratch/output root. This envelope admits only the three unchanged
+204/205/225 owners plus registered native207. Full227 or any other live owner
+requires a fresh complete claim calculation; this package is not approval to
+reuse an old census.
+
+`admit-warmup223` and `capture-warmup223` accept the separate
+`jetstreamer-private-warmup223-native20-admission-spec-v1` with exact `observer`
+and `fleet` bindings. The admission checks the accepted sample, full owner
+census, existing guards, native20 input proof and planning capability. Capture
+requires its genuinely running invocation and fresh invocation-bound VMA/disk
+guard before it writes `launch.json`. The event retains `entry_replay:true`,
+the existing private-warmup fleet phase and all unqualified archive gates.
+
+Immediately reconcile that captured launch into the existing accepted resource
+sample, then publish one generic pipeline status model through
+`status-publish-pipeline`. Its wire phase is `verification`, its claim phase is
+`private-warmup-reproduction`, its origin is the immutable native20 launch, and
+its elapsed clock is the actual PID1 invocation start. Measure the exact
+`output/epoch-223.jet`: absent means zero bytes; an actual empty or partially
+written regular file is measured as such. Do not fabricate a zero-entry native
+test receipt. Include evidence and a positive current best estimate through
+prefix, suffix/restart, assembly, full/plugin verification, upload and readback
+to the canonical sidecar.
+
+Refresh that same status model only from each existing 30-minute coordinated
+observation, with its current fleet bindings and measured file size. Do not add
+a second polling timer. At `resource.json`/`failure.json` or actual manager
+termination, stop publishing its old countdown, retain the loaded terminal unit
+long enough to capture genuine terminal fleet evidence, and promptly invoke
+the ordinary authenticated, conditional inactive-status cleanup if no active
+replacement/handoff exists. Keep the status for an evidenced active downstream
+owner instead. The warmup result is not an uploaded epoch: canonical completion
+still requires all independent archive gates, and completion cleanup follows
+sidecar commit.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain

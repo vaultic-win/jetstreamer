@@ -27,6 +27,7 @@ use {
 const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2";
 mod append_log;
 mod host_pressure;
+mod native_input_diagnostic;
 mod rss;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
@@ -97,6 +98,8 @@ struct Config {
     // must not suppress healthy ordinary observations.
     #[serde(default)]
     diagnostic_replays: Vec<ReplayConfig>,
+    #[serde(default)]
+    native_input_diagnostics: Vec<native_input_diagnostic::NativeConfig>,
     // A separate, tightly scoped private benchmark is not a publication claim.
     // Its predecessor namespace must not collide with the primary epoch203.
     #[serde(default)]
@@ -309,7 +312,9 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     );
     parse_utc(&config.not_before_utc).context("invalid configured not-before timestamp")?;
     ensure!(
-        !config.replays.is_empty() || !config.diagnostic_replays.is_empty(),
+        !config.replays.is_empty()
+            || !config.diagnostic_replays.is_empty()
+            || !config.native_input_diagnostics.is_empty(),
         "at least one replay is required"
     );
     ensure!(config.output.is_absolute(), "output path must be absolute");
@@ -328,6 +333,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
         "filesystem path must be absolute"
     );
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
+    native_input_diagnostic::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     Ok((config, sha256(&bytes)))
 }
@@ -344,6 +350,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "config_sha256": digest,
             "ordinary_replay_count": config.replays.len(),
             "diagnostic_replay_count": config.diagnostic_replays.len(),
+            "native_input_resource_diagnostic_count":config.native_input_diagnostics.len(),
             "configuration_validated": true,
             "resource_observation_performed": false,
             "live_invocations_verified": false,
@@ -1810,6 +1817,7 @@ fn observe_private(
 
 fn run(config: Config) -> Result<()> {
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
+    native_input_diagnostic::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     let (previous_bytes, previous_value, previous_timestamp, previous_unix) =
         previous_sample(&config.previous_sample)?;
@@ -1854,7 +1862,7 @@ fn run(config: Config) -> Result<()> {
             progress_since_unix,
         )?);
     }
-    let diagnostic_observations = observe_diagnostics(
+    let mut diagnostic_observations = observe_diagnostics(
         &config.diagnostic_replays,
         &previous_value,
         |replay, previous| {
@@ -1867,6 +1875,9 @@ fn run(config: Config) -> Result<()> {
             .map_err(Into::into)
         },
     );
+    diagnostic_observations.extend(native_input_diagnostic::sample(
+        &config.native_input_diagnostics,
+    ));
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
             std::slice::from_ref(&auxiliary.replay),
@@ -1907,7 +1918,7 @@ fn run(config: Config) -> Result<()> {
     let observed_entries = observations.len()
         + diagnostic_observations
             .iter()
-            .filter(|r| r["status"] == "observed")
+            .filter(|r| r["status"] == "observed" && r["native_resource_only"] != true)
             .count()
         + auxiliary_observations
             .iter()
@@ -2025,6 +2036,21 @@ mod tests {
         })
     }
 
+    #[test]
+    fn native_config_preflight_is_static_and_cannot_overlap_a_replay_range() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("native.json");
+        let mut v = preflight_fixture(temp.path());
+        v["native_input_diagnostics"] = serde_json::json!([{"epoch":227,"unit":"horizon-native-input-227-capped-710f6523-v1.service","expected_invocation_id":"c".repeat(32),"main_pid":42,
+            "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch","executable":"/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test","executable_sha256":"1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"}]);
+        fs::write(&path, serde_json::to_vec(&v).unwrap()).unwrap();
+        let r = dispatch(&path, true).unwrap().unwrap();
+        assert_eq!(r["native_input_resource_diagnostic_count"], 1);
+        assert_eq!(r["resource_observation_performed"], false);
+        v["replays"][0]["range"] = serde_json::json!("220-228");
+        fs::write(&path, serde_json::to_vec(&v).unwrap()).unwrap();
+        assert!(dispatch(&path, true).is_err());
+    }
     #[test]
     fn config_only_preflight_does_not_observe_or_consume_cadence() {
         let temp = tempfile::tempdir().unwrap();
@@ -2332,6 +2358,7 @@ mod tests {
             output: "/output.json".into(),
             replays: Vec::new(),
             diagnostic_replays: vec![primary],
+            native_input_diagnostics: vec![],
             host_global_pressure: false,
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,

@@ -22,6 +22,20 @@ mod bounded_resource_runner {
             .context("available memory overflow")
     }
     impl StorageHooks for WarmupStorage {
+        fn progress_slot(&self, line: &str) -> Option<u64> {
+            warmup_complete_slot(line)
+        }
+        fn progress_counters(&self, line: &str) -> Option<Value> {
+            let slot = warmup_slot(line)?;
+            let counter = |prefix: &str| {
+                line.split_whitespace()
+                    .find_map(|s| s.strip_prefix(prefix))
+                    .and_then(|s| s.parse::<u64>().ok())
+            };
+            Some(
+                json!({"slot":slot,"transactions":counter("txs=")?,"account_updates":counter("accounts=")?}),
+            )
+        }
         fn capability_only(&self) -> bool {
             env::args()
                 .next_back()
@@ -55,17 +69,18 @@ mod bounded_resource_runner {
         }
         fn before_spawn(&self, _p: &Plan, _iid: &str) -> Result<Value> {
             ensure!(
-                available_memory()? >= (448 + 128) * (1u64 << 30),
+                available_memory()? >= INITIAL_AVAILABLE,
                 "warmup memory admission"
             );
             ensure!(
-                free_bytes(&_p.run_root)? >= ENFORCED_FREE,
+                free_bytes(&_p.run_root)? >= ENFORCED_FREE.max(MINIMUM_FREE),
                 "warmup protected free-space admission"
             );
             Ok(
                 json!({"worker_entry_start":INITIAL_REPLAY,"worker_entry_end_exclusive":TARGET+1,
                 "parent_requested_root":TERMINAL,"parent_request_is_not_worker_scope":true,
                 "scratch_planning_bytes":MAX_SCRATCH,"enforced_filesystem_floor_bytes":ENFORCED_FREE,
+                "minimum_available_memory_bytes":MEMORY_RESERVE,"initial_available_memory_bytes":INITIAL_AVAILABLE,
                 "canonical_prefix_qualified":false}),
             )
         }
@@ -87,7 +102,7 @@ mod bounded_resource_runner {
             *next = Instant::now() + Duration::from_secs(15);
             let check = (|| -> Result<()> {
                 ensure!(
-                    available_memory()? >= 448 * (1u64 << 30),
+                    available_memory()? >= MEMORY_RESERVE,
                     "host-memory reserve"
                 );
                 ensure!(
@@ -109,6 +124,31 @@ mod bounded_resource_runner {
             }
             Ok(())
         }
+    }
+    fn warmup_complete_slot(line: &str) -> Option<u64> {
+        let (prefix, tail) =
+            line.split_once(" jetstreamer_node] private epoch223 warmup complete slot=")?;
+        (prefix.starts_with('[')
+            && prefix.trim_end().ends_with(" INFO")
+            && tail.trim() == format!("{TARGET} complete=true"))
+        .then_some(TARGET)
+    }
+    fn warmup_slot(line: &str) -> Option<u64> {
+        if let Some(slot) = warmup_complete_slot(line) {
+            return Some(slot);
+        }
+        let (prefix, tail) = line.split_once(" jetstreamer_node] warmup slot ")?;
+        if !prefix.starts_with('[') || !prefix.trim_end().ends_with(" INFO") {
+            return None;
+        }
+        let (slot, rest) = tail.split_once('/')?;
+        if rest.split_whitespace().next()?.parse::<u64>().ok()? != 96_335_999
+            || !tail.trim_end().ends_with("(recording starts at 96336000)")
+        {
+            return None;
+        }
+        let slot = slot.parse::<u64>().ok()?;
+        (INITIAL_REPLAY..=TARGET).contains(&slot).then_some(slot)
     }
     fn planning_report(text: &str, worker: &Path) -> Result<Value> {
         ensure!(text.len() <= 1 << 20, "parent planning output too large");
@@ -149,6 +189,46 @@ mod bounded_resource_runner {
     #[cfg(test)]
     mod warmup_tests {
         use super::*;
+        #[test]
+        fn only_verified_complete_slot_marker_triggers_capture() {
+            let marker = format!(
+                "[2026-10-23T19:00:00Z INFO jetstreamer_node] private epoch223 warmup complete slot={TARGET} complete=true"
+            );
+            assert_eq!(warmup_complete_slot(&marker), Some(TARGET));
+            assert_eq!(warmup_complete_slot(&marker.replace(" INFO ", " INFO  ")), Some(TARGET));
+            for bad in [
+                marker.replace("jetstreamer_node]", "other_module]"),
+                marker.replace("complete=true", "complete=false"),
+                marker.replace(&TARGET.to_string(), &(TARGET + 1).to_string()),
+                format!("program log: {marker}"),
+                format!("{marker} trailing"),
+            ] {
+                assert_eq!(warmup_complete_slot(&bad), None);
+            }
+            let log = format!(
+                "[2026-10-23T19:00:00Z INFO jetstreamer_node] warmup slot {TARGET}/96335999 txs=123 accounts=456 (recording starts at 96336000)"
+            );
+            assert_eq!(warmup_slot(&log), Some(TARGET));
+            assert_eq!(warmup_slot(&log.replace(" INFO ", " INFO  ")), Some(TARGET));
+            assert_eq!(warmup_complete_slot(&log), None);
+            let storage = WarmupStorage {
+                next_guard: std::sync::Mutex::new(Instant::now()),
+            };
+            assert_eq!(storage.progress_slot(&log), None);
+            assert_eq!(
+                storage.progress_counters(&log).unwrap(),
+                json!({"slot":TARGET,"transactions":123,"account_updates":456})
+            );
+            for bad in [
+                log.replace("jetstreamer_node]", "other_module]"),
+                log.replace("/96335999", "/96767522"),
+                log.replace("starts at 96336000", "starts at 96336001"),
+                log.replace("warmup slot", "progress slot"),
+                log.replace(&format!("{TARGET}/"), &format!("{}/", TARGET + 1)),
+            ] {
+                assert_eq!(warmup_slot(&bad), None);
+            }
+        }
         fn plan() -> Plan {
             Plan {
                 schema: PLAN_SCHEMA.into(),
@@ -182,7 +262,8 @@ mod bounded_resource_runner {
                 .collect::<Vec<_>>();
             assert!(args.contains(&"--qualification-end-slot=96767522"));
             assert_eq!(TARGET - INITIAL_REPLAY + 1, 16);
-            assert!(ENFORCED_FREE > MINIMUM_FREE);
+            assert!(ENFORCED_FREE > 0);
+            assert_eq!(INITIAL_AVAILABLE, MEMORY_RESERVE + (128u64 << 30));
             assert!(root_manifest_valid(&json!({})).is_err());
             assert!(validate_checkpoint_names(&CHECKPOINT_NAMES.join("\n")).is_ok());
             assert!(validate_checkpoint_names(SNAPSHOT_NAME).is_err());

@@ -130,6 +130,13 @@ launch, record the missing bound and stage the smallest useful bounded experimen
 Do not leave an indefinite hold with no evidence-gathering next action. The experiment itself must
 fit fresh admission, use isolated private output and scratch, and have a sealed work/time bound,
 invocation-bound reserve/VMA guard, and terminal evidence capture. Do not disturb healthy replays.
+Before starting a new service profile, validate its complete guard plan through the same static
+validation entry point used by the deployed guard, including the service namespace, native or
+worker binding, run root and budgets. Passing a native-PID helper test alone does not prove that
+the outer guard accepts that service. Qualify native-input and full-replay service profiles
+separately. If the first actual guard fire fails, stop only the new attempt, preserve its exact
+terminal and guard evidence, and repair the guard before a freshly admitted retry; never leave
+the new job running without its required guard or change an older healthy job's guard in place.
 For a failure before archive recording begins, prefer an explicit bounded warmup reproduction.
 Bind the cold bootstrap and enforce its entry limit in the worker when parent progress can run
 ahead of execution. Retain the native fatal result and trace; a bounded diagnostic is neither a

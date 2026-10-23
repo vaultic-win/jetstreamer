@@ -53,7 +53,7 @@ pub(crate) fn history(previous: &Value, current: &Value) -> Result<Value> {
         );
     }
     for row in rows {
-        if row["invocation_binding_stable"] != true {
+        if row["invocation_binding_stable"] != true || row["resource_only"] == true {
             continue;
         }
         let Some((first, last)) = row["range"].as_str().and_then(|r| r.split_once('-')) else {
@@ -380,6 +380,17 @@ mod tests {
             121
         );
         let previous = serde_json::json!({"lane_rss_history":first});
+        let mut native = current.clone();
+        native["replays"][0]["resource_only"] = Value::Bool(true);
+        native["replays"][0]["producer_after"]["rss"]["aggregate_rss_bytes"] = Value::from(999999);
+        assert!(
+            history(&Value::Null, &native)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .is_empty(),
+            "native cold-input RSS is not an executing lane maximum"
+        );
         assert_eq!(
             history(&previous, &Value::Null).unwrap(),
             previous["lane_rss_history"]

@@ -56,6 +56,8 @@ pub(crate) struct Plan {
 /// Plans cannot select an implementation. Existing binaries use DiskStorage;
 /// no RAM path, mount operation or relaxed resource gate is introduced here.
 pub(crate) trait StorageHooks {
+    fn progress_slot(&self,line:&str)->Option<u64> {progress_slot(line)}
+    fn progress_counters(&self,line:&str)->Option<Value> {progress_counters(line)}
     fn capability_only(&self)->bool {false}
     fn capability_result(&self,_p:&Plan,_invocation:&str,_bindings:&Value,_command:&Command)->Result<()> {
         anyhow::bail!("storage capability path is unsupported")
@@ -645,7 +647,10 @@ fn root_manifest_valid(m: &Value) -> Result<()> {
         223 => {
             m["output_slot_start"] == 96_336_000u64
                 && m["output_slot_count"] == 431_523u64
-                && m["runtime"]["runtime_profile"] == "solana-v1.6.25"
+                && ((WORKER == "fde3ba53cc52012b894bac29bd7889b4cfd326fff75f4f67ec4cbdbf2ac7136c"
+                    && m["runtime"]["runtime_profile"] == "solana-v1.6.25")
+                    || (WORKER == "a651b7a6ee3c0d4f8359e1ea6cfcb96becf259d440ee744beb173b264de6af20"
+                        && m["runtime"]["runtime_profile"] == "solana-v1.6.20"))
                 && m["bootstrap"]["slot"] == 96_335_538u64
                 && m["bootstrap"]["accounts_hash"] == "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE"
                 && m["bootstrap"]["bank_hash"] == "8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F"
@@ -920,14 +925,14 @@ fn measure(
                 Ok(Ok(line)) => {
                     print!("{line}");
                     std::io::stdout().flush()?;
-                    if let Some(mut counters) = progress_counters(&line) {
+                    if let Some(mut counters) = storage.progress_counters(&line) {
                         counters["elapsed_millis"] = json!(started.elapsed().as_millis());
                         if first_progress.is_none() {
                             first_progress = Some(counters.clone());
                         }
                         last_progress = Some(counters);
                     }
-                    if let Some(slot) = progress_slot(&line) {
+                    if let Some(slot) = storage.progress_slot(&line) {
                         observed = Some(observed.unwrap_or(slot).max(slot));
                         if stop_at.is_none() && slot >= p.target_slot {
                             ensure!(
