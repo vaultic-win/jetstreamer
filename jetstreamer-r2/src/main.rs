@@ -3293,6 +3293,8 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 #[tokio::main]
 async fn main() -> Result<()> {
     match env::args().nth(1).as_deref() {
+        Some("prepare-original141-capped-layout") => return fleet::prepare_original141_capped(),
+        Some("capture-original141-capped-launch") => return fleet::capture_original141_capped(),
         Some("prepare-original141-vote-prefix-layout") => {
             return fleet::prepare_original141_vote_prefix();
         }
@@ -3321,6 +3323,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("admit-original141-vote-prefix") {
         return fleet::admit_original141_vote_prefix().await;
+    }
+    if env::args().nth(1).as_deref() == Some("admit-original141-capped") {
+        return fleet::admit_original141_capped().await;
     }
     if env::args().nth(1).as_deref() == Some("admit-continuation203") {
         return fleet::admit_continuation203();

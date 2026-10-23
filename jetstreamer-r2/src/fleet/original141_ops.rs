@@ -17,10 +17,16 @@ const GUARDS: [&str; 5] = [
     "jetstreamer-adaptive-reserve-controller-rebind-185-185-20261023-v1.service",
 ];
 #[path = "original141_growth.rs"]
-#[allow(clippy::duplicate_mod, reason = "Growth validation belongs to each separately compiled closed141 profile")]
+#[allow(
+    clippy::duplicate_mod,
+    reason = "Growth validation belongs to each separately compiled closed141 profile"
+)]
 mod growth_bridge;
 #[path = "original141_guard_pin.rs"]
-#[allow(clippy::duplicate_mod, reason = "Guard pins bind distinct compile-time producer and guard identities")]
+#[allow(
+    clippy::duplicate_mod,
+    reason = "Guard pins bind distinct compile-time producer and guard identities"
+)]
 pub(super) mod guard_pin;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -568,11 +574,11 @@ fn cpu_budget(o: &Value) -> Result<Value> {
         units.insert(range.into(),json!({"unit":name,"invocation_id":row["producer_after"]["invocation_id"],"quota_cores":quota}));
     }
     ensure!(
-        cpus >= total + 2 + 8,
+        cpus >= total + CPU_CORES + 8,
         "CPU envelope cannot fit candidate and reserve"
     );
     Ok(
-        json!({"affinity_logical_cpus":cpus,"existing_producer_quota_cores":total,"candidate_quota_cores":2,"reserved_other_work_cores":8,"uncommitted_cores":cpus-total-10,"units":units}),
+        json!({"affinity_logical_cpus":cpus,"existing_producer_quota_cores":total,"candidate_quota_cores":CPU_CORES,"reserved_other_work_cores":8,"uncommitted_cores":cpus-total-CPU_CORES-8,"units":units}),
     )
 }
 pub(super) async fn admit() -> Result<()> {

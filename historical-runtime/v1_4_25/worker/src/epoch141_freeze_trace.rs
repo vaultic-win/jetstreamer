@@ -204,11 +204,19 @@ mod tests {
             path::Path,
             process::{Command, Stdio},
         };
-        let path = Path::new(if cfg!(feature = "epoch141-vote-prefix-diagnostic") {
+        let profile = std::env::var("SEALED_WORKER_PROFILE").unwrap_or_default();
+        let selected = match profile.as_str() {
+            "corrected-default" => "/usr/local/lib/jetstreamer/horizon-v1425-corrected-default-candidate-20261023-v1/jetstreamer-historical-worker-v1-4-25",
+            "capped" => "/usr/local/lib/jetstreamer/horizon-v1425-capped-candidate-20261023-v1/jetstreamer-historical-worker-v1-4-25",
+            "" if cfg!(feature = "epoch141-vote-prefix-diagnostic") => {
             "/usr/local/lib/jetstreamer/horizon-epoch141-vote-prefix-worker-20261023-v1/jetstreamer-historical-worker-v1-4-25"
-        } else {
+            },
+            "" => {
             "/usr/local/lib/jetstreamer/horizon-epoch141-freeze-worker-20261023-v1/jetstreamer-historical-worker-v1-4-25"
-        });
+            },
+            _ => panic!("unknown sealed worker protocol-only profile"),
+        };
+        let path = Path::new(selected);
         let expected = std::env::var("FREEZE_WORKER_SHA256").expect("explicit release worker hash");
         let before = fs::symlink_metadata(path).unwrap();
         assert!(

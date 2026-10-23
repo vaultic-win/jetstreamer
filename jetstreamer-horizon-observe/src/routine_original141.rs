@@ -26,6 +26,20 @@ const VOTE_ROOT: &str =
 const VOTE_READER: &str =
     "/usr/local/lib/jetstreamer/horizon-original141-vote-prefix-reader-20261023-v1/jetstreamer-r2";
 const VOTE_READER_SHA: &str = "11e14c8d8e6799ace6891d30d55cba6a42663f5de1a83e3a27437c900984a739";
+const CAPPED_UNIT: &str = "horizon-qualify-141-original-entry-capped-root-20261023-v1.service";
+const CAPPED_ROOT: &str =
+    "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1";
+const CAPPED_READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-original141-capped-root-reader-20261023-v1/jetstreamer-r2";
+const CAPPED_READER_SHA: &str = "98d7e79faa62d8250d307f8fcc3b7dd2bd14f0e67424d4c8eced429663ac5d86";
+fn vote_result() -> Bound {
+    Bound {
+        path:
+            "/usr/local/lib/jetstreamer/horizon-epoch141-vote-prefix-result-20261023-v1/result.json"
+                .into(),
+        sha256: "2947b49f24aaeb731cb7ea102c55726bb065545ffba5e1c585bbddd7dcd06972".into(),
+    }
+}
 fn predecessor_result() -> Bound {
     Bound { path:"/usr/local/lib/jetstreamer/horizon-epoch141-freeze-components-result-20261023-v1/result.json".into(),sha256:"f158bd27bf7c071684f4e2c1d7a49b1ed8c432c2c530f03fd59d4792b47e233d".into() }
 }
@@ -33,7 +47,9 @@ fn trace_disabled(trace: &bool) -> bool {
     !trace
 }
 fn identity(s: &Profile) -> (&'static str, &'static str) {
-    if s.vote_prefix {
+    if s.capped_root {
+        (CAPPED_UNIT, CAPPED_ROOT)
+    } else if s.vote_prefix {
         (VOTE_UNIT, VOTE_ROOT)
     } else if s.freeze_components {
         (FREEZE_UNIT, FREEZE_ROOT)
@@ -44,7 +60,9 @@ fn identity(s: &Profile) -> (&'static str, &'static str) {
     }
 }
 fn reader_binding(s: &Profile) -> (&'static str, &'static str) {
-    if s.vote_prefix {
+    if s.capped_root {
+        (CAPPED_READER, CAPPED_READER_SHA)
+    } else if s.vote_prefix {
         (VOTE_READER, VOTE_READER_SHA)
     } else if s.freeze_components {
         (FREEZE_READER, FREEZE_READER_SHA)
@@ -57,6 +75,8 @@ fn reader_binding(s: &Profile) -> (&'static str, &'static str) {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
+    #[serde(default, skip_serializing_if = "trace_disabled")]
+    capped_root: bool,
     #[serde(default, skip_serializing_if = "trace_disabled")]
     vote_prefix: bool,
     #[serde(default, skip_serializing_if = "trace_disabled")]
@@ -73,6 +93,8 @@ pub(super) struct Profile {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
+    #[serde(default)]
+    capped_root: bool,
     #[serde(default)]
     vote_prefix: bool,
     #[serde(default)]
@@ -100,6 +122,9 @@ pub(super) fn freeze_enabled(p: &Plan) -> bool {
 }
 pub(super) fn vote_enabled(p: &Plan) -> bool {
     p.original141_root.as_ref().is_some_and(|s| s.vote_prefix)
+}
+pub(super) fn capped_enabled(p: &Plan) -> bool {
+    p.original141_root.as_ref().is_some_and(|s| s.capped_root)
 }
 pub(super) fn invocation(p: &Plan) -> Option<&str> {
     p.original141_root
@@ -176,6 +201,29 @@ fn claim(s: &Profile) -> Value {
 }
 fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<()> {
     let (unit, root) = identity(s);
+    let peak = if s.capped_root {
+        512u64 << 30
+    } else {
+        256u64 << 30
+    };
+    if s.capped_root {
+        ensure!(
+            s.trace
+                && !s.freeze_components
+                && !s.vote_prefix
+                && !s.coordinated_adoption
+                && r["worker_sha256"]
+                    == "fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759"
+                && r["capped_shrink_candidate"] == true
+                && r["capped_shrink_profile_qualified"] == false
+                && r["full_cold_epoch_peak_qualified"] == false
+                && r["century_200_300_planning_assumption_applied"] == false
+                && r["resource_budget_kind"]
+                    == "bounded-qualification-stop-not-adopted-full-epoch-peak"
+                && r.get("worker_entry_terminal_slot").is_none(),
+            "capped141 must bind its distinct worker and experimental budget, without a diagnostic stop"
+        );
+    }
     if s.freeze_components {
         ensure!(
             s.trace
@@ -188,17 +236,17 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
     if s.trace {
         ensure!(
             r["historical_trace_enabled"] == true
-                && r["whole_root_physical_limit_bytes"] == 256u64 << 30
-                && r["maximum_runtime_seconds"] == 1800
+                && r["whole_root_physical_limit_bytes"] == peak
+                && r["maximum_runtime_seconds"] == if s.capped_root { 432000 } else { 1800 }
                 && g["producer_stop_enabled"] == true
-                && g["maximum_root_physical_bytes"] == 256u64 << 30
+                && g["maximum_root_physical_bytes"] == peak
                 && g.get("root_physical_observation_error")
                     .is_some_and(Value::is_null)
-                && g["root_physical_observation"]["maximum_physical_bytes"] == 256u64 << 30
+                && g["root_physical_observation"]["maximum_physical_bytes"] == peak
                 && g["root_physical_observation"]["exceeds_budget"] == false
                 && g["root_physical_observation"]["conservative_physical_bytes"]
                     .as_u64()
-                    .is_some_and(|n| n <= 256u64 << 30),
+                    .is_some_and(|n| n <= peak),
             "trace141 handoff lacks bounded logging/physical guard scope"
         );
     }
@@ -207,7 +255,9 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
             && iid(&s.invocation_id)
             && r["schema"]
                 == if s.trace {
-                    if s.vote_prefix {
+                    if s.capped_root {
+                        "jetstreamer-private-epoch141-original-entry-capped-root-launch-v2"
+                    } else if s.vote_prefix {
                         "jetstreamer-private-epoch141-original-entry-vote-prefix-launch-v2"
                     } else if s.freeze_components {
                         "jetstreamer-private-epoch141-original-entry-freeze-components-launch-v2"
@@ -228,8 +278,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
             && r["run_root"] == root
             && r["private_original_entry_root_qualification"] == true
             && r["first_guard"]["path"] == format!("{root}/receipts/first-guard.json")
-            && r["candidate_incremental_peak_bytes"]
-                == if s.trace { 256u64 << 30 } else { 768u64 << 30 },
+            && r["candidate_incremental_peak_bytes"] == if s.trace { peak } else { 768u64 << 30 },
         "original141 handoff has foreign launch/owner/span"
     );
     for key in [
@@ -368,6 +417,24 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
     Ok(())
 }
 fn read(s: &Profile) -> Result<(Value, Value)> {
+    if s.capped_root {
+        let prior = bound_json(&vote_result(), true)?;
+        ensure!(
+            prior["schema"] == "jetstreamer-epoch141-vote-prefix-result-v2"
+                && prior["invocation_id"] == "5b09e442086149b3a9775d728f1ff047"
+                && prior["worker_sha256"]
+                    == "8f61690a486c5c0322857b25980ec681ec58cfd870b3425cba4bb892e2f4eb9b"
+                && prior["terminal"]["main_pid"] == 0
+                && prior["terminal"]["restarts"] == 0
+                && prior["terminal"]["exit_status"] == 1
+                && prior["execution_evidence"]["formerly_failing_vote_strict_execution_passed"]
+                    == true
+                && prior["execution_evidence"]["later_batch_first_entry"] == 452
+                && prior["full_epoch_verified"] == false
+                && prior["publication_authorized"] == false,
+            "capped141 lacks exact successful bounded vote-prefix evidence"
+        );
+    }
     if s.vote_prefix {
         ensure!(
             s.freeze_components && s.trace && !s.coordinated_adoption,
@@ -454,13 +521,32 @@ fn replace_terminal_trace(
     let old = p.original141_root.as_ref().context("old trace profile")?;
     ensure!(
         old.trace
-            && next.freeze_components
             && next.trace
-            && ((!old.freeze_components && !old.vote_prefix && !next.vote_prefix)
-                || (old.freeze_components && !old.vote_prefix && next.vote_prefix)),
+            && !old.capped_root
+            && ((!old.freeze_components
+                && !old.vote_prefix
+                && next.freeze_components
+                && !next.vote_prefix
+                && !next.capped_root)
+                || (old.freeze_components
+                    && !old.vote_prefix
+                    && next.vote_prefix
+                    && next.freeze_components
+                    && !next.capped_root)
+                || (old.freeze_components
+                    && old.vote_prefix
+                    && next.capped_root
+                    && !next.freeze_components
+                    && !next.vote_prefix)),
         "only terminal trace-to-freeze or freeze-to-vote observer replacement is supported"
     );
     let (old_unit, _) = identity(old);
+    ensure!(
+        !next.capped_root
+            || (old.invocation_id == "5b09e442086149b3a9775d728f1ff047"
+                && !next.coordinated_adoption),
+        "capped141 must replace the exact result-bound vote-prefix invocation"
+    );
     ensure!(
         !next.vote_prefix
             || (old.invocation_id == "412f43b5db1046a2822efe3aeff95162"
@@ -540,12 +626,19 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     if s.vote_prefix {
         additions.push(serde_json::to_value(predecessor_result())?);
     }
+    if s.capped_root {
+        additions.push(serde_json::to_value(vote_result())?);
+    }
     for b in additions {
         if !evidence.contains(&b) {
             evidence.push(b);
         }
     }
-    f["gates"]["141"]["next_action"] = if s.vote_prefix {
+    f["gates"]["141"]["next_action"] = if s.capped_root {
+        json!(
+            "Advance the freshly built corrected/capped v1.4.25 worker to canonical root61328765 under its512GiB whole-root and5day experimental stops. Preserve all prior diagnostic roots and the strictly passed60912005vote evidence. Reassess actual growth/RSS/pressure at each coordinated sample; this budget is not an adopted full-cold peak. Root success qualifies only the416766slot prefix;15234epoch141suffix slots and independent complete-span/full/plugin/delivery gates remain before a ready pair."
+        )
+    } else if s.vote_prefix {
         json!(
             "Capture worker-enforced60912005 terminal and frozen Bank evidence; determine whether the formerly failing60912005entry388transaction378 vote executes successfully with the separately built corrected-builtin worker. Retain prior60912004 canonical vote-expected Bank/reward match and both earlier failed roots. Parent progress is prefetch, not execution proof. Keep incident open through complete-span qualification and a verified ready pair."
         )
@@ -564,6 +657,31 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     if let Some(s) = &p.original141_root {
         let (c, g) = read(s)?;
         fold(f, c, g, s)?;
+        if s.capped_root {
+            let previous = bound_json(&p.previous_fleet, false)?;
+            if previous["epochs"].as_array().is_some_and(|rows| {
+                rows.iter()
+                    .any(|r| r["epoch"] == 144 && r["state"] == "remote-ready")
+            }) {
+                for epoch in 136..=139 {
+                    if f["gates"][epoch.to_string()]["state"] == "blocked-qualification" {
+                        f["gates"][epoch.to_string()]["next_action"] = json!(
+                            "Epoch144 is now remote-ready and the rebuilt141worker has passed the formerly blocking vote. Review retained136–139prefix checkpoint provenance and independent full/current-plugin evidence, then dispatch qualified retained work or a freshly admitted repair with the corrected worker. Keep each incident open until its verified ready pair."
+                        );
+                    }
+                }
+            }
+            if f["gates"]["140"]["state"] == "blocked-qualification" {
+                f["gates"]["140"]["next_action"] = json!(
+                    "The complete original-entry/PoH bundle and successful60912005vote-prefix result are sealed. Advance corrected/capped141qualification to61328765 to close its canonical-root obligation; then qualify the retained140prefix plus248post-cut slots through the independent complete-span/full/plugin/delivery gates. Preserve the original140evidence."
+                );
+            }
+            if f["gates"]["186"]["state"] == "blocked-qualification" {
+                f["gates"]["186"]["next_action"] = json!(
+                    "Capped1.6.15worker, cohesive186inputs and input capability are staged. Implement its distinct bounded admission/guard/fleet path against the current five production claims plus any live141remaining-growth claim. Reassess after each accepted event/sample; require a clean expanded operating point before another experimental lane. The512GiB/384GiB draft is not a qualified full-cold budget."
+                );
+            }
+        }
     }
     Ok(())
 }
@@ -693,6 +811,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
     );
     let launch = bound_json(&spec.launch, false)?;
     let s = Profile {
+        capped_root: spec.capped_root,
         vote_prefix: spec.vote_prefix,
         freeze_components: spec.freeze_components,
         coordinated_adoption: spec.coordinated_adoption,
@@ -706,7 +825,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
             .into(),
     };
     ensure!(
-        !enabled(p) || s.freeze_components,
+        !enabled(p) || s.freeze_components || s.capped_root,
         "only a separately qualified freeze diagnostic can replace the terminal trace observer"
     );
     let (unit, _) = identity(&s);
@@ -767,6 +886,53 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capped_replacement_requires_exact_terminal_vote_and_retains_144() {
+        let (mut p, _, mut config) = fixture();
+        let old = p.original141_root.as_mut().unwrap();
+        old.trace = true;
+        old.freeze_components = true;
+        old.vote_prefix = true;
+        old.invocation_id = "5b09e442086149b3a9775d728f1ff047".into();
+        old.launch.path = Path::new(VOTE_ROOT).join("receipts/launch.json");
+        config["diagnostic_replays"][1] = config_row(old);
+        let old_id = old.invocation_id.clone();
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.diagnostic_ranges[1].controller_unit = VOTE_UNIT.into();
+        scope.diagnostic_ranges[1].producer_unit = VOTE_UNIT.into();
+        scope.diagnostic_ranges[1].expected_controller_invocation_id = old_id.clone();
+        scope.diagnostic_ranges[1].expected_producer_invocation_id = old_id.clone();
+        let first = config["diagnostic_replays"][0].clone();
+        let mut next = profile();
+        next.trace = true;
+        next.capped_root = true;
+        next.invocation_id = "c".repeat(32);
+        next.launch.path = Path::new(CAPPED_ROOT).join("receipts/launch.json");
+        let ledger = json!({"diagnostics":[{"live":false,"unit":{"Id":VOTE_UNIT,"InvocationID":old_id,"MainPID":"0","NRestarts":"0","ActiveState":"failed","SubState":"failed","Result":"exit-code","ExecMainStatus":"1"}}]});
+        for (pointer, value) in [
+            ("/diagnostics/0/live", json!(true)),
+            ("/diagnostics/0/unit/MainPID", json!("1")),
+            ("/diagnostics/0/unit/Id", json!(FREEZE_UNIT)),
+            ("/diagnostics/0/unit/InvocationID", json!("b".repeat(32))),
+        ] {
+            let mut bad = ledger.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                replace_terminal_trace(&mut p, &mut config, &next, &bad).is_err(),
+                "{pointer}"
+            );
+        }
+        replace_terminal_trace(&mut p, &mut config, &next, &ledger).unwrap();
+        assert_eq!(config["diagnostic_replays"][0], first);
+        assert_eq!(
+            config["diagnostic_replays"][1]["producer_unit"],
+            CAPPED_UNIT
+        );
+        p.original141_root = Some(next);
+        assert!(retained144_census(&p, p.scope_101_200.as_ref().unwrap()));
+        assert!(capped_enabled(&p));
+        assert!(crate::generation_101(&p).starts_with("capped141-"));
+    }
     #[test]
     fn vote_replacement_requires_terminal_freeze_and_keeps_retained_144() {
         let (mut p, _, mut config) = fixture();
@@ -893,6 +1059,7 @@ mod tests {
             sha256: "a".repeat(64),
         };
         Profile {
+            capped_root: false,
             vote_prefix: false,
             freeze_components: false,
             coordinated_adoption: false,

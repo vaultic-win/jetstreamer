@@ -1,7 +1,10 @@
 // Shared validation for two closed, compile-bound private141 profiles.
 use super::*;
 #[path = "original141_ops.rs"]
-#[allow(clippy::duplicate_mod, reason = "Each closed profile compiles operations against distinct immutable constants")]
+#[allow(
+    clippy::duplicate_mod,
+    reason = "Each closed profile compiles operations against distinct immutable constants"
+)]
 mod ops;
 pub(super) async fn admit() -> Result<()> {
     ops::admit().await
@@ -87,9 +90,25 @@ fn expected_command() -> String {
     )
 }
 fn denied(v: &Value) -> Result<()> {
+    if CAPPED_SHRINK {
+        ensure!(
+            v["capped_shrink_candidate"] == true
+                && v["capped_shrink_profile_qualified"] == false
+                && v["full_cold_epoch_peak_qualified"] == false
+                && v["century_200_300_planning_assumption_applied"] == false
+                && v.get("worker_entry_terminal_slot").is_none()
+                && v.get("worker_freeze_component_diagnostic").is_none()
+                && v["resource_budget_kind"]
+                    == "bounded-qualification-stop-not-adopted-full-epoch-peak",
+            "capped141 must retain its experimental budget and qualification denials"
+        );
+    }
     if let Some(slot) = WORKER_ENTRY_TERMINAL {
-        ensure!(v["worker_freeze_component_diagnostic"] == true && v["worker_entry_terminal_slot"] == slot,
-            "freeze141 must bind its worker-enforced diagnostic terminal");
+        ensure!(
+            v["worker_freeze_component_diagnostic"] == true
+                && v["worker_entry_terminal_slot"] == slot,
+            "freeze141 must bind its worker-enforced diagnostic terminal"
+        );
     }
     if TRACE {
         ensure!(
@@ -309,6 +328,7 @@ fn live_shape(c: &DiagnosticClaim, v: &Value) -> Result<()> {
     Ok(())
 }
 fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
+    let cpu = format!("{CPU_CORES}s");
     for (key, value) in [
         ("User", "sol"),
         ("Type", "exec"),
@@ -316,7 +336,7 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
         ("KillMode", "control-group"),
         ("Delegate", "no"),
         ("RuntimeMaxUSec", RUNTIME_DISPLAY),
-        ("CPUQuotaPerSecUSec", "2s"),
+        ("CPUQuotaPerSecUSec", cpu.as_str()),
         ("MemoryHigh", "137438953472"),
         ("MemoryMax", "206158430208"),
         ("MemorySwapMax", "0"),
@@ -349,7 +369,16 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
     Ok(())
 }
 fn environment() -> String {
-    let base = format!("JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1 JETSTREAMER_HISTORICAL_WORKER_V1_4_25={PACKAGE}/jetstreamer-historical-worker-v1-4-25 SOLANA_RAYON_THREADS=2");
+    let base = format!(
+        "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1 JETSTREAMER_HISTORICAL_WORKER_V1_4_25={PACKAGE}/jetstreamer-historical-worker-v1-4-25 SOLANA_RAYON_THREADS={CPU_CORES}"
+    );
+    // The wider worker shares a512-task cgroup with its parent. Bound index
+    // download threads while the restored worker remains live.
+    let base = if CAPPED_SHRINK {
+        format!("{base} JETSTREAMER_RIPGET_THREADS=32")
+    } else {
+        base
+    };
     if TRACE {
         format!("{base} JETSTREAMER_HISTORICAL_TRACE=1")
     } else {
@@ -357,6 +386,13 @@ fn environment() -> String {
     }
 }
 fn trace_fields(v: &mut Value) {
+    if CAPPED_SHRINK {
+        v["capped_shrink_candidate"] = json!(true);
+        v["capped_shrink_profile_qualified"] = json!(false);
+        v["full_cold_epoch_peak_qualified"] = json!(false);
+        v["century_200_300_planning_assumption_applied"] = json!(false);
+        v["resource_budget_kind"] = json!("bounded-qualification-stop-not-adopted-full-epoch-peak");
+    }
     if let Some(slot) = WORKER_ENTRY_TERMINAL {
         v["worker_freeze_component_diagnostic"] = json!(true);
         v["worker_entry_terminal_slot"] = json!(slot);
@@ -550,6 +586,7 @@ mod tests {
         let writable =
             format!("{ROOT}/destination {ROOT}/output {ROOT}/scratch {ROOT}/.jetstreamer-private");
         let env = environment();
+        let cpu = format!("{CPU_CORES}s");
         let props = BTreeMap::from([
             ("User", "sol"),
             ("Type", "exec"),
@@ -557,7 +594,7 @@ mod tests {
             ("KillMode", "control-group"),
             ("Delegate", "no"),
             ("RuntimeMaxUSec", RUNTIME_DISPLAY),
-            ("CPUQuotaPerSecUSec", "2s"),
+            ("CPUQuotaPerSecUSec", cpu.as_str()),
             ("MemoryHigh", "137438953472"),
             ("MemoryMax", "206158430208"),
             ("MemorySwapMax", "0"),
@@ -602,8 +639,16 @@ mod tests {
                     assert!(denied(&bad).is_err(), "{key}");
                 }
             }
-            assert_eq!(MAX_RUNTIME, 1800);
-            assert_eq!(PEAK, 256 << 30);
+            if CAPPED_SHRINK {
+                assert_eq!(MAX_RUNTIME, 432000);
+                assert_eq!(PEAK, 512 << 30);
+                assert_eq!(CPU_CORES, 8);
+                assert!(WORKER_ENTRY_TERMINAL.is_none());
+            } else {
+                assert_eq!(MAX_RUNTIME, 1800);
+                assert_eq!(PEAK, 256 << 30);
+                assert_eq!(CPU_CORES, 2);
+            }
             assert!(environment().ends_with("JETSTREAMER_HISTORICAL_TRACE=1"));
         }
     }

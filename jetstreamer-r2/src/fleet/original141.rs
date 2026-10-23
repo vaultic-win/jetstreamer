@@ -17,6 +17,8 @@ const PEAK: u64 = 768 << 30;
 const MAX_RUNTIME: u64 = 604800;
 const RUNTIME_DISPLAY: &str = "1w";
 const TRACE: bool = false;
+const CAPPED_SHRINK: bool = false;
+const CPU_CORES: u64 = 2;
 const MIN_MEMORY: u64 = 192 << 30;
 const SAMPLE_MEMORY_KIB: u64 = 256 * 1024 * 1024;
 include!("original141_core.rs");
