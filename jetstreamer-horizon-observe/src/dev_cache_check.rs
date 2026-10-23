@@ -337,6 +337,28 @@ fn relative_cache_literal(target: &Path) -> &'static [u8] {
     }
 }
 fn relative_cache_reference(bytes: &[u8], target: &Path) -> bool {
+    if target == Path::new(UBUNTU_DEBUG_DEPS) {
+        // A same-workspace debug binary may load deps later. An absolute
+        // private build elsewhere is not a reference to this cache merely
+        // because its pathname contains the substring "target/debug".
+        return process_references::encoded_reference(bytes, TARGET.as_bytes(), true)
+            || [b"target/debug".as_slice(), b"./target/debug".as_slice()]
+                .iter()
+                .any(|needle| {
+                    bytes
+                        .windows(needle.len())
+                        .enumerate()
+                        .any(|(offset, word)| {
+                            word == *needle
+                                && (offset == 0 || b"=\0\n\r\t '\"".contains(&bytes[offset - 1]))
+                                && process_references::encoded_reference(
+                                    &bytes[offset..],
+                                    needle,
+                                    true,
+                                )
+                        })
+                });
+    }
     let relative = relative_cache_literal(target);
     if target == Path::new(SOL_RELEASE_DEPS) {
         process_references::encoded_reference(bytes, relative, true)
@@ -832,6 +854,21 @@ mod tests {
             b"ExecStart=target/debug/worker\n",
             target
         ));
+        assert!(relative_cache_reference(
+            b"ExecStart=./target/debug/worker\n",
+            target
+        ));
+        assert!(relative_cache_reference(
+            format!("ExecStart={TARGET}/worker\n").as_bytes(),
+            target
+        ));
+        for command in [
+            b"ExecStart=/private/other-build/target/debug/deps/test\n".as_slice(),
+            b"ExecStart=/private/other-build/./target/debug/test\n",
+            b"ExecStart=target/debug-sibling/test\n",
+        ] {
+            assert!(!relative_cache_reference(command, target));
+        }
         let tree = json!({"device":1,"inode":2,"entries":3});
         let mut prior = json!({"schema":"jetstreamer-horizon-dev-cache-check-v1",
             "cache_profile":UBUNTU_DEBUG_DEPS_PROFILE,"cache":tree,
