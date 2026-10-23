@@ -62,6 +62,105 @@ fn rows<'a>(v: &'a Value, name: &str) -> Result<&'a Vec<Value>> {
         .as_array()
         .with_context(|| format!("191 queue {name}"))
 }
+fn read_head() -> Result<(Bound, Value)> {
+    let path = Path::new(ROOT).join("state.json");
+    let bytes = read_stable_bounded(&path, 4 << 20, "191 queue current head")?;
+    let b = Bound {
+        path,
+        sha256: hex_lower(&Sha256::digest(&bytes)),
+    };
+    let v = bound(&b, false)?;
+    Ok((b, v))
+}
+fn eligible_snapshot<'a>(
+    rows: &'a [(Bound, Value)],
+    cutoff: u64,
+) -> Result<Option<&'a (Bound, Value)>> {
+    let cutoff = cutoff
+        .checked_mul(1000)
+        .context("191 queue cutoff overflow")?;
+    let mut latest = None;
+    let mut previous_revision = 0;
+    let mut previous_time = 0;
+    for row in rows {
+        let revision = row.1["revision"].as_u64().context("191 revision number")?;
+        let time = row.1["updated_unix_millis"]
+            .as_u64()
+            .context("191 revision time")?;
+        ensure!(
+            revision > previous_revision && time >= previous_time && time > 0,
+            "191 queue history has duplicate/reordered/backdated revisions"
+        );
+        previous_revision = revision;
+        previous_time = time;
+        if time <= cutoff {
+            latest = Some(row);
+        }
+    }
+    Ok(latest)
+}
+fn selected_state(anchor: &Bound, cutoff: u64) -> Result<(Bound, Value, Bound, Value)> {
+    let (head_bound, head) = read_head()?;
+    let history = Path::new(ROOT).join("history");
+    if !history.try_exists()? {
+        ensure!(
+            anchor.path == head_bound.path && anchor.sha256 == head_bound.sha256,
+            "191 current-only queue anchor changed; capture a real historical revision"
+        );
+        return Ok((head_bound.clone(), head.clone(), head_bound, head));
+    }
+    let m = fs::symlink_metadata(&history)?;
+    ensure!(
+        m.is_dir() && m.uid() == 0 && m.mode() & 0o077 == 0 && history.canonicalize()? == history,
+        "191 history namespace is not root-private"
+    );
+    let mut snapshots = Vec::new();
+    for entry in fs::read_dir(&history)? {
+        let path = entry?.path();
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .context("191 history name")?;
+        if name.starts_with('.') {
+            continue;
+        }
+        ensure!(
+            snapshots.len() < 256 && name.starts_with("state-") && name.ends_with(".json"),
+            "191 queue history scope/size differs"
+        );
+        let bytes = read_stable_bounded(&path, 4 << 20, "191 immutable queue revision")?;
+        let b = Bound {
+            path: path.clone(),
+            sha256: hex_lower(&Sha256::digest(&bytes)),
+        };
+        let v = bound(&b, true)?;
+        let revision = v["revision"].as_u64().context("191 history revision")?;
+        ensure!(
+            name == format!("state-{revision:06}.json"),
+            "191 revision filename/body differs"
+        );
+        snapshots.push((b, v));
+    }
+    snapshots.sort_by_key(|(_, v)| v["revision"].as_u64().unwrap_or(0));
+    let selected = eligible_snapshot(&snapshots, cutoff)?
+        .context("191 no real queue revision exists at/before cutoff")?;
+    // The sealed capture anchor names a real native snapshot or the actual
+    // mutable head namespace; selection is independently performed at cutoff.
+    if anchor.path != head_bound.path {
+        ensure!(
+            snapshots
+                .iter()
+                .any(|(b, _)| b.path == anchor.path && b.sha256 == anchor.sha256),
+            "191 capture anchor is not an actual immutable native revision"
+        );
+    }
+    ensure!(
+        head["revision"].as_u64() >= selected.1["revision"].as_u64()
+            && snapshots.iter().any(|(_, v)| *v == head),
+        "191 current head is not a real persisted native revision"
+    );
+    Ok((selected.0.clone(), selected.1.clone(), head_bound, head))
+}
 fn task_shape(
     row: &Value,
     e: &jetstreamer_horizon_observe::cohort191_delivery_model::Epoch,
@@ -180,7 +279,8 @@ fn plan_shape(v: &Value, b: &Binding, p: &Capture) -> Result<()> {
     );
     ensure!(
         b.plan.path.starts_with("/usr/local/lib/jetstreamer")
-            && b.state.path == Path::new(ROOT).join("state.json"),
+            && (b.state.path == Path::new(ROOT).join("state.json")
+                || b.state.path.parent() == Some(Path::new(ROOT).join("history").as_path())),
         "191 queue plan/state namespace changed"
     );
     let slots = rows(v, "task_slots")?;
@@ -300,6 +400,13 @@ fn child(
                 && s["program"] == owner["program"]
                 && same_bound(&s["queue_plan"], plan)?
                 && s["queue_invocation_id"] == manager_iid
+                && a["observer"] == s["observer"]
+                && a["routine_completion"] == s["routine_completion"]
+                && a["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && a["observer"].is_object()
+                && a["routine_completion"].is_object()
+                && a["other_pending_os_growth_bytes"].is_u64()
+                && l["resource_admission"].is_object()
                 && s["source_revalidation_policy"]
                     == serde_json::to_value(
                         p.source_revalidation_policy
@@ -350,6 +457,15 @@ fn child(
             "191 same-PID uploader exec transition differs from native launch"
         );
     }
+    ensure!(
+        pipeline_status::same_exec_start(
+            &c.expected_exec_start,
+            l["native_owner"]["ExecStart"]
+                .as_str()
+                .context("191 actual launcher command")?
+        ),
+        "191 actual native launcher command differs from queue owner binding"
+    );
     Ok((c, u))
 }
 pub(super) fn observe(
@@ -377,7 +493,7 @@ pub(super) fn observe(
         return Ok(None);
     }
     plan_check(&b.plan, &materialized)?;
-    let state = bound(&b.state, false)?;
+    let (selected_bound, state, head_bound, head) = selected_state(&b.state, cutoff)?;
     let working: Vec<_> = p.claims.iter().filter(|c| c.phase == PHASE).collect();
     ensure!(
         !working.is_empty() && working.len() == p.claims.len(),
@@ -421,6 +537,25 @@ pub(super) fn observe(
                 .as_ref()
                 .is_some_and(|b| same_bound(&plan["program"], b).unwrap_or(false)),
         "191 queue is not its exact sealed program/plan command"
+    );
+    ensure!(
+        head["schema"] == state["schema"]
+            && head["unit"] == UNIT
+            && head["status"] == "managing"
+            && head["plan"] == state["plan"]
+            && head["invocation_id"] == state["invocation_id"]
+            && head["manager_pid"] == state["manager_pid"]
+            && head["manager_start_ticks"] == state["manager_start_ticks"]
+            && head["updated_unix_millis"].as_u64().is_some_and(|t| t
+                <= SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0) as u64)
+            && (head["revision"] == state["revision"]
+                || head["updated_unix_millis"]
+                    .as_u64()
+                    .is_some_and(|t| t > cutoff.saturating_mul(1000))),
+        "191 later native state is failed/replaced/backdated; do not hide a live queue failure"
     );
     let pid = state["manager_pid"]
         .as_u64()
@@ -498,11 +633,18 @@ pub(super) fn observe(
         "191 queue exceeds its one verifier/one uploader envelope"
     );
     ensure!(
-        bound(&b.state, false)? == state && fleet::unit(UNIT)? == *u && stat(pid)? == start,
+        bound(
+            &selected_bound,
+            selected_bound.path != Path::new(ROOT).join("state.json")
+        )? == state
+            && read_head()?.0.sha256 == head_bound.sha256
+            && fleet::unit(UNIT)? == *u
+            && stat(pid)? == start,
         "191 queue state/manager changed during capture"
     );
     Ok(Some(
-        json!({"schema":"jetstreamer-cohort191-delivery-queue-observation-v2","plan":b.plan,"state":b.state,
+        json!({"schema":"jetstreamer-cohort191-delivery-queue-observation-v2","plan":b.plan,"state":selected_bound,"current_head":head_bound,
+        "post_cutoff_transition":if head["revision"] != state["revision"] {json!({"state":head,"backdated":false})} else {Value::Null},
         "revision":state["revision"],"manager":u,"manager_start_ticks":start,"epochs":entries,
         "sync_observations":observations,"resource_samples":0,"publication_authorized":false,"r2_mutations":false}),
     ))
@@ -653,6 +795,33 @@ mod tests {
         let mut invalid = valid;
         invalid.push(json!({"stage":"source-revalidation"}));
         assert!(task_limits(&invalid).is_err());
+    }
+    #[test]
+    fn selects_real_cutoff_revision_and_never_backdates_later_native_state() {
+        let b = |n| Bound {
+            path: format!("/history/{n}").into(),
+            sha256: "a".repeat(64),
+        };
+        let revisions = vec![
+            (b(1), json!({"revision":1,"updated_unix_millis":1000})),
+            (b(2), json!({"revision":2,"updated_unix_millis":2001})),
+            (b(3), json!({"revision":3,"updated_unix_millis":3000})),
+        ];
+        assert_eq!(
+            eligible_snapshot(&revisions, 2).unwrap().unwrap().1["revision"],
+            1
+        );
+        assert_eq!(
+            eligible_snapshot(&revisions, 3).unwrap().unwrap().1["revision"],
+            3
+        );
+        assert!(eligible_snapshot(&revisions, 0).unwrap().is_none());
+        let mut bad = revisions.clone();
+        bad[2].1["updated_unix_millis"] = json!(1500);
+        assert!(eligible_snapshot(&bad, 3).is_err());
+        let mut bad = revisions;
+        bad[2].1["revision"] = json!(2);
+        assert!(eligible_snapshot(&bad, 3).is_err());
     }
     #[test]
     fn queue_and_sync_namespaces_cannot_borrow_another_epoch_or_legacy_watcher() {

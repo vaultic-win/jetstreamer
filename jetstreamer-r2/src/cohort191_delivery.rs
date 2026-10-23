@@ -1296,10 +1296,29 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
     }
     let regenerated = capture(&p)?;
     for (key, expected) in regenerated.as_object().context("191 regenerated event")? {
-        ensure!(
-            v[key] == *expected,
-            "191 native event differs from bound capture:{key}"
-        );
+        if key == "queue_observation" && !expected.is_null() {
+            let mut actual = expected.clone();
+            let mut prior = v[key].clone();
+            for name in ["current_head", "post_cutoff_transition"] {
+                actual
+                    .as_object_mut()
+                    .context("191 current queue proof")?
+                    .remove(name);
+                prior
+                    .as_object_mut()
+                    .context("191 captured queue proof")?
+                    .remove(name);
+            }
+            ensure!(
+                actual == prior,
+                "191 cutoff queue revision/owner/task proof changed"
+            );
+        } else {
+            ensure!(
+                v[key] == *expected,
+                "191 native event differs from bound capture:{key}"
+            );
+        }
     }
     Ok(())
 }
@@ -1947,6 +1966,15 @@ mod tests {
         phase_scope(&c).unwrap();
         c.invocation_id = "unknown".into();
         assert!(phase_scope(&c).is_err());
+    }
+    #[test]
+    fn source_tail_provisional_allowance_never_silently_zeroes_or_hides_overrun() {
+        assert_eq!(tail_budget(10000, 1000, 5000).unwrap(), 5000);
+        assert_eq!(tail_budget(10000, 1000, 9500).unwrap(), 1000);
+        assert_eq!(tail_budget(10000, 1000, 10000).unwrap(), 1000);
+        assert_eq!(tail_budget(10000, 1000, 15000).unwrap(), 6000);
+        assert!(tail_budget(0, 1000, 0).is_err());
+        assert!(tail_budget(1000, 1001, 0).is_err());
     }
     #[test]
     fn upload_and_readback_have_independent_rates_and_stall_age() {

@@ -243,6 +243,19 @@ pub(super) fn publish(p: &Plan, provisional: &Value, observer: &Bound) -> Result
         for c in v["claims"].as_array().context("191 current claims")? {
             let epoch = c["epoch"].as_u64().context("191 current epoch")?;
             let phase = match c["phase"].as_str().context("191 phase")? {
+                "cohort191-delivery" => {
+                    let row = v["queue_observation"]["epochs"]
+                        .as_array()
+                        .context("191 queue cutoff rows")?
+                        .iter()
+                        .find(|r| r["epoch"] == epoch)
+                        .context("191 queue cutoff member")?;
+                    match row["stage"].as_str() {
+                        Some("upload") => "upload",
+                        Some("readback" | "source-revalidation") => "readback",
+                        _ => "verification",
+                    }
+                }
                 "upload-readback" => {
                     let f: Bound = serde_json::from_value(v["forecast"].clone())?;
                     let f = bound_json(&f, true)?;
