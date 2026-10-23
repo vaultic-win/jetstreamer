@@ -376,26 +376,48 @@ fn deadline141(row: &Value, p: &Profile, elapsed_millis: u64) -> Result<Value> {
         "141 deadline needs a valid root rate"
     );
     let maximum_runtime_millis = 432_000_000u64;
-    let remaining_runtime_millis = maximum_runtime_millis
-        .checked_sub(elapsed_millis)
-        .context("141 runtime cap is already exhausted")?;
+    // The hard stop is operational risk evidence, never a filter selecting
+    // only forecasts that happen to fit it. Live ownership is checked separately.
+    let remaining_runtime_millis = maximum_runtime_millis.saturating_sub(elapsed_millis);
+    let remaining_runtime_millis_signed =
+        i128::from(maximum_runtime_millis) - i128::from(elapsed_millis);
     let projection = ((p.execution_terminal - slot) as f64 * 1000.0 / rate).ceil();
     ensure!(
         projection.is_finite() && projection >= 0.0 && projection < u64::MAX as f64,
         "141 root runtime projection overflow"
     );
     let projected_root_replay_millis = projection as u64;
-    ensure!(
-        projected_root_replay_millis < remaining_runtime_millis,
-        "141 root projection {projected_root_replay_millis}ms does not fit remaining runtime cap {remaining_runtime_millis}ms; preserve the live owner and repair the ETA basis, never assume runtime extension or qualified resume"
-    );
+    let root_replay_margin_millis =
+        remaining_runtime_millis_signed - i128::from(projected_root_replay_millis);
+    let projected_runtime_overrun_millis = -root_replay_margin_millis;
+    // Every difference of these u64 inputs fits i128. serde_json supports the
+    // corresponding signed/unsigned JSON integer range, including negative margins.
+    let signed_json = |value: i128| -> Result<Value> {
+        if let Ok(value) = i64::try_from(value) {
+            Ok(json!(value))
+        } else if let Ok(value) = u64::try_from(value) {
+            Ok(json!(value))
+        } else {
+            anyhow::bail!("141 signed runtime risk exceeds JSON integer range")
+        }
+    };
     Ok(
-        json!({"schema":"jetstreamer-qualification141-runtime-window-v2",
+        json!({"schema":"jetstreamer-qualification141-runtime-window-v3",
         "maximum_runtime_millis":maximum_runtime_millis,
         "elapsed_execution_millis":elapsed_millis,
         "remaining_runtime_millis":remaining_runtime_millis,
         "projected_root_replay_millis":projected_root_replay_millis,
-        "root_replay_margin_millis":remaining_runtime_millis-projected_root_replay_millis,
+        "remaining_runtime_millis_signed":signed_json(remaining_runtime_millis_signed)?,
+        "root_replay_margin_millis":signed_json(root_replay_margin_millis)?,
+        "projected_runtime_overrun_millis":signed_json(projected_runtime_overrun_millis)?,
+        "root_projection_reaches_runtime_cap":root_replay_margin_millis <= 0,
+        "runtime_cap_exhausted":elapsed_millis >= maximum_runtime_millis,
+        "forecast_basis":"observed-slot-rate-plus-separate-suffix-and-policy-allowances",
+        "forecast_conditional_on_continued_progress":true,
+        "cap_miss_recovery_route_qualified":false,
+        "cap_miss_recovery_delay_measured":false,
+        "forecast_includes_measured_cap_miss_recovery_delay":false,
+        "runtime_cap_is_forecast_publication_gate":false,
         "root_projection_excludes_terminal_work":true,
         "root_projection_is_measured_bound":false,
         "suffix_runs_in_current_invocation":false,
@@ -651,14 +673,32 @@ mod tests {
         assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 546_525_910);
     }
     #[test]
-    fn epoch141_infeasible_or_exhausted_runtime_cannot_publish_a_fresh_countdown() {
+    fn epoch141_runtime_risk_keeps_current_forecast_and_denies_runtime_authority() {
         let p = profile(141).unwrap();
         let row = json!({"useful_work":{"sufficient_for_rates":true,
             "last":{"slot":p.execution_terminal-100},"slots_per_second":2.0}});
-        assert!(deadline141(&row, p, 432_000_000 - 50_001).is_ok());
-        assert!(deadline141(&row, p, 432_000_000 - 50_000).is_err());
-        assert!(deadline141(&row, p, 432_000_000).is_err());
-        assert!(deadline141(&row, p, 432_000_001).is_err());
+        for (elapsed, margin, overrun, exhausted) in [
+            (432_000_000 - 50_001, 1, -1, false),
+            (432_000_000 - 50_000, 0, 0, false),
+            (432_000_000 - 49_999, -1, 1, false),
+            (432_000_000, -50_000, 50_000, true),
+            (432_000_001, -50_001, 50_001, true),
+        ] {
+            let risk = deadline141(&row, p, elapsed).unwrap();
+            assert_eq!(risk["root_replay_margin_millis"], margin);
+            assert_eq!(risk["projected_runtime_overrun_millis"], overrun);
+            assert_eq!(risk["root_projection_reaches_runtime_cap"], margin <= 0);
+            assert_eq!(risk["runtime_cap_exhausted"], exhausted);
+            assert_eq!(
+                risk["remaining_runtime_millis"],
+                432_000_000u64.saturating_sub(elapsed)
+            );
+            assert_eq!(risk["maximum_runtime_millis"], 432_000_000u64);
+            assert_eq!(risk["runtime_extension_authorized"], false);
+            assert_eq!(risk["runtime_checkpoint_resume_qualified"], false);
+            assert_eq!(risk["runtime_cap_is_forecast_publication_gate"], false);
+            assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 137_267_000);
+        }
         for (key, value) in [
             ("slots_per_second", json!(0)),
             ("slots_per_second", json!(-1)),
@@ -672,6 +712,18 @@ mod tests {
         bad["useful_work"]["last"]["slot"] = json!(p.execution_terminal + 1);
         assert!(deadline141(&bad, p, 1).is_err());
         assert!(deadline141(&bad, &PROFILES[0], 1).is_err());
+    }
+    #[test]
+    fn epoch141_observed_cap_overrun_does_not_select_a_faster_rate() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":60929552},"slots_per_second":0.8954750570114269}});
+        let risk = deadline141(&row, p, 17_536_387).unwrap();
+        assert_eq!(risk["projected_root_replay_millis"], 445_811_413u64);
+        assert_eq!(risk["root_replay_margin_millis"], -31_347_800i64);
+        assert_eq!(risk["projected_runtime_overrun_millis"], 31_347_800u64);
+        assert_eq!(risk["cap_miss_recovery_route_qualified"], false);
+        assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 592_423_612);
     }
     #[test]
     fn eta_includes_every_queued_slot_and_downstream_work() {
