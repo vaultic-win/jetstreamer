@@ -368,6 +368,12 @@ mod tests {
         let m =
             repair185::effective_model(&p, &repair183::effective_model(&p, &old).unwrap()).unwrap();
         validate_observer_config(&p, &m, &c).unwrap();
+        if let Ok(bytes) = read_checked(&p.observer, LIMIT, 0, false) {
+            let observed: Value = serde_json::from_slice(&bytes).unwrap();
+            let observed_model = cohort191::for_observation(&p, &m, &observed).unwrap();
+            repair183::for_observation(&p, &observed_model, &observed).unwrap();
+            repair185::for_observation(&p, &observed_model, &observed).unwrap();
+        }
         assert_eq!(p.sample_target_utc, FIRST);
         assert_eq!(m["ranges"].as_array().unwrap().len(), 5);
         for (a, b) in old["ranges"]

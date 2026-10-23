@@ -9,7 +9,16 @@ const DIRECTORY: &str = "/home/sol/.jetstreamer-private/epochs-191-194-v4-202610
 const CONTROLLER: &str = "21da099d82964bb69f6b2bdeca6579fd";
 const PRODUCER: &str = "ea93199ed2fa470d99de248c2a10b246";
 
+#[cfg(test)]
 fn apply(model: &Value, observed: &Value, manifest: &Value) -> Result<Value> {
+    apply_controller(model, observed, manifest, CONTROLLER)
+}
+fn apply_controller(
+    model: &Value,
+    observed: &Value,
+    manifest: &Value,
+    controller: &str,
+) -> Result<Value> {
     let ranges = model["ranges"].as_array().context("cohort191 ranges")?;
     let indices: Vec<_> = ranges
         .iter()
@@ -28,7 +37,7 @@ fn apply(model: &Value, observed: &Value, manifest: &Value) -> Result<Value> {
             && model["phase"] == "replay"
             && r["epochs"] == json!([191, 192, 193, 194])
             && r["archive_directory"] == DIRECTORY
-            && r["expected_controller_invocation_id"] == CONTROLLER
+            && r["expected_controller_invocation_id"] == controller
             && r["expected_producer_invocation_id"] == PRODUCER
             && matches!(old, OLD | NEW)
             && r.get("elapsed_execution_millis").is_none()
@@ -103,8 +112,8 @@ fn apply(model: &Value, observed: &Value, manifest: &Value) -> Result<Value> {
     let after = &o["worker_after"];
     ensure!(
         o["invocation_binding_stable"] == true
-            && o["controller_before"]["invocation_id"] == CONTROLLER
-            && o["controller_after"]["invocation_id"] == CONTROLLER
+            && o["controller_before"]["invocation_id"] == controller
+            && o["controller_after"]["invocation_id"] == controller
             && o["producer_before"]["invocation_id"] == PRODUCER
             && o["producer_after"]["invocation_id"] == PRODUCER
             && before["matching_workers"] == 1
@@ -151,7 +160,8 @@ pub(super) fn for_observation(p: &Plan, model: &Value, observer: &Value) -> Resu
         },
         true,
     )?;
-    apply(model, observer, &manifest)
+    let controller = controller_rebind::controller(p, "191-194", CONTROLLER, PRODUCER)?;
+    apply_controller(model, observer, &manifest, &controller)
 }
 
 #[cfg(test)]
