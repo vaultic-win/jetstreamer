@@ -40,6 +40,14 @@ struct Spec {
     observer: BoundFile,
     fleet: BoundFile,
 }
+fn delivery_complete(f: &Value) -> bool {
+    f["inventory"]["entries"].as_array().is_some_and(|a| {
+        a.iter()
+            .filter(|r| r["epoch"] == 203 && r["state"] == "ready-pair")
+            .count()
+            == 1
+    })
+}
 fn sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
     let sampled = utc_seconds(
         o["recorded_at_utc"]
@@ -59,7 +67,9 @@ fn sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
             && f["observer_sha256"] == spec.observer.sha256
             && f["sampled_at_utc"] == o["recorded_at_utc"]
             && f["inventory"]["anomalies"] == 0
-            && f["active"].as_array().is_some_and(|a| a.len() == 4),
+            && f["active"]
+                .as_array()
+                .is_some_and(|a| a.len() == if delivery_complete(f) { 3 } else { 4 }),
         "warmup requires fresh accepted complete fleet"
     );
     ensure!(
@@ -83,6 +93,9 @@ fn sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
         "warmup must not duplicate a staged or completed remote223"
     );
     for (name, iid) in OWNERS {
+        if name == OWNERS[0].0 && delivery_complete(f) {
+            continue;
+        }
         let rows = f["active"]
             .as_array()
             .unwrap()
@@ -113,6 +126,13 @@ fn names(f: &Value) -> Result<BTreeSet<String>> {
 fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
     for (name, iid) in OWNERS {
         let u = c.get(name).context("protected owner missing")?;
+        if name == OWNERS[0].0 && delivery_complete(f) {
+            ensure!(
+                u["MainPID"] == "0" && u["ActiveState"] == "inactive",
+                "completed203 uploader is still active"
+            );
+            continue;
+        }
         ensure!(
             u["InvocationID"] == iid
                 && u["NRestarts"] == "0"
@@ -138,7 +158,20 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
     }
     Ok(())
 }
-fn inputs() -> Result<()> {
+fn inputs(f: &Value) -> Result<()> {
+    if delivery_complete(f) {
+        let receipt = bound_json(&BoundFile {
+            path: "/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-203.r2.json".into(),
+            sha256: "d4222cd99f521700c12bb8227722d1cbecf90c5c1f48d66a22b7bb65f20d26c4".into(),
+        })?;
+        ensure!(
+            receipt["epoch"] == 203
+                && receipt["remote_sha256_readback"] == true
+                && receipt["archive_sha256"]
+                    == "7efb3b28b2761cd646d20fa282d87c508249488fd0fb27ce8e033a1aed7d39ad",
+            "completed203 receipt differs"
+        );
+    }
     let proof = bound_json(&BoundFile {
         path: "/var/lib/jetstreamer/horizon-cold223-input-proof-v1/input-proof.json".into(),
         sha256: "b0ee9a5136e075d0c1605573cc78e154a3059351e0e0f961068211f344c5387f".into(),
@@ -184,7 +217,7 @@ pub(super) fn run(capture: bool) -> Result<()> {
     let f = bound_json(&spec.fleet)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let sampled = sample(&spec, &o, &f, now)?;
-    inputs()?;
+    inputs(&f)?;
     let before = census(&names(&f)?, 201, 300)?;
     protected(&f, &before)?;
     let own = &before[UNIT];
@@ -628,5 +661,19 @@ mod tests {
         assert!(!command.contains("--storage-capability"));
         assert!(command.contains(PLAN_SHA));
         assert!(command.contains(RUNNER_SHA));
+    }
+    #[test]
+    fn completed203_is_released_only_after_ready_inventory_and_without_live_claim() {
+        let (s, o, mut f) = fixture();
+        let now = utc_seconds("2026-10-23T13:17:08Z").unwrap();
+        f["inventory"]["entries"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"epoch":203,"state":"ready-pair"}));
+        assert!(sample(&s, &o, &f, now).is_err());
+        f["active"].as_array_mut().unwrap().remove(0);
+        sample(&s, &o, &f, now).unwrap();
+        f["inventory"]["entries"][1]["state"] = json!("archive-only");
+        assert!(sample(&s, &o, &f, now).is_err());
     }
 }
