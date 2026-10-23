@@ -1749,14 +1749,48 @@ mod tests {
         };
         const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst";
         const LEDGER: &str = "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1";
-        let scratch = env::var("JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH")
+        let requested = env::var("JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH")
             .expect("explicit isolated test scratch required");
+        let temporary = if requested == "/tmp" {
+            let name = std::ffi::CString::new("/tmp").unwrap();
+            let mut geometry = std::mem::MaybeUninit::<libc::statfs>::uninit();
+            assert_eq!(
+                unsafe { libc::statfs(name.as_ptr(), geometry.as_mut_ptr()) },
+                0
+            );
+            assert_eq!(
+                unsafe { geometry.assume_init() }.f_type as u64,
+                0x01021994,
+                "native test /tmp must be the admitted tmpfs"
+            );
+            let dir = tempfile::Builder::new()
+                .prefix("native-input223-v1620-")
+                .tempdir_in("/tmp")
+                .unwrap();
+            fs::create_dir(dir.path().join("scratch")).unwrap();
+            fs::set_permissions(
+                dir.path().join("scratch"),
+                fs::Permissions::from_mode(0o700),
+            )
+            .unwrap();
+            Some(dir)
+        } else {
+            None
+        };
+        let scratch = temporary
+            .as_ref()
+            .map(|d| d.path().join("scratch").to_str().unwrap().to_string())
+            .unwrap_or(requested);
         let path = Path::new(&scratch);
         assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
         let root = path.parent().unwrap();
         assert_eq!(
             root.parent(),
-            Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+            Some(Path::new(if temporary.is_some() {
+                "/tmp"
+            } else {
+                "/home/ubuntu/.jetstreamer-private"
+            }))
         );
         assert!(root
             .file_name()
