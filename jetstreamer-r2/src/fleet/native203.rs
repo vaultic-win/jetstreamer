@@ -4,7 +4,7 @@ use super::*;
 
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch203-native-restore-launch-v1";
 pub(super) const GUARD_SHA: &str =
-    "d039ddf0b161bc554614a862bd12987bd6a3474549a22d066ebefa5584e5dd98";
+    "cf110b7397f4a134aaba422bb46838acc5b8d52b97cb6a6a2f1b70c6e1459a14";
 const UNIT: &str = "horizon-native-203-0158-v1.service";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/epoch203-native-0158-v1";
 const PROBE: &str = "/var/lib/jetstreamer/horizon-native203-profile-fixed-0154-v1/jetstreamer-epoch203-native-restore-probe";
