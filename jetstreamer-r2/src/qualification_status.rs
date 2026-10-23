@@ -226,7 +226,7 @@ pub(super) fn matches(
     let Some(u) = census.get(p.unit) else {
         return false;
     };
-    receipt.status.phase == "qualification"
+    matches!(receipt.status.phase.as_str(), "replay" | "qualification")
         && receipt.epoch == epoch
         && receipt.producer_invocation_id == p.iid
         && receipt.controller_invocation_id == p.iid
@@ -242,7 +242,10 @@ pub(super) fn matches(
 pub(super) fn inactive_owner(
     publication: &StatusPublicationReceipt,
 ) -> Result<Option<(String, String)>> {
-    if publication.status.phase != "qualification" {
+    if !matches!(
+        publication.status.phase.as_str(),
+        "replay" | "qualification"
+    ) {
         return Ok(None);
     }
     let Ok(p) = profile(publication.epoch) else {
@@ -331,7 +334,7 @@ pub(super) async fn run() -> Result<()> {
                     p.downstream_allowance_millis[&epoch],
                 )?,
                 sampled_at_utc: sampled.into(),
-                phase: "qualification".into(),
+                phase: "replay".into(),
             });
         }
     }
@@ -351,9 +354,8 @@ pub(super) async fn run() -> Result<()> {
         states = serde_json::from_value(saved["statuses"].clone())?;
         ensure!(
             states.iter().map(|s| s.epoch).eq([204, 205, 225, 226])
-                && states
-                    .iter()
-                    .all(|s| s.sampled_at_utc == sampled && s.phase == "qualification"),
+                && states.iter().all(|s| s.sampled_at_utc == sampled
+                    && matches!(s.phase.as_str(), "replay" | "qualification")),
             "qualification estimate receipt differs"
         );
     } else if args.len() == 7 {

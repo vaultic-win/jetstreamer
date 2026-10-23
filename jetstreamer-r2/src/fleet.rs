@@ -2734,13 +2734,20 @@ pub(super) async fn run() -> Result<()> {
                 &r2.bucket,
                 epoch,
             );
+            // Status phase describes actual work (replay, input verification),
+            // while this separately authenticated owner binding preserves the
+            // private compatibility gates and grants no production claim.
+            let private_qualification_binding =
+                publication.as_ref().is_ok_and(|(receipt, _, _)| {
+                    qualification_status::matches(receipt, epoch, &observer, &before)
+                        || native223_status::matches(receipt, epoch, &observer, &before)
+                });
             // Missing local publication history is explicitly unbound, never current.
             let matches = publication.as_ref().is_ok_and(|(receipt, _, _)| {
-                if receipt.status.phase == "qualification" {
+                if private_qualification_binding {
                     return receipt.status == status
                         && receipt.object_etag == object.etag
-                        && receipt.authenticated_readback
-                        && qualification_status::matches(receipt, epoch, &observer, &before);
+                        && receipt.authenticated_readback;
                 }
                 if let Some(binding) = &receipt.pipeline_binding {
                     receipt.status == status
@@ -2758,7 +2765,7 @@ pub(super) async fn run() -> Result<()> {
                 }
             });
             let production_matches = production_status_binding_matches(matches, state)
-                || (matches && status.phase == "qualification");
+                || (matches && private_qualification_binding);
             json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && status.sampled_at_utc == sample})
         } else {
             Value::Null
@@ -2800,6 +2807,9 @@ pub(super) async fn run() -> Result<()> {
     receipt["pipelines"] = json!(pipelines);
     receipt["terminal_replays"] = json!(terminal_replays);
     receipt["auxiliary_diagnostics"] = json!(auxiliary_diagnostics);
+    if plan.first_epoch == 201 && plan.last_epoch == 300 {
+        receipt["memory_target"] = fleet_memory::report(&observer, &receipt);
+    }
     if let Some(entry) = runtime157 {
         receipt["runtime_handoff157"] = entry;
     }

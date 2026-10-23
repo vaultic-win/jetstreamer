@@ -85,6 +85,15 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   }
   ```
 
+- The live Vaultic dashboard accepts exactly `replay`, `verification`, `upload`, and `readback`
+  as lowercase status phases. Use `replay` for observed transaction execution even when its
+  compatibility route remains under qualification, and `verification` for active native-input,
+  qualification, archive/plugin checks, assembly or finalization work before upload. Preserve the
+  precise internal stage and all qualification gates in private fleet/estimate receipts; the coarse
+  dashboard phase never promotes a job or qualifies an archive. Do not publish internal labels such
+  as `qualification`, `publication`, `finalization` or `queued-upload` as wire phases without a
+  coordinated consumer change. Compare an actual accepted payload when diagnosing missing ETAs;
+  an unsupported phase causes the reader to discard the whole report, including bytes and ETA.
 - Bind `epoch` to the exact live claim. Measure `jet_size_bytes` from the current `.jet` regular
   file and use `0` before that file exists. Derive `elapsed_execution_millis` from the authoritative
   producer invocation start, not from the most recent poll. `estimated_remaining_millis` is the
