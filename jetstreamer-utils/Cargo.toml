@@ -119,6 +119,10 @@ name = "jetstreamer-epoch141-source-equivalence"
 path = "src/epoch141_source_equivalence_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch141-reward-reference"
+path = "src/epoch141_reward_reference_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch141-original-bundle"
 path = "src/epoch141_original_bundle_bin.rs"
 
