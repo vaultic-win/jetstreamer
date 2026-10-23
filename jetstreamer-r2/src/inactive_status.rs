@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 mod capped141;
 mod metadata_cycle;
 mod missing157;
+mod native207;
 mod native223;
 mod native227;
 mod natural144;
@@ -240,6 +241,9 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
     if let Some(owner) = qualification_status::inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
+    if let Some(owner) = fleet::full227_status_inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     let bytes = read_stable_bounded(
         &publication.observer_receipt,
         MAX_OBSERVER_RECEIPT_BYTES,
@@ -386,6 +390,10 @@ fn fresh_census(
     if native223 {
         native223::validate(&current, terminal_fleet, owners)?;
     }
+    let native207 = plan.epoch == 207 && native207::recognized(terminal_fleet, owners);
+    if native207 {
+        native207::validate(&current, terminal_fleet, owners)?;
+    }
     let native227 = plan.epoch == 227 && native227::recognized(terminal_fleet, owners);
     if native227 {
         native227::validate(&current, terminal_fleet, owners)?;
@@ -409,6 +417,7 @@ fn fresh_census(
             && !natural144
             && !capped141
             && !native223
+            && !native207
             && !native227
             && reserve.is_none()
         {

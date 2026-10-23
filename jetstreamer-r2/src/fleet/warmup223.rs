@@ -1,5 +1,6 @@
 //! Closed admission/ownership for the first16-slot failure-context experiment.
 use super::*;
+mod guard_receipt;
 mod native20;
 const HISTORICAL_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
 const UNIT: &str = "horizon-qualify-223-warmup-resource-5072b7ba-v4.service";

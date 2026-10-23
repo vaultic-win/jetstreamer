@@ -167,8 +167,11 @@ cooperative parent and first16-entry worker. It reserves a 300-GB scratch
 increment, starts only above 2.3-TB free disk and 608-GiB MemAvailable, and stops
 its own group below the protected 2-TB/480-GiB floors. The actual systemd owner
 requires 128-GiB maximum/112-GiB high memory, zero swap, no restart and the exact
-private scratch/output root. This envelope admits only the three unchanged
-204/205/225 owners plus registered native207. Full227 or any other live owner
+private scratch/output root. This envelope admits the three unchanged
+204/205/225 owners, with either the exact registered live native207 or its
+independently authenticated successful terminal207 proof and a complete census
+showing only those three remaining owners. The optional native207 path retains
+the same reserves. Full227 or any other live owner
 requires a fresh complete claim calculation; this package is not approval to
 reuse an old census.
 
@@ -190,6 +193,23 @@ written regular file is measured as such. Do not fabricate a zero-entry native
 test receipt. Include evidence and a positive current best estimate through
 prefix, suffix/restart, assembly, full/plugin verification, upload and readback
 to the canonical sidecar.
+
+Guard admission and native20 capture select the latest completed oneshot from
+its PID1 manager history. A guard's current `InvocationID` may name a newly
+started invocation whose `sample-IID.json` is not written yet, or may already
+be cleared. Require the exact start, printed receipt, successful deactivation
+and completed job events for the selected invocation, with matching unit,
+boot identity, receipt bytes, ordered clocks and the existing freshness bound.
+Bind PID1's full finished-job command to the immutable executable hash and
+current exact `ExecStart`; any available kernel `_EXE`/`_CMDLINE` must agree.
+Those optional kernel fields can disappear when a short guard exits before
+journald reads `/proc`. Keep the default `systemd-run` command description for
+this guard so PID1 preserves its full command. Preserve that history in
+admission/launch evidence.
+An incomplete newer invocation does not hide the latest completed success; a
+later failure or protective stop prevents fallback to an older success. The
+existing guard fingerprints, producer identity, timer and resource gates still
+apply unchanged. This is a guard-history read, not another resource poll.
 
 Refresh that same status model only from each existing 30-minute coordinated
 observation, with its current fleet bindings and measured file size. Do not add

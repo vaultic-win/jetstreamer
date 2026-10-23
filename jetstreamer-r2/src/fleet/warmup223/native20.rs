@@ -83,11 +83,11 @@ fn active_unit(r: &Value) -> &Value {
         &r["unit"]
     }
 }
-fn checked_owners(f: &Value) -> Result<PipelineClaim> {
+fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
     let rows = f["active"].as_array().context("native20 active census")?;
     ensure!(
-        rows.len() == 4,
-        "native20 envelope admits only three old replays and native207; recompute for any other owner"
+        matches!(rows.len(), 3 | 4),
+        "native20 envelope admits only three old replays and optional authenticated native207"
     );
     for (name, iid) in super::OWNERS.into_iter().skip(1) {
         ensure!(
@@ -105,6 +105,11 @@ fn checked_owners(f: &Value) -> Result<PipelineClaim> {
         .iter()
         .filter(|r| active_unit(r)["Id"] == native207::UNIT)
         .collect::<Vec<_>>();
+    if rows.len() == 3 {
+        ensure!(native.is_empty(), "native20 protected old owner omitted");
+        native207_terminal::find(f)?;
+        return Ok(None);
+    }
     ensure!(
         native.len() == 1
             && native[0]["epoch"] == 207
@@ -135,7 +140,7 @@ fn checked_owners(f: &Value) -> Result<PipelineClaim> {
         "native20 native207 registered evidence differs"
     );
     native207::claim(&c)?;
-    Ok(c)
+    Ok(Some(c))
 }
 fn names(f: &Value) -> Result<BTreeSet<String>> {
     let mut n = f["unit_census"]
@@ -168,11 +173,15 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
             "native20 old owner changed"
         );
     }
-    native207::live(
-        &native,
-        c.get(native207::UNIT)
-            .context("native20 live native207 missing")?,
-    )?;
+    let native_owner = c
+        .get(native207::UNIT)
+        .context("native20 native207 census missing")?;
+    if let Some(native) = native {
+        native207::live(&native, native_owner)?;
+    } else {
+        let (_, iid) = native207_terminal::find(f)?;
+        native207_terminal::terminal_shape(native_owner, &iid)?;
+    }
     for (name, u) in c {
         ensure!(
             !diagnostic_stage_running(u)
@@ -281,20 +290,19 @@ fn sandbox(c: &PipelineClaim, u: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn protective(c: &PipelineClaim) -> Result<BoundFile> {
-    let u = unit(GUARD)?;
-    let iid = u["InvocationID"].as_str().context("native20 guard IID")?;
-    ensure!(
-        iid.len() == 32 && iid.bytes().all(|b| b.is_ascii_hexdigit()),
-        "native20 guard IID malformed"
-    );
-    let b: BoundFile = serde_json::from_value(private157::file_binding(
-        &Path::new(GUARD_RECEIPTS).join(format!("sample-{iid}.json")),
-    )?)?;
-    let g = bound_json(&b)?;
+fn protective(c: &PipelineClaim) -> Result<(BoundFile, Value)> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let selection = super::guard_receipt::select(
+        GUARD,
+        Path::new(GUARD_RECEIPTS),
+        now.saturating_sub(120),
+        now,
+        120,
+    )?;
+    let b = selection.binding;
+    let g = selection.receipt;
     let pb: BoundFile = serde_json::from_value(private157::file_binding(Path::new(GUARD_PLAN))?)?;
     let p = bound_json(&pb)?;
-    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
             && g["plan_sha256"] == pb.sha256
@@ -326,7 +334,7 @@ fn protective(c: &PipelineClaim) -> Result<BoundFile> {
         out.status.success() && out.stdout == b"active\n",
         "native20 guard timer inactive"
     );
-    Ok(b)
+    Ok((b, selection.history))
 }
 fn launch_shape(c: &PipelineClaim, r: &Value) -> Result<()> {
     ensure!(
@@ -383,6 +391,35 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
             && a["candidate_memory_bytes"] == 128u64 << 30,
         "native20 admission differs"
     );
+    let gb: BoundFile = serde_json::from_value(r["guard"].clone())?;
+    let g = bound_json(&gb)?;
+    super::guard_receipt::validate_history(&r["guard_history"], &g)?;
+    ensure!(
+        r["guard_history"]["unit"] == GUARD
+            && r["guard_history"]["maximum_age_seconds"] == 120
+            && g["producer_invocation_id"] == c.invocation_id,
+        "native20 captured guard history names another owner"
+    );
+    let guards = a["guards"]
+        .as_array()
+        .context("native20 admission guard bindings")?;
+    let histories = a["guard_history"]
+        .as_array()
+        .context("native20 admission guard history")?;
+    ensure!(
+        guards.len() == 3 && histories.len() == 3,
+        "native20 admission guard history census differs"
+    );
+    for (index, history) in histories.iter().enumerate() {
+        let b: BoundFile = serde_json::from_value(guards[index].clone())?;
+        let guard = bound_json(&b)?;
+        super::guard_receipt::validate_history(history, &guard)?;
+        ensure!(
+            history["maximum_age_seconds"] == 1800
+                && guard["producer_invocation_id"] == super::OWNERS[index + 1].1,
+            "native20 preserved guard history differs"
+        );
+    }
     Ok(())
 }
 pub(super) fn validate_live(c: &PipelineClaim, u: &Value) -> Result<()> {
@@ -434,7 +471,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
             evidence: vec![],
         };
         sandbox(&claim, own)?;
-        let guard = protective(&claim)?;
+        let (guard, guard_history) = protective(&claim)?;
         let after = census(&names(&f)?, 201, 300)?;
         protected(&f, &after)?;
         ensure!(
@@ -444,7 +481,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
         );
         private157::immutable_receipt(
             &Path::new(STATE).join("launch.json"),
-            &json!({"schema":"jetstreamer-private-warmup223-launch-v1","epoch":223,"unit":UNIT,"invocation_id":claim.invocation_id,"expected_exec_start":command(),"admission":private157::binding(&ab),"guard":private157::binding(&guard),"runtime_profile":"solana-v1.6.20","worker_entry_start":96335539,"worker_entry_end_exclusive":96335555,"runner_sha256":RUNNER_SHA,"recorded_unix_seconds":now,"sampled_at_utc":publication203::utc(now)?,"self_sha256":self_sha,"observer":private157::binding(&spec.observer),"previous_fleet":private157::binding(&spec.fleet),"resource_samples_taken":0,"entry_replay":true,"ordinary_replay_claim":false,"current_sidecar_eta_valid":false,"public_sidecar_countdown_authorized":true,"repair_closed":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+            &json!({"schema":"jetstreamer-private-warmup223-launch-v1","epoch":223,"unit":UNIT,"invocation_id":claim.invocation_id,"expected_exec_start":command(),"admission":private157::binding(&ab),"guard":private157::binding(&guard),"guard_history":guard_history,"runtime_profile":"solana-v1.6.20","worker_entry_start":96335539,"worker_entry_end_exclusive":96335555,"runner_sha256":RUNNER_SHA,"recorded_unix_seconds":now,"sampled_at_utc":publication203::utc(now)?,"self_sha256":self_sha,"observer":private157::binding(&spec.observer),"previous_fleet":private157::binding(&spec.fleet),"resource_samples_taken":0,"entry_replay":true,"ordinary_replay_claim":false,"current_sidecar_eta_valid":false,"public_sidecar_countdown_authorized":true,"repair_closed":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         )?;
     } else {
         ensure!(
@@ -453,6 +490,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
             "native20 already active"
         );
         let mut guards = Vec::new();
+        let mut guard_history = Vec::new();
         for (index, name, root) in [
             (
                 0,
@@ -470,19 +508,11 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
                 "/var/lib/jetstreamer/horizon-prefix204-guard-receipts-v1",
             ),
         ] {
-            let g = unit(name)?;
-            let iid = g["InvocationID"]
-                .as_str()
-                .context("native20 old guard IID")?;
-            ensure!(
-                iid.len() == 32 && iid.bytes().all(|b| b.is_ascii_hexdigit()),
-                "native20 old guard IID malformed"
-            );
-            let b: BoundFile = serde_json::from_value(private157::file_binding(
-                &Path::new(root).join(format!("sample-{iid}.json")),
-            )?)?;
-            publication203::guard(&bound_json(&b)?, index, sampled, now)?;
-            guards.push(private157::binding(&b));
+            let selection =
+                super::guard_receipt::select(name, Path::new(root), sampled, now, 1800)?;
+            publication203::guard(&selection.receipt, index, sampled, now)?;
+            guards.push(private157::binding(&selection.binding));
+            guard_history.push(selection.history);
         }
         let after = census(&names(&f)?, 201, 300)?;
         protected(&f, &after)?;
@@ -492,7 +522,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
         );
         private157::immutable_receipt(
             &Path::new(STATE).join("admission.json"),
-            &json!({"schema":"jetstreamer-private-warmup223-native20-admission-v1","spec":private157::binding(&binding),"self_sha256":self_sha,"recorded_unix_seconds":now,"observer":private157::binding(&spec.observer),"fleet":private157::binding(&spec.fleet),"guards":guards,"decision":"pass","century_floor":floor,"candidate_memory_bytes":128u64<<30,"scratch_planning_bytes":300_000_000_000u64,"required_observed_free_bytes":INITIAL_DISK,"protected_disk_floor_bytes":DISK_FLOOR,"minimum_available_memory_bytes":MEMORY_RESERVE,"required_initial_memory_bytes":INITIAL_MEMORY,"expected_exec_start":command(),"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+            &json!({"schema":"jetstreamer-private-warmup223-native20-admission-v1","spec":private157::binding(&binding),"self_sha256":self_sha,"recorded_unix_seconds":now,"observer":private157::binding(&spec.observer),"fleet":private157::binding(&spec.fleet),"guards":guards,"guard_history":guard_history,"decision":"pass","century_floor":floor,"candidate_memory_bytes":128u64<<30,"scratch_planning_bytes":300_000_000_000u64,"required_observed_free_bytes":INITIAL_DISK,"protected_disk_floor_bytes":DISK_FLOOR,"minimum_available_memory_bytes":MEMORY_RESERVE,"required_initial_memory_bytes":INITIAL_MEMORY,"expected_exec_start":command(),"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         )?;
     }
     println!(

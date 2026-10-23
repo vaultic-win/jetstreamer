@@ -3470,6 +3470,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capped141-terminal-capture") {
         return inactive_status::capture_capped141_terminal();
     }
+    if env::args().nth(1).as_deref() == Some("status-publish-full227") {
+        return fleet::publish_full227_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-native223") {
         return native223_status::run().await;
     }
@@ -3508,6 +3511,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("capture-native207-input") {
         return fleet::capture_native207_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native207-terminal") {
+        return fleet::capture_native207_terminal();
     }
     if env::args().nth(1).as_deref() == Some("estimate-readback203") {
         return fleet::estimate_readback203();
