@@ -31,7 +31,7 @@ pub(super) fn scope(phase: &str, unit: &str) -> bool {
 }
 fn command() -> String {
     format!(
-        "{{ path={RUNNER} ; argv[]={RUNNER} {PLAN} --plan-sha256 {PLAN_SHA} --self-sha256 {RUNNER_SHA} ; ignore_errors=no }}"
+        "{{ path={RUNNER} ; argv[]={RUNNER} {PLAN} --plan-sha256 {PLAN_SHA} --self-sha256 {RUNNER_SHA} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}"
     )
 }
 #[derive(Deserialize)]
@@ -719,6 +719,21 @@ mod tests {
         assert!(!command.contains("--storage-capability"));
         assert!(command.contains(PLAN_SHA));
         assert!(command.contains(RUNNER_SHA));
+    }
+    #[test]
+    fn static_command_matches_live_display_metadata_but_preserves_exact_arguments() {
+        let expected = command();
+        let live = expected
+            .replace(
+                "start_time=[n/a]",
+                "start_time=[Fri 2026-10-23 14:08:13 UTC]",
+            )
+            .replace("pid=0", "pid=3959253");
+        assert!(pipeline_status::same_exec_start(&expected, &live));
+        assert!(!pipeline_status::same_exec_start(
+            &expected,
+            &live.replace(PLAN_SHA, &"f".repeat(64))
+        ));
     }
     #[test]
     fn completed203_is_released_only_after_ready_inventory_and_without_live_claim() {
