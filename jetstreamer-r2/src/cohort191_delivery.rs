@@ -1,6 +1,7 @@
 //! Closed191–194 native metadata custody. Never creates a ready/archive receipt.
 use super::*;
 use serde_json::json;
+mod queue;
 use std::{
     collections::{BTreeMap, BTreeSet},
     process::Command,
@@ -59,6 +60,10 @@ struct Capture {
     gate_receipts: BTreeMap<u64, BTreeMap<String, Bound>>,
     gate_tools: BTreeMap<String, GateTool>,
     ready_receipts: BTreeMap<u64, Bound>,
+    #[serde(default)]
+    queue: Option<queue::Binding>,
+    #[serde(default)]
+    source_revalidation_policy: Option<Bound>,
     output: PathBuf,
 }
 pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
@@ -840,6 +845,9 @@ fn batch(b: &Bound, public: bool, materialized: &BTreeSet<u64>) -> Result<Value>
     Ok(v)
 }
 fn phase_scope(c: &Claim) -> Result<()> {
+    if c.phase == queue::PHASE {
+        return queue::claim(c);
+    }
     ensure!(
         (191..=194).contains(&c.epoch) && is_lower_hex(&c.invocation_id, 32),
         "foreign191 claim"
@@ -950,7 +958,12 @@ fn ready(b: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
     // Use the same canonical receipt validator as authenticated restore. The
     // receipt is historical remote proof; the fleet must still re-observe the
     // ready pair. It grants neither archive publication nor local retirement.
-    let bytes = receipt_bytes(b, 1001, 16 << 10)?;
+    let uid = fs::symlink_metadata(&b.path)?.uid();
+    ensure!(
+        matches!(uid, 0 | 1001),
+        "191 unexpected durable R2 receipt owner"
+    );
+    let bytes = receipt_bytes(b, uid, 16 << 10)?;
     ensure!(
         b.path
             == receipt_path(
@@ -1170,6 +1183,12 @@ fn validate_inputs(
                         || matches!(e.source_revalidation_and_sidecar, Work::Active { .. })),
                 "191 uploader forecast lacks independent gates or actual active sync"
             ),
+            "cohort191-delivery" => ensure!(
+                p.queue.is_some()
+                    && matches!(forecast.finalization, Work::Complete)
+                    && matches!(forecast.import, Work::Complete),
+                "191 live queue has not inherited authenticated completed import"
+            ),
             _ => bail!("191 unsupported queued/legacy owner"),
         }
     }
@@ -1211,6 +1230,11 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
         ("gate_receipts", json!(p.gate_receipts)),
         ("gate_tools", json!(p.gate_tools)),
         ("ready_receipts", json!(p.ready_receipts)),
+        ("queue", json!(p.queue)),
+        (
+            "source_revalidation_policy",
+            json!(p.source_revalidation_policy),
+        ),
     ] {
         ensure!(
             v[name] == expected,
@@ -1279,6 +1303,51 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
     }
     Ok(())
 }
+fn tail_budget(allowance: u64, minimum: u64, elapsed: u64) -> Result<u64> {
+    ensure!(
+        allowance > 0 && minimum > 0 && minimum <= allowance,
+        "191 tail policy has invalid positive budgets"
+    );
+    if elapsed < allowance {
+        Ok((allowance - elapsed).max(minimum))
+    } else {
+        minimum
+            .checked_add(elapsed - allowance)
+            .context("191 overdue tail estimate overflow")
+    }
+}
+fn provisional_tail(b: &Bound, started: u64, cutoff: u64) -> Result<u64> {
+    let policy = bound(b, true)?;
+    ensure!(
+        policy["schema"] == "jetstreamer-cohort191-source-revalidation-policy-v2"
+            && policy["epochs"] == json!([191, 192, 193, 194])
+            && policy["publication_authorized"] == false
+            && policy["r2_mutations"] == false
+            && policy["estimate_basis"]
+                .as_str()
+                .is_some_and(|s| !s.trim().is_empty()),
+        "191 source-revalidation policy is foreign or authorizing"
+    );
+    let evidence: Vec<Bound> = serde_json::from_value(policy["evidence"].clone())?;
+    ensure!(
+        !evidence.is_empty() && evidence.len() <= 16,
+        "191 source tail has no qualified evidence"
+    );
+    for b in evidence {
+        bound(&b, false)?;
+    }
+    tail_budget(
+        policy["provisional_allowance_millis"]
+            .as_u64()
+            .context("191 tail allowance")?,
+        policy["minimum_remaining_millis"]
+            .as_u64()
+            .context("191 tail floor")?,
+        cutoff
+            .checked_sub(started)
+            .context("191 source-revalidation starts after cutoff")?,
+    )
+}
 fn progress_remaining(rows: &[(u64, u64, u64)], total: u64, cutoff_millis: u64) -> Result<u64> {
     ensure!(
         rows.len() >= 2 && total > 0,
@@ -1317,14 +1386,17 @@ fn sync_observation(
     u: &Value,
     e: &jetstreamer_horizon_observe::cohort191_delivery_model::Epoch,
     cutoff: u64,
+    tail_policy: Option<&Bound>,
 ) -> Result<Value> {
     use jetstreamer_horizon_observe::cohort191_delivery_model::Work;
     let stage = if matches!(e.upload, Work::Active { .. }) {
         "upload"
     } else if matches!(e.readback, Work::Active { .. }) {
         "readback"
+    } else if matches!(e.source_revalidation_and_sidecar, Work::Active { .. }) {
+        "source-revalidation"
     } else {
-        bail!("191 final source revalidation requires a separately qualified progress source");
+        bail!("191 sync phase has no actual active work");
     };
     let result = Command::new("/usr/bin/journalctl")
         .args([
@@ -1344,10 +1416,10 @@ fn sync_observation(
     let archive = archives(c.epoch, "upload-readback");
     let length = regular_identity(&archive)?.length;
     let key = format!("epoch-{}.jet", c.epoch);
-    let event = if stage == "upload" {
-        "r2-upload-progress"
-    } else {
-        "r2-readback-progress"
+    let event = match stage {
+        "upload" => "r2-upload-progress",
+        "readback" => "r2-readback-progress",
+        _ => "r2-readback-verified",
     };
     let bytes = if stage == "upload" {
         "acknowledged_bytes"
@@ -1372,7 +1444,21 @@ fn sync_observation(
         let Ok(v) = serde_json::from_str::<Value>(message) else {
             continue;
         };
-        if v["key"] != key || v["event"] != event {
+        if v["key"] != key {
+            continue;
+        }
+        if stage == "upload"
+            && matches!(
+                v["event"].as_str(),
+                Some("r2-readback-start" | "r2-readback-progress" | "r2-readback-verified")
+            )
+        {
+            bail!("191 upload forecast ignored an actual readback handoff");
+        }
+        if stage == "readback" && v["event"] == "r2-readback-verified" {
+            bail!("191 readback forecast ignored actual source-revalidation handoff");
+        }
+        if v["event"] != event {
             continue;
         }
         ensure!(
@@ -1381,7 +1467,7 @@ fn sync_observation(
                 && row["_PID"] == pid
                 && row["_UID"] == uid
                 && v["total_bytes"] == length
-                && v["whole_file_sha256_verified"] == false,
+                && v["whole_file_sha256_verified"] == (stage == "source-revalidation"),
             "191 sync journal belongs to another process/object"
         );
         let time = row["__REALTIME_TIMESTAMP"]
@@ -1403,15 +1489,24 @@ fn sync_observation(
         ));
         selected.push(row);
     }
-    let remaining = progress_remaining(
-        &progress,
-        length,
-        cutoff.checked_mul(1000).context("191 sync clock")?,
-    )?;
-    let expected = if stage == "upload" {
-        &e.upload
+    let cutoff_ms = cutoff.checked_mul(1000).context("191 sync clock")?;
+    let remaining = if stage == "source-revalidation" {
+        ensure!(
+            progress.len() == 1 && progress[0].1 == length,
+            "191 tail lacks one whole-object verified readback marker"
+        );
+        provisional_tail(
+            tail_policy.context("191 tail requires qualified provisional policy")?,
+            progress[0].0,
+            cutoff_ms,
+        )?
     } else {
-        &e.readback
+        progress_remaining(&progress, length, cutoff_ms)?
+    };
+    let expected = match stage {
+        "upload" => &e.upload,
+        "readback" => &e.readback,
+        _ => &e.source_revalidation_and_sidecar,
     };
     ensure!(
         matches!(expected,Work::Active {remaining_millis} if *remaining_millis == remaining),
@@ -1463,10 +1558,14 @@ fn capture(p: &Capture) -> Result<Value> {
                 .iter()
                 .find(|e| e.epoch == c.epoch)
                 .context("191 sync forecast row")?;
-            sync_observations.insert(c.epoch, sync_observation(c, &u, e, cutoff)?);
+            sync_observations.insert(
+                c.epoch,
+                sync_observation(c, &u, e, cutoff, p.source_revalidation_policy.as_ref())?,
+            );
         }
         census.insert(c.unit.clone(), u);
     }
+    let queue_observation = queue::observe(p, &forecast, &census, cutoff)?;
     let producer = fleet::unit(UNIT)?;
     let controller = fleet::unit(CONTROLLER)?;
 
@@ -1621,7 +1720,8 @@ fn capture(p: &Capture) -> Result<Value> {
     let v = json!({"schema":EVENT_SCHEMA,"first_epoch":191,"last_epoch":194,"sampled_at_utc":sample,"sample_unix_seconds":cutoff,
         "observer":p.observer,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
         "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"controller":controller,"controller_lifecycle":controller_history,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
-        "gate_receipts":p.gate_receipts,"gate_tools":p.gate_tools,"ready_receipts":p.ready_receipts,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
+        "gate_receipts":p.gate_receipts,"gate_tools":p.gate_tools,"ready_receipts":p.ready_receipts,
+        "queue":p.queue,"queue_observation":queue_observation,"source_revalidation_policy":p.source_revalidation_policy,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
     Ok(v)
 }
 pub(super) fn run() -> Result<()> {
@@ -1947,4 +2047,46 @@ mod tests {
         assert!(hash_bytes(&"0".repeat(32)).is_err());
         assert!(hash_bytes(&"z".repeat(44)).is_err());
     }
+}
+
+pub(super) fn queue_scope(phase: &str, unit: &str) -> bool {
+    queue::scope(phase, unit)
+}
+pub(super) fn queue_plan_check(plan: &Bound, materialized: &BTreeSet<u64>) -> Result<Value> {
+    queue::plan_check(plan, materialized)
+}
+pub(super) fn queue_admission_check(
+    admission: &Bound,
+    plan: &Bound,
+    iid: &str,
+    epoch: u64,
+    stage: &str,
+) -> Result<Value> {
+    queue::admission_check(admission, plan, iid, epoch, stage)
+}
+pub(super) fn queue_gate(
+    receipt: &Bound,
+    epoch: u64,
+    stage: &str,
+    wrapper: &Bound,
+    verifier: &Bound,
+    digest: &str,
+) -> Result<()> {
+    gate(
+        receipt,
+        epoch,
+        stage,
+        &GateTool {
+            verifier: verifier.clone(),
+            wrapper: wrapper.clone(),
+        },
+        digest,
+    )
+}
+pub(super) fn queue_ready(receipt: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
+    ready(receipt, epoch, cutoff)
+}
+
+pub(super) fn queue_sync_epoch(phase: &str, unit: &str) -> Option<u64> {
+    queue::sync_epoch(phase, unit)
 }

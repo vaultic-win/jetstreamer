@@ -493,6 +493,12 @@ pub(super) fn pipeline_unit_range(
     if watch198::namespace(phase, unit) {
         return Ok(198..=198);
     }
+    if super::cohort191_delivery::queue_scope(phase, unit) {
+        return Ok(191..=194);
+    }
+    if let Some(epoch) = super::cohort191_delivery::queue_sync_epoch(phase, unit) {
+        return Ok(epoch..=epoch);
+    }
     if phase == "producer-finalization" {
         return super::cohort_finalization::scope(unit);
     }

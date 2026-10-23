@@ -93,6 +93,7 @@ impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
+            | ("cohort191-delivery", "verification" | "upload" | "readback")
             | ("private-cold-snapshot-verification", "verification")
             | ("private-warmup-reproduction", "verification")
             | ("local-publication", "verification" | "publication")
@@ -114,6 +115,17 @@ impl Binding {
             ensure!(
                 self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
                 "producer finalization/native input must retain the original invocation clock"
+            );
+        }
+        if self.claim_phase == "cohort191-delivery" {
+            ensure!(
+                super::cohort191_delivery::queue_scope(&self.claim_phase, &self.unit)
+                    && super::cohort191_delivery::origin(
+                        epoch,
+                        &self.origin_unit,
+                        &self.origin_invocation_id
+                    ),
+                "191 queue status cannot reset the original producer clock or borrow another manager"
             );
         }
         if self.claim_phase == "controller-import-handoff" {
@@ -518,6 +530,7 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
                 e["phase"].as_str(),
                 Some(
                     "full-verification"
+                        | "cohort191-delivery"
                         | "plugin-verification"
                         | "local-publication"
                         | "upload-readback"
@@ -567,6 +580,7 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             unit_name(peer)
                 && [
                     "full-verification",
+                    "cohort191-delivery",
                     "plugin-verification",
                     "local-publication",
                     "upload-readback",
