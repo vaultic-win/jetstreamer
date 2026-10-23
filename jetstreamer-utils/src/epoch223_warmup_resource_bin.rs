@@ -2,8 +2,6 @@
 //! The old parent requires an epoch/root output range, so it retains that request.
 //! The exact worker rejects every entry after96335554 before decoding or mutation.
 //! Neither a target stop nor any produced artifact qualifies an epoch or root.
-#[path = "horizon_standalone_guard_root.rs"]
-mod root_budget;
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-223.jet";
@@ -18,6 +16,7 @@ mod profile {
     pub const MINIMUM_FREE: u64 = 548_289_182_611;
     pub const MAX_SCRATCH: u64 = 300_000_000_000;
     pub const MAX_RUNTIME: u64 = 3600;
+    pub const ENFORCED_FREE: u64 = 1_511_435_598_739;
     pub const SNAPSHOT_SIZE: u64 = 9_815_262_303;
     pub const SNAPSHOT: &str = "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665";
     pub const SNAPSHOT_NAME: &str =
@@ -92,10 +91,15 @@ mod bounded_resource_runner {
                 available_memory()? >= (448 + 128) * (1u64 << 30),
                 "warmup memory admission"
             );
+            ensure!(
+                free_bytes(&_p.run_root)? >= ENFORCED_FREE,
+                "warmup protected free-space admission"
+            );
             Ok(
                 json!({"worker_entry_start":INITIAL_REPLAY,"worker_entry_end_exclusive":TARGET+1,
                 "parent_requested_root":TERMINAL,"parent_request_is_not_worker_scope":true,
-                "maximum_scratch_bytes":MAX_SCRATCH,"canonical_prefix_qualified":false}),
+                "scratch_planning_bytes":MAX_SCRATCH,"enforced_filesystem_floor_bytes":ENFORCED_FREE,
+                "canonical_prefix_qualified":false}),
             )
         }
         fn guard(
@@ -120,14 +124,12 @@ mod bounded_resource_runner {
                     "host-memory reserve"
                 );
                 ensure!(
-                    free_bytes(&p.run_root)? >= 248_289_182_611,
-                    "century disk floor"
+                    free_bytes(&p.run_root)? >= ENFORCED_FREE,
+                    "protected filesystem floor"
                 );
-                let budget = crate::root_budget::observe(&p.run_root.join("scratch"), MAX_SCRATCH)?;
-                ensure!(
-                    !budget.exceeds_budget,
-                    "scratch exceeds the live physical budget"
-                );
+                // Live AccountsDb trees can take minutes to census. Enforce the
+                // reserved host free-space floor here; the external guard owns
+                // VMA protection. The scratch estimate is not a measured cap.
                 Ok(())
             })();
             if let Err(error) = check {
@@ -209,6 +211,7 @@ mod bounded_resource_runner {
                 .collect::<Vec<_>>();
             assert!(args.contains(&"--qualification-end-slot=96767522"));
             assert_eq!(TARGET - INITIAL_REPLAY + 1, 16);
+            assert!(ENFORCED_FREE > MINIMUM_FREE);
             assert!(root_manifest_valid(&json!({})).is_err());
             assert!(validate_checkpoint_names(&CHECKPOINT_NAMES.join("\n")).is_ok());
             assert!(validate_checkpoint_names(SNAPSHOT_NAME).is_err());
