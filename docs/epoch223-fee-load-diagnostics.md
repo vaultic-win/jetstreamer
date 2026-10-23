@@ -251,6 +251,44 @@ Ordinary conditional status deletion, authenticated absence, repair-backlog and
 no-active-handoff checks remain mandatory. Terminal metadata never counts as
 archive or sidecar completion.
 
+### Resume and drain after the cooperative native20 target
+
+The preserved attempt `13a5f755a196442e991c6930b410c04f` reached the exact
+96,335,554 complete-slot target. Its resource runner then sent SIGINT to a
+parent that had already set its shared shutdown flag before SIGSTOP. The
+parent's normal second-interrupt handler force-exited130. That attempt remains
+failed; its target marker and captured resources do not qualify a clean warmup.
+Keep its proof and terminal history unchanged.
+
+The corrected runner selects `cooperative-resume-only` only for the native20
+runtime, sealed cooperative parent99f643ff, first16 worker52d6c86a and exact
+96,335,539–96,335,554 interval with parent terminal96,767,522. It first observes
+the parent's own stopped state within a five-second bound, then freezes the
+whole owned group and durably captures the resource/stop intent. Waiting for
+the self-stop prevents racing a still-pending parent SIGSTOP against resume.
+The runner sends SIGCONT without another interrupt and retains the existing
+120-second drainage bound. Runtime/external stops retain their prior signal
+handling. v1.6.25 and every other profile retain resume-plus-SIGINT behavior
+and unchanged receipt fields. Cooperative receipts and planning capability
+identify their selected protocol explicitly.
+
+The controlled success gate remains unchanged: target observed, no external
+signal, no capture/guard/drainage error and an actual child return code0or1.
+Exit130 remains fatal. Bank-free process tests reproduce the old130 failure,
+exercise freeze/capture/resume/natural drainage through the real measure loop,
+and check that all archive/publication authority stays false.
+
+Before another actual attempt, build and seal a distinctly versioned runner,
+new plan, unit, private root, admission/origin and invocation-bound guard. Bind
+the new runner digest through the fleet, status and terminal-reader registry;
+do not overwrite or reuse the failed attempt. Precreate all five owner-private
+directories: root, `scratch`, `output`, `receipts`, `ledger`. Repeat the exact
+planning capability and obtain fresh complete-fleet admission including the
+already-running full227; the old three-owner/native207 envelope is not launch
+approval. Only a successful new bounded native warmup can support the separate
+full-prefix admission. Prefix, suffix/restart, assembly, full/plugin, upload,
+readback and canonical sidecar gates remain independent.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain

@@ -58,6 +58,7 @@ pub(crate) struct Plan {
 pub(crate) trait StorageHooks {
     fn progress_slot(&self,line:&str)->Option<u64> {progress_slot(line)}
     fn progress_counters(&self,line:&str)->Option<Value> {progress_counters(line)}
+    fn target_stop_protocol(&self)->TargetStopProtocol {TargetStopProtocol::ResumeAndInterrupt}
     fn capability_only(&self)->bool {false}
     fn capability_result(&self,_p:&Plan,_invocation:&str,_bindings:&Value,_command:&Command)->Result<()> {
         anyhow::bail!("storage capability path is unsupported")
@@ -75,6 +76,48 @@ pub(crate) trait StorageHooks {
 }
 struct DiskStorage;
 impl StorageHooks for DiskStorage {}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TargetStopProtocol {
+    ResumeAndInterrupt,
+    CooperativeResumeOnly,
+}
+impl TargetStopProtocol {
+    fn label(self) -> &'static str {
+        match self {
+            Self::ResumeAndInterrupt => "resume-and-interrupt",
+            Self::CooperativeResumeOnly => "cooperative-resume-only",
+        }
+    }
+}
+fn prepare_target_capture(pid: u32, protocol: TargetStopProtocol) -> Result<()> {
+    if protocol == TargetStopProtocol::CooperativeResumeOnly {
+        // The sealed parent logs just before SIGSTOP. Observe its own pause
+        // before adding our group stop, otherwise CONT could expose a second
+        // pending self-stop. This is a bounded target-event handshake only.
+        let start = Instant::now();
+        loop {
+            let (group, state) = stat_group_state(&fs::read_to_string(format!("/proc/{pid}/stat"))?)?;
+            ensure!(group == pid, "cooperative parent process group changed");
+            if matches!(state, 'T' | 't') {
+                break;
+            }
+            ensure!(
+                start.elapsed() < Duration::from_secs(5),
+                "cooperative parent did not pause after complete-slot marker"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+    freeze_group(pid)
+}
+fn resume_target(pid: u32, protocol: TargetStopProtocol) -> Result<()> {
+    group_signal(pid, libc::SIGCONT)?;
+    if protocol == TargetStopProtocol::ResumeAndInterrupt {
+        group_signal(pid, libc::SIGINT)?;
+    }
+    Ok(())
+}
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
@@ -939,7 +982,8 @@ fn measure(
                                 slot <= p.target_slot + 1000,
                                 "target overshoot exceeds sealed bound"
                             );
-                            freeze_group(pid)?;
+                            let protocol=storage.target_stop_protocol();
+                            prepare_target_capture(pid,protocol)?;
                             capture = capture_resources(&p.run_root.join("scratch"), cgroup)?;
                             let external = EXTERNAL_SIGNAL.load(Ordering::SeqCst);
                             ensure!(external == 0, "external signal during target capture");
@@ -947,13 +991,13 @@ fn measure(
                             let capture_sha256 =
                                 hex(&Sha256::digest(serde_json::to_vec(&capture)?));
                             persist(&capture_path, &capture)?;
-                            persist(
-                                &p.run_root.join("receipts/target-stop.json"),
-                                &json!({"schema":STOP_SCHEMA,"invocation_id":invocation,"target_slot":p.target_slot,"observed_slot":slot,"child_pid":pid,"written_unix_seconds":now()?,"scratch_snapshot_captured":true,"external_signal":0,"capture_path":capture_path,"capture_canonical_json_sha256":capture_sha256}),
-                            )?;
+                            let mut intent=json!({"schema":STOP_SCHEMA,"invocation_id":invocation,"target_slot":p.target_slot,"observed_slot":slot,"child_pid":pid,"written_unix_seconds":now()?,"scratch_snapshot_captured":true,"external_signal":0,"capture_path":capture_path,"capture_canonical_json_sha256":capture_sha256});
+                            if protocol==TargetStopProtocol::CooperativeResumeOnly {
+                                intent["target_stop_protocol"]=json!(protocol.label());
+                            }
+                            persist(&p.run_root.join("receipts/target-stop.json"),&intent)?;
                             target = true;
-                            group_signal(pid, libc::SIGCONT)?;
-                            group_signal(pid, libc::SIGINT)?;
+                            resume_target(pid,protocol)?;
                             stop_at = Some(Instant::now());
                         }
                     }
@@ -999,6 +1043,9 @@ fn measure(
     let success = error.is_none() && controlled_success(target, external, code);
     let payload = json!({"schema":RESULT_SCHEMA,"epoch":EPOCH,"unit":p.unit,"invocation_id":invocation,"plan":{"path":bindings["plan_path"],"sha256":bindings["plan_sha256"]},"runner_sha256":bindings["self_sha256"],"node_sha256":p.node.sha256,"worker_sha256":WORKER,"snapshot_sha256":SNAPSHOT,"target_slot":p.target_slot,"observed_slot":observed,"target_reached":target,"first_progress":first_progress,"last_progress":last_progress,"child_pid":pid,"child_return_code":code,"external_signal":external,"elapsed_millis":started.elapsed().as_millis(),"capture":capture,"cgroup_before":before,"cgroup_after":metrics(cgroup)?,"free_before":free_before,"free_after":free_bytes(&p.run_root)?,"success":success,"error":error,"authority":{"ordinary_replay_authorized":false,"full_cold_epoch_peak_qualified":false,"publication_authorized":false,"runtime_promotion_authorized":false,"canonical_sidecar_authorized":false,"remote_mutations":false,"r2_mutations":false}});
     let mut payload = payload;
+    if storage.target_stop_protocol()==TargetStopProtocol::CooperativeResumeOnly {
+        payload["target_stop_protocol"]=json!(storage.target_stop_protocol().label());
+    }
     payload["storage_evidence"] = storage_evidence;
     payload["solana_rayon_threads"] = json!(RAYON_THREADS);
     persist(
@@ -1692,6 +1739,7 @@ mod tests {
             serde_json::from_slice(&fs::read(temp.path().join("receipts/resource.json")).unwrap())
                 .unwrap();
         assert_eq!(receipt["success"], true);
+        assert!(receipt.get("target_stop_protocol").is_none());
         assert_eq!(receipt["epoch"], EPOCH);
         assert_eq!(receipt["schema"], RESULT_SCHEMA);
         assert_eq!(receipt["solana_rayon_threads"], json!(RAYON_THREADS));
@@ -1712,6 +1760,7 @@ mod tests {
         assert_eq!(intent["target_slot"], TARGET);
         assert_eq!(intent["schema"], STOP_SCHEMA);
         assert_eq!(intent["external_signal"], 0);
+        assert!(intent.get("target_stop_protocol").is_none());
         assert_eq!(intent["scratch_snapshot_captured"], true);
         assert!(temp.path().join("receipts/target-capture.json").is_file());
     }

@@ -22,6 +22,16 @@ mod bounded_resource_runner {
             .context("available memory overflow")
     }
     impl StorageHooks for WarmupStorage {
+        fn target_stop_protocol(&self) -> TargetStopProtocol {
+            warmup_target_protocol(
+                RUNTIME,
+                PARENT_SHA,
+                WORKER,
+                INITIAL_REPLAY,
+                TARGET,
+                TERMINAL,
+            )
+        }
         fn progress_slot(&self, line: &str) -> Option<u64> {
             warmup_complete_slot(line)
         }
@@ -56,16 +66,17 @@ mod bounded_resource_runner {
                 String::from_utf8_lossy(&result.stderr)
             );
             let report = planning_report(std::str::from_utf8(&result.stdout)?, &p.worker)?;
-            persist(
-                &p.run_root.join("receipts/capability.json"),
-                &json!({
+            let mut capability = json!({
                 "schema":CAPABILITY_SCHEMA,"invocation_id":iid,
                 "bindings":bindings,"node_sha256":PARENT_SHA,"worker_sha256":WORKER,"parent_planning_report":report,
                 "snapshot_sha256":SNAPSHOT,"worker_entry_start":INITIAL_REPLAY,"worker_entry_end_exclusive":TARGET+1,
                 "parent_requested_root":TERMINAL,"input_hashes_and_private_paths_verified":true,
                 "worker_started":false,"entry_replay":false,"resource_observation_performed":false,
-                "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
-            )
+                "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
+            if self.target_stop_protocol() == TargetStopProtocol::CooperativeResumeOnly {
+                capability["target_stop_protocol"] = json!(self.target_stop_protocol().label());
+            }
+            persist(&p.run_root.join("receipts/capability.json"), &capability)
         }
         fn before_spawn(&self, _p: &Plan, _iid: &str) -> Result<Value> {
             ensure!(
@@ -101,10 +112,7 @@ mod bounded_resource_runner {
             }
             *next = Instant::now() + Duration::from_secs(15);
             let check = (|| -> Result<()> {
-                ensure!(
-                    available_memory()? >= MEMORY_RESERVE,
-                    "host-memory reserve"
-                );
+                ensure!(available_memory()? >= MEMORY_RESERVE, "host-memory reserve");
                 ensure!(
                     free_bytes(&p.run_root)? >= ENFORCED_FREE,
                     "protected filesystem floor"
@@ -123,6 +131,26 @@ mod bounded_resource_runner {
                 return Err(error);
             }
             Ok(())
+        }
+    }
+    fn warmup_target_protocol(
+        runtime: &str,
+        parent: &str,
+        worker: &str,
+        initial: u64,
+        target: u64,
+        terminal: u64,
+    ) -> TargetStopProtocol {
+        if runtime == "solana-v1.6.20"
+            && parent == "99f643ff0dbbcd37d1fbc524a1c1088d7273c7fc91330df059d30d51b8b0fcd4"
+            && worker == "52d6c86a8103b8965ca68ead96af471a7899a0a0e6e69c48989b39fd5d922f0c"
+            && initial == 96_335_539
+            && target == 96_335_554
+            && terminal == 96_767_522
+        {
+            TargetStopProtocol::CooperativeResumeOnly
+        } else {
+            TargetStopProtocol::ResumeAndInterrupt
         }
     }
     fn warmup_complete_slot(line: &str) -> Option<u64> {
@@ -189,13 +217,203 @@ mod bounded_resource_runner {
     #[cfg(test)]
     mod warmup_tests {
         use super::*;
+        extern "C" fn fixture_force_exit(_: i32) {
+            unsafe {
+                libc::_exit(130);
+            }
+        }
+        #[test]
+        fn cooperative_child_fixture() {
+            let Ok(root) = env::var("JETSTREAMER_TEST_EPOCH223_WARMUP_ROOT") else {
+                return;
+            };
+            let root = PathBuf::from(root);
+            assert!(
+                root.starts_with(env::temp_dir())
+                    && root
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .starts_with("epoch223-warmup-fixture-")
+            );
+            let accounts = root.join("scratch/runtime/accounts-state");
+            fs::create_dir_all(&accounts).unwrap();
+            fs::write(accounts.join("1.0"), b"fixture accounts").unwrap();
+            let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
+            action.sa_sigaction = fixture_force_exit as *const () as usize;
+            unsafe {
+                libc::sigemptyset(&mut action.sa_mask);
+                assert_eq!(
+                    libc::sigaction(libc::SIGINT, &action, std::ptr::null_mut()),
+                    0
+                );
+            }
+            eprintln!(
+                "[2026-10-23T20:44:33Z INFO  jetstreamer_node] private epoch223 warmup complete slot={TARGET} complete=true"
+            );
+            assert_eq!(unsafe { libc::raise(libc::SIGSTOP) }, 0);
+            // Simulate ordinary shutdown drainage; a second interrupt is fatal,
+            // exactly as in the sealed parent's already-set shutdown handler.
+            thread::sleep(Duration::from_millis(100));
+            fs::remove_dir_all(accounts).unwrap();
+            std::process::exit(0);
+        }
+        fn fixture_command(root: &Path) -> Command {
+            let mut command = Command::new(env::current_exe().unwrap());
+            command
+                .args([
+                    "--exact",
+                    "bounded_resource_runner::warmup_tests::cooperative_child_fixture",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env("JETSTREAMER_TEST_EPOCH223_WARMUP_ROOT", root)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .process_group(0);
+            command
+        }
+        #[test]
+        fn cooperative_complete_slot_freezes_captures_then_resumes_and_drains_without_interrupt() {
+            struct Fixture;
+            impl StorageHooks for Fixture {
+                fn progress_slot(&self, line: &str) -> Option<u64> {
+                    warmup_complete_slot(line)
+                }
+                fn target_stop_protocol(&self) -> TargetStopProtocol {
+                    TargetStopProtocol::CooperativeResumeOnly
+                }
+            }
+            let t = tempfile::Builder::new()
+                .prefix("epoch223-warmup-fixture-")
+                .tempdir()
+                .unwrap();
+            for name in ["scratch", "output", "receipts", "cgroup"] {
+                let d = t.path().join(name);
+                fs::create_dir(&d).unwrap();
+                fs::set_permissions(d, fs::Permissions::from_mode(0o700)).unwrap();
+            }
+            for name in [
+                "memory.current",
+                "memory.peak",
+                "memory.events",
+                "memory.stat",
+                "cpu.stat",
+                "io.stat",
+                "memory.pressure",
+                "io.pressure",
+            ] {
+                fs::write(t.path().join("cgroup").join(name), b"0\n").unwrap();
+            }
+            let mut p = plan();
+            p.run_root = t.path().into();
+            p.minimum_free_bytes = 0;
+            p.maximum_runtime_seconds = 10;
+            measure(&p,&"a".repeat(32),&t.path().join("cgroup"),&mut fixture_command(t.path()),&json!({"self_sha256":"a".repeat(64),"plan_path":"/fixture","plan_sha256":"b".repeat(64)}),&Fixture).unwrap();
+            let result: Value =
+                serde_json::from_slice(&fs::read(t.path().join("receipts/resource.json")).unwrap())
+                    .unwrap();
+            let intent: Value = serde_json::from_slice(
+                &fs::read(t.path().join("receipts/target-stop.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(result["success"], true);
+            assert_eq!(result["child_return_code"], 0);
+            assert_eq!(result["target_reached"], true);
+            assert_eq!(result["external_signal"], 0);
+            assert_eq!(result["target_stop_protocol"], "cooperative-resume-only");
+            assert_eq!(intent["target_stop_protocol"], "cooperative-resume-only");
+            assert_eq!(result["capture"]["accounts_state"]["regular_files"], 1);
+            assert!(
+                result["authority"]
+                    .as_object()
+                    .unwrap()
+                    .values()
+                    .all(|v| v == false)
+            );
+            assert!(!t.path().join("scratch/runtime/accounts-state").exists());
+            assert!(!t.path().join("receipts/failure.json").exists());
+        }
+        #[test]
+        fn legacy_resume_still_interrupts_and_exit130_cannot_qualify() {
+            let t = tempfile::Builder::new()
+                .prefix("epoch223-warmup-fixture-")
+                .tempdir()
+                .unwrap();
+            let mut child = ChildGroup(fixture_command(t.path()).spawn().unwrap(), false);
+            // Establish the same already-self-stopped state as failed13a5.
+            prepare_target_capture(child.0.id(), TargetStopProtocol::CooperativeResumeOnly)
+                .unwrap();
+            resume_target(child.0.id(), TargetStopProtocol::ResumeAndInterrupt).unwrap();
+            let status = child.0.wait().unwrap();
+            child.1 = true;
+            assert_eq!(status.code(), Some(130));
+            assert!(!controlled_success(true, 0, status.code()));
+            assert!(!controlled_success(false, 0, Some(0)));
+            assert!(!controlled_success(true, libc::SIGTERM, Some(0)));
+        }
+        #[test]
+        fn cooperative_protocol_requires_exact_native20_parent_worker_and_first16_scope() {
+            let p = "99f643ff0dbbcd37d1fbc524a1c1088d7273c7fc91330df059d30d51b8b0fcd4";
+            let w = "52d6c86a8103b8965ca68ead96af471a7899a0a0e6e69c48989b39fd5d922f0c";
+            assert_eq!(
+                warmup_target_protocol("solana-v1.6.20", p, w, 96335539, 96335554, 96767522),
+                TargetStopProtocol::CooperativeResumeOnly
+            );
+            for (runtime, parent, worker, initial, target, terminal) in [
+                ("solana-v1.6.25", p, w, 96335539, 96335554, 96767522),
+                (
+                    "solana-v1.6.20",
+                    "old-parent",
+                    w,
+                    96335539,
+                    96335554,
+                    96767522,
+                ),
+                (
+                    "solana-v1.6.20",
+                    p,
+                    "a651b7a6ee3c0d4f8359e1ea6cfcb96becf259d440ee744beb173b264de6af20",
+                    96335539,
+                    96335554,
+                    96767522,
+                ),
+                ("solana-v1.6.20", p, w, 96335540, 96335554, 96767522),
+                ("solana-v1.6.20", p, w, 96335539, 96335555, 96767522),
+                ("solana-v1.6.20", p, w, 96335539, 96335554, 96767999),
+            ] {
+                assert_eq!(
+                    warmup_target_protocol(runtime, parent, worker, initial, target, terminal),
+                    TargetStopProtocol::ResumeAndInterrupt
+                );
+            }
+            let configured = WarmupStorage {
+                next_guard: std::sync::Mutex::new(Instant::now()),
+            }
+            .target_stop_protocol();
+            assert_eq!(
+                configured,
+                if RUNTIME == "solana-v1.6.20" {
+                    TargetStopProtocol::CooperativeResumeOnly
+                } else {
+                    TargetStopProtocol::ResumeAndInterrupt
+                }
+            );
+            assert_eq!(
+                DiskStorage.target_stop_protocol(),
+                TargetStopProtocol::ResumeAndInterrupt
+            );
+        }
         #[test]
         fn only_verified_complete_slot_marker_triggers_capture() {
             let marker = format!(
                 "[2026-10-23T19:00:00Z INFO jetstreamer_node] private epoch223 warmup complete slot={TARGET} complete=true"
             );
             assert_eq!(warmup_complete_slot(&marker), Some(TARGET));
-            assert_eq!(warmup_complete_slot(&marker.replace(" INFO ", " INFO  ")), Some(TARGET));
+            assert_eq!(
+                warmup_complete_slot(&marker.replace(" INFO ", " INFO  ")),
+                Some(TARGET)
+            );
             for bad in [
                 marker.replace("jetstreamer_node]", "other_module]"),
                 marker.replace("complete=true", "complete=false"),
