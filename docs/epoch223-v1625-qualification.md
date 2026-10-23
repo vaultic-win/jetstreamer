@@ -119,6 +119,17 @@ must now validate that profile and resolve its worker executable as well.
 The old static era label includes v1.6.20; the selected descriptor is v1.6.25,
 as asserted by the actual bootstrap-selector regression and new preflight.
 
+The distinct `--epoch223-prefix-preflight` flag admits only the exact cold
+prefix96335538..96767522 and its prefix namespace. It cannot be combined with
+either tail flag. It retains both independent checkpoint obligations and
+returns a `jetstreamer-private-epoch223-prefix-planning-preflight-v1` report
+only at the actual replay entrypoint's pre-worker barrier. Like tail preflight,
+it requires preseeded genesis, forbids ledger extraction and performs no worker
+spawn, entries or archive creation. It is package capability evidence, never
+snapshot-content verification or resource admission. A rebuilt parent needs
+new immutable digest bindings before any supervisor may use it; do not edit
+the older sealed package or treat its tail-only flag as prefix capability.
+
 The new worker feature restores the two future restart markers 96,542,804 and
 96,542,805 using the same native algorithm tested in the v1.6.20 correction.
 It validates the full four-marker list before mutation, requires every already
