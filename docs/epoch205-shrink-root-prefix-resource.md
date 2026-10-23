@@ -20,6 +20,14 @@ merely because this feature exists.
 
 Keep the executable dormant until exact-package capability, fresh complete
 admission, fleet registration and the first real sandboxed guard fire qualify.
+The optional final `--storage-capability` flag selects a separately compile-bound
+no-entry mode. Under the intended UID1000 sandbox it rehashes the exact node,
+capped worker, bootstrap, checkpoint list and genesis, prepares only the private
+genesis copy, then writes `receipts/capability.json`. It returns before resource
+sampling, parent/worker spawn, snapshot restore or archive creation. Use a
+separate empty attempt with its own matching unit/plan; never reuse that attempt
+for replay. This input proof does not establish native checkpoint equivalence,
+resource fit, producer admission or compatibility/publication success.
 Keep all output private and sidecar-free. Independent prefix reread and exact
 native checkpoint comparison remain separate requirements. The949-slot suffix,
 checkpoint restart, V4 assembly, full/current-plugin verification and reviewed

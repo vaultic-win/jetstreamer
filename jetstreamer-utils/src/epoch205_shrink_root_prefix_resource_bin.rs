@@ -31,6 +31,48 @@ mod profile {
 }
 mod bounded_resource_runner {
     include!("bounded_resource_runner.rs");
+    struct InputCapability;
+    impl StorageHooks for InputCapability {
+        fn capability_only(&self) -> bool {
+            true
+        }
+        fn capability_result(
+            &self,
+            p: &Plan,
+            invocation: &str,
+            bindings: &Value,
+            cmd: &Command,
+        ) -> Result<()> {
+            // run() has independently hashed every immutable input and copied
+            // only genesis. execute_prepared() returns here before measure_root,
+            // resource sampling, child spawn or any replay entry.
+            let arguments: Vec<_> = cmd
+                .get_args()
+                .map(|s| s.to_string_lossy().into_owned())
+                .collect();
+            persist(
+                &p.run_root.join("receipts/capability.json"),
+                &json!({
+                    "schema":"jetstreamer-private-epoch205-capped-prefix-input-capability-v1",
+                    "epoch":EPOCH,"unit":p.unit,"invocation_id":invocation,
+                    "runner_sha256":bindings["self_sha256"],"plan":bindings,
+                    "node_sha256":p.node.sha256,"worker_sha256":WORKER,
+                    "snapshot_sha256":SNAPSHOT,"snapshot_bytes":SNAPSHOT_SIZE,
+                    "epoch_hashes_sha256":p.epoch_hashes.sha256,
+                    "bootstrap_slot":88559361,"terminal_root_slot":TERMINAL,
+                    "output_slot_start":88560000,"output_slot_count":431051,
+                    "node_arguments":arguments,"all_immutable_inputs_rehashed":true,
+                    "worker_spawned":false,"snapshot_restored":false,"archive_created":false,
+                    "replay_launch_authorized":false,"canonical_prefix_qualified":false,
+                    "full_cold_epoch_peak_qualified":false,"publication_authorized":false,
+                    "remote_mutations":false,"r2_mutations":false
+                }),
+            )
+        }
+    }
+    pub(super) fn input_capability() {
+        main_with_storage(&InputCapability);
+    }
     #[cfg(test)]
     mod tests205 {
         use super::*;
@@ -57,6 +99,55 @@ mod bounded_resource_runner {
                 minimum_free_bytes: MINIMUM_FREE,
                 maximum_runtime_seconds: MAX_RUNTIME,
             }
+        }
+        #[test]
+        fn input_capability_dispatch_cannot_spawn_even_an_absent_parent() {
+            let temp = tempfile::tempdir().unwrap();
+            fs::create_dir(temp.path().join("receipts")).unwrap();
+            fs::set_permissions(
+                temp.path().join("receipts"),
+                fs::Permissions::from_mode(0o700),
+            )
+            .unwrap();
+            let mut p = plan();
+            p.run_root = temp.path().into();
+            let mut cmd = Command::new("/nonexistent-epoch205-parent-must-not-run");
+            execute_prepared(
+                &InputCapability,
+                &p,
+                &"a".repeat(32),
+                Path::new("/no-cgroup-access"),
+                &mut cmd,
+                &json!({"self_sha256":"b".repeat(64)}),
+            )
+            .unwrap();
+            let r: Value = serde_json::from_slice(
+                &fs::read(temp.path().join("receipts/capability.json")).unwrap(),
+            )
+            .unwrap();
+            for key in [
+                "worker_spawned",
+                "snapshot_restored",
+                "archive_created",
+                "replay_launch_authorized",
+                "canonical_prefix_qualified",
+                "publication_authorized",
+                "r2_mutations",
+            ] {
+                assert_eq!(r[key], false, "{key}");
+            }
+            assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
+            assert!(
+                execute_prepared(
+                    &InputCapability,
+                    &p,
+                    &"a".repeat(32),
+                    Path::new("/no-cgroup-access"),
+                    &mut cmd,
+                    &json!({"self_sha256":"b".repeat(64)})
+                )
+                .is_err()
+            );
         }
         #[test]
         fn launch_scope_cannot_borrow_bounded_probe_or_relax_resources() {
@@ -146,5 +237,9 @@ mod bounded_resource_runner {
     }
 }
 fn main() {
-    bounded_resource_runner::main();
+    if std::env::args().next_back().as_deref() == Some("--storage-capability") {
+        bounded_resource_runner::input_capability();
+    } else {
+        bounded_resource_runner::main();
+    }
 }
