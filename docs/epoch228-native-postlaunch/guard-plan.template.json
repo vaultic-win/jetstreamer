@@ -1,0 +1,16 @@
+{
+  "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+  "unit": "horizon-native-input-228-capped-1bfa8d51-v1.service",
+  "invocation_id": null,
+  "filesystem": "/",
+  "minimum_free_bytes": null,
+  "worker_root": "/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1",
+  "maximum_worker_vmas": 3500000,
+  "maximum_root_physical_bytes": 300000000000,
+  "receipt_directory": "/var/lib/jetstreamer/horizon-native228-guard-receipts-v1",
+  "native_main": {
+    "executable": "/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test",
+    "sha256": "d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827",
+    "main_pid": null
+  }
+}

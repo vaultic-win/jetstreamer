@@ -1,0 +1,35 @@
+{
+  "schema": "jetstreamer-horizon-pipeline-status-plan-v1",
+  "epoch": 228,
+  "phase": "verification",
+  "binding": {
+    "unit": "horizon-native-input-228-capped-1bfa8d51-v1.service",
+    "invocation_id": null,
+    "expected_exec_start": null,
+    "claim_phase": "private-cold-snapshot-verification",
+    "origin_unit": "horizon-native-input-228-capped-1bfa8d51-v1.service",
+    "origin_invocation_id": null,
+    "model_path": null,
+    "model_sha256": "",
+    "fleet_path": null,
+    "fleet_sha256": null
+  },
+  "observer": {
+    "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/horizon-live-resource-sample-20261023T232400Z-diagnostics-v335.json",
+    "sha256": "ef32aa2f819b37220a5a041fc3dba2226647e6caef2383cecebb834cb5a7ac25"
+  },
+  "fleet": { "path": null, "sha256": null },
+  "origin_launch": {
+    "path": "/var/lib/jetstreamer/horizon-228-native-capture-actual-v1/intent.json",
+    "sha256": null
+  },
+  "estimate_evidence": [{ "path": null, "sha256": null }],
+  "estimate_basis": null,
+  "estimated_remaining_millis": null,
+  "jet_path": "/var/lib/jetstreamer/horizon-228-native-capture-actual-v1/epoch-228.jet",
+  "expected_jet_size_bytes": 0,
+  "peer_units": [],
+  "receipt_directory": null,
+  "receipt_directory_uid": 0,
+  "phase_handoff_event": null
+}
