@@ -1,10 +1,14 @@
 //! Actual bounded entry replay under qualification; never a zero-entry test.
 use super::*;
 const UNIT: &str = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";
+const UNITS: [&str; 2] = [
+    UNIT,
+    "horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service",
+];
 pub(super) fn selected(p: &Plan) -> bool {
     p.epoch == 223
         && p.binding.claim_phase == "private-warmup-reproduction"
-        && p.binding.unit == UNIT
+        && UNITS.contains(&p.binding.unit.as_str())
 }
 pub(super) fn validate_origin(p: &Plan, r: &Value, f: &Value) -> Result<()> {
     ensure!(
@@ -27,7 +31,7 @@ pub(super) fn validate_origin(p: &Plan, r: &Value, f: &Value) -> Result<()> {
         .iter()
         .filter(|c| {
             c["epoch"] == 223
-                && c["unit"] == UNIT
+                && c["unit"] == p.binding.unit
                 && c["invocation_id"] == p.binding.invocation_id
                 && c["phase"] == p.binding.claim_phase
         })
@@ -62,7 +66,7 @@ pub(super) fn validate_origin(p: &Plan, r: &Value, f: &Value) -> Result<()> {
         "warmup clock changed"
     );
     for name in ["resource.json", "failure.json"] {
-        let root = fleet::warmup223_status_jet_path()
+        let root = fleet::warmup223_status_jet_path(&p.binding.unit)?
             .parent()
             .context("warmup output parent")?
             .parent()
@@ -79,7 +83,7 @@ pub(super) fn validate_origin(p: &Plan, r: &Value, f: &Value) -> Result<()> {
 }
 pub(super) fn jet_identity(p: &Plan) -> Result<Option<FileIdentity>> {
     ensure!(
-        p.jet_path == fleet::warmup223_status_jet_path(),
+        p.jet_path == fleet::warmup223_status_jet_path(&p.binding.unit)?,
         "warmup jet path differs"
     );
     optional_jet(&p.jet_path, p.expected_jet_size_bytes)
@@ -163,7 +167,7 @@ pub(super) fn matches(
         && epoch == 223
         && r.status.phase == "verification"
         && r.pipeline_binding.as_ref().is_some_and(|b| {
-            b.unit == UNIT
+            UNITS.contains(&b.unit.as_str())
                 && b.claim_phase == "private-warmup-reproduction"
                 && b.validate(epoch, "verification").is_ok()
                 && c.get(&b.unit).is_some_and(|u| b.live_matches(u))

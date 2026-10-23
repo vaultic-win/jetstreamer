@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "native209_input.rs"]
+mod native209_input;
+
 use crate::{leader_schedule, poh_backend, snapshot};
 use jetstreamer_historical_protocol::{
     AccountWrite, Checkpoint, EntryProcessed, EntryRequest, Initialized, InitializedSource,

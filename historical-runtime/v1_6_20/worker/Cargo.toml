@@ -26,6 +26,8 @@ epoch223-prefix-warmup-diagnostic = ["epoch223-prefix-qualification"]
 epoch227-capped-qualification = []
 # Separately sealed sixteen-slot cold comparison, never a full epoch.
 epoch227-capped-warmup-diagnostic = ["epoch227-capped-qualification"]
+# Exact epoch228 input plus its279-slot canonical checkpoint tail in229.
+epoch228-capped-qualification = []
 
 [[example]]
 name = "snapshot_hard_forks"

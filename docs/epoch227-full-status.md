@@ -64,11 +64,28 @@ handoffs use the existing separately qualified delivery publisher when their
 actual downstream owner takes over.
 
 Elapsed time derives from the real PID1 monotonic start, checked against the
-captured launch. Bytes come from the current private `output/epoch-227.jet`
-regular file, or zero before it exists. ETA includes the complete432000-slot
+captured launch. During replay, bytes come from this producer's private
+`archives/epoch-227.jet` before cohort import. The reader derives the exact
+destination namespace from the canonical output path, selects only the run
+whose PID matches the captured node, and binds its epoch range and manifest
+fingerprint through `cohort-state.json`. It rejects ambiguous runs, symlinks,
+multiple hard links and changing directory identities; it never scans AccountsDb.
+Zero means this bound run has not created its archive yet. After cohort import,
+the canonical destination supplies the size. The immutable estimate records
+the measured path, source and cohort-state digest.
+
+Observed slots between the pinned bootstrap and epoch227 remain `verification`.
+They retain the full epoch estimate and provisional rate until epoch recording
+begins; a fast pre-epoch warmup does not shorten the estimate for432000slots.
+ETA includes the complete432000-slot
 epoch, its suffix and every declared downstream stage through verified sidecar
-commit. A sufficient measured rate replaces the provisional rate. Invalid
-measured rates, counter resets, unknown owners or stale samples fail closed.
+commit. A sufficient measured rate replaces the provisional rate. If transaction
+or account counters reset, retain their raw reset count and accept a slot rate
+only when the observer's accumulated slot delta exactly equals last-minus-first,
+both endpoints bind this epoch and terminal slot, and the timestamp-derived rate
+matches the reported rate. The observer's reset accumulation makes this equality
+independent proof that slots themselves never reset. Invalid rates, slot resets,
+unproved accounting resets, unknown owners or stale samples fail closed.
 When initialization exceeds its original allowance, the provisional model
 expands its remaining initialization allowance instead of pinning an overdue
 stage to zero; revise that model from new evidence at the next coordinated poll.

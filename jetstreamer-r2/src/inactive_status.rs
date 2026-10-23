@@ -7,11 +7,14 @@ mod capped141;
 mod metadata_cycle;
 mod missing157;
 mod native207;
+mod native209;
 mod native223;
 mod native227;
+mod native228;
 mod natural144;
 mod preserved144;
 mod publication144;
+mod warmup223;
 pub(super) fn prepare_publication144_preservation() -> Result<()> {
     publication144::prepare()
 }
@@ -244,6 +247,9 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
     if let Some(owner) = fleet::full227_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
+    if let Some(owner) = fleet::full209_status_inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     let bytes = read_stable_bounded(
         &publication.observer_receipt,
         MAX_OBSERVER_RECEIPT_BYTES,
@@ -394,6 +400,18 @@ fn fresh_census(
     if native207 {
         native207::validate(&current, terminal_fleet, owners)?;
     }
+    let native209 = plan.epoch == 209 && native209::recognized(terminal_fleet, owners);
+    if native209 {
+        native209::validate(&current, terminal_fleet, owners)?;
+    }
+    let native228 = plan.epoch == 228 && native228::recognized(terminal_fleet, owners);
+    if native228 {
+        native228::validate(&current, terminal_fleet, owners)?;
+    }
+    let warmup223 = plan.epoch == 223 && warmup223::recognized(terminal_fleet, owners);
+    if warmup223 {
+        warmup223::validate(&current, terminal_fleet, owners)?;
+    }
     let native227 = plan.epoch == 227 && native227::recognized(terminal_fleet, owners);
     if native227 {
         native227::validate(&current, terminal_fleet, owners)?;
@@ -418,6 +436,9 @@ fn fresh_census(
             && !capped141
             && !native223
             && !native207
+            && !native209
+            && !native228
+            && !warmup223
             && !native227
             && reserve.is_none()
         {
