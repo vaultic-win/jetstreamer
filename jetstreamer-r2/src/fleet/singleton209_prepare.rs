@@ -138,3 +138,38 @@ pub(super) fn run() -> Result<()> {
     );
     Ok(())
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    #[ignore = "root-only completed guard history selection; no guard fire, resource observation, admission or worker"]
+    fn root_current_completed_protected_guard_bindings() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let minimum = utc_seconds("2026-10-23T22:53:00Z").unwrap();
+        let mut selected = BTreeMap::new();
+        let mut maximum = 0;
+        for (owner, guard, dir) in GUARDS {
+            let value =
+                warmup223::completed_guard_binding(guard, Path::new(dir), minimum, now).unwrap();
+            let b: BoundFile = serde_json::from_value(value["binding"].clone()).unwrap();
+            let receipt = bound_json(&b).unwrap();
+            assert_eq!(
+                receipt["producer_invocation_id"],
+                receipt["producer"]["invocation_id"]
+            );
+            maximum = maximum.max(receipt["minimum_free_bytes"].as_u64().unwrap());
+            selected.insert(owner.to_owned(), value);
+        }
+        println!(
+            "GUARD_SELECTIONS {}",
+            serde_json::to_string(
+                &json!({"maximum_minimum_free_bytes":maximum,"selected":selected})
+            )
+            .unwrap()
+        );
+    }
+}
