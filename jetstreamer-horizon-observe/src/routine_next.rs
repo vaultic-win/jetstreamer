@@ -40,7 +40,8 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
             && (c["fleet_plan"]["path"].as_str()
                 == p.cycle_directory.join("sealed/fleet-plan.json").to_str()
                 || public198::promoted(p, c)?
-                || repair183_fleet_recovery::completed_plan(p, c)?),
+                || repair183_fleet_recovery::completed_plan(p, c)?
+                || repair185_fleet_recovery::completed_plan(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [
@@ -340,6 +341,7 @@ pub(super) fn prepare(
     native144_recovery::consume(&mut next, &completion)?;
     public160_recovery::consume(&mut next, &completion)?;
     repair183_fleet_recovery::consume(&mut next, &completion)?;
+    repair185_fleet_recovery::consume(&mut next, &completion)?;
     delivery160::consume(&mut next)?;
     if mode == "--prepare-next-public160-timing" {
         ensure!(

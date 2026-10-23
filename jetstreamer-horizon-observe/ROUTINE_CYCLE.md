@@ -20,6 +20,17 @@ validation and successor preparation remain offline; active-cycle preflight
 separately authenticates both actual reserve guards. Never track recurring guard
 invocations as stable replay owners or restart healthy work during adoption.
 
+Epoch185's old `reserve_stop` is invocation-specific. Once its exact new
+admission/guard handoff is verified, preserve that stop in the separately sealed
+history receipt and retain both original intent/completion evidence; remove only
+the obsolete active-stop field from the derived185 gate. Keep its
+`failed-needs-repair` gate and every other evidence item unchanged. This is not
+repair closure, scratch retirement, or authority to ignore a new guard trip.
+The exact03:29 transaction has a bounded fleet-tail recovery that authenticates
+the failed owner/child, immutable five-range sample/model and ten successful
+status receipts, seals that one-gate correction, and completes fleet inventory
+without another sample or replay-status publication.
+
 The optional `repair183_handoff` binding is metadata-only and restricted to the
 new `readerfix-full-20261023` controller/producer pair. Its immutable owner-only
 `handoff.json` uses `jetstreamer-horizon-repair183-live-monitor-handoff-v1` and

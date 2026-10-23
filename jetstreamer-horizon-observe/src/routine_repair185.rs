@@ -397,6 +397,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
         let epoch = "185";
         let e = serde_json::to_value(p.repair185_handoff.as_ref().unwrap())?;
         let gate = &mut fleet["gates"][epoch];
+        replacement_gate(gate)?;
         ensure!(
             gate["state"] == "failed-needs-repair",
             "repair185 original open repair gate changed"
@@ -539,9 +540,114 @@ pub(super) fn bootstrap_model(p: &Plan, model: &Value) -> bool {
     })
 }
 
+pub(super) fn replacement_gate(gate: &mut Value) -> Result<()> {
+    let binding = Bound { path: "/usr/local/lib/jetstreamer/horizon-epoch185-reserve-stop-history-20261023-v1/history.json".into(), sha256: "1739cdf4f724a0843d7406bd3ae904fea0421356c52f2242030bcfbba29fb8e2".into() };
+    let history = bound_json(&binding, true)?;
+    let source: Bound = serde_json::from_value(history["source_fleet_plan"].clone())?;
+    ensure!(
+        bound_json(&source, true)?["gates"]["185"]["reserve_stop"] == history["original_stop"],
+        "repair185 historical stop differs from original immutable gate"
+    );
+    replacement_gate_with(gate, &history, &binding)
+}
+fn replacement_gate_with(gate: &mut Value, history: &Value, binding: &Bound) -> Result<()> {
+    let stop = &history["original_stop"];
+    ensure!(
+        history["schema"] == "jetstreamer-horizon-epoch185-reserve-stop-history-v1"
+            && history["epoch"] == 185
+            && history["repair_closed"] == false
+            && [
+                "replay_launch_authorized",
+                "publication_authorized",
+                "remote_mutations",
+                "r2_mutations"
+            ]
+            .iter()
+            .all(|k| history[*k] == false)
+            && stop["epoch"] == 185
+            && stop["controller_unit"]
+                == "jetstreamer-epoch185-singleton-20261020-controller-v1-r2.service"
+            && stop["controller_invocation_id"] == "5aae80ffd2364f0aa984c1ae1737ca4d"
+            && stop["producer_unit"]
+                == "jetstreamer-root-sweep-e185-s1-20261020-v1-r2-e185-185-lane-a-1.service"
+            && stop["producer_invocation_id"] == "557be07ab87d47fbac93afe1876a4281"
+            && gate["state"] == "failed-needs-repair",
+        "repair185 cannot retire a foreign stop or close the repair"
+    );
+    let evidence = gate["evidence"]
+        .as_array()
+        .context("repair185 stop evidence")?;
+    ensure!(
+        ["intent", "completion"]
+            .iter()
+            .all(|key| evidence.contains(&stop[*key])),
+        "repair185 must retain both original stop receipts"
+    );
+    let value = serde_json::to_value(binding)?;
+    if gate["reserve_stop"].is_null() {
+        ensure!(
+            evidence.contains(&value),
+            "repair185 replacement lost its stop history"
+        );
+        return Ok(());
+    }
+    ensure!(
+        gate["reserve_stop"] == *stop,
+        "repair185 replacement cannot remove another stop"
+    );
+    gate.as_object_mut()
+        .context("repair185 gate object")?
+        .remove("reserve_stop");
+    let evidence = gate["evidence"].as_array_mut().unwrap();
+    if !evidence.contains(&value) {
+        evidence.push(value);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn replacement_preserves_stop_as_history_without_discarding_the_new_claim() {
+        let stop = json!({"epoch":185,"controller_unit":"jetstreamer-epoch185-singleton-20261020-controller-v1-r2.service",
+            "controller_invocation_id":"5aae80ffd2364f0aa984c1ae1737ca4d","producer_unit":"jetstreamer-root-sweep-e185-s1-20261020-v1-r2-e185-185-lane-a-1.service",
+            "producer_invocation_id":"557be07ab87d47fbac93afe1876a4281","intent":{"path":"/intent","sha256":"a".repeat(64)},"completion":{"path":"/completion","sha256":"b".repeat(64)}});
+        let h = json!({"schema":"jetstreamer-horizon-epoch185-reserve-stop-history-v1","epoch":185,"original_stop":stop,"repair_closed":false,
+            "replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        let bound = Bound {
+            path: "/history".into(),
+            sha256: "c".repeat(64),
+        };
+        let original = json!({"state":"failed-needs-repair","reserve_stop":stop,"evidence":[stop["intent"],stop["completion"]],"sentinel":u64::MAX});
+        let mut fixed = original.clone();
+        replacement_gate_with(&mut fixed, &h, &bound).unwrap();
+        assert!(fixed["reserve_stop"].is_null());
+        assert_eq!(fixed["state"], "failed-needs-repair");
+        assert_eq!(fixed["sentinel"], u64::MAX);
+        assert_eq!(
+            &fixed["evidence"].as_array().unwrap()[..2],
+            original["evidence"].as_array().unwrap().as_slice()
+        );
+        let repeat = fixed.clone();
+        replacement_gate_with(&mut fixed, &h, &bound).unwrap();
+        assert_eq!(fixed, repeat);
+        for (key, value) in [
+            ("reserve_stop", json!({"epoch":186})),
+            ("state", json!("remote-ready")),
+            ("evidence", json!([])),
+        ] {
+            let mut bad = original.clone();
+            bad[key] = value;
+            assert!(
+                replacement_gate_with(&mut bad, &h, &bound).is_err(),
+                "{key}"
+            );
+        }
+        let mut bad_history = h;
+        bad_history["repair_closed"] = json!(true);
+        assert!(replacement_gate_with(&mut original.clone(), &bad_history, &bound).is_err());
+    }
     fn h() -> Handoff {
         serde_json::from_value(json!({"schema":"jetstreamer-horizon-repair185-live-monitor-handoff-v1",
             "controller_invocation_id":"a".repeat(32),"producer_invocation_id":"b".repeat(32),

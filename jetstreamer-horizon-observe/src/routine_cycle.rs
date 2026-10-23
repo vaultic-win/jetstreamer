@@ -50,6 +50,8 @@ mod public160_timing;
 mod public198;
 #[path = "routine_repair183_fleet_recovery.rs"]
 mod repair183_fleet_recovery;
+#[path = "routine_repair185_fleet_recovery.rs"]
+mod repair185_fleet_recovery;
 
 #[path = "routine_private144.rs"]
 mod private144;
@@ -1870,6 +1872,8 @@ fn main() {
                             | "--check-public160-recovery"
                             | "--recover-repair183-fleet"
                             | "--check-repair183-fleet-recovery"
+                            | "--recover-repair185-fleet"
+                            | "--check-repair185-fleet-recovery"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
@@ -1892,6 +1896,16 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| {
+            a == "--recover-repair185-fleet" || a == "--check-repair185-fleet-recovery"
+        }) {
+            return repair185_fleet_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-repair185-fleet-recovery",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             a == "--recover-repair183-fleet" || a == "--check-repair183-fleet-recovery"
         }) {
