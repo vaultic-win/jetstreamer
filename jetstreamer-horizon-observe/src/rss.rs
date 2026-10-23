@@ -24,7 +24,9 @@ fn lane_rss(row: &Value, suffix: &str) -> Option<u64> {
     };
     let p = Path::new(producer["control_group"].as_str()?);
     let c = Path::new(controller["control_group"].as_str()?);
-    if p.starts_with(c) {
+    if p == c {
+        Some(bytes(producer)?.max(bytes(controller)?))
+    } else if p.starts_with(c) {
         bytes(controller)
     } else if c.starts_with(p) {
         bytes(producer)
@@ -257,6 +259,12 @@ mod tests {
         let first = history(&Value::Null, &current).unwrap();
         assert_eq!(first["200"]["maximum_observed_lane_rss_bytes"], 101);
         assert_eq!(first["200"]["reservation_ceiling_bytes"], 151); // integer floor, no double-counting same unit
+        let mut asymmetric = current.clone();
+        asymmetric["replays"][0]["producer_after"]["rss"]["aggregate_rss_bytes"] = Value::from(121);
+        assert_eq!(
+            history(&Value::Null, &asymmetric).unwrap()["200"]["maximum_observed_lane_rss_bytes"],
+            121
+        );
         let previous = serde_json::json!({"lane_rss_history":first});
         assert_eq!(
             history(&previous, &Value::Null).unwrap(),
