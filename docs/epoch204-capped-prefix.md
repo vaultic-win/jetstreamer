@@ -14,7 +14,8 @@ natural zero-exit completion are mandatory. A progress marker cannot qualify
 the prefix. No checksum, import, R2 mutation or runtime promotion is authorized.
 
 Use `--storage-capability` first under the exact immutable input package and
-sandbox. This branch hashes every input, copies only genesis, records the exact
+sandbox. Pre-create the run root and its `scratch`, `output`, `receipts` and
+`ledger` children as the replay user, all mode0700. This branch hashes every input, copies only genesis, records the exact
 prepared parent command and exits before worker spawn, scratch observation,
 snapshot restore or archive creation. Its receipt never admits replay. Actual
 launch still needs independent fresh fleet/memory admission, disjoint ownership,

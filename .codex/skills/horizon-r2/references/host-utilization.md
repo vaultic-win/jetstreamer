@@ -134,6 +134,10 @@ the normal work-conserving backfill path rather than waiting for another status 
 - Do not start a producer until its exact invocation can be guarded. If invocation IDs exist only
   after launch, start the dormant controller under observation, immediately bind and prove its
   reserve/VMA guard, and do not leave it unattended before the first real sandboxed guard fire.
+  Before an input-capability probe, validate the private run root itself and each required child
+  under the actual service user. Creating mode0700 children can leave an automatically created
+  parent group-writable; check ownership, traversal and owner-only modes before spending time
+  hashing large immutable inputs.
 - If current concurrency is below the proven operating point and every gate passes, launch the
   staged replacement. If it does not launch, record the exact binding limiter or missing evidence;
   “waiting for utilization” is not a blocker.
