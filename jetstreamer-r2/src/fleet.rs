@@ -22,6 +22,7 @@ mod continuation203_runtime;
 mod native141;
 mod native144;
 mod native203;
+mod ownroot203_rebase;
 mod prefix144;
 mod prefix223;
 mod private144;
@@ -71,6 +72,12 @@ pub(super) fn capture_continuation203_launch() -> Result<()> {
 }
 pub(super) fn extend_continuation203_runtime() -> Result<()> {
     continuation203_runtime::run()
+}
+pub(super) fn prepare_ownroot203_rebase() -> Result<()> {
+    ownroot203_rebase::prepare()
+}
+pub(super) fn capture_ownroot203_rebase() -> Result<()> {
+    ownroot203_rebase::capture()
 }
 pub(super) fn prepare_continuation144_layout() -> Result<()> {
     continuation144::prepare_layout()

@@ -91,7 +91,7 @@ fn policy(p: &Value, native: &Value, prior: &Value, terminal: &Value) -> Result<
     Ok(())
 }
 
-fn floor(v: &Value, fleet: &Value) -> Result<u64> {
+pub(super) fn floor(v: &Value, fleet: &Value) -> Result<u64> {
     ensure!(
         v["schema"] == "horizon-century-floor-recomputation-v1"
             && v["century_first_epoch"] == 200

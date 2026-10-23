@@ -3378,6 +3378,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("extend-continuation203-runtime") {
         return fleet::extend_continuation203_runtime();
     }
+    if env::args().nth(1).as_deref() == Some("prepare-ownroot203-rebase") {
+        return fleet::prepare_ownroot203_rebase();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-ownroot203-rebase") {
+        return fleet::capture_ownroot203_rebase();
+    }
     if env::args().nth(1).as_deref() == Some("status-retire-inactive") {
         return inactive_status::run().await;
     }
