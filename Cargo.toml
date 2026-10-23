@@ -45,6 +45,7 @@ jetstreamer-plugin = { path = "jetstreamer-plugin", version = "0.9.0" }
 jetstreamer-utils = { path = "jetstreamer-utils", version = "0.9.0" }
 jetstreamer-node = { path = "jetstreamer-node", version = "0.9.0" }
 jetstreamer-horizon = { path = "jetstreamer-horizon", version = "0.9.0" }
+jetstreamer-horizon-observe = { path = "jetstreamer-horizon-observe", version = "0.9.0" }
 tokio = "1"
 futures-util = { version = "0", default-features = false }
 futures = "0"

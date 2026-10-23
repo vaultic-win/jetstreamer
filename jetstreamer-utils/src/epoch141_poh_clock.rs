@@ -17,7 +17,12 @@ pub(super) const NATIVE_SHA: &str =
 const SNAPSHOT: &str = "47d5911465901975e397c570e06ccf72296db7ecd3b3b1beda710cacd3e683a1";
 const BANK: &[u8] =
     include_bytes!("../../historical-runtime/v1_4_25/vendor/solana-runtime-1.4.25/src/bank.rs");
-const WORKER: &[u8] = include_bytes!("../../historical-runtime/v1_4_25/worker/src/runtime.rs");
+// Preserve the exact source reviewed with the original typed/native proof.
+// Subsequent trace/capped-storage candidates are a separate provenance pin.
+const REVIEWED_WORKER: &[u8] =
+    include_bytes!("../tests/fixtures/epoch141-clock-reviewed-worker-a6e0d6ab.rs.txt");
+const CURRENT_WORKER: &[u8] =
+    include_bytes!("../../historical-runtime/v1_4_25/worker/src/runtime.rs");
 #[derive(Debug, Serialize)]
 pub(super) struct ClockBindings {
     pub(super) snapshot_slot: u64,
@@ -25,6 +30,7 @@ pub(super) struct ClockBindings {
     pub(super) hashes_per_tick: u64,
     pub(super) bank_source_sha256: String,
     pub(super) worker_runtime_source_sha256: String,
+    pub(super) current_worker_runtime_source_sha256: String,
     pub(super) diagnostic_only: bool,
 }
 fn validate(c: &Value, n: &Value) -> Result<ClockBindings> {
@@ -104,18 +110,22 @@ fn validate(c: &Value, n: &Value) -> Result<ClockBindings> {
         ensure!(n[key] == false, "native probe acquired authority:{key}");
     }
     let bank = evidence::sha(BANK);
-    let worker = evidence::sha(WORKER);
+    let worker = evidence::sha(REVIEWED_WORKER);
+    let current_worker = evidence::sha(CURRENT_WORKER);
     ensure!(
         bank == "f136ec6b4d40bced37936df1800cc7f2d64484a0640d76edb2839dd04599d4ac"
-            && worker == "ae01b0813fa1564511e450acc693941268076659e4d741aae085fb288d0fd2ac",
+            && worker == "ae01b0813fa1564511e450acc693941268076659e4d741aae085fb288d0fd2ac"
+            && current_worker == "8400f8053bc2efdf40ee100d2883e6c80ea4c470029bc85279df015c30b84abe",
         "reviewed clock inheritance source changed"
     );
     let bank_text = std::str::from_utf8(BANK)?;
-    let worker_text = std::str::from_utf8(WORKER)?;
+    let worker_text = std::str::from_utf8(REVIEWED_WORKER)?;
+    let current_worker_text = std::str::from_utf8(CURRENT_WORKER)?;
     ensure!(
         bank_text.contains("hashes_per_tick: parent.hashes_per_tick,")
             && bank_text.contains("ticks_per_slot: parent.ticks_per_slot,")
-            && !worker_text.contains(".set_hashes_per_tick("),
+            && !worker_text.contains(".set_hashes_per_tick(")
+            && !current_worker_text.contains(".set_hashes_per_tick("),
         "clock inheritance differs"
     );
     Ok(ClockBindings {
@@ -124,6 +134,7 @@ fn validate(c: &Value, n: &Value) -> Result<ClockBindings> {
         hashes_per_tick: 12500,
         bank_source_sha256: bank,
         worker_runtime_source_sha256: worker,
+        current_worker_runtime_source_sha256: current_worker,
         diagnostic_only: true,
     })
 }
@@ -149,7 +160,15 @@ mod tests {
     #[test]
     fn clock_is_independent_not_fitted_to_observed_hash_work() {
         let (c, n) = fixture();
-        validate(&c, &n).unwrap();
+        let bindings = validate(&c, &n).unwrap();
+        assert_eq!(
+            bindings.worker_runtime_source_sha256,
+            "ae01b0813fa1564511e450acc693941268076659e4d741aae085fb288d0fd2ac"
+        );
+        assert_eq!(
+            bindings.current_worker_runtime_source_sha256,
+            "8400f8053bc2efdf40ee100d2883e6c80ea4c470029bc85279df015c30b84abe"
+        );
         for (pointer, value) in [
             ("/census/clock/hashes_per_tick", json!(1)),
             ("/census/clock/ticks_per_slot", json!(32)),
