@@ -7,7 +7,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use solana_runtime::{
     bank::Bank,
-    snapshot_utils::{add_snapshot, serialize_status_cache, SnapshotVersion},
+    serde_snapshot::{bank_to_stream, SerdeStyle, MAX_SNAPSHOT_DATA_FILE_SIZE},
 };
 use solana_sdk::hash::Hash;
 use std::{
@@ -54,6 +54,7 @@ struct Manifest {
     archive_name: String,
     archive_size: u64,
     archive_sha256: [u8; 32],
+    metadata_maximum_bytes: u64,
 }
 #[derive(Serialize)]
 struct SelectedSource {
@@ -236,19 +237,65 @@ struct MaximumWriter<W> {
     inner: W,
     bytes: u64,
     maximum: u64,
+    failed: bool,
 }
 impl<W: Write> Write for MaximumWriter<W> {
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
-        if b.len() as u64 > self.maximum.saturating_sub(self.bytes) {
-            return Err(io_error("snapshot archive byte cap exceeded"));
+        if self.failed || b.len() as u64 > self.maximum.saturating_sub(self.bytes) {
+            self.failed = true;
+            return Err(io_error(
+                "snapshot byte cap exceeded or writer already failed",
+            ));
         }
-        let n = self.inner.write(b)?;
+        let n = match self.inner.write(b) {
+            Ok(n) => n,
+            Err(e) => {
+                self.failed = true;
+                return Err(e);
+            }
+        };
         self.bytes += n as u64;
         Ok(n)
     }
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
+}
+fn serialize_metadata_file<F>(path: &Path, maximum: u64, serialize: F) -> Result<(), String>
+where
+    F: FnOnce(&mut BufWriter<MaximumWriter<File>>) -> Result<(), String>,
+{
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|e| e.to_string())?;
+    file.sync_all().map_err(|e| e.to_string())?;
+    File::open(
+        path.parent()
+            .ok_or_else(|| "metadata path has no parent".to_string())?,
+    )
+    .and_then(|d| d.sync_all())
+    .map_err(|e| e.to_string())?;
+    // The pinned Bank serializer requires BufWriter<W>. W owns the file and
+    // refuses every crossing write, including any retry by BufWriter::drop.
+    let mut output = BufWriter::new(MaximumWriter {
+        inner: file,
+        bytes: 0,
+        maximum,
+        failed: false,
+    });
+    let encoded = serialize(&mut output);
+    let flushed = output.flush();
+    let synced = output.get_ref().inner.sync_all();
+    let directory_synced = File::open(path.parent().unwrap()).and_then(|d| d.sync_all());
+    encoded?;
+    flushed.map_err(|e| e.to_string())?;
+    synced.map_err(|e| e.to_string())?;
+    directory_synced.map_err(|e| e.to_string())?;
+    Ok(())
 }
 fn publish_no_clobber(source: &Path, destination: &Path) -> io::Result<()> {
     let a = CString::new(source.as_os_str().as_bytes())
@@ -281,10 +328,11 @@ fn add_bytes(total: &mut u64, n: u64) -> io::Result<()> {
     Ok(())
 }
 
-pub fn export_archive<F>(
+pub fn export_archive_capped<F>(
     bank: &Bank,
     output: &Path,
     expected_hash: Hash,
+    metadata_limit: u64,
     mut validate_seal: F,
 ) -> Result<ExportedSnapshot, String>
 where
@@ -292,6 +340,9 @@ where
 {
     let mut retained = None;
     let result = (|| -> Result<ExportedSnapshot, String> {
+        if metadata_limit > MAX_SNAPSHOT_DATA_FILE_SIZE {
+            return Err("native metadata cap exceeds the pinned native maximum".into());
+        }
         validate_seal()?;
         let m = fs::symlink_metadata(output).map_err(|e| e.to_string())?;
         if !output.is_absolute()
@@ -370,14 +421,24 @@ where
             fs::create_dir(snapshots.join(bank.slot().to_string()))?;
             File::open(&snapshots)?.sync_all()?;
             File::open(&stage)?.sync_all()?;
-            // Pinned native helpers serialize schema1.2.0. Their native32GiB
-            // serialization bound is checked after streaming; see source-review limitation.
-            let bank_file = add_snapshot(&snapshots, bank, &storages, SnapshotVersion::V1_2_0)
-                .map_err(|e| io_error(&e.to_string()))?
-                .snapshot_file_path;
+            // Exactly the same pinned NEWER serializer used by add_snapshot,
+            // now writing through a cap that rejects a crossing file write.
+            let bank_file = snapshots
+                .join(bank.slot().to_string())
+                .join(bank.slot().to_string());
+            serialize_metadata_file(&bank_file, metadata_limit, |stream| {
+                bank_to_stream(SerdeStyle::NEWER, stream, bank, &storages)
+                    .map_err(|e| e.to_string())
+            })
+            .map_err(|e| io_error(&e))?;
             let status = snapshots.join("status_cache");
-            serialize_status_cache(bank.slot(), &bank.src.slot_deltas(&roots), &status)
-                .map_err(|e| io_error(&e.to_string()))?;
+            let slot_deltas = bank.src.slot_deltas(&roots);
+            serialize_metadata_file(&status, metadata_limit, |stream| {
+                // Same bincode::serialize_into(stream, &[BankSlotDelta]) as the
+                // pinned serialize_status_cache helper; no layout/options change.
+                bincode::serialize_into(stream, slot_deltas.as_slice()).map_err(|e| e.to_string())
+            })
+            .map_err(|e| io_error(&e))?;
             let version = stage.join("version");
             let mut f = OpenOptions::new()
                 .write(true)
@@ -386,7 +447,7 @@ where
                 .open(&version)?;
             f.write_all(b"1.2.0")?;
             f.sync_all()?;
-            let maximum = solana_runtime::serde_snapshot::MAX_SNAPSHOT_DATA_FILE_SIZE;
+            let maximum = metadata_limit;
             let mut members = vec![
                 measure(&stage, &bank_file, maximum)?,
                 measure(&stage, &status, maximum)?,
@@ -437,6 +498,7 @@ where
                 inner: file,
                 bytes: 0,
                 maximum: MAX_ARCHIVE_BYTES,
+                failed: false,
             };
             let encoder = BzEncoder::new(BufWriter::new(bounded), Compression::Fastest);
             let mut tar = tar::Builder::new(encoder);
@@ -481,6 +543,7 @@ where
                 archive_name: final_name.clone(),
                 archive_size: identity.len(),
                 archive_sha256: digest,
+                metadata_maximum_bytes: metadata_limit,
             };
             let mut proof = OpenOptions::new()
                 .write(true)
@@ -547,6 +610,7 @@ mod tests {
             inner: Vec::new(),
             bytes: 0,
             maximum: 3,
+            failed: false,
         };
         w.write_all(b"abc").unwrap();
         assert!(w.write_all(b"d").is_err());
@@ -555,6 +619,34 @@ mod tests {
         assert!(add_bytes(&mut overflow, 1).is_err());
         let mut full = MAX_HANDOFF_ARCHIVE_EXTRACTED_SIZE;
         assert!(add_bytes(&mut full, 1).is_err());
+    }
+    #[test]
+    fn metadata_writer_never_crosses_cap_or_flushes_after_failure() {
+        let d = tempfile::tempdir().unwrap();
+        let path = d.path().join("metadata");
+        let error = serialize_metadata_file(&path, 4, |stream| {
+            stream.write_all(b"abc").map_err(|e| e.to_string())?;
+            stream.flush().map_err(|e| e.to_string())?;
+            stream.write_all(b"de").map_err(|e| e.to_string())?;
+            Ok(())
+        })
+        .unwrap_err();
+        assert!(error.contains("byte cap"));
+        // Includes the buffered writer's drop path: the rejected suffix is never written.
+        assert_eq!(fs::read(&path).unwrap(), b"abc");
+        assert!(fs::metadata(&path).unwrap().len() <= 4);
+        assert!(serialize_metadata_file(&path, 4, |_| Ok(())).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"abc");
+        let bincode_path = d.path().join("status");
+        assert!(
+            serialize_metadata_file(&bincode_path, 1, |stream| bincode::serialize_into(
+                stream,
+                &vec![1u64, 2, 3]
+            )
+            .map_err(|e| e.to_string()))
+            .is_err()
+        );
+        assert!(fs::metadata(&bincode_path).unwrap().len() <= 1);
     }
     #[test]
     fn selected_copy_detects_length_and_duplicate_destination_without_clobber() {

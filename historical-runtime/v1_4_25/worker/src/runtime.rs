@@ -62,6 +62,8 @@ pub struct RuntimeState {
     last_accounts_clean_block_height: u64,
     accounts_shrink_consumed_budget: usize,
     snapshot_export_seal: Option<Result<SnapshotExportSeal, String>>,
+    #[cfg(test)]
+    snapshot_export_metadata_limit: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -166,6 +168,8 @@ impl RuntimeState {
                 last_accounts_clean_block_height: 0,
                 accounts_shrink_consumed_budget: 0,
                 snapshot_export_seal: None,
+                #[cfg(test)]
+                snapshot_export_metadata_limit: None,
             },
             initialized,
         ))
@@ -647,10 +651,16 @@ impl RuntimeState {
             );
         }
         self.validate_export_seal(&seal)?;
-        let exported = snapshot::export_archive(
+        let metadata_limit = solana_runtime::serde_snapshot::MAX_SNAPSHOT_DATA_FILE_SIZE;
+        #[cfg(test)]
+        let metadata_limit = self
+            .snapshot_export_metadata_limit
+            .unwrap_or(metadata_limit);
+        let exported = snapshot::export_archive_capped(
             &self.bank,
             Path::new(output_directory),
             seal.tuple.accounts_hash,
+            metadata_limit,
             || self.validate_export_seal(&seal),
         )?;
         self.validate_export_seal(&seal)?;
@@ -812,6 +822,8 @@ impl RuntimeState {
             last_accounts_clean_block_height: 0,
             accounts_shrink_consumed_budget: 0,
             snapshot_export_seal: None,
+            #[cfg(test)]
+            snapshot_export_metadata_limit: None,
         }
     }
 }

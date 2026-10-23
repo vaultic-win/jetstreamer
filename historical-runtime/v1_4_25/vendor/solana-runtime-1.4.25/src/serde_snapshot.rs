@@ -290,7 +290,7 @@ where
     })
 }
 
-pub(crate) fn bank_to_stream<W>(
+pub fn bank_to_stream<W>(
     serde_style: SerdeStyle,
     stream: &mut BufWriter<W>,
     bank: &Bank,

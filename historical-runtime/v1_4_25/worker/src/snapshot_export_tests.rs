@@ -200,10 +200,11 @@ fn native_export_prepublication_failure_and_collision_retain_staging() {
             Hash::new(&checkpoint.accounts_hash)
         ));
         let mut calls = 0;
-        let error = snapshot::export_archive(
+        let error = snapshot::export_archive_capped(
             &state.bank,
             &output,
             Hash::new(&checkpoint.accounts_hash),
+            solana_runtime::serde_snapshot::MAX_SNAPSHOT_DATA_FILE_SIZE,
             || {
                 calls += 1;
                 if calls > 1 {
@@ -260,4 +261,118 @@ fn native_export_ineligible_cache_does_not_discard_checkpoint_response() {
         .contains("rooted status cache"));
     assert!(state.snapshot_export_seal.is_none());
     assert!(std::fs::read_dir(&output).unwrap().next().is_none());
+}
+
+#[test]
+fn native_export_bounded_metadata_matches_existing_native_helpers() {
+    use solana_runtime::snapshot_utils::{add_snapshot, serialize_status_cache, SnapshotVersion};
+    let (mut state, output, checkpoint) = native_export_ready();
+    let storages = state.bank.get_snapshot_storages();
+    let reference = output.join("native-reference");
+    std::fs::create_dir(&reference).unwrap();
+    let reference_bank = add_snapshot(&reference, &state.bank, &storages, SnapshotVersion::V1_2_0)
+        .unwrap()
+        .snapshot_file_path;
+    let mut roots = state.bank.src.roots();
+    roots.sort_unstable();
+    let reference_status = reference.join("status_cache");
+    serialize_status_cache(0, &state.bank.src.slot_deltas(&roots), &reference_status).unwrap();
+    state
+        .export_snapshot(0, output.to_str().unwrap(), &checkpoint.accounts_hash)
+        .unwrap();
+    let stages: Vec<_> = std::fs::read_dir(&output)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("jetstreamer-native-export-")
+        })
+        .collect();
+    assert_eq!(stages.len(), 1);
+    assert_eq!(
+        std::fs::read(&reference_bank).unwrap(),
+        std::fs::read(stages[0].join("snapshots/0/0")).unwrap()
+    );
+    assert_eq!(
+        std::fs::read(&reference_status).unwrap(),
+        std::fs::read(stages[0].join("snapshots/status_cache")).unwrap()
+    );
+}
+
+#[test]
+#[cfg(not(any(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic",
+    feature = "epoch140-original-bootstrap-clock-diagnostic"
+)))]
+fn native_export_dispatch_metadata_overflow_consumes_seal_without_response() {
+    use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody};
+    let (mut state, output, checkpoint) = native_export_ready();
+    state.snapshot_export_metadata_limit = Some(1); // cfg(test) only; no protocol/env selector.
+    let mut worker = crate::Worker {
+        hello_complete: true,
+        state: Some(state),
+    };
+    let request = || RequestBody::ExportSnapshot {
+        slot: 0,
+        output_directory: output.to_str().unwrap().into(),
+        expected_accounts_hash: checkpoint.accounts_hash.clone(),
+    };
+    let (response, stop) = worker.handle(Request {
+        id: 1,
+        body: request(),
+    });
+    assert!(!stop);
+    match response.body {
+        ResponseBody::Error(e) => {
+            assert_eq!(
+                e.code,
+                jetstreamer_historical_protocol::WorkerErrorCode::Runtime
+            );
+            assert!(e.message.contains("byte cap"));
+            assert!(e.message.contains("retained native export evidence"));
+        }
+        other => panic!("overflow must never yield SnapshotExported: {:?}", other),
+    };
+    assert!(worker
+        .state
+        .as_ref()
+        .unwrap()
+        .snapshot_export_seal
+        .is_none());
+    let (again, stop) = worker.handle(Request {
+        id: 2,
+        body: request(),
+    });
+    assert!(!stop);
+    match again.body {
+        ResponseBody::Error(e) => assert!(e.message.contains("immediately preceding")),
+        other => panic!("consumed seal was reused: {:?}", other),
+    };
+    let stages: Vec<_> = std::fs::read_dir(&output)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("jetstreamer-native-export-")
+        })
+        .collect();
+    assert_eq!(stages.len(), 1);
+    assert!(
+        std::fs::metadata(stages[0].join("snapshots/0/0"))
+            .unwrap()
+            .len()
+            <= 1
+    );
+    let final_path = output.join(format!(
+        "snapshot-0-{}.tar.bz2",
+        Hash::new(&checkpoint.accounts_hash)
+    ));
+    assert!(!final_path.exists());
 }

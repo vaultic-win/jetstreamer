@@ -576,6 +576,9 @@ fn export_via_worker_dispatch(
     root: &Path,
     mut state: RuntimeState,
 ) -> (RuntimeState, Member, Vec<Member>, String) {
+    // cfg(test) fixture admission: same serializer/dispatch, a stricter512MiB
+    // per-metadata-file ceiling within the retained10GiB fixture-root budget.
+    state.snapshot_export_metadata_limit = Some(MAX_SELECTED_BYTES);
     // cfg(test) injection only: exercise the unchanged real request dispatcher,
     // without adding a synthetic Initialize selector to the production worker.
     let mut worker = crate::Worker {

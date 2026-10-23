@@ -29,18 +29,36 @@ The patch implements the approved design in v1.4.25 only:
   capped builds, plus a separately ignored actual-dispatch/fresh-process fixture.
   Existing hash/cursor/cache/signature/output equality assertions remain intact.
 
-## Two points requiring design/qualification review
+## Bounded metadata and remaining qualification gap
 
-The pinned native `add_snapshot` and `serialize_status_cache` public helpers
-call `serialize_snapshot_data_file_capped`, whose32GiB size check occurs **after**
-streaming the native metadata file. The serializer itself is crate-private.
-This candidate does not modify vendor APIs or claim that its metadata has a
-hard pre-write cap. Selected copies and compressed archive output have explicit
-checked caps, and the existing external guard remains necessary. A qualification
-admission must account for the actual native helper behavior; a sampled disk
-guard cannot be represented as a pre-write byte cap. If strict per-write native
-metadata bounding is required, review a minimal pinned-vendor writer adapter
-before implementing it. No vendor change or alternative serializer was added.
+The original public native metadata helpers checked32GiB only after streaming.
+The separately approved vendor change is exactly `pub(crate)` to `pub` on
+`serde_snapshot::bank_to_stream`; its body, NEWER layout, bincode options and
+standard helper behavior are unchanged. Export now calls that exact serializer
+with `BufWriter<MaximumWriter<File>>`. The file-owning writer refuses a crossing
+write before forwarding it and latches failure so buffered-drop retries cannot
+write a rejected suffix. Status-cache metadata uses the identical pinned
+`bincode::serialize_into(stream, &[BankSlotDelta])` encoding through the same
+bounded file writer. Partial files and their directories are fsynced and retained
+on error. The runtime's one-use export attempt is consumed before these writes.
+
+Production uses the native32GiB per-file maximum, with no protocol/environment
+limit selector. Only cfg(test) state can choose a smaller cap. The ignored API
+fixture uses512MiB per metadata file alongside its512MiB selected-storage and
+10GiB whole-root experiment limits. Source tests prove a crossing write and drop
+retry cannot grow a file beyond its cap, compare bounded Bank/cache bytes against
+the unchanged native helpers, and force a one-byte API limit to require an error,
+consumed seal, retained bounded partial file and no SnapshotExported response.
+These tests are still unexecuted pending admitted compilation.
+
+The visibility-only source hash changed from
+`482df258dbcd2930e21c8c40a82300cebeb28858ac9141ecf0149869c6035121` to
+`9a6ca01b166b247f6dc5a3d973b641c72ac1a4167d98ab5daaacca32559b8985`.
+In this lineage, `snapshot_clock.rs` actually includes and fingerprints
+`serde_snapshot/future.rs`, whose unchanged SHA256 is
+`4baee9ce91616985b8872b6f77fc3358cce5ca44ef95a7d337d235598d7148db`.
+Therefore its LAYOUT_SHA is unchanged. No existing clock/fixture deployment or
+the separate f908-based terminal candidate receives a new fingerprint claim.
 
 The synthetic actual-dispatch test injects RuntimeState into Worker entirely
 under cfg(test), then calls the real Hello/FreezeCheckpoint/ExportSnapshot
@@ -52,7 +70,7 @@ production initialization path requires a separately reviewed, trusted bounded
 mainnet-compatible input, or a separately approved test-only process seam.
 No synthetic production initialization selector was introduced.
 The read-only snapshot-clock binaries also include runtime tests but do not
-contain Worker. The two actual-dispatch tests are therefore enabled only without
+contain Worker. The actual-dispatch tests are therefore enabled only without
 those three diagnostic feature flags; normal default and capped worker profiles
 include them. Read-only diagnostic wrappers retain the native helper tests and
 cannot acquire an artificial worker dispatcher through this test seam.
