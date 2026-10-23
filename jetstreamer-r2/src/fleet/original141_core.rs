@@ -13,7 +13,6 @@ pub(super) fn prepare() -> Result<()> {
     ops::prepare()
 }
 
-const PACKAGE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-original-parent-20261023-v1";
 const INPUT: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-original-input-20261023-v1";
 const SNAPSHOT: &str = "/usr/local/lib/jetstreamer/horizon-epoch140-native-restore-inputs-20261020-v1/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst";
 const CHECKPOINTS: &str =
@@ -49,7 +48,6 @@ fn admission_path(path: &Path) -> bool {
     .is_ok()
 }
 const NODE_SHA: &str = "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0";
-const WORKER_SHA: &str = "abe395d482174e490833928c7343a33d135d8572096faf873ce3103c35fe520d";
 const INDEX_SHA: &str = "fe38bd4ce018996349c10029720dd7f738340fb0ad30ce6b8577b9651bf87df3";
 const DATA_SHA: &str = "5605dd1ba08b7e790227b0efc388a74a02cdf665220d2455c3ed39f803feada0";
 const FLOOR: u64 = 3_572_465_819_078;
@@ -89,6 +87,10 @@ fn expected_command() -> String {
     )
 }
 fn denied(v: &Value) -> Result<()> {
+    if let Some(slot) = WORKER_ENTRY_TERMINAL {
+        ensure!(v["worker_freeze_component_diagnostic"] == true && v["worker_entry_terminal_slot"] == slot,
+            "freeze141 must bind its worker-enforced diagnostic terminal");
+    }
     if TRACE {
         ensure!(
             v["historical_trace_enabled"] == true && v["whole_root_physical_limit_bytes"] == PEAK,
@@ -355,6 +357,10 @@ fn environment() -> String {
     }
 }
 fn trace_fields(v: &mut Value) {
+    if let Some(slot) = WORKER_ENTRY_TERMINAL {
+        v["worker_freeze_component_diagnostic"] = json!(true);
+        v["worker_entry_terminal_slot"] = json!(slot);
+    }
     if TRACE {
         v["historical_trace_enabled"] = json!(true);
         v["whole_root_physical_limit_bytes"] = json!(PEAK);
