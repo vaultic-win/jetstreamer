@@ -32,6 +32,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test",
                 "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3",
             ),
+            228 => (
+                "horizon-native-input-228-capped-1bfa8d51-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1/scratch",
+                "/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test",
+                "d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827",
+            ),
             _ => return Err(anyhow!("unknown native input telemetry profile")),
         };
         ensure!(
@@ -271,6 +277,21 @@ mod tests {
                 "{field}"
             );
         }
+    }
+    #[test]
+    fn native228_cannot_use_the_neighboring_native_harness() {
+        let mut n: NativeConfig = serde_json::from_value(serde_json::json!({
+            "epoch":228,"unit":"horizon-native-input-228-capped-1bfa8d51-v1.service",
+            "expected_invocation_id":"a".repeat(32),"main_pid":42,
+            "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1/scratch",
+            "executable":"/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test",
+            "executable_sha256":"d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827"
+        })).unwrap();
+        n.validate().unwrap();
+        let neighbor = config();
+        n.executable = neighbor.executable;
+        n.executable_sha256 = neighbor.executable_sha256;
+        assert!(n.validate().is_err());
     }
     #[test]
     fn mapped_process_requires_exact_inode_hash_and_owner_without_worker_impersonation() {
