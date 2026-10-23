@@ -4,6 +4,17 @@ use super::super::*;
 pub(super) const IID: &str = "a10f37b57711425a81633c62c66438d5";
 const GUARD: &str = "horizon-singleton227-protective-v1.service";
 const RECEIPTS: &str = "/var/lib/jetstreamer/horizon-singleton227-guard-receipts-v1";
+fn require_timer(read: impl FnOnce(&str, &str) -> Result<BTreeMap<String, String>>) -> Result<()> {
+    let properties = read(
+        "horizon-singleton227-protective-v1.timer",
+        "ActiveState,SubState",
+    )?;
+    ensure!(
+        properties.get("ActiveState").map(String::as_str) == Some("active"),
+        "v2 full227 guard timer inactive"
+    );
+    Ok(())
+}
 fn owner(row: &Value) -> &Value {
     if row["producer"].is_object() {
         &row["producer"]
@@ -264,11 +275,7 @@ pub(super) fn guard(f: &Value, sample: u64, now: u64) -> Result<super::guard_rec
             .all(|k| g.get(*k).is_some_and(Value::is_null)),
         "v2 full227 protective guard differs or tripped"
     );
-    let timer = unit("horizon-singleton227-protective-v1.timer")?;
-    ensure!(
-        timer["ActiveState"] == "active",
-        "v2 full227 guard timer inactive"
-    );
+    require_timer(singleton227_capture::properties)?;
     Ok(selected)
 }
 pub(super) fn budget(
@@ -278,9 +285,16 @@ pub(super) fn budget(
     floor: u64,
     sample: u64,
     now: u64,
+    full_guard: &Value,
 ) -> Result<Value> {
+    let free_before = singleton227_admission::disk_free()?;
     accepted(f)?;
     let pending = sample_memory(o, f)?;
+    let (credit, sampled_allocation, guarded_allocation) =
+        native209_full227::allocation(o, full_guard, IID)?;
+    let remaining = lane::PEAK
+        .checked_sub(credit)
+        .context("v3 full227 allocation credit exceeds envelope")?;
     // Derived arithmetic subcensus only, never an accepted or published fleet.
     // The complete four-owner census above remains the authority.
     let mut old = f.clone();
@@ -296,30 +310,68 @@ pub(super) fn budget(
         singleton227_admission::protected_growth(&old, o, guards, sample, now)?;
     let protected = floor
         .checked_add(growth)
-        .and_then(|n| n.checked_add(lane::PEAK))
+        .and_then(|n| n.checked_add(remaining))
         .context("v2 expanded disk arithmetic overflow")?;
     ensure!(
         protected <= 2_000_000_000_000,
         "v2 expanded protected disk exceeds the sealed2TBfloor; raise the generation before launch"
     );
+    let (after_growth, _) = singleton227_admission::protected_growth(&old, o, guards, sample, now)?;
+    let free_after = singleton227_admission::disk_free()?;
+    ensure!(
+        after_growth <= growth
+            && free_before >= 2_300_000_000_000
+            && free_after >= 2_300_000_000_000,
+        "v3 growth/free-space bracket changed or no longer fits"
+    );
     Ok(
-        json!({"schema":"jetstreamer-warmup223-expanded-budget-v2","complete_owner_count":4,"old_three_remaining_growth_bytes":growth,"old_three_growth_evidence":measurements,"full227_remaining_growth_bytes":lane::PEAK,"full227_scratch_credit_bytes":0,"century_floor_bytes":floor,"required_protected_disk_bytes":protected,"required_initial_disk_bytes":2_300_000_000_000u64,"candidate_scratch_bytes":300_000_000_000u64,"full227_remaining_hard_memory_bytes":pending,"required_initial_memory_bytes":(608u64<<30)+pending,"memory_target_percent":90,"publication_authorized":false,"r2_mutations":false}),
+        json!({"schema":"jetstreamer-warmup223-expanded-budget-v3","complete_owner_count":4,"old_three_remaining_growth_bytes":growth,"old_three_growth_evidence":measurements,"full227_remaining_growth_bytes":remaining,"full227_scratch_credit_bytes":credit,"full227_sampled_whole_root_bytes":sampled_allocation,"full227_guarded_whole_root_bytes":guarded_allocation,"century_floor_bytes":floor,"required_protected_disk_bytes":protected,"required_initial_disk_bytes":2_300_000_000_000u64,"candidate_scratch_bytes":300_000_000_000u64,"full227_remaining_hard_memory_bytes":pending,"required_initial_memory_bytes":(608u64<<30)+pending,"memory_target_percent":90,"actual_free_before_bytes":free_before,"actual_free_after_bytes":free_after,"after_old_three_growth_bytes":after_growth,"publication_authorized":false,"r2_mutations":false}),
     )
 }
 pub(super) fn validate_budget(v: &Value) -> Result<()> {
+    let credit = v["full227_scratch_credit_bytes"]
+        .as_u64()
+        .context("saved full227 credit missing")?;
+    let remaining = lane::PEAK
+        .checked_sub(credit)
+        .context("saved full227 credit exceeds cap")?;
+    let credited = v["schema"] == "jetstreamer-warmup223-expanded-budget-v3";
+    if credited {
+        let sampled = v["full227_sampled_whole_root_bytes"]
+            .as_u64()
+            .context("saved full227 sample allocation")?;
+        let guarded = v["full227_guarded_whole_root_bytes"]
+            .as_u64()
+            .context("saved full227 guarded allocation")?;
+        ensure!(
+            sampled <= lane::PEAK
+                && guarded <= lane::PEAK
+                && credit == sampled.min(guarded)
+                && v["actual_free_before_bytes"]
+                    .as_u64()
+                    .is_some_and(|n| n >= 2_300_000_000_000)
+                && v["actual_free_after_bytes"]
+                    .as_u64()
+                    .is_some_and(|n| n >= 2_300_000_000_000)
+                && v["after_old_three_growth_bytes"]
+                    .as_u64()
+                    .zip(v["old_three_remaining_growth_bytes"].as_u64())
+                    .is_some_and(|(a, b)| a <= b),
+            "saved full227 credit/bracket mismatch"
+        );
+    }
     let sum = v["old_three_remaining_growth_bytes"]
         .as_u64()
-        .and_then(|n| n.checked_add(lane::PEAK))
+        .and_then(|n| n.checked_add(remaining))
         .and_then(|n| n.checked_add(v["century_floor_bytes"].as_u64()?))
         .context("v2 saved disk budget overflow/missing")?;
     let pending = v["full227_remaining_hard_memory_bytes"]
         .as_u64()
         .context("v2 saved memory budget missing")?;
     ensure!(
-        v["schema"] == "jetstreamer-warmup223-expanded-budget-v2"
+        (credited || (v["schema"] == "jetstreamer-warmup223-expanded-budget-v2" && credit == 0))
             && v["complete_owner_count"] == 4
-            && v["full227_remaining_growth_bytes"] == lane::PEAK
-            && v["full227_scratch_credit_bytes"] == 0
+            && v["full227_remaining_growth_bytes"] == remaining
             && v["candidate_scratch_bytes"] == 300_000_000_000u64
             && v["required_protected_disk_bytes"] == sum
             && sum <= 2_000_000_000_000
@@ -335,6 +387,13 @@ pub(super) fn validate_budget(v: &Value) -> Result<()> {
     );
     let b: BoundFile = serde_json::from_value(v["full227_guard"].clone())?;
     let g = bound_json(&b)?;
+    if credited {
+        ensure!(
+            v["full227_guarded_whole_root_bytes"]
+                == g["root_physical_observation"]["conservative_physical_bytes"],
+            "saved credit does not match bound full227 guard"
+        );
+    }
     super::guard_receipt::validate_history(&v["full227_guard_history"], &g)?;
     ensure!(
         v["full227_guard_history"]["unit"] == GUARD
@@ -348,6 +407,24 @@ pub(super) fn validate_budget(v: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn production_timer_getter_accepts_timer_and_preserves_active_gate() {
+        for state in ["active", "inactive", "failed"] {
+            let result = require_timer(|name, fields| {
+                assert_eq!(name, "horizon-singleton227-protective-v1.timer");
+                assert_eq!(fields, "ActiveState,SubState");
+                Ok([
+                    ("ActiveState".into(), state.into()),
+                    ("SubState".into(), "waiting".into()),
+                ]
+                .into_iter()
+                .collect())
+            });
+            assert_eq!(result.is_ok(), state == "active");
+        }
+        assert!(require_timer(|_, _| anyhow::bail!("property read failed")).is_err());
+        assert!(require_timer(|_, _| Ok(BTreeMap::new())).is_err());
+    }
     #[test]
     fn kernel_memory_limits_are_page_rounded_without_weakening_requested_policy() {
         assert_eq!(

@@ -550,6 +550,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
                 floor["floor_bytes"].as_u64().context("v2 century floor")?,
                 sampled,
                 now,
+                &peer.receipt,
             )?;
             budget["full227_guard"] = private157::binding(&peer.binding);
             budget["full227_guard_history"] = peer.history;
@@ -557,6 +558,14 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
         } else {
             Value::Null
         };
+        if EXPECT_FULL227 {
+            let final_census = census(&names(&f)?, 201, 300)?;
+            protected(&f, &final_census)?;
+            ensure!(
+                final_census[UNIT]["MainPID"] == "0",
+                "native20 started during expanded budget capture"
+            );
+        }
         private157::immutable_receipt(
             &Path::new(STATE).join("admission.json"),
             &json!({"schema":ADMISSION_SCHEMA,"spec":private157::binding(&binding),"self_sha256":self_sha,"recorded_unix_seconds":now,"observer":private157::binding(&spec.observer),"fleet":private157::binding(&spec.fleet),"guards":guards,"guard_history":guard_history,"expanded_fleet_budget":expanded_budget,"decision":"pass","century_floor":floor,"candidate_memory_bytes":128u64<<30,"scratch_planning_bytes":300_000_000_000u64,"required_observed_free_bytes":INITIAL_DISK,"protected_disk_floor_bytes":DISK_FLOOR,"minimum_available_memory_bytes":MEMORY_RESERVE,"required_initial_memory_bytes":if EXPECT_FULL227{expanded_budget["required_initial_memory_bytes"].clone()}else{json!(INITIAL_MEMORY)},"expected_exec_start":command(),"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),

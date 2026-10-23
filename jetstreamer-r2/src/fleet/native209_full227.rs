@@ -139,7 +139,7 @@ fn guard(
 }
 
 type Split = (Value, BTreeMap<String, BoundFile>, u64, Vec<Value>);
-fn allocation(o: &Value, g: &Value, iid: &str) -> Result<(u64, u64, u64)> {
+pub(super) fn allocation(o: &Value, g: &Value, iid: &str) -> Result<(u64, u64, u64)> {
     let rows = o["diagnostic_replays"]
         .as_array()
         .context("209 full227 observer census")?
