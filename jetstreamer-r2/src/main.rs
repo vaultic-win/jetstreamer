@@ -65,6 +65,7 @@ mod cohort160_finalization;
 mod cohort160_handoff;
 mod cohort191_delivery;
 mod cohort191_dispatch;
+mod cohort191_queue_run;
 mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
@@ -3474,6 +3475,12 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("check-delivery-191") {
         return cohort191_delivery::check();
+    }
+    if env::args().nth(1).as_deref() == Some("sync-verified191") {
+        return cohort191_queue_run::sync_verified();
+    }
+    if env::args().nth(1).as_deref() == Some("delivery-queue-191") {
+        return cohort191_queue_run::run();
     }
     if env::args().nth(1).as_deref() == Some("dispatch-verification-191") {
         return cohort191_dispatch::run();

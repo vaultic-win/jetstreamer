@@ -1,0 +1,29 @@
+# Persistent191–194 queue execution candidate
+
+This is source only: no build, tests, deployment, service action or R2 action has been run for this change. `rustfmt` parsed the new module and `git diff --check` passed. Existing compiler closure work and reservations are untouched.
+
+`jetstreamer-r2 delivery-queue-191 PLAN --plan-sha256 SHA --self-sha256 SHA` owns the four already imported epochs through the fixed unit and root specified by the queue-plan-v2 metadata contract. Root must provision private `history`, `intents`, `admissions`, `sync` directories and an existing root-private inode-bound `queue.lock`. The executable and plan are sealed. The manager checks its actual PID1 IID/PID/ExecStart, process executable/cgroup, PrivateNetwork and absence of credential environment variables and EnvironmentFiles. Restart must be `no`.
+
+The manager writes an initial queued state, then waits for root-only per-task admissions. A waiting slot has no task owner and does not consume a precomputed future observer hash. Only a currently eligible full/plugin/sync admission is opened. Admissions bind the real queue IID, queue plan hash, epoch/stage and exact separately sealed dispatch or sync plan. The dispatcher independently applies its fresh observer/resource/OS gates. The queue additionally binds its imported source/public batch and archive digest to the dispatcher/spec. An immutable task intent precedes launch. The actual dispatcher launch receipt, PID1 native owner, PID/start ticks, executable and cgroup must be observed before an active owner is recorded. No launch is retried.
+
+There is at most one verifier and one sync child. A completed full verifier advances to queued-plugin; a completed plugin verifier advances to queued-upload. A separate admitted uploader can overlap the next epoch's verification. Natural service success is necessary but insufficient: each verifier also needs its own native wrapper launch and native receipt plus the strict shared canonical gate parser. Completed artifacts are preserved.
+
+The sync plan uses `jetstreamer-cohort191-sync-plan-v2` with `queue_plan`, `queue_invocation_id`, `epoch`, `program`, `archive_sha256`, `archive_length`, `source_batch`, `public_batch`, `source_revalidation_policy`, `full_receipt`, `plugin_receipt`, `gate_tools` and `output_directory`. `gate_tools` has `full` and `plugin` objects each binding `wrapper` and `verifier`; `output_directory` is QUEUE_ROOT/sync/epoch-N. The exact immutable root-only sync admission binds this plan.
+
+The queue starts `horizon-r2-sync-N-native191-20261023-v1.service` with the same sealed executable's `sync-verified191 PLAN --plan-sha256 SHA --self-sha256 SHA` entry. Only that child has `/etc/jetstreamer/horizon-r2.env`, network access and TOKIO_WORKER_THREADS=2. It has CPU200%, MemoryHigh1GiB/MemoryMax2GiB, swap0,512tasks, Restart=no, bounded runtime and strict filesystem sandboxing. Read-write paths are the normal private R2 receipt directory and that one native sync launch directory; local archives are read-only.
+
+The child independently checks the live queue state/admission, actual native import, both strict gates/tool hashes and sealed policy. It authenticates its actual native invocation and writes `jetstreamer-cohort191-sync-launch-v2` with native_owner, process_identity, sync_plan, admission and exec_argv. After repeating gate checks, Unix exec replaces the child with:
+
+```
+jetstreamer-r2 sync /home/sol/horizon --epochs N-N --receipt-directory /home/sol/.jetstreamer-private/r2-receipts --part-size-mib 64 --concurrency 2
+```
+
+PID, process start, executable inode and IID remain the same. PID1 ExecStart remains the admitted gate wrapper command. Both the queue and metadata authenticate the exact approved post-exec argv. There are no overwrite, local retirement, remote deletion, legacy integrity or repair options. Normal sync retains its ordinary source revalidation, remote integrity and sidecar gates.
+
+Own-PID/IID native journal events move upload to readback and then source-revalidation; only an exact whole-object verified marker moves into the latter. State is not updated on each progress sample. Terminal sync additionally requires the normal canonical authenticated R2 receipt with whole-object readback, exact imported digest/length and a timestamp within this child invocation's lifetime.
+
+Each real transition increments revision and writes QUEUE_ROOT/history/state-000001.json (six-digit minimum width) through the existing no-clobber fsynced publisher, then atomically replaces QUEUE_ROOT/state.json with the same JSON and fsyncs the directory. There is no heartbeat. Failure sets explicit failed status and preserves current owners, every history/intent, artifacts and services. Startup refuses any previous current state/history/intents; interrupted operations require explicit reconciliation rather than blind retry. This is a long-running manager, not automatic crash recovery.
+
+Seven source tests are present and unrun: serial verifier/overlap scheduling, queued versus active ownership, exact nonweakening sync arguments, terminal identity rejection, foreign queue/gate sync plans, own-process readback phase proof and exclusion of a second uploader during readback/tail.
+
+Remaining qualification: parent review, compile/Clippy/tests under the approved build sandbox, sealed packages/real plan hashes, provisioned root-only state/admission directories, manager service sandbox verification, controlled runtime launch evidence, admission publication and metadata immutable-revision integration. The sync admission is currently the root-only IID/plan-bound resource authorization; unlike the verifier dispatcher, the sync gate does not itself reread a resource observer/cycle receipt. Parent must decide whether to require an explicit fresh resource check there before qualification. No deployment or live action is implied by this source candidate.
