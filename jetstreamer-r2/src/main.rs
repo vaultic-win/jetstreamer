@@ -3480,6 +3480,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("fleet-reconcile") {
         return fleet::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("admit-singleton227") {
+        return fleet::admit_singleton227();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-singleton227") {
+        return fleet::capture_singleton227();
+    }
     if env::args().nth(1).as_deref() == Some("estimate-readback203") {
         return fleet::estimate_readback203();
     }
