@@ -387,7 +387,61 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
-    sandbox(c, current)
+    sandbox(c, current)?;
+    let gu = unit("horizon-warmup223-protective-v1.service")?;
+    let iid = gu["InvocationID"]
+        .as_str()
+        .context("warmup protective invocation")?;
+    ensure!(
+        iid.len() == 32 && iid.bytes().all(|b| b.is_ascii_hexdigit()),
+        "warmup protective iid"
+    );
+    let binding: BoundFile = serde_json::from_value(private157::file_binding(
+        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v1")
+            .join(format!("sample-{iid}.json")),
+    )?)?;
+    let g = bound_json(&binding)?;
+    let pb: BoundFile = serde_json::from_value(private157::file_binding(Path::new(
+        "/var/lib/jetstreamer/horizon-warmup223-guard-v1/guard-plan.json",
+    ))?)?;
+    let p = bound_json(&pb)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && g["plan_sha256"] == pb.sha256
+            && g["guard_sha256"]
+                == "134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be"
+            && g["producer_invocation_id"] == c.invocation_id
+            && g["producer"]["invocation_id"] == c.invocation_id
+            && g["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| n <= now && now - n <= 120)
+            && g.get("trip_reason").is_some_and(Value::is_null)
+            && g.get("worker_observation_error")
+                .is_some_and(Value::is_null)
+            && g.get("root_physical_observation_error")
+                .is_some_and(Value::is_null)
+            && g["maximum_worker_vmas"] == 3_500_000
+            && g["maximum_root_physical_bytes"] == 300_000_000_000u64
+            && p["unit"] == UNIT
+            && p["invocation_id"] == c.invocation_id
+            && p["worker_root"] == format!("{ROOT}/scratch")
+            && p["minimum_free_bytes"] == 1_511_435_598_739u64,
+        "warmup external VMA/disk guard unavailable or tripped"
+    );
+    let out = ProcessCommand::new("systemctl")
+        .args([
+            "show",
+            "horizon-warmup223-protective-v1.timer",
+            "--property=ActiveState",
+            "--value",
+        ])
+        .output()?;
+    ensure!(
+        out.status.success() && out.stdout == b"active\n",
+        "warmup protective timer inactive"
+    );
+    Ok(())
 }
 
 pub(super) fn event_predecessor(
