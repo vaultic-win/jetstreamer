@@ -162,7 +162,7 @@ imported `output/epoch-209.jet`; it never invents a path or archive size. A full
 producer must terminate cleanly with complete cohort/root/tail/native evidence
 and a correct local archive/sidecar pair before independent delivery starts.
 
-The independent commands are:
+The independent tools used by the delivery helper are:
 
 ```text
 /var/lib/jetstreamer/horizon-full209-verification-tools-v1/verify_archive ROOT/output/epoch-209.jet --full --internal-full --threads 8
@@ -170,14 +170,48 @@ The independent commands are:
 ```
 
 `ROOT` in these command templates is the fixed full209 run root above. Admit
-each stage's real resource envelope and actual owner separately. Full and
-current-plugin verification must record success bound to the same unchanged
-complete archive digest before upload. A command line or successful capacity
-probe is not a verification receipt. Use reviewed receipt-producing Rust
-orchestration; if it has not yet been deployed for209, keep delivery dormant
-until that bridge is implemented and tested. Do not synthesize generic
-receipts, reuse another epoch's receipts, or silently add new shell/Python
-business logic. The source preparation here does not claim that bridge is live.
+each stage's real resource envelope and actual owner separately. The reviewed
+Rust `deliver-singleton209-output` helper takes the same exact immutable
+`SPEC --spec-sha256 HEX --self-sha256 HEX` convention. Its strict spec schema is
+`jetstreamer-private-epoch209-singleton-delivery-spec-v1` with:
+
+- `stage`: `full`, `plugin` or `upload`;
+- bound files `launch, cohort_publication` and nullable
+  `full_verification, plugin_verification`;
+- precreated root-private `output_directory` beneath
+  `/var/lib/jetstreamer/horizon-209-singleton-delivery-*`;
+- `r2_receipt_directory` exactly
+  `/home/ubuntu/.jetstreamer-private/r2-receipts`, and `upload_lock` exactly its
+  `local-mutation.lock` child;
+- `r2_mutations`: false for both verifiers, true only for the explicit upload.
+
+Preserve the actual completed node's v2 cohort-publication receipt into a
+root-owned immutable file and bind its digest as `cohort_publication`.
+The helper revalidates the original launch/native/first-guard evidence, exact
+successful terminal producer and PID1 history, original canonical root and
+accounts hash, native bootstrap/terminal summaries, durable cohort context,
+committed archive path/inode/digest and complete432000-slot output. It rejects
+a successor checkpoint, prefix-only artifact, failed/replaced producer or
+unbound native terminal. A capacity probe or launch never substitutes for this
+actual completed cohort receipt.
+
+Dispatch each stage under its exact `Type=exec` systemd unit named below, with
+fresh admitted resource bounds, no restart, exact sealed helper/spec command,
+required private evidence read access and only its receipt directory writable
+(plus the explicit authenticated receipt directory for upload). The helper
+requires its own real MainPID/IID and command before/after execution. It starts
+no service, observes no fleet/replay resources, and grants no local retirement.
+
+The full stage runs independent full PoH and ordered coverage scans and records
+`full.json`. It requires the verifier to report epoch209, first90288000 and
+432000slots. The plugin stage requires that exact full receipt, runs the current
+read-only plugin and records `plugin.json`. Both rehash the same canonical pair
+before/after, use the pinned independent binaries, fsync actual successful logs
+and write immutable no-clobber receipts. Later stages revalidate tool hashes,
+exact arguments, log digests and success markers. Receipt schemas are private
+to this bridge; do not invent generic progressive-uploader receipts. Keep failed
+logs; use a fresh private attempt directory for a failed stage and reuse already
+successful bound upstream receipts instead of restarting replay or prior scans.
 
 The existing `status-publish-pipeline` accepts this genuine launched origin's
 `evidence.units`; retain the full209 origin unit/IID/start clock when handing
@@ -187,13 +221,17 @@ owners. Use bounded units such as `horizon-full-verify-209-singleton-v1.service`
 `horizon-upload-209-singleton-v1.service`. Wire phases are `verification`,
 `upload` or `readback`; the estimate always includes sidecar publication.
 
-After both independent receipts, use the existing Rust `jetstreamer-r2 sync`
-with the fixed output directory, `--epochs 209-209`, private authenticated
-receipt directory and the existing shared upload serialization/lock. The
-orchestrator must enforce those receipts before invoking sync; sync itself does
-not infer the verification policy. Never start an overlapping progressive
-coordinator. Do not pass `--delete-local`. Whole-object authenticated R2 SHA-256
-readback, source revalidation and matching sidecar publication remain mandatory.
+After both independent receipts, the upload stage requires their exact same
+launch, cohort, pair identity and current tool/log evidence. It takes the
+existing shared upload serialization/lock and invokes the same sealed Rust
+`jetstreamer-r2 sync` with the fixed output directory, `--epochs 209-209` and
+private authenticated receipt directory. No transport is reimplemented. It
+requires the durable authenticated receipt to report the same archive digest
+and length and completed whole-object SHA-256 readback before writing
+`upload.json`; the lock spans that final durable receipt. Never start an
+overlapping progressive coordinator. The bridge passes no deletion, overwrite,
+anonymous verification or public-origin option. Whole-object authenticated R2
+SHA-256 readback, source revalidation and matching sidecar publication remain mandatory.
 Only after that commit may the exact owned status JSON be conditionally removed.
 No anonymous URL or public-access check is required.
 

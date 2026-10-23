@@ -32,7 +32,7 @@ struct Model {
     estimate_basis: String,
     estimate_evidence: Vec<BoundFile>,
 }
-fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
+pub(super) fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
     let launch = bound_json(binding)?;
     let rows = launch["evidence"]["units"]
         .as_array()

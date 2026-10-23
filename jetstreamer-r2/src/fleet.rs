@@ -71,6 +71,7 @@ mod singleton209;
 mod singleton209_admission;
 mod singleton209_capability;
 mod singleton209_capture;
+mod singleton209_delivery;
 mod singleton209_peer223;
 mod singleton209_prepare;
 mod singleton227;
@@ -124,6 +125,9 @@ pub(super) fn prepare_singleton209_inputs() -> Result<()> {
 }
 pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
     singleton209_prepare::run()
+}
+pub(super) fn deliver_singleton209_output() -> Result<()> {
+    singleton209_delivery::run()
 }
 pub(super) fn admit_singleton209() -> Result<()> {
     singleton209_admission::run()

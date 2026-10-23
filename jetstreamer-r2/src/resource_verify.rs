@@ -169,6 +169,61 @@ fn run_child(tool: &Bound, args: &[String], output: &Path) -> Result<Value> {
         "completed_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()}),
     )
 }
+pub(super) fn run_bound_child(
+    path: &Path,
+    sha256: &str,
+    args: &[String],
+    output: &Path,
+) -> Result<Value> {
+    run_child(
+        &Bound {
+            path: path.to_owned(),
+            sha256: sha256.to_owned(),
+        },
+        args,
+        output,
+    )
+}
+pub(super) fn validate_bound_child(
+    value: &Value,
+    path: &Path,
+    sha256: &str,
+    args: &[String],
+) -> Result<()> {
+    ensure!(
+        value["path"].as_str() == path.to_str()
+            && value["sha256"] == sha256
+            && value["arguments"] == serde_json::to_value(args)?
+            && value["status"] == "passed"
+            && value["exit_code"] == 0,
+        "completed verifier child has foreign tool, arguments or outcome"
+    );
+    verify_executable(&Bound {
+        path: path.to_owned(),
+        sha256: sha256.to_owned(),
+    })?;
+    let log = Path::new(
+        value["log"]
+            .as_str()
+            .context("completed verifier child log missing")?,
+    );
+    let meta = fs::symlink_metadata(log)?;
+    ensure!(
+        log.is_absolute()
+            && log.canonicalize()? == log
+            && meta.is_file()
+            && meta.uid() == 0
+            && meta.nlink() == 1
+            && meta.mode() & 0o022 == 0,
+        "completed verifier child log unsafe"
+    );
+    let bytes = read_stable_bounded(log, 64 << 20, "completed verifier child log")?;
+    ensure!(
+        value["log_sha256"] == hex_lower(&Sha256::digest(&bytes)),
+        "completed verifier child log digest differs"
+    );
+    validate_result(&bytes, args)
+}
 
 fn run_phases<F>(parallel: bool, work: F) -> Result<[Value; 3]>
 where
