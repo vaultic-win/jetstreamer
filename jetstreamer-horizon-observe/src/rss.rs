@@ -292,7 +292,7 @@ fn capture_processes(
     })
 }
 fn validate_host_identities(proc_root: &Path, processes: &[Process]) -> Result<()> {
-    for process in &processes {
+    for process in processes {
         let path = proc_root.join(process.pid.to_string()).join("stat");
         let stat = fs::read_to_string(&path)
             .with_context(|| format!("RSS final identity {}", path.display()))?;
