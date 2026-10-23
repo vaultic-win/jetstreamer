@@ -222,6 +222,35 @@ owner instead. The warmup result is not an uploaded epoch: canonical completion
 still requires all independent archive gates, and completion cleanup follows
 sidecar commit.
 
+### Native20 terminal-event adapter
+
+`capture-warmup223-terminal` consumes a sealed
+`jetstreamer-warmup223-native20-terminal-spec-v1` with `running_origin`,
+`observer`, `fleet` bindings and an `output` named `proof.json` under a fresh
+root-private `/var/lib/jetstreamer/horizon-warmup223-native20-terminal-*`
+directory. Run it only after the existing `systemctl start --wait` handle or
+another genuine manager event reports termination. It reads manager history
+and terminal metadata, without taking another resource observation.
+
+Capture preserves exact journal bytes and the actual resource/failure output
+no-clobber, retaining its original path and digest. A failed invocation with
+no output records confirmed absence rather than inventing a failure receipt.
+Success requires its original registered launch, exact bounded worker/input
+fingerprints, clean manager termination, successful resource receipt and the
+verified complete-slot marker. Failure and cleared-IID termination are supported.
+The earlier unregistered failed startup is retained as separate hash-bound
+operator/manager/journal history. Every full-prefix, native-restart, suffix,
+assembly, full/plugin, runtime-promotion, sidecar and R2 gate remains false.
+
+The metadata event keeps the accepted observer sample and all existing owner
+claims. Only epoch223's next action/evidence may advance; its repair gate stays
+`failed-needs-repair`. The inactive adapter authenticates that event and the
+original status owner even if systemd cleared its IID, rejects live/restarted/
+replacement owners, and rechecks latest PID1 history for a later invocation.
+Ordinary conditional status deletion, authenticated absence, repair-backlog and
+no-active-handoff checks remain mandatory. Terminal metadata never counts as
+archive or sidecar completion.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain

@@ -2,6 +2,35 @@
 use super::*;
 mod guard_receipt;
 mod native20;
+mod terminal;
+pub(super) const TERMINAL_SCHEMA: &str = terminal::SCHEMA;
+pub(super) fn capture_terminal() -> Result<()> {
+    terminal::capture()
+}
+pub(super) fn terminal_identity(v: &Value) -> Result<(String, String)> {
+    terminal::validate(v)
+}
+pub(super) fn terminal_predecessor(
+    previous: &Value,
+    p: &Plan,
+    proof: &Value,
+    sample: &str,
+    now: u64,
+) -> Result<()> {
+    terminal::predecessor(previous, p, proof, sample, now)
+}
+pub(super) fn terminal_census(p: &Plan, current: &BTreeMap<String, Value>) -> Result<()> {
+    terminal::census_check(p, current)
+}
+pub(super) fn terminal_not_replaced(proof: &Value) -> Result<()> {
+    let (_, iid) = terminal::validate(proof)?;
+    terminal::no_later_invocation(
+        &iid,
+        proof["journal_summary"]["started_unix_microseconds"]
+            .as_u64()
+            .context("warmup terminal start")?,
+    )
+}
 const HISTORICAL_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
 const UNIT: &str = "horizon-qualify-223-warmup-resource-5072b7ba-v4.service";
 const ROOT: &str =
