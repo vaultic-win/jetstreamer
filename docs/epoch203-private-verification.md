@@ -72,7 +72,8 @@ and exact scanner PID1 completion exist. Its sealed spec binds the accepted
 observer/fleet, recomputed century floor, all three replay guard receipts, exact
 publisher and filesystem capability. It preserves225/205/204 by invocation,
 authoritative PID and immutable command identity, and allows only a rename of the
-additional verified copy,64MiB metadata growth and a2GiB publisher. It neither
+additional verified copy,64MiB metadata growth and a16GiB publisher (the retained213
+publication used an8GiB high/16GiB hard limit and peaked at8GiB). It neither
 opens archive bytes nor starts a job. Seal its exact generated plan with the
 native deployment sealer before publication. Repeated matching admissions reuse
 the original record and deadline; they do not renew permission or replay work.
