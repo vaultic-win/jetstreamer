@@ -869,6 +869,10 @@ pub(super) async fn run(m: &Mapping, spec: &Bound, own: &str, value: Value) -> R
             .redirect(reqwest::redirect::Policy::none())
             .retry(reqwest::retry::never())
             .no_proxy()
+            .no_gzip()
+            .no_brotli()
+            .no_deflate()
+            .no_zstd()
             .timeout(Duration::from_secs(20))
             .build()?,
         trace: Trace::default(),
