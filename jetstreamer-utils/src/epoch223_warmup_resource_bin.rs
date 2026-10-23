@@ -20,7 +20,10 @@ mod profile {
     pub const SNAPSHOT: &str = "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665";
     pub const SNAPSHOT_NAME: &str =
         "snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst";
-    pub const CHECKPOINT_NAMES: &[&str] = &[SNAPSHOT_NAME];
+    pub const CHECKPOINT_NAMES: &[&str] = &[
+        SNAPSHOT_NAME,
+        "snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst",
+    ];
     pub const PLAN_SCHEMA: &str = "jetstreamer-private-epoch223-warmup-resource-plan-v1";
     pub const RESULT_SCHEMA: &str = "jetstreamer-private-epoch223-warmup-resource-v1";
     pub const STOP_SCHEMA: &str = "jetstreamer-private-epoch223-warmup-stop-v1";
@@ -51,6 +54,29 @@ mod bounded_resource_runner {
             .context("available memory overflow")
     }
     impl StorageHooks for WarmupStorage {
+        fn capability_only(&self) -> bool {
+            env::args()
+                .last()
+                .is_some_and(|s| s == "--storage-capability")
+        }
+        fn capability_result(
+            &self,
+            p: &Plan,
+            iid: &str,
+            bindings: &Value,
+            _command: &Command,
+        ) -> Result<()> {
+            persist(
+                &p.run_root.join("receipts/capability.json"),
+                &json!({
+                "schema":"jetstreamer-private-epoch223-warmup-input-capability-v1","invocation_id":iid,
+                "bindings":bindings,"node_sha256":PARENT_SHA,"worker_sha256":WORKER,
+                "snapshot_sha256":SNAPSHOT,"worker_entry_start":INITIAL_REPLAY,"worker_entry_end_exclusive":TARGET+1,
+                "parent_requested_root":TERMINAL,"input_hashes_and_private_paths_verified":true,
+                "worker_started":false,"entry_replay":false,"resource_observation_performed":false,
+                "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
+            )
+        }
         fn before_spawn(&self, _p: &Plan, _iid: &str) -> Result<Value> {
             ensure!(
                 available_memory()? >= (448 + 128) * (1u64 << 30),
@@ -143,6 +169,8 @@ mod bounded_resource_runner {
             assert!(args.contains(&"--qualification-end-slot=96767522"));
             assert_eq!(TARGET - INITIAL_REPLAY + 1, 16);
             assert!(root_manifest_valid(&json!({})).is_err());
+            assert!(validate_checkpoint_names(&CHECKPOINT_NAMES.join("\n")).is_ok());
+            assert!(validate_checkpoint_names(SNAPSHOT_NAME).is_err());
             assert!(
                 cmd.get_envs()
                     .any(|(key, value)| key == WORKER_ENV && value == Some(p.worker.as_os_str()))
