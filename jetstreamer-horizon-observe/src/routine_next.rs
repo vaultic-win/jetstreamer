@@ -119,7 +119,8 @@ pub(super) fn derive_next(
             p.observer == Path::new(OBSERVERS_101).join(format!("sample-{old_stamp}.json"))
                 && ((p.epoch198_delivery.is_none() && p.observer_config.path == legacy_config)
                     || p.observer_config.path == prepared_config
-                    || terminal141::matches(p)),
+                    || terminal141::matches(p)
+                    || provisional141::candidate(p)),
             "101observer/config is outside its exact manual or prepared namespace"
         );
         (

@@ -59,6 +59,8 @@ mod capacity;
 mod original141;
 #[path = "routine_private144.rs"]
 mod private144;
+#[path = "routine_provisional141_predecessor.rs"]
+mod provisional141;
 #[path = "routine_original141_terminal.rs"]
 mod terminal141;
 
@@ -610,10 +612,17 @@ fn newer_fleet_in_scope(
 
 fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
     if is_101(p)? {
+        let canonical = provisional141::canonical_predecessor(p, previous)?;
+        let expected = canonical.as_ref().unwrap_or(&p.previous_fleet);
+        let canonical_value = canonical
+            .as_ref()
+            .map(|b| bound_json(b, false))
+            .transpose()?;
+        let previous = canonical_value.as_ref().unwrap_or(previous);
         let root = Path::new(FLEET_ROOT_101);
         private_dir(root)?;
         ensure!(
-            p.previous_fleet.path.parent() == Some(root),
+            expected.path.parent() == Some(root),
             "foreign101fleet predecessor namespace"
         );
         for entry in fs::read_dir(root)? {
@@ -632,9 +641,9 @@ fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
                 value["first_epoch"] == 101 && value["last_epoch"] == 200,
                 "foreign fleet inside101namespace"
             );
-            if entry.path() == p.previous_fleet.path {
+            if entry.path() == expected.path {
                 ensure!(
-                    sha(&read_checked(&entry.path(), LIMIT, 0, false)?) == p.previous_fleet.sha256,
+                    sha(&read_checked(&entry.path(), LIMIT, 0, false)?) == expected.sha256,
                     "fleet predecessor changed during census"
                 );
                 continue;
@@ -739,7 +748,8 @@ fn validate_templates(
         ensure!(
             previous["first_epoch"] == 101
                 && previous["last_epoch"] == 200
-                && p.previous_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101)),
+                && (p.previous_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101))
+                    || provisional141::canonical_predecessor(p, previous)?.is_some()),
             "foreign101fleet predecessor"
         );
     }
