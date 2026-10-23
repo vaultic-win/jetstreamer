@@ -125,6 +125,7 @@ fn observer_feature_families_are_complete_and_epoch223_remains_isolated() {
     for feature in [
         "epoch223-tail-snapshot-tests",
         "epoch223-cold-snapshot-tests",
+        "epoch223-warmup-snapshot-tests",
     ] {
         let isolated: Vec<_> = observer
             .iter()

@@ -106,6 +106,10 @@ name = "jetstreamer-epoch141-native-admit"
 path = "src/native141_admit_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch136-input-capability"
+path = "src/epoch136_inputs_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch203-stopped-scratch-check"
 path = "src/stopped203_check_bin.rs"
 
