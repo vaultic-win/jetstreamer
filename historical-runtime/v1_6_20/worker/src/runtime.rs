@@ -330,6 +330,12 @@ impl RuntimeState {
             )));
         }
 
+        if cfg!(feature = "epoch223-prefix-qualification") && self.enforce_candidate_range {
+            for request in &requests {
+                validate_candidate_entry_slot(request.slot)
+                    .map_err(ProcessEntriesError::Runtime)?;
+            }
+        }
         let prepared_results: Vec<Result<PreparedEntry, String>> = self
             .poh_pool
             .install(|| requests.into_par_iter().map(prepare_entry).collect());
@@ -772,6 +778,13 @@ impl RuntimeState {
             self.accounts_shrink_consumed_budget,
             ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
         );
+        if cfg!(feature = "epoch223-prefix-qualification") {
+            // Match the pinned validator background-service debt cap. This
+            // reclaims storage without generating account writes or Bank state.
+            self.accounts_shrink_consumed_budget = self
+                .accounts_shrink_consumed_budget
+                .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
+        }
 
         let block_height = self.bank.block_height();
         if block_height.saturating_sub(self.last_accounts_clean_block_height)
@@ -854,6 +867,9 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(feature = "epoch223-prefix-qualification") && slot != 96_335_538 {
+        return Err("epoch223 prefix requires the exact cold snapshot96335538".into());
+    }
     if !(MIN_SUPPORTED_SNAPSHOT_SLOT..MAX_SUPPORTED_SLOT_EXCLUSIVE).contains(&slot) {
         return Err(format!(
             "Solana v1.6.20 candidate snapshot slot {} is outside {}..{}",
@@ -865,20 +881,33 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
 
 fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
     let max_supported_slot_exclusive = effective_max_supported_entry_slot_exclusive();
-    if slot < MIN_SUPPORTED_ENTRY_SLOT || slot >= max_supported_slot_exclusive {
+    let minimum = effective_min_supported_entry_slot();
+    if slot < minimum || slot >= max_supported_slot_exclusive {
         return Err(format!(
             "Solana v1.6.20 candidate entry slot {} is outside {}..{}",
-            slot, MIN_SUPPORTED_ENTRY_SLOT, max_supported_slot_exclusive
+            slot, minimum, max_supported_slot_exclusive
         ));
     }
     Ok(())
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "diagnostic-singleton") {
+    if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
+        96_335_555
+    } else if cfg!(feature = "epoch223-prefix-qualification") {
+        96_767_523
+    } else if cfg!(feature = "diagnostic-singleton") {
         DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE
     } else {
         MAX_SUPPORTED_SLOT_EXCLUSIVE
+    }
+}
+
+fn effective_min_supported_entry_slot() -> u64 {
+    if cfg!(feature = "epoch223-prefix-qualification") {
+        96_335_539
+    } else {
+        MIN_SUPPORTED_ENTRY_SLOT
     }
 }
 
@@ -1636,24 +1665,181 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT).is_ok());
-        assert!(validate_candidate_snapshot_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE - 1).is_ok());
+        if cfg!(feature = "epoch223-prefix-qualification") {
+            assert!(validate_candidate_snapshot_slot(96_335_538).is_ok());
+            assert!(validate_candidate_snapshot_slot(96_767_522).is_err());
+        } else {
+            assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT).is_ok());
+            assert!(validate_candidate_snapshot_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE - 1).is_ok());
+        }
         assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT - 1).is_err());
         assert!(validate_candidate_snapshot_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE).is_err());
 
         let entry_end = effective_max_supported_entry_slot_exclusive();
-        assert!(validate_candidate_entry_slot(MIN_SUPPORTED_ENTRY_SLOT).is_ok());
+        let entry_start = effective_min_supported_entry_slot();
+        assert!(validate_candidate_entry_slot(entry_start).is_ok());
         assert!(validate_candidate_entry_slot(entry_end - 1).is_ok());
-        assert!(validate_candidate_entry_slot(MIN_SUPPORTED_ENTRY_SLOT - 1).is_err());
+        assert!(validate_candidate_entry_slot(entry_start - 1).is_err());
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "diagnostic-singleton") {
+            if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
+                96_335_555
+            } else if cfg!(feature = "epoch223-prefix-qualification") {
+                96_767_523
+            } else if cfg!(feature = "diagnostic-singleton") {
                 DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE
             } else {
                 MAX_SUPPORTED_SLOT_EXCLUSIVE
             }
         );
+    }
+
+    #[cfg(feature = "epoch223-prefix-qualification")]
+    #[test]
+    fn prefix_refuses_later_input_before_decoding_or_bank_mutation() {
+        let (mut state, _) = test_state(1, Some(2));
+        state.enforce_candidate_range = true;
+        let before = (
+            state.bank.slot(),
+            state.bank.hash(),
+            state.bank.transaction_count(),
+            state.write_cursor,
+        );
+        let request = EntryRequest {
+            slot: effective_max_supported_entry_slot_exclusive(),
+            entry_index: 0,
+            num_hashes: 0,
+            hash: vec![],
+            transactions: vec![vec![255]],
+        };
+        let error = state.process_entry(request).unwrap_err();
+        assert!(
+            error.contains("outside"),
+            "scope must precede malformed transaction decoding: {}",
+            error
+        );
+        assert_eq!(
+            before,
+            (
+                state.bank.slot(),
+                state.bank.hash(),
+                state.bank.transaction_count(),
+                state.write_cursor
+            )
+        );
+        assert!(validate_candidate_entry_slot(96_767_526).is_err());
+        if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
+            assert!(validate_candidate_entry_slot(96_335_554).is_ok());
+            assert!(validate_candidate_entry_slot(96_335_555).is_err());
+            assert!(validate_candidate_entry_slot(96_336_000).is_err());
+        }
+    }
+
+    #[cfg(feature = "epoch223-prefix-warmup-diagnostic")]
+    #[test]
+    #[ignore]
+    fn native_epoch223_cold_input_matches_canonical_accounts_commitment() {
+        use sha2::{Digest, Sha256};
+        use std::{
+            fs,
+            io::Read,
+            os::unix::fs::{MetadataExt, PermissionsExt},
+            path::Path,
+        };
+        const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst";
+        const LEDGER: &str = "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1";
+        let scratch = env::var("JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH")
+            .expect("explicit isolated test scratch required");
+        let path = Path::new(&scratch);
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
+        let root = path.parent().unwrap();
+        assert_eq!(
+            root.parent(),
+            Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        );
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("native-input223-v1620-"));
+        let metadata = fs::symlink_metadata(path).unwrap();
+        assert!(
+            metadata.is_dir()
+                && metadata.uid() == unsafe { libc::geteuid() }
+                && metadata.permissions().mode() & 0o077 == 0
+        );
+        assert_eq!(fs::canonicalize(path).unwrap(), path);
+        assert!(fs::read_dir(path).unwrap().next().is_none());
+        let mut file = fs::File::open(SNAPSHOT).unwrap();
+        assert_eq!(file.metadata().unwrap().len(), 9_815_262_303);
+        let mut digest = Sha256::new();
+        let mut buffer = vec![0u8; 1024 * 1024];
+        loop {
+            let n = file.read(&mut buffer).unwrap();
+            if n == 0 {
+                break;
+            }
+            digest.input(&buffer[..n]);
+        }
+        assert_eq!(
+            format!("{:x}", digest.result()),
+            "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"
+        );
+        let initial = jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+            archive_path: SNAPSHOT.into(),
+        };
+        let (mut state, initialized) =
+            RuntimeState::initialize(LEDGER, &initial, Some(&scratch)).unwrap();
+        assert_eq!(initialized.slot, 96_335_538);
+        let original_transactions = state.bank.transaction_count();
+        let checkpoint = state.freeze_checkpoint(96_335_538).unwrap();
+        assert!(checkpoint.slot_complete && checkpoint.writes.is_empty());
+        assert_eq!(
+            checkpoint.next_write_version,
+            initialized.next_write_version
+        );
+        assert_eq!(checkpoint.transaction_count, original_transactions);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE"
+        );
+        println!("epoch223-v1620-native-input slot={} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transaction_count={} tick_height={} next_write_version={} replay_entries=0 bootstrap_writes=0",
+            checkpoint.slot,Hash::new(&checkpoint.bank_hash),Hash::new(&checkpoint.accounts_hash),
+            Hash::new(&checkpoint.last_blockhash),checkpoint.capitalization,checkpoint.transaction_count,
+            checkpoint.tick_height,checkpoint.next_write_version);
+    }
+
+    #[cfg(feature = "epoch223-prefix-qualification")]
+    #[test]
+    fn prefix_shrink_caps_debt_without_changing_consensus_state_or_write_cursor() {
+        let (mut state, mint) = test_state(1, Some(2));
+        let tick = request_for(&state, 0, 0, 2, &[]);
+        state.process_entry(tick).unwrap();
+        state.freeze_checkpoint(0).unwrap();
+        let fingerprint = |s: &RuntimeState| {
+            (
+                s.bank.accounts().accounts_db.next_write_version(),
+                s.bank.capitalization(),
+                s.bank.hash(),
+                s.bank.last_blockhash(),
+                s.bank.get_balance(&mint.pubkey()),
+            )
+        };
+        let before = fingerprint(&state);
+        for debt in &[251usize, 500, 25_000, usize::MAX] {
+            state.accounts_shrink_consumed_budget = *debt;
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(
+                state.accounts_shrink_consumed_budget,
+                debt.saturating_sub(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
+                    .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
+            );
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(state.accounts_shrink_consumed_budget, 0);
+            assert_eq!(before, fingerprint(&state));
+        }
     }
 
     fn request_for(

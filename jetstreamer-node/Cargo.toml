@@ -26,6 +26,9 @@ epoch144-checkpoint-continuation-diagnostic = []
 epoch203-checkpoint-continuation-diagnostic = []
 # Private epoch223 cold/tail comparison, never the ordinary runtime route.
 epoch223-v1-6-25-qualification = []
+# Independently checkpointed v1.6.20 cold prefix, ending before the known tail
+# incompatibility. Separate private namespace; no full epoch or tail execution.
+epoch223-v1-6-20-prefix-qualification = []
 # Build-bound, non-production epoch-224 diagnostic. It compares the historical
 # worker's transaction-attributed lamport writes with canonical source metadata
 # and records the exact freeze-time writes at the first divergent boundary.

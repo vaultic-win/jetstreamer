@@ -66,6 +66,10 @@ jobs:
             scope: "-p jetstreamer-node"
             flags: "--features epoch223-v1-6-25-qualification"
             examples: false
+          - name: node-epoch223-v1620-prefix-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch223-v1-6-20-prefix-qualification"
+            examples: false
           - name: node-epoch144-continuation
             scope: "-p jetstreamer-node"
             flags: "--features epoch144-checkpoint-continuation-diagnostic"

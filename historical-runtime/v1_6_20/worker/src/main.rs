@@ -3,6 +3,12 @@ mod poh_backend;
 mod runtime;
 mod snapshot;
 
+#[cfg(all(
+    feature = "epoch223-prefix-qualification",
+    feature = "diagnostic-singleton"
+))]
+compile_error!("epoch223 prefix cannot combine singleton execution diagnostics");
+
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,
     EntryProcessedChunk, EntryProcessedChunkBody, EntryRequest, Handshake, Request, RequestBody,

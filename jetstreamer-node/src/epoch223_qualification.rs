@@ -1,4 +1,4 @@
-//! Private v1.6.25 epoch223 comparison. Never an ordinary runtime promotion.
+//! Private epoch223 era comparisons. Never an ordinary runtime promotion.
 use crate::{BankHashExpectation, QualificationPlan, compatibility, snapshot_path_expectation};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -6,6 +6,174 @@ use std::path::Path;
 pub(crate) const COLD_BOOTSTRAP: u64 = 96_335_538;
 pub(crate) const TAIL_BOOTSTRAP: u64 = 96_767_522;
 pub(crate) const OUTPUT_END: u64 = 96_767_999;
+
+pub(crate) fn private_build_enabled() -> bool {
+    cfg!(any(
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch223-v1-6-20-prefix-qualification"
+    ))
+}
+
+fn private_namespace() -> &'static str {
+    if cfg!(feature = "epoch223-v1-6-20-prefix-qualification") {
+        "qualification-223-v1620-"
+    } else {
+        "qualification-223-v1625-"
+    }
+}
+
+fn prefix_namespace() -> &'static str {
+    if cfg!(feature = "epoch223-v1-6-20-prefix-qualification") {
+        "qualification-223-v1620-prefix-"
+    } else {
+        "qualification-223-v1625-prefix-"
+    }
+}
+
+#[cfg(all(test, feature = "epoch223-v1-6-20-prefix-qualification"))]
+mod v1620_tests {
+    use super::*;
+    fn plan() -> QualificationPlan {
+        QualificationPlan {
+            epoch: 223,
+            bootstrap_slot: COLD_BOOTSTRAP,
+            replay_start: COLD_BOOTSTRAP + 1,
+            output_slot_start: 96_336_000,
+            end_inclusive: TAIL_BOOTSTRAP,
+        }
+    }
+    fn expected() -> BTreeMap<u64, BankHashExpectation> {
+        [
+            (
+                COLD_BOOTSTRAP,
+                "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE",
+            ),
+            (
+                TAIL_BOOTSTRAP,
+                "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7",
+            ),
+        ]
+        .into_iter()
+        .map(|(slot, hash)| {
+            (
+                slot,
+                BankHashExpectation::LegacyAccountsHash(hash.parse().unwrap()),
+            )
+        })
+        .collect()
+    }
+    #[test]
+    fn original_runtime_prefix_is_exact_and_cannot_borrow_tail_or_v1625_paths() {
+        let root =
+            Path::new("/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-test");
+        let ledger = root.join("ledger");
+        let output = root.join("output/epoch-223.jet");
+        let scratch = root.join("scratch");
+        for (focused, cohort, recovery, valid) in [
+            (Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)), false, false, true),
+            (Some((COLD_BOOTSTRAP, OUTPUT_END)), false, false, false),
+            (Some((TAIL_BOOTSTRAP, OUTPUT_END)), false, false, false),
+            (Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)), true, false, false),
+            (Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)), false, true, false),
+        ] {
+            assert_eq!(
+                validate_launch(
+                    223,
+                    223,
+                    focused,
+                    cohort,
+                    recovery,
+                    Some((&ledger, &output, &scratch))
+                )
+                .is_ok(),
+                valid
+            );
+        }
+        assert!(
+            validate_tail_mode(true, false, Some((TAIL_BOOTSTRAP, OUTPUT_END)), &ledger).is_err()
+        );
+        let wrong =
+            Path::new("/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-test");
+        assert!(
+            validate_launch(
+                223,
+                223,
+                Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)),
+                false,
+                false,
+                Some((
+                    &wrong.join("ledger"),
+                    &wrong.join("output/epoch-223.jet"),
+                    &wrong.join("scratch")
+                ))
+            )
+            .is_err()
+        );
+        validate_prefix_expectations(&expected(), plan()).unwrap();
+        for slot in [COLD_BOOTSTRAP, TAIL_BOOTSTRAP] {
+            let mut incomplete = expected();
+            incomplete.remove(&slot);
+            assert!(validate_prefix_expectations(&incomplete, plan()).is_err());
+        }
+        let selection = compatibility::select_focused_qualification_runtime(
+            COLD_BOOTSTRAP + 1..TAIL_BOOTSTRAP + 1,
+            true,
+        )
+        .unwrap();
+        validate_tail_runtime(&selection).unwrap();
+        assert_eq!(selection.descriptor.identity.name, "solana-v1.6.20");
+        assert_eq!(
+            selection.descriptor.identity.revision,
+            compatibility::SOLANA_V1_6_20_REVISION
+        );
+    }
+    #[tokio::test]
+    async fn original_runtime_prefix_reaches_real_worker_barrier_only_with_both_roots() {
+        use crate::{ReplayBootstrap, ReplayCursor, RestartTracker, SnapshotVerifier};
+        use std::sync::{Arc, atomic::AtomicBool};
+        let root = std::path::PathBuf::from(format!(
+            "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-barrier-test-{}",
+            std::process::id()
+        ));
+        for missing in [None, Some(COLD_BOOTSTRAP), Some(TAIL_BOOTSTRAP)] {
+            assert!(!root.exists());
+            let mut checkpoints = expected();
+            if let Some(slot) = missing {
+                checkpoints.remove(&slot);
+            }
+            let shutdown = Arc::new(AtomicBool::new(false));
+            let outcome=crate::run_geyser_replay(223,true,&root.join("ledger"),&root.join("scratch"),
+                &ReplayBootstrap::SnapshotArchive(Path::new("/absent/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst").into()),
+                shutdown.clone(),Arc::new(ReplayCursor::new()),Arc::new(RestartTracker::new()),
+                Some(Arc::new(SnapshotVerifier::new(checkpoints,Some(shutdown)))),root.join("output/epoch-223.jet"),
+                Some(plan()),None,None,None,None,None,None,false,None,TailMode::PrefixPlanningPreflight).await;
+            assert!(!root.exists());
+            if missing.is_some() {
+                assert!(outcome.is_err());
+                continue;
+            }
+            let crate::ReplayRunOutcome::PlanningPreflight(report) = outcome.unwrap() else {
+                panic!("preflight cannot complete replay");
+            };
+            assert_eq!(report["runtime_profile"], "solana-v1.6.20");
+            assert_eq!(
+                report["worker_environment_override"],
+                "JETSTREAMER_HISTORICAL_WORKER_V1_6_20"
+            );
+            assert_eq!(report["canonical_terminal_required"], true);
+            assert_eq!(report["worker_profile_validated"], true);
+            assert_eq!(report["runtime_checkpoint_policy_validated"], true);
+            for key in [
+                "worker_spawned",
+                "archive_created",
+                "publication_authorized",
+                "r2_mutations",
+            ] {
+                assert_eq!(report[key], false);
+            }
+        }
+    }
+}
 
 /// This exact private span retains the ordinary terminal-checkpoint obligation.
 /// It is a prefix qualification, never an exception like the bootstrap-only tail.
@@ -136,6 +304,11 @@ pub(crate) fn validate_tail_mode(
     if !enabled {
         return Ok(());
     }
+    if cfg!(feature = "epoch223-v1-6-20-prefix-qualification") {
+        return Err(
+            "v1.6.20 prefix build cannot execute or preflight the incompatible tail".into(),
+        );
+    }
     if focused != Some((TAIL_BOOTSTRAP, OUTPUT_END))
         || !ledger
             .parent()
@@ -155,16 +328,32 @@ pub(crate) fn validate_tail_runtime(
     selection: &compatibility::RuntimeSelection,
 ) -> Result<(), String> {
     let d = selection.descriptor;
-    if d.identity.name != "solana-v1.6.25"
-        || d.identity.revision != "7de8a55b54d3e11058b82f9483bb405d143b455c"
+    let (name, revision, identity, environment) =
+        if cfg!(feature = "epoch223-v1-6-20-prefix-qualification") {
+            (
+                "solana-v1.6.20",
+                compatibility::SOLANA_V1_6_20_REVISION,
+                "jetstreamer-historical-worker-v1-6-20",
+                "JETSTREAMER_HISTORICAL_WORKER_V1_6_20",
+            )
+        } else {
+            (
+                "solana-v1.6.25",
+                "7de8a55b54d3e11058b82f9483bb405d143b455c",
+                "jetstreamer-historical-worker-v1-6-25",
+                "JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
+            )
+        };
+    if d.identity.name != name
+        || d.identity.revision != revision
         || selection.admission != compatibility::AdmissionLevel::Candidate
-        || !d.worker.as_ref().is_some_and(|w| {
-            w.identity == "jetstreamer-historical-worker-v1-6-25"
-                && w.environment_override == "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
-        })
+        || !d
+            .worker
+            .as_ref()
+            .is_some_and(|w| w.identity == identity && w.environment_override == environment)
     {
         return Err(
-            "epoch223 tail comparison requires exact v1.6.25 candidate descriptor and worker"
+            "epoch223 comparison requires its exact build-selected candidate descriptor and worker"
                 .into(),
         );
     }
@@ -241,6 +430,11 @@ pub(crate) fn validate_launch(
     recovery_or_inherited_lease: bool,
     paths: Option<(&Path, &Path, &Path)>,
 ) -> Result<(), String> {
+    if cfg!(feature = "epoch223-v1-6-20-prefix-qualification")
+        && focused != Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP))
+    {
+        return Err("v1.6.20 prefix build accepts only the exact cold-to-known-root span".into());
+    }
     if first != 223
         || last != 223
         || !matches!(
@@ -257,10 +451,10 @@ pub(crate) fn validate_launch(
     let root = ledger
         .parent()
         .ok_or("missing private qualification root")?;
-    let prefix_namespace = root
+    let is_prefix_namespace = root
         .file_name()
         .and_then(|s| s.to_str())
-        .and_then(|s| s.strip_prefix("qualification-223-v1625-prefix-"))
+        .and_then(|s| s.strip_prefix(prefix_namespace()))
         .is_some_and(|suffix| {
             !suffix.is_empty()
                 && suffix
@@ -270,15 +464,15 @@ pub(crate) fn validate_launch(
     let prefix_reserved = root
         .file_name()
         .and_then(|s| s.to_str())
-        .is_some_and(|s| s.starts_with("qualification-223-v1625-prefix"));
-    if (prefix_reserved && !prefix_namespace)
-        || prefix_namespace != (focused == Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)))
+        .is_some_and(|s| s.starts_with(prefix_namespace().trim_end_matches('-')));
+    if (prefix_reserved && !is_prefix_namespace)
+        || is_prefix_namespace != (focused == Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)))
     {
         return Err("epoch223 known-root prefix requires its exclusive private prefix namespace and exact span".into());
     }
     if root.parent() != Some(Path::new("/home/ubuntu/.jetstreamer-private"))
         || !root.file_name().and_then(|s| s.to_str()).is_some_and(|s| {
-            s.starts_with("qualification-223-v1625-")
+            s.starts_with(private_namespace())
                 && s.bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
         })
@@ -293,7 +487,7 @@ pub(crate) fn validate_launch(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "epoch223-v1-6-20-prefix-qualification")))]
 mod tests {
     use super::*;
     async fn actual_worker_barrier(

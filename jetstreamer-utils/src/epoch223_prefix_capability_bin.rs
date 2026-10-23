@@ -19,10 +19,48 @@ use std::{
     process::Command,
 };
 
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1";
-const NODE_SHA: &str = "90474659be2a4a7d1cc9d4dfe3d5ab1587adb1b388b83163b2bf16c771624f66";
+const V1620: bool = cfg!(feature = "epoch223-v1620-prefix-capability");
+const PACKAGE: &str = if V1620 {
+    "/var/lib/jetstreamer/horizon-223-v1620-prefix-warmup-63ece8f4-v1"
+} else {
+    "/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1"
+};
+const NODE_SHA: &str = if V1620 {
+    "96faec40d52160a06e92b0fd0f9ab1556820bf145c21cecdda5ab00dc0ec3b51"
+} else {
+    "90474659be2a4a7d1cc9d4dfe3d5ab1587adb1b388b83163b2bf16c771624f66"
+};
 const SNAPSHOT: &str = "snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst";
-const WORKER: &str = "jetstreamer-historical-worker-v1-6-25";
+const WORKER: &str = if V1620 {
+    "jetstreamer-historical-worker-v1-6-20"
+} else {
+    "jetstreamer-historical-worker-v1-6-25"
+};
+const WORKER_SHA: &str = if V1620 {
+    "52d6c86a8103b8965ca68ead96af471a7899a0a0e6e69c48989b39fd5d922f0c"
+} else {
+    "fde3ba53cc52012b894bac29bd7889b4cfd326fff75f4f67ec4cbdbf2ac7136c"
+};
+const RUNTIME: &str = if V1620 {
+    "solana-v1.6.20"
+} else {
+    "solana-v1.6.25"
+};
+const REVISION: &str = if V1620 {
+    "77bdb45d4af61fc687161ec06cc0178ff79726d5"
+} else {
+    "7de8a55b54d3e11058b82f9483bb405d143b455c"
+};
+const WORKER_ENV: &str = if V1620 {
+    "JETSTREAMER_HISTORICAL_WORKER_V1_6_20"
+} else {
+    "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
+};
+const PROBE_PREFIX: &str = if V1620 {
+    "qualification-223-v1620-prefix-capability-"
+} else {
+    "qualification-223-v1625-prefix-capability-"
+};
 const GENESIS: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 const SEALER: &str = "2c939dde066672a13d6119d86dfb2bf460c428fd95e0854da726c6c6419f6853";
 #[derive(Deserialize)]
@@ -50,7 +88,7 @@ fn scope(p: &Plan) -> Result<()> {
             && p.probe_root
                 .file_name()
                 .and_then(|s| s.to_str())
-                .and_then(|s| s.strip_prefix("qualification-223-v1625-prefix-capability-"))
+                .and_then(|s| s.strip_prefix(PROBE_PREFIX))
                 .is_some_and(
                     |s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
                 ),
@@ -113,10 +151,7 @@ fn package(p: &Plan) -> Result<BTreeMap<String, Identity>> {
     }
     let fixed = [
         ("jetstreamer-node", p.node_sha256.as_str()),
-        (
-            WORKER,
-            "fde3ba53cc52012b894bac29bd7889b4cfd326fff75f4f67ec4cbdbf2ac7136c",
-        ),
+        (WORKER, WORKER_SHA),
         (
             SNAPSHOT,
             "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665",
@@ -188,10 +223,10 @@ fn report(text: &str) -> Result<Value> {
             && v["output_slot_start"] == 96_336_000u64
             && v["terminal_slot"] == 96_767_522u64
             && v["output_slot_count"] == 431_523
-            && v["runtime_profile"] == "solana-v1.6.25"
-            && v["runtime_revision"] == "7de8a55b54d3e11058b82f9483bb405d143b455c"
+            && v["runtime_profile"] == RUNTIME
+            && v["runtime_revision"] == REVISION
             && v["worker_identity"] == WORKER
-            && v["worker_environment_override"] == "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
+            && v["worker_environment_override"] == WORKER_ENV
             && v["worker_executable"] == format!("{PACKAGE}/{WORKER}"),
         "wrong prefix/runtime/worker scope"
     );
@@ -302,10 +337,7 @@ fn probe(p: &Plan) -> Result<Value> {
         .env("TOKIO_WORKER_THREADS", "2")
         .env("RAYON_NUM_THREADS", "2")
         .env("JETSTREAMER_ALLOW_CANDIDATE_RUNTIME", "1")
-        .env(
-            "JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
-            p.package.join(WORKER),
-        )
+        .env(WORKER_ENV, p.package.join(WORKER))
         .current_dir(&p.probe_root);
     unsafe {
         command.pre_exec(|| {
@@ -401,9 +433,9 @@ mod tests {
     fn fixture() -> Value {
         let mut v = json!({"schema":"jetstreamer-private-epoch223-prefix-planning-preflight-v1",
             "epoch":223,"bootstrap_slot":96335538,"output_slot_start":96336000,"terminal_slot":96767522,
-            "output_slot_count":431523,"runtime_profile":"solana-v1.6.25",
-            "runtime_revision":"7de8a55b54d3e11058b82f9483bb405d143b455c","worker_identity":WORKER,
-            "worker_environment_override":"JETSTREAMER_HISTORICAL_WORKER_V1_6_25",
+            "output_slot_count":431523,"runtime_profile":RUNTIME,
+            "runtime_revision":REVISION,"worker_identity":WORKER,
+            "worker_environment_override":WORKER_ENV,
             "worker_executable":format!("{PACKAGE}/{WORKER}")});
         for k in [
             "canonical_bootstrap_bound",
@@ -465,9 +497,7 @@ mod tests {
             node_sha256: NODE_SHA.into(),
             seal_sha256: "b".repeat(64),
             sums_sha256: "c".repeat(64),
-            probe_root:
-                "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-capability-test"
-                    .into(),
+            probe_root: format!("/home/ubuntu/.jetstreamer-private/{PROBE_PREFIX}test").into(),
             receipt_directory: "/var/lib/jetstreamer/horizon-223-prefix-capability-receipts-test"
                 .into(),
         };
