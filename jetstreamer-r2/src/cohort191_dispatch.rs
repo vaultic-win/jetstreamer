@@ -76,7 +76,7 @@ fn validate(p: &Plan, spec: &Value) -> Result<()> {
             && p.program.path == Path::new(PROGRAM)
             && is_lower_hex(&p.program.sha256, 64)
             && p.verifier_plan.path
-                == PathBuf::from(format!(
+                == Path::new(&format!(
                     "{PLANS}-{}-{}-20261023-v1/plan.json",
                     p.epoch,
                     p.stage.name()

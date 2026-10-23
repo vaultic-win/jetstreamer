@@ -1097,8 +1097,7 @@ fn validate_inputs(
         }
         // Completed verification claims require actual independent receipts,
         // even when the owner is already uploading or waiting on another gate.
-        let digest = if p.public_batch.is_some() {
-            let b = p.public_batch.as_ref().unwrap();
+        let digest = if let Some(b) = &p.public_batch {
             let bytes = receipt_bytes(b, 1001, 4 << 20)?;
             let v: Value = serde_json::from_slice(&bytes)?;
             v["outcome"]["members"]
@@ -1918,6 +1917,48 @@ pub(super) fn dispatch_import_check(
     )
 }
 
+pub(super) fn queue_scope(phase: &str, unit: &str) -> bool {
+    queue::scope(phase, unit)
+}
+pub(super) fn queue_plan_check(plan: &Bound, materialized: &BTreeSet<u64>) -> Result<Value> {
+    queue::plan_check(plan, materialized)
+}
+pub(super) fn queue_admission_check(
+    admission: &Bound,
+    plan: &Bound,
+    iid: &str,
+    epoch: u64,
+    stage: &str,
+) -> Result<Value> {
+    queue::admission_check(admission, plan, iid, epoch, stage)
+}
+pub(super) fn queue_gate(
+    receipt: &Bound,
+    epoch: u64,
+    stage: &str,
+    wrapper: &Bound,
+    verifier: &Bound,
+    digest: &str,
+) -> Result<()> {
+    gate(
+        receipt,
+        epoch,
+        stage,
+        &GateTool {
+            verifier: verifier.clone(),
+            wrapper: wrapper.clone(),
+        },
+        digest,
+    )
+}
+pub(super) fn queue_ready(receipt: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
+    ready(receipt, epoch, cutoff)
+}
+
+pub(super) fn queue_sync_epoch(phase: &str, unit: &str) -> Option<u64> {
+    queue::sync_epoch(phase, unit)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2050,10 +2091,13 @@ mod tests {
         let event = json!({"UNIT":CONTROLLER,"_PID":"1","_UID":"0","INVOCATION_ID":CID,
             "MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{CONTROLLER}: Deactivated successfully."),
             "__REALTIME_TIMESTAMP":"1000000"});
-        assert_eq!(controller_manager_end(&[event.clone()], 2).unwrap(), event);
+        assert_eq!(
+            controller_manager_end(std::slice::from_ref(&event), 2).unwrap(),
+            event
+        );
         assert!(controller_manager_end(&[], 2).is_err());
         assert!(controller_manager_end(&[event.clone(), event.clone()], 2).is_err());
-        assert!(controller_manager_end(&[event.clone()], 0).is_err());
+        assert!(controller_manager_end(std::slice::from_ref(&event), 0).is_err());
         for (key, value) in [
             ("_PID", "2"),
             ("_UID", "1001"),
@@ -2076,46 +2120,4 @@ mod tests {
         assert!(hash_bytes(&"0".repeat(32)).is_err());
         assert!(hash_bytes(&"z".repeat(44)).is_err());
     }
-}
-
-pub(super) fn queue_scope(phase: &str, unit: &str) -> bool {
-    queue::scope(phase, unit)
-}
-pub(super) fn queue_plan_check(plan: &Bound, materialized: &BTreeSet<u64>) -> Result<Value> {
-    queue::plan_check(plan, materialized)
-}
-pub(super) fn queue_admission_check(
-    admission: &Bound,
-    plan: &Bound,
-    iid: &str,
-    epoch: u64,
-    stage: &str,
-) -> Result<Value> {
-    queue::admission_check(admission, plan, iid, epoch, stage)
-}
-pub(super) fn queue_gate(
-    receipt: &Bound,
-    epoch: u64,
-    stage: &str,
-    wrapper: &Bound,
-    verifier: &Bound,
-    digest: &str,
-) -> Result<()> {
-    gate(
-        receipt,
-        epoch,
-        stage,
-        &GateTool {
-            verifier: verifier.clone(),
-            wrapper: wrapper.clone(),
-        },
-        digest,
-    )
-}
-pub(super) fn queue_ready(receipt: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
-    ready(receipt, epoch, cutoff)
-}
-
-pub(super) fn queue_sync_epoch(phase: &str, unit: &str) -> Option<u64> {
-    queue::sync_epoch(phase, unit)
 }

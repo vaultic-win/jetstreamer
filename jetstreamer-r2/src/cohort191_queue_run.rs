@@ -268,23 +268,21 @@ fn eligible(state: &Value) -> Vec<(usize, &'static str)> {
         )
     });
     let mut out = Vec::new();
-    if !sync {
-        if let Some((i, _)) = rows
+    if !sync
+        && let Some((i, _)) = rows
             .iter()
             .enumerate()
             .find(|(_, r)| pending_stage(r) == Some("sync"))
-        {
-            out.push((i, "sync"));
-        }
+    {
+        out.push((i, "sync"));
     }
-    if !verifier {
-        if let Some((i, r)) = rows
+    if !verifier
+        && let Some((i, r)) = rows
             .iter()
             .enumerate()
             .find(|(_, r)| matches!(pending_stage(r), Some("full" | "plugin")))
-        {
-            out.push((i, pending_stage(r).unwrap()));
-        }
+    {
+        out.push((i, pending_stage(r).unwrap()));
     }
     out
 }
@@ -736,7 +734,7 @@ pub(super) fn sync_verified() -> Result<()> {
         u["Id"] == sync_unit(epoch)
             && u["InvocationID"] == env::var("INVOCATION_ID")?
             && is_lower_hex(text(&u, "InvocationID")?, 32)
-            && u["MainPID"] == pid.to_string()
+            && text(&u, "MainPID")?.parse::<u64>()? == pid
             && u["ActiveState"] == "active"
             && u["SubState"] == "running"
             && u["NRestarts"] == "0"
@@ -858,7 +856,7 @@ fn phase_from_journal(row: &Value, lines: &[u8]) -> Result<&'static str> {
         // the admitted main process merely because they share a service name.
         if j["_SYSTEMD_UNIT"] != owner["unit"]
             || j["_SYSTEMD_INVOCATION_ID"] != owner["invocation_id"]
-            || j["_PID"] != number(owner, "pid")?.to_string()
+            || j["_PID"].as_str().and_then(|s| s.parse::<u64>().ok()) != Some(number(owner, "pid")?)
             || j["_UID"] != "0"
         {
             continue;
@@ -1063,7 +1061,7 @@ pub(super) fn run() -> Result<()> {
         is_lower_hex(&iid, 32)
             && u["Id"] == UNIT
             && u["InvocationID"] == iid
-            && u["MainPID"] == std::process::id().to_string()
+            && text(&u, "MainPID")?.parse::<u32>()? == std::process::id()
             && u["ActiveState"] == "active"
             && u["SubState"] == "running"
             && u["NRestarts"] == "0"

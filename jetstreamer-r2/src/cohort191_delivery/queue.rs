@@ -188,10 +188,7 @@ fn read_head() -> Result<(Bound, Value)> {
     let v = bound(&b, false)?;
     Ok((b, v))
 }
-fn eligible_snapshot<'a>(
-    rows: &'a [(Bound, Value)],
-    cutoff: u64,
-) -> Result<Option<&'a (Bound, Value)>> {
+fn eligible_snapshot(rows: &[(Bound, Value)], cutoff: u64) -> Result<Option<&(Bound, Value)>> {
     let cutoff = cutoff
         .checked_mul(1000)
         .context("191 queue cutoff overflow")?;
