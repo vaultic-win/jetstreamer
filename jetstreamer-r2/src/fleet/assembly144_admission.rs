@@ -186,7 +186,7 @@ pub(super) fn protected_owners(f: &Value, current: &BTreeMap<String, Value>) -> 
     // under the existing conservative protection checker.
     continuation144_protection::owners(&filtered, current)
 }
-async fn remote_floor(s3: &Client, r2: &R2Config, floor: &Value) -> Result<()> {
+pub(super) async fn remote_floor(s3: &Client, r2: &R2Config, floor: &Value) -> Result<()> {
     for proof in floor["samples"].as_array().context("floor samples")? {
         let epoch = proof["epoch"].as_u64().context("floor epoch")?;
         let remote = inventory_epoch(s3, r2, epoch).await?;

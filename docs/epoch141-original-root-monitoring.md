@@ -40,3 +40,36 @@ the actual routine observer/fleet handoff using this contract. Seal the tooling 
 prove exact unprivileged input capability, and bind the real invocation to its
 guard before leaving it unattended. Preserve the five healthy owners. This
 source change alone does not satisfy those remaining operational gates.
+
+The reviewed Rust operational commands are deliberately separate:
+
+- `prepare-original141-layout --self-sha256 HEX` stages only a fresh private
+  layout and a digest-verified cached genesis. It does not use gcloud or launch.
+- `admit-original141 SPEC --spec-sha256 HEX --self-sha256 HEX [--check-only]`
+  binds the accepted five-lane observer/fleet/plan, century floor, current guards,
+  private layout and retained growth claims. The check-only path reads existing
+  evidence without sampling resources, contacting R2 or writing admission.
+  Actual admission additionally checks current owners, free disk, available
+  memory, CPU quotas and VMA limits, and authenticates the century-floor pair.
+- `capture-original141-launch SPEC --spec-sha256 HEX --self-sha256 HEX`
+  records an already running, guarded owner. It never starts the service.
+
+Admission requires ordered `growth_extension_observers` linking each retained
+growth receipt's final sample to the current accepted sample. Only the sealed
+controller-only recovery mapping may bridge changed controller identities;
+producer, worker and scratch identities must remain unchanged. Compaction cannot
+reduce the previous maximum: the extended minimum remains twice the maximum
+physical scratch observed over all retained windows plus twice the verified
+maximum archive size. The original live controllers' claims are never edited.
+
+The capture specification supplies both `first_guard_source` and `first_guard`.
+The former identifies the exact `sample-INVOCATION.json` emitted beneath
+`/var/lib/jetstreamer/horizon-original141-root-guard-20261023-v1`; the latter is
+the fixed private `receipts/first-guard.json`. Both digests must match. Capture
+requires a successful actual timer invocation of
+`horizon-original141-root-guard-20261023-v1.service`, the exact sealed guard
+command and sandbox, a recent one-worker no-trip sample, and absence of stop
+intents. It pins the original bytes with no-clobber publication and fsyncs the
+file and parent directory. A manual guard run cannot substitute for the timer
+trigger evidence. Preserve a pin if a later capture step rejects; investigate
+that rejection rather than replacing existing evidence.
