@@ -14,6 +14,7 @@ epoch227-native-main-guard = []
 # Reuse the native observer, with one additional closed 207 tuple. Each plan
 # must match its full tuple; this remains compatible with utils --all-features.
 epoch207-native-main-guard = ["epoch227-native-main-guard"]
+epoch227-singleton-guard = []
 epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]
 # Pins the separate bounded epoch225 upstream-comparison worker, not an era.
@@ -54,6 +55,10 @@ path = "src/epoch227_input_capability_bin.rs"
 [[bin]]
 name = "jetstreamer-epoch207-singleton-prepare"
 path = "src/epoch207_singleton_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch227-native-retain"
+path = "src/epoch227_native_retain_bin.rs"
 
 [[bin]]
 name = "clickhouse-server"
