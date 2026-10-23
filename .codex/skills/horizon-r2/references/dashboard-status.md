@@ -18,6 +18,11 @@ Absence means no published live estimate; it never means the epoch is storage-co
 - Refresh at the existing coordinated 30-minute cadence and handle authenticated failure,
   completion and phase-handoff events promptly. Do not create another routine polling loop or
   restart healthy producers to improve the display.
+  When observation and metadata publication use separate oneshot services, give the metadata
+  service `Requires=` and `After=` dependencies on that exact observer service. A fixed timer
+  offset does not prove its receipt is ready. If metadata fails before writing because that
+  receipt is absent, preserve the failure, confirm its output is absent, and retry only the same
+  metadata plan once after successful observer completion. Do not repeat the observation.
 - Bind every estimate to the actual invocation, sample time, current progress and phase. Recompute
   remaining replay from measured rates and the real publication gate, including queued members of
   a legacy cohort. Include archive close/import, independent full/current-plugin checks, upload,
@@ -26,6 +31,10 @@ Absence means no published live estimate; it never means the epoch is storage-co
   contention. Do not mechanically count down an old estimate, clamp an overdue job to zero, insist
   that ETAs decrease monotonically, or conceal a slowdown to keep the dashboard looking stable.
   Keep the required JSON integers and use `sampled_at_utc` and `phase` honestly.
+  A projection exceeding an execution runtime cap is risk, not a reason to suppress an otherwise
+  valid numeric forecast. Preserve the measured rate, include separate continuation and delivery
+  work, and record the signed runtime margin and unresolved recovery assumptions privately.
+  Publishing that forecast grants no runtime extension or checkpoint-resume authority.
 - A running producer with temporarily missing rates is not inactive. Never invent a replacement
   estimate after an estimator fails closed. Treat a stale or invalid projection, failed status
   publication, unsupported downstream phase or missing authenticated readback as an operational
