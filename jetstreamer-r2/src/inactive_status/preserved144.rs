@@ -69,6 +69,9 @@ fn evidence(p: &Plan, i: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn owner(p: &Plan, i: &Value, r: &StatusPublicationReceipt) -> Result<()> {
+    if publication144::recognized(i) {
+        return publication144::owner(p, i, r);
+    }
     scope(p, i)?;
     let b = r
         .pipeline_binding
@@ -126,6 +129,9 @@ pub(super) fn terminal_census(
     i: &Value,
     current: &BTreeMap<String, Value>,
 ) -> Result<()> {
+    if publication144::recognized(i) {
+        return publication144::terminal_census(p, i, current);
+    }
     scope(p, i)?;
     for (name, capture) in [(PUB, &i["publisher"]["publisher"]), (UPLOAD, &i["owner"])] {
         let v = current
@@ -163,6 +169,9 @@ fn identity(m: &fs::Metadata) -> Value {
     ])
 }
 pub(super) fn local(p: &Plan, i: &Value) -> Result<()> {
+    if publication144::recognized(i) {
+        return publication144::local(p, i);
+    }
     evidence(p, i)?;
     ensure!(
         p.public_archive_directory.canonicalize()? == p.public_archive_directory,
