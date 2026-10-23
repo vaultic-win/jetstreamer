@@ -9,7 +9,7 @@ the current Rust1.98 compiler and compatible, read-only release dependency rlibs
 do not write the modern Cargo target. Cached rlibs from historical compilers or
 different serde-core feature identities are not interchangeable.
 
-The only profiles are the fixed native-build unit
+The build and canary profiles are the fixed native-build unit
 `horizon-v1425-portability-native-build-20261023-v1.service` and the explicitly
 selected `--canary` disposable unit
 `horizon-v1425-os-budget-canary-20261023-v1.service`. There is no arbitrary unit,
@@ -115,3 +115,30 @@ an external actor. Subsequent builds use the sealed persistent fixed unit,
 with TMPDIR/TMP/TEMP inside its guarded legacy artifact tree and private `/tmp`
 and `/var/tmp` mounted read-only. Cargo1.46 requires the worker package manifest
 when selecting features; the virtual workspace manifest rejects `--features`.
+
+The v4 guard adds exactly one `fixture` profile, requiring the separate
+`--fixture` flag, for
+`horizon-v1425-native-portability-fixture-20261023-v1.service`. Its only root is
+`/var/lib/jetstreamer-checkpoint-fixtures/native-v1425-capped-20261023-v1`,
+maximum10737418240physical bytes. Its minimum209506426310free bytes preserves
+the205211459014floor plus4GiB modern-builder reservation. The build/canary
+thresholds, roots and stop logic remain unchanged. Combined, duplicated and
+foreign profile flags are denied. Fixture receipts are separately rooted at
+`/var/lib/jetstreamer-v1425-os-guard-fixture-20261023-v1/receipts/IID`.
+The fixture permits no aliases, nonregular members or external hardlinks: an
+additional bounded, descriptor-anchored census requires UID1001, the same
+device, singly linked regular files and a stable root. The jemalloc exceptions
+are confined to the original exact build tree and cannot enter this profile.
+
+The v4 native-sealed package is
+`/usr/local/lib/jetstreamer/horizon-v1425-os-experiment-guard-20261023-v4`,
+guard SHA `45fa9fddf425bef2fa65fe92ab77ee603e5895d5f4db2912b1818a81d2b8c4b5`.
+Strict compilation and15ordinary tests passed, including fixture scope, flag,
+cap, alias, hardlink and nonregular-member regressions. Its actual canary stop
+completed for invocation `cd88d115522e43d1b7c67f2c93dc32ee`, receipt SHA
+`4c81a575df84dab0ddc0a273d6de41e78a39ceae56d3aa6cba64be0e3abfe74b`;
+the idempotent recovery also passed. The package includes a proposed persistent
+`native-fixture.service` with only the exact saved test executable/invocation,
+guarded TMPDIR, private network and the admitted resource envelope. That fixture
+unit has not been installed or started; the runtime fixture remains unexecuted
+pending parent review of the launch plan and completion-event OS admission.

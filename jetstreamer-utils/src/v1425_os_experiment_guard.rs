@@ -8,6 +8,7 @@ use std::{
     os::unix::{
         ffi::OsStrExt,
         fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+        io::AsRawFd,
     },
     path::Path,
     process::Command,
@@ -21,6 +22,10 @@ const BUDGET: &str =
 const BUDGET_SHA: &str = "2e95927a3c49972630c9de458e32359a859b90de7b0fa9b195d6dbb1083ed620";
 const BUILD_UNIT: &str = "horizon-v1425-portability-native-build-20261023-v1.service";
 const CANARY_UNIT: &str = "horizon-v1425-os-budget-canary-20261023-v1.service";
+const FIXTURE_UNIT: &str = "horizon-v1425-native-portability-fixture-20261023-v1.service";
+const FIXTURE_ROOT: &str =
+    "/var/lib/jetstreamer-checkpoint-fixtures/native-v1425-capped-20261023-v1";
+const FIXTURE_MIN_FREE: u64 = 209_506_426_310;
 const LEGACY_ROOT: &str =
     "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/legacy-v1-4-25";
 const MIN_FREE: u64 = 220_243_844_550;
@@ -34,30 +39,41 @@ const BUILD_ALIASES: [&str; 2] = [
 enum Profile {
     Build,
     Canary,
+    Fixture,
 }
 impl Profile {
     fn unit(self) -> &'static str {
         match self {
             Self::Build => BUILD_UNIT,
             Self::Canary => CANARY_UNIT,
+            Self::Fixture => FIXTURE_UNIT,
         }
     }
     fn root(self) -> &'static str {
         match self {
             Self::Build => LEGACY_ROOT,
             Self::Canary => "/var/lib/jetstreamer-v1425-os-guard-canary-20261023-v1/tree",
+            Self::Fixture => FIXTURE_ROOT,
         }
     }
     fn receipts(self) -> &'static str {
         match self {
             Self::Build => "/var/lib/jetstreamer-v1425-os-guard-build-20261023-v1/receipts",
             Self::Canary => "/var/lib/jetstreamer-v1425-os-guard-canary-20261023-v1/receipts",
+            Self::Fixture => "/var/lib/jetstreamer-v1425-os-guard-fixture-20261023-v1/receipts",
         }
     }
     fn maximum(self) -> u64 {
         match self {
             Self::Build => MAX_LEGACY,
             Self::Canary => 16 << 10,
+            Self::Fixture => 10 << 30,
+        }
+    }
+    fn minimum(self) -> u64 {
+        match self {
+            Self::Fixture => FIXTURE_MIN_FREE,
+            Self::Build | Self::Canary => MIN_FREE,
         }
     }
 }
@@ -139,7 +155,7 @@ fn record(path: &Path) -> Result<Option<Value>> {
         Ok(_) => Ok(Some(serde_json::from_slice(&read_regular(path, true)?)?)),
     }
 }
-fn parse_plan(v: &Value, canary: bool) -> Result<(Profile, String, String)> {
+fn parse_plan(v: &Value, canary: bool, fixture: bool) -> Result<(Profile, String, String)> {
     let fields = v.as_object().context("guard plan object")?;
     ensure!(
         fields.len() == 5
@@ -153,9 +169,10 @@ fn parse_plan(v: &Value, canary: bool) -> Result<(Profile, String, String)> {
             .contains(&k.as_str())),
         "unknown guard plan field"
     );
-    let profile = match (v["profile"].as_str(), canary) {
-        (Some("build"), false) => Profile::Build,
-        (Some("disposable-canary"), true) => Profile::Canary,
+    let profile = match (v["profile"].as_str(), canary, fixture) {
+        (Some("build"), false, false) => Profile::Build,
+        (Some("disposable-canary"), true, false) => Profile::Canary,
+        (Some("fixture"), false, true) => Profile::Fixture,
         _ => anyhow::bail!("foreign guard profile"),
     };
     let iid = v["invocation_id"].as_str().context("target invocation")?;
@@ -171,7 +188,7 @@ fn parse_plan(v: &Value, canary: bool) -> Result<(Profile, String, String)> {
 }
 fn unit(name: &str) -> Result<Value> {
     ensure!(
-        matches!(name, BUILD_UNIT | CANARY_UNIT),
+        matches!(name, BUILD_UNIT | CANARY_UNIT | FIXTURE_UNIT),
         "foreign target unit"
     );
     let o = Command::new("/usr/bin/systemctl").args(["show", name, "--no-pager",
@@ -468,6 +485,9 @@ fn tree_with_aliases(
     Ok(tree)
 }
 fn tree_sample(root: &Path, maximum: u64, device: u64) -> Result<Value> {
+    if root == Path::new(FIXTURE_ROOT) {
+        closed_fixture_members(root, device, 1001)?;
+    }
     tree_with_aliases(
         root,
         maximum,
@@ -480,6 +500,79 @@ fn tree_sample(root: &Path, maximum: u64, device: u64) -> Result<Value> {
         1001,
     )
 }
+fn closed_fixture_members(root: &Path, device: u64, uid: u32) -> Result<()> {
+    ensure!(root.canonicalize()? == root, "aliased fixture root");
+    let directory = |path: &Path| -> Result<File> {
+        Ok(OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(path)?)
+    };
+    let root_fd = directory(root)?;
+    let root_id = root_fd.metadata()?;
+    let mut stack = vec![(root_fd, 0u32)];
+    let mut count = 0u64;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while let Some((fd, depth)) = stack.pop() {
+        ensure!(
+            depth <= 128 && Instant::now() < deadline,
+            "fixture link census exceeded bound"
+        );
+        let m = fd.metadata()?;
+        ensure!(
+            m.dev() == device && m.uid() == uid,
+            "foreign fixture directory"
+        );
+        for entry in fs::read_dir(format!("/proc/self/fd/{}", fd.as_raw_fd()))? {
+            count += 1;
+            ensure!(
+                count <= 65536 && Instant::now() < deadline,
+                "fixture member census exceeded bound"
+            );
+            let path = entry?.path();
+            let m = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e.into()),
+            };
+            ensure!(
+                m.dev() == device && m.uid() == uid && !m.file_type().is_symlink(),
+                "fixture contains foreign member or alias"
+            );
+            if m.is_dir() {
+                let child = match directory(&path) {
+                    Ok(f) => f,
+                    Err(e)
+                        if e.downcast_ref::<std::io::Error>()
+                            .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
+                    {
+                        continue
+                    }
+                    Err(e) => return Err(e),
+                };
+                ensure!(
+                    child.metadata()?.ino() == m.ino(),
+                    "fixture directory changed"
+                );
+                stack.push((child, depth + 1));
+            } else {
+                ensure!(
+                    m.is_file() && m.nlink() == 1,
+                    "fixture contains external hardlink or nonregular member"
+                );
+            }
+        }
+    }
+    let after = fs::symlink_metadata(root)?;
+    ensure!(
+        root.canonicalize()? == root
+            && after.is_dir()
+            && after.dev() == root_id.dev()
+            && after.ino() == root_id.ino(),
+        "fixture root changed during closed member census"
+    );
+    Ok(())
+}
 fn sample(profile: Profile) -> Result<Value> {
     let free = available(Path::new("/var/lib"))?;
     let tree = tree_sample(Path::new(profile.root()), profile.maximum(), 2304)?;
@@ -487,14 +580,14 @@ fn sample(profile: Profile) -> Result<Value> {
         .as_u64()
         .context("physical total")?;
     Ok(
-        json!({"available_bytes":free,"minimum_free_bytes":MIN_FREE,"tree":tree,
-        "trip":exceeds(free,MIN_FREE,physical,profile.maximum()),"device":2304}),
+        json!({"available_bytes":free,"minimum_free_bytes":profile.minimum(),"tree":tree,
+        "trip":exceeds(free,profile.minimum(),physical,profile.maximum()),"device":2304}),
     )
 }
 fn intent_descriptor(profile: Profile, plan_sha: &str, iid: &str, start: &str) -> Value {
     json!({"schema":"jetstreamer-v1425-os-guard-stop-intent-v2","unit":profile.unit(),
         "invocation_id":iid,"start_monotonic":start,"plan_sha256":plan_sha,"budget_sha256":BUDGET_SHA,
-        "tree":profile.root(),"minimum_free_bytes":MIN_FREE,"maximum_physical_bytes":profile.maximum(),
+        "tree":profile.root(),"minimum_free_bytes":profile.minimum(),"maximum_physical_bytes":profile.maximum(),
         "replay_signal_authorized":false,"r2_mutations":false})
 }
 fn transition(
@@ -608,6 +701,25 @@ fn has_stop_lineage(
     }
     Ok(false)
 }
+fn profile_flags(options: &[String]) -> Result<(bool, bool, bool)> {
+    ensure!(
+        options.len() <= 2
+            && options
+                .iter()
+                .all(|s| matches!(s.as_str(), "--check-only" | "--canary" | "--fixture"))
+            && options
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                == options.len(),
+        "unknown or duplicate guard option"
+    );
+    let check = options.iter().any(|s| s == "--check-only");
+    let canary = options.iter().any(|s| s == "--canary");
+    let fixture = options.iter().any(|s| s == "--fixture");
+    ensure!(!(canary && fixture), "combined guard profiles denied");
+    Ok((check, canary, fixture))
+}
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
     let a: Vec<_> = std::env::args().collect();
@@ -617,24 +729,16 @@ fn run() -> Result<()> {
             && a[4] == "--self-sha256"
             && digest(&a[3], 64)
             && digest(&a[5], 64),
-        "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only] [--canary]"
+        "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only] [--canary|--fixture]"
     );
-    ensure!(
-        a[6..]
-            .iter()
-            .all(|s| matches!(s.as_str(), "--check-only" | "--canary"))
-            && a.len() <= 8,
-        "unknown guard option"
-    );
-    let check = a[6..].contains(&"--check-only".into());
-    let canary = a[6..].contains(&"--canary".into());
+    let (check, canary, fixture) = profile_flags(&a[6..])?;
     ensure!(
         sha(&fs::read("/proc/self/exe")?) == a[5],
         "guard executable hash mismatch"
     );
     let bytes = read_regular(Path::new(&a[1]), true)?;
     ensure!(sha(&bytes) == a[3], "guard plan hash mismatch");
-    let (profile, iid, start) = parse_plan(&serde_json::from_slice(&bytes)?, canary)?;
+    let (profile, iid, start) = parse_plan(&serde_json::from_slice(&bytes)?, canary, fixture)?;
     let budget = read_regular(Path::new(BUDGET), true)?;
     ensure!(sha(&budget) == BUDGET_SHA, "immutable OS budget mismatch");
     let b: Value = serde_json::from_slice(&budget)?;
@@ -645,7 +749,12 @@ fn run() -> Result<()> {
             && b["minimum_retained_free_bytes"]
                 .as_u64()
                 .and_then(|n| n.checked_add(14 << 30))
-                == Some(MIN_FREE),
+                == Some(MIN_FREE)
+            && b["minimum_retained_free_bytes"]
+                .as_u64()
+                .and_then(|n| n.checked_add(4 << 30))
+                == Some(FIXTURE_MIN_FREE)
+            && b["reservations"]["fixture_maximum_physical_bytes"] == Profile::Fixture.maximum(),
         "OS guard budget scope mismatch"
     );
     let receipt_root = Path::new(profile.receipts());
@@ -890,10 +999,78 @@ mod tests {
     fn closed_profiles_cannot_select_arbitrary_tree_or_unit() {
         let mut p = json!({"schema":"jetstreamer-v1425-os-experiment-guard-plan-v2","profile":"build",
             "budget":{"path":BUDGET,"sha256":BUDGET_SHA},"invocation_id":"a".repeat(32),"start_monotonic":"123"});
-        assert!(parse_plan(&p, false).is_ok());
-        assert!(parse_plan(&p, true).is_err());
+        assert!(parse_plan(&p, false, false).is_ok());
+        assert!(parse_plan(&p, true, false).is_err());
         p["unit"] = json!("other.service");
-        assert!(parse_plan(&p, false).is_err());
+        assert!(parse_plan(&p, false, false).is_err());
+    }
+    #[test]
+    fn fixture_role_scope_caps_and_flags_cannot_change_other_profiles() {
+        let p = json!({"schema":"jetstreamer-v1425-os-experiment-guard-plan-v2","profile":"fixture",
+            "budget":{"path":BUDGET,"sha256":BUDGET_SHA},"invocation_id":"a".repeat(32),"start_monotonic":"123"});
+        let (role, _, _) = parse_plan(&p, false, true).unwrap();
+        assert_eq!(role.unit(), FIXTURE_UNIT);
+        assert_eq!(role.root(), FIXTURE_ROOT);
+        assert_eq!(role.minimum(), 209506426310);
+        assert_eq!(role.maximum(), 10u64 << 30);
+        assert!(role.receipts().contains("guard-fixture"));
+        assert!(parse_plan(&p, false, false).is_err());
+        assert!(parse_plan(&p, true, true).is_err());
+        assert!(parse_plan(&p, true, false).is_err());
+        let mut foreign = p.clone();
+        foreign["root"] = json!(LEGACY_ROOT);
+        assert!(parse_plan(&foreign, false, true).is_err());
+        let opts = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(profile_flags(&opts(&["--fixture", "--check-only"])).is_ok());
+        assert!(profile_flags(&opts(&["--fixture", "--canary"])).is_err());
+        assert!(profile_flags(&opts(&["--fixture", "--fixture"])).is_err());
+        assert!(profile_flags(&opts(&["--foreign"])).is_err());
+        assert_eq!(Profile::Build.unit(), BUILD_UNIT);
+        assert_eq!(Profile::Build.root(), LEGACY_ROOT);
+        assert_eq!(Profile::Build.minimum(), MIN_FREE);
+        assert_eq!(Profile::Build.maximum(), MAX_LEGACY);
+        assert_eq!(Profile::Canary.unit(), CANARY_UNIT);
+        assert_eq!(Profile::Canary.minimum(), MIN_FREE);
+        assert_eq!(Profile::Canary.maximum(), 16 << 10);
+        assert!(!exceeds(
+            role.minimum(),
+            role.minimum(),
+            role.maximum(),
+            role.maximum()
+        ));
+        assert!(exceeds(
+            role.minimum() - 1,
+            role.minimum(),
+            0,
+            role.maximum()
+        ));
+        assert!(exceeds(
+            role.minimum(),
+            role.minimum(),
+            role.maximum() + 1,
+            role.maximum()
+        ));
+    }
+    #[test]
+    fn fixture_members_reject_all_aliases_external_links_and_foreign_objects() {
+        let d = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let dev = fs::metadata(d.path()).unwrap().dev();
+        let uid = unsafe { libc::geteuid() };
+        fs::write(d.path().join("member"), b"fixture").unwrap();
+        assert!(closed_fixture_members(d.path(), dev, uid).is_ok());
+        std::os::unix::fs::symlink("member", d.path().join("alias")).unwrap();
+        assert!(closed_fixture_members(d.path(), dev, uid).is_err());
+        fs::remove_file(d.path().join("alias")).unwrap();
+        fs::hard_link(d.path().join("member"), outside.path().join("external")).unwrap();
+        assert!(closed_fixture_members(d.path(), dev, uid).is_err());
+        fs::remove_file(outside.path().join("external")).unwrap();
+        assert!(closed_fixture_members(d.path(), dev + 1, uid).is_err());
+        assert!(closed_fixture_members(d.path(), dev, uid + 1).is_err());
+        let fifo = d.path().join("fifo");
+        let c = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(c.as_ptr(), 0o600) }, 0);
+        assert!(closed_fixture_members(d.path(), dev, uid).is_err());
     }
     #[test]
     fn stop_frontiers_retry_and_reused_owner_never_receives_stop() {
