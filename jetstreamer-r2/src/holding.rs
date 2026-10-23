@@ -5,6 +5,8 @@ use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
 #[path = "holding_epoch136.rs"]
 mod epoch136;
+#[path = "holding_framing136.rs"]
+mod framing136;
 
 const HOST: &str = "dev-samjohnson";
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";
@@ -1124,6 +1126,9 @@ pub(super) async fn run() -> Result<()> {
     let map: Bound = serde_json::from_value(v["mapping"].clone())?;
     let m: Mapping = serde_json::from_value(bound(&map)?)?;
     mapping(&m)?; // Must pass before credentials, listing or first remote write.
+    if args[1] == "holding-probe136-framing" {
+        return framing136::run(&m, &spec, &args[6], v).await;
+    }
     private(Path::new(STATE))?;
     private(&Path::new(STATE).join("receipts"))?;
     let mut lock = OpenOptions::new()

@@ -3347,6 +3347,7 @@ async fn main() -> Result<()> {
         env::args().nth(1).as_deref(),
         Some(
             "holding-park"
+                | "holding-probe136-framing"
                 | "holding-restore"
                 | "holding-admit-restore"
                 | "holding-restore-genesis-probe"

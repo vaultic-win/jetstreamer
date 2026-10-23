@@ -19,6 +19,8 @@ futures-util = { workspace = true, features = ["async-await", "std"] }
 md-5.workspace = true
 libc.workspace = true
 jetstreamer-horizon-observe.workspace = true
+jetstreamer-horizon.workspace = true
+lencode.workspace = true
 reqwest = { workspace = true, features = ["rustls"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["std"] }
