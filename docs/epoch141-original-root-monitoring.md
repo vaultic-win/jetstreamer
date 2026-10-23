@@ -28,8 +28,15 @@ claims, allow a conservative 768 GiB candidate increment, and meet the actual
 guard floor if higher. A successful reader test is not admission, a canonical
 root result, a resource qualification, or a throughput measurement.
 
+The routine helper can adopt a hash-bound same-sample fleet event with
+`--prepare-next-original141 SPEC --handoff-sha256 HEX`. It adds the private owner
+to the existing observer's diagnostic census and preserves the exact retained
+144 row. Both diagnostics stay outside the production ETA model. An unavailable
+diagnostic remains explicit unresolved evidence; the complete fleet census and
+guard remain responsible for actual failure and ownership transitions.
+
 Before launching, complete and qualify the admission/launch capture tooling and
-routine observer/fleet handoff using this contract. Seal the tooling and plans,
+the actual routine observer/fleet handoff using this contract. Seal the tooling and plans,
 prove exact unprivileged input capability, and bind the real invocation to its
 guard before leaving it unattended. Preserve the five healthy owners. This
 source change alone does not satisfy those remaining operational gates.

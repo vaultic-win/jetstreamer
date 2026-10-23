@@ -320,6 +320,7 @@ pub(super) fn prepare(
         || scans_spec.is_some()
         || acquisition_spec.is_some()
         || mode == "--prepare-next-publication144"
+        || mode == "--prepare-next-original141"
     {
         None
     } else {
@@ -390,7 +391,9 @@ pub(super) fn prepare(
     let effective = repair185::effective_model(&next, &effective)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
-    if prefix_spec.is_none() || mode == "--prepare-next-completed144" {
+    if (prefix_spec.is_none() && mode != "--prepare-next-original141")
+        || mode == "--prepare-next-completed144"
+    {
         latest_fleet_unchanged(&next, &fleet)?;
     }
     for tool in [&next.tools.sealer, &next.tools.estimator, &next.tools.r2] {
@@ -514,6 +517,16 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         publication144::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-original141" {
+        original141::enable(
+            &mut next,
+            &mut next_config,
+            handoff_spec.context("original141 handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        original141::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     if mode == "--prepare-next-upload198" {
         ensure!(

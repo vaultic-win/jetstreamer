@@ -25,7 +25,8 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
                 || (p.runtime_handoff157.is_some() && runtime157::writer(p))
                 || (delivery198::pending(p)
                     && p.tools.r2.path == Path::new(delivery198::HANDOFF_WRITER)
-                    && p.tools.r2.sha256 == delivery198::HANDOFF_WRITER_SHA),
+                    && p.tools.r2.sha256 == delivery198::HANDOFF_WRITER_SHA)
+                || original141::reader(p),
             "private144 requires its qualified fleet/status writer"
         );
         ensure!(

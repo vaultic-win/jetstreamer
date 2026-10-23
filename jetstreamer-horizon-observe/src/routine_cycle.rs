@@ -53,6 +53,8 @@ mod repair183_fleet_recovery;
 #[path = "routine_repair185_fleet_recovery.rs"]
 mod repair185_fleet_recovery;
 
+#[path = "routine_original141.rs"]
+mod original141;
 #[path = "routine_private144.rs"]
 mod private144;
 
@@ -167,6 +169,8 @@ struct Plan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     native141_audit: Option<native141::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    original141_root: Option<original141::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_scans: Option<assembly144_scans::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     publication144: Option<publication144::Profile>,
@@ -197,7 +201,7 @@ fn is_101(p: &Plan) -> Result<bool> {
         (PLAN_SCHEMA, None) => Ok(false),
         (PLAN_SCHEMA_101, Some(scope)) => {
             ensure!(
-                scope.diagnostic_ranges.len() <= 1,
+                scope.diagnostic_ranges.len() <= if original141::enabled(p) { 2 } else { 1 },
                 "unsupported diagnostic census"
             );
             let unique: BTreeSet<_> = scope.additional_tracked_units.iter().collect();
@@ -214,13 +218,14 @@ fn is_101(p: &Plan) -> Result<bool> {
             );
             for d in &scope.diagnostic_ranges {
                 ensure!(
-                    d.range == "144"
+                    (d.range == "144"
                         && (d.controller_unit
                             == "horizon-qualify-epoch144-loader-focus-20261016-v1.service"
                             && p.native144_restore.is_none()
                             || native144::owner(p, d)
                             || continuation144::owner(p, d)
                             || assembly144::owner(p, d))
+                        || original141::owner(p, d))
                         && d.producer_unit == d.controller_unit
                         && d.expected_controller_invocation_id == d.expected_producer_invocation_id,
                     "unsupported private diagnostic owner/scope"
@@ -240,7 +245,12 @@ fn is_101(p: &Plan) -> Result<bool> {
             }
             if scope.private144_observer {
                 ensure!(
-                    scope.diagnostic_ranges.len() == 1
+                    scope
+                        .diagnostic_ranges
+                        .iter()
+                        .filter(|d| d.range == "144")
+                        .count()
+                        == 1
                         && (scope.diagnostic_ranges[0].expected_producer_invocation_id
                             == private144::INVOCATION
                             && p.native144_restore.is_none()
@@ -248,6 +258,19 @@ fn is_101(p: &Plan) -> Result<bool> {
                             || continuation144::owner(p, &scope.diagnostic_ranges[0])
                             || assembly144::owner(p, &scope.diagnostic_ranges[0])),
                     "private144 observer requires exact retained diagnostic owner"
+                );
+            }
+            if original141::enabled(p) {
+                ensure!(
+                    scope.private144_observer
+                        && scope.diagnostic_ranges.len() == 2
+                        && scope
+                            .diagnostic_ranges
+                            .iter()
+                            .filter(|d| original141::owner(p, d))
+                            .count()
+                            == 1,
+                    "original141 requires exact retained144 plus private141 owners"
                 );
             }
             Ok(true)
@@ -260,6 +283,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if original141::enabled(p) {
+        return "original141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if p.repair185_handoff.is_some() {
         return "repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -710,6 +736,7 @@ fn validate_templates(
             && fleet["observer"]["path"].as_str() == p.previous_observer.path.to_str()
             && fleet["observer"]["sha256"] == p.previous_observer.sha256
             && (fleet["admission_transition_guard"].is_null()
+                || original141::transition_template(p, fleet)?
                 || prefix157::transition_template(p, fleet)?
                 || prefix144::transition_template(p, fleet)?
                 || native144::transition_template(p, fleet)?
@@ -763,6 +790,7 @@ fn validate_templates(
     continuation144::validate(p)?;
     assembly144::validate(p)?;
     native141::validate(p)?;
+    original141::validate(p)?;
     census141_poh::validate(p)?;
     assembly144_scans::validate(p)?;
     publication144::validate(p)?;
@@ -930,6 +958,10 @@ fn validate_diagnostics(p: &Plan, model: &Value, value: &Value, observed: bool) 
         return Ok(());
     };
     if scope.private144_observer {
+        if original141::enabled(p) {
+            let old = original141::diagnostics(p, model, value, observed)?;
+            return private144::validate(p, model, &old, observed);
+        }
         return private144::validate(p, model, value, observed);
     }
     for d in &scope.diagnostic_ranges {
@@ -1218,6 +1250,7 @@ fn apply_known_action_corrections(p: &Plan, fleet: &mut Value) -> Result<()> {
 fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(Value, Value)> {
     let mut model = model.clone();
     let mut fleet = fleet.clone();
+    original141::consume_transition(p, &mut fleet)?;
     model["sample_target_utc"] = json!(p.sample_target_utc);
     if is_101(p)? {
         let evidence = model["evidence"].as_array_mut().context("model evidence")?;
@@ -1274,6 +1307,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     publication144::derive_fleet(p, &mut fleet)?;
     repair183::derive_fleet(p, &mut fleet)?;
     repair185::derive_fleet(p, &mut fleet)?;
+    original141::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1481,6 +1515,8 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     let estimates = bound_json(&p.previous_estimates, false)?;
     let old_observer = bound_json(&p.previous_observer, false)?;
     validate_templates(p, &model, &fleet, &previous, &estimates, &old_observer)?;
+    let mut fleet = fleet;
+    original141::consume_transition(p, &mut fleet)?;
     terminal_handoff::preflight(p, &model)?;
     let model = private144::effective_model(
         p,
@@ -1518,6 +1554,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     publication144::derive_fleet(p, &mut fleet.clone())?;
     repair183::derive_fleet(p, &mut fleet.clone())?;
     repair185::derive_fleet(p, &mut fleet.clone())?;
+    original141::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1830,6 +1867,7 @@ fn main() {
                             | "--prepare-next-census141-poh"
                             | "--prepare-next-publication144"
                             | "--prepare-next-native141-rejection"
+                            | "--prepare-next-original141"
                             | "--prepare-next-native141-acquisition"
                             | "--prepare-next-assembly144-scans"
                             | "--prepare-next-native198"
@@ -2062,6 +2100,7 @@ mod tests {
             "--prepare-next-native141-all-retry"
         ));
         assert!(super::preparation_mode("--prepare-next"));
+        assert!(super::preparation_mode("--prepare-next-original141"));
         assert!(super::preparation_mode("--prepare-package-recovery"));
         for mode in [
             "--check-only",

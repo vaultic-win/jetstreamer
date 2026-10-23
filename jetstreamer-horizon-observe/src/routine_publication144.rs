@@ -42,7 +42,8 @@ pub(super) fn composite_reader(p: &Plan) -> bool {
         && ((p.tools.r2.path == Path::new(COMPOSITE_READER)
             && p.tools.r2.sha256 == COMPOSITE_READER_SHA)
             || (p.tools.r2.path == Path::new(HISTORY_READER)
-                && p.tools.r2.sha256 == HISTORY_READER_SHA))
+                && p.tools.r2.sha256 == HISTORY_READER_SHA)
+            || original141::reader(p))
 }
 const ACTIVE: &str = "Track exact144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
 const SUCCESS: &str = "Exact144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
