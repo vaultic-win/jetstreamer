@@ -90,6 +90,14 @@ fn remaining(start: u64, sample: u64, budget: u64) -> Result<u64> {
     Ok(n)
 }
 pub(crate) fn publish(p: &Plan, prior_pipeline: &Value, observer: &Bound) -> Result<Value> {
+    publish_using(p, prior_pipeline, observer, &p.tools.r2)
+}
+pub(crate) fn publish_using(
+    p: &Plan,
+    prior_pipeline: &Value,
+    observer: &Bound,
+    writer: &Bound,
+) -> Result<Value> {
     let Some(profile) = &p.publication144 else {
         return Ok(json!({"enabled":false}));
     };
@@ -159,7 +167,7 @@ pub(crate) fn publish(p: &Plan, prior_pipeline: &Value, observer: &Bound) -> Res
         let capture = p
             .cycle_directory
             .join(format!("child-publication144-{name}.json"));
-        if let Err(e) = child(&p.tools.r2, &args, !check, &capture) {
+        if let Err(e) = child(writer, &args, !check, &capture) {
             return Ok(
                 json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":bound(capture,false)?,"reason":format!("Exact144 status needs prompt repair:{e:#}"),"archive_mutations":false}),
             );
