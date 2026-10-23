@@ -110,6 +110,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     let mv = bound_json(&model, true)?;
     let fv = bound_json(&fleet_plan, true)?;
     corrected_fleet(&fv)?;
+    repair183::validate_live(p)?;
     repair183::effective_model(p, &bound_json(&p.model_template, true)?)?;
     let provisional_plan = Bound {
         path: p

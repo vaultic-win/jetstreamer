@@ -1450,6 +1450,7 @@ fn verify_estimates(
 }
 
 fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Result<()> {
+    repair183::validate_live(p)?;
     let model = bound_json(&p.model_template, true)?;
     let fleet = bound_json(&p.fleet_template, true)?;
     let previous = bound_json(&p.previous_fleet, false)?;

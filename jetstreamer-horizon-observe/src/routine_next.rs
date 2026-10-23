@@ -371,6 +371,7 @@ pub(super) fn prepare(
             &delivery198::preparation_model(&next, &model, delivery_spec)?,
         )?,
     )?;
+    let effective = repair183::effective_model(&next, &effective)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     if prefix_spec.is_none() || mode == "--prepare-next-completed144" {

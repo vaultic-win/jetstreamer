@@ -250,8 +250,11 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
         "repair183 admission does not bind the exact prelaunch observer"
     );
     guard(&h, &bound_json(&h.guard_first_fire, true)?)?;
-    live_guard(&h)?;
     Ok(Some(h))
+}
+pub(super) fn validate_live(p: &Plan) -> Result<()> {
+    if let Some(h) = proof(p)? { live_guard(&h)?; }
+    Ok(())
 }
 pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> {
     if let Some(h) = proof(p)? {
