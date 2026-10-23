@@ -559,6 +559,22 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
         && pin["r2_mutations"] == false
 }
 
+fn supported_unit(plan: &Plan) -> bool {
+    if plan.unit.starts_with("horizon-qualify-") {
+        return true;
+    }
+    // Only the separately admitted203 native comparator may use this namespace.
+    // Do not extend this to arbitrary native units or bounded-stop exemptions.
+    plan.unit == "horizon-native-203-0158-v1.service"
+        && plan.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/epoch203-native-0158-v1")
+        && plan.filesystem == Path::new("/")
+        && plan.minimum_free_bytes >= 2_687_830_606_739
+        && plan.maximum_worker_vmas == 3_500_000
+        && plan.bounded_measurement.is_none()
+        && plan.bounded_canary.is_none()
+}
+
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
     let args: Vec<_> = env::args().collect();
@@ -590,7 +606,7 @@ fn run() -> Result<()> {
     }
     ensure!(
         plan.schema == "jetstreamer-horizon-standalone-guard-plan-v1"
-            && plan.unit.starts_with("horizon-qualify-")
+            && supported_unit(&plan)
             && plan.unit.ends_with(".service")
             && plan
                 .unit
@@ -861,6 +877,40 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native203_guard_namespace_is_exact_and_keeps_all_resource_gates() {
+        let mut p = Plan {
+            schema: "jetstreamer-horizon-standalone-guard-plan-v1".into(),
+            unit: "horizon-native-203-0158-v1.service".into(),
+            invocation_id: "a".repeat(32),
+            filesystem: "/".into(),
+            minimum_free_bytes: 2_687_830_606_739,
+            worker_root: "/home/ubuntu/.jetstreamer-private/epoch203-native-0158-v1".into(),
+            maximum_worker_vmas: 3_500_000,
+            receipt_directory: "/sealed/receipts".into(),
+            bounded_measurement: None,
+            bounded_canary: None,
+        };
+        assert!(supported_unit(&p));
+        p.unit = "horizon-native-203-other.service".into();
+        assert!(!supported_unit(&p));
+        p.unit = "horizon-native-203-0158-v1.service".into();
+        p.minimum_free_bytes -= 1;
+        assert!(!supported_unit(&p));
+        p.minimum_free_bytes += 1;
+        p.maximum_worker_vmas += 1;
+        assert!(!supported_unit(&p));
+        p.maximum_worker_vmas -= 1;
+        p.worker_root = "/home/ubuntu/.jetstreamer-private/other".into();
+        assert!(!supported_unit(&p));
+        p.worker_root = "/home/ubuntu/.jetstreamer-private/epoch203-native-0158-v1".into();
+        p.bounded_canary = Some(BoundedCanary {
+            expected_uid: 1000,
+            target_stop_intent: "/tmp/intent".into(),
+            maximum_drainage_seconds: 180,
+        });
+        assert!(!supported_unit(&p));
+    }
     fn unit() -> Unit {
         Unit {
             load_state: "loaded".into(),
