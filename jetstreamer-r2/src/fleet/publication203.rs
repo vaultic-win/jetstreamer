@@ -556,6 +556,79 @@ fn event_scope(s: &EventSpec) -> Result<&'static str> {
     );
     Ok(name)
 }
+fn validate_phase_limits(name: &str, p: &BTreeMap<String, String>) -> Result<()> {
+    let (high, max, tasks, system, home, network, rw) = if name == PUBLISH {
+        ("8589934592", "17179869184", "512", "full", "no", "yes", "")
+    } else {
+        ensure!(name == UPLOAD, "203 unknown phase sandbox");
+        (
+            "4294967296",
+            "8589934592",
+            "1024",
+            "strict",
+            "read-only",
+            "no",
+            "/home/ubuntu/.jetstreamer-private/r2-receipts",
+        )
+    };
+    for (key, value) in [
+        ("Type", "oneshot"),
+        ("User", "root"),
+        ("Restart", "no"),
+        ("KillMode", "control-group"),
+        ("MemoryHigh", high),
+        ("MemoryMax", max),
+        ("MemorySwapMax", "0"),
+        ("CPUQuotaPerSecUSec", "8s"),
+        ("TasksMax", tasks),
+        ("ProtectSystem", system),
+        ("ProtectHome", home),
+        ("PrivateNetwork", network),
+        ("NoNewPrivileges", "yes"),
+        ("ReadWritePaths", rw),
+        ("UMask", "0077"),
+    ] {
+        ensure!(
+            p.get(key).map(String::as_str) == Some(value),
+            "203 phase sandbox differs:{key}"
+        );
+    }
+    Ok(())
+}
+fn phase_limits(name: &str) -> Result<Value> {
+    let out=ProcessCommand::new("/usr/bin/systemctl").args(["show",name,"--no-pager",
+        "--property=Type,User,Restart,KillMode,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,UMask"]).output()?;
+    ensure!(
+        out.status.success() && out.stdout.len() < 32768,
+        "203 phase sandbox unreadable"
+    );
+    let mut p = BTreeMap::new();
+    for line in std::str::from_utf8(&out.stdout)?.lines() {
+        let (key, value) = line.split_once('=').context("203 phase property syntax")?;
+        ensure!(
+            p.insert(key.to_owned(), value.to_owned()).is_none(),
+            "duplicate203 phase property"
+        );
+    }
+    // systemctl omits empty list printers; verify the empty publication write
+    // mount list through DBus when needed rather than infer absence from text.
+    if name == PUBLISH && !p.contains_key("ReadWritePaths") {
+        let out=ProcessCommand::new("/usr/bin/busctl").args(["--system","--json=short","--timeout=10s","get-property","org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1/unit/horizon_2dpublish_2d203_2dv4_2d20261023_2dv1_2eservice","org.freedesktop.systemd1.Service","ReadWritePaths"]).output()?;
+        ensure!(
+            out.status.success(),
+            "203 publication write mounts unavailable"
+        );
+        let v: Value = serde_json::from_slice(&out.stdout)?;
+        ensure!(
+            v["type"] == "as" && v["data"].as_array().is_some_and(Vec::is_empty),
+            "203 publisher has split write mounts"
+        );
+        p.insert("ReadWritePaths".into(), String::new());
+    }
+    validate_phase_limits(name, &p)?;
+    Ok(json!(p))
+}
 pub(super) fn capture() -> Result<()> {
     let (binding, self_sha) = parsed_args("capture-handoff203")?;
     let s: EventSpec = serde_json::from_value(bound_json(&binding)?)?;
@@ -659,6 +732,7 @@ pub(super) fn capture() -> Result<()> {
         "203 handoff resource evidence stale or foreign"
     );
     let after = unit(name)?;
+    let sandbox = phase_limits(name)?;
     for k in [
         "InvocationID",
         "MainPID",
@@ -675,7 +749,7 @@ pub(super) fn capture() -> Result<()> {
         &json!({"schema":"jetstreamer-exact203-phase-handoff-v1","epoch":203,"phase":s.phase,
         "sampled_at_utc":utc(time)?,"observer":private157::binding(&s.observer),"previous_fleet":private157::binding(&s.fleet),
         "source":private157::binding(&s.source),"publication_plan":private157::binding(&s.publication_plan),"origin":s.origin,
-        "owner":u,"prior_stage_terminal":prior,"claim":claim,"capture_spec":private157::binding(&binding),"self_sha256":self_sha,
+        "owner":u,"sandbox":sandbox,"prior_stage_terminal":prior,"claim":claim,"capture_spec":private157::binding(&binding),"self_sha256":self_sha,
         "resource_samples_taken":0,"phase_handoff_event":true,"grants_publication_or_upload_authority":false,"producer_mutations":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     println!("Exact203 phase handoff recorded without a resource poll or remote mutation");
@@ -908,6 +982,36 @@ mod tests {
                 &expected
             ));
         }
+    }
+    #[test]
+    fn publisher_and_delivery_caps_are_distinct_and_cannot_be_unbounded() {
+        let mut p = BTreeMap::from(
+            [
+                ("Type", "oneshot"),
+                ("User", "root"),
+                ("Restart", "no"),
+                ("KillMode", "control-group"),
+                ("MemoryHigh", "8589934592"),
+                ("MemoryMax", "17179869184"),
+                ("MemorySwapMax", "0"),
+                ("CPUQuotaPerSecUSec", "8s"),
+                ("TasksMax", "512"),
+                ("ProtectSystem", "full"),
+                ("ProtectHome", "no"),
+                ("PrivateNetwork", "yes"),
+                ("NoNewPrivileges", "yes"),
+                ("ReadWritePaths", ""),
+                ("UMask", "0077"),
+            ]
+            .map(|(k, v)| (k.to_owned(), v.to_owned())),
+        );
+        validate_phase_limits(PUBLISH, &p).unwrap();
+        assert!(validate_phase_limits(UPLOAD, &p).is_err());
+        p.insert("MemoryMax".into(), "infinity".into());
+        assert!(validate_phase_limits(PUBLISH, &p).is_err());
+        p.insert("MemoryMax".into(), "17179869184".into());
+        p.insert("ReadWritePaths".into(), "/home/ubuntu/horizon".into());
+        assert!(validate_phase_limits(PUBLISH, &p).is_err());
     }
     #[test]
     fn event_clock_round_trips_and_capture_scope_cannot_expand() {
