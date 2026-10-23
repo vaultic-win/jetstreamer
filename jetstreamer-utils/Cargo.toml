@@ -25,6 +25,8 @@ epoch203-root-prefix-resource = []
 epoch203-shrink-root-prefix-resource = ["epoch203-root-prefix-resource"]
 # Closed private cold epoch223 prefix ending at the independently known root.
 epoch223-root-prefix-resource = []
+# Private first16-slot worker envelope; never epoch or root qualification.
+epoch223-warmup-resource = []
 # Private fixed-span epoch224 measurement against its pinned v1.6.25 package.
 epoch224-bounded-resource = []
 # Dormant exact epoch205 checkpoint-prefix measurement; no ordinary replay.
@@ -82,6 +84,11 @@ path = "src/epoch223_prefix_capability_bin.rs"
 name = "jetstreamer-epoch223-root-prefix-resource"
 path = "src/epoch223_root_prefix_resource_bin.rs"
 required-features = ["epoch223-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch223-warmup-resource"
+path = "src/epoch223_warmup_resource_bin.rs"
+required-features = ["epoch223-warmup-resource"]
 
 [[bin]]
 name = "jetstreamer-gcs-metadata-observe"
