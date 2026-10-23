@@ -82,6 +82,8 @@ mod prefix144;
 mod prefix157;
 #[path = "routine_publication144.rs"]
 mod publication144;
+#[path = "routine_repair183.rs"]
+mod repair183;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -107,6 +109,8 @@ struct Plan {
     // All derived metadata uses sample_target_utc (the actual observation time).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     delayed_schedule_utc: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repair183_handoff: Option<Bound>,
     endpoint_sha256: String,
     bucket: String,
     observer: PathBuf,
@@ -248,6 +252,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.repair183_handoff.is_some() {
+        return "repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if publication144::uploading(p) && census141_poh::collected(p) {
         return "upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -748,6 +755,7 @@ fn validate_templates(
     census141_poh::validate(p)?;
     assembly144_scans::validate(p)?;
     publication144::validate(p)?;
+    repair183::extend_epochs(p, &mut epochs)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1250,6 +1258,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     census141_poh::derive_fleet(p, &mut fleet)?;
     assembly144_scans::derive_fleet(p, &mut fleet)?;
     publication144::derive_fleet(p, &mut fleet)?;
+    repair183::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1448,6 +1457,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             &delivery198::effective_model(p, &controller_recovery::model(p, &model)?)?,
         )?,
     )?;
+    let model = repair183::effective_model(p, &model)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1473,6 +1483,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     census141_poh::derive_fleet(p, &mut fleet.clone())?;
     assembly144_scans::derive_fleet(p, &mut fleet.clone())?;
     publication144::derive_fleet(p, &mut fleet.clone())?;
+    repair183::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1522,6 +1533,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
                 serde_json::from_slice(&read_checked(&p.observer, LIMIT, 0, false)?)?;
             let checked = terminal_handoff::for_observation(p, &model, &observed)?;
             let checked = cohort191::for_observation(p, &checked, &observed)?;
+            let checked = repair183::for_observation(p, &checked, &observed)?;
             validate_observation(
                 p,
                 &checked,
@@ -1543,6 +1555,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     // manifest-bound runtime transition may change the next derived model.
     let model = terminal_handoff::for_observation(p, &model, &observed)?;
     let model = cohort191::for_observation(p, &model, &observed)?;
+    let model = repair183::for_observation(p, &model, &observed)?;
     validate_observation(
         p,
         &model,

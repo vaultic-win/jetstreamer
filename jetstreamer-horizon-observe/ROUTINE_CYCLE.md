@@ -1,5 +1,43 @@
 # Routine metadata child diagnostics
 
+## Exact admitted 183–184 repair adoption
+
+The optional `repair183_handoff` binding is metadata-only and restricted to the
+new `readerfix-full-20261023` controller/producer pair. Its immutable owner-only
+`handoff.json` uses `jetstreamer-horizon-repair183-live-monitor-handoff-v1` and
+binds actual controller/producer invocation IDs, exact private scratch/archive
+siblings, the prelaunch observer, the complete admission receipt, original
+package capability and a separately sealed actual guard first-fire receipt.
+It must explicitly deny replay/publication/remote authority and new samples.
+No handoff can exist merely from a planned unit or successful admission.
+
+The first-fire receipt schema is
+`jetstreamer-horizon-repair183-guard-first-fire-v1`. Require the actual timer-fired
+service invocation, zero exit/restarts, absent stop intent/completion and its
+original JSON `sample`: armed/no-trip, exact live owner IDs, one readable worker
+at or below800000VMAs, and minimum-free3332894621696bytes. The coordinator also
+checks the still-active exact guard timer, healthy service, pinned unchanged
+guard script and live guard command bindings. This guard protects the existing
+live guards without lowering any of their floors.
+
+For initial adoption, the original three-range model and its accepted estimate
+receipt remain unchanged history. Only the effective model adds183–184 after
+validating the complete admission and first-fire lineage; the observer's first
+predecessor must be the admission's prelaunch observation. Use the distinct
+`repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1`
+namespace, a four-range v2 observer configuration and the exact ten-epoch census.
+Never edit a sealed three-range plan or arm a second observer for its timestamp.
+
+Both epochs remain behind the epoch184 import gate. While183 is observed, add
+432000 queued slots to each ETA; after a stable, identity-matching transition to
+184, remove that offset and keep the12h/24h downstream allowances. Reject backward
+or unknown terminals, owner changes, partial/overlapping claims and reset clocks.
+The fleet retains the failed-repair gate/history and tracks the actual new
+controller, producer and guard; recovery closes only at verified ready pairs.
+An admission receipt, handoff, source test or successful monitor never launches
+replay or grants archive mutation. Fresh admission, observed launch, immediate
+guard binding and actual first fire remain separate operational requirements.
+
 A sealed recovery plan may set `delayed_schedule_utc` to the original observer
 deadline only when the actual observation started 1–300 seconds later. Its
 `sample_target_utc` and all derived metadata must retain the actual receipt time;
