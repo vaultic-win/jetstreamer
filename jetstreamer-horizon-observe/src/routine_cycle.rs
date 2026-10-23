@@ -293,6 +293,12 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.controller_rebind.is_some() && original141::vote_enabled(p) {
+        return "controller-rebind-vote141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
+    if original141::vote_enabled(p) {
+        return "vote141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if p.controller_rebind.is_some() && original141::freeze_enabled(p) {
         return "controller-rebind-freeze141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }

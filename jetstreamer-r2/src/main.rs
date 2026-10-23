@@ -3293,6 +3293,12 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 #[tokio::main]
 async fn main() -> Result<()> {
     match env::args().nth(1).as_deref() {
+        Some("prepare-original141-vote-prefix-layout") => {
+            return fleet::prepare_original141_vote_prefix();
+        }
+        Some("capture-original141-vote-prefix-launch") => {
+            return fleet::capture_original141_vote_prefix();
+        }
         Some("prepare-original141-freeze-layout") => return fleet::prepare_original141_freeze(),
         Some("capture-original141-freeze-launch") => return fleet::capture_original141_freeze(),
         Some("prepare-original141-trace-layout") => return fleet::prepare_original141_trace(),
@@ -3312,6 +3318,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("admit-original141-freeze") {
         return fleet::admit_original141_freeze().await;
+    }
+    if env::args().nth(1).as_deref() == Some("admit-original141-vote-prefix") {
+        return fleet::admit_original141_vote_prefix().await;
     }
     if env::args().nth(1).as_deref() == Some("admit-continuation203") {
         return fleet::admit_continuation203();
