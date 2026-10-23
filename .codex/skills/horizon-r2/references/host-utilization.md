@@ -244,6 +244,33 @@ next unblocking action and last substantive progress in the fleet's durable repa
 independent work continues. Neither reclaiming failed scratch nor deleting stale dashboard status
 closes the repair incident; reconcile it until qualified recovery reaches a verified ready pair.
 
+## Delegate epoch-specific repairs
+
+Assign an epoch-specific diagnosis or repair to a dedicated sub-agent. Group epochs only when
+they share the same repair and artifacts; avoid duplicate agents changing the same incident.
+The main agent continues the fleet loop, assesses the memory-selected lane target, stages and
+admits independent work, maintains the authoritative repair backlog, and reports progress.
+Repair delegation must not turn missing compatibility evidence into an idle-host policy.
+
+Give each repair agent the exact failed invocation, immutable inputs and receipts, remaining
+integrity gates, scope of authorized changes, and ownership of files or an isolated worktree.
+The agent builds, tests, seals and preflights the repair, preserves terminal evidence, and reports
+the concrete next action or blocker. Coordinate overlapping files and Git integration explicitly.
+The main agent retains responsibility for failed-epoch tracking and stale status-file cleanup.
+
+Repair agents consume the main agent's latest accepted observation and fleet receipts. They do
+not create routine polling loops or competing schedules. The main agent performs user-requested
+out-of-band observations and distributes the resulting evidence. Before a repair agent launches
+a host job, it sends the exact sealed plan, resource envelope and service scope to the main agent
+for coordination against the complete fleet. This is internal admission coordination, not another
+user permission request; existing user authorization persists. The main agent records the new
+owner and accounts for it before admitting more work. Preserve healthy jobs and every normal
+capability, resource, checkpoint, verification and publication gate.
+
+When agent slots are full, retain a prioritized repair queue with a named next action and keep
+the fleet loop moving. Do not silently drop failed epochs or replace the campaign objective with
+the easiest repair. Close an incident only on the usual verified ready-pair evidence.
+
 ## Scale beyond the proven point
 
 Increase beyond the proven operating point by exactly one replay lane at a time; capacity at or

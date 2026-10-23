@@ -62,9 +62,11 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   history view. Read [references/dashboard-status.md](references/dashboard-status.md) before
   changing an ETA model, handling a dropped/failed lane, or retiring stale status metadata.
   A plausible old countdown is not an acceptable substitute for a current, evidence-backed estimate.
-- Publish one mutable R2 object named `epoch-N.epoch-status.json` for every epoch currently claimed
-  by a live replay or an authenticated active post-replay delivery stage and not yet committed by
-  its canonical `.sha256` sidecar. Keep these objects out
+- Publish one mutable R2 object named `epoch-N.epoch-status.json` for every epoch actively being
+  worked on, including input preparation, qualification, repair, replay and post-replay delivery,
+  until its canonical `.sha256` sidecar is committed. Internal labels such as "private" or
+  "diagnostic" must never hide active work from the dashboard. Label the real phase and bind its
+  live producer or current repair/task owner; a queued plan alone is not active work. Keep these objects out
   of `HORIZON_DIR`; build them in private state and publish them with reviewed Rust tooling. The
   object is operational metadata, never an archive, verification receipt, lease, or publication
   gate.
@@ -220,6 +222,12 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
+  campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
+  coordination and user reporting. Keep the loop work-conserving while repair agents investigate;
+  do not let one difficult epoch monopolize the main agent or stall independent admissible work.
+  Follow [the repair coordination guidance](references/host-utilization.md#delegate-epoch-specific-repairs)
+  when assigning work or admitting a repair experiment.
 - Maintain one authoritative fleet ledger for the complete assigned campaign, not merely a list of
   the ranges that happened to appear in the latest live-resource observer config. Reconcile it in
   the same 30-minute control cycle as the coordinated replay/resource observation and status-object

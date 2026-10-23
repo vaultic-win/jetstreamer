@@ -71,6 +71,7 @@ mod holding;
 mod inactive_status;
 mod inventory_batch;
 mod pipeline_status;
+mod qualification_status;
 mod readback_progress;
 mod reserve_scratch;
 mod reserve_stop;
@@ -1495,7 +1496,7 @@ fn validate_epoch_status(status: &EpochStatus, expected_epoch: u64) -> Result<()
     ensure!(
         matches!(
             status.phase.as_str(),
-            "replay" | "verification" | "publication" | "upload" | "readback" | "finalization"
+            "replay" | "qualification" | "verification" | "publication" | "upload" | "readback" | "finalization"
         ) || (status.epoch == 144 && status.phase == "queued-upload"),
         "status object phase is invalid"
     );
@@ -3439,6 +3440,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
+        return qualification_status::run().await;
     }
     if env::args().nth(1).as_deref() == Some("observe-public-160") {
         return fleet::watch160::run();
