@@ -18,6 +18,7 @@ mod continuation144_protection;
 mod native141;
 mod native144;
 mod prefix144;
+mod prefix223;
 mod private144;
 mod private144_scan;
 mod private157;
@@ -218,6 +219,11 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     if tail223::namespace(claim) {
         let evidence: BoundFile = serde_json::from_value(launch["capability"].clone())?;
         tail223::capability(&bound_json(&evidence)?)?;
+    }
+    if prefix223::namespace(claim) {
+        let evidence: BoundFile = serde_json::from_value(launch["capability"].clone())?;
+        prefix223::capability(&bound_json(&evidence)?)?;
+        prefix223::terminal203_release(&launch)?;
     }
     Ok(launch)
 }
@@ -593,6 +599,7 @@ fn validate_same_sample_admission(
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
         223 if tail223::namespace(claim) => tail223::GUARD_SHA,
+        223 if prefix223::namespace(claim) => prefix223::GUARD_SHA,
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -711,7 +718,7 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
-    if tail223::namespace(claim) {
+    if tail223::namespace(claim) || prefix223::namespace(claim) {
         claim.scratch_path.join("scratch")
     } else {
         claim.scratch_path.clone()
@@ -760,6 +767,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if tail223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| tail223::guard_matches(claim, &receipt, plan))
+    } else if prefix223::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
     } else if bounded205::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| bounded205::guard_matches(claim, &receipt, plan))
@@ -876,6 +886,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
     let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
     let tail_223 = receipt["schema"] == tail223::SCHEMA;
+    let prefix_223 = receipt["schema"] == prefix223::SCHEMA;
+    ensure!(
+        !prefix223::namespace(claim) || prefix_223,
+        "prefix223 namespace requires its own private schema"
+    );
     ensure!(
         !tail223::namespace(claim) || tail_223,
         "tail223 namespace requires its own private schema"
@@ -917,6 +932,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || bounded_203
             || bounded_205
             || tail_223
+            || prefix_223
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -930,7 +946,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if tail_223 {
+    let scope_valid = if prefix_223 {
+        prefix223::launch_matches(claim, receipt)
+    } else if tail_223 {
         tail223::launch_matches(claim, receipt)
     } else if bounded_205 {
         bounded205::launch_matches(claim, receipt)
@@ -2190,6 +2208,13 @@ pub(super) async fn run() -> Result<()> {
                     "tail223 diagnostic live command changed"
                 );
             }
+            if prefix223::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    prefix223::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
+                    "prefix223 diagnostic live command changed"
+                );
+            }
             if bounded205::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -2212,7 +2237,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if tail223::namespace(claim) {
+            let phase = if prefix223::namespace(claim) {
+                "private-known-root-prefix"
+            } else if tail223::namespace(claim) {
                 "private-tail-comparison"
             } else if census141_poh::namespace(claim) {
                 "private-poh-diagnostic"
@@ -3162,6 +3189,50 @@ mod tests {
         let mut bad = gp.clone();
         bad["bounded_canary"] = json!({"expected_uid":1000});
         assert!(check(&guard, &bad).is_err());
+    }
+
+    #[test]
+    fn prefix223_same_sample_admission_keeps_natural_root_and_exact_guard_envelope() {
+        let (previous, mut plan, mut guard, mut gp) = admission_fixture();
+        let (mut claim, launch) = prefix223::tests::fixture();
+        claim.invocation_id = "c".repeat(32);
+        let root = tempfile::tempdir().unwrap();
+        let bytes = serde_json::to_vec(&launch).unwrap();
+        let path = root.path().join("prefix-launch.json");
+        fs::write(&path, &bytes).unwrap();
+        claim.launch_receipt = BoundFile {
+            path,
+            sha256: hex_lower(&Sha256::digest(&bytes)),
+        };
+        gp["unit"] = json!(claim.unit);
+        gp["worker_root"] = json!(claim.scratch_path.join("scratch"));
+        gp["filesystem"] = json!("/");
+        gp["minimum_free_bytes"] = json!(1004203426707u64);
+        gp.as_object_mut().unwrap().remove("bounded_canary");
+        guard["producer"]["cgroup"] = json!(format!("/system.slice/{}", claim.unit));
+        guard["guard_sha256"] = json!(prefix223::GUARD_SHA);
+        guard["minimum_free_bytes"] = gp["minimum_free_bytes"].clone();
+        plan.diagnostics[1] = claim;
+        let check = |g: &Value, p: &Value| {
+            validate_same_sample_admission(
+                &previous,
+                &plan,
+                "2026-10-20T00:04:42Z",
+                g,
+                p,
+                1792455200,
+            )
+        };
+        check(&guard, &gp).unwrap();
+        let mut bad = gp.clone();
+        bad["minimum_free_bytes"] = json!(1004203426706u64);
+        assert!(check(&guard, &bad).is_err());
+        let mut bad = gp.clone();
+        bad["worker_root"] = json!(plan.diagnostics[1].scratch_path);
+        assert!(check(&guard, &bad).is_err());
+        let mut bad = guard.clone();
+        bad["workers"] = json!([]);
+        assert!(check(&bad, &gp).is_err());
     }
     #[test]
     fn natural_root_prefix_admission_still_requires_one_real_worker_and_protection() {
