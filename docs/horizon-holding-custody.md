@@ -7,8 +7,10 @@ inputs and private root-owned state at
 `/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1`, including
 `receipts/` and `restores/`. An exclusive transition lock spans the operation.
 
-The host prefix remains a required user choice. Do not generate a hostname
-default or borrow the other server's prefix. The mapping schema is
+The user selected `node_02/` for dev-samjohnson on 2026-10-23. Its sealed mapping
+is `/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json`.
+Other hosts still need their own user choice; do not generate a hostname
+default or borrow another server's prefix. The mapping schema is
 `jetstreamer-horizon-host-holding-prefix-v2`, with `host`, `prefix`,
 `user_provided_prefix: true` and the actual `authorization_reference`. Prefixes
 are relative, end with `/`, and contain only unambiguous alphanumeric, `_` or
@@ -47,8 +49,15 @@ and nonempty `owners` of exact `unit`/`invocation_id` pairs, plus a hash-bound
 newer routine/phase ledgers are rejected, the minimum must cover its complete
 protected-growth budget, and the declared owners must exactly cover live
 controllers, producers and private diagnostics. The admission
-producer must derive the complete current census and arithmetic; this tool does
-not create that authority. The current five-lane baseline is a lower bound,
+producer must derive the complete current census and arithmetic. Use
+`holding-admit-restore` with schema
+`jetstreamer-horizon-holding-restore-admission-plan-v2` and only `mapping`,
+`custody`, and `capacity_completion` bindings. It derives all live owners and
+the complete protected-growth minimum, rejects a newer fleet or changed owner,
+requires both accepted sampled space and actual current space to cover the
+entire restore above that minimum, then fsyncs a private admission. Its output
+name binds the exact spec digest. It performs no R2 requests or mutations and
+never grants retirement or replay authority. The current five-lane baseline is a lower bound,
 not a replacement for additional live claims.
 
 Restore verifies and writes into private staging, enforcing the minimum reserve
@@ -64,5 +73,27 @@ provided here. A holding manifest is neither a canonical `.sha256` sidecar nor
 full/plugin/boundary evidence. Qualify an actual small authenticated R2 round
 trip under this host's approved prefix before relying on this path, then qualify
 artifact-specific retirement and restoration back to a consumer independently.
-No real holding prefix or R2 write has been selected merely by implementing these
-commands. Healthy replay and canonical uploader deployments remain unchanged.
+The isolated public-genesis fixture has been parked under `node_02/` and passed
+complete authenticated SHA-256 readback. This establishes real custody, not
+ordinary restoration or local-retirement qualification. Healthy replay and
+canonical uploader deployments remain unchanged.
+
+`holding-restore-genesis-probe` qualifies the same download, per-write floor,
+hashing, fsync and no-clobber restore implementation on the separate OS volume.
+Its plan schema is `jetstreamer-horizon-holding-root-genesis-probe-plan-v2`,
+with only `mapping`, `custody`, and `capacity_completion` bindings. It accepts
+only the exact 20,144-byte public genesis fixture and its compiled digest/path.
+It revalidates the fresh complete fleet and every live owner, requires the
+accepted century floor to remain 205,211,459,014 bytes, and preserves that floor
+on the OS volume. Its fixed root is
+`/var/lib/jetstreamer/horizon-holding-public-genesis-probe-20261023-v1`, with
+private `restores/` and `receipts/` children. The root must share `/`'s device
+and differ from the home holding volume. No restored bytes or probe receipts
+are written on home. The distinct probe receipt grants no ordinary home-volume
+restore, local retirement, checkpoint, resume or publication authority.
+
+Keep filesystem accounting explicit: build caches under `/var/lib` live on the
+OS filesystem on this host. Cleaning them does not free replay space on
+`/home/sol`. Likewise, a small successful transport probe is not evidence that
+a large job restore fits; ordinary restoration still needs its complete-growth
+admission and artifact-specific retirement/restoration gates remain separate.

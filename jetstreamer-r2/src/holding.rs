@@ -9,6 +9,10 @@ const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohn
 const BUCKET: &str = "solana-archive-with-accounts-data";
 const BASE_RESERVE: u64 = 3_572_465_819_078;
 const MAX_FILE: u64 = DEFAULT_PART_SIZE * 10_000;
+const GENESIS_PROBE_ROOT: &str =
+    "/var/lib/jetstreamer/horizon-holding-public-genesis-probe-20261023-v1";
+const GENESIS_PROBE_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
+const GENESIS_PROBE_FLOOR: u64 = 205_211_459_014;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -42,6 +46,14 @@ struct Restore {
     mapping: Bound,
     custody: Bound,
     admission: Bound,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RestoreAdmission {
+    schema: String,
+    mapping: Bound,
+    custody: Bound,
+    capacity_completion: Bound,
 }
 
 fn digest(s: &str) -> bool {
@@ -538,6 +550,25 @@ fn restore_basis(a: &Value, c: &Value, f: &Value, minimum: u64, now: u64) -> Res
             && now - sampled <= 1800,
         "holding restore omits live growth or accepted fresh fleet"
     );
+    let expected = fleet_owners(f)?;
+    let mut declared = std::collections::BTreeMap::new();
+    for row in a["owners"].as_array().context("holding declared census")? {
+        let name = row["unit"].as_str().context("declared holding unit")?;
+        let iid = row["invocation_id"]
+            .as_str()
+            .context("declared holding identity")?;
+        ensure!(
+            declared.insert(name.to_owned(), iid.to_owned()).is_none(),
+            "duplicate holding owner"
+        );
+    }
+    ensure!(
+        !expected.is_empty() && expected == declared,
+        "holding restore owner census is incomplete or foreign"
+    );
+    Ok(())
+}
+fn fleet_owners(f: &Value) -> Result<std::collections::BTreeMap<String, String>> {
     let mut expected = std::collections::BTreeMap::new();
     let mut insert = |unit: &Value| -> Result<()> {
         let name = unit["Id"].as_str().context("holding fleet unit")?;
@@ -574,21 +605,98 @@ fn restore_basis(a: &Value, c: &Value, f: &Value, minimum: u64, now: u64) -> Res
     {
         insert(&row["unit"])?;
     }
-    let mut declared = std::collections::BTreeMap::new();
-    for row in a["owners"].as_array().context("holding declared census")? {
-        let name = row["unit"].as_str().context("declared holding unit")?;
-        let iid = row["invocation_id"]
-            .as_str()
-            .context("declared holding identity")?;
-        ensure!(
-            declared.insert(name.to_owned(), iid.to_owned()).is_none(),
-            "duplicate holding owner"
-        );
-    }
+    ensure!(!expected.is_empty(), "empty holding fleet owner census");
+    Ok(expected)
+}
+
+fn admission_bytes(minimum: u64, length: u64, free: u64) -> Result<u64> {
     ensure!(
-        !expected.is_empty() && expected == declared,
-        "holding restore owner census is incomplete or foreign"
+        minimum >= BASE_RESERVE && length > 0 && length <= MAX_FILE,
+        "invalid holding restore resource bounds"
     );
+    let required = minimum
+        .checked_add(length)
+        .context("holding admission overflow")?;
+    ensure!(
+        free >= required,
+        "holding restore needs {required} free bytes, has {free}; protected growth/floor {minimum}, restore {length}, deficit {}",
+        required.saturating_sub(free)
+    );
+    Ok(required)
+}
+
+fn admit_restore(m: &Mapping, p: &RestoreAdmission, spec: &Bound) -> Result<()> {
+    ensure!(
+        p.schema == "jetstreamer-horizon-holding-restore-admission-plan-v2",
+        "foreign holding restore admission plan"
+    );
+    let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
+    mapping(&supplied)?;
+    ensure!(
+        supplied.host == m.host && supplied.prefix == m.prefix,
+        "holding admission mapping changed"
+    );
+    let c = bound(&p.custody)?;
+    let (_, _, _, length) = custody(&c, m)?;
+    let completion = evidence(&p.capacity_completion, false)?;
+    let fleet: Bound = serde_json::from_value(completion["fleet"].clone())?;
+    let f = evidence(&fleet, false)?;
+    let minimum =
+        completion["capacity_decision"]["capped186_budget"]["all_current_protected_bytes"]
+            .as_u64()
+            .context("holding complete protected-growth budget missing")?
+            .max(BASE_RESERVE);
+    let owners: Vec<_> = fleet_owners(&f)?
+        .into_iter()
+        .map(|(unit, invocation_id)| json!({"unit":unit,"invocation_id":invocation_id}))
+        .collect();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let mut a = json!({"schema":"jetstreamer-horizon-holding-restore-admission-v2",
+        "host":HOST,"prefix":m.prefix,"restore_only":true,
+        "all_live_growth_and_century_floor_protected":true,"minimum_free_bytes":minimum,
+        "custody_sha256":p.custody.sha256,"restore_bytes":length,"owners":owners,
+        "capacity_completion":p.capacity_completion,"recorded_unix_seconds":now,
+        "spec":{"path":spec.path,"sha256":spec.sha256},"mapping":p.mapping,
+        "remote_mutations":false,"r2_mutations":false,"local_retirement_authorized":false,
+        "replay_launch_authorized":false,"job_resume_authorized":false,"new_resource_samples":0});
+    // This validates the accepted clock, exact complete owner census, no newer
+    // fleet and actual live owner metadata before any resource grant is written.
+    restore_admission(&a, minimum, now)?;
+    let observer: Bound = serde_json::from_value(completion["observer"].clone())?;
+    let o = evidence(&observer, false)?;
+    ensure!(
+        o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && o["recorded_at_utc"] == completion["sampled_at_utc"],
+        "holding admission observer clock differs"
+    );
+    let sampled_free = o["filesystem"]["conservative_available_bytes"]
+        .as_u64()
+        .context("holding sampled free-space missing")?;
+    let required = admission_bytes(minimum, length, sampled_free)?;
+    let directory = Path::new(STATE).join("restores");
+    private(&directory)?;
+    let current_free = available(&directory)?;
+    admission_bytes(minimum, length, current_free)?;
+    restore_admission(
+        &a,
+        minimum,
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+    )?;
+    a["required_initial_free_bytes"] = json!(required);
+    a["sampled_free_bytes"] = json!(sampled_free);
+    a["current_free_bytes"] = json!(current_free);
+    a["admitted"] = json!(true);
+    let destination = Path::new(STATE)
+        .join("receipts")
+        .join(format!("restore-admission-{}.json", spec.sha256));
+    // Admission clocks are not idempotently rewritten. A retry needs a newly
+    // sealed plan if a prior successful admission has already been persisted.
+    ensure!(
+        !destination.try_exists()?,
+        "holding admission output already exists"
+    );
+    persist(&destination, &a)?;
+    println!("{}", destination.display());
     Ok(())
 }
 fn restore_owners(a: &Value) -> Result<()> {
@@ -701,7 +809,7 @@ async fn restore(client: &Client, m: &Mapping, p: &Restore) -> Result<()> {
         "foreign restore plan"
     );
     let c = bound(&p.custody)?;
-    let (key, etag, sha, length) = custody(&c, m)?;
+    let (_, _, _, length) = custody(&c, m)?;
     // Restoration consumes space. A separate fresh admission remains mandatory.
     let a = bound(&p.admission)?;
     let minimum = a["minimum_free_bytes"]
@@ -713,6 +821,130 @@ async fn restore(client: &Client, m: &Mapping, p: &Restore) -> Result<()> {
         a["custody_sha256"] == p.custody.sha256 && a["restore_bytes"] == length,
         "restore admission covers different artifact"
     );
+    restore_into(
+        client,
+        m,
+        RestoreTarget {
+            custody: &p.custody,
+            content: &c,
+            owners: &a,
+            directory: Path::new(STATE).join("restores"),
+            receipt_directory: Path::new(STATE).join("receipts"),
+            minimum,
+            genesis_probe: false,
+        },
+    )
+    .await
+}
+
+fn genesis_probe_scope(c: &Value, minimum: u64) -> Result<()> {
+    ensure!(
+        c["sha256"] == GENESIS_PROBE_SHA
+            && c["length"] == 20144
+            && c["source"]
+                == "/home/sol/.jetstreamer-private/holding-public-genesis-fixture-20261023-v1/genesis.tar.bz2"
+            && minimum == GENESIS_PROBE_FLOOR,
+        "root holding probe is restricted to the isolated public genesis fixture"
+    );
+    Ok(())
+}
+
+async fn restore_genesis_probe(client: &Client, m: &Mapping, p: &RestoreAdmission) -> Result<()> {
+    ensure!(
+        p.schema == "jetstreamer-horizon-holding-root-genesis-probe-plan-v2",
+        "foreign root holding probe plan"
+    );
+    let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
+    mapping(&supplied)?;
+    ensure!(
+        supplied.host == m.host && supplied.prefix == m.prefix,
+        "root holding probe mapping changed"
+    );
+    let c = bound(&p.custody)?;
+    custody(&c, m)?;
+    genesis_probe_scope(&c, GENESIS_PROBE_FLOOR)?;
+    let completion = evidence(&p.capacity_completion, false)?;
+    ensure!(
+        completion["capacity_decision"]["capped186_budget"]["century_floor_bytes"]
+            == GENESIS_PROBE_FLOOR,
+        "root probe must retain the current accepted century floor"
+    );
+    let fleet: Bound = serde_json::from_value(completion["fleet"].clone())?;
+    let f = evidence(&fleet, false)?;
+    let owners: Vec<_> = fleet_owners(&f)?
+        .into_iter()
+        .map(|(unit, invocation_id)| json!({"unit":unit,"invocation_id":invocation_id}))
+        .collect();
+    let protected =
+        completion["capacity_decision"]["capped186_budget"]["all_current_protected_bytes"]
+            .as_u64()
+            .context("root probe complete fleet budget missing")?
+            .max(BASE_RESERVE);
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    // Reuse complete-fleet freshness/identity validation, but this is NOT an
+    // admission to restore on home. No restored byte is written on that volume.
+    let a = json!({"schema":"jetstreamer-horizon-holding-restore-admission-v2",
+        "host":HOST,"restore_only":true,"all_live_growth_and_century_floor_protected":true,
+        "capacity_completion":p.capacity_completion,"owners":owners,"recorded_unix_seconds":now});
+    restore_admission(&a, protected, now)?;
+    let root = Path::new(GENESIS_PROBE_ROOT);
+    private(root)?;
+    let directory = root.join("restores");
+    let receipt_directory = root.join("receipts");
+    private(&directory)?;
+    private(&receipt_directory)?;
+    ensure!(
+        fs::symlink_metadata(root)?.dev() == fs::symlink_metadata("/")?.dev()
+            && fs::symlink_metadata(root)?.dev() != fs::symlink_metadata(STATE)?.dev(),
+        "root holding probe must use the separate OS filesystem"
+    );
+    ensure!(
+        available(root)?
+            >= GENESIS_PROBE_FLOOR
+                .checked_add(20144)
+                .context("probe space overflow")?,
+        "OS volume cannot fit the fixed probe above its century-sized reserve"
+    );
+    restore_into(
+        client,
+        m,
+        RestoreTarget {
+            custody: &p.custody,
+            content: &c,
+            owners: &a,
+            directory,
+            receipt_directory,
+            minimum: GENESIS_PROBE_FLOOR,
+            genesis_probe: true,
+        },
+    )
+    .await
+}
+
+struct RestoreTarget<'a> {
+    custody: &'a Bound,
+    content: &'a Value,
+    owners: &'a Value,
+    directory: PathBuf,
+    receipt_directory: PathBuf,
+    minimum: u64,
+    genesis_probe: bool,
+}
+
+async fn restore_into(client: &Client, m: &Mapping, target: RestoreTarget<'_>) -> Result<()> {
+    let RestoreTarget {
+        custody: custody_binding,
+        content: c,
+        owners: a,
+        directory,
+        receipt_directory,
+        minimum,
+        genesis_probe,
+    } = target;
+    let (key, etag, sha, length) = custody(c, m)?;
+    if genesis_probe {
+        genesis_probe_scope(c, minimum)?;
+    }
     let expected_owner = owner_bytes(m)?;
     ensure!(
         get_mutable_object(client, BUCKET, &format!("{}owner.json", m.prefix))
@@ -733,7 +965,6 @@ async fn restore(client: &Client, m: &Mapping, p: &Restore) -> Result<()> {
         .await?
         .context("holding object missing")?;
     remote_matches(&remote, &key, length, &sha, Some(&etag))?;
-    let directory = Path::new(STATE).join("restores");
     private(&directory)?;
     let destination = directory.join(format!("{sha}.blob"));
     let partial = directory.join(format!(".{sha}.partial"));
@@ -815,7 +1046,7 @@ async fn restore(client: &Client, m: &Mapping, p: &Restore) -> Result<()> {
             file.set_permissions(fs::Permissions::from_mode(0o400))?;
             file.sync_all()?;
         }
-        restore_owners(&a)?;
+        restore_owners(a)?;
         ensure!(
             regular_identity(&partial)? == identity(&file.metadata()?),
             "holding partial changed before commit"
@@ -834,14 +1065,14 @@ async fn restore(client: &Client, m: &Mapping, p: &Restore) -> Result<()> {
     ensure!(proof.sha256_hex == sha, "restored holding digest differs");
     native_checksum(&remote, &proof, length)?;
     persist(
-        &Path::new(STATE)
-            .join("receipts")
-            .join(format!("restore-{sha}.json")),
+        &receipt_directory.join(format!("restore-{sha}.json")),
         &json!({
-        "schema":"jetstreamer-horizon-holding-restore-v2","host":HOST,"custody":p.custody,
+        "schema":if genesis_probe {"jetstreamer-horizon-holding-root-genesis-probe-v2"} else {"jetstreamer-horizon-holding-restore-v2"},"host":HOST,"custody":custody_binding,
         "object_key":key,"object_etag":etag,"length":length,"sha256":sha,"destination":destination,
         "remote_sha256_readback":true,"local_source_revalidated":true,
         "staging_only":true,"original_file_metadata":c["manifest"],
+        "root_genesis_transport_probe_only":genesis_probe,"minimum_free_bytes":minimum,
+        "capacity_completion":a["capacity_completion"],"owners":a["owners"],
         "local_retirement_authorized":false,"canonical_publication_authorized":false,
         "runtime_checkpoint_qualified":false,"job_resume_authorized":false,"replay_launch_authorized":false}),
     )?;
@@ -852,7 +1083,7 @@ pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-park|holding-restore SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -896,12 +1127,18 @@ pub(super) async fn run() -> Result<()> {
     );
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
+    if args[1] == "holding-admit-restore" {
+        return admit_restore(&m, &serde_json::from_value(v)?, &spec);
+    }
     let r2 = r2_config_from_env()?;
     ensure!(r2.bucket == BUCKET, "foreign holding bucket");
     let client = s3_client(&r2);
     match args[1].as_str() {
         "holding-park" => park(&client, &m, &serde_json::from_value(v)?).await,
         "holding-restore" => restore(&client, &m, &serde_json::from_value(v)?).await,
+        "holding-restore-genesis-probe" => {
+            restore_genesis_probe(&client, &m, &serde_json::from_value(v)?).await
+        }
         _ => bail!("unsupported holding action"),
     }
 }

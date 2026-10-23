@@ -3335,7 +3335,12 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 async fn main() -> Result<()> {
     if matches!(
         env::args().nth(1).as_deref(),
-        Some("holding-park" | "holding-restore")
+        Some(
+            "holding-park"
+                | "holding-restore"
+                | "holding-admit-restore"
+                | "holding-restore-genesis-probe"
+        )
     ) {
         return holding::run().await;
     }
