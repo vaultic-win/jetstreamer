@@ -27,6 +27,106 @@ fn active_owner(row: &Value) -> Result<&Value> {
         ),
     }
 }
+fn native223_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
+    let owner = active_owner(row)?;
+    let unit = owner["Id"].as_str().context("227 auxiliary unit")?;
+    ensure!(
+        row["epoch"] == 223
+            && unit == "archive-223-v1620-native-input-release-actual-v1.service"
+            && row["phase"] == "private-cold-snapshot-verification"
+            && row["ordinary_replay_claim"] == false,
+        "227 auxiliary is not the centrally registered optimized native223 profile"
+    );
+    let plan = bound_json(&BoundFile {
+        path: f["plan"]
+            .as_str()
+            .context("227 accepted fleet plan")?
+            .into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("227 fleet plan digest")?
+            .into(),
+    })?;
+    let matching = plan["pipeline_claims"]
+        .as_array()
+        .context("227 fleet pipeline census")?
+        .iter()
+        .filter(|v| v["unit"] == unit)
+        .collect::<Vec<_>>();
+    ensure!(
+        matching.len() == 1,
+        "227 native223 registered claim missing/duplicate"
+    );
+    let claim: PipelineClaim = serde_json::from_value(matching[0].clone())?;
+    ensure!(
+        claim.invocation_id == owner["InvocationID"]
+            && claim.evidence == serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,
+        "227 native223 live claim differs from accepted fleet"
+    );
+    cold223_scan::validate(&claim)?;
+    Ok(claim)
+}
+fn remaining_hard_memory(cap: u64, charge: u64) -> Result<u64> {
+    ensure!(
+        cap == 128u64 << 30 && charge <= cap,
+        "227 auxiliary hard cap/charge invalid or exceeded"
+    );
+    Ok(cap - charge)
+}
+fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
+    let mut total = 0u64;
+    let mut evidence = Vec::new();
+    for row in f["active"]
+        .as_array()
+        .context("227 auxiliary owner census")?
+    {
+        if row["epoch"] != 223 {
+            continue;
+        }
+        let claim = native223_claim(f, row)?;
+        let owner = active_owner(row)?;
+        cold223_scan::validate_live(&claim, owner)?;
+        let group = owner["ControlGroup"]
+            .as_str()
+            .context("227 auxiliary cgroup")?;
+        ensure!(
+            group == format!("/system.slice/{}", claim.unit),
+            "227 auxiliary cgroup escaped"
+        );
+        let root = Path::new("/sys/fs/cgroup").join(&group[1..]);
+        let read = |name: &str| -> Result<u64> {
+            Ok(fs::read_to_string(root.join(name))?.trim().parse::<u64>()?)
+        };
+        let cap = read("memory.max")?;
+        let high = read("memory.high")?;
+        let charge = read("memory.current")?;
+        ensure!(
+            high == 112u64 << 30 && read("memory.swap.max")? == 0,
+            "227 auxiliary memory controls changed"
+        );
+        let remaining = remaining_hard_memory(cap, charge)?;
+        total = total
+            .checked_add(remaining)
+            .context("227 auxiliary growth overflow")?;
+        evidence.push(json!({"epoch":223,"unit":claim.unit,"invocation_id":claim.invocation_id,
+            "origin":private157::binding(&claim.evidence[0]),"hard_memory_cap_bytes":cap,"memory_high_bytes":high,
+            "current_cgroup_charge_bytes":charge,"remaining_hard_memory_growth_bytes":remaining,
+            "accounting":"kernel cgroup charge, never substituted lane RSS or a zero-growth claim"}));
+    }
+    Ok((total, evidence))
+}
+fn available_memory() -> Result<u64> {
+    fs::read_to_string("/proc/meminfo")?
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix("MemAvailable:")
+                .and_then(|v| v.split_whitespace().next())
+                .and_then(|v| v.parse::<u64>().ok())
+        })
+        .context("227 actual available memory")?
+        .checked_mul(1024)
+        .context("227 available memory overflow")
+}
 fn century_floor(f: &Value) -> Result<u64> {
     let inventory = &f["inventory"];
     ensure!(
@@ -104,15 +204,15 @@ fn protected_growth(
         );
         let epoch = row["epoch"].as_u64().context("227 owner epoch")?;
         if epoch == 223 {
+            let claim = native223_claim(f, row)?;
+            let intent = bound_json(&claim.evidence[0])?;
             ensure!(
-                unit == "archive-223-v1620-native-input-actual-v1.service"
-                    && row["phase"] == "private-cold-snapshot-verification"
-                    && row["ordinary_replay_claim"] == false,
-                "227 unknown native auxiliary owner"
+                intent["maximum_memory_bytes"] == 128u64 << 30
+                    && intent["tmpfs_bytes"] == 512u64 << 30,
+                "227 native223 storage/memory profile changed"
             );
-            // This exact native223 deployment uses an invocation-private tmpfs;
-            // its128GiB cgroup charge is reflected in observed/actual memory.
-            // Never pretend it vanished from the complete owner/memory census.
+            // Private tmpfs has no root-filesystem growth claim. Its remaining
+            // hard-memory growth is separately measured and reserved below.
             continue;
         }
         let full_envelope = match epoch {
@@ -664,6 +764,8 @@ pub(super) fn run() -> Result<()> {
     let before = census(&names, 201, 300)?;
     owners(&f, &before)?;
     let caps = limits(&f)?;
+    let memory_before_aux = available_memory()?;
+    let (auxiliary_before, auxiliary_before_evidence) = auxiliary_memory(&f)?;
     let path = CString::new("/")?;
     let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     ensure!(
@@ -703,6 +805,16 @@ pub(super) fn run() -> Result<()> {
     );
     let after = census(&names, 201, 300)?;
     owners(&f, &after)?;
+    let (auxiliary_after, auxiliary_after_evidence) = auxiliary_memory(&f)?;
+    let memory = memory.min(memory_before_aux).min(available_memory()?);
+    let auxiliary_growth = auxiliary_before.max(auxiliary_after);
+    let protected_memory_required = memory_required
+        .checked_add(auxiliary_growth)
+        .context("227 protected memory overflow")?;
+    ensure!(
+        memory >= protected_memory_required,
+        "227 new native lane would consume another auxiliary's remaining hard-memory growth"
+    );
     ensure!(
         limits(&f)? == caps,
         "227 protected cgroup limits changed during admission"
@@ -718,7 +830,10 @@ pub(super) fn run() -> Result<()> {
         "protected_growth_measurements_before":growth_measurements,"protected_growth_measurements_after":after_measurements,
         "computed_existing_floor_bytes":computed_floor,"conservative_additional_plan_margin_bytes":protected-computed_floor,
         "remaining_growth_policy225":{"path":"/var/lib/jetstreamer/horizon-ownroot203-rebase-preparation-v1/policy.json","sha256":"1c72102ae9e9659a27860158b225c53548560fb0b7261654740e5cca0de65dc9"},
-        "unit_census_before":before,"unit_census_after":after,"protected_memory_limits":caps});
+        "unit_census_before":before,"unit_census_after":after,"protected_memory_limits":caps,
+        "auxiliary_memory_before":auxiliary_before_evidence,"auxiliary_memory_after":auxiliary_after_evidence,
+        "auxiliary_remaining_hard_memory_growth_bytes":auxiliary_growth,"required_available_memory_with_auxiliary_bytes":protected_memory_required,
+        "auxiliary_memory_charge_bracketed_by_actual_available_memory":true});
     let mut payload = json!({"schema":"jetstreamer-private-epoch227-singleton-admission-v1","mode":s.mode,
         "admitted":true,"unit":unit,"private_run_root":root,"candidate_incremental_peak_bytes":peak,"maximum_scratch_bytes":c::SCRATCH,
         "protected_existing_floor_bytes":protected,"required_initial_free_bytes":required,"century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,
@@ -769,6 +884,19 @@ mod tests {
         assert!(active_owner(&json!({"unit":{"Id":"native223"}})).is_ok());
         assert!(active_owner(&json!({"producer":{},"unit":{}})).is_err());
         assert!(active_owner(&json!({"controller":{},"producer":{}})).is_err());
+    }
+    #[test]
+    fn native_auxiliary_reserves_remaining_hard_cap_without_inventing_lane_rss() {
+        assert_eq!(
+            remaining_hard_memory(128u64 << 30, 50u64 << 30).unwrap(),
+            78u64 << 30
+        );
+        assert_eq!(
+            remaining_hard_memory(128u64 << 30, 0).unwrap(),
+            128u64 << 30
+        );
+        assert!(remaining_hard_memory(256u64 << 30, 0).is_err());
+        assert!(remaining_hard_memory(128u64 << 30, (128u64 << 30) + 1).is_err());
     }
     #[test]
     fn sample_rejects_stale_memory_missing_owner_and_pressure_instead_of_inventing_capacity() {
