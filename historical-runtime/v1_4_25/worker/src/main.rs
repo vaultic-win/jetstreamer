@@ -5,6 +5,8 @@ mod snapshot;
 
 #[cfg(test)]
 mod legacy_entry_wire_fixture;
+#[cfg(test)]
+mod recovered_boundary_bank_fixture;
 
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,
