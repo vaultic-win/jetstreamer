@@ -60,6 +60,23 @@ no-clobber receipt is produced. No proposed value substitutes for an execution.
    canonical_sidecar_authorized, publication_authorized, remote_mutations,
    r2_mutations` are false.
 
+`prepare-singleton209-admission-spec` constructs the concrete immutable resource
+and admission specs once the capability digest exists. Its immutable input uses
+schema `jetstreamer-private-epoch209-singleton-admission-preparation-spec-v1`
+and fields `observer, fleet, capability, native_input, terminal223` (nullable),
+`output_directory, admission_output`. The precreated root-private output
+directory must be `/var/lib/jetstreamer/horizon-209-singleton-admission-specs-*`.
+It selects each of the four protected guards from exact completed PID1 history,
+without firing a guard, and runs the reviewed protected-growth calculation
+twice using only saved observations/guards and bounded204/205 output-file
+metadata. It performs no scratch scan, host resource observation, admission or
+launch. The resulting `resource-plan.json`, `admission-spec.json` and
+`preparation.json` are no-clobber root0400 receipts. The preparation report binds
+both measurements and guard histories and states whether the resulting bound
+fits the saved free-space observation. Actual admission must still bracket
+current owner identities, caps, free disk and memory and reject stale evidence
+or increased remaining growth; preparation does not reserve or admit a lane.
+
 The historical terminal-from333 fleet contains four owners. It is not current
 launch authority after another owner starts. In particular, a live223v2 repair
 is rejected until its exact registered envelope/guard/memory model is supported

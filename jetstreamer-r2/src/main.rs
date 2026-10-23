@@ -3468,6 +3468,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("prepare-singleton209-inputs") {
         return fleet::prepare_singleton209_inputs();
     }
+    if env::args().nth(1).as_deref() == Some("prepare-singleton209-admission-spec") {
+        return fleet::prepare_singleton209_admission_spec();
+    }
     if env::args().nth(1).as_deref() == Some("admit-singleton209") {
         return fleet::admit_singleton209();
     }

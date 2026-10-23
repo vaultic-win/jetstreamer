@@ -72,6 +72,7 @@ mod singleton209_admission;
 mod singleton209_capability;
 mod singleton209_capture;
 mod singleton209_peer223;
+mod singleton209_prepare;
 mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
@@ -116,6 +117,9 @@ pub(super) fn full209_status_inactive_owner(
 }
 pub(super) fn prepare_singleton209_inputs() -> Result<()> {
     singleton209_capability::run()
+}
+pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
+    singleton209_prepare::run()
 }
 pub(super) fn admit_singleton209() -> Result<()> {
     singleton209_admission::run()

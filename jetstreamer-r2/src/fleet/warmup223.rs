@@ -8,6 +8,15 @@ mod terminal;
 mod terminal_v2;
 pub(super) const TERMINAL_SCHEMA: &str = terminal::SCHEMA;
 pub(super) const TERMINAL_SCHEMA_V2: &str = terminal_v2::SCHEMA;
+pub(super) fn completed_guard_binding(
+    name: &str,
+    directory: &Path,
+    minimum: u64,
+    now: u64,
+) -> Result<Value> {
+    let selected = guard_receipt::select(name, directory, minimum, now, 1800)?;
+    Ok(json!({"binding":private157::binding(&selected.binding),"history":selected.history}))
+}
 pub(super) fn capture_terminal() -> Result<()> {
     let a: Vec<_> = env::args().collect();
     ensure!(a.len() == 7, "warmup terminal capture arguments");
