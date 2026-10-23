@@ -181,7 +181,9 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "wrong canary scope"
     );
     ensure!(
-        p.run_root.parent() == Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        p.run_root.parent() == Some(Path::new(if EPOCH == 186 {
+            "/home/sol/.jetstreamer-private"
+        } else { "/home/ubuntu/.jetstreamer-private" }))
             && p.run_root
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -232,6 +234,7 @@ fn command(p: &Plan) -> Command {
         .env("JETSTREAMER_HISTORICAL_TRACE", "1")
         .env("RUST_LOG", "info")
         .env("SOLANA_RAYON_THREADS", RAYON_THREADS.to_string())
+        .env_remove("JETSTREAMER_HISTORICAL_WORKER_V1_6_15")
         .env_remove("JETSTREAMER_HISTORICAL_WORKER_V1_6_16")
         .env_remove("JETSTREAMER_HISTORICAL_WORKER_V1_6_20")
         .env_remove("JETSTREAMER_HISTORICAL_WORKER_V1_6_25")
@@ -598,12 +601,21 @@ fn execute_prepared(storage:&dyn StorageHooks,p:&Plan,invocation:&str,cgroup:&Pa
 
 fn root_manifest_valid(m: &Value) -> Result<()> {
     ensure!(
-        NATURAL_ROOT_FINISH && matches!(EPOCH, 203 | 204 | 205 | 223) && TARGET == TERMINAL,
+        NATURAL_ROOT_FINISH && matches!(EPOCH, 186 | 203 | 204 | 205 | 223) && TARGET == TERMINAL,
         "root completion is not a target-stop profile"
     );
     // Compile-bound scopes, never plan-selectable runtime/checkpoint policy.
     // Each epoch has independently bound snapshots and canonical-root coverage.
     let scope_matches = match EPOCH {
+        186 => {
+            m["output_slot_start"] == 80_352_000u64
+                && m["output_slot_count"] == 431_540u64
+                && m["runtime"]["runtime_profile"] == "solana-v1.6.15"
+                && m["bootstrap"]["slot"] == 80_351_283u64
+                && m["bootstrap"]["accounts_hash"] == "Dq1knez4dNLE3zsSM69ve8Gd96LKJLJz4f56ysEHjfT8"
+                && m["terminal"]["slot"] == 80_783_539u64
+                && m["terminal"]["accounts_hash"] == "EWu2G86akFM3CKJ8D4YZzi8ASZeaPKm2WXLG239Zjnj9"
+        }
         203 => {
             m["output_slot_start"] == 87_696_000u64
                 && m["output_slot_count"] == 431_581u64

@@ -32,3 +32,16 @@ worker digest in every plan and receipt. Retain the century floor and all live
 remaining-growth claims; do not transfer the 200–300 century's 300 GB planning
 assumption to epoch 186. Ordinary archive verification, current-plugin checks,
 R2 readback and sidecar gates remain independent.
+
+The modern utility feature `epoch186-shrink-root-prefix-resource` builds
+`jetstreamer-epoch186-shrink-root-prefix-resource`. Its initial enabled command
+is `PLAN --plan-sha256 HEX --self-sha256 HEX --storage-capability`; replay
+without that flag is denied pending separate admission and guard qualification.
+The capability path rehashes the exact sealed parent, capped worker, bootstrap,
+genesis and two checkpoint names, writes a private receipt, and returns before
+resource measurement, worker spawn, snapshot restoration or archive creation.
+It binds `/home/sol/.jetstreamer-private`, bootstrap 80351283 and terminal root
+80783539. The prospective 431540-slot output starts at 80352000 and excludes the
+remaining 460 epoch slots. The experimental scratch stop in the profile is not
+a qualified full cold-epoch budget. A capability receipt grants no replay,
+runtime promotion, complete-epoch, sidecar or R2 authority.
