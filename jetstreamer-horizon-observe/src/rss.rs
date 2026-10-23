@@ -202,13 +202,36 @@ fn status(text: &str, pid: u32) -> Result<(u64, u64)> {
     Ok((rss, high))
 }
 fn checked_capture(cgroup: &Path, group: &Path, proc_root: &Path) -> Result<Report> {
+    capture_processes(cgroup, group, proc_root, false)
+}
+fn capture_processes(
+    cgroup: &Path,
+    group: &Path,
+    proc_root: &Path,
+    allow_kernel: bool,
+) -> Result<Report> {
     let before = members(cgroup)?;
     let mut processes = Vec::new();
     let mut aggregate = 0u64;
     for pid in &before {
         let root = proc_root.join(pid.to_string());
-        let start = start_ticks(&fs::read_to_string(root.join("stat"))?, *pid)?;
-        let (rss, high) = status(&fs::read_to_string(root.join("status"))?, *pid)?;
+        let stat = fs::read_to_string(root.join("stat"))?;
+        let start = start_ticks(&stat, *pid)?;
+        let kernel = stat
+            .rsplit_once(')')
+            .context("RSS stat comm")?
+            .1
+            .split_whitespace()
+            .nth(6)
+            .context("RSS flags")?
+            .parse::<u64>()?
+            & 0x0020_0000
+            != 0;
+        let (rss, high) = if allow_kernel && kernel {
+            (0, 0)
+        } else {
+            status(&fs::read_to_string(root.join("status"))?, *pid)?
+        };
         let membership = fs::read_to_string(root.join("cgroup"))?;
         let current = membership
             .lines()
@@ -245,9 +268,100 @@ pub(crate) fn capture(cgroup: &Path, group: &Path) -> Report {
     })
 }
 
+/// System process RSS and kernel allocations use a resident-byte basis. Keep
+/// MemAvailable separate: reclaimable file mappings are present in both RSS
+/// and MemAvailable and cannot be subtracted to infer non-lane use.
+pub(crate) fn host_resident() -> Value {
+    let result = (|| -> Result<Value> {
+        let report = capture_processes(
+            Path::new("/sys/fs/cgroup"),
+            Path::new("/"),
+            Path::new("/proc"),
+            true,
+        )?;
+        let kernel = kernel_bytes(&fs::read_to_string("/proc/meminfo")?)?;
+        Ok(serde_json::json!({"status":"observed","rss":report,
+            "kernel_components_bytes":kernel,"scope":"entire visible cgroup hierarchy",
+            "accounting_basis":"process RSS plus Slab,KernelStack,PageTables,Percpu; unmapped file cache excluded",
+            "shared_pages_may_be_counted_per_process":true,"admission_authorized":false}))
+    })();
+    result.unwrap_or_else(
+        |error| serde_json::json!({"status":"unavailable","error":format!("{error:#}")}),
+    )
+}
+
+fn kernel_bytes(text: &str) -> Result<BTreeMap<String, u64>> {
+    let mut components = BTreeMap::new();
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        if !["Slab", "KernelStack", "PageTables", "Percpu"].contains(&key) {
+            continue;
+        }
+        let mut fields = value.split_whitespace();
+        let bytes = fields
+            .next()
+            .context("kernel memory value")?
+            .parse::<u64>()?
+            .checked_mul(1024)
+            .context("kernel memory overflow")?;
+        ensure!(
+            fields.next() == Some("kB") && fields.next().is_none(),
+            "kernel memory units"
+        );
+        ensure!(
+            components.insert(key.into(), bytes).is_none(),
+            "duplicate kernel component"
+        );
+    }
+    ensure!(
+        components.len() == 4,
+        "incomplete kernel resident accounting"
+    );
+    Ok(components)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn kernel_resident_components_do_not_double_count_slab_children() {
+        let text = "Slab: 10 kB\nSReclaimable: 7 kB\nSUnreclaim: 3 kB\nKernelStack: 2 kB\nPageTables: 3 kB\nPercpu: 1 kB\n";
+        let parsed = kernel_bytes(text).unwrap();
+        assert_eq!(parsed.values().sum::<u64>(), 16 * 1024);
+        assert!(kernel_bytes("Slab: 1 kB\n").is_err());
+        assert!(kernel_bytes(&format!("{text}Slab: 1 kB\n")).is_err());
+    }
+    #[test]
+    fn kernel_threads_have_zero_process_rss_only_in_host_census() {
+        let temp = tempfile::tempdir().unwrap();
+        let cg = temp.path().join("cg");
+        let proc = temp.path().join("proc");
+        fs::create_dir_all(&cg).unwrap();
+        fs::create_dir_all(proc.join("2")).unwrap();
+        fs::write(cg.join("cgroup.procs"), "2\n").unwrap();
+        let mut fields = vec!["0"; 20];
+        fields[0] = "S";
+        fields[6] = "2097152"; // PF_KTHREAD; valid start_ticks may be zero at boot
+        fs::write(
+            proc.join("2/stat"),
+            format!("2 (kthreadd) {}", fields.join(" ")),
+        )
+        .unwrap();
+        fs::write(proc.join("2/cgroup"), "0::/\n").unwrap();
+        let host = capture_processes(&cg, Path::new("/"), &proc, true).unwrap();
+        assert_eq!(host.aggregate_rss_bytes, Some(0));
+        assert_eq!(host.processes[0].start_ticks, 0);
+        assert!(checked_capture(&cg, Path::new("/"), &proc).is_err());
+        fields[6] = "0";
+        fs::write(
+            proc.join("2/stat"),
+            format!("2 (user) {}", fields.join(" ")),
+        )
+        .unwrap();
+        assert!(capture_processes(&cg, Path::new("/"), &proc, true).is_err());
+    }
     #[test]
     fn century_maxima_survive_smaller_missing_and_cross_century_samples() {
         let unit = serde_json::json!({"unit":"lane.service","invocation_id":"a".repeat(32),
