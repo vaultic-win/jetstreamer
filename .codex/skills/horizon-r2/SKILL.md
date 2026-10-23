@@ -315,6 +315,19 @@ not stall otherwise admissible ordinary campaign work.
   participating host within its own assigned range; never infer another host's capacity from local
   observations. Optimize verified R2 sidecars per day, preserve every safety/integrity gate, and add
   no extra autonomous routine polls.
+- Prefer capped-shrink workers for new replays when that exact runtime/worker profile is supported.
+  Bind the capped worker's actual digest and settings in the sealed package, capability evidence,
+  admission and guard; never substitute a worker beneath a live job. Preserve healthy existing
+  producers. Capped shrink changes resource planning, not canonical checkpoint, full/current-plugin,
+  provenance or publication requirements. Read the century-specific scratch policy in
+  [references/host-utilization.md](references/host-utilization.md) when budgeting a candidate.
+  For epochs 200–300, the user has chosen **300 GB (300,000,000,000 bytes) of scratch per capped-shrink
+  lane** as the planning assumption. Use it for new admission generations instead of carrying an
+  uncapped worker's historical scratch projection into a capped candidate. Account separately for
+  archive output, restore/copy and verification overlap, all live remaining-growth claims and the
+  century safety floor. Other centuries need their own measured or user-selected scratch assumption;
+  800 GB for the 900s was illustrative, not an adopted bound. Keep actual resource guards and
+  increase concurrency through the normal one-lane experiment beyond the proven operating point.
 - Define the filesystem safety floor for a campaign century from resulting `.jet` sizes, not from
   snapshots, replay scratch, or a fixed multi-terabyte constant. For the current century use epochs
   200 through 300 inclusive. Select each epoch at most once and include only canonical complete

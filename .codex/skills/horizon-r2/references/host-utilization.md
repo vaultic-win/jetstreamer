@@ -33,6 +33,30 @@ Do not transfer a proven count between materially different machines or lane sha
 
 ## Qualify measured admission budgets
 
+### Capped-shrink scratch estimates by century
+
+Use a separately recorded scratch estimate for each century and worker/runtime profile. For this
+campaign, the user selected **300,000,000,000 bytes (300 GB, decimal)** per capped-shrink lane for
+epochs 200–300. This is an authorized planning assumption, not a claim that every epoch's peak has
+been measured. It can support a newly sealed bounded admission without first demanding a completed
+full-epoch peak experiment for every candidate. Exact input/runtime capability and protective guards
+still have to pass. Keep uncapped historical measurements labeled with their original worker;
+neither impose their larger projection on a capped candidate nor erase the evidence.
+
+Keep the scratch estimate separate from archive output, cached or restored inputs, assembly/copy,
+verification staging and margin. Count overlapping phases at their incremental peak and avoid
+double-counting an already protected allocation. The twice-average-`.jet` century floor remains a
+separate host reserve. Record both the capacity implied by disk and the smaller count allowed by
+CPU, protected memory, VMAs, I/O, compatibility and guards; report that count alongside the number
+actually running. A directory name or unused R2 holding prefix has freed no local capacity.
+
+Reassess the estimate with each existing coordinated observation. If measured scratch approaches or
+exceeds the planning allowance, stop increasing concurrency, preserve the healthy work and update
+the century/profile estimate and fresh admission using the actual evidence. Changes to a live
+reservation or guard need an explicit immutable transition with protection maintained throughout;
+do not rewrite sealed plans. Do not transfer 300 GB to later centuries. The user's suggestion that
+the 900s might need about 800 GB is illustrative until that century's estimate is measured or chosen.
+
 When an unqualified or inherited capacity estimate is the only reason a staged singleton cannot
 launch, record the missing bound and stage the smallest useful bounded experiment to resolve it.
 Do not leave an indefinite hold with no evidence-gathering next action. The experiment itself must
