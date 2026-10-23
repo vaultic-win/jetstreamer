@@ -15,7 +15,10 @@ fn rejected(args: &[&str], expected: &str) {
 }
 
 #[test]
-#[cfg(feature = "epoch223-v1-6-25-qualification")]
+#[cfg(any(
+    feature = "epoch223-v1-6-25-qualification",
+    feature = "epoch223-v1-6-20-prefix-qualification"
+))]
 fn actual_entrypoint_rejects_maintenance_before_accessing_the_plan() {
     rejected(
         &[
@@ -81,19 +84,46 @@ fn actual_focused_gate_precedes_destination_creation_and_snapshot_access() {
 }
 
 #[test]
-#[cfg(not(feature = "epoch223-v1-6-25-qualification"))]
+#[cfg(not(any(
+    feature = "epoch223-v1-6-25-qualification",
+    feature = "epoch223-v1-6-20-prefix-qualification"
+)))]
 fn default_binary_cannot_enable_comparison_or_preflight() {
     for flag in [
         "--epoch223-tail-comparison",
         "--epoch223-tail-preflight",
         "--epoch223-prefix-preflight",
     ] {
-        rejected(&["223", flag], "tail flags require the isolated");
+        rejected(
+            &["223", flag],
+            "epoch223 planning flags require an isolated epoch223 qualification build",
+        );
     }
 }
 
 #[test]
-#[cfg(feature = "epoch223-v1-6-25-qualification")]
+#[cfg(feature = "epoch223-v1-6-20-prefix-qualification")]
+fn prefix_binary_requires_its_exact_span_before_accessing_private_paths() {
+    let t = tempfile::tempdir().unwrap();
+    let ledger = t.path().join("must-not-create");
+    for flag in [
+        "--epoch223-tail-comparison",
+        "--epoch223-tail-preflight",
+        "--epoch223-prefix-preflight",
+    ] {
+        rejected(
+            &["223", ledger.to_str().unwrap(), flag],
+            "v1.6.20 prefix build accepts only the exact cold-to-known-root span",
+        );
+        assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 0);
+    }
+}
+
+#[test]
+#[cfg(any(
+    feature = "epoch223-v1-6-25-qualification",
+    feature = "epoch223-v1-6-20-prefix-qualification"
+))]
 fn comparison_flags_are_not_repeatable() {
     for flag in [
         "--epoch223-tail-comparison",
