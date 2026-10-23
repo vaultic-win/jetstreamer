@@ -23,6 +23,16 @@ that bound bootstrap predecessor, and publishes both estimates once real
 progress is available. Missing progress after the epoch184 transition is an
 error, not a bootstrap exception. Never resample to repair a metadata rejection.
 
+The exact October23 02:29 metadata transaction has a separate fleet-tail recovery
+mode (`--check-repair183-fleet-recovery`, then `--recover-repair183-fleet`). It
+binds the failed invocation, rejected child, observer, immutable models and eight
+successful authenticated status receipts. A pinned fleet reader recognizes only
+the exact183–184 reserve timer as an additional observational unit, never as a
+replay or pipeline claim. Recovery reuses the original model, sample and statuses,
+authenticates fresh inventory, writes the missing fleet/completion, and carries
+the reader pin into the next prepared cycle. It never republishes replay
+statuses, samples resources, restarts a producer or weakens a ready-pair gate.
+
 The first-fire receipt schema is
 `jetstreamer-horizon-repair183-guard-first-fire-v1`. Require the actual timer-fired
 service invocation, zero exit/restarts, absent stop intent/completion and its

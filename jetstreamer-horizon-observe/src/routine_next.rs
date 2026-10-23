@@ -326,6 +326,7 @@ pub(super) fn prepare(
     publication144::upgrade_reader(&mut next);
     native144_recovery::consume(&mut next, &completion)?;
     public160_recovery::consume(&mut next, &completion)?;
+    repair183_fleet_recovery::consume(&mut next, &completion)?;
     delivery160::consume(&mut next)?;
     if mode == "--prepare-next-public160-timing" {
         ensure!(
