@@ -1,0 +1,34 @@
+# Dormant: sealed input/harness, fresh root admission, fleet registration and guard required.
+[Unit]
+Description=Horizon epoch209 v1.6.16 native cold input verification
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=2700
+TimeoutStopSec=60
+MemoryHigh=112G
+MemoryMax=128G
+MemorySwapMax=0
+TasksMax=512
+CPUAffinity=0-7
+CPUQuota=800%
+Nice=10
+IOWeight=10
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1
+Environment=RUST_MIN_STACK=134217728
+Environment=SOLANA_RAYON_THREADS=8
+Environment=JETSTREAMER_HISTORICAL_POH_THREADS=2
+Environment=JETSTREAMER_EPOCH209_V1616_TEST_SCRATCH=/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1/scratch
+ExecStart=/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test runtime::native209_input::native_epoch209_cold_input_matches_canonical_accounts_commitment --exact --ignored --test-threads=1 --nocapture

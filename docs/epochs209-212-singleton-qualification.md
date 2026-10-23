@@ -74,3 +74,33 @@ sidecar commit remain separate publication gates. Preparation and preflight
 open none of those gates. Register any actual work with its true owner and
 publish status in the existing coordinated 30-minute cycle using only `replay`,
 `verification`, `upload` or `readback`.
+
+## Epoch 209 native input harness
+
+The test-only v1.6.16 module `worker/src/native209_input.rs` supplies the ignored
+`runtime::native209_input::native_epoch209_cold_input_matches_canonical_accounts_commitment`
+gate. It admits only the exact retained 8,543,246,873-byte bootstrap and
+20,144-byte genesis, rehashes both against their sealed SHA-256 values, and
+requires empty current-owner mode-0700 scratch under its own
+`native-input209-v1616-capped-*` namespace. It restores only slot 90287519,
+freezes that bootstrap, requires its canonical accounts commitment, zero writes
+and unchanged write cursor/capitalization/transaction count, and prints an
+epoch-specific marker. No entries are replayed. The ordinary worker's runtime
+semantics are unchanged; the module is compiled only for tests.
+
+Build with rustc 1.51.0 from the v1.6.16 workspace root using `cargo +1.51.0
+test --release --locked --offline -p jetstreamer-historical-worker-v1-6-16
+--no-run`. Seal the optimized artifact separately, prove the exact ignored
+listing, and run only its small non-native input-integrity regression before
+actual admission. A build or listing does not qualify native restore.
+
+The [dormant service template](epoch209-native-input-service.service) reserves
+128 GiB hard/112 GiB high memory, 300 GB scratch, eight CPUs and 2,700 seconds,
+with no network or restarts. Those are explicit preparation claims, not current
+capacity evidence. Before launch the campaign owner must add the new exact
+unit/root/harness-digest tuple to the separately sealed native MainPID guard and
+fleet/admission/capture/status registry. Preserve the existing 207 and 227
+tuples. Bind actual invocation/MainPID, fresh complete-fleet admission, canonical
+clock and first sandboxed guard fire before publishing active `verification`
+status. A successful native bootstrap will still leave the full singleton,
+canonical final root, complete output and publication gates unqualified.
