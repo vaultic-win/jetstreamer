@@ -407,6 +407,9 @@ fn child(
                 && a["routine_completion"].is_object()
                 && a["other_pending_os_growth_bytes"].is_u64()
                 && l["resource_admission"].is_object()
+                && l["observer"] == s["observer"]
+                && l["routine_completion"] == s["routine_completion"]
+                && l["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
                 && s["source_revalidation_policy"]
                     == serde_json::to_value(
                         p.source_revalidation_policy
@@ -425,6 +428,18 @@ fn child(
         ensure!(
             sync_epoch(&c.phase, &c.unit) == Some(epoch) && program.path == Path::new(PROGRAM),
             "191 queue adopted another uploader namespace/program"
+        );
+        let prelaunch: Bound = serde_json::from_value(l["prelaunch_resources"].clone())?;
+        let before = bound(&prelaunch, false)?;
+        ensure!(
+            before["schema"] == "jetstreamer-cohort191-sync-prelaunch-resources-v1"
+                && before["sync_plan"] == serde_json::to_value(&sync)?
+                && before["admission"] == serde_json::to_value(&admission)?
+                && before["observer"] == s["observer"]
+                && before["routine_completion"] == s["routine_completion"]
+                && before["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && before["resource_admission"].is_object(),
+            "191 sync prelaunch resources differ from admitted native step"
         );
         let expected = vec![
             PROGRAM.to_string(),
