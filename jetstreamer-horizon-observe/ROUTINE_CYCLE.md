@@ -1,5 +1,15 @@
 # Routine metadata child diagnostics
 
+A sealed recovery plan may set `delayed_schedule_utc` to the original observer
+deadline only when the actual observation started 1–300 seconds later. Its
+`sample_target_utc` and all derived metadata must retain the actual receipt time;
+the unchanged observer configuration must bind the original scheduled deadline.
+The original deadline must still be exactly one qualified predecessor interval
+later, and the receipt must prove the actual elapsed interval. This does not
+permit another scan, timestamp rewriting, stale publication, or a cadence bypass.
+Offline successor preparation clears the recovery field and schedules from the
+accepted actual observation time, preserving the 1,800-second minimum.
+
 The fixed October22 narrative review may update only the exact superseded
 `next_action` strings for epochs203,205,227. Bind its immutable path and
 SHA-256 in each affected epoch's `additional_gate_evidence`. The coordinator
