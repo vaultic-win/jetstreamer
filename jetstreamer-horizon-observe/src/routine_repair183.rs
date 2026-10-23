@@ -370,8 +370,6 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     for unit in [
         CONTROLLER.to_owned(),
         PRODUCER.to_owned(),
-        GUARD.to_owned(),
-        GUARD.replace(".service", ".timer"),
     ] {
         let value = json!(unit);
         if !tracked.contains(&value) {

@@ -39,7 +39,7 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                 == p.cycle_directory.join("sealed/eta-model.json").to_str()
             && (c["fleet_plan"]["path"].as_str()
                 == p.cycle_directory.join("sealed/fleet-plan.json").to_str()
-                || public198::promoted(p, c)?),
+                || public198::promoted(p, c)? || repair183_fleet_recovery::completed_plan(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [

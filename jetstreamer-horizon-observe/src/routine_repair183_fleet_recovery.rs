@@ -4,11 +4,11 @@ const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261
 const PLAN_SHA: &str = "224a145cf146dd9b42448b8baaaeef41527b5bce0290501bf8f93c713dc8b716";
 const OLD_IID: &str = "d01b04d9f585485ab1cb534f4d813506";
 const FAILED_SHA: &str = "01c549c126a545f718d422ab595033076f2a0956da7ad2684513f889fc04449a";
-const UNIT: &str = "horizon-repair183-fleet-recovery-20261023-v1.service";
+const UNIT: &str = "horizon-repair183-fleet-recovery-20261023-v2.service";
 pub(super) const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-repair183-fleet-reader-20261023-v1/jetstreamer-r2";
+    "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261023-v4/jetstreamer-r2";
 pub(super) const READER_SHA: &str =
-    "2f0a72732780eacb9e2e8a353317ec5e2a67495b2ad25c491756af9acca36d79";
+    "0ac98fef0a7397ba2f5cb879ff829dfc1a4a33a2b3d7c0cf1789764e04cd2e70";
 pub(super) fn reader() -> Bound {
     Bound {
         path: READER.into(),
@@ -21,6 +21,17 @@ fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
         path,
         sha256: sha(&bytes),
     })
+}
+fn corrected_fleet(original: &Value) -> Result<Value> {
+    let mut corrected = original.clone();
+    let units = corrected["tracked_units"].as_array_mut().context("repair183 tracked units")?;
+    for name in ["jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.service",
+        "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.timer"] {
+        ensure!(units.iter().filter(|u| u.as_str() == Some(name)).count() == 1,
+            "repair183 guard census correction is not exact");
+        units.retain(|u| u.as_str() != Some(name));
+    }
+    Ok(corrected)
 }
 fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
     ensure!(
@@ -98,6 +109,8 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     };
     let mv = bound_json(&model, true)?;
     let fv = bound_json(&fleet_plan, true)?;
+    corrected_fleet(&fv)?;
+    repair183::effective_model(p, &bound_json(&p.model_template, true)?)?;
     let provisional_plan = Bound {
         path: p
             .cycle_directory
@@ -160,7 +173,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         return Ok(());
     }
     let iid = authenticate_named_service(UNIT)?;
-    let root = p.cycle_directory.join("repair183-fleet-recovery-v1");
+    let root = p.cycle_directory.join("repair183-fleet-recovery-v2");
     absent(&root)?;
     fs::create_dir(&root)?;
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
@@ -172,6 +185,15 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         "recovery_unit":UNIT,"recovery_invocation_id":iid,"new_resource_samples":0,"replay_status_republications":0,
         "archive_mutations":false,"sidecar_mutations":false,"replay_launch_authorized":false}),
     )?;
+    let corrected = corrected_fleet(&fv)?;
+    let mut provisional_value = corrected.clone();
+    provisional_value["output"] = json!(provisional_path);
+    let mut staging: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    staging.cycle_directory = root.clone();
+    let package = delivery198::seal_values(&staging, "guard-census-correction",
+        &[("fleet-plan.json", corrected), ("provisional-plan.json", provisional_value)])?;
+    let fleet_plan = file(package.join("fleet-plan.json"), true)?;
+    let provisional_plan = file(package.join("provisional-plan.json"), true)?;
     child(
         &reader,
         &[
@@ -239,7 +261,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
     };
     let b: Bound = serde_json::from_value(b.clone())?;
     ensure!(
-        b.path == Path::new(ROOT).join("repair183-fleet-recovery-v1/intent.json"),
+        b.path == Path::new(ROOT).join("repair183-fleet-recovery-v2/intent.json"),
         "foreign183 fleet recovery intent"
     );
     let v = bound_json(&b, false)?;
@@ -261,9 +283,36 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
+    if c.get("repair183_fleet_recovery").is_none() { return Ok(false); }
+    let mut checked: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    consume(&mut checked, c)?;
+    let corrected: Bound = serde_json::from_value(c["fleet_plan"].clone())?;
+    ensure!(corrected.path == Path::new(ROOT).join("repair183-fleet-recovery-v2/guard-census-correction/sealed/fleet-plan.json"),
+        "foreign repair183 corrected plan");
+    let original = Bound { path: Path::new(ROOT).join("sealed/fleet-plan.json"),
+        sha256: "c7987fae86f18ea208806afecd298b8d05a9142b9e3655b4e29c28775b8f87e3".into() };
+    ensure!(bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
+        "repair183 correction changed more than the two non-replay guard observations");
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
  use super::*;
+ #[test]
+ fn correction_removes_only_volatile_guard_observations_not_replay_claims() {
+   let guard="jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1";
+   let original=json!({"tracked_units":["controller.service",format!("{guard}.service"),"producer.service",format!("{guard}.timer")],
+       "gates":{"183":{"state":"failed-needs-repair"}},"sentinel":u64::MAX});
+   let mut expected=original.clone();
+   expected["tracked_units"]=json!(["controller.service","producer.service"]);
+   assert_eq!(corrected_fleet(&original).unwrap(), expected);
+   assert!(corrected_fleet(&expected).is_err());
+   let mut duplicate=original.clone();
+   duplicate["tracked_units"].as_array_mut().unwrap().push(json!(format!("{guard}.service")));
+   assert!(corrected_fleet(&duplicate).is_err());
+ }
  #[test]
  fn foreign_plan_or_nonmatching_failure_cannot_resume() {
    let (mut p,_,_,_,_,_,_,_) = crate::tests::fixture101();

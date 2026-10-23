@@ -26,11 +26,14 @@ error, not a bootstrap exception. Never resample to repair a metadata rejection.
 The exact October23 02:29 metadata transaction has a separate fleet-tail recovery
 mode (`--check-repair183-fleet-recovery`, then `--recover-repair183-fleet`). It
 binds the failed invocation, rejected child, observer, immutable models and eight
-successful authenticated status receipts. A pinned fleet reader recognizes only
-the exact183–184 reserve timer as an additional observational unit, never as a
-replay or pipeline claim. Recovery reuses the original model, sample and statuses,
+successful authenticated status receipts. The v2 recovery seals a correction
+removing only the two183–184 guard service/timer observations from the fleet's
+stable replay-unit census: their minute-by-minute invocations legitimately change
+during an inventory read. Replay owners remain fully identity-stable; the actual
+guard and timer are authenticated separately through the sealed handoff and live
+guard checks. Recovery reuses the original model, sample, reader and statuses,
 authenticates fresh inventory, writes the missing fleet/completion, and carries
-the reader pin into the next prepared cycle. It never republishes replay
+the corrected plan into the next prepared cycle. It never republishes replay
 statuses, samples resources, restarts a producer or weakens a ready-pair gate.
 
 The first-fire receipt schema is

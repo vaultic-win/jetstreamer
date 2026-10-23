@@ -1434,17 +1434,12 @@ pub(super) fn utc_seconds(value: &str) -> Result<u64> {
     Ok(u64::try_from(seconds)?)
 }
 
-fn observed_unit_name(name: &str) -> bool {
-    (name.ends_with(".service")
-        || name == "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.timer")
-            && name
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b))
-}
-
 pub(super) fn unit(name: &str) -> Result<Value> {
     ensure!(
-        observed_unit_name(name),
+        name.ends_with(".service")
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b)),
         "invalid fleet unit name"
     );
     let result = ProcessCommand::new("systemctl").args([
@@ -2486,14 +2481,6 @@ pub(super) async fn run() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn tracked_guard_timer_exception_is_exact_not_an_archive_claim() {
-        assert!(super::observed_unit_name("jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.timer"));
-        assert!(super::observed_unit_name("a.service"));
-        for name in ["a.timer", "a.path", "a;bad.service", "a/service", "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v2.timer"] {
-            assert!(!super::observed_unit_name(name));
-        }
-    }
     #[test]
     fn retained_terminal_diagnostic_does_not_own_a_delivery_lane() {
         use serde_json::json;
