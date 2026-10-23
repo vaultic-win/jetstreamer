@@ -48,6 +48,7 @@ mod shrink_root203;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
+mod warmup223;
 mod warmup223_input_capture;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
@@ -60,6 +61,9 @@ pub(super) fn estimate_readback203() -> Result<()> {
 }
 pub(super) fn capture_warmup223_input() -> Result<()> {
     warmup223_input_capture::run()
+}
+pub(super) fn admit_warmup223(capture: bool) -> Result<()> {
+    warmup223::run(capture)
 }
 pub(super) fn capture_original141() -> Result<()> {
     original141::capture()
@@ -372,7 +376,10 @@ pub(super) fn pipeline_unit_range(
     if private144_scan::scope(phase, unit) {
         return Ok(144..=144);
     }
-    if tail223_scan::scope(phase, unit) || cold223_scan::scope(phase, unit) {
+    if tail223_scan::scope(phase, unit)
+        || cold223_scan::scope(phase, unit)
+        || warmup223::scope(phase, unit)
+    {
         return Ok(223..=223);
     }
     if watch198::namespace(phase, unit) {
@@ -570,6 +577,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         }
         if cold223_scan::scope(&claim.phase, &claim.unit) {
             cold223_scan::validate_live(claim, current)?;
+        }
+        if warmup223::scope(&claim.phase, &claim.unit) {
+            warmup223::validate_live(claim, current)?;
         }
         if claim.epoch == 160 && watch160::namespace(&claim.phase, &claim.unit) {
             return Ok(watch160::child_start(&claim.phase, current)?.is_some());
@@ -2075,7 +2085,9 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == "jetstreamer-exact203-phase-handoff-v1" {
+            if event["schema"] == "jetstreamer-private-warmup223-launch-v1" {
+                warmup223::event_predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == "jetstreamer-exact203-phase-handoff-v1" {
                 publication203::event_predecessor(
                     &previous,
                     &plan,
@@ -2205,6 +2217,9 @@ pub(super) async fn run() -> Result<()> {
         if cold223_scan::scope(&claim.phase, &claim.unit) {
             cold223_scan::validate(claim)?;
         }
+        if warmup223::scope(&claim.phase, &claim.unit) {
+            warmup223::validate(claim)?;
+        }
         ensure!(
             pipeline_epoch_units.insert((claim.epoch, claim.unit.clone()))
                 && !diagnostic_units.contains(&claim.unit),
@@ -2228,6 +2243,7 @@ pub(super) async fn run() -> Result<()> {
     }
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
     publication203::event_census(&plan, &before)?;
+    warmup223::event_census(&plan, &before)?;
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
@@ -2298,7 +2314,8 @@ pub(super) async fn run() -> Result<()> {
         };
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
             || tail223_scan::scope(&claim.phase, &claim.unit)
-            || cold223_scan::scope(&claim.phase, &claim.unit);
+            || cold223_scan::scope(&claim.phase, &claim.unit)
+            || warmup223::scope(&claim.phase, &claim.unit);
         let mut entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
             "finalization_evidence":finalization,
             "live":is_active,"expected_invocation_id":claim.invocation_id,
@@ -2314,7 +2331,8 @@ pub(super) async fn run() -> Result<()> {
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
                         || ((tail223_scan::scope(&claim.phase, &claim.unit)
-                            || cold223_scan::scope(&claim.phase, &claim.unit))
+                            || cold223_scan::scope(&claim.phase, &claim.unit)
+                            || warmup223::scope(&claim.phase, &claim.unit))
                             && plan.gates[&claim.epoch].state == "failed-needs-repair")
                 } else {
                     plan.gates[&claim.epoch].state == "post-replay-pipeline"

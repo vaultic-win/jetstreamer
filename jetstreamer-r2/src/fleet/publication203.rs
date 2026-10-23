@@ -43,7 +43,7 @@ struct AdmissionSpec {
 fn now() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
-fn utc(time: u64) -> Result<String> {
+pub(super) fn utc(time: u64) -> Result<String> {
     let time: libc::time_t = time.try_into()?;
     let mut t = std::mem::MaybeUninit::<libc::tm>::uninit();
     ensure!(
@@ -246,7 +246,7 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
     }
     Ok(())
 }
-fn guard(g: &Value, index: usize, sampled: u64, time: u64) -> Result<()> {
+pub(super) fn guard(g: &Value, index: usize, sampled: u64, time: u64) -> Result<()> {
     let (name, iid) = REPLAYS[index];
     let (sha, plan) = match index {
         0 => (

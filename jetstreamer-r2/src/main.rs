@@ -3400,6 +3400,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-warmup223-input") {
         return fleet::capture_warmup223_input();
     }
+    if env::args().nth(1).as_deref() == Some("admit-warmup223") {
+        return fleet::admit_warmup223(false);
+    }
+    if env::args().nth(1).as_deref() == Some("capture-warmup223") {
+        return fleet::admit_warmup223(true);
+    }
     if env::args().nth(1).as_deref() == Some("extend-continuation203-runtime") {
         return fleet::extend_continuation203_runtime();
     }
