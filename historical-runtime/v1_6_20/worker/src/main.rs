@@ -1,6 +1,7 @@
 mod leader_schedule;
 mod poh_backend;
 mod runtime;
+mod epoch228_profile;
 mod snapshot;
 
 #[cfg(all(
@@ -17,6 +18,9 @@ compile_error!("epoch223 prefix cannot combine singleton execution diagnostics")
     )
 ))]
 compile_error!("epoch227 capped requires an exclusive qualification build");
+
+#[cfg(all(feature = "epoch228-capped-qualification", any(feature = "epoch227-capped-qualification", feature = "epoch223-prefix-qualification", feature = "diagnostic-singleton")))]
+compile_error!("epoch228 capped requires an exclusive qualification build");
 
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,

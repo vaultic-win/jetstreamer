@@ -239,7 +239,7 @@ fn century_floor(f: &Value) -> Result<u64> {
 }
 pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> {
     ensure!(
-        matches!(candidate_epoch, 207 | 227),
+        matches!(candidate_epoch, 207 | 209 | 227 | 228),
         "unregistered native candidate century"
     );
     let inventory = &f["inventory"];
@@ -766,8 +766,25 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
                 .as_str()
                 .context("227 unavailable diagnostic unit")?;
             let prior = &f["unit_census"][unit];
+            let known_terminal = if unit == NATIVE_UNIT {
+                true
+            } else if unit == "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service" {
+                let event: BoundFile = serde_json::from_value(f["metadata_event"].clone())?;
+                let proof = bound_json(&event)?;
+                let (expected_unit, expected_iid) = warmup223::terminal_identity(&proof)?;
+                ensure!(
+                    expected_unit == unit
+                        && row["expected_producer_invocation_id"] == expected_iid
+                        && proof["terminal_manager"] == *prior,
+                    "227 unavailable warmup is not its authenticated terminal owner"
+                );
+                warmup223::terminal_not_replaced(&proof)?;
+                true
+            } else {
+                false
+            };
             ensure!(
-                unit == NATIVE_UNIT
+                known_terminal
                     && row["status"] == "unavailable"
                     && row["observation"].is_null()
                     && prior["MainPID"] == "0"
@@ -1076,6 +1093,25 @@ mod tests {
         f["inventory"]["ready_pairs"] = json!(14);
         assert!(century_floor_for(&f, 207).is_ok());
         assert!(century_floor(&f).is_err());
+    }
+    #[test]
+    fn native228_uses_its_own_missing_epoch_and_exact_century_average() {
+        let f = inventory();
+        assert_eq!(century_floor_for(&f, 228).unwrap(), 2415);
+        for unregistered in [0, 200, 208, 229, 230, 299, 300, 301, u64::MAX] {
+            assert!(century_floor_for(&f, unregistered).is_err());
+        }
+        let mut other_ready = f.clone();
+        other_ready["inventory"]["entries"][26] = json!({"epoch":227,"state":"ready-pair","archive_length":1,
+            "sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)});
+        other_ready["inventory"]["ready_pairs"] = json!(15);
+        assert_eq!(century_floor_for(&other_ready, 228).unwrap(), 2255);
+        assert!(century_floor_for(&other_ready, 227).is_err());
+        let mut completed = f;
+        completed["inventory"]["entries"][27] = json!({"epoch":228,"state":"ready-pair","archive_length":1,
+            "sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)});
+        completed["inventory"]["ready_pairs"] = json!(15);
+        assert!(century_floor_for(&completed, 228).is_err());
     }
     #[test]
     fn owner_shape_never_silently_drops_an_auxiliary_or_controller() {

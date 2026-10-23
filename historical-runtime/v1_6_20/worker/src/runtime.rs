@@ -331,7 +331,8 @@ impl RuntimeState {
         }
 
         if (cfg!(feature = "epoch223-prefix-qualification")
-            || cfg!(feature = "epoch227-capped-qualification"))
+            || cfg!(feature = "epoch227-capped-qualification")
+            || cfg!(feature = "epoch228-capped-qualification"))
             && self.enforce_candidate_range
         {
             for request in &requests {
@@ -783,6 +784,7 @@ impl RuntimeState {
         );
         if cfg!(feature = "epoch223-prefix-qualification")
             || cfg!(feature = "epoch227-capped-qualification")
+            || cfg!(feature = "epoch228-capped-qualification")
         {
             // Match the pinned validator background-service debt cap. This
             // reclaims storage without generating account writes or Bank state.
@@ -872,6 +874,9 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(feature = "epoch228-capped-qualification") {
+        crate::epoch228_profile::validate_snapshot(slot)?;
+    }
     if cfg!(feature = "epoch227-capped-qualification") && slot != 98_063_464 {
         return Err("epoch227 capped requires the exact cold snapshot98063464".into());
     }
@@ -900,7 +905,9 @@ fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
+    if cfg!(feature = "epoch228-capped-qualification") {
+        crate::epoch228_profile::END_EXCLUSIVE
+    } else if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
         98_063_481
     } else if cfg!(feature = "epoch227-capped-qualification") {
         98_496_000
@@ -916,7 +923,9 @@ fn effective_max_supported_entry_slot_exclusive() -> u64 {
 }
 
 fn effective_min_supported_entry_slot() -> u64 {
-    if cfg!(feature = "epoch227-capped-qualification") {
+    if cfg!(feature = "epoch228-capped-qualification") {
+        crate::epoch228_profile::FIRST_ENTRY_SLOT
+    } else if cfg!(feature = "epoch227-capped-qualification") {
         98_063_465
     } else if cfg!(feature = "epoch223-prefix-qualification") {
         96_335_539
@@ -1679,7 +1688,11 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        if cfg!(feature = "epoch227-capped-qualification") {
+        if cfg!(feature = "epoch228-capped-qualification") {
+            assert!(validate_candidate_snapshot_slot(98_495_291).is_ok());
+            assert!(validate_candidate_snapshot_slot(98_495_290).is_err());
+            assert!(validate_candidate_snapshot_slot(98_495_292).is_err());
+        } else if cfg!(feature = "epoch227-capped-qualification") {
             assert!(validate_candidate_snapshot_slot(98_063_464).is_ok());
             assert!(validate_candidate_snapshot_slot(98_063_463).is_err());
             assert!(validate_candidate_snapshot_slot(98_063_465).is_err());
@@ -1701,7 +1714,9 @@ mod tests {
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
+            if cfg!(feature = "epoch228-capped-qualification") {
+                98_928_279
+            } else if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
                 98_063_481
             } else if cfg!(feature = "epoch227-capped-qualification") {
                 98_496_000
@@ -1715,6 +1730,20 @@ mod tests {
                 MAX_SUPPORTED_SLOT_EXCLUSIVE
             }
         );
+    }
+
+    #[cfg(feature = "epoch228-capped-qualification")]
+    #[test]
+    fn epoch228_refuses_foreign_batches_before_decode_or_bank_mutation() {
+        let (mut state, _) = test_state(1, Some(2));
+        state.enforce_candidate_range = true;
+        let before = (state.bank.slot(),state.bank.hash(),state.bank.transaction_count(),state.write_cursor);
+        for slot in &[crate::epoch228_profile::BOOTSTRAP_SLOT,crate::epoch228_profile::END_EXCLUSIVE] {
+            let request=EntryRequest{slot:*slot,entry_index:0,num_hashes:0,hash:vec![],transactions:vec![vec![255]]};
+            let error=state.process_entries(vec![request]).unwrap_err();
+            assert!(error.contains("outside"),"{}",error);
+            assert_eq!(before,(state.bank.slot(),state.bank.hash(),state.bank.transaction_count(),state.write_cursor));
+        }
     }
 
     #[cfg(feature = "epoch227-capped-qualification")]
@@ -1978,7 +2007,8 @@ mod tests {
 
     #[cfg(any(
         feature = "epoch223-prefix-qualification",
-        feature = "epoch227-capped-qualification"
+        feature = "epoch227-capped-qualification",
+        feature = "epoch228-capped-qualification"
     ))]
     #[test]
     fn prefix_shrink_caps_debt_without_changing_consensus_state_or_write_cursor() {

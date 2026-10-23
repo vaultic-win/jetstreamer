@@ -8,6 +8,8 @@ mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
 mod failed_prefix220;
+mod singletons209_212;
+mod singletons209_212_profile;
 
 #[cfg(all(
     feature = "epoch223-v1-6-20-prefix-qualification",
@@ -5529,7 +5531,10 @@ fn plan_runtime_spans_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<Vec<compatibility::RuntimeSpan>, String> {
-    if focused_qualification || epoch207_singleton::selected(&range) {
+    if focused_qualification
+        || epoch207_singleton::selected(&range)
+        || singletons209_212::selected(&range)
+    {
         compatibility::plan_focused_qualification_runtime_spans(range, allow_candidate_runtime)
     } else {
         compatibility::plan_runtime_spans(range, allow_candidate_runtime)
@@ -5541,7 +5546,10 @@ fn plan_replay_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<Vec<compatibility::ReplaySegment>, String> {
-    if focused_qualification || epoch207_singleton::selected(&range) {
+    if focused_qualification
+        || epoch207_singleton::selected(&range)
+        || singletons209_212::selected(&range)
+    {
         compatibility::plan_focused_qualification_replay(range, allow_candidate_runtime)
     } else {
         compatibility::plan_replay(range, allow_candidate_runtime)
@@ -5553,7 +5561,10 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    if focused_qualification || epoch207_singleton::selected(&range) {
+    if focused_qualification
+        || epoch207_singleton::selected(&range)
+        || singletons209_212::selected(&range)
+    {
         compatibility::select_focused_qualification_runtime(range, allow_candidate_runtime)
     } else {
         compatibility::select_runtime(range, allow_candidate_runtime)
@@ -5566,7 +5577,10 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    if focused_qualification || epoch207_singleton::selected(&output_range) {
+    if focused_qualification
+        || epoch207_singleton::selected(&output_range)
+        || singletons209_212::selected(&output_range)
+    {
         compatibility::select_focused_qualification_runtime_with_snapshot_warmup(
             replay_start,
             output_range,
@@ -5837,6 +5851,13 @@ fn root_checkpoint_cohort_runtime(
     end_epoch: u64,
     allow_candidate_runtime: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    if cfg!(feature = "epochs209-212-singleton-qualification")
+        && start_epoch != end_epoch
+        && (singletons209_212_profile::profile(start_epoch).is_ok()
+            || singletons209_212_profile::profile(end_epoch).is_ok())
+    {
+        return Err("private209–212cohorts admit exactly one registered epoch".into());
+    }
     if start_epoch == 0 || start_epoch > end_epoch {
         return Err("a root-checkpoint cohort requires one or more nonzero epochs".to_string());
     }
@@ -6753,13 +6774,16 @@ fn replay_start_for_bootstrap(
 }
 
 fn archive_generation_profile() -> String {
+    #[cfg(feature = "epochs209-212-singleton-qualification")]
+    let route = "epochs209-212-singleton-qualification-v1";
     #[cfg(feature = "epoch207-singleton-qualification")]
     let route = "epoch207-singleton-qualification-v1";
     #[cfg(feature = "epoch141-original-entry-qualification")]
     let route = "epoch141-original-entry-qualification-v1";
     #[cfg(not(any(
         feature = "epoch141-original-entry-qualification",
-        feature = "epoch207-singleton-qualification"
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification"
     )))]
     let route = "old-faithful-to-horizon-v2";
     format!(
@@ -19509,6 +19533,7 @@ async fn main() {
     let mut replay_scratch: Option<PathBuf> = None;
     let mut root_checkpoint_cohort = false;
     let mut epoch207_singleton_preflight = false;
+    let mut private_singleton_preflight = false;
     let mut recover_staged_only = false;
     let mut recover_staged_cohort_only = false;
     let mut recover_unreceipted_root_cohort_only = false;
@@ -19592,6 +19617,16 @@ async fn main() {
             }
         } else if let Some(path) = arg.strip_prefix("--replay-scratch=") {
             replay_scratch = Some(PathBuf::from(path));
+        } else if arg == "--singleton-preflight" {
+            if !cfg!(feature = "epochs209-212-singleton-qualification")
+                || private_singleton_preflight
+            {
+                eprintln!(
+                    "singleton preflight requires the exclusive209–212build and may appear only once"
+                );
+                exit(2);
+            }
+            private_singleton_preflight = true;
         } else if arg == "--epoch207-singleton-preflight" {
             if !cfg!(feature = "epoch207-singleton-qualification") || epoch207_singleton_preflight {
                 eprintln!(
@@ -19935,6 +19970,32 @@ async fn main() {
         eprintln!("error: {error}");
         exit(2);
     }
+    if cfg!(feature = "epochs209-212-singleton-qualification")
+        && let Err(error) = singletons209_212::validate_launch(
+            start_epoch,
+            end_epoch,
+            explicit_verify,
+            verify_option_count,
+            root_checkpoint_cohort,
+            env_truthy("JETSTREAMER_ALLOW_CANDIDATE_RUNTIME"),
+            recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease
+                || qualification_end_slot.is_some()
+                || horizon_output.is_some()
+                || epoch_hashes.is_some()
+                || range_info.is_some()
+                || replay_scratch.is_some()
+                || env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+            &dest_dir,
+            snapshot_archive_override.as_deref(),
+        )
+        .and_then(|_| singletons209_212::validate_filesystem(&dest_dir))
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     let cohort_bootstrap_override = root_checkpoint_cohort
         .then(|| snapshot_archive_override.take())
         .flatten();
@@ -20260,6 +20321,30 @@ async fn main() {
                     "worker_started":false,"replay_entries":0,
                     "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
                 })
+            );
+            return;
+        }
+    }
+    if cfg!(feature = "epochs209-212-singleton-qualification") {
+        let plan = cohort_plan
+            .as_ref()
+            .expect("private singleton requires an exact cohort");
+        let p = match singletons209_212::validate_plan(start_epoch, plan) {
+            Ok(p) => p,
+            Err(error) => {
+                eprintln!("error: {error}");
+                exit(2);
+            }
+        };
+        if private_singleton_preflight {
+            println!(
+                "{}",
+                serde_json::json!({"schema":"jetstreamer-private-v1616-singleton-preflight-v1","epoch":p.epoch,
+                "bootstrap_slot":p.bootstrap.slot,"output_slot_start":p.start(),"output_slot_end_exclusive":p.end(),
+                "canonical_root_slots":[p.root.slot],"post_root_slot_count":p.end()-1-p.root.slot,"manifest_fingerprint":plan.fingerprint,
+                "retained_package":p.package,"snapshot_bindings_sha256":p.bindings_sha,
+                "runtime":"solana-v1.6.16","candidate_only":true,"full_epoch_replay_qualified":false,"snapshot_restored":false,
+                "worker_started":false,"replay_entries":0,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false})
             );
             return;
         }

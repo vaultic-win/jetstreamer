@@ -20,6 +20,7 @@ mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
 mod epoch136;
+mod full209_status;
 mod full227_status;
 mod native141;
 mod native144;
@@ -29,6 +30,19 @@ mod native207_admission;
 mod native207_capture;
 mod native207_event;
 mod native207_terminal;
+mod native209;
+mod native209_admission;
+mod native209_capture;
+mod native209_event;
+mod native209_full227;
+mod native209_terminal;
+mod native228;
+mod native228_admission;
+mod native228_capture;
+mod native228_event;
+mod native228_full209;
+mod native228_peer209;
+mod native228_terminal;
 mod original141;
 mod original141_capped;
 mod original141_freeze;
@@ -54,6 +68,13 @@ mod retained220;
 mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
+mod singleton209;
+mod singleton209_admission;
+mod singleton209_capability;
+mod singleton209_capture;
+mod singleton209_delivery;
+mod singleton209_peer223;
+mod singleton209_prepare;
 mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
@@ -64,6 +85,7 @@ mod tail223;
 mod tail223_scan;
 mod warmup223;
 mod warmup223_input_capture;
+mod warmup223_retire;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
 
@@ -85,8 +107,43 @@ pub(super) fn estimate_readback203() -> Result<()> {
 pub(super) fn capture_warmup223_input() -> Result<()> {
     warmup223_input_capture::run()
 }
+pub(super) fn capture_warmup223_terminal() -> Result<()> {
+    warmup223::capture_terminal()
+}
+pub(super) fn retire_warmup223_scratch() -> Result<()> {
+    warmup223_retire::run()
+}
+pub(super) fn warmup223_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    warmup223::terminal_identity(proof)
+}
+pub(super) fn warmup223_terminal_not_replaced(proof: &Value) -> Result<()> {
+    warmup223::terminal_not_replaced(proof)
+}
 pub(super) async fn publish_full227_status() -> Result<()> {
     full227_status::run().await
+}
+pub(super) async fn publish_full209_status() -> Result<()> {
+    full209_status::run().await
+}
+pub(super) fn full209_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    full209_status::inactive_owner(receipt)
+}
+pub(super) fn prepare_singleton209_inputs() -> Result<()> {
+    singleton209_capability::run()
+}
+pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
+    singleton209_prepare::run()
+}
+pub(super) fn deliver_singleton209_output() -> Result<()> {
+    singleton209_delivery::run()
+}
+pub(super) fn admit_singleton209() -> Result<()> {
+    singleton209_admission::run()
+}
+pub(super) fn capture_singleton209() -> Result<()> {
+    singleton209_capture::run()
 }
 pub(super) fn full227_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
@@ -193,11 +250,35 @@ pub(super) fn capture_native207_terminal() -> Result<()> {
 pub(super) fn native207_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
     Ok((native207::UNIT.into(), native207_terminal::validate(proof)?))
 }
+pub(super) fn admit_native209_input() -> Result<()> {
+    native209_admission::run()
+}
+pub(super) fn capture_native209_input() -> Result<()> {
+    native209_capture::run()
+}
+pub(super) fn capture_native209_terminal() -> Result<()> {
+    native209_terminal::capture()
+}
+pub(super) fn native209_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    Ok((native209::UNIT.into(), native209_terminal::validate(proof)?))
+}
+pub(super) fn admit_native228_input() -> Result<()> {
+    native228_admission::run()
+}
+pub(super) fn capture_native228_input() -> Result<()> {
+    native228_capture::run()
+}
+pub(super) fn capture_native228_terminal() -> Result<()> {
+    native228_terminal::capture()
+}
+pub(super) fn native228_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    Ok((native228::UNIT.into(), native228_terminal::validate(proof)?))
+}
 pub(super) fn validate_warmup223_status_claim(value: &Value) -> Result<()> {
     warmup223::status_claim(value)
 }
-pub(super) fn warmup223_status_jet_path() -> PathBuf {
-    warmup223::status_jet_path()
+pub(super) fn warmup223_status_jet_path(unit: &str) -> Result<PathBuf> {
+    warmup223::status_jet_path(unit)
 }
 /// The native status publisher shares the exact fleet registration gates;
 /// a metadata countdown cannot register or qualify a new native attempt.
@@ -205,6 +286,10 @@ pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
     let claim: PipelineClaim = serde_json::from_value(value.clone())?;
     if claim.epoch == 207 && native207::scope(&claim.phase, &claim.unit) {
         native207::claim(&claim)
+    } else if claim.epoch == 228 && native228::scope(&claim.phase, &claim.unit) {
+        native228::claim(&claim)
+    } else if claim.epoch == 209 && native209::scope(&claim.phase, &claim.unit) {
+        native209::claim(&claim)
     } else if claim.epoch == 223 && cold223_scan::scope(&claim.phase, &claim.unit) {
         cold223_scan::validate(&claim)
     } else if claim.epoch == 227 && singleton227::native_scope(&claim.phase, &claim.unit) {
@@ -431,6 +516,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     if singleton227::namespace(claim) {
         singleton227::bindings(claim, &launch)?;
     }
+    if singleton209::namespace(claim) {
+        singleton209::bindings(claim, &launch)?;
+    }
     Ok(launch)
 }
 
@@ -480,6 +568,12 @@ pub(super) fn pipeline_unit_range(
     }
     if native207::scope(phase, unit) {
         return Ok(207..=207);
+    }
+    if native209::scope(phase, unit) {
+        return Ok(209..=209);
+    }
+    if native228::scope(phase, unit) {
+        return Ok(228..=228);
     }
     if singleton227::native_scope(phase, unit) {
         return Ok(227..=227);
@@ -697,6 +791,10 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         }
         if native207::scope(&claim.phase, &claim.unit) {
             native207::live(claim, current)?;
+        } else if native228::scope(&claim.phase, &claim.unit) {
+            native228::live(claim, current)?;
+        } else if native209::scope(&claim.phase, &claim.unit) {
+            native209::live(claim, current)?;
         }
         if warmup223::scope(&claim.phase, &claim.unit) {
             warmup223::validate_live(claim, current)?;
@@ -850,6 +948,7 @@ fn validate_same_sample_admission(
         205 if prefix205::namespace(claim) => prefix205::GUARD_SHA,
         204 if prefix204::namespace(claim) => prefix204::GUARD_SHA,
         227 if singleton227::namespace(claim) => singleton227::SINGLETON_GUARD_SHA,
+        209 if singleton209::namespace(claim) => singleton209::GUARD_SHA,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
         203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
@@ -1074,6 +1173,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if singleton227::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| singleton227::guard_matches(claim, &r, plan))
+    } else if singleton209::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| singleton209::guard_matches(claim, &r, plan))
     } else if prefix223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
@@ -1223,6 +1325,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let prefix_205 = receipt["schema"] == prefix205::SCHEMA;
     let prefix_204 = receipt["schema"] == prefix204::SCHEMA;
     let singleton_227 = receipt["schema"] == singleton227::SCHEMA;
+    let singleton_209 = receipt["schema"] == singleton209::SCHEMA;
+    ensure!(
+        !singleton209::namespace(claim) || singleton_209,
+        "capped209 namespace requires its own full singleton schema"
+    );
     ensure!(
         !singleton227::namespace(claim) || singleton_227,
         "capped227 namespace requires its own full singleton schema"
@@ -1284,6 +1391,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || prefix_205
             || prefix_204
             || singleton_227
+            || singleton_209
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -1297,7 +1405,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if singleton_227 {
+    let scope_valid = if singleton_209 {
+        singleton209::launch_matches(claim, receipt)
+    } else if singleton_227 {
         singleton227::launch_matches(claim, receipt)
     } else if prefix_204 {
         prefix204::launch_matches(claim, receipt)
@@ -2253,7 +2363,11 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == "jetstreamer-private-warmup223-launch-v1" {
+            if event["schema"] == warmup223::TERMINAL_SCHEMA
+                || event["schema"] == warmup223::TERMINAL_SCHEMA_V2
+            {
+                warmup223::terminal_predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == "jetstreamer-private-warmup223-launch-v1" {
                 warmup223::event_predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"]
                 == "jetstreamer-private-epoch223-native-v1620-ram-snapshot-intent-v1"
@@ -2287,6 +2401,26 @@ pub(super) async fn run() -> Result<()> {
                 )?;
             } else if event["schema"] == native207_terminal::SCHEMA {
                 native207_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == native209_terminal::SCHEMA {
+                native209_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == native209::SCHEMA {
+                native209_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == native228_terminal::SCHEMA {
+                native228_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == native228::SCHEMA {
+                native228_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == native207::SCHEMA {
                 native207_event::event_predecessor(
                     &previous,
@@ -2448,6 +2582,10 @@ pub(super) async fn run() -> Result<()> {
         }
         if native207::scope(&claim.phase, &claim.unit) {
             native207::claim(claim)?;
+        } else if native228::scope(&claim.phase, &claim.unit) {
+            native228::claim(claim)?;
+        } else if native209::scope(&claim.phase, &claim.unit) {
+            native209::claim(claim)?;
         }
         if warmup223::scope(&claim.phase, &claim.unit) {
             warmup223::validate(claim)?;
@@ -2476,10 +2614,51 @@ pub(super) async fn run() -> Result<()> {
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
+    warmup223::terminal_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
     singleton227_terminal::terminal_census(&plan, &before)?;
     native207_terminal::census_check(&plan, &before)?;
+    native209_terminal::census_check(&plan, &before)?;
+    native228_terminal::census_check(&plan, &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == native209::SCHEMA
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native209 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| native209::scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding))
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native209 event requires one bound new owner"
+        );
+        native209_event::event_census(&previous, &before, claims[0])?;
+    }
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == native228::SCHEMA
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native228 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| native228::scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding))
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native228 event requires one bound new owner"
+        );
+        native228_event::event_census(&previous, &before, claims[0])?;
+    }
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native207::SCHEMA
     {
@@ -2633,6 +2812,8 @@ pub(super) async fn run() -> Result<()> {
             (live, proof)
         };
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
+            || native209::scope(&claim.phase, &claim.unit)
+            || native228::scope(&claim.phase, &claim.unit)
             || native207::scope(&claim.phase, &claim.unit)
             || tail223_scan::scope(&claim.phase, &claim.unit)
             || cold223_scan::scope(&claim.phase, &claim.unit)
@@ -2653,6 +2834,8 @@ pub(super) async fn run() -> Result<()> {
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
                         || ((tail223_scan::scope(&claim.phase, &claim.unit)
+                            || native209::scope(&claim.phase, &claim.unit)
+                            || native228::scope(&claim.phase, &claim.unit)
                             || native207::scope(&claim.phase, &claim.unit)
                             || cold223_scan::scope(&claim.phase, &claim.unit)
                             || singleton227::native_scope(&claim.phase, &claim.unit)
@@ -2820,6 +3003,14 @@ pub(super) async fn run() -> Result<()> {
                     singleton227::same_command(&current["ExecStart"], &launch),
                     "capped227 live command changed"
                 );
+            }
+            if singleton209::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    singleton209::same_command(&current["ExecStart"]),
+                    "capped209 live command changed"
+                );
+                singleton209::bindings(claim, &launch)?;
             }
             if shrink_budget225::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
@@ -3020,6 +3211,7 @@ pub(super) async fn run() -> Result<()> {
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
+                        || full209_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                 });

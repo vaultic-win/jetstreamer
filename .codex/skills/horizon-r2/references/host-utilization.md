@@ -52,6 +52,17 @@ Do not transfer a proven count between materially different machines or lane sha
 
 ## Qualify measured admission budgets
 
+Preserve the protective free-space thresholds of every existing live owner when admitting a
+candidate. The required initial free space must cover the candidate's incremental peak above
+the larger of (a) the century floor plus all protected remaining-growth claims and (b) the maximum
+`minimum_free_bytes` in the existing invocation-bound guard plans/receipts. Do not sum a shared
+threshold once per lane, count the candidate twice, or lower another owner's guard to make it fit.
+Keep this inherited guard constraint separate from the twice-average-century `.jet` safety floor.
+A lane that fits the growth calculation can still trip an existing guard; record the exact
+shortfall and qualify reclamation/offload or a separate reviewed guard handoff before launch.
+Enforce this calculation in actual admission as well as planning, using the same coordinated
+sample and authenticated guard evidence; it does not authorize another routine resource poll.
+
 ### Memory reservations from lane RSS
 
 Observe RSS in the existing 30-minute resource sample, with the ordinary user-requested status

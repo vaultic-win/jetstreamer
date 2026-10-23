@@ -400,19 +400,23 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
             r["UNIT"] == unit
                 && r["INVOCATION_ID"] == invocation
                 && r["_PID"] == "1"
-                && r["_UID"] == "0"
-                && r["MESSAGE"].as_str().is_some_and(|s| {
-                    s.starts_with("Starting ")
-                        || (((unit == super::cohort_finalization::CONTROLLER
-                            && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
-                            || (unit == super::cohort198_handoff::CONTROLLER
-                                && invocation == super::cohort198_handoff::CONTROLLER_INVOCATION
-                                && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
-                            || (unit == super::cohort160_handoff::CONTROLLER
-                                && invocation == super::cohort160_handoff::IID
-                                && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"))
-                            && s.starts_with("Started "))
-                })
+                && r["_UID"] == "0" && r["MESSAGE"].as_str().is_some_and(|s| {
+                s.starts_with("Starting ")
+                    || (((unit == super::cohort_finalization::CONTROLLER
+                        && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
+                        || (unit == super::cohort198_handoff::CONTROLLER
+                            && invocation == super::cohort198_handoff::CONTROLLER_INVOCATION
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (unit == super::cohort160_handoff::CONTROLLER
+                            && invocation == super::cohort160_handoff::IID
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (matches!(
+                            unit,
+                            "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service"
+                                | "horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service"
+                        ) && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"))
+                        && s.starts_with("Started "))
+            })
         })
         .collect();
     ensure!(
@@ -895,6 +899,37 @@ pub(super) fn native_input_matches_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native20_warmup_simple_service_uses_its_exact_pid1_started_clock() {
+        let unit = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";
+        let invocation = "13a5f755a196442e991c6930b410c04f";
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":format!("Started {unit} - Private epoch 223 native20 first16-slot warmup qualification."),"__REALTIME_TIMESTAMP":"1792787565383406"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1792787565383
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("foreign");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
+    #[test]
+    fn native20_v2_started_event_is_scoped_to_exact_unit_iid_and_canonical_manager_id() {
+        let unit = "horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service";
+        let iid = "a".repeat(32);
+        let r = json!({"UNIT":unit,"INVOCATION_ID":iid,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":format!("Started {unit} - Native20 cooperative warmup."),"__REALTIME_TIMESTAMP":"123456789"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&r), unit, &iid).unwrap(),
+            123456
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = r.clone();
+            bad[key] = json!("wrong");
+            assert!(start_millis(&[bad], unit, &iid).is_err());
+        }
+    }
     #[test]
     fn exact160_controller_started_event_keeps_actual_handoff_clock() {
         let unit = super::super::cohort160_handoff::CONTROLLER;

@@ -7,6 +7,13 @@ Absence means no published live estimate; it never means the epoch is storage-co
 
 ## Maintain useful estimates
 
+- Always show an ETA for active work, including active recovery after a failed producer. When
+  measured progress is insufficient, use a reviewed planning estimate with explicit repair,
+  restart/qualification, replay and delivery allowances, bound to the current active repair owner.
+  Explain the assumptions and uncertainty in private receipts and human updates. Repair missing
+  model/tool support promptly; do not substitute "ETA unavailable", hide the countdown, reuse a
+  terminal replay identity, or claim an unmeasured allowance is a guaranteed upper bound. This
+  requirement does not turn an unowned backlog entry into active work or bypass publication gates.
 - The current consumer (`apps/web/src/horizon.rs` in the Vaultic dashboard repository) requires
   all six wire fields and accepts only the phases `replay`, `verification`, `upload`, `readback`.
   An unknown phase rejects the entire report. Native-input/qualification checks and assembly are

@@ -1,0 +1,32 @@
+# Dormant review template. Requires registered profile, fresh admission and
+# an actual MainPID/executable/VMA protective guard. Do not start from this file.
+[Unit]
+Description=Horizon epoch228 original-runtime native cold input qualification
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=2700
+TimeoutStopSec=120
+MemoryHigh=112G
+MemoryMax=128G
+MemorySwapMax=0
+TasksMax=512
+CPUAffinity=0-7
+CPUQuota=800%
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1
+Environment=RUST_MIN_STACK=67108864
+Environment=SOLANA_RAYON_THREADS=8
+Environment=JETSTREAMER_HISTORICAL_POH_THREADS=2
+Environment=JETSTREAMER_EPOCH228_V1620_TEST_SCRATCH=/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1/scratch
+ExecStart=/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test epoch228_profile::tests::native_epoch228_cold_input_matches_canonical_accounts_commitment --exact --ignored --test-threads=1 --nocapture
