@@ -194,7 +194,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && p.scope_101_200
                 .as_ref()
                 .is_some_and(|s| s.private144_observer
-                    && s.diagnostic_ranges.len() == 1
+                    && original141::retained144_census(p, s)
                     && (owner(p, &s.diagnostic_ranges[0])
                         || continuation144::owner(p, &s.diagnostic_ranges[0])
                         || assembly144::owner(p, &s.diagnostic_ranges[0]))),

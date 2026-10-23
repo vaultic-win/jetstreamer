@@ -30,9 +30,20 @@ memory, the marginal lane estimate is `ceil(R / L)` and desired concurrency is
 memory-selected target. The century maximum from independently valid lane RSS
 observations still sets the separate `floor(3*maximum/2)` reservation ceiling.
 
-The initial implementation applies this target to the 101–200 control cycle.
-Active private diagnostics require explicit accounting before a target is
-reported. Older samples without the host census produce an unavailable target;
+The implementation applies this target to the 101–200 control cycle. Active
+private diagnostics use the same PID/start-time matched host census, count shared
+controller/producer processes once, and subtract their RSS separately from the
+remaining production-memory budget. Their transient RSS does not enter the
+production marginal-size average or its current maximum comparison. With `D`
+the private RSS and `P` the number of private lanes, the production target is
+`ceil(max(0, floor(9*T/10) - N - D) / marginal_production)`; the reported total
+desired count adds `P`. Missing private RSS, a changing process census, or a live
+fleet owner absent from diagnostic telemetry makes the target unavailable.
+Retained admission/launch profiles are history, not evidence of a live lane.
+Only current invocation-bound observations and the authenticated fleet census
+can contribute live owners.
+
+Older samples without the host census produce an unavailable target;
 they are never retroactively populated from a later resource read. A target
 grants no launch, stop, restart, archive or R2 mutation authority. Fresh
 invocation-bound admission, pressure relief where required, the century disk

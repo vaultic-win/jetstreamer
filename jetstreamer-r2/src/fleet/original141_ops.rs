@@ -17,9 +17,11 @@ const GUARDS: [&str; 5] = [
     "jetstreamer-adaptive-reserve-controller-rebind-185-185-20261023-v1.service",
 ];
 #[path = "original141_growth.rs"]
+#[allow(clippy::duplicate_mod, reason = "Growth validation belongs to each separately compiled closed141 profile")]
 mod growth_bridge;
 #[path = "original141_guard_pin.rs"]
-mod guard_pin;
+#[allow(clippy::duplicate_mod, reason = "Guard pins bind distinct compile-time producer and guard identities")]
+pub(super) mod guard_pin;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Guard {
@@ -170,10 +172,9 @@ pub(super) fn prepare() -> Result<()> {
         dormant()? == before,
         "original141 owner changed during layout"
     );
-    private157::immutable_receipt(
-        &root.join("receipts/layout.json"),
-        &json!({"schema":"jetstreamer-original141-private-layout-v2","epoch":141,"run_root":ROOT,"uid":1001,"gid":1003,"genesis_sha256":GENESIS_SHA,"genesis_bytes":bytes.len(),"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"self_sha256":a[3],"recorded_unix_seconds":now()?}),
-    )?;
+    let mut receipt = json!({"schema":"jetstreamer-original141-private-layout-v2","epoch":141,"run_root":ROOT,"uid":1001,"gid":1003,"genesis_sha256":GENESIS_SHA,"genesis_bytes":bytes.len(),"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"self_sha256":a[3],"recorded_unix_seconds":now()?});
+    trace_fields(&mut receipt);
+    private157::immutable_receipt(&root.join("receipts/layout.json"), &receipt)?;
     println!("original141 private layout and verified genesis staged; no launch");
     Ok(())
 }
@@ -228,7 +229,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
             .is_some_and(|n| n >= FLOOR + PEAK)
             && o["host_memory"]["conservative_available_kib"]
                 .as_u64()
-                .is_some_and(|n| n >= 256 * 1024 * 1024)
+                .is_some_and(|n| n >= SAMPLE_MEMORY_KIB)
             && o["vm_max_map_count"].as_u64().is_some_and(|n| n >= 4194304),
         "original141 sampled envelope unavailable"
     );
@@ -623,7 +624,7 @@ pub(super) async fn admit() -> Result<()> {
         .trim()
         .parse::<u64>()?;
     ensure!(
-        available >= protected + PEAK && memory >= 256 * 1024 * 1024 && vmas >= 4194304,
+        available >= protected + PEAK && memory >= SAMPLE_MEMORY_KIB && vmas >= 4194304,
         "original141 current envelope unavailable"
     );
     let after = census(&names, 101, 200)?;
@@ -653,10 +654,11 @@ pub(super) async fn admit() -> Result<()> {
         available >= required + PEAK,
         "original141 current guards require larger envelope"
     );
-    let mut receipt = json!({"schema":"jetstreamer-original141-root-admission-v2","epoch":141,"unit":UNIT,"admitted":true,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"candidate_incremental_peak_bytes":PEAK,"required_guard_minimum_free_bytes":required,"required_initial_free_bytes":required+PEAK,"minimum_available_memory_bytes":192u64<<30,"existing_growth_claims_protected":true,"century_floor_protected":true,"century_floor_bytes":snapshot144::floor(&floor)?,"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"spec":private157::binding(&sb),"layout":private157::binding(&s.layout),"growth":s.growth,"guard_evidence":guard_evidence,"unit_census_before":before,"unit_census_after":after,"available_bytes":available,"memory_available_kib":memory,"vm_max_map_count":vmas,"new_resource_samples":0,"guard_first_fire_required":true,"actual_fleet_transition_required":true,"recorded_unix_seconds":now()?,"invocation_id":inv,"self_sha256":own});
+    let mut receipt = json!({"schema":"jetstreamer-original141-root-admission-v2","epoch":141,"unit":UNIT,"admitted":true,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"candidate_incremental_peak_bytes":PEAK,"required_guard_minimum_free_bytes":required,"required_initial_free_bytes":required+PEAK,"minimum_available_memory_bytes":MIN_MEMORY,"existing_growth_claims_protected":true,"century_floor_protected":true,"century_floor_bytes":snapshot144::floor(&floor)?,"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"spec":private157::binding(&sb),"layout":private157::binding(&s.layout),"growth":s.growth,"guard_evidence":guard_evidence,"unit_census_before":before,"unit_census_after":after,"available_bytes":available,"memory_available_kib":memory,"vm_max_map_count":vmas,"new_resource_samples":0,"guard_first_fire_required":true,"actual_fleet_transition_required":true,"recorded_unix_seconds":now()?,"invocation_id":inv,"self_sha256":own});
     for key in DENIED {
         receipt[*key] = json!(false);
     }
+    trace_fields(&mut receipt);
     receipt["growth_extension"] = growth_evidence;
     receipt["cpu_budget"] = cpu;
     receipt["host_memory_reserve_bytes"] = json!(64u64 << 30);
@@ -713,6 +715,7 @@ pub(super) fn capture() -> Result<()> {
     for key in DENIED {
         r[*key] = json!(false);
     }
+    trace_fields(&mut r);
     r["actual_start_unix_seconds"] = json!(guard_pin::producer_start_seconds()?);
     shape(&r, &c)?;
     bindings(&r, &p, &a)?;
@@ -724,7 +727,9 @@ pub(super) fn capture() -> Result<()> {
         "capture sandbox read failed"
     );
     let text = std::str::from_utf8(&properties.stdout)?;
-    let props: BTreeMap<_, _> = text.lines().filter_map(|l| l.split_once('=')).collect();
+    let mut props: BTreeMap<_, _> = text.lines().filter_map(|l| l.split_once('=')).collect();
+    let empty_files = guard_pin::empty_environment_files(UNIT)?;
+    props.insert("EnvironmentFiles", &empty_files);
     limits(&props)?;
     ensure!(
         props.get("EnvironmentFiles") == Some(&""),
@@ -787,7 +792,7 @@ mod tests {
             output: ADMISSION.into(),
         };
         let o = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":"2026-10-23T06:39:58Z",
-            "filesystem":{"conservative_available_bytes":FLOOR+PEAK},"host_memory":{"conservative_available_kib":256u64*1024*1024},"vm_max_map_count":4194304,
+            "filesystem":{"conservative_available_bytes":FLOOR+PEAK},"host_memory":{"conservative_available_kib":SAMPLE_MEMORY_KIB},"vm_max_map_count":4194304,
             "replays":RANGES.iter().map(|r|json!({"range":r,"invocation_binding_stable":true,"controller_after":{"restarts":0},"producer_after":{"restarts":0},
                 "worker_after":{"matching_workers":1,"vmas":400000},"useful_work":{"sufficient_for_rates":true,"slots_per_second":1.},
                 "cross_sample":{"producer_cgroup_counter_delta":{"memory_events.oom":0,"memory_events.oom_kill":0,"memory_events.oom_group_kill":0,"memory_events.max":0}}})).collect::<Vec<_>>()});

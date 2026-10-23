@@ -23,6 +23,7 @@ mod native141;
 mod native144;
 mod native203;
 mod original141;
+mod original141_trace;
 mod ownroot203_rebase;
 mod prefix144;
 mod prefix204;
@@ -56,6 +57,15 @@ pub(super) fn capture_original141() -> Result<()> {
 }
 pub(super) fn prepare_original141() -> Result<()> {
     original141::prepare()
+}
+pub(super) async fn admit_original141_trace() -> Result<()> {
+    original141_trace::admit().await
+}
+pub(super) fn capture_original141_trace() -> Result<()> {
+    original141_trace::capture()
+}
+pub(super) fn prepare_original141_trace() -> Result<()> {
+    original141_trace::prepare()
 }
 
 pub(super) fn prepare_private_prefix157() -> Result<()> {
@@ -660,6 +670,7 @@ fn validate_same_sample_admission(
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
+        141 if original141_trace::namespace(claim) => original141_trace::GUARD_SHA,
         141 if original141::namespace(claim) => original141::GUARD_SHA,
         140 if native_restore_140(claim) => {
             // This host's unchanged, sealed generic bootstrap/drainage guard.
@@ -751,7 +762,15 @@ fn validate_same_sample_admission(
             && guard
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
-            && if native_restore_140(claim)
+            && if original141_trace::namespace(claim) {
+                guard.get("canary_target_error").is_some_and(Value::is_null)
+                    && guard["bounded_measurement"] == false
+                    && guard.get("bounded_canary").is_some_and(Value::is_null)
+                    && guard.get("target_handoff").is_some_and(Value::is_null)
+                    && guard
+                        .get("target_handoff_error")
+                        .is_some_and(Value::is_null)
+            } else if native_restore_140(claim)
                 || original141::namespace(claim)
                 || native144::namespace(claim)
                 || continuation144::namespace(claim)
@@ -800,7 +819,14 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
-    if tail223::namespace(claim)
+    if original141_trace::namespace(claim) {
+        // The profile validator independently binds the exact canonical root.
+        claim
+            .scratch_path
+            .parent()
+            .unwrap_or(Path::new("/"))
+            .to_path_buf()
+    } else if tail223::namespace(claim)
         || prefix223::namespace(claim)
         || prefix205::namespace(claim)
         || prefix204::namespace(claim)
@@ -842,7 +868,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if original141::namespace(claim) {
+    if original141_trace::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| original141_trace::guard_matches(claim, &r, plan))
+    } else if original141::namespace(claim) {
         bound_json(&claim.launch_receipt).is_ok_and(|r| original141::guard_matches(claim, &r, plan))
     } else if continuation203::namespace(claim) {
         bound_json(&claim.launch_receipt)
@@ -940,6 +969,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if original141_trace::namespace(claim) || receipt["schema"] == original141_trace::SCHEMA {
+        return original141_trace::launch(receipt, claim);
+    }
     if original141::namespace(claim) || receipt["schema"] == original141::SCHEMA {
         return original141::launch(receipt, claim);
     }
@@ -1650,7 +1682,7 @@ pub(super) fn census(
             || ram_entry_owner(name)
             || assigned_diagnostic
             || assigned_pipeline
-            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name)))
+            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name)))
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
@@ -2082,6 +2114,7 @@ pub(super) async fn run() -> Result<()> {
         if native141::namespace(claim)
             || census141_poh::namespace(claim)
             || original141::namespace(claim)
+            || original141_trace::namespace(claim)
         {
             ensure!(
                 plan.gates[&141].state == "failed-needs-repair",
@@ -2322,6 +2355,9 @@ pub(super) async fn run() -> Result<()> {
             if original141::namespace(claim) {
                 original141::validate_live(claim, current)?;
             }
+            if original141_trace::namespace(claim) {
+                original141_trace::validate_live(claim, current)?;
+            }
             if census141_poh::namespace(claim) {
                 census141_poh::validate_live(claim, current)?;
             }
@@ -2413,7 +2449,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if original141::namespace(claim) {
+            let phase = if original141_trace::namespace(claim) {
+                "private-original-entry-trace-repair"
+            } else if original141::namespace(claim) {
                 "private-original-entry-root-qualification"
             } else if prefix223::namespace(claim)
                 || prefix205::namespace(claim)
@@ -2506,6 +2544,7 @@ pub(super) async fn run() -> Result<()> {
                     native141::namespace(c)
                         || census141_poh::namespace(c)
                         || original141::namespace(c)
+                        || original141_trace::namespace(c)
                 }))
             {
                 state = private_qualification_inventory_state(gate.state.as_str());
