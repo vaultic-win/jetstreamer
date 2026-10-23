@@ -1,8 +1,8 @@
 use crate::{leader_schedule, poh_backend, snapshot};
 use jetstreamer_historical_protocol::{
     AccountWrite, Checkpoint, EntryProcessed, EntryRequest, Initialized, InitializedSource,
-    InstructionError as WireInstructionError, TransactionError as WireTransactionError,
-    TransactionOutcome, MAX_ENTRIES_PER_BATCH,
+    InstructionError as WireInstructionError, SnapshotExport,
+    TransactionError as WireTransactionError, TransactionOutcome, MAX_ENTRIES_PER_BATCH,
 };
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
 use solana_merkle_tree::MerkleTree;
@@ -61,6 +61,26 @@ pub struct RuntimeState {
     enforce_candidate_range: bool,
     last_accounts_clean_block_height: u64,
     accounts_shrink_consumed_budget: usize,
+    snapshot_export_seal: Option<Result<SnapshotExportSeal, String>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SnapshotExportTuple {
+    slot: u64,
+    bank_hash: Hash,
+    accounts_hash: Hash,
+    last_blockhash: Hash,
+    capitalization: u64,
+    transaction_count: u64,
+    tick_height: u64,
+    slot_complete: bool,
+    next_write_version: u64,
+}
+
+struct SnapshotExportSeal {
+    bank_identity: usize,
+    tuple: SnapshotExportTuple,
+    rooted_cache: snapshot::CacheSeal,
 }
 
 pub enum ProcessEntriesError<E> {
@@ -145,6 +165,7 @@ impl RuntimeState {
                 enforce_candidate_range: true,
                 last_accounts_clean_block_height: 0,
                 accounts_shrink_consumed_budget: 0,
+                snapshot_export_seal: None,
             },
             initialized,
         ))
@@ -184,6 +205,7 @@ impl RuntimeState {
     where
         F: FnMut(EntryProcessed) -> Result<(), E>,
     {
+        self.invalidate_snapshot_export();
         if requests.is_empty() {
             return Err(ProcessEntriesError::Runtime(
                 "entry batch must contain at least one entry".to_string(),
@@ -511,6 +533,7 @@ impl RuntimeState {
     }
 
     pub fn freeze_checkpoint(&mut self, expected_slot: u64) -> Result<Checkpoint, String> {
+        self.invalidate_snapshot_export();
         if expected_slot != self.bank.slot() {
             return Err(format!(
                 "checkpoint requested for slot {}, current bank is {}",
@@ -535,7 +558,7 @@ impl RuntimeState {
         }
         let writes = self.freeze_root_and_drain()?;
         let accounts_hash = self.bank.update_accounts_hash();
-        Ok(Checkpoint {
+        let checkpoint = Checkpoint {
             slot: self.bank.slot(),
             bank_hash: self.bank.hash().as_ref().to_vec(),
             accounts_hash: accounts_hash.as_ref().to_vec(),
@@ -546,6 +569,101 @@ impl RuntimeState {
             slot_complete: self.bank.is_complete(),
             writes,
             next_write_version: self.write_cursor,
+        };
+        // Preserve the existing checkpoint response, including its already-drained
+        // writes, even if the additional export eligibility check fails. The next
+        // one-use export attempt reports that exact error; it gains no capability.
+        self.snapshot_export_seal = Some(self.validate_export_boundary().and_then(|()| {
+            Ok(SnapshotExportSeal {
+                bank_identity: Arc::as_ptr(&self.bank) as usize,
+                tuple: self.export_tuple(),
+                rooted_cache: snapshot::cache_seal(&self.bank)?,
+            })
+        }));
+        Ok(checkpoint)
+    }
+
+    pub fn invalidate_snapshot_export(&mut self) {
+        self.snapshot_export_seal = None;
+    }
+
+    fn export_tuple(&self) -> SnapshotExportTuple {
+        SnapshotExportTuple {
+            slot: self.bank.slot(),
+            bank_hash: self.bank.hash(),
+            accounts_hash: self.bank.get_accounts_hash(),
+            last_blockhash: self.bank.last_blockhash(),
+            capitalization: self.bank.capitalization(),
+            transaction_count: self.bank.transaction_count(),
+            tick_height: self.bank.tick_height(),
+            slot_complete: self.bank.is_complete(),
+            next_write_version: self.write_cursor,
+        }
+    }
+
+    fn validate_export_boundary(&self) -> Result<(), String> {
+        if !self.bank.is_complete()
+            || !self.bank.is_frozen()
+            || self.bank.parent().is_some()
+            || self.tick_hash_count != 0
+            || self.last_entry_hash != self.bank.last_blockhash()
+            || self.write_cursor != self.bank.accounts().accounts_db.next_write_version()
+        {
+            return Err(
+                "snapshot export requires a frozen rooted drained complete-slot boundary".into(),
+            );
+        }
+        Ok(())
+    }
+
+    fn validate_export_seal(&self, seal: &SnapshotExportSeal) -> Result<(), String> {
+        self.validate_export_boundary()?;
+        if seal.bank_identity != Arc::as_ptr(&self.bank) as usize
+            || seal.tuple != self.export_tuple()
+            || seal.rooted_cache != snapshot::cache_seal(&self.bank)?
+        {
+            return Err("snapshot export Bank/checkpoint tuple or raw write cursor changed".into());
+        }
+        Ok(())
+    }
+
+    pub fn export_snapshot(
+        &mut self,
+        slot: u64,
+        output_directory: &str,
+        expected_accounts_hash: &[u8],
+    ) -> Result<SnapshotExport, String> {
+        // An attempt consumes the capability even when argument or I/O validation fails.
+        let seal = self.snapshot_export_seal.take().ok_or_else(|| {
+            "snapshot export requires the immediately preceding successful checkpoint".to_string()
+        })?;
+        let seal = seal?;
+        if slot != seal.tuple.slot
+            || expected_accounts_hash.len() != 32
+            || expected_accounts_hash != seal.tuple.accounts_hash.as_ref()
+        {
+            return Err(
+                "snapshot export slot/accounts hash does not match the sealed checkpoint".into(),
+            );
+        }
+        self.validate_export_seal(&seal)?;
+        let exported = snapshot::export_archive(
+            &self.bank,
+            Path::new(output_directory),
+            seal.tuple.accounts_hash,
+            || self.validate_export_seal(&seal),
+        )?;
+        self.validate_export_seal(&seal)?;
+        Ok(SnapshotExport {
+            slot,
+            archive_path: exported
+                .archive_path
+                .to_str()
+                .ok_or_else(|| "snapshot export path is not UTF-8".to_string())?
+                .to_string(),
+            accounts_hash: seal.tuple.accounts_hash.as_ref().to_vec(),
+            archive_size: exported.archive_size,
+            archive_sha256: exported.archive_sha256.to_vec(),
         })
     }
 
@@ -693,6 +811,7 @@ impl RuntimeState {
             enforce_candidate_range: false,
             last_accounts_clean_block_height: 0,
             accounts_shrink_consumed_budget: 0,
+            snapshot_export_seal: None,
         }
     }
 }
@@ -1958,17 +2077,24 @@ mod tests {
             state.accounts_shrink_consumed_budget = *debt;
             state.maintain_accounts_storage().unwrap();
             let remaining = debt.saturating_sub(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
-            assert_eq!(state.accounts_shrink_consumed_budget,
+            assert_eq!(
+                state.accounts_shrink_consumed_budget,
                 if cfg!(feature = "capped-shrink-candidate") {
                     remaining.min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
-                } else { remaining });
+                } else {
+                    remaining
+                }
+            );
             if cfg!(feature = "capped-shrink-candidate") {
                 state.maintain_accounts_storage().unwrap();
                 assert_eq!(state.accounts_shrink_consumed_budget, 0);
                 state.maintain_accounts_storage().unwrap();
                 assert!(state.accounts_shrink_consumed_budget <= ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
             }
-            assert_eq!(state.bank.accounts().accounts_db.next_write_version(), cursor);
+            assert_eq!(
+                state.bank.accounts().accounts_db.next_write_version(),
+                cursor
+            );
             assert_eq!(state.bank.get_balance(&mint_keypair.pubkey()), balance);
             assert_eq!(state.bank.capitalization(), capitalization);
             assert_eq!(state.bank.last_blockhash(), blockhash);
@@ -2118,4 +2244,5 @@ mod tests {
         );
         assert_eq!(checkpoint.accounts_hash, expected_accounts_hash);
     }
+    include!("snapshot_export_tests.rs");
 }

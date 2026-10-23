@@ -69,6 +69,7 @@ struct Plan {
     genesis: Member,
     archive: Member,
     members: Vec<Member>,
+    staging_directory: String,
     checkpoint: Checkpoint,
     rooted_signature: Vec<u8>,
     roots: Vec<u64>,
@@ -296,6 +297,16 @@ fn native_export(root: &Path, state: &RuntimeState) -> (Member, Vec<Member>) {
 #[test]
 #[ignore]
 fn native_v12_fresh_process_raw_output_equivalence() {
+    run_fixture(false);
+}
+
+#[test]
+#[ignore]
+fn native_export_dispatch_fresh_process_raw_output_equivalence() {
+    run_fixture(true);
+}
+
+fn run_fixture(via_dispatch: bool) {
     assert!(std::env::var_os(CHILD_ENV).is_none());
     let base = PathBuf::from(
         std::env::var_os(ROOT_ENV).expect("requires separately admitted OS-only fixture root"),
@@ -358,7 +369,94 @@ fn native_v12_fresh_process_raw_output_equivalence() {
     );
     let checkpoint = tuple(&state);
     let roots = state.bank.src.roots();
-    let (archive, members) = native_export(root, &state);
+    let (archive, members, staging_directory) = if via_dispatch {
+        let selected_bytes: u64 = state
+            .bank
+            .get_snapshot_storages()
+            .iter()
+            .flatten()
+            .map(|s| fs::metadata(s.get_path()).unwrap().len())
+            .sum();
+        assert!(selected_bytes <= MAX_SELECTED_BYTES);
+        // cfg(test) injection only: exercise the unchanged real request dispatcher,
+        // without adding a synthetic Initialize selector to the production worker.
+        let mut worker = crate::Worker {
+            hello_complete: false,
+            state: Some(state),
+        };
+        use jetstreamer_historical_protocol::{
+            Request, RequestBody, ResponseBody, PROTOCOL_VERSION,
+        };
+        let (hello, stop) = worker.handle(Request {
+            id: 1,
+            body: RequestBody::Hello {
+                protocol_version: PROTOCOL_VERSION,
+            },
+        });
+        assert!(!stop);
+        assert!(matches!(hello.body, ResponseBody::Handshake(_)));
+        let (frozen, stop) = worker.handle(Request {
+            id: 2,
+            body: RequestBody::FreezeCheckpoint { slot: 1 },
+        });
+        assert!(!stop);
+        let checkpoint = match frozen.body {
+            ResponseBody::Checkpoint(c) => c,
+            other => panic!("unexpected freeze response: {:?}", other),
+        };
+        let (response, stop) = worker.handle(Request {
+            id: 3,
+            body: RequestBody::ExportSnapshot {
+                slot: 1,
+                output_directory: root.to_str().unwrap().into(),
+                expected_accounts_hash: checkpoint.accounts_hash,
+            },
+        });
+        assert!(!stop);
+        let exported = match response.body {
+            ResponseBody::SnapshotExported(s) => s,
+            other => panic!("unexpected export response: {:?}", other),
+        };
+        state = worker.state.take().unwrap();
+        let archive = measure(root, Path::new(&exported.archive_path));
+        assert_eq!(archive.length, exported.archive_size);
+        assert_eq!(archive.sha256, exported.archive_sha256);
+        let stages: Vec<_> = fs::read_dir(root)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| {
+                p.file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("jetstreamer-native-export-")
+            })
+            .collect();
+        assert_eq!(stages.len(), 1);
+        let staging = &stages[0];
+        private(staging);
+        let mut paths = vec![
+            staging.join("snapshots/1/1"),
+            staging.join("snapshots/status_cache"),
+            staging.join("version"),
+            staging.join("export-manifest.bin"),
+        ];
+        paths.extend(
+            fs::read_dir(staging.join("accounts"))
+                .unwrap()
+                .map(|e| e.unwrap().path()),
+        );
+        let members = paths.iter().map(|p| measure(staging, p)).collect();
+        (
+            archive,
+            members,
+            staging.file_name().unwrap().to_str().unwrap().to_string(),
+        )
+    } else {
+        let (archive, members) = native_export(root, &state);
+        (archive, members, "native-staging".to_string())
+    };
+    assert_eq!(tuple(&state), checkpoint);
     let mut requests = Vec::new();
     let mut responses = Vec::new();
     let mut terminals = Vec::new();
@@ -402,6 +500,7 @@ fn native_v12_fresh_process_raw_output_equivalence() {
         genesis: measure(root, &ledger.join("genesis.bin")),
         archive,
         members,
+        staging_directory,
         checkpoint,
         rooted_signature: rooted_tx.signatures[0].as_ref().to_vec(),
         roots,
@@ -460,7 +559,14 @@ fn fresh_process_restore_child() {
     );
     checked_member(&root, &plan.genesis);
     let archive = checked_member(&root, &plan.archive);
-    let staging = root.join("native-staging");
+    assert!(
+        Path::new(&plan.staging_directory).components().count() == 1
+            && matches!(
+                Path::new(&plan.staging_directory).components().next(),
+                Some(Component::Normal(_))
+            )
+    );
+    let staging = root.join(&plan.staging_directory);
     for member in &plan.members {
         checked_member(&staging, member);
     }
