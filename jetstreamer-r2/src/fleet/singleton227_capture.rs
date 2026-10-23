@@ -390,7 +390,7 @@ pub(super) fn run() -> Result<()> {
     let u = before.get(unit).context("227 producer absent")?;
     let sandbox = properties(
         unit,
-        "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,NoNewPrivileges,ReadWritePaths,Environment,ExecMainPID,ExecMainStatus,Result,ActiveState,SubState,NRestarts,ExecStart",
+        "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,NoNewPrivileges,ReadWritePaths,Environment,ExecMainPID,ExecMainStartTimestampMonotonic,ExecMainStatus,Result,ActiveState,SubState,NRestarts,ExecStart",
     )?;
     if s.mode == "native-cold" {
         ensure!(
@@ -529,6 +529,35 @@ pub(super) fn run() -> Result<()> {
         result[k] = json!(false);
     }
     result["recorded_unix_seconds"] = json!(now);
+    result["sampled_at_utc"] = json!(publication203::utc(now)?);
+    if s.mode == "native-cold" {
+        result["entry_replay"] = json!(false);
+        let start = sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()?;
+        let mut mono = std::mem::MaybeUninit::<libc::timespec>::uninit();
+        ensure!(
+            unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, mono.as_mut_ptr()) } == 0,
+            "227 monotonic clock unavailable"
+        );
+        let mono = unsafe { mono.assume_init() };
+        let micros = u64::try_from(mono.tv_sec)?
+            .checked_mul(1_000_000)
+            .and_then(|s| s.checked_add(u64::try_from(mono.tv_nsec).ok()? / 1000))
+            .context("227 monotonic clock overflow")?;
+        let elapsed = micros
+            .checked_sub(start)
+            .context("227 producer start is future-dated")?
+            / 1000;
+        let wall: u64 = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_millis()
+            .try_into()?;
+        result["producer_start_monotonic_microseconds"] = json!(start);
+        result["producer_started_unix_millis"] = json!(
+            wall.checked_sub(elapsed)
+                .context("227 execution start underflow")?
+        );
+        result["elapsed_execution_millis_at_capture"] = json!(elapsed);
+    }
     result["admission"] = private157::binding(&s.admission);
     result["guard"] = private157::binding(&s.guard);
     result["guard_plan"] = private157::binding(&s.guard_plan);

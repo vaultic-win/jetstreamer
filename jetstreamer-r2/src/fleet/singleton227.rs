@@ -31,7 +31,10 @@ pub(super) fn native_scope(phase: &str, unit: &str) -> bool {
 }
 pub(super) fn native_claim(claim: &PipelineClaim) -> Result<()> {
     ensure!(
-        claim.epoch == 227 && native_scope(&claim.phase, &claim.unit) && claim.evidence.len() == 1,
+        claim.epoch == 227
+            && native_scope(&claim.phase, &claim.unit)
+            && !claim.evidence.is_empty()
+            && claim.evidence.len() <= 4,
         "227 native live claim scope differs"
     );
     ensure!(
@@ -43,6 +46,14 @@ pub(super) fn native_claim(claim: &PipelineClaim) -> Result<()> {
         "227 native claim command differs"
     );
     let r = bound_json(&claim.evidence[0])?;
+    let extras = ["guard", "admission", "guard_plan"]
+        .iter()
+        .map(|k| serde_json::from_value::<BoundFile>(r[*k].clone()))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        claim.evidence.iter().skip(1).all(|e| extras.contains(e)),
+        "227 native evidence contains an unrelated origin"
+    );
     ensure!(
         r["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
             && r["epoch"] == 227
@@ -59,10 +70,21 @@ pub(super) fn native_claim(claim: &PipelineClaim) -> Result<()> {
             && r["replay_entries"] == 0
             && r["native_input_qualified"] == false
             && r["resource_samples_taken"] == 0
+            && r["entry_replay"] == false
             && r["public_sidecar_countdown_authorized"] == false
             && r["publication_authorized"] == false
             && r["r2_mutations"] == false,
         "227 native running proof differs"
+    );
+    ensure!(
+        utc_seconds(
+            r["sampled_at_utc"]
+                .as_str()
+                .context("227 native origin UTC")?
+        )? == r["recorded_unix_seconds"]
+            .as_u64()
+            .context("227 native origin clock")?,
+        "227 native origin clocks disagree"
     );
     let g = bound_json(&serde_json::from_value(r["guard"].clone())?)?;
     ensure!(
