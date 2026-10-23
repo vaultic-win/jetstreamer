@@ -25,8 +25,10 @@ active repair/delivery owner or remove the inactive status through its gated
 lifecycle; do not keep refreshing the old replay owner.
 
 The routine plan's optional `qualification141_status` contains `publisher` and
-`delivery_policy` hash bindings. The publisher must be sealed at
-`/usr/local/lib/jetstreamer/horizon-epoch141-status-tools-20261023-v1/jetstreamer-r2`.
+`delivery_policy` hash bindings. The risk-aware publisher must be sealed at the new immutable path
+`/usr/local/lib/jetstreamer/horizon-epoch141-eta-risk-tools-20261023-v1/jetstreamer-r2`.
+Preserve older deployment directories. The routine-cycle binary must also include
+this exact publisher path in its closed allowlist before the next plan uses it.
 The cycle reuses its existing same-sample provisional fleet, seals a141-only
 publisher plan, publishes and authenticates the status, then uses that new reader
 for the final fleet reconciliation. The eleven ordinary estimates and legacy
@@ -43,14 +45,28 @@ neither terminality nor cleanup or remaining-growth release. Structural plan and
 tool validation still fail closed. Investigate this incident promptly; repeated
 incidents are not an acceptable substitute for repairing or retiring the status.
 
-The deadline check also binds the launch's five-day runtime cap and compares
-remaining root replay at the sampled rate with its remaining execution window.
-The private estimate records the projected root time and margin separately from
-the future suffix and delivery allowances. A projection reaching or exceeding
-the cap fails into the same durable ETA incident; it does not extend the runtime,
-qualify checkpoint recovery, stop a live worker or authorize status deletion.
-Passing this check is a point projection which excludes terminal work, not a
-measured completion bound.
+The runtime-risk calculation binds the launch's unchanged five-day runtime cap
+and compares remaining root replay at the sampled rate with its remaining window.
+It always retains the current root-plus-suffix-plus-delivery forecast when the
+existing freshness, stable live owner, positive observed rate and policy gates pass,
+including when the root projection reaches or exceeds the cap. It never selects
+a faster historical rate to make the forecast fit. No rate is invented when the
+observed rate is missing or invalid; those evidence failures still create incidents.
+
+The private v3 runtime-window receipt records signed remaining runtime, signed
+root margin and signed projected overrun (positive means overrun), plus explicit
+cap-reached and cap-exhausted risk flags. Its unsigned remaining-runtime field
+saturates at zero after expiry. The forecast is conditional on continued progress;
+it is a current planning estimate, not a measured bound or permission to execute
+past the cap. If the cap is missed, completion additionally depends on unresolved
+recovery or continuation work. That route and its delay are unqualified and
+unmeasured; the estimate does not invent a recovery rate or claim that its
+existing policy allowances bound this delay. Root projection excludes terminal work. The 15,234-slot separate
+suffix and all six policy allowances remain included in the sidecar forecast.
+The worker's hard stop, restart policy and all identity, checkpoint, archive and
+publication gates remain unchanged. Runtime extension and checkpoint-resume
+qualification stay false, and a forecast never authorizes either action.
+Once the live owner terminates, the existing terminal-handoff lifecycle applies.
 
 ## Stopping-root terminal handoff
 
