@@ -10,6 +10,7 @@ repository.workspace = true
 documentation.workspace = true
 
 [features]
+epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]
 # Pins the separate bounded epoch225 upstream-comparison worker, not an era.
 epoch225-v1-6-25-diagnostic = []
