@@ -2,11 +2,14 @@
 use super::*;
 #[path = "native223_v1620_event.rs"]
 mod native20_event;
+#[path = "native223_v1620_input_capture.rs"]
+mod native20_input_capture;
 pub(super) use native20_event::{
     event_census as native20_event_census, event_predecessor as native20_event_predecessor,
     terminal_census as native20_terminal_census,
     terminal_predecessor as native20_terminal_predecessor,
 };
+pub(super) use native20_input_capture::run as capture_native20_input;
 pub(super) const UNIT: &str = "archive-223-cold-snapshot-test-actual-v1.service";
 const BINARY: &str = "/var/lib/jetstreamer/horizon-223-cold-snapshot-supervisor-294d2330-v1/jetstreamer-horizon-ram-snapshot-test";
 const PLAN: &str = "/var/lib/jetstreamer/horizon-223-cold-snapshot-actual-plan-2330-v1/plan.json";

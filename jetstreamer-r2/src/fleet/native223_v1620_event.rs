@@ -56,7 +56,7 @@ fn terminal_journal(binding: &BoundFile, owner: &Profile, iid: &str) -> Result<(
     }
     terminal.context("native20 exact terminal manager event absent")
 }
-fn terminal_proof(proof: &Value) -> Result<(&'static Profile, String, bool, u64)> {
+pub(super) fn terminal_proof(proof: &Value) -> Result<(&'static Profile, String, bool, u64)> {
     let owner = profile(proof["unit"].as_str().context("native20 terminal unit")?)?;
     let iid = proof["invocation_id"]
         .as_str()
