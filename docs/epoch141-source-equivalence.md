@@ -36,3 +36,49 @@ read-only private inputs and minimal private-path traversal capability. The
 tool requires its own supplied executable and plan SHA-256, the real systemd
 invocation ID, a 30-second RPC deadline and a 90-second overall work deadline.
 Normal root/plugin/full-span and publication gates remain separately required.
+
+## Complete immutable original-entry bundle
+
+`jetstreamer-epoch141-original-bundle` prepares input from the exact completed
+18,283-target acquisition and successful complete-census PoH diagnostic. It
+does not refetch source, retry native acquisition, execute replay or promote a
+route. Each target/raw receipt is reopened by its bound digest; original
+SlotMeta endpoints, structural entries, tick counts and finalized final hash
+must still agree. Existing private evidence remains unchanged.
+
+The output contains `original-entries.data` and `index.json`. Each data record
+is a little-endian u32 batch count followed by a little-endian u32 length and
+the complete original padded bytes for each batch. Framing avoids placing
+millions of batch lengths in the JSON index. Each sorted index row binds the
+slot, finalized parent/anchors, exact offset, framed length, batch count and
+record SHA-256. The complete index binds the source/acquisition/PoH digests,
+source interval, independent clock and whole data length/digest. All records
+must cover the data exactly, without gaps, overlaps or duplicate targets, and
+cover precisely 18,283 targets and 84,597 boundary slots.
+
+Preparation is non-restarting, bounded to two hours and 32 GiB of data, with
+64-MiB per-slot and 16-MiB index bounds. It preserves at least
+4,397,099,539,910 actual free bytes on the output filesystem while preparing
+input, rather than consuming a replay's protected growth. Its sealed plan
+uses schema `jetstreamer-epoch141-original-bundle-build-plan-v1` and an empty
+root-private `output_directory` directly beneath
+`/home/sol/.jetstreamer-private`, named `epoch141-original-bundle-*`.
+Run it with only that directory writable and a bounded memory/CPU sandbox.
+After fsync it independently rereads and hashes the complete data before
+writing the index and no-clobber completion. An interrupted attempt remains
+partial evidence, not a usable bundle; do not restart into its occupied output.
+
+The library's `OriginalEntryBundle::open` consumes only separately sealed,
+root-owned, singly linked, non-writable files with independently supplied
+index and data SHA-256 values. It hashes the entire data member before returning
+an open bundle. Every slot reread rechecks both the descriptor and pathname
+identity and its record digest/framing. A missing index row means the slot is
+outside the recovery census, not proof it was skipped. Loading succeeds only
+for this exact complete qualification profile; it never authorizes execution.
+
+Before a parent can use a returned slot, it must collect the entire independent
+source transaction sequence, pass `bind_v1_4_25_source_entries`, preserve the
+corresponding transaction status/index attribution, and send the original
+entries through the normal strict worker checks. No partial source slot may
+mutate a Bank first. Private canonical-root and ordinary full/plugin/publication
+qualification remain outstanding even after bundle preparation succeeds.
