@@ -268,6 +268,13 @@ pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> 
 fn apply(model: &Value, h: &Handoff) -> Result<Value> {
     scope(h)?;
     let mut v = model.clone();
+    v.as_object_mut().context("repair183 model object")?.remove("unestimated_bootstrap_epochs");
+    if let Some(census) = v.get_mut("expected_observer_ranges") {
+        let census = census.as_array_mut().context("repair183 observer census")?;
+        if !census.contains(&json!("183-184")) {
+            census.push(json!("183-184"));
+        }
+    }
     let ranges = v["ranges"].as_array_mut().context("repair183 ranges")?;
     let indices: Vec<_> = ranges
         .iter()
@@ -332,9 +339,16 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
         .iter()
         .any(|r| r["range"] == "183-184");
     if !already {
+        let continued_bootstrap = bootstrap_model(p, model);
+        if continued_bootstrap {
+            let prior = bound_json(&p.previous_observer, false)?;
+            let checked = observation(model, &h, &prior)?;
+            ensure!(checked["unestimated_bootstrap_epochs"] == json!([183,184]),
+                "repair183 bootstrap predecessor changed");
+        }
         ensure!(
-            h.observer_before_launch.path == p.previous_observer.path
-                && h.observer_before_launch.sha256 == p.previous_observer.sha256,
+            continued_bootstrap || (h.observer_before_launch.path == p.previous_observer.path
+                && h.observer_before_launch.sha256 == p.previous_observer.sha256),
             "repair183 initial predecessor differs"
         );
     }
@@ -421,6 +435,25 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
             );
         }
     }
+    if o["useful_work"]["last"].is_null() {
+        ensure!(o["useful_work"]["first"].is_null()
+            && o["useful_work"]["matching_markers"] == 0
+            && o["useful_work"]["counter_resets"] == 0
+            && o["useful_work"]["sufficient_for_rates"] == false
+            && o["useful_work"]["slots_per_second"].is_null()
+            && v["ranges"].as_array().unwrap().iter().find(|r| r["range"] == "183-184").unwrap()["terminal_slot"] == FIRST_END,
+            "repair183 absent progress is not initial bootstrap");
+        for point in ["before", "after"] {
+            let worker = &o[format!("worker_{point}")];
+            ensure!(worker["matching_workers"] == 1
+                && worker["executable_beneath_bound_scratch"] == true
+                && worker["vmas"].as_u64().is_some_and(|n| n > 0 && n <= 800000),
+                "repair183 bootstrap worker is not protected");
+        }
+        v["ranges"].as_array_mut().unwrap().retain(|r| r["range"] != "183-184");
+        v["unestimated_bootstrap_epochs"] = json!([183,184]);
+        return Ok(v);
+    }
     let terminal = o["useful_work"]["last"]["terminal_slot"]
         .as_u64()
         .context("repair183 observed terminal")?;
@@ -440,6 +473,14 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
         ));
     }
     Ok(v)
+}
+
+pub(super) fn bootstrap_model(p: &Plan, model: &Value) -> bool {
+    p.repair183_handoff.as_ref().is_some_and(|b|
+        model["unestimated_bootstrap_epochs"] == json!([183,184])
+        && model["ranges"].as_array().is_some_and(|rs| rs.len() == 3 && !rs.iter().any(|r| r["range"] == "183-184"))
+        && model["expected_observer_ranges"].as_array().is_some_and(|rs| rs.len() == 4 && rs.contains(&json!("183-184")))
+        && model["evidence"].as_array().is_some_and(|es| es.contains(&serde_json::to_value(b).unwrap())))
 }
 
 #[cfg(test)]
@@ -525,6 +566,39 @@ mod tests {
             *bad.pointer_mut(path).unwrap() = value;
             assert!(guard(&h, &bad).is_err());
         }
+    }
+    #[test]
+    fn initial_bootstrap_keeps_full_census_but_never_invents_a_rate_or_terminal() {
+        let h = h();
+        let point = |unit: &str, id: &str| json!({"unit":unit,"invocation_id":id,"restarts":0,"active_state":"active"});
+        let worker = json!({"matching_workers":1,"executable_beneath_bound_scratch":true,"vmas":366000});
+        let o = json!({"replays":[{"range":"183-184","scratch_path":h.scratch_path,"invocation_binding_stable":true,
+            "controller_before":point(CONTROLLER,&h.controller_invocation_id),"controller_after":point(CONTROLLER,&h.controller_invocation_id),
+            "producer_before":point(PRODUCER,&h.producer_invocation_id),"producer_after":point(PRODUCER,&h.producer_invocation_id),
+            "worker_before":worker,"worker_after":worker,"useful_work":{"first":null,"last":null,"matching_markers":0,"counter_resets":0,"sufficient_for_rates":false,"slots_per_second":null}}]});
+        let mut m = model();
+        m["expected_observer_ranges"] = json!(["152-153","155-156","191-194"]);
+        let filtered = observation(&m, &h, &o).unwrap();
+        assert_eq!(filtered["ranges"], m["ranges"]);
+        assert_eq!(filtered["expected_observer_ranges"].as_array().unwrap().len(), 4);
+        assert_eq!(filtered["unestimated_bootstrap_epochs"], json!([183,184]));
+        for (path, value) in [
+            ("/replays/0/useful_work/matching_markers", json!(1)),
+            ("/replays/0/useful_work/counter_resets", json!(1)),
+            ("/replays/0/useful_work/sufficient_for_rates", json!(true)),
+            ("/replays/0/useful_work/slots_per_second", json!(1)),
+            ("/replays/0/worker_after/matching_workers", json!(0)),
+            ("/replays/0/worker_after/vmas", json!(800001)),
+            ("/replays/0/producer_after/restarts", json!(1)),
+        ] {
+            let mut bad = o.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(observation(&m, &h, &bad).is_err(), "{path}");
+        }
+        let mut advanced = apply(&m, &h).unwrap();
+        advanced["ranges"][3]["terminal_slot"] = json!(FINAL_END);
+        advanced["ranges"][3]["epoch_additional_replay_slots"] = json!({"183":0,"184":0});
+        assert!(observation(&advanced, &h, &o).is_err());
     }
     #[test]
     fn epoch184_transition_preserves_gate_allowances_and_rejects_owner_reset() {

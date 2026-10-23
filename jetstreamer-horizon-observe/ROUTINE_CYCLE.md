@@ -11,6 +11,18 @@ package capability and a separately sealed actual guard first-fire receipt.
 It must explicitly deny replay/publication/remote authority and new samples.
 No handoff can exist merely from a planned unit or successful admission.
 
+An initial snapshot restore may have no replay progress markers yet. For this
+exact admitted and guard-protected pair only, preserve the complete four-range
+observer and fleet census while estimating and refreshing just the three
+rate-bearing ranges. Require stable zero-restart owners, one readable worker
+below the VMA ceiling, zero markers/resets, and absent first/last/rate values.
+Record `unestimated_bootstrap_epochs: [183, 184]` explicitly; do not invent a
+terminal, rate, or countdown. The immutable model keeps the handoff evidence
+and full expected observer census. The next cycle re-adopts the pair only from
+that bound bootstrap predecessor, and publishes both estimates once real
+progress is available. Missing progress after the epoch184 transition is an
+error, not a bootstrap exception. Never resample to repair a metadata rejection.
+
 The first-fire receipt schema is
 `jetstreamer-horizon-repair183-guard-first-fire-v1`. Require the actual timer-fired
 service invocation, zero exit/restarts, absent stop intent/completion and its

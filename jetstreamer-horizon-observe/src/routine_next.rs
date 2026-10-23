@@ -59,10 +59,18 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
         "not a completed unambiguous metadata owner"
     );
+    let bootstrap_count = if c["unestimated_bootstrap_epochs"].is_null() {
+        0
+    } else {
+        ensure!(c["unestimated_bootstrap_epochs"] == json!([183,184]), "foreign bootstrap omission");
+        let binding: Bound = serde_json::from_value(c["model"].clone())?;
+        ensure!(repair183::bootstrap_model(p, &bound_json(&binding, true)?), "unbound bootstrap omission");
+        2
+    };
     ensure!(
         c["status_publications"]
             .as_array()
-            .is_some_and(|a| a.len() == p.expected_epochs.len()),
+            .is_some_and(|a| a.len() + bootstrap_count == p.expected_epochs.len()),
         "completion status census differs"
     );
     Ok(())

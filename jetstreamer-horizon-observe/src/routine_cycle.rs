@@ -863,7 +863,7 @@ fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> 
     let modeled = model["ranges"].as_array().context("model census missing")?;
     ensure!(
         observed.len()
-            == modeled.len()
+            == modeled.len() + usize::from(repair183::bootstrap_model(p, model))
                 + p.scope_101_200
                     .as_ref()
                     .map_or(0, |s| if s.private144_observer {
@@ -1435,8 +1435,13 @@ fn verify_estimates(
             "invalid estimate integers"
         );
     }
-    ensure!(
-        seen.len() == p.expected_epochs.len(),
+    let modeled_epochs: BTreeSet<_> = model["ranges"].as_array().context("estimate model ranges")?
+        .iter().flat_map(|r| r["epochs"].as_array().into_iter().flatten())
+        .filter_map(Value::as_u64).collect();
+    let expected: BTreeSet<_> = p.expected_epochs.iter().copied().collect();
+    ensure!(seen == modeled_epochs
+        && (seen == expected || (repair183::bootstrap_model(p, model)
+            && expected.difference(&seen).copied().collect::<BTreeSet<_>>() == BTreeSet::from([183,184]))),
         "estimate census incomplete"
     );
     Ok(entries.clone())
@@ -1753,7 +1758,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":plan_bound,"self_sha256":self_sha,
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
-            "inventory":ledger["inventory"],"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
+            "inventory":ledger["inventory"],"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
             "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
