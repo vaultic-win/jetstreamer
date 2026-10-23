@@ -2,6 +2,7 @@
 use super::*;
 use std::{collections::BTreeMap, process::Command};
 mod event144;
+mod origin203;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -671,6 +672,10 @@ pub(super) async fn run() -> Result<()> {
             receipt.status.sampled_at_utc <= sample && receipt.verified_unix_seconds <= now,
             "origin replay receipt is from the future"
         );
+    } else if plan.epoch == 203
+        && origin["schema"] == "jetstreamer-private-epoch203-checkpoint-continuation-launch-v1"
+    {
+        origin203::validate(&plan, &origin)?;
     } else {
         ensure!(
             origin["epoch"] == plan.epoch

@@ -27,6 +27,11 @@ Absence means no published live estimate; it never means the epoch is storage-co
   remaining-time estimate. If the deployed publisher only supports replay identities, qualify the
   required pipeline binding rather than pretending a terminated producer is still replaying.
   Queued epochs within a live legacy cohort remain claimed even before their own replay begins.
+- Preserve the producer's real manager start and authenticated launch receipt across delivery
+  phases. A private continuation's launch schema may differ from a legacy controller's; qualify
+  its exact native receipt binding instead of rewriting it into a legacy shape. Never backdate a
+  new phase to an observation taken before it started. Use a supported authenticated handoff-event
+  publisher, or the next scheduled observation, while delivery continues independently.
 
 ## Remove confirmed inactive status objects
 
