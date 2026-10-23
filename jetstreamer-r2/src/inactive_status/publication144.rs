@@ -111,73 +111,6 @@ fn idle_upload(v: &Value) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn preservation_requires_original_terminal_publisher_not_another_attempt() {
-        let origin = Bound {
-            path: Path::new(ROOT).join("launch.json"),
-            sha256: "a".repeat(64),
-        };
-        let o = json!({"schema":"jetstreamer-exact144-publication-launch-v1","epoch":144,"launched":true,
-            "publisher_sha256":"4274f83c6d84a2bc2014b30122a38406b6498045f543ba170598baa8369a7efa",
-            "claim":{"unit":PUB,"phase":"local-publication","invocation_id":"b".repeat(32)}});
-        let t = json!({"schema":"jetstreamer-exact144-publication-terminal-v1","epoch":144,
-            "launch":{"path":origin.path,"sha256":origin.sha256},"owner":{"Id":PUB,"InvocationID":"b".repeat(32)},
-            "archive_verification_or_ready_pair_proven":false,"r2_mutations":false});
-        checked_lineage(&origin, &o, &t).unwrap();
-        for (which, pointer) in [
-            (0, "/publisher_sha256"),
-            (0, "/claim/unit"),
-            (0, "/claim/invocation_id"),
-            (1, "/launch/sha256"),
-            (1, "/owner/InvocationID"),
-            (1, "/archive_verification_or_ready_pair_proven"),
-        ] {
-            let mut values = [o.clone(), t.clone()];
-            *values[which].pointer_mut(pointer).unwrap() = json!("foreign");
-            assert!(
-                checked_lineage(&origin, &values[0], &values[1]).is_err(),
-                "{which}:{pointer}"
-            );
-        }
-    }
-    #[test]
-    fn never_capture_over_a_live_replacement_or_previously_started_uploader() {
-        let v = json!({"Id":UPLOAD,"LoadState":"not-found","MainPID":"0","InvocationID":"","ActiveState":"inactive","SubState":"dead"});
-        idle_upload(&v).unwrap();
-        let mut installed = v.clone();
-        installed["LoadState"] = json!("loaded");
-        idle_upload(&installed).unwrap();
-        for field in ["Id", "MainPID", "InvocationID", "ActiveState", "SubState"] {
-            let mut bad = v.clone();
-            bad[field] = json!("foreign");
-            assert!(idle_upload(&bad).is_err(), "{field}");
-        }
-    }
-    #[test]
-    fn custody_receipt_cannot_authorize_archive_completion_or_other_epochs() {
-        let (mut p, _) = super::super::tests::plan_fixture();
-        p.epoch = 144;
-        p.public_archive_directory = "/home/sol/horizon".into();
-        p.status_receipt_directory = "/home/sol/.jetstreamer-private/r2-status-receipts".into();
-        let v = json!({"schema":SCHEMA,"epoch":144,"archive_completion_claimed":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false});
-        scope(&p, &v).unwrap();
-        for field in [
-            "archive_completion_claimed",
-            "archive_mutations",
-            "remote_mutations",
-            "r2_mutations",
-        ] {
-            let mut bad = v.clone();
-            bad[field] = json!(true);
-            assert!(scope(&p, &bad).is_err(), "{field}");
-        }
-        p.epoch = 145;
-        assert!(scope(&p, &v).is_err());
-    }
-}
 fn owners(current: &BTreeMap<String, Value>, o: &Value, t: &Value) -> Result<()> {
     let publisher = current.get(PUB).context("publisher absent from census")?;
     let iid = o["claim"]["invocation_id"]
@@ -290,4 +223,72 @@ pub(super) fn prepare() -> Result<()> {
     fleet::persist(&p.output, &v)?;
     println!("{}", p.output.display());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn preservation_requires_original_terminal_publisher_not_another_attempt() {
+        let origin = Bound {
+            path: Path::new(ROOT).join("launch.json"),
+            sha256: "a".repeat(64),
+        };
+        let o = json!({"schema":"jetstreamer-exact144-publication-launch-v1","epoch":144,"launched":true,
+            "publisher_sha256":"4274f83c6d84a2bc2014b30122a38406b6498045f543ba170598baa8369a7efa",
+            "claim":{"unit":PUB,"phase":"local-publication","invocation_id":"b".repeat(32)}});
+        let t = json!({"schema":"jetstreamer-exact144-publication-terminal-v1","epoch":144,
+            "launch":{"path":origin.path,"sha256":origin.sha256},"owner":{"Id":PUB,"InvocationID":"b".repeat(32)},
+            "archive_verification_or_ready_pair_proven":false,"r2_mutations":false});
+        checked_lineage(&origin, &o, &t).unwrap();
+        for (which, pointer) in [
+            (0, "/publisher_sha256"),
+            (0, "/claim/unit"),
+            (0, "/claim/invocation_id"),
+            (1, "/launch/sha256"),
+            (1, "/owner/InvocationID"),
+            (1, "/archive_verification_or_ready_pair_proven"),
+        ] {
+            let mut values = [o.clone(), t.clone()];
+            *values[which].pointer_mut(pointer).unwrap() = json!("foreign");
+            assert!(
+                checked_lineage(&origin, &values[0], &values[1]).is_err(),
+                "{which}:{pointer}"
+            );
+        }
+    }
+    #[test]
+    fn never_capture_over_a_live_replacement_or_previously_started_uploader() {
+        let v = json!({"Id":UPLOAD,"LoadState":"not-found","MainPID":"0","InvocationID":"","ActiveState":"inactive","SubState":"dead"});
+        idle_upload(&v).unwrap();
+        let mut installed = v.clone();
+        installed["LoadState"] = json!("loaded");
+        idle_upload(&installed).unwrap();
+        for field in ["Id", "MainPID", "InvocationID", "ActiveState", "SubState"] {
+            let mut bad = v.clone();
+            bad[field] = json!("foreign");
+            assert!(idle_upload(&bad).is_err(), "{field}");
+        }
+    }
+    #[test]
+    fn custody_receipt_cannot_authorize_archive_completion_or_other_epochs() {
+        let (mut p, _) = super::super::tests::plan_fixture();
+        p.epoch = 144;
+        p.public_archive_directory = "/home/sol/horizon".into();
+        p.status_receipt_directory = "/home/sol/.jetstreamer-private/r2-status-receipts".into();
+        let v = json!({"schema":SCHEMA,"epoch":144,"archive_completion_claimed":false,"archive_mutations":false,"remote_mutations":false,"r2_mutations":false});
+        scope(&p, &v).unwrap();
+        for field in [
+            "archive_completion_claimed",
+            "archive_mutations",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            let mut bad = v.clone();
+            bad[field] = json!(true);
+            assert!(scope(&p, &bad).is_err(), "{field}");
+        }
+        p.epoch = 145;
+        assert!(scope(&p, &v).is_err());
+    }
 }

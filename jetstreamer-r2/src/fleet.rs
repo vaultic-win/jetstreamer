@@ -15,6 +15,7 @@ mod continuation144;
 mod continuation144_admission;
 mod continuation144_prepare;
 mod continuation144_protection;
+mod continuation203;
 mod native141;
 mod native144;
 mod native203;
@@ -611,6 +612,7 @@ fn validate_same_sample_admission(
         }
         205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
+        203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
             .unit
             .starts_with("horizon-qualify-225-bounded-resource-") =>
@@ -760,7 +762,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if native203::namespace(claim) {
+    if continuation203::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| continuation203::guard_matches(claim, &r, plan))
+    } else if native203::namespace(claim) {
         bound_json(&claim.launch_receipt).is_ok_and(|r| native203::guard_matches(claim, &r, plan))
     } else if continuation144::namespace(claim) || assembly144::namespace(claim) {
         let Ok(launch) = checked_diagnostic_launch(claim) else {
@@ -849,6 +854,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if continuation203::namespace(claim) || receipt["schema"] == continuation203::SCHEMA {
+        return continuation203::launch(receipt, claim);
+    }
     if native203::namespace(claim) || receipt["schema"] == native203::SCHEMA {
         return native203::launch(receipt, claim);
     }
@@ -2181,6 +2189,9 @@ pub(super) async fn run() -> Result<()> {
             if native203::namespace(claim) {
                 native203::validate_live(claim, current)?;
             }
+            if continuation203::namespace(claim) {
+                continuation203::validate_live(claim, current)?;
+            }
             if native141::namespace(claim) {
                 native141::validate_live(claim, current)?;
             }
@@ -2271,7 +2282,7 @@ pub(super) async fn run() -> Result<()> {
                 "native-ledger-read-only"
             } else if assembly144::namespace(claim) {
                 "private-assembly-only"
-            } else if continuation144::namespace(claim) {
+            } else if continuation144::namespace(claim) || continuation203::namespace(claim) {
                 "private-checkpoint-continuation"
             } else if native_restore_140(claim)
                 || native144::namespace(claim)

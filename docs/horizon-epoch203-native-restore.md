@@ -136,3 +136,16 @@ admission, and authenticated R2 upload/readback remain separate gates. No
 canonical sidecar, ordinary import, publication, retirement, or remote mutation
 is authorized by this feature. Never borrow epoch 213's whitelist or flatten
 the restarted V4 provenance to uninterrupted V1/V2.
+
+Fleet registration for `horizon-qualify-203-checkpoint-continuation-ed66145-v1.service`
+is observational only and pins the clean sealed parent `1a299ad1…`, the exact
+419-slot plan, a 256-GiB full-path envelope, the unchanged worker, private
+UID-1000 sandbox and a fresh admission no older than fifteen minutes at launch.
+It cannot borrow the restore-only registration or another epoch's schema.
+The guard watches the existing private run root, which must initially be empty;
+the parent creates its nested scratch only after the complete prefix reread.
+A zero-worker prefix-reread phase is not proof of the required real-worker
+guard fire: same-sample fleet admission still requires exactly one authenticated
+worker under that root and the exact separately sealed generic guard. Guard
+protection may exceed the older-growth/century-floor bound, never fall below it.
+There is no automatic launch trigger or sidecar ETA in this registration.
