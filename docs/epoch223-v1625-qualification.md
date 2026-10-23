@@ -83,6 +83,25 @@ existing203/225 workers and their guards. After natural success, independently
 reread the prefix; producer success still grants no restart, assembly, complete
 epoch, plugin, canonical-sidecar or publication authority.
 
+The fleet's distinct `jetstreamer-private-epoch223-known-root-prefix-launch-v1`
+contract registers only the fixed cold-prefix resource supervisor, readable
+sealed plan, exact parent/worker/input digests and the real prefix capability
+receipt. It never reuses the 477-slot tail contract. It retains the failed
+incident state and labels live work `private-known-root-prefix`, without a
+sidecar countdown or complete-epoch authority. Its same-observation admission
+requires the exact nested scratch path and the real one-worker first-fire guard.
+
+For the first prefix attempt, the original203producer's clean natural terminal
+and independently reread prefix are preserved in
+`horizon-prefix203-terminal-independent-evidence-v1`. The fleet authenticates
+that exact terminal handoff receipt before accepting release of its old960GiB
+remaining-growth claim; this does not qualify203's suffix or any new203work.
+Admission still reserves the unchanged225640GiB, the full2231536GiB trial and
+the thirteen-sample century floor: 2,584,751,391,635 bytes. The223guard protects
+225 plus a64GiB buffer and that floor: 1,004,203,426,707 bytes. No entry launch
+is granted by registration, capability, cache cleanup or terminal203evidence
+alone: require fresh full-fleet/resource admission and a proved invocation guard.
+
 The independent reader has a separate closed prefix profile for
 `qualification-223-v1625-prefix-*/output/epoch-223.jet`, output slots
 96,336,000–96,767,522, the exact candidate worker digest and upstream revision.
