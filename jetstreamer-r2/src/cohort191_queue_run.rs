@@ -289,9 +289,11 @@ fn eligible(state: &Value) -> Vec<(usize, &'static str)> {
     out
 }
 fn persist(state: &mut Value) -> Result<()> {
-    state["revision"] = json!(number(state, "revision")?
-        .checked_add(1)
-        .context("191 revision overflow")?);
+    state["revision"] = json!(
+        number(state, "revision")?
+            .checked_add(1)
+            .context("191 revision overflow")?
+    );
     state["updated_unix_millis"] = json!(now_ms()?);
     let root = Path::new(ROOT);
     root_dir(root)?;
@@ -724,7 +726,12 @@ pub(super) fn sync_verified() -> Result<()> {
     let u = manager(&sync_unit(epoch))?;
     let pid = u64::from(std::process::id());
     let start = ticks(pid)?;
-    let expected=format!("{{ path={PROGRAM} ; argv[]={PROGRAM} sync-verified191 {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no ;",sb.path.display(),sb.sha256,a[6]);
+    let expected = format!(
+        "{{ path={PROGRAM} ; argv[]={PROGRAM} sync-verified191 {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no ;",
+        sb.path.display(),
+        sb.sha256,
+        a[6]
+    );
     ensure!(
         u["Id"] == sync_unit(epoch)
             && u["InvocationID"] == env::var("INVOCATION_ID")?
@@ -1040,7 +1047,12 @@ pub(super) fn run() -> Result<()> {
     );
     let iid = env::var("INVOCATION_ID")?;
     let u = manager(UNIT)?;
-    let expected=format!("{{ path={PROGRAM} ; argv[]={PROGRAM} delivery-queue-191 {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no ;",plan.path.display(),plan.sha256,a[6]);
+    let expected = format!(
+        "{{ path={PROGRAM} ; argv[]={PROGRAM} delivery-queue-191 {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no ;",
+        plan.path.display(),
+        plan.sha256,
+        a[6]
+    );
     ensure!(
         is_lower_hex(&iid, 32)
             && u["Id"] == UNIT
@@ -1152,9 +1164,10 @@ mod tests {
         ] {
             assert!(!a.iter().any(|s| s == bad));
         }
-        assert!(a
-            .iter()
-            .any(|s| s == &format!("--property=EnvironmentFile={ENVFILE}")));
+        assert!(
+            a.iter()
+                .any(|s| s == &format!("--property=EnvironmentFile={ENVFILE}"))
+        );
         assert!(a.iter().any(|s| s == "--property=MemoryMax=2G"));
         assert!(a.iter().any(|s| s == "--property=Restart=no"));
         assert!(!a.iter().any(|s| s == "--wait"));
