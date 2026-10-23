@@ -5,14 +5,16 @@ use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch203-checkpoint-continuation-launch-v1";
 pub(super) const GUARD_SHA: &str =
     "d039ddf0b161bc554614a862bd12987bd6a3474549a22d066ebefa5584e5dd98";
-const UNIT: &str = "horizon-qualify-203-checkpoint-continuation-ed66145-v1.service";
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1";
-const NODE: &str =
+pub(super) const UNIT: &str = "horizon-qualify-203-checkpoint-continuation-ed66145-v1.service";
+pub(super) const ROOT: &str =
+    "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1";
+pub(super) const NODE: &str =
     "/var/lib/jetstreamer/horizon-continuation203-parent-ed66145-v1/jetstreamer-node";
 pub(super) const NODE_SHA: &str =
     "1a299ad19472906b0721555ae3bd01840cbd249724ece9c0f61e086b8ace8716";
-const PLAN: &str = "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/plan.json";
-const WORKER: &str = "/var/lib/jetstreamer/horizon-v1616-shrink-budget-worker-003fe15-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";
+pub(super) const PLAN: &str =
+    "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/plan.json";
+pub(super) const WORKER: &str = "/var/lib/jetstreamer/horizon-v1616-shrink-budget-worker-003fe15-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";
 pub(super) const PREFIX_SHA: &str =
     "ba191cf1918cac8b67cb7512bd07cc1eeccb16e525e4c15c27fd7c325f6993ce";
 pub(super) const NATIVE_SHA: &str =
@@ -23,7 +25,7 @@ pub(super) const WORKER_SHA: &str =
     "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc";
 pub(super) const FLOOR_LOWER_BOUND: u64 = 2_687_830_606_739;
 pub(super) const PEAK: u64 = 256 << 30;
-const NO_AUTHORITY: &[&str] = &[
+pub(super) const NO_AUTHORITY: &[&str] = &[
     "ordinary_replay_claim",
     "current_sidecar_eta_valid",
     "full_epoch_verified",
@@ -200,6 +202,9 @@ pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> 
             && command(&current["ExecStart"]) == command(&r["expected_exec_start"]),
         "203 live continuation command/owner differs"
     );
+    live_limits()
+}
+pub(super) fn live_limits() -> Result<()> {
     let out = ProcessCommand::new("systemctl").args(["show", UNIT, "--no-pager",
         "--property=User,Group,Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,PrivateMounts,NoNewPrivileges,UMask,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,Environment"]).output()?;
     ensure!(
