@@ -3,7 +3,13 @@
 use super::*;
 const UNIT: &str = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";
 pub(super) fn recognized(f: &Value, owners: &[(String, String)]) -> bool {
-    owners.len() == 1 && owners[0].0 == UNIT && f["metadata_event"].is_object()
+    owners.len() == 1
+        && [
+            UNIT,
+            "horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service",
+        ]
+        .contains(&owners[0].0.as_str())
+        && f["metadata_event"].is_object()
 }
 fn shape(u: &Value, expected: &(String, String), proof: &Value, historical: bool) -> Result<()> {
     ensure!(
@@ -47,9 +53,11 @@ pub(super) fn validate(
         owners[0] == expected,
         "warmup status owner differs from terminal proof"
     );
-    shape(&f["unit_census"][UNIT], &expected, &proof, true)?;
+    shape(&f["unit_census"][&expected.0], &expected, &proof, true)?;
     shape(
-        current.get(UNIT).context("warmup current owner missing")?,
+        current
+            .get(&expected.0)
+            .context("warmup current owner missing")?,
         &expected,
         &proof,
         false,

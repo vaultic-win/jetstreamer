@@ -213,8 +213,8 @@ pub(super) fn native209_terminal_status_identity(proof: &Value) -> Result<(Strin
 pub(super) fn validate_warmup223_status_claim(value: &Value) -> Result<()> {
     warmup223::status_claim(value)
 }
-pub(super) fn warmup223_status_jet_path() -> PathBuf {
-    warmup223::status_jet_path()
+pub(super) fn warmup223_status_jet_path(unit: &str) -> Result<PathBuf> {
+    warmup223::status_jet_path(unit)
 }
 /// The native status publisher shares the exact fleet registration gates;
 /// a metadata countdown cannot register or qualify a new native attempt.
@@ -2261,7 +2261,9 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == warmup223::TERMINAL_SCHEMA {
+            if event["schema"] == warmup223::TERMINAL_SCHEMA
+                || event["schema"] == warmup223::TERMINAL_SCHEMA_V2
+            {
                 warmup223::terminal_predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == "jetstreamer-private-warmup223-launch-v1" {
                 warmup223::event_predecessor(&previous, &plan, &event, sample, started_seconds)?;

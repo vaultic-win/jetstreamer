@@ -294,3 +294,47 @@ fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain
 outstanding until their respective invocations succeed. A16-slot result is not
 a measured full-prefix peak or an epoch archive.
+
+## Cooperative native20 v2 retry preparation
+
+The v2 runner is separately sealed at
+`/var/lib/jetstreamer/horizon-223-v1620-warmup-cooperative-8457f800-v2`:
+runner SHA256 `8457f800789027054f118e783d2b3aba7a6a3294801b77734d30fda056f28f25`,
+actual-plan SHA256 `928482470656dac32cfc4e0ca686b0b025c9f5cbbd4c8fc0bb302ed21cebbe68`.
+Its actual owner is
+`horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service`, with an independent
+`qualification-223-v1620-prefix-warmup-8457f800-v2` private root and all five
+required directories already prepared. Its service is sealed but not installed
+or started by preparation.
+
+The no-worker planning capability passed in the v5 capability namespace and is
+sealed at `/var/lib/jetstreamer/horizon-warmup223-native20-capability-v5/capability.json`,
+SHA256 `955bb371ec8543fab27811f5cb0ed3c72f26134706daaeab041105666999f164`.
+It explicitly binds `cooperative-resume-only`, parent99f643ff and first16
+worker52d6c86a. No native replay or resource admission follows from that result.
+
+`admit-warmup223`/`capture-warmup223` route the separate
+`jetstreamer-private-warmup223-native20-admission-spec-v2` to the v2 admission
+state. The accepted census must contain exactly the three unchanged old owners
+and registered full227 invocation `a10f37b57711425a81633c62c66438d5`.
+Admission validates its original launch, current command/caps and a freshly
+completed protective guard, then reserves its full remaining hard-memory
+headroom and its entire471,798,691,840-byte disk envelope without scratch credit.
+The existing reviewed old-three growth calculation and current century floor
+are added independently. If that exceeds the sealed2-TB protected floor or the
+sampled expanded memory envelope, admission fails; raise/requalify the generation
+instead of hiding a peer or reducing a healthy guard. Root owns the fresh
+observation/admission and any actual dispatch.
+
+V2 uses `horizon-warmup223-native20-admission-v2`,
+`horizon-warmup223-native20-guard-v2/guard-plan.json`,
+`horizon-warmup223-native20-guard-receipts-v2`, and the matching
+`horizon-warmup223-native20-protective-v2.service`/`.timer` namespaces.
+The guard plan requires the actual new IID and must be sealed after start; keep
+the default full-command systemd-run description. Status lookup selects the
+jet root by exact approved unit, and PID1 Started-clock support is constrained
+to the two native20 owners. V2 terminal capture uses
+`jetstreamer-warmup223-native20-terminal-spec-v2` and preserves the previous
+failed13a5 terminal proof alongside its own exact journal/output. V1 launch,
+status and terminal support remain available independently; neither generation
+can borrow the other's runner, plan, root or result identity.
