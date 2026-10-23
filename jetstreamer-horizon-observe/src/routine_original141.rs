@@ -483,6 +483,13 @@ mod tests {
         let (p, model, config) = fixture();
         assert!(is_101(&p).unwrap());
         assert!(reader(&p));
+        let mut composite = fixture().0;
+        composite.controller_rebind = Some(Bound {
+            path: "/proof.json".into(),
+            sha256: "a".repeat(64),
+        });
+        assert!(crate::generation_101(&composite).starts_with("controller-rebind-original141-"));
+        assert_ne!(crate::generation_101(&composite), crate::generation_101(&p));
         let old = diagnostics(&p, &model, &config, false).unwrap();
         assert_eq!(
             old["diagnostic_replays"],
