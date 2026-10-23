@@ -172,3 +172,34 @@ trial envelope at admission. The private no-clobber receipt leaves exact input
 capability, real-worker guard first fire, ordinary replay and publication gates
 independent. Do not issue it early while launch prerequisites remain unresolved:
 the parent rechecks its fifteen-minute clock after the full prefix reread.
+
+Three separate immutable Rust operations prepare this exact attempt:
+
+- `prepare-continuation203-layout --self-sha256 HEX` runs as root, refuses an
+  active/failed/restarted owner or occupied workspace, and prepares only the
+  fixed empty private root, separate capability directory and mode-0600 lease.
+  Its private no-clobber receipt records the root/lease identities; no admission
+  or launch is implied.
+- `probe-continuation203-inputs SPEC --spec-sha256 HEX --self-sha256 HEX` runs as
+  UID 1000 from a sealed helper. The strict
+  `jetstreamer-private203-input-capability-spec-v1` names the exact node, retained
+  prefix/manifest, successful native result, restart snapshot, worker and genesis
+  plus its fixed private output. It fully hashes every input through a regular
+  no-follow read, checks file/path identity before and after, and writes only a
+  no-clobber private capability receipt. It never forks a worker, restores a Bank,
+  decodes the archive, or alters input permissions. The executing parent still
+  independently rereads/decodes the complete prefix and repeats the native barrier.
+- `capture-continuation203-launch SPEC --spec-sha256 HEX --self-sha256 HEX` runs
+  as root only after the separately authorized exact service is live. Its strict
+  `jetstreamer-private203-launch-capture-spec-v1` binds plan, admission, observer,
+  previous fleet, capability and layout receipts. It checks matching helper/input
+  lineage, root/lease custody, exact live invocation/command/sandbox and fresh
+  admission, then durably captures the launch and emits a separately sealable
+  guard plan. It does not start or restart anything. Seal that plan, bind the
+  generic guard, prove its real one-worker sandboxed fire and record the fleet
+  admission before leaving the producer unattended.
+
+Keep one qualified helper generation for layout, input capability and capture;
+a new helper digest cannot silently borrow its predecessor's capability or layout.
+All resulting artifacts stay private and confer no ordinary replay, publication,
+sidecar, retirement, or R2 authority.

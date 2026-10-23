@@ -17,6 +17,7 @@ mod continuation144_prepare;
 mod continuation144_protection;
 mod continuation203;
 mod continuation203_admission;
+mod continuation203_ops;
 mod native141;
 mod native144;
 mod native203;
@@ -57,6 +58,15 @@ pub(super) async fn admit_continuation144() -> Result<()> {
 }
 pub(super) fn admit_continuation203() -> Result<()> {
     continuation203_admission::run()
+}
+pub(super) fn prepare_continuation203_layout() -> Result<()> {
+    continuation203_ops::layout()
+}
+pub(super) fn probe_continuation203_inputs() -> Result<()> {
+    continuation203_ops::capability()
+}
+pub(super) fn capture_continuation203_launch() -> Result<()> {
+    continuation203_ops::capture()
 }
 pub(super) fn prepare_continuation144_layout() -> Result<()> {
     continuation144::prepare_layout()
