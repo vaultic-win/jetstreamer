@@ -63,6 +63,7 @@ const STATUS_DELETION_RECEIPT_SCHEMA: &str =
 
 mod cohort160_finalization;
 mod cohort160_handoff;
+mod cohort191_delivery;
 mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
@@ -3466,6 +3467,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("observe-delivery-191") {
+        return cohort191_delivery::run();
     }
     if env::args().nth(1).as_deref() == Some("capped141-terminal-capture") {
         return inactive_status::capture_capped141_terminal();
