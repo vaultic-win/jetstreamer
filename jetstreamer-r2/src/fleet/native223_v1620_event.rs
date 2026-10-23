@@ -3,11 +3,12 @@
 use super::*;
 
 const TERMINAL_SCHEMA: &str = "jetstreamer-private-epoch223-native-v1620-terminal-event-v1";
+#[cfg(test)]
 const ACTUAL_IID: &str = "41684426155f4124a64b10c55ffeed96";
 const ACTUAL_INTENT: &str = "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-v1620-actual-v1/intent.json";
 const ACTUAL_INTENT_SHA: &str = "2d6f4a1b081d700e4b0a68488a1eb69e2f68301dcbd6dc27a1883c2b5a8d88c8";
 
-fn terminal_journal(binding: &BoundFile) -> Result<(bool, u64)> {
+fn terminal_journal(binding: &BoundFile, owner: &Profile, iid: &str) -> Result<(bool, u64)> {
     let bytes = read_stable_bounded(&binding.path, 16 << 20, "native20 terminal journal")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == binding.sha256,
@@ -34,11 +35,11 @@ fn terminal_journal(binding: &BoundFile) -> Result<(bool, u64)> {
             .context("native20 terminal journal message")?;
         if row["_PID"] == "1" {
             ensure!(
-                row["UNIT"] == NATIVE20.unit && row["INVOCATION_ID"] == ACTUAL_IID,
+                row["UNIT"] == owner.unit && row["INVOCATION_ID"] == iid,
                 "native20 foreign manager event"
             );
-            let success = message == format!("{}: Deactivated successfully.", NATIVE20.unit);
-            let failed = message.starts_with(&format!("{}: Failed with result '", NATIVE20.unit))
+            let success = message == format!("{}: Deactivated successfully.", owner.unit);
+            let failed = message.starts_with(&format!("{}: Failed with result '", owner.unit))
                 && message.ends_with("'.");
             if success || failed {
                 ensure!(
@@ -48,19 +49,30 @@ fn terminal_journal(binding: &BoundFile) -> Result<(bool, u64)> {
             }
         } else {
             ensure!(
-                row["_SYSTEMD_UNIT"] == NATIVE20.unit
-                    && row["_SYSTEMD_INVOCATION_ID"] == ACTUAL_IID,
+                row["_SYSTEMD_UNIT"] == owner.unit && row["_SYSTEMD_INVOCATION_ID"] == iid,
                 "native20 foreign child journal"
             );
         }
     }
     terminal.context("native20 exact terminal manager event absent")
 }
-fn terminal_proof(proof: &Value) -> Result<(bool, u64)> {
+fn terminal_proof(proof: &Value) -> Result<(&'static Profile, String, bool, u64)> {
+    let owner = profile(proof["unit"].as_str().context("native20 terminal unit")?)?;
+    let iid = proof["invocation_id"]
+        .as_str()
+        .context("native20 terminal invocation")?;
+    ensure!(
+        owner.intent_schema == NATIVE20.intent_schema
+            && iid.len() == 32
+            && iid
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "native20 terminal approved profile/identity"
+    );
     ensure!(
         proof["schema"] == TERMINAL_SCHEMA
-            && proof["unit"] == NATIVE20.unit
-            && proof["invocation_id"] == ACTUAL_IID
+            && proof["unit"] == owner.unit
+            && proof["invocation_id"] == iid
             && proof["resource_samples_taken"] == 0,
         "native20 terminal proof scope"
     );
@@ -79,40 +91,42 @@ fn terminal_proof(proof: &Value) -> Result<(bool, u64)> {
     }
     let input: BoundFile = serde_json::from_value(proof["intent"].clone())?;
     ensure!(
-        input.path == Path::new(ACTUAL_INTENT) && input.sha256 == ACTUAL_INTENT_SHA,
+        input.path == Path::new(owner.state).join("intent.json")
+            && (owner.unit != NATIVE20.unit
+                || (input.path == Path::new(ACTUAL_INTENT) && input.sha256 == ACTUAL_INTENT_SHA)),
         "native20 terminal intent differs"
     );
     let i = bound_json(&input)?;
     ensure!(
-        i["invocation_id"] == ACTUAL_IID
-            && i["schema"] == NATIVE20.intent_schema
-            && i["plan_sha256"] == NATIVE20.plan_sha
-            && i["self_sha256"] == NATIVE20.self_sha
-            && i["test_sha256"] == NATIVE20.test_sha,
+        i["invocation_id"] == iid
+            && i["schema"] == owner.intent_schema
+            && i["plan_sha256"] == owner.plan_sha
+            && i["self_sha256"] == owner.self_sha
+            && i["test_sha256"] == owner.test_sha,
         "native20 terminal intent identity"
     );
     let journal: BoundFile = serde_json::from_value(proof["journal"].clone())?;
-    let (success, clock) = terminal_journal(&journal)?;
+    let (success, clock) = terminal_journal(&journal, owner, iid)?;
     if proof["result"].is_null() {
         ensure!(
             !success
-                && fs::symlink_metadata(Path::new(ACTUAL_INTENT).with_file_name("result.json"))
+                && fs::symlink_metadata(Path::new(owner.state).join("result.json"))
                     .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
             "native20 missing result is not a proved failed terminal"
         );
     } else {
         let result: BoundFile = serde_json::from_value(proof["result"].clone())?;
         ensure!(
-            result.path == Path::new(ACTUAL_INTENT).with_file_name("result.json"),
+            result.path == Path::new(owner.state).join("result.json"),
             "native20 terminal result path"
         );
         let r = bound_json(&result)?;
         ensure!(
             r["schema"] == "jetstreamer-private-epoch223-native-v1620-ram-snapshot-result-v1"
-                && r["invocation_id"] == ACTUAL_IID
-                && r["plan_sha256"] == NATIVE20.plan_sha
-                && r["self_sha256"] == NATIVE20.self_sha
-                && r["test_sha256"] == NATIVE20.test_sha
+                && r["invocation_id"] == iid
+                && r["plan_sha256"] == owner.plan_sha
+                && r["self_sha256"] == owner.self_sha
+                && r["test_sha256"] == owner.test_sha
                 && r["exact_ignored_test_count"] == 1
                 && r["elapsed_millis"]
                     .as_u64()
@@ -139,7 +153,7 @@ fn terminal_proof(proof: &Value) -> Result<(bool, u64)> {
             );
         }
     }
-    Ok((success, clock))
+    Ok((owner, iid.into(), success, clock))
 }
 pub(in crate::fleet) fn terminal_predecessor(
     previous: &Value,
@@ -148,7 +162,7 @@ pub(in crate::fleet) fn terminal_predecessor(
     sampled: &str,
     now: u64,
 ) -> Result<()> {
-    let (_, terminal_clock) = terminal_proof(proof)?;
+    let (owner, iid, _, terminal_clock) = terminal_proof(proof)?;
     ensure!(
         p.first_epoch == 201
             && p.last_epoch == 300
@@ -204,7 +218,7 @@ pub(in crate::fleet) fn terminal_predecessor(
     let claims = p
         .pipeline_claims
         .iter()
-        .filter(|c| c.unit == NATIVE20.unit && c.invocation_id == ACTUAL_IID)
+        .filter(|c| c.unit == owner.unit && c.invocation_id == iid)
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
@@ -237,16 +251,16 @@ pub(in crate::fleet) fn terminal_census(p: &Plan, before: &BTreeMap<String, Valu
     if proof["schema"] != TERMINAL_SCHEMA {
         return Ok(());
     }
-    let (success, _) = terminal_proof(&proof)?;
+    let (owner, iid, success, _) = terminal_proof(&proof)?;
     let current = before
-        .get(NATIVE20.unit)
+        .get(owner.unit)
         .context("native20 terminal owner absent")?;
     let collected = current["LoadState"] == "not-found"
         && current["ActiveState"] == "inactive"
         && current["SubState"] == "dead"
         && current["InvocationID"] == "";
     let stopped = current["LoadState"] == "loaded"
-        && current["InvocationID"] == ACTUAL_IID
+        && current["InvocationID"] == iid
         && current["NRestarts"] == "0"
         && matches!(
             (
@@ -275,7 +289,7 @@ pub(in crate::fleet) fn terminal_census(p: &Plan, before: &BTreeMap<String, Valu
             .cloned()
             .collect(),
     );
-    protected_owners(&protected, before)
+    protected_owners_for(&protected, before, owner.unit)
 }
 
 pub(in crate::fleet) fn event_predecessor(
@@ -326,7 +340,10 @@ pub(in crate::fleet) fn event_predecessor(
     let claims = p
         .pipeline_claims
         .iter()
-        .filter(|c| c.unit == NATIVE20.unit)
+        .filter(|c| {
+            profile(&c.unit).is_ok_and(|p| p.intent_schema == NATIVE20.intent_schema)
+                && p.metadata_event.as_ref() == c.evidence.first()
+        })
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
@@ -338,7 +355,7 @@ pub(in crate::fleet) fn event_predecessor(
         p.metadata_event.as_ref() == claim.evidence.first()
             && claim.invocation_id == proof["invocation_id"]
             && p.pipeline_claims.len() == old.pipeline_claims.len() + 1
-            && !old.pipeline_claims.iter().any(|c| c.unit == NATIVE20.unit)
+            && !old.pipeline_claims.iter().any(|c| c.unit == claim.unit)
             && old
                 .pipeline_claims
                 .iter()
@@ -346,7 +363,7 @@ pub(in crate::fleet) fn event_predecessor(
         "native20 event changed pipeline history"
     );
     let mut names = old.tracked_units.iter().cloned().collect::<BTreeSet<_>>();
-    names.insert(NATIVE20.unit.into());
+    names.insert(claim.unit.clone());
     ensure!(
         names == p.tracked_units.iter().cloned().collect::<BTreeSet<_>>()
             && old.diagnostics.len() == p.diagnostics.len()
@@ -380,7 +397,15 @@ pub(in crate::fleet) fn event_predecessor(
     Ok(())
 }
 
+#[cfg(test)]
 fn protected_owners(previous: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
+    protected_owners_for(previous, census, NATIVE20.unit)
+}
+fn protected_owners_for(
+    previous: &Value,
+    census: &BTreeMap<String, Value>,
+    native_unit: &str,
+) -> Result<()> {
     let rows = previous["active"]
         .as_array()
         .context("native20 prior active census")?;
@@ -432,7 +457,7 @@ fn protected_owners(previous: &Value, census: &BTreeMap<String, Value>) -> Resul
     }
     for (name, state) in census {
         ensure!(
-            !diagnostic_stage_running(state) || names.contains(name) || name == NATIVE20.unit,
+            !diagnostic_stage_running(state) || names.contains(name) || name == native_unit,
             "native20 unaccounted live competitor:{name}"
         );
     }
@@ -448,16 +473,19 @@ pub(in crate::fleet) fn event_census(p: &Plan, census: &BTreeMap<String, Value>)
                     .as_ref()
                     .context("native20 event prior fleet")?,
             )?;
-            protected_owners(&previous, census)?;
             let claim = p
                 .pipeline_claims
                 .iter()
-                .find(|c| c.unit == NATIVE20.unit)
+                .find(|c| {
+                    c.evidence.first() == Some(binding)
+                        && profile(&c.unit).is_ok_and(|p| p.intent_schema == NATIVE20.intent_schema)
+                })
                 .context("native20 event claim")?;
+            protected_owners_for(&previous, census, &claim.unit)?;
             validate_live(
                 claim,
                 census
-                    .get(NATIVE20.unit)
+                    .get(&claim.unit)
                     .context("native20 new owner missing")?,
             )?;
         }
@@ -490,7 +518,10 @@ mod tests {
         let manager = json!({"_PID":"1","UNIT":NATIVE20.unit,"INVOCATION_ID":ACTUAL_IID,"MESSAGE":format!("{}: Deactivated successfully.",NATIVE20.unit),"__REALTIME_TIMESTAMP":"2000000"});
         let rows = vec![child.clone(), manager.clone()];
         let (_dir, b) = terminal_fixture(&rows);
-        assert_eq!(terminal_journal(&b).unwrap(), (true, 2_000_000));
+        assert_eq!(
+            terminal_journal(&b, &NATIVE20, ACTUAL_IID).unwrap(),
+            (true, 2_000_000)
+        );
         for variant in 0..4 {
             let mut bad = rows.clone();
             match variant {
@@ -502,12 +533,18 @@ mod tests {
                 _ => bad.swap(0, 1),
             };
             let (_dir, b) = terminal_fixture(&bad);
-            assert!(terminal_journal(&b).is_err(), "{variant}");
+            assert!(
+                terminal_journal(&b, &NATIVE20, ACTUAL_IID).is_err(),
+                "{variant}"
+            );
         }
         let mut failure = manager;
         failure["MESSAGE"] = json!(format!("{}: Failed with result 'timeout'.", NATIVE20.unit));
         let (_dir, b) = terminal_fixture(&[child, failure]);
-        assert_eq!(terminal_journal(&b).unwrap(), (false, 2_000_000));
+        assert_eq!(
+            terminal_journal(&b, &NATIVE20, ACTUAL_IID).unwrap(),
+            (false, 2_000_000)
+        );
     }
     fn fixture() -> (Value, BTreeMap<String, Value>) {
         let mut census = BTreeMap::new();
