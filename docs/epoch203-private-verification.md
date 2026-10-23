@@ -46,3 +46,22 @@ pinned current-plugin scan, and records durable phase/output evidence. It create
 no canonical checksum, uploader receipts, public archive or R2 object. Fresh full
 and plugin success still needs a separately reviewed exact203 publication gate;
 adjacent-boundary and local-retirement requirements remain independent.
+
+`jetstreamer-epoch203-publish` is the separate local publication gate. Its code
+retains the proven absence-only transaction and Landlock confinement mechanics
+from the213 publisher, with independently supplied203 producer, snapshot, native
+comparison, source provenance, RPC anchors and private-runner bindings. The213
+publisher, sealed binaries and receipts remain untouched. The203 gate additionally
+requires the actual scan admission and exact scanner invocation's clean PID1
+completion, and rehashes all four raw RPC boundary responses. Its fixture-only
+`--capability-probe` does not open any campaign archive.
+
+Do not deploy or launch publication until its tests and private filesystem probe
+pass and the actual203 full/plugin verification finishes successfully. Use the
+same publication plan fields and rename-compatible sandbox described in
+[the213 publication procedure](epoch213-v4-artifact-publication.md), substituting
+the203 schema, private/work namespaces and the203 boundary-candidate digest. Bind
+the actual203 verification receipt, archive digest/length, fresh fleet/inventory
+and resource admission independently. Moving the additional private verification
+copy must preserve the original assembly and all evidence. Authenticated R2
+delivery, sidecar commit and adjacent-boundary retirement remain separate stages.
