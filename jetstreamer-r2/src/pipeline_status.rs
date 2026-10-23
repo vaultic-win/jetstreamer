@@ -2,6 +2,7 @@
 use super::*;
 use std::{collections::BTreeMap, process::Command};
 mod event144;
+mod native_input;
 mod origin203;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -91,6 +92,7 @@ impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
+            | ("private-cold-snapshot-verification", "verification")
             | ("local-publication", "verification" | "publication")
             | ("producer-finalization", "verification" | "finalization")
             | ("controller-import-handoff", "verification" | "publication")
@@ -101,10 +103,13 @@ impl Binding {
             ),
             _ => bail!("pipeline and status phases disagree"),
         };
-        if self.claim_phase == "producer-finalization" {
+        if matches!(
+            self.claim_phase.as_str(),
+            "producer-finalization" | "private-cold-snapshot-verification"
+        ) {
             ensure!(
                 self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
-                "producer finalization must retain the original invocation clock"
+                "producer finalization/native input must retain the original invocation clock"
             );
         }
         if self.claim_phase == "controller-import-handoff" {
@@ -440,6 +445,9 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
             && plan.binding.fleet_sha256 == plan.fleet.sha256,
         "pipeline model does not bind the coordinated fleet and v2 observation"
     );
+    if native_input::selected(plan) {
+        return native_input::sample(plan, observer, fleet, now);
+    }
     let sample = observer["recorded_at_utc"]
         .as_str()
         .context("observer time missing")?;
@@ -655,7 +663,9 @@ pub(super) async fn run() -> Result<()> {
     if plan.epoch == 144 {
         validate144_origin(&plan, &origin)?;
     }
-    if origin["schema"] == STATUS_RECEIPT_SCHEMA {
+    if native_input::selected(&plan) {
+        native_input::validate_origin(&plan, &origin, &fleet)?;
+    } else if origin["schema"] == STATUS_RECEIPT_SCHEMA {
         let receipt: StatusPublicationReceipt = serde_json::from_value(origin)?;
         let prior_observer = bound_bytes(&Bound {
             path: receipt.observer_receipt.clone(),
@@ -718,17 +728,24 @@ pub(super) async fn run() -> Result<()> {
         .checked_sub(origin_start)
         .context("producer origin starts after sample")?;
     let before = census(&plan, &fleet)?;
-    let identity = regular_identity(&plan.jet_path)?;
+    let identity = if native_input::selected(&plan) {
+        native_input::zero_jet(&plan)?;
+        None
+    } else {
+        Some(regular_identity(&plan.jet_path)?)
+    };
     ensure!(
-        identity.length == plan.expected_jet_size_bytes,
+        identity.as_ref().map_or(0, |i| i.length) == plan.expected_jet_size_bytes,
         "pipeline jet length differs from model"
     );
-    let meta = fs::symlink_metadata(&plan.jet_path)?;
-    ensure!(meta.nlink() == 1, "pipeline jet has multiple links");
+    if identity.is_some() {
+        let meta = fs::symlink_metadata(&plan.jet_path)?;
+        ensure!(meta.nlink() == 1, "pipeline jet has multiple links");
+    }
     validate_receipt_directory(&plan)?;
     let status = EpochStatus {
         epoch: plan.epoch,
-        jet_size_bytes: identity.length,
+        jet_size_bytes: identity.as_ref().map_or(0, |i| i.length),
         elapsed_execution_millis: elapsed,
         estimated_remaining_millis: plan.estimated_remaining_millis,
         sampled_at_utc: sample,
@@ -736,7 +753,12 @@ pub(super) async fn run() -> Result<()> {
     };
     validate_epoch_status(&status, plan.epoch)?;
     ensure!(
-        census(&plan, &fleet)? == before && regular_identity(&plan.jet_path)? == identity,
+        census(&plan, &fleet)? == before
+            && if native_input::selected(&plan) {
+                native_input::zero_jet(&plan).is_ok()
+            } else {
+                Some(regular_identity(&plan.jet_path)?) == identity
+            },
         "pipeline identity or source changed during the coordinated status sample"
     );
     if args.len() == 6 {
@@ -781,6 +803,14 @@ pub(super) async fn run() -> Result<()> {
         write_status_receipt(&plan.receipt_directory, &receipt)?.display()
     );
     Ok(())
+}
+
+pub(super) fn native_input_matches_status(
+    receipt: &StatusPublicationReceipt,
+    epoch: u64,
+    census: &BTreeMap<String, Value>,
+) -> bool {
+    native_input::matches(receipt, epoch, census)
 }
 
 #[cfg(test)]
@@ -991,6 +1021,25 @@ mod tests {
             fleet_path: "/fleet".into(),
             fleet_sha256: "d".repeat(64),
         }
+    }
+    #[test]
+    fn native_input_verification_binds_approved_epoch_unit_and_original_clock() {
+        let mut b = binding();
+        b.unit = "archive-223-v1620-native-input-actual-v1.service".into();
+        b.invocation_id = "41684426155f4124a64b10c55ffeed96".into();
+        b.claim_phase = "private-cold-snapshot-verification".into();
+        b.origin_unit = b.unit.clone();
+        b.origin_invocation_id = b.invocation_id.clone();
+        b.validate(223, "verification").unwrap();
+        assert!(b.validate(224, "verification").is_err());
+        assert!(b.validate(223, "replay").is_err());
+        let mut wrong = b.clone();
+        wrong.origin_invocation_id = "0".repeat(32);
+        assert!(wrong.validate(223, "verification").is_err());
+        let mut wrong = b;
+        wrong.unit = "archive-223-v1620-native-input-unapproved.service".into();
+        wrong.origin_unit = wrong.unit.clone();
+        assert!(wrong.validate(223, "verification").is_err());
     }
     #[test]
     fn exact_simple_controller_uses_its_authenticated_started_manager_event() {
