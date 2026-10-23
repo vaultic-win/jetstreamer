@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 mod metadata_cycle;
 mod missing157;
 mod native223;
+mod native227;
 mod natural144;
 mod preserved144;
 mod publication144;
@@ -357,6 +358,10 @@ fn fresh_census(
     if native223 {
         native223::validate(&current, terminal_fleet, owners)?;
     }
+    let native227 = plan.epoch == 227 && native227::recognized(terminal_fleet, owners);
+    if native227 {
+        native227::validate(&current, terminal_fleet, owners)?;
+    }
     let reserve = reserve_owner_evidence(terminal_fleet, owners)?;
     if let Some(stop) = &reserve {
         stop.validate(
@@ -371,7 +376,13 @@ fn fresh_census(
             .context("owner omitted from complete census")?;
         if preserved_delivery.is_some() {
             preserved144::terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
-        } else if !preserved && !missing157 && !natural144 && !native223 && reserve.is_none() {
+        } else if !preserved
+            && !missing157
+            && !natural144
+            && !native223
+            && !native227
+            && reserve.is_none()
+        {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
         }
         no_pending_owner_trigger(name, value["LoadState"] == "not-found")?;

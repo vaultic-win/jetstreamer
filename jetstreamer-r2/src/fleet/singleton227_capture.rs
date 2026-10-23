@@ -95,7 +95,17 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile, terminal: bool) -> Resul
             ("CPUQuotaPerSecUSec", "1s"),
         ],
     )?;
-    if !terminal { require(&p, &[("Result", "success"), ("ExecMainStatus", "0"), ("ActiveState", "inactive"), ("SubState", "dead")])?; }
+    if !terminal {
+        require(
+            &p,
+            &[
+                ("Result", "success"),
+                ("ExecMainStatus", "0"),
+                ("ActiveState", "inactive"),
+                ("SubState", "dead"),
+            ],
+        )?;
+    }
     let guard_plan = bound_json(plan)?;
     ensure!(
         p.get("ReadWritePaths").map(String::as_str) == guard_plan["receipt_directory"].as_str(),
@@ -120,10 +130,12 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile, terminal: bool) -> Resul
         "227 protective command differs"
     );
     let timer = properties(&unit.replace(".service", ".timer"), "ActiveState,SubState")?;
-    if !terminal { require(
-        &timer,
-        &[("ActiveState", "active"), ("SubState", "waiting")],
-    )?; }
+    if !terminal {
+        require(
+            &timer,
+            &[("ActiveState", "active"), ("SubState", "waiting")],
+        )?;
+    }
     let (rows, sha) = journal(unit)?;
     let success = rows
         .iter()
@@ -372,25 +384,64 @@ pub(super) fn run() -> Result<()> {
     );
     let terminal_native = s.mode == "native-cold" && !s.native_running;
     let origin = if terminal_native {
-        let binding = s.running_origin.as_ref().context("227 terminal capture needs registered running origin")?;
+        let binding = s
+            .running_origin
+            .as_ref()
+            .context("227 terminal capture needs registered running origin")?;
         let origin = bound_json(binding)?;
-        ensure!(origin["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
-            && origin["admission"] == private157::binding(&s.admission)
-            && origin["guard"] == private157::binding(&s.guard)
-            && origin["guard_plan"] == private157::binding(&s.guard_plan)
-            && origin["invocation_id"] == iid && origin["main_pid"] == g["producer"]["pid"], "227 terminal origin differs");
+        ensure!(
+            origin["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
+                && origin["admission"] == private157::binding(&s.admission)
+                && origin["guard"] == private157::binding(&s.guard)
+                && origin["guard_plan"] == private157::binding(&s.guard_plan)
+                && origin["invocation_id"] == iid
+                && origin["main_pid"] == g["producer"]["pid"],
+            "227 terminal origin differs"
+        );
         terminal_launch_clock(admitted, guarded, now, &origin)?;
         Some(origin)
-    } else { ensure!(s.running_origin.is_none(), "227 running origin only applies to terminal input capture"); None };
+    } else {
+        ensure!(
+            s.running_origin.is_none(),
+            "227 running origin only applies to terminal input capture"
+        );
+        None
+    };
     let manager = manager(&s.mode, &g, &s.guard_plan, terminal_native)?;
     let mut f = if terminal_native {
-        let fleet = bound_json(s.terminal_fleet.as_ref().context("227 terminal capture needs current accepted fleet")?)?;
-        ensure!(fleet["pipelines"].as_array().is_some_and(|rows| rows.iter().any(|row|
-            row["unit"]["Id"] == unit && row["expected_invocation_id"] == iid
-            && row["evidence"].as_array().is_some_and(|e|e.first()==s.running_origin.as_ref().map(private157::binding).as_ref()))), "227 terminal fleet lacks original pipeline history");
+        let fleet = bound_json(
+            s.terminal_fleet
+                .as_ref()
+                .context("227 terminal capture needs current accepted fleet")?,
+        )?;
+        ensure!(
+            fleet["pipelines"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|row| row["unit"]["Id"] == unit
+                    && row["expected_invocation_id"] == iid
+                    && row["evidence"].as_array().is_some_and(|e| e.first()
+                        == s.running_origin.as_ref().map(private157::binding).as_ref()))),
+            "227 terminal fleet lacks original pipeline history"
+        );
         fleet
-    } else { ensure!(s.terminal_fleet.is_none(), "227 terminal fleet is terminal-only"); bound_json(&serde_json::from_value(a["fleet"].clone())?)? };
-    if terminal_native { f["active"] = Value::Array(f["active"].as_array().context("227 terminal fleet active census")?.iter().filter(|row| row["epoch"] != 227).cloned().collect()); }
+    } else {
+        ensure!(
+            s.terminal_fleet.is_none(),
+            "227 terminal fleet is terminal-only"
+        );
+        bound_json(&serde_json::from_value(a["fleet"].clone())?)?
+    };
+    if terminal_native {
+        f["active"] = Value::Array(
+            f["active"]
+                .as_array()
+                .context("227 terminal fleet active census")?
+                .iter()
+                .filter(|row| row["epoch"] != 227)
+                .cloned()
+                .collect(),
+        );
+    }
     let mut names = f["unit_census"]
         .as_object()
         .context("227 prior census")?
@@ -476,8 +527,11 @@ pub(super) fn run() -> Result<()> {
                 .split_once(" ; ignore_errors=")
                 .map(|(s, _)| s)
                 == Some(native_command().as_str())
-                && (terminal_native || sandbox["ExecMainPID"].parse::<u64>()?
-                    == g["producer"]["pid"].as_u64().context("227 native guarded PID")?)
+                && (terminal_native
+                    || sandbox["ExecMainPID"].parse::<u64>()?
+                        == g["producer"]["pid"]
+                            .as_u64()
+                            .context("227 native guarded PID")?)
                 && g["workers"].as_array().is_some_and(|w| w.len() == 1)
                 && g["workers"][0][0] == g["producer"]["pid"]
                 && g["workers"][0][1]
@@ -494,13 +548,20 @@ pub(super) fn run() -> Result<()> {
                 "replay_entries":0,"native_input_qualified":false,"public_sidecar_countdown_authorized":false})
         } else {
             let (rows, journal_sha) = journal(unit)?;
-            let (success, terminal_micros) = super::singleton227_terminal::journal_terminal(&rows, iid,
-                g["producer"]["pid"].as_u64().context("227 native PID")?)?;
+            let (success, terminal_micros) = super::singleton227_terminal::journal_terminal(
+                &rows,
+                iid,
+                g["producer"]["pid"].as_u64().context("227 native PID")?,
+            )?;
             ensure!(success, "227 native manager did not complete successfully");
             let origin = origin.as_ref().context("227 terminal origin absent")?;
-            let start = origin["producer_started_unix_millis"].as_u64().context("227 native start")?;
-            ensure!(terminal_micros / 1000 >= start && terminal_micros / 1000 - start <= 2_701_000,
-                "227 terminal exceeds exact bounded native attempt");
+            let start = origin["producer_started_unix_millis"]
+                .as_u64()
+                .context("227 native start")?;
+            ensure!(
+                terminal_micros / 1000 >= start && terminal_micros / 1000 - start <= 2_701_000,
+                "227 terminal exceeds exact bounded native attempt"
+            );
             let native = marker(&rows, iid)?;
             json!({"schema":"jetstreamer-private-epoch227-native-input-qualified-v1","epoch":227,"test_sha256":TEST_SHA,
             "unit":unit,"invocation_id":iid,"main_pid":g["producer"]["pid"],"resource_samples_taken":0,
@@ -554,8 +615,11 @@ pub(super) fn run() -> Result<()> {
     result["sampled_at_utc"] = json!(publication203::utc(now)?);
     if s.mode == "native-cold" {
         result["entry_replay"] = json!(false);
-        let start = if terminal_native { origin.as_ref().context("227 terminal start origin")?["producer_start_monotonic_microseconds"].as_u64().context("227 original monotonic start")? }
-            else { sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()? };
+        let start = if terminal_native {
+            origin.as_ref().context("227 terminal start origin")?["producer_start_monotonic_microseconds"].as_u64().context("227 original monotonic start")?
+        } else {
+            sandbox["ExecMainStartTimestampMonotonic"].parse::<u64>()?
+        };
         let mut mono = std::mem::MaybeUninit::<libc::timespec>::uninit();
         ensure!(
             unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, mono.as_mut_ptr()) } == 0,
@@ -567,21 +631,35 @@ pub(super) fn run() -> Result<()> {
             .and_then(|s| s.checked_add(u64::try_from(mono.tv_nsec).ok()? / 1000))
             .context("227 monotonic clock overflow")?;
         let elapsed = if terminal_native {
-            (result["terminal_unix_microseconds"].as_u64().context("227 terminal stop clock")? / 1000)
-                .checked_sub(origin.as_ref().unwrap()["producer_started_unix_millis"].as_u64().context("227 original wall start")?).context("227 stop before start")?
-        } else { micros
-            .checked_sub(start)
-            .context("227 producer start is future-dated")?
-            / 1000 };
+            (result["terminal_unix_microseconds"]
+                .as_u64()
+                .context("227 terminal stop clock")?
+                / 1000)
+                .checked_sub(
+                    origin.as_ref().unwrap()["producer_started_unix_millis"]
+                        .as_u64()
+                        .context("227 original wall start")?,
+                )
+                .context("227 stop before start")?
+        } else {
+            micros
+                .checked_sub(start)
+                .context("227 producer start is future-dated")?
+                / 1000
+        };
         let wall: u64 = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
             .as_millis()
             .try_into()?;
         result["producer_start_monotonic_microseconds"] = json!(start);
-        result["producer_started_unix_millis"] = if terminal_native { origin.as_ref().unwrap()["producer_started_unix_millis"].clone() } else { json!(
-            wall.checked_sub(elapsed)
-                .context("227 execution start underflow")?
-        ) };
+        result["producer_started_unix_millis"] = if terminal_native {
+            origin.as_ref().unwrap()["producer_started_unix_millis"].clone()
+        } else {
+            json!(
+                wall.checked_sub(elapsed)
+                    .context("227 execution start underflow")?
+            )
+        };
         result["elapsed_execution_millis_at_capture"] = json!(elapsed);
     }
     result["admission"] = private157::binding(&s.admission);
@@ -613,10 +691,22 @@ pub(super) fn run() -> Result<()> {
 }
 
 fn terminal_launch_clock(admitted: u64, guarded: u64, now: u64, origin: &Value) -> Result<()> {
-    let start = origin["producer_started_unix_millis"].as_u64().context("227 origin start")? / 1000;
-    let captured = origin["recorded_unix_seconds"].as_u64().context("227 origin clock")?;
-    ensure!(start >= admitted && start - admitted <= 900 && guarded >= start && captured >= guarded
-        && captured - admitted <= 900 && captured <= now, "227 launch was outside admission validity");
+    let start = origin["producer_started_unix_millis"]
+        .as_u64()
+        .context("227 origin start")?
+        / 1000;
+    let captured = origin["recorded_unix_seconds"]
+        .as_u64()
+        .context("227 origin clock")?;
+    ensure!(
+        start >= admitted
+            && start - admitted <= 900
+            && guarded >= start
+            && captured >= guarded
+            && captured - admitted <= 900
+            && captured <= now,
+        "227 launch was outside admission validity"
+    );
     Ok(())
 }
 
@@ -627,7 +717,8 @@ mod tests {
     fn terminal_qualification_uses_launch_validity_not_capture_wall_age() {
         let origin = json!({"producer_started_unix_millis":1_100_000,"recorded_unix_seconds":1110});
         terminal_launch_clock(1000, 1105, 5000, &origin).unwrap();
-        let mut bad = origin.clone(); bad["producer_started_unix_millis"] = json!(1_901_000);
+        let mut bad = origin.clone();
+        bad["producer_started_unix_millis"] = json!(1_901_000);
         assert!(terminal_launch_clock(1000, 1905, 5000, &bad).is_err());
         assert!(terminal_launch_clock(1200, 1105, 5000, &origin).is_err());
     }

@@ -55,6 +55,7 @@ mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
 mod singleton227_event;
+mod singleton227_terminal;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
@@ -153,6 +154,12 @@ pub(super) fn admit_singleton227() -> Result<()> {
 }
 pub(super) fn capture_singleton227() -> Result<()> {
     singleton227_capture::run()
+}
+pub(super) fn capture_native227_terminal() -> Result<()> {
+    singleton227_terminal::capture()
+}
+pub(super) fn native227_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    singleton227_terminal::terminal_status_identity(proof)
 }
 pub(super) fn admit_native207_input() -> Result<()> {
     native207_admission::run()
@@ -803,7 +810,7 @@ fn validate_same_sample_admission(
         205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
         205 if prefix205::namespace(claim) => prefix205::GUARD_SHA,
         204 if prefix204::namespace(claim) => prefix204::GUARD_SHA,
-        227 if singleton227::namespace(claim) => singleton227::GUARD_SHA,
+        227 if singleton227::namespace(claim) => singleton227::SINGLETON_GUARD_SHA,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
         203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
@@ -2220,6 +2227,16 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"]
+                == "jetstreamer-private-epoch227-native-input-terminal-event-v1"
+            {
+                singleton227_terminal::terminal_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == native207::SCHEMA {
                 native207_event::event_predecessor(
                     &previous,
@@ -2403,6 +2420,7 @@ pub(super) async fn run() -> Result<()> {
     warmup223::event_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
+    singleton227_terminal::terminal_census(&plan, &before)?;
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native207::SCHEMA
     {

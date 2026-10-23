@@ -574,7 +574,8 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-singleton-227-capped-710f6523-v1.service" {
         return cfg!(feature = "epoch227-singleton-guard")
             && plan.filesystem == Path::new("/")
-            && plan.worker_root == Path::new("/home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1")
+            && plan.worker_root
+                == Path::new("/home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1")
             && plan.maximum_root_physical_bytes == Some(471_798_691_840)
             && plan.maximum_worker_vmas == 3_500_000
             && plan.bounded_measurement.is_none()
@@ -1067,21 +1068,40 @@ mod tests {
             "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":471_798_691_840u64,
             "receipt_directory":"/sealed/receipts"});
         let plan: Plan = serde_json::from_value(value.clone()).unwrap();
-        assert_eq!(validate_plan(&plan).is_ok(), cfg!(feature = "epoch227-singleton-guard"));
+        assert_eq!(
+            validate_plan(&plan).is_ok(),
+            cfg!(feature = "epoch227-singleton-guard")
+        );
         for (pointer, replacement) in [
-            ("/schema", json!("unknown")), ("/unit", json!("horizon-singleton-228-capped.service")),
-            ("/invocation_id", json!("invalid")), ("/filesystem", json!("/other")),
-            ("/minimum_free_bytes", json!(0)), ("/worker_root", json!("/other")),
-            ("/maximum_worker_vmas", json!(3_500_001)), ("/maximum_root_physical_bytes", json!(300_000_000_000u64)),
+            ("/schema", json!("unknown")),
+            ("/unit", json!("horizon-singleton-228-capped.service")),
+            ("/invocation_id", json!("invalid")),
+            ("/filesystem", json!("/other")),
+            ("/minimum_free_bytes", json!(0)),
+            ("/worker_root", json!("/other")),
+            ("/maximum_worker_vmas", json!(3_500_001)),
+            ("/maximum_root_physical_bytes", json!(300_000_000_000u64)),
         ] {
             let mut bad = value.clone();
             *bad.pointer_mut(pointer).unwrap() = replacement;
-            assert!(validate_plan(&serde_json::from_value(bad).unwrap()).is_err(), "{pointer}");
+            assert!(
+                validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{pointer}"
+            );
         }
         for (key, replacement) in [
-            ("bounded_measurement", json!({"producer_uid":1000,"target_slot":98495999,"intent_path":"/tmp/intent","maximum_drain_seconds":180})),
-            ("bounded_canary", json!({"expected_uid":1000,"target_stop_intent":"/tmp/intent","maximum_drainage_seconds":180})),
-            ("native_main", json!({"executable":"/other","sha256":"a".repeat(64),"main_pid":42})),
+            (
+                "bounded_measurement",
+                json!({"producer_uid":1000,"target_slot":98495999,"intent_path":"/tmp/intent","maximum_drain_seconds":180}),
+            ),
+            (
+                "bounded_canary",
+                json!({"expected_uid":1000,"target_stop_intent":"/tmp/intent","maximum_drainage_seconds":180}),
+            ),
+            (
+                "native_main",
+                json!({"executable":"/other","sha256":"a".repeat(64),"main_pid":42}),
+            ),
         ] {
             let mut bad = value.clone();
             bad[key] = replacement;
