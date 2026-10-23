@@ -176,6 +176,47 @@ pub(super) fn matches(
         && o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
         && census.get(UNIT).is_some_and(owner)
 }
+/// Select only the authenticated native status owner; ordinary inactive-cleanup
+/// terminal, replacement/handoff, conditional-delete and race gates remain.
+pub(super) fn inactive_owner(
+    publication: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    if publication.epoch != 223 || publication.status.phase != "qualification" {
+        return Ok(None);
+    }
+    ensure!(
+        publication.controller_invocation_id == IID
+            && publication.producer_invocation_id == IID
+            && publication.pipeline_binding.is_none()
+            && publication.status.jet_size_bytes == 0,
+        "native223 inactive status owner differs"
+    );
+    let i = bound(&Bound {
+        path: INTENT.into(),
+        sha256: INTENT_SHA.into(),
+    })?;
+    intent(&i)?;
+    let o = bound(&Bound {
+        path: publication.observer_receipt.clone(),
+        sha256: publication.observer_receipt_sha256.clone(),
+    })?;
+    ensure!(
+        o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && fleet::utc_seconds(&publication.status.sampled_at_utc)?
+                == fleet::utc_seconds(
+                    o["recorded_at_utc"]
+                        .as_str()
+                        .context("native223 inactive observer clock")?
+                )?
+                .max(
+                    i["recorded_unix_seconds"]
+                        .as_u64()
+                        .context("native223 inactive event clock")?
+                ),
+        "native223 inactive status sample differs"
+    );
+    Ok(Some((UNIT.into(), IID.into())))
+}
 pub(super) async fn run() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
     ensure!(

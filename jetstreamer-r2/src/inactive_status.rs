@@ -205,6 +205,12 @@ fn validate_fleet(fleet: &Value, plan: &Plan, now: u64) -> Result<()> {
 }
 
 fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, String)>> {
+    if let Some(owner) = native223_status::inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
+    if let Some(owner) = qualification_status::inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     if let Some(binding) = &publication.pipeline_binding {
         binding.validate(publication.epoch, &publication.status.phase)?;
         return Ok(vec![(binding.unit.clone(), binding.invocation_id.clone())]);

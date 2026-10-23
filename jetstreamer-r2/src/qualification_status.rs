@@ -236,6 +236,36 @@ pub(super) fn matches(
         && u["SubState"] == "running"
         && observed(o, p).is_ok()
 }
+/// Recover the old diagnostic owner from its preserved authenticated sample.
+/// This selects ownership only; inactive cleanup still proves terminality,
+/// absence of replacement work and its conditional deletion race gates.
+pub(super) fn inactive_owner(
+    publication: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    if publication.status.phase != "qualification" {
+        return Ok(None);
+    }
+    let Ok(p) = profile(publication.epoch) else {
+        return Ok(None);
+    };
+    ensure!(
+        publication.controller_invocation_id == p.iid
+            && publication.producer_invocation_id == p.iid
+            && publication.pipeline_binding.is_none(),
+        "qualification inactive owner differs"
+    );
+    let o = bound(&Bound {
+        path: publication.observer_receipt.clone(),
+        sha256: publication.observer_receipt_sha256.clone(),
+    })?;
+    ensure!(
+        o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && o["recorded_at_utc"] == publication.status.sampled_at_utc,
+        "qualification inactive sample differs"
+    );
+    observed(&o, p)?;
+    Ok(Some((p.unit.into(), p.iid.into())))
+}
 pub(super) async fn run() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
     ensure!(
@@ -337,7 +367,9 @@ pub(super) async fn run() -> Result<()> {
     if args.len() == 8 {
         println!(
             "{}",
-            serde_json::to_string(&json!({"statuses":states,"r2_mutations":false}))?
+            serde_json::to_string(
+                &json!({"statuses":states,"memory_target":fleet_memory::report(&o, &f),"r2_mutations":false})
+            )?
         );
         return Ok(());
     }
