@@ -568,6 +568,9 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    if let Some(native) = &plan.native_main {
+        return plan.filesystem == Path::new("/") && native227::validate(plan, native).is_ok();
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -582,6 +585,43 @@ fn supported_unit(plan: &Plan) -> bool {
         && plan.bounded_measurement.is_none()
         && plan.bounded_canary.is_none()
         && plan.maximum_root_physical_bytes.is_none()
+}
+
+fn validate_plan(plan: &Plan) -> Result<()> {
+    ensure!(
+        plan.bounded_measurement.is_none() || plan.bounded_canary.is_none(),
+        "choose exactly one bounded guard profile"
+    );
+    if let Some(c) = &plan.bounded_canary {
+        ensure!(
+            canary_scope(&plan.unit).is_ok()
+                && c.expected_uid == 1000
+                && c.target_stop_intent == plan.worker_root.join("receipts/target-stop.json")
+                && (60..=180).contains(&c.maximum_drainage_seconds),
+            "invalid bounded-canary guard scope"
+        );
+    }
+    ensure!(
+        plan.schema == "jetstreamer-horizon-standalone-guard-plan-v1"
+            && supported_unit(plan)
+            && plan.unit.ends_with(".service")
+            && plan
+                .unit
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b))
+            && identity(&plan.invocation_id)
+            && plan.minimum_free_bytes > 0
+            && plan.maximum_worker_vmas > 0,
+        "invalid standalone guard plan"
+    );
+    ensure!(
+        plan.maximum_root_physical_bytes.is_none_or(|n| n > 0),
+        "root physical budget must be nonzero"
+    );
+    if let Some(native) = &plan.native_main {
+        native227::validate(plan, native)?;
+    }
+    Ok(())
 }
 
 fn run() -> Result<()> {
@@ -603,39 +643,7 @@ fn run() -> Result<()> {
     let bytes = read_private(Path::new(&args[1]))?;
     ensure!(sha(&bytes) == args[3], "guard plan digest mismatch");
     let plan: Plan = serde_json::from_slice(&bytes)?;
-    ensure!(
-        plan.bounded_measurement.is_none() || plan.bounded_canary.is_none(),
-        "choose exactly one bounded guard profile"
-    );
-    if let Some(c) = &plan.bounded_canary {
-        ensure!(
-            canary_scope(&plan.unit).is_ok()
-                && c.expected_uid == 1000
-                && c.target_stop_intent == plan.worker_root.join("receipts/target-stop.json")
-                && (60..=180).contains(&c.maximum_drainage_seconds),
-            "invalid bounded-canary guard scope"
-        );
-    }
-    ensure!(
-        plan.schema == "jetstreamer-horizon-standalone-guard-plan-v1"
-            && supported_unit(&plan)
-            && plan.unit.ends_with(".service")
-            && plan
-                .unit
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b))
-            && identity(&plan.invocation_id)
-            && plan.minimum_free_bytes > 0
-            && plan.maximum_worker_vmas > 0,
-        "invalid standalone guard plan"
-    );
-    ensure!(
-        plan.maximum_root_physical_bytes.is_none_or(|n| n > 0),
-        "root physical budget must be nonzero"
-    );
-    if let Some(native) = &plan.native_main {
-        native227::validate(&plan, native)?;
-    }
+    validate_plan(&plan)?;
     ensure!(
         !capability_only
             || (plan.maximum_root_physical_bytes.is_some()
@@ -995,6 +1003,51 @@ mod tests {
             })
             .is_err()
         );
+    }
+    #[test]
+    fn complete_native_plans_pass_the_same_validator_used_before_runtime_observation() {
+        for (unit, root, exe, sha, enabled) in [
+            (
+                "archive-207-v1616-native-input-actual-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-v1",
+                "/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test",
+                "3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948",
+                cfg!(feature = "epoch207-native-main-guard"),
+            ),
+            (
+                "horizon-native-input-227-capped-710f6523-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1",
+                "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test",
+                "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3",
+                cfg!(feature = "epoch227-native-main-guard"),
+            ),
+        ] {
+            let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":unit,"invocation_id":"a".repeat(32),
+                "filesystem":"/","minimum_free_bytes":1,"worker_root":root,"maximum_worker_vmas":3500000,
+                "maximum_root_physical_bytes":300_000_000_000u64,"receipt_directory":"/sealed/receipts",
+                "native_main":{"executable":exe,"sha256":sha,"main_pid":42}});
+            let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(validate_plan(&plan).is_ok(), enabled, "{unit}");
+            for (pointer, replacement) in [
+                ("/schema", json!("unknown")),
+                ("/unit", json!("horizon-qualify-unknown.service")),
+                ("/invocation_id", json!("invalid")),
+                ("/filesystem", json!("/other")),
+                ("/minimum_free_bytes", json!(0)),
+                ("/worker_root", json!("/other")),
+                ("/maximum_worker_vmas", json!(1)),
+                ("/maximum_root_physical_bytes", json!(1)),
+                ("/native_main/executable", json!("/other")),
+                ("/native_main/sha256", json!("b".repeat(64))),
+                ("/native_main/main_pid", json!(1)),
+                ("/native_main", Value::Null),
+            ] {
+                let mut bad = value.clone();
+                *bad.pointer_mut(pointer).unwrap() = replacement;
+                let bad: Plan = serde_json::from_value(bad).unwrap();
+                assert!(validate_plan(&bad).is_err(), "{unit}:{pointer}");
+            }
+        }
     }
     #[test]
     fn native203_guard_namespace_is_exact_and_keeps_all_resource_gates() {
