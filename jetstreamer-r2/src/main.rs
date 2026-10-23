@@ -67,16 +67,20 @@ mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
 mod fleet;
+mod fleet_memory;
 mod holding;
 mod inactive_status;
 mod inventory_batch;
+mod native223_status;
 mod pipeline_status;
+mod qualification_status;
 mod readback_progress;
 mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
 mod resource_verify;
 mod status_inactive;
+mod status_inspect;
 mod transport_probe;
 mod upload_progress;
 
@@ -1495,7 +1499,13 @@ fn validate_epoch_status(status: &EpochStatus, expected_epoch: u64) -> Result<()
     ensure!(
         matches!(
             status.phase.as_str(),
-            "replay" | "verification" | "publication" | "upload" | "readback" | "finalization"
+            "replay"
+                | "qualification"
+                | "verification"
+                | "publication"
+                | "upload"
+                | "readback"
+                | "finalization"
         ) || (status.epoch == 144 && status.phase == "queued-upload"),
         "status object phase is invalid"
     );
@@ -3446,6 +3456,15 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
+        return qualification_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-native223") {
+        return native223_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("status-inspect") {
+        return status_inspect::run().await;
     }
     if env::args().nth(1).as_deref() == Some("observe-public-160") {
         return fleet::watch160::run();

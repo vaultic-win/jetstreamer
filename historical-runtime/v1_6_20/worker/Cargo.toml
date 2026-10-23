@@ -21,6 +21,11 @@ snapshot-hard-fork-metadata = ["solana-runtime/snapshot-hard-fork-metadata"]
 epoch223-prefix-qualification = []
 # Independently sealed sixteen-slot cold comparison, never a long replay.
 epoch223-prefix-warmup-diagnostic = ["epoch223-prefix-qualification"]
+# Independently admitted epoch227 singleton; same storage-only debt cap, with
+# exact cold snapshot and full epoch bounds. Never substitutes for epoch223.
+epoch227-capped-qualification = []
+# Separately sealed sixteen-slot cold comparison, never a full epoch.
+epoch227-capped-warmup-diagnostic = ["epoch227-capped-qualification"]
 
 [[example]]
 name = "snapshot_hard_forks"

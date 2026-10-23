@@ -1,5 +1,10 @@
 //! Exact historical snapshot load/freeze tests, not an entry replay or publisher.
 #[cfg(all(
+    feature = "epoch223-v1620-native-input",
+    feature = "epoch223-warmup-snapshot-tests"
+))]
+compile_error!("v1.6.20 native input cannot combine the v1.6.25 warmup profile");
+#[cfg(all(
     feature = "epoch223-tail-snapshot-tests",
     feature = "epoch223-cold-snapshot-tests"
 ))]
@@ -20,7 +25,10 @@ compile_error!("epoch223 snapshot profile cannot be combined with another profil
     feature = "epoch223-cold-snapshot-tests"
 ))]
 #[cfg_attr(
-    feature = "epoch223-warmup-snapshot-tests",
+    any(
+        feature = "epoch223-warmup-snapshot-tests",
+        feature = "epoch223-v1620-native-input"
+    ),
     path = "ram_snapshot223_warmup.rs"
 )]
 mod ram_snapshot223;
@@ -54,6 +62,7 @@ use {
 };
 
 const GIB: u64 = 1 << 30;
+const V1620: bool = cfg!(feature = "epoch223-v1620-native-input");
 // Separate diagnostic envelope, never a change to a live replay or old sandbox.
 // The 64-GiB experiment stalled at ~65 GB including unreclaimable tmpfs pages.
 const MEMORY_MAX: u64 = 128 * GIB;
@@ -110,7 +119,9 @@ const SNAPSHOT_SIZE: u64 = if COLD223 {
     8_046_142_592
 };
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const TEST_SHA: &str = if cfg!(feature = "epoch223-warmup-snapshot-tests") {
+const TEST_SHA: &str = if V1620 {
+    "01e69e4a5a1ec30d5ad9055c60aa5f1dc98e7fddc93001cd2db389937e78079a"
+} else if cfg!(feature = "epoch223-warmup-snapshot-tests") {
     "647665f8abc11570f40d0fac45c4e17dbe7c1c86a0a91da5700fe03fc3f4ab67"
 } else if PROFILE223 {
     "d685cbbe8ad720e1bff567ebbcfbd92d92e47f16d798e74783c06e0114c0b92f"
@@ -119,7 +130,9 @@ const TEST_SHA: &str = if cfg!(feature = "epoch223-warmup-snapshot-tests") {
 } else {
     "bfa7aadf5be9d895747b379c18354ecc312e50ba895341a5e46a21a6a085fd64"
 };
-const FILTER: &str = if PROFILE225 || PROFILE223 {
+const FILTER: &str = if V1620 {
+    "native_epoch223_cold_input_matches_canonical_accounts_commitment"
+} else if PROFILE225 || PROFILE223 {
     "_v1_6_25_boundary_snapshot"
 } else {
     "_v1_6_16_boundary_snapshot"
@@ -138,13 +151,15 @@ const RESOURCE_FILES: [&str; 12] = [
     "io.stat",
     "io.pressure",
 ];
-const TEST_NAMES: [&str; 2] = if PROFILE225 || PROFILE223 {
-    [
+const TEST_NAMES: &[&str] = if V1620 {
+    &["runtime::tests::native_epoch223_cold_input_matches_canonical_accounts_commitment: test"]
+} else if PROFILE225 || PROFILE223 {
+    &[
         "runtime::tests::initializes_and_checkpoints_v1_6_25_boundary_snapshot: test",
         "snapshot::tests::loads_and_verifies_v1_6_25_boundary_snapshot: test",
     ]
 } else {
-    [
+    &[
         "runtime::tests::initializes_and_checkpoints_v1_6_16_boundary_snapshot: test",
         "snapshot::tests::loads_and_verifies_v1_6_16_boundary_snapshot: test",
     ]
@@ -190,7 +205,9 @@ fn hex(b: &[u8]) -> String {
 fn receipt_schema(kind: &str) -> String {
     format!(
         "jetstreamer-private-{}-ram-snapshot-{kind}-v1",
-        if cfg!(feature = "epoch223-warmup-snapshot-tests") {
+        if V1620 {
+            "epoch223-native-v1620"
+        } else if cfg!(feature = "epoch223-warmup-snapshot-tests") {
             "epoch223-warmup-v1625"
         } else if COLD223 {
             "epoch223-cold-v1625"
@@ -888,8 +905,13 @@ fn credential_probe() -> Result<()> {
 }
 fn validate_test_list(s: &str) -> Result<()> {
     let names: Vec<_> = s.lines().filter(|l| l.ends_with(": test")).collect();
+    let count = if TEST_NAMES.len() == 1 {
+        "1 test, 0 benchmarks".into()
+    } else {
+        format!("{} tests, 0 benchmarks", TEST_NAMES.len())
+    };
     ensure!(
-        names == TEST_NAMES && s.lines().any(|l| l == "2 tests, 0 benchmarks"),
+        names == TEST_NAMES && s.lines().any(|l| l == count),
         "wrong ignored-test census"
     );
     Ok(())
@@ -971,11 +993,21 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
     ))]
     verify_released_225()?;
     let resources_before = resource_snapshot(p)?;
-    write_new(
-        &p.receipt_directory,
-        "intent.json",
-        &json!({"schema":receipt_schema("intent"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"maximum_memory_bytes":MEMORY_MAX,"tmpfs_bytes":TMPFS_SIZE,"resources_before":resources_before,"entry_replay":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
-    )?;
+    if V1620 {
+        let intent = json!({"schema":receipt_schema("intent"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,
+            "test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,
+            "maximum_memory_bytes":MEMORY_MAX,"tmpfs_bytes":TMPFS_SIZE,"resources_before":resources_before,
+            "observer":{"path":p.observer.path,"sha256":p.observer.sha256},"fleet":{"path":p.fleet.path,"sha256":p.fleet.sha256},
+            "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"resource_samples_taken":0,
+            "entry_replay":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        write_new(&p.receipt_directory, "intent.json", &intent)?;
+    } else {
+        write_new(
+            &p.receipt_directory,
+            "intent.json",
+            &json!({"schema":receipt_schema("intent"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"maximum_memory_bytes":MEMORY_MAX,"tmpfs_bytes":TMPFS_SIZE,"resources_before":resources_before,"entry_replay":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+        )?;
+    }
     unsafe {
         libc::signal(libc::SIGTERM, signal as *const () as libc::sighandler_t);
         libc::signal(libc::SIGINT, signal as *const () as libc::sighandler_t);
@@ -989,6 +1021,11 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
             .env("TMPDIR", "/tmp")
             .env("RUST_MIN_STACK", "134217728")
             .env("SOLANA_RAYON_THREADS", if PROFILE223 { "2" } else { "16" })
+            .envs(if V1620 {
+                vec![("JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH", "/tmp")]
+            } else {
+                Vec::new()
+            })
             .env(
                 if PROFILE225 || PROFILE223 {
                     "JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT"
@@ -1071,7 +1108,7 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
     write_new(
         &p.receipt_directory,
         "result.json",
-        &json!({"schema":receipt_schema("result"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"elapsed_millis":started.elapsed().as_millis(),"child_exit_code":status.code(),"child_success":status.success(),"trip":trip,"resources_before":resources_before,"resources_after":resources_after.as_ref().ok(),"resource_capture_error":resources_after.as_ref().err().map(|e|format!("{e:#}")),"exact_ignored_test_count":2,"entry_replay":false,"full_peak_qualified":false,"runtime_promotion_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":receipt_schema("result"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,"test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"elapsed_millis":started.elapsed().as_millis(),"child_exit_code":status.code(),"child_success":status.success(),"trip":trip,"resources_before":resources_before,"resources_after":resources_after.as_ref().ok(),"resource_capture_error":resources_after.as_ref().err().map(|e|format!("{e:#}")),"exact_ignored_test_count":TEST_NAMES.len(),"entry_replay":false,"full_peak_qualified":false,"runtime_promotion_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     resources_after?;
     ensure!(
@@ -1462,14 +1499,16 @@ mod tests {
         }
     }
     #[test]
-    fn exact_two_ignored_tests_are_required() {
-        let s = format!(
-            "{}\n{}\n\n2 tests, 0 benchmarks\n",
-            TEST_NAMES[0], TEST_NAMES[1]
-        );
+    fn exact_build_selected_ignored_test_census_is_required() {
+        let count = if TEST_NAMES.len() == 1 {
+            "1 test, 0 benchmarks".into()
+        } else {
+            format!("{} tests, 0 benchmarks", TEST_NAMES.len())
+        };
+        let s = format!("{}\n\n{count}\n", TEST_NAMES.join("\n"));
         validate_test_list(&s).unwrap();
-        assert!(validate_test_list(&s.replace("2 tests", "0 tests")).is_err());
-        assert!(validate_test_list(&s.replace(TEST_NAMES[1], "other: test")).is_err());
+        assert!(validate_test_list(&s.replace(&count, "0 tests, 0 benchmarks")).is_err());
+        assert!(validate_test_list(&s.replace(TEST_NAMES[0], "other: test")).is_err());
     }
     #[test]
     fn utc_rejects_normalized_or_noncanonical_dates() {

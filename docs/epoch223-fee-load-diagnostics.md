@@ -118,9 +118,25 @@ and checks its canonical accounts commitment, unchanged write cursor and zero
 bootstrap writes. It prints the native tuple with integer formatting. Run it
 only in a separately admitted, sealed128-GiB sandbox with an owner-only fresh
 `native-input223-v1620-*/scratch` directory supplied through
-`JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH`. Merely compiling this ignored test is
+`JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH`. The separately built
+`epoch223-v1620-native-input` observer supervisor may instead pass the literal
+`/tmp`: the test requires a real tmpfs there, creates a fresh owner-only test
+directory, and retains its lifetime through native load/freeze. That supervisor
+keeps the 128-GiB hard limit, 112-GiB high limit, private 512-GiB tmpfs with one
+million inodes, exact UID1000 child, complete protected-owner census and
+15-second memory/tmpfs guards. Its separate native20 harness, unit and receipt
+namespaces cannot borrow the v1.6.25 snapshot profile. Merely compiling this ignored test is
 not native input qualification. The exact test executable, source/input hashes,
 terminal journal and result still need durable evidence before an entry replay.
+
+The separate `jetstreamer-epoch223-v1620-warmup-resource` binary pins the
+v1.6.20 parent and first16-entry worker, its own plan/result/stop namespaces and
+the `qualification-223-v1620-prefix-warmup-*` scratch prefix. Both warmup
+binaries share storage guards and entry-bounded command construction; each
+retains independent runtime, revision, executable hashes and worker override
+checks in the actual planning preflight. The v1.6.20 warmup cannot qualify the
+known root or borrow v1.6.25 evidence. Its compilation and unit tests do not
+replace fresh coordinated admission and invocation-bound VMA protection.
 
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,

@@ -9,6 +9,15 @@ mod snapshot;
 ))]
 compile_error!("epoch223 prefix cannot combine singleton execution diagnostics");
 
+#[cfg(all(
+    feature = "epoch227-capped-qualification",
+    any(
+        feature = "epoch223-prefix-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch227 capped requires an exclusive qualification build");
+
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,
     EntryProcessedChunk, EntryProcessedChunkBody, EntryRequest, Handshake, Request, RequestBody,

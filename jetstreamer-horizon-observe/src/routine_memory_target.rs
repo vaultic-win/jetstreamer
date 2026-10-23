@@ -1,5 +1,7 @@
 //! Memory-only planning from one observer receipt; never admission authority.
-use super::*;
+use anyhow::{Context, Result, ensure};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 
 type Census = BTreeMap<u64, (u64, u64)>;
 
@@ -49,7 +51,8 @@ fn census(row: &Value, suffix: &str) -> Result<Census> {
     Ok(result)
 }
 
-fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
+fn checked(o: &Value, live: usize, diagnostics: usize, century: u64) -> Result<Value> {
+    ensure!(century.is_multiple_of(100), "invalid RSS century");
     let ordinary = o["replays"].as_array().context("memory lane census")?;
     ensure!(
         live > 0 && ordinary.len() == live && live + diagnostics <= 64,
@@ -171,13 +174,13 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
     let non_lane = used
         .checked_sub(sum)
         .context("lane RSS exceeds host resident census")?;
-    let maximum = o["lane_rss_history"]["100"]["maximum_observed_lane_rss_bytes"]
+    let history = &o["lane_rss_history"][century.to_string()];
+    let maximum = history["maximum_observed_lane_rss_bytes"]
         .as_u64()
-        .context("missing century100 RSS history")?;
+        .context("missing selected century RSS history")?;
     let reservation = maximum.checked_mul(3).context("RSS reservation overflow")? / 2;
     ensure!(
-        maximum >= largest
-            && o["lane_rss_history"]["100"]["reservation_ceiling_bytes"] == reservation,
+        maximum >= largest && history["reservation_ceiling_bytes"] == reservation,
         "invalid century RSS maximum or reservation"
     );
     let target = u64::try_from(u128::from(total) * 9 / 10)?;
@@ -196,7 +199,7 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
         .context("desired count overflow")?;
     let executing = live + diagnostics;
     Ok(
-        json!({"valid":true,"target_percent":90,"desired_lanes":desired,
+        json!({"valid":true,"target_percent":90,"century":century,"desired_lanes":desired,
         "executing_lanes":executing,"lane_gap":i128::from(desired)-i128::try_from(executing)?,
         "executing_production_lanes":live,"executing_private_lanes":diagnostics,"desired_production_lanes":production_desired,
         "host_total_bytes":total,"host_resident_planning_bytes":used,
@@ -211,11 +214,15 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
     )
 }
 
-pub(super) fn report(o: &Value, live: usize, diagnostics: usize) -> Value {
-    checked(o, live, diagnostics).unwrap_or_else(|error| json!({
+pub fn report_for_century(o: &Value, live: usize, diagnostics: usize, century: u64) -> Value {
+    checked(o, live, diagnostics, century).unwrap_or_else(|error| json!({
         "valid":false,"target_percent":90,"executing_lanes":live+diagnostics,
         "limiting_gate":format!("{error:#}"),"admission_authorized":false,
         "next_action":"Resolve RSS/host accounting from the coordinated observer; retain prior qualified scheduling evidence and all live protections."}))
+}
+
+pub fn report(o: &Value, live: usize, diagnostics: usize) -> Value {
+    report_for_century(o, live, diagnostics, 100)
 }
 
 #[cfg(test)]
@@ -251,6 +258,17 @@ mod tests {
         assert_eq!(r["desired_lanes"], 8);
         assert_eq!(r["reservation_ceiling_bytes"], 150 * 1024);
         assert_eq!(r["admission_authorized"], false);
+    }
+    #[test]
+    fn centuries_keep_independent_history_and_reservation_bounds() {
+        let mut o = fixture();
+        o["lane_rss_history"]["200"] = o["lane_rss_history"]["100"].clone();
+        o["lane_rss_history"].as_object_mut().unwrap().remove("100");
+        assert_eq!(report_for_century(&o, 2, 0, 200)["desired_lanes"], 8);
+        assert_eq!(report(&o, 2, 0)["valid"], false);
+        assert_eq!(report_for_century(&o, 2, 0, 201)["valid"], false);
+        o["lane_rss_history"]["200"]["reservation_ceiling_bytes"] = json!(200 * 1024);
+        assert_eq!(report_for_century(&o, 2, 0, 200)["valid"], false);
     }
     #[test]
     fn accounting_and_identity_gaps_never_create_a_target() {

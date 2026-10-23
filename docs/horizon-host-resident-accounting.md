@@ -30,7 +30,15 @@ memory, the marginal lane estimate is `ceil(R / L)` and desired concurrency is
 memory-selected target. The century maximum from independently valid lane RSS
 observations still sets the separate `floor(3*maximum/2)` reservation ceiling.
 
-The implementation applies this target to the 101–200 control cycle. Active
+The implementation applies this target to the 101–200 control cycle and the
+201–300 fleet ledger. The latter also counts settled private prefix/root
+qualifications as comparable replay lanes when the same accepted sample proves
+their stable invocation, zero restarts and useful execution. A repair, restore
+or delivery owner consumes separate measured RSS and does not enter the replay
+size average. Every live fleet owner must have matching coordinated telemetry;
+a newly admitted owner absent from the older sample makes its target unavailable
+until that owner's RSS is included. No extra resource poll is taken to fill the gap.
+Each campaign uses its own century RSS history and reservation ceiling. Active
 private diagnostics use the same PID/start-time matched host census, count shared
 controller/producer processes once, and subtract their RSS separately from the
 remaining production-memory budget. Their transient RSS does not enter the

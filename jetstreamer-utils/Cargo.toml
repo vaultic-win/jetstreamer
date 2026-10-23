@@ -28,6 +28,8 @@ epoch203-shrink-root-prefix-resource = ["epoch203-root-prefix-resource"]
 epoch223-root-prefix-resource = []
 # Private first16-slot worker envelope; never epoch or root qualification.
 epoch223-warmup-resource = []
+# Separate exact v1.6.20 first16-entry qualification; no root promotion.
+epoch223-v1620-warmup-resource = []
 # Private fixed-span epoch224 measurement against its pinned v1.6.25 package.
 epoch224-bounded-resource = []
 # Dormant exact epoch205 checkpoint-prefix measurement; no ordinary replay.
@@ -40,6 +42,10 @@ epoch186-shrink-root-prefix-resource = []
 
 [lib]
 name = "jetstreamer_utils"
+
+[[bin]]
+name = "jetstreamer-epoch227-input-capability"
+path = "src/epoch227_input_capability_bin.rs"
 
 [[bin]]
 name = "clickhouse-server"
@@ -90,6 +96,11 @@ required-features = ["epoch223-root-prefix-resource"]
 name = "jetstreamer-epoch223-warmup-resource"
 path = "src/epoch223_warmup_resource_bin.rs"
 required-features = ["epoch223-warmup-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch223-v1620-warmup-resource"
+path = "src/epoch223_v1620_warmup_resource_bin.rs"
+required-features = ["epoch223-v1620-warmup-resource"]
 
 [[bin]]
 name = "jetstreamer-gcs-metadata-observe"

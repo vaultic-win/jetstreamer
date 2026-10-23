@@ -1,6 +1,25 @@
 //! Exact native input qualification of the bounded223worker, never entry replay.
 use super::*;
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-223-warmup-e3d48954-v1";
+const PACKAGE: &str = if V1620 {
+    "/var/lib/jetstreamer/horizon-223-v1620-native-test-v1"
+} else {
+    "/var/lib/jetstreamer/horizon-223-warmup-e3d48954-v1"
+};
+const PLAN_SCHEMA: &str = if V1620 {
+    "jetstreamer-private-epoch223-v1620-native-input-plan-v1"
+} else {
+    "jetstreamer-private-epoch223-warmup-native-input-plan-v1"
+};
+const UNIT_PREFIX: &str = if V1620 {
+    "archive-223-v1620-native-input-"
+} else {
+    "archive-223-warmup-snapshot-"
+};
+const RECEIPT_PREFIX: &str = if V1620 {
+    "ram-snapshot-test-223-v1620-"
+} else {
+    "ram-snapshot-test-223-warmup-"
+};
 const INPUT: &str = "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1";
 const OWNERS: [(u64, &str, &str, &str); 3] = [
     (
@@ -27,9 +46,9 @@ const UPLOAD_IID: &str = "4a9d184a487540409e4edcd1ac353cf4";
 
 pub(super) fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
-        p.schema == "jetstreamer-private-epoch223-warmup-native-input-plan-v1"
+        p.schema == PLAN_SCHEMA
             && matches!(p.mode.as_str(), "capability" | "snapshot-tests")
-            && p.unit.starts_with("archive-223-warmup-snapshot-")
+            && p.unit.starts_with(UNIT_PREFIX)
             && p.unit.ends_with(".service")
             && p.unit
                 .bytes()
@@ -53,7 +72,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
             && p.receipt_directory
                 .file_name()
                 .and_then(|n| n.to_str())
-                .is_some_and(|s| s.starts_with("ram-snapshot-test-223-warmup-")
+                .is_some_and(|s| s.starts_with(RECEIPT_PREFIX)
                     && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))
             && (60..=1800).contains(&p.maximum_runtime_seconds),
         "warmup qualification output/time differs"
@@ -62,12 +81,16 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
 }
 
 pub(super) fn validate_observer(o: &Value, now: u64) -> Result<()> {
+    let routine = o["cadence"]["routine_minimum_interval_enforced"] == true
+        && o["cadence"]["observation_reason"] == "routine";
+    let requested = V1620
+        && o["cadence"]["routine_minimum_interval_enforced"] == false
+        && o["cadence"]["observation_reason"] == "user-requested-status";
     ensure!(
         o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
-            && o["cadence"]["routine_minimum_interval_enforced"] == true
-            && o["cadence"]["observation_reason"] == "routine"
+            && (routine || requested)
             && o["cadence"]["minimum_interval_seconds"] == 1800,
-        "not a routine warmup input sample"
+        "not an authorized warmup input sample"
     );
     let sampled = utc(o["recorded_at_utc"]
         .as_str()
@@ -133,6 +156,23 @@ pub(super) fn validate_observer(o: &Value, now: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn selected_native_harness_requires_its_exact_list_and_receipt_era() {
+        let count = if V1620 {
+            "1 test, 0 benchmarks"
+        } else {
+            "2 tests, 0 benchmarks"
+        };
+        let text = format!("{}\n\n{count}\n", TEST_NAMES.join("\n"));
+        validate_test_list(&text).unwrap();
+        assert!(validate_test_list(&text.replace(TEST_NAMES[0], "foreign: test")).is_err());
+        assert!(validate_test_list(&text.replace(count, "0 tests, 0 benchmarks")).is_err());
+        if V1620 {
+            assert!(receipt_schema("intent").contains("v1620"));
+            assert_eq!(TEST_NAMES.len(), 1);
+            assert!(!FILTER.contains("v1_6_25"));
+        }
+    }
     fn observer() -> Value {
         let diagnostics = OWNERS.iter().map(|(_,range,name,iid)| {
             let role=json!({"invocation_id":iid,"restarts":0,"active_state":"active"});
@@ -171,6 +211,16 @@ mod tests {
         assert!(validate_observer(&good, now + 1801).is_err());
     }
     #[test]
+    fn native20_user_requested_sample_requires_the_exact_cadence_pair() {
+        let mut requested = observer();
+        requested["cadence"]["routine_minimum_interval_enforced"] = json!(false);
+        requested["cadence"]["observation_reason"] = json!("user-requested-status");
+        let now = utc("2026-10-23T11:17:00Z").unwrap();
+        assert_eq!(validate_observer(&requested, now).is_ok(), V1620);
+        requested["cadence"]["observation_reason"] = json!("routine");
+        assert!(validate_observer(&requested, now).is_err());
+    }
+    #[test]
     fn active_owners_exclude_other_work_but_include_the_actual_optional_upload() {
         let active=OWNERS.iter().map(|(epoch,_,name,iid)|json!({"epoch":epoch,
             "ordinary_replay_claim":false,"current_sidecar_eta_valid":false,"producer":{
@@ -193,15 +243,36 @@ mod tests {
     }
     #[test]
     fn native_plan_is_bound_to_the_new_harness_cold_snapshot_and_private_scope() {
-        let mut p=Plan {
-            schema:"jetstreamer-private-epoch223-warmup-native-input-plan-v1".into(),mode:"capability".into(),
-            unit:"archive-223-warmup-snapshot-fixture.service".into(),
-            test_binary:Bound{path:Path::new(PACKAGE).join("snapshot-test-harness"),sha256:TEST_SHA.into()},
-            snapshot:Bound{path:Path::new(INPUT).join("snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst"),sha256:SNAPSHOT_SHA.into()},
-            genesis:Bound{path:Path::new(INPUT).join("genesis.tar.bz2"),sha256:GENESIS_SHA.into()},
-            observer:Bound{path:"/fixture/observer".into(),sha256:"a".repeat(64)},
-            fleet:Bound{path:"/fixture/fleet".into(),sha256:"b".repeat(64)},
-            receipt_directory:"/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-warmup-fixture".into(),maximum_runtime_seconds:1800,
+        let mut p = Plan {
+            schema: PLAN_SCHEMA.into(),
+            mode: "capability".into(),
+            unit: format!("{UNIT_PREFIX}fixture.service"),
+            test_binary: Bound {
+                path: Path::new(PACKAGE).join("snapshot-test-harness"),
+                sha256: TEST_SHA.into(),
+            },
+            snapshot: Bound {
+                path: Path::new(INPUT)
+                    .join("snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst"),
+                sha256: SNAPSHOT_SHA.into(),
+            },
+            genesis: Bound {
+                path: Path::new(INPUT).join("genesis.tar.bz2"),
+                sha256: GENESIS_SHA.into(),
+            },
+            observer: Bound {
+                path: "/fixture/observer".into(),
+                sha256: "a".repeat(64),
+            },
+            fleet: Bound {
+                path: "/fixture/fleet".into(),
+                sha256: "b".repeat(64),
+            },
+            receipt_directory: format!(
+                "/var/lib/jetstreamer/horizon-ram-snapshot-tests/{RECEIPT_PREFIX}fixture"
+            )
+            .into(),
+            maximum_runtime_seconds: 1800,
         };
         validate_plan(&p).unwrap();
         p.test_binary.sha256 = "a".repeat(64);

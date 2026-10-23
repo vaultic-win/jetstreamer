@@ -1,5 +1,10 @@
 //! Closed observational owner of the admitted cold snapshot tests, never delivery.
 use super::*;
+#[path = "native223_v1620_event.rs"]
+mod native20_event;
+pub(super) use native20_event::{
+    event_census as native20_event_census, event_predecessor as native20_event_predecessor,
+};
 pub(super) const UNIT: &str = "archive-223-cold-snapshot-test-actual-v1.service";
 const BINARY: &str = "/var/lib/jetstreamer/horizon-223-cold-snapshot-supervisor-294d2330-v1/jetstreamer-horizon-ram-snapshot-test";
 const PLAN: &str = "/var/lib/jetstreamer/horizon-223-cold-snapshot-actual-plan-2330-v1/plan.json";
@@ -40,10 +45,22 @@ const WARMUP: Profile = Profile {
     intent_schema: "jetstreamer-private-epoch223-warmup-v1625-ram-snapshot-intent-v1",
     plan_schema: "jetstreamer-private-epoch223-warmup-native-input-plan-v1",
 };
+const NATIVE20: Profile = Profile {
+    unit: "archive-223-v1620-native-input-actual-v1.service",
+    binary: "/var/lib/jetstreamer/horizon-223-v1620-native-supervisor-v1/jetstreamer-horizon-ram-snapshot-test",
+    plan: "/var/lib/jetstreamer/horizon-223-v1620-native-actual-plan-v1/plan.json",
+    plan_sha: "395262f95e2dc504300b3174542936aaf5996684060e2f9c804f66d4ed13f87d",
+    self_sha: "8768a500512a36a3f1d887f4383c6b7c42feb4924cd4f32e8b237ad02d65ae85",
+    state: "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-v1620-actual-v1",
+    test_sha: "01e69e4a5a1ec30d5ad9055c60aa5f1dc98e7fddc93001cd2db389937e78079a",
+    intent_schema: "jetstreamer-private-epoch223-native-v1620-ram-snapshot-intent-v1",
+    plan_schema: "jetstreamer-private-epoch223-v1620-native-input-plan-v1",
+};
 fn profile(unit: &str) -> Result<&'static Profile> {
     match unit {
         UNIT => Ok(&OLD),
         n if n == WARMUP.unit => Ok(&WARMUP),
+        n if n == NATIVE20.unit => Ok(&NATIVE20),
         _ => anyhow::bail!("unknown223nativeinput owner"),
     }
 }
@@ -165,6 +182,41 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native20_owner_cannot_borrow_the_v1625_harness_or_entry_authority() {
+        let c = PipelineClaim {
+            epoch: 223,
+            phase: "private-cold-snapshot-verification".into(),
+            unit: NATIVE20.unit.into(),
+            invocation_id: "c".repeat(32),
+            expected_exec_start: format!("{} ; ignore_errors=no }}", profile_command(&NATIVE20)),
+            evidence: vec![],
+        };
+        let intent = json!({"schema":NATIVE20.intent_schema,"invocation_id":c.invocation_id,
+            "plan_sha256":NATIVE20.plan_sha,"self_sha256":NATIVE20.self_sha,"test_sha256":NATIVE20.test_sha,
+            "snapshot_sha256":"301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665",
+            "genesis_sha256":"133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+            "maximum_memory_bytes":128u64<<30,"tmpfs_bytes":512u64<<30,"entry_replay":false,
+            "publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        checked(&c, &intent).unwrap();
+        assert_eq!(pipeline_unit_range(&c.phase, &c.unit).unwrap(), 223..=223);
+        for (key, value) in [
+            ("schema", json!(WARMUP.intent_schema)),
+            ("test_sha256", json!(WARMUP.test_sha)),
+            ("plan_sha256", json!(WARMUP.plan_sha)),
+            ("entry_replay", json!(true)),
+            ("maximum_memory_bytes", json!(256u64 << 30)),
+        ] {
+            let mut bad = intent.clone();
+            bad[key] = value;
+            assert!(checked(&c, &bad).is_err(), "{key}");
+        }
+        assert!(!scope(
+            &c.phase,
+            "archive-223-v1620-native-input-capability-v1.service"
+        ));
+        assert!(pipeline_unit_range("upload-readback", &c.unit).is_err());
+    }
     #[test]
     fn warmup_input_owner_retains_its_own_plan_worker_and_no_entry_authority() {
         let c = PipelineClaim {

@@ -7,6 +7,14 @@ Absence means no published live estimate; it never means the epoch is storage-co
 
 ## Maintain useful estimates
 
+- The current consumer (`apps/web/src/horizon.rs` in the Vaultic dashboard repository) requires
+  all six wire fields and accepts only the phases `replay`, `verification`, `upload`, `readback`.
+  An unknown phase rejects the entire report. Native-input/qualification checks and assembly are
+  coarse `verification`; actual transaction execution is `replay` even when its internal route is
+  still unqualified. Keep detailed stage names and qualification authority separate in private
+  receipts. A new wire phase requires reader support and parser coverage before publication.
+  ETA is `sampled_at_utc + estimated_remaining_millis`, so republishing a newer sample must use
+  a newly calculated estimate, not restart an old countdown.
 - Refresh at the existing coordinated 30-minute cadence and handle authenticated failure,
   completion and phase-handoff events promptly. Do not create another routine polling loop or
   restart healthy producers to improve the display.

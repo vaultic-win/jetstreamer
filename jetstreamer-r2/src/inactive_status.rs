@@ -209,6 +209,12 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
         binding.validate(publication.epoch, &publication.status.phase)?;
         return Ok(vec![(binding.unit.clone(), binding.invocation_id.clone())]);
     }
+    if let Some(owner) = native223_status::inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
+    if let Some(owner) = qualification_status::inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     let bytes = read_stable_bounded(
         &publication.observer_receipt,
         MAX_OBSERVER_RECEIPT_BYTES,
