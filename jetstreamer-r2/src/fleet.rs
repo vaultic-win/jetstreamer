@@ -22,6 +22,7 @@ mod continuation203_runtime;
 mod native141;
 mod native144;
 mod native203;
+mod original141;
 mod prefix144;
 mod prefix223;
 mod private144;
@@ -608,6 +609,7 @@ fn validate_same_sample_admission(
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
+        141 if original141::namespace(claim) => original141::GUARD_SHA,
         140 if native_restore_140(claim) => {
             // This host's unchanged, sealed generic bootstrap/drainage guard.
             // Admission still requires its real one-worker sandboxed first fire.
@@ -697,6 +699,7 @@ fn validate_same_sample_admission(
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
             && if native_restore_140(claim)
+                || original141::namespace(claim)
                 || native144::namespace(claim)
                 || continuation144::namespace(claim)
                 || assembly144::namespace(claim)
@@ -782,7 +785,9 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if continuation203::namespace(claim) {
+    if original141::namespace(claim) {
+        bound_json(&claim.launch_receipt).is_ok_and(|r| original141::guard_matches(claim, &r, plan))
+    } else if continuation203::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| continuation203::guard_matches(claim, &r, plan))
     } else if native203::namespace(claim) {
@@ -874,6 +879,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if original141::namespace(claim) || receipt["schema"] == original141::SCHEMA {
+        return original141::launch(receipt, claim);
+    }
     if continuation203::namespace(claim) || receipt["schema"] == continuation203::SCHEMA {
         return continuation203::launch(receipt, claim);
     }
@@ -1565,7 +1573,7 @@ pub(super) fn census(
             || ram_entry_owner(name)
             || assigned_diagnostic
             || assigned_pipeline
-            || ((first_epoch..=last_epoch).contains(&141) && native141::unit_name(name))
+            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name)))
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
@@ -1983,7 +1991,10 @@ pub(super) async fn run() -> Result<()> {
     }
     let mut diagnostic_units = BTreeSet::new();
     for claim in &plan.diagnostics {
-        if native141::namespace(claim) || census141_poh::namespace(claim) {
+        if native141::namespace(claim)
+            || census141_poh::namespace(claim)
+            || original141::namespace(claim)
+        {
             ensure!(
                 plan.gates[&141].state == "failed-needs-repair",
                 "private native141 acquisition cannot close or relabel the failed repair"
@@ -2219,6 +2230,9 @@ pub(super) async fn run() -> Result<()> {
             if native141::namespace(claim) {
                 native141::validate_live(claim, current)?;
             }
+            if original141::namespace(claim) {
+                original141::validate_live(claim, current)?;
+            }
             if census141_poh::namespace(claim) {
                 census141_poh::validate_live(claim, current)?;
             }
@@ -2296,7 +2310,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if prefix223::namespace(claim) {
+            let phase = if original141::namespace(claim) {
+                "private-original-entry-root-qualification"
+            } else if prefix223::namespace(claim) {
                 "private-known-root-prefix"
             } else if tail223::namespace(claim) {
                 "private-tail-comparison"
@@ -2376,10 +2392,11 @@ pub(super) async fn run() -> Result<()> {
                     .is_some_and(|last| epoch <= last)
         }) {
             if !(epoch == 141
-                && plan
-                    .diagnostics
-                    .iter()
-                    .any(|c| native141::namespace(c) || census141_poh::namespace(c)))
+                && plan.diagnostics.iter().any(|c| {
+                    native141::namespace(c)
+                        || census141_poh::namespace(c)
+                        || original141::namespace(c)
+                }))
             {
                 state = private_qualification_inventory_state(gate.state.as_str());
             }
