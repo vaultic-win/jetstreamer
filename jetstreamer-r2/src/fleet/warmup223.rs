@@ -409,7 +409,7 @@ fn sandbox(c: &PipelineClaim, current: &Value) -> Result<()> {
         .filter_map(|l| l.split_once('='))
         .collect::<BTreeMap<_, _>>();
     for (key, value) in [
-        ("Type", "oneshot"),
+        ("Type", "simple"),
         ("User", "ubuntu"),
         ("Group", "ubuntu"),
         ("Restart", "no"),
