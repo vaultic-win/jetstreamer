@@ -19,6 +19,8 @@ use {
 
 #[path = "horizon_standalone_guard_handoff.rs"]
 mod handoff;
+#[path = "horizon_standalone_guard_native227.rs"]
+mod native227;
 #[path = "horizon_standalone_guard_root.rs"]
 mod root_budget;
 
@@ -39,6 +41,8 @@ struct Plan {
     bounded_measurement: Option<handoff::BoundedMeasurement>,
     #[serde(default)]
     bounded_canary: Option<BoundedCanary>,
+    #[serde(default)]
+    native_main: Option<native227::Binding>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -629,6 +633,9 @@ fn run() -> Result<()> {
         plan.maximum_root_physical_bytes.is_none_or(|n| n > 0),
         "root physical budget must be nonzero"
     );
+    if let Some(native) = &plan.native_main {
+        native227::validate(&plan, native)?;
+    }
     ensure!(
         !capability_only
             || (plan.maximum_root_physical_bytes.is_some()
@@ -735,7 +742,11 @@ fn run() -> Result<()> {
         .checked_mul(stat.f_frsize)
         .context("free bytes overflow")?;
     let observed_workers = if active(&before) {
-        workers(&before, &plan.worker_root)
+        if let Some(native) = &plan.native_main {
+            native227::observe(&before, native)
+        } else {
+            workers(&before, &plan.worker_root)
+        }
     } else {
         Ok(Vec::new())
     };
@@ -839,7 +850,7 @@ fn run() -> Result<()> {
         "bounded_measurement":plan.bounded_measurement.is_some(),
         "bounded_canary":plan.bounded_canary,"canary_target_stop_valid":valid_target,"canary_target_error":target_error,
         "target_handoff":handoff_evidence,"target_handoff_error":handoff_error,
-        "remote_mutations":false,"r2_mutations":false,"scratch_deleted":false});
+        "native_main":plan.native_main,"remote_mutations":false,"r2_mutations":false,"scratch_deleted":false});
     if publish_root_capability(capability_only, &evidence, reason, |capability| {
         persist(
             &plan
@@ -996,6 +1007,7 @@ mod tests {
             worker_root: "/home/ubuntu/.jetstreamer-private/epoch203-native-0158-v1".into(),
             maximum_worker_vmas: 3_500_000,
             maximum_root_physical_bytes: None,
+            native_main: None,
             receipt_directory: "/sealed/receipts".into(),
             bounded_measurement: None,
             bounded_canary: None,

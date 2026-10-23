@@ -10,6 +10,8 @@ keywords.workspace = true
 
 [features]
 default = []
+# Exact private207cohort through its own final slot; never ordinary support.
+epoch207-singleton-qualification = []
 # Complete original-entry source binding for one private141root qualification.
 epoch141-original-entry-qualification = ["dep:jetstreamer-utils"]
 # Fixed60911751 native restore comparison; never sends replay entries.

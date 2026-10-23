@@ -148,6 +148,13 @@ windows and account for nonlinear growth, compaction, archive assembly, verifica
 overlapping delivery work when proposing a conservative incremental-peak envelope. A short canary,
 low current use, or a cheap 457-slot continuation is not a full cold-epoch resource bound.
 
+Use an optimized test harness for a full cold snapshot load/freeze qualification or performance
+measurement. Bind its build mode, exact ignored-test selection, source and executable digest in
+the preparation evidence. An inherited debug harness can exhaust the work bound without reaching
+the native checkpoint; reserve it for an explicit diagnostic requiring debug behavior. Preserve
+an already running attempt, capture its real terminal outcome, and qualify a separately sealed
+optimized generation before retrying. Listing an ignored test is not executing or qualifying it.
+
 Promote a smaller scheduling or growth estimate only through reviewed, sealed evidence and fresh
 admission that protects all older invocation-bound remaining-growth claims and the century floor.
 Keep hard memory/CPU limits, reserves and VMA stops unchanged. Do not edit claims beneath a live

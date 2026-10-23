@@ -48,6 +48,10 @@ mod retained220;
 mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
+mod singleton227;
+mod singleton227_admission;
+mod singleton227_capture;
+mod singleton227_event;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
@@ -149,6 +153,30 @@ pub(super) fn admit_prefix204() -> Result<()> {
 }
 pub(super) fn capture_prefix204() -> Result<()> {
     prefix204_capture::run()
+}
+pub(super) fn admit_singleton227() -> Result<()> {
+    singleton227_admission::run()
+}
+pub(super) fn capture_singleton227() -> Result<()> {
+    singleton227_capture::run()
+}
+/// The native status publisher shares the exact fleet registration gates;
+/// a metadata countdown cannot register or qualify a new native attempt.
+pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
+    let claim: PipelineClaim = serde_json::from_value(value.clone())?;
+    if claim.epoch == 223 && cold223_scan::scope(&claim.phase, &claim.unit) {
+        cold223_scan::validate(&claim)
+    } else if claim.epoch == 227 && singleton227::native_scope(&claim.phase, &claim.unit) {
+        singleton227::native_claim(&claim)
+    } else {
+        bail!("native input status claim is not a registered closed profile")
+    }
+}
+pub(super) fn capture_native223_input() -> Result<()> {
+    cold223_scan::capture_native20_input()
+}
+pub(super) fn native223_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    cold223_scan::terminal_status_identity(proof)
 }
 pub(super) fn admit_publication203() -> Result<()> {
     publication203::admit()
@@ -359,6 +387,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     if prefix204::namespace(claim) {
         prefix204::bindings(claim, &launch)?;
     }
+    if singleton227::namespace(claim) {
+        singleton227::bindings(claim, &launch)?;
+    }
     Ok(launch)
 }
 
@@ -405,6 +436,9 @@ pub(super) fn pipeline_unit_range(
 ) -> Result<std::ops::RangeInclusive<u64>> {
     if private144_scan::scope(phase, unit) {
         return Ok(144..=144);
+    }
+    if singleton227::native_scope(phase, unit) {
+        return Ok(227..=227);
     }
     if tail223_scan::scope(phase, unit)
         || cold223_scan::scope(phase, unit)
@@ -608,6 +642,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         if cold223_scan::scope(&claim.phase, &claim.unit) {
             cold223_scan::validate_live(claim, current)?;
         }
+        if singleton227::native_scope(&claim.phase, &claim.unit) {
+            singleton227::native_live(claim, current)?;
+        }
         if warmup223::scope(&claim.phase, &claim.unit) {
             warmup223::validate_live(claim, current)?;
         }
@@ -759,6 +796,7 @@ fn validate_same_sample_admission(
         205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
         205 if prefix205::namespace(claim) => prefix205::GUARD_SHA,
         204 if prefix204::namespace(claim) => prefix204::GUARD_SHA,
+        227 if singleton227::namespace(claim) => singleton227::GUARD_SHA,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
         203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
@@ -980,6 +1018,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
         bound_json(&claim.launch_receipt).is_ok_and(|r| prefix205::guard_matches(claim, &r, plan))
     } else if prefix204::namespace(claim) {
         bound_json(&claim.launch_receipt).is_ok_and(|r| prefix204::guard_matches(claim, &r, plan))
+    } else if singleton227::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| singleton227::guard_matches(claim, &r, plan))
     } else if prefix223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
@@ -1128,6 +1169,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let prefix_223 = receipt["schema"] == prefix223::SCHEMA;
     let prefix_205 = receipt["schema"] == prefix205::SCHEMA;
     let prefix_204 = receipt["schema"] == prefix204::SCHEMA;
+    let singleton_227 = receipt["schema"] == singleton227::SCHEMA;
+    ensure!(
+        !singleton227::namespace(claim) || singleton_227,
+        "capped227 namespace requires its own full singleton schema"
+    );
     ensure!(
         !prefix204::namespace(claim) || prefix_204,
         "capped204 namespace requires its own schema"
@@ -1184,6 +1230,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || prefix_223
             || prefix_205
             || prefix_204
+            || singleton_227
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -1197,7 +1244,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if prefix_204 {
+    let scope_valid = if singleton_227 {
+        singleton227::launch_matches(claim, receipt)
+    } else if prefix_204 {
         prefix204::launch_matches(claim, receipt)
     } else if prefix_205 {
         prefix205::launch_matches(claim, receipt)
@@ -2163,6 +2212,24 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"]
+                == "jetstreamer-private-epoch223-native-v1620-terminal-event-v1"
+            {
+                cold223_scan::native20_terminal_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == "jetstreamer-private-epoch227-native-input-running-v1" {
+                singleton227_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == "jetstreamer-exact203-phase-handoff-v1" {
                 publication203::event_predecessor(
                     &previous,
@@ -2303,6 +2370,9 @@ pub(super) async fn run() -> Result<()> {
         if cold223_scan::scope(&claim.phase, &claim.unit) {
             cold223_scan::validate(claim)?;
         }
+        if singleton227::native_scope(&claim.phase, &claim.unit) {
+            singleton227::native_claim(claim)?;
+        }
         if warmup223::scope(&claim.phase, &claim.unit) {
             warmup223::validate(claim)?;
         }
@@ -2331,6 +2401,28 @@ pub(super) async fn run() -> Result<()> {
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
+    cold223_scan::native20_terminal_census(&plan, &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native227 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| {
+                singleton227::native_scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding)
+            })
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native227 event requires exactly one bound new owner"
+        );
+        singleton227_event::event_census(&previous, &before, claims[0])?;
+    }
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
@@ -2402,6 +2494,7 @@ pub(super) async fn run() -> Result<()> {
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
             || tail223_scan::scope(&claim.phase, &claim.unit)
             || cold223_scan::scope(&claim.phase, &claim.unit)
+            || singleton227::native_scope(&claim.phase, &claim.unit)
             || warmup223::scope(&claim.phase, &claim.unit);
         let mut entry = json!({"epoch":claim.epoch,"phase":claim.phase,"unit":current,
             "finalization_evidence":finalization,
@@ -2419,6 +2512,7 @@ pub(super) async fn run() -> Result<()> {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
                         || ((tail223_scan::scope(&claim.phase, &claim.unit)
                             || cold223_scan::scope(&claim.phase, &claim.unit)
+                            || singleton227::native_scope(&claim.phase, &claim.unit)
                             || warmup223::scope(&claim.phase, &claim.unit))
                             && plan.gates[&claim.epoch].state == "failed-needs-repair")
                 } else {
@@ -2575,6 +2669,13 @@ pub(super) async fn run() -> Result<()> {
                 ensure!(
                     prefix204::same_command(&current["ExecStart"], &launch),
                     "capped204 live command changed"
+                );
+            }
+            if singleton227::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    singleton227::same_command(&current["ExecStart"], &launch),
+                    "capped227 live command changed"
                 );
             }
             if shrink_budget225::namespace(claim) {
@@ -2776,6 +2877,7 @@ pub(super) async fn run() -> Result<()> {
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
+                        || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                 });
             // Missing local publication history is explicitly unbound, never current.
             let matches = publication.as_ref().is_ok_and(|(receipt, _, _)| {
