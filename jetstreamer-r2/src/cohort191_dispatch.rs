@@ -1,8 +1,9 @@
 //! One exact native191 verifier admission/launch. Never replays or mutates R2.
 use super::*;
 use crate::cohort191_delivery::{self as custody, Bound};
+use serde_json::json;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     os::fd::AsRawFd,
     process::{Command, Stdio},
     time::Instant,
@@ -164,7 +165,7 @@ fn utc(s: &str) -> Result<u64> {
     ensure!(t >= 0 && canonical == s, "191 noncanonical resource clock");
     Ok(t as u64)
 }
-fn resources(p: &Plan, o: &Value, c: &Value, now: u64) -> Result<()> {
+fn resources(observer: &Bound, o: &Value, c: &Value, now: u64) -> Result<()> {
     let sample = o["recorded_at_utc"]
         .as_str()
         .context("191 observer clock")?;
@@ -176,7 +177,7 @@ fn resources(p: &Plan, o: &Value, c: &Value, now: u64) -> Result<()> {
             && o["cadence"]["routine_minimum_interval_enforced"] == true
             && c["schema"] == "jetstreamer-horizon-routine-cycle-completion-v1"
             && c["sampled_at_utc"] == sample
-            && c["observer"] == serde_json::to_value(&p.observer)?
+            && c["observer"] == serde_json::to_value(observer)?
             && c["capacity_decision"]["sampled_at_utc"] == sample,
         "191 mismatched/stale coordinated resources"
     );
@@ -204,7 +205,7 @@ fn resources(p: &Plan, o: &Value, c: &Value, now: u64) -> Result<()> {
     );
     Ok(())
 }
-fn os_capacity(p: &Plan) -> Result<u64> {
+fn os_capacity(other_pending_os_growth_bytes: u64) -> Result<u64> {
     let root = Path::new(ROOT);
     private_directory(root)?;
     ensure!(
@@ -222,7 +223,7 @@ fn os_capacity(p: &Plan) -> Result<u64> {
         .checked_mul(s.f_frsize)
         .context("191 free-space overflow")?;
     let required = OLD_OS_PROTECTED
-        .checked_add(p.other_pending_os_growth_bytes)
+        .checked_add(other_pending_os_growth_bytes)
         .and_then(|n| n.checked_add(OS_ALLOWANCE))
         .context("191 OS budget overflow")?;
     ensure!(
@@ -230,6 +231,89 @@ fn os_capacity(p: &Plan) -> Result<u64> {
         "191 OS floor/other claims/log reserve do not fit"
     );
     Ok(available)
+}
+fn fresh_owners(o: &Value) -> Result<Value> {
+    let mut expected = BTreeMap::<String, String>::new();
+    let mut collect = |row: &Value, roles: &[&str]| -> Result<()> {
+        ensure!(
+            row["invocation_binding_stable"] == true,
+            "191 resource owner sample changed identity"
+        );
+        for role in roles {
+            let owner = &row[*role];
+            let name = owner["unit"].as_str().context("191 admitted unit")?;
+            let iid = owner["invocation_id"]
+                .as_str()
+                .context("191 admitted invocation")?;
+            ensure!(
+                name.ends_with(".service")
+                    && !name.starts_with('-')
+                    && name
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b))
+                    && is_lower_hex(iid, 32),
+                "191 malformed admitted owner"
+            );
+            if let Some(prior) = expected.insert(name.into(), iid.into()) {
+                ensure!(prior == iid, "191 duplicate unit with conflicting owners");
+            }
+        }
+        Ok(())
+    };
+    let rows = o["replays"].as_array().context("191 replay owner census")?;
+    ensure!(!rows.is_empty(), "191 empty protected replay census");
+    for row in rows {
+        collect(row, &["controller_after", "producer_after"])?;
+    }
+    for row in o["diagnostic_replays"]
+        .as_array()
+        .context("191 private owner census")?
+    {
+        if row["status"] == "observed" {
+            collect(&row["observation"], &["producer_after"])?;
+        }
+    }
+    let mut current = Vec::new();
+    for (name, iid) in expected {
+        let v = manager(&name)?;
+        ensure!(
+            v["LoadState"] == "loaded"
+                && v["InvocationID"] == iid
+                && v["ActiveState"] == "active"
+                && v["SubState"] == "running"
+                && v["NRestarts"] == "0",
+            "191 admitted live owner changed before task launch"
+        );
+        current.push(v);
+    }
+    Ok(json!(current))
+}
+/// Reused by independently gated same-PID sync before it acquires credentials.
+/// Does not take a new replay/resource sample or authorize a replay/claim release.
+pub(super) fn check_resources(
+    observer: &Bound,
+    completion: &Bound,
+    other_pending_os_growth_bytes: u64,
+) -> Result<Value> {
+    let budget = custody::bound(
+        &Bound {
+            path: OS_BUDGET.0.into(),
+            sha256: OS_BUDGET.1.into(),
+        },
+        true,
+    )?;
+    ensure!(
+        budget["required_initial_free_bytes"] == OLD_OS_PROTECTED,
+        "191 retained OS budget differs"
+    );
+    let o = custody::bound(observer, false)?;
+    let c = custody::bound(completion, false)?;
+    resources(observer, &o, &c, clock()?)?;
+    let owners = fresh_owners(&o)?;
+    let available = os_capacity(other_pending_os_growth_bytes)?;
+    Ok(
+        json!({"schema":"jetstreamer-cohort191-downstream-resource-recheck-v1","observer":observer,"routine_completion":completion,"owners":owners,"old_os_claims_protected_bytes":OLD_OS_PROTECTED,"other_pending_os_growth_bytes":other_pending_os_growth_bytes,"cohort_os_allowance_bytes":OS_ALLOWANCE,"os_available_bytes":available,"new_resource_samples":0,"replay_launch_authorized":false,"reservation_release_authorized":false,"r2_mutations":false}),
+    )
 }
 fn bounded_command(program: &str, args: &[String], maximum: usize) -> Result<Vec<u8>> {
     // Regular private output gives a hard bounded read and a service timeout;
@@ -507,8 +591,9 @@ pub(super) fn run() -> Result<()> {
     );
     let o = custody::bound(&p.observer, false)?;
     let c = custody::bound(&p.routine_completion, false)?;
-    resources(&p, &o, &c, clock()?)?;
-    let available = os_capacity(&p)?;
+    resources(&p.observer, &o, &c, clock()?)?;
+    fresh_owners(&o)?;
+    let available = os_capacity(p.other_pending_os_growth_bytes)?;
     let before = census(&p)?;
     // Immutable executables are streamed, not passed through the JSON reader.
     let im = fs::symlink_metadata(&p.program.path)?;
@@ -560,12 +645,13 @@ pub(super) fn run() -> Result<()> {
     let again = custody::dispatch_import_check(&p.source_batch, &p.public_batch, &materialized)?;
     ensure!(again == import, "191 native import changed before launch");
     resources(
-        &p,
+        &p.observer,
         &custody::bound(&p.observer, false)?,
         &custody::bound(&p.routine_completion, false)?,
         clock()?,
     )?;
-    os_capacity(&p)?;
+    fresh_owners(&o)?;
+    os_capacity(p.other_pending_os_growth_bytes)?;
     bounded_command("/usr/bin/systemd-run", &argv(&p), 1 << 20)?;
     let name = unit(p.epoch, p.stage);
     let deadline = Instant::now() + Duration::from_secs(15);
@@ -662,13 +748,13 @@ mod tests {
         let now = utc(sample).unwrap();
         let o = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":sample,"cadence":{"routine_minimum_interval_enforced":true},"host_memory":{"conservative_available_kib":192u64*1024*1024}});
         let mut c = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","sampled_at_utc":sample,"observer":p.observer,"capacity_decision":{"sampled_at_utc":sample,"memory_concurrency_target":{"valid":true,"host_resident_planning_bytes":500*GIB,"reservation_ceiling_bytes":180*GIB,"host_total_bytes":764*GIB}}});
-        resources(&p, &o, &c, now).unwrap();
+        resources(&p.observer, &o, &c, now).unwrap();
         c["capacity_decision"]["memory_concurrency_target"]["host_total_bytes"] = json!(763 * GIB);
-        assert!(resources(&p, &o, &c, now).is_err());
+        assert!(resources(&p.observer, &o, &c, now).is_err());
         c["capacity_decision"]["memory_concurrency_target"]["host_total_bytes"] = json!(764 * GIB);
-        assert!(resources(&p, &o, &c, now + 901).is_err());
+        assert!(resources(&p.observer, &o, &c, now + 901).is_err());
         c["observer"]["sha256"] = json!("b".repeat(64));
-        assert!(resources(&p, &o, &c, now).is_err());
+        assert!(resources(&p.observer, &o, &c, now).is_err());
     }
     #[test]
     fn launcher_is_network_isolated_nonrestarting_and_exact() {
