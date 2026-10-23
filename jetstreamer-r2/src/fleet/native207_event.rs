@@ -155,6 +155,29 @@ pub(super) fn event_predecessor(
     Ok(())
 }
 
+pub(super) fn event_census(
+    previous: &Value,
+    current: &BTreeMap<String, Value>,
+    claim: &PipelineClaim,
+) -> Result<()> {
+    c::claim(claim)?;
+    ensure!(
+        !previous["active"]
+            .as_array()
+            .context("207 old active census")?
+            .iter()
+            .any(|r| r["epoch"] == 207),
+        "207 event overlaps an existing owner"
+    );
+    let mut view = current.clone();
+    let native = view
+        .remove(c::UNIT)
+        .context("207 new native owner missing")?;
+    singleton227_admission::owners(previous, &view)?;
+    c::live(claim, &native)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,26 +216,4 @@ mod tests {
         }
         assert!(origin_binding(&previous, &p, &proof, sampled, 1792779000).is_err());
     }
-}
-pub(super) fn event_census(
-    previous: &Value,
-    current: &BTreeMap<String, Value>,
-    claim: &PipelineClaim,
-) -> Result<()> {
-    c::claim(claim)?;
-    ensure!(
-        !previous["active"]
-            .as_array()
-            .context("207 old active census")?
-            .iter()
-            .any(|r| r["epoch"] == 207),
-        "207 event overlaps an existing owner"
-    );
-    let mut view = current.clone();
-    let native = view
-        .remove(c::UNIT)
-        .context("207 new native owner missing")?;
-    singleton227_admission::owners(previous, &view)?;
-    c::live(claim, &native)?;
-    Ok(())
 }

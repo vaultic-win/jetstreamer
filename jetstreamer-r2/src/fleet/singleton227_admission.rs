@@ -900,7 +900,6 @@ mod tests {
         f["inventory"]["entries"][6] = json!({"epoch":207,"state":"missing"});
         f["inventory"]["ready_pairs"] = json!(13);
         assert!(century_floor_for(&f, 207).is_ok());
-        let mut f = f;
         f["inventory"]["entries"][26] = json!({"epoch":227,"state":"ready-pair","archive_length":1,"sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)});
         f["inventory"]["ready_pairs"] = json!(14);
         assert!(century_floor_for(&f, 207).is_ok());
