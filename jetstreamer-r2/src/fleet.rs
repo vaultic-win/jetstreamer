@@ -17,6 +17,7 @@ mod continuation144_prepare;
 mod continuation144_protection;
 mod native141;
 mod native144;
+mod native203;
 mod prefix144;
 mod prefix223;
 mod private144;
@@ -609,6 +610,7 @@ fn validate_same_sample_admission(
             "f4f5c0758c1c02b7d9a3b2b1595af7bbc033997f671cd43f2d4a92d38c346c69"
         }
         205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
+        203 if native203::namespace(claim) => native203::GUARD_SHA,
         225 if claim
             .unit
             .starts_with("horizon-qualify-225-bounded-resource-") =>
@@ -758,7 +760,9 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if continuation144::namespace(claim) || assembly144::namespace(claim) {
+    if native203::namespace(claim) {
+        bound_json(&claim.launch_receipt).is_ok_and(|r| native203::guard_matches(claim, &r, plan))
+    } else if continuation144::namespace(claim) || assembly144::namespace(claim) {
         let Ok(launch) = checked_diagnostic_launch(claim) else {
             return false;
         };
@@ -845,6 +849,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if native203::namespace(claim) || receipt["schema"] == native203::SCHEMA {
+        return native203::launch(receipt, claim);
+    }
     if census141_poh::namespace(claim) || receipt["schema"] == census141_poh::SCHEMA {
         return census141_poh::launch(receipt, claim);
     }
@@ -2171,6 +2178,9 @@ pub(super) async fn run() -> Result<()> {
             if native144::namespace(claim) {
                 native144::validate_live(claim, current)?;
             }
+            if native203::namespace(claim) {
+                native203::validate_live(claim, current)?;
+            }
             if native141::namespace(claim) {
                 native141::validate_live(claim, current)?;
             }
@@ -2263,7 +2273,10 @@ pub(super) async fn run() -> Result<()> {
                 "private-assembly-only"
             } else if continuation144::namespace(claim) {
                 "private-checkpoint-continuation"
-            } else if native_restore_140(claim) || native144::namespace(claim) {
+            } else if native_restore_140(claim)
+                || native144::namespace(claim)
+                || native203::namespace(claim)
+            {
                 "native-restore-only"
             } else if claim
                 .unit
