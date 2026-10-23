@@ -20,6 +20,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test",
                 "3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948",
             ),
+            209 => (
+                "archive-209-v1616-native-input-actual-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1/scratch",
+                "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test",
+                "5276276827aab0ccc809d123ebc8bf78cc7bfc36e6def550566059e70a8d4842",
+            ),
             227 => (
                 "horizon-native-input-227-capped-710f6523-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch",
@@ -229,6 +235,42 @@ mod tests {
         assert_eq!(r["status"], "unavailable");
         assert_eq!(r["observation"], Value::Null);
         assert_eq!(r["entry_replay"], false);
+    }
+    #[test]
+    fn native209_requires_its_own_complete_sealed_tuple() {
+        let mut value = serde_json::to_value(config()).unwrap();
+        value["epoch"] = serde_json::json!(209);
+        value["unit"] = serde_json::json!("archive-209-v1616-native-input-actual-v1.service");
+        value["scratch_path"] = serde_json::json!(
+            "/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1/scratch"
+        );
+        value["executable"] = serde_json::json!(
+            "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test"
+        );
+        value["executable_sha256"] =
+            serde_json::json!("5276276827aab0ccc809d123ebc8bf78cc7bfc36e6def550566059e70a8d4842");
+        serde_json::from_value::<NativeConfig>(value.clone())
+            .unwrap()
+            .validate()
+            .unwrap();
+        let original = serde_json::to_value(config()).unwrap();
+        for field in [
+            "epoch",
+            "unit",
+            "scratch_path",
+            "executable",
+            "executable_sha256",
+        ] {
+            let mut wrong = value.clone();
+            wrong[field] = original[field].clone();
+            assert!(
+                serde_json::from_value::<NativeConfig>(wrong)
+                    .unwrap()
+                    .validate()
+                    .is_err(),
+                "{field}"
+            );
+        }
     }
     #[test]
     fn mapped_process_requires_exact_inode_hash_and_owner_without_worker_impersonation() {
