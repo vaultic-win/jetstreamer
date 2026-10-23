@@ -54,7 +54,10 @@ no-clobber receipt is produced. No proposed value substitutes for an execution.
    recomputed `guard_minimum_free_bytes, required_initial_free_bytes`.
    The latter equals protected floor plus471798691840. The protected floor is
    at least the current twice-average-century `.jet` floor plus every other
-   owner's remaining guarded growth. Preserve full227 whole-root credit and
+   owner's remaining guarded growth, and at least the largest actual
+   `minimum_free_bytes` baseline among all bound protected guards. A new
+   candidate must never be planned to trip a healthy existing guard at peak.
+   Preserve full227 whole-root credit and
    remaining hard-memory growth,204/205/225 and all auxiliaries. All six fields
    `runtime_promotion_authorized, full_epoch_qualified,
    canonical_sidecar_authorized, publication_authorized, remote_mutations,
@@ -76,6 +79,11 @@ both measurements and guard histories and states whether the resulting bound
 fits the saved free-space observation. Actual admission must still bracket
 current owner identities, caps, free disk and memory and reject stale evidence
 or increased remaining growth; preparation does not reserve or admit a lane.
+For saved334, full227's2TB guard baseline alone requires at least
+2471798691840bytes of initial free space. Saved availability2420007051264bytes
+is51791640576bytes short. Keep this blocked budget explicit until safe reclaim
+or later authoritative evidence establishes headroom; never lower an existing
+guard or substitute imaginary output/reclaim credit.
 
 The historical terminal-from333 fleet contains four owners. It is not current
 launch authority after another owner starts. In particular, a live223v2 repair

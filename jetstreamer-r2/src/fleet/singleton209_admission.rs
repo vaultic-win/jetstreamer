@@ -24,6 +24,29 @@ fn supported_peer(active: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn guard_floor_values(guards: &[Value]) -> Result<u64> {
+    let mut maximum = 0;
+    for g in guards {
+        ensure!(
+            g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1",
+            "209 protected guard floor schema differs"
+        );
+        let floor = g["minimum_free_bytes"]
+            .as_u64()
+            .filter(|n| *n > 0)
+            .context("209 protected guard baseline missing")?;
+        maximum = maximum.max(floor);
+    }
+    Ok(maximum)
+}
+pub(super) fn protected_guard_floor(guards: &BTreeMap<String, BoundFile>) -> Result<u64> {
+    guard_floor_values(
+        &guards
+            .values()
+            .map(bound_json)
+            .collect::<Result<Vec<_>>>()?,
+    )
+}
 fn sample(
     s: &Spec,
     o: &Value,
@@ -280,12 +303,13 @@ pub(super) fn run() -> Result<()> {
     let computed = floor
         .checked_add(growth)
         .context("209 full protected growth overflow")?;
+    let guard_baseline = protected_guard_floor(&arithmetic_guards)?;
     let protected = p["guard_minimum_free_bytes"]
         .as_u64()
         .context("209 full floor")?;
     ensure!(
-        protected >= computed,
-        "209 full plan under-reserves protected growth"
+        protected >= computed.max(guard_baseline),
+        "209 full plan under-reserves protected growth or an existing guard's minimum-free baseline"
     );
     let required = protected
         .checked_add(c::PEAK)
@@ -385,6 +409,7 @@ pub(super) fn run() -> Result<()> {
         "unit":c::UNIT,"private_run_root":c::ROOT,"candidate_incremental_peak_bytes":c::PEAK,"maximum_scratch_bytes":c::SCRATCH,
         "maximum_memory_bytes":c::MEMORY,"protected_existing_floor_bytes":protected,"required_initial_free_bytes":required,
         "century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,"computed_existing_floor_bytes":computed,
+        "preserved_guard_baseline_floor_bytes":guard_baseline,
         "protected_growth_measurements_before":measurements,"protected_growth_measurements_after":after_measurements,
         "auxiliary_remaining_memory_growth_bytes":aux,"auxiliary_memory_before":aux_evidence,"auxiliary_memory_after":after_aux_evidence,
         "protected_memory_limits":caps,"unit_census_before":before,"unit_census_after":after,"memory_target_percent":90,
@@ -418,6 +443,21 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn candidate_must_preserve_the_largest_existing_guard_baseline_without_summing_it_per_lane() {
+        let guard = |n: u64| json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","minimum_free_bytes":n});
+        let floor = guard_floor_values(&[
+            guard(2_000_000_000_000),
+            guard(1_372_922_903_443),
+            guard(1_210_361_856_915),
+        ])
+        .unwrap();
+        assert_eq!(floor, 2_000_000_000_000);
+        assert_eq!(floor + c::PEAK, 2_471_798_691_840);
+        assert_eq!(floor + c::PEAK - 2_420_007_051_264, 51_791_640_576);
+        assert!(guard_floor_values(&[guard(0)]).is_err());
+        assert!(guard_floor_values(&[json!({"minimum_free_bytes":floor})]).is_err());
+    }
     #[test]
     fn live223_repair_cannot_borrow_the_older_native_only_envelope() {
         supported_peer(&json!({"epoch":204,"producer":{"Id":"full204"}})).unwrap();

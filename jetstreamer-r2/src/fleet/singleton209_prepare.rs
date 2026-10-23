@@ -91,9 +91,11 @@ pub(super) fn run() -> Result<()> {
     let (growth_after, measurements_after) =
         native209_admission::protected_growth(&af, &ao, &guards, sample, now)?;
     let growth = growth.max(growth_after);
+    let guard_baseline = singleton209_admission::protected_guard_floor(&guards)?;
     let protected = floor
         .checked_add(growth)
-        .context("209 prepared floor overflow")?;
+        .context("209 prepared floor overflow")?
+        .max(guard_baseline);
     let required = protected
         .checked_add(c::PEAK)
         .context("209 prepared free overflow")?;
@@ -123,6 +125,7 @@ pub(super) fn run() -> Result<()> {
     let report = json!({"schema":"jetstreamer-private-epoch209-singleton-admission-preparation-v1","epoch":209,"preparation_spec":private157::binding(&binding),"self_sha256":self_sha,
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"guard_selection_history":histories,
         "century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,"protected_growth_before":measurements,"protected_growth_after":measurements_after,
+        "preserved_guard_baseline_floor_bytes":guard_baseline,
         "protected_floor_bytes":protected,"required_initial_free_bytes":required,"saved_available_bytes":saved,"fits_saved_available_disk":saved>=required,
         "resource_plan":resource_binding,"admission_spec":private157::file_binding(&admission_path)?,"terminal223_accounting":singleton209_peer223::evidence(peer.as_ref()),
         "resource_samples_taken":0,"scratch_scans_performed":0,"bounded_output_metadata_accounting":true,"admission_executed":false,"producer_started":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
