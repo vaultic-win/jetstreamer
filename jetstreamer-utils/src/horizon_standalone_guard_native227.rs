@@ -27,8 +27,17 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
                 "/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test",
             )
         && n.sha256 == "3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948";
+    let profile209 = cfg!(feature = "epoch209-native-main-guard")
+        && p.unit == "archive-209-v1616-native-input-actual-v1.service"
+        && p.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1")
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test",
+            )
+        && n.sha256 == "5276276827aab0ccc809d123ebc8bf78cc7bfc36e6def550566059e70a8d4842";
     ensure!(
-        (profile227 || profile207)
+        (profile227 || profile207 || profile209)
             && n.main_pid > 1
             && p.maximum_root_physical_bytes == Some(300_000_000_000)
             && p.maximum_worker_vmas == 3500000

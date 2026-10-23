@@ -3501,6 +3501,15 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-native207-input") {
         return fleet::admit_native207_input();
     }
+    if env::args().nth(1).as_deref() == Some("admit-native209-input") {
+        return fleet::admit_native209_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native209-input") {
+        return fleet::capture_native209_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native209-terminal") {
+        return fleet::capture_native209_terminal();
+    }
     if env::args().nth(1).as_deref() == Some("capture-native207-input") {
         return fleet::capture_native207_input();
     }

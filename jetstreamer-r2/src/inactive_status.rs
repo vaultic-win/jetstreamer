@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 mod metadata_cycle;
 mod missing157;
 mod native207;
+mod native209;
 mod native223;
 mod native227;
 mod natural144;
@@ -367,6 +368,10 @@ fn fresh_census(
     if native207 {
         native207::validate(&current, terminal_fleet, owners)?;
     }
+    let native209 = plan.epoch == 209 && native209::recognized(terminal_fleet, owners);
+    if native209 {
+        native209::validate(&current, terminal_fleet, owners)?;
+    }
     let warmup223 = plan.epoch == 223 && warmup223::recognized(terminal_fleet, owners);
     if warmup223 {
         warmup223::validate(&current, terminal_fleet, owners)?;
@@ -394,6 +399,7 @@ fn fresh_census(
             && !natural144
             && !native223
             && !native207
+            && !native209
             && !warmup223
             && !native227
             && reserve.is_none()

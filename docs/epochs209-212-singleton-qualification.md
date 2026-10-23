@@ -104,3 +104,67 @@ tuples. Bind actual invocation/MainPID, fresh complete-fleet admission, canonica
 clock and first sandboxed guard fire before publishing active `verification`
 status. A successful native bootstrap will still leave the full singleton,
 canonical final root, complete output and publication gates unqualified.
+
+### Closed deployment and operator protocol
+
+| Member | Sealed path | SHA-256 |
+| --- | --- | --- |
+| Optimized native harness | `/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test` | `5276276827aab0ccc809d123ebc8bf78cc7bfc36e6def550566059e70a8d4842` |
+| Cold plan | `/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-cold-plan.json` | `50471e126bc16642f283e986f101dea864fa5296403f4d37c956cfe92351ebf7` |
+| Native MainPID guard | `/var/lib/jetstreamer/horizon-209-native-main-guard-v1/jetstreamer-horizon-standalone-guard` | `6b9de9d25d09832931d270f886c00449afa044c35473ab651dc7b08655443abc` |
+
+The unit is `archive-209-v1616-native-input-actual-v1.service`; its exact run
+root is `/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1`.
+The guard feature is `epoch209-native-main-guard`, which preserves the existing
+227 native observer and adds only this complete 209 tuple. A differently built
+harness, mismatched root/unit, PID 1 or budget exception is rejected.
+
+The reviewed Rust helper commands are `admit-native209-input`,
+`capture-native209-input` and `capture-native209-terminal`. Each takes
+`SPEC --spec-sha256 SHA --self-sha256 SHA` as root. Seal and bind that helper
+before use. None starts a producer, restores a snapshot, performs R2 operations
+or takes another routine resource sample. Admission performs its necessary
+current owner/free-space/cgroup race checks against the existing accepted sample.
+
+Admission schema `jetstreamer-private-epoch209-native-admission-spec-v1` binds
+`mode: "native-cold"`, `observer`, `fleet`, `cold_plan`, `resource_plan`,
+`protected_guards` and `output`. Output must be a fresh
+`/var/lib/jetstreamer/horizon-209-native-admission-*/admission.json`.
+The resource-plan schema is `jetstreamer-private-epoch209-native-resource-plan-v1`;
+it binds the closed unit/root, harness/snapshot/genesis/guard digests, cold plan,
+300 GB candidate scratch, 128 GiB hard memory, protected floor and required
+initial free bytes. Its eight authority flags remain false.
+
+Current full227 work is a distinct authenticated diagnostic owner, never a
+native227 substitute. Admission validates its launch, canonical command and
+current whole-root protective guard. Its disk reservation is the whole-root
+envelope minus the smaller of coordinated same-invocation whole-root allocation
+and current guarded whole-root allocation. Both observer scope paths must equal
+the exact singleton root. Actual free space brackets these calculations, owners
+and caps are checked twice, and increased remaining growth aborts admission.
+The full227 hard cgroup memory growth is separately reserved; current RSS cannot
+replace that claim. Existing 204/205/225 and any supported native auxiliaries
+retain their original guard and accounting gates.
+
+Capture schema `jetstreamer-private-epoch209-native-capture-spec-v1` binds `mode`
+(`running` or `qualified`), `admission`, `guard`, `guard_plan` and `output`.
+For the initial owner use exactly
+`/var/lib/jetstreamer/horizon-209-native-capture-actual-v1/intent.json`.
+Require the actual MainPID, unique invocation, first completed no-trip guard
+fire, effective service sandboxes, canonical clocks and unchanged full census.
+Register the resulting `jetstreamer-private-epoch209-native-input-running-v1`
+origin through the authenticated fleet metadata event. Status publication uses
+the existing approved-native pipeline path, with phase `verification` and the
+original producer start time; it does not qualify the input.
+
+After successful termination, seal the actual invocation's raw journal under
+`/var/lib/jetstreamer/horizon-native209-terminal-raw-*/journal.json`. The terminal
+schema `jetstreamer-native209-terminal-capture-spec-v1` binds `running_origin`,
+`journal`, `observer`, `fleet` and `output`; the spec itself must be immutable
+root-owned evidence. Output is
+`/var/lib/jetstreamer/horizon-native209-terminal-proof-*/proof.json`.
+Terminal validation rechecks that exact immutable spec and original registered
+owner, child PID, ordered canonical marker/test/PID1 success and bounded run
+clock. Preserve the proof in a fleet terminal event, then conditionally retire
+only its exact owned status using the existing inactive-status protocol.
+Never reuse epoch207's origin/journal hashes or rerun an already successful Bank.
