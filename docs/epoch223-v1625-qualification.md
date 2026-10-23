@@ -61,7 +61,7 @@ artifact and do not treat the current diagnostic tail as a reusable qualified
 suffix before those obligations are proven.
 
 The separately opt-in `epoch223-root-prefix-resource` utility profile pins
-the sealed prefix parent `d2cb8dd8…`, unchanged worker `fde3ba53…`, cold
+the separately preflight-capable parent `90474659…`, unchanged worker `fde3ba53…`, cold
 snapshot `301110ca…`, two Rayon threads and natural parent completion at
 96,767,522. It cannot run the 477-slot tail or request the unknown full-epoch
 terminal. Both bootstrap and terminal Bank/accounts commitments, exact output
@@ -129,6 +129,22 @@ spawn, entries or archive creation. It is package capability evidence, never
 snapshot-content verification or resource admission. A rebuilt parent needs
 new immutable digest bindings before any supervisor may use it; do not edit
 the older sealed package or treat its tail-only flag as prefix capability.
+
+`jetstreamer-epoch223-prefix-capability` is a separate closed Rust checker for
+`horizon-223-prefix-preflight-a928381d-v1` and parent `90474659…`. It rehashes
+the complete native-sealed package before and after the real no-worker probe,
+including the unchanged cold snapshot and worker, and validates one exact
+prefix preflight report with every non-authorizing field. It creates a fresh
+private prefix-capability root, preseeds and rehashes genesis in ledger/output,
+drops supplementary groups then GID/UID1000 before executing the parent, and
+rejects any archive or sidecar in its bounded artifact census. Run only as a
+persistent root oneshot with the minimal DAC_OVERRIDE/CHOWN/SETUID/SETGID
+capabilities, a private network, read-only home/package and exact writable
+probe/receipt paths. Its native-sealed immutable plan and self-digests remain
+independent inputs. Successful capability evidence proves no snapshot contents,
+resource admission, prefix replay, restart, assembly or publication. The prior
+tail checker keeps its own fixed package and report scope; only its unchanged
+immutable-file/persistence/artifact-census primitives are shared internally.
 
 The new worker feature restores the two future restart markers 96,542,804 and
 96,542,805 using the same native algorithm tested in the v1.6.20 correction.

@@ -63,24 +63,24 @@ struct Plan {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
-struct Identity {
-    sha256: String,
-    bytes: u64,
+pub(crate) struct Identity {
+    pub(crate) sha256: String,
+    pub(crate) bytes: u64,
     dev: u64,
     ino: u64,
-    mode: u32,
+    pub(crate) mode: u32,
     uid: u32,
     gid: u32,
     modified: (i64, i64),
     changed: (i64, i64),
 }
 
-fn digest(s: &str) -> bool {
+pub(crate) fn digest(s: &str) -> bool {
     s.len() == 64
         && s.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn hash(mut f: impl Read) -> Result<String> {
+pub(crate) fn hash(mut f: impl Read) -> Result<String> {
     let mut h = Sha256::new();
     let mut b = vec![0; 1 << 20];
     loop {
@@ -92,7 +92,7 @@ fn hash(mut f: impl Read) -> Result<String> {
     }
     Ok(format!("{:x}", h.finalize()))
 }
-fn file(path: &Path, limit: u64) -> Result<Identity> {
+pub(crate) fn file(path: &Path, limit: u64) -> Result<Identity> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
         "aliased input"
@@ -143,7 +143,7 @@ fn file(path: &Path, limit: u64) -> Result<Identity> {
         changed: (before.ctime(), before.ctime_nsec()),
     })
 }
-fn directory(path: &Path, uid: u32, private: bool) -> Result<()> {
+pub(crate) fn directory(path: &Path, uid: u32, private: bool) -> Result<()> {
     let m = fs::symlink_metadata(path)?;
     ensure!(
         path.is_absolute()
@@ -155,7 +155,7 @@ fn directory(path: &Path, uid: u32, private: bool) -> Result<()> {
     );
     Ok(())
 }
-fn persist(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn persist(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut f = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -327,7 +327,7 @@ fn package(p: &Plan) -> Result<BTreeMap<String, Identity>> {
     )?)?)?;
     Ok(entries)
 }
-fn artifact_free(path: &Path, remaining: &mut usize) -> Result<()> {
+pub(crate) fn artifact_free(path: &Path, remaining: &mut usize) -> Result<()> {
     for e in fs::read_dir(path)? {
         ensure!(*remaining > 0, "probe tree limit");
         *remaining -= 1;
