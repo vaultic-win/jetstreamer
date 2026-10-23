@@ -73,7 +73,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         .context("capacity arithmetic")?;
     let original = original141::enabled(p);
     let terminal_repair = terminal141::failure_recorded(ledger);
-    let diagnostic_live: BTreeSet<_> = o["diagnostic_replays"]
+    let mut diagnostic_live: BTreeSet<_> = o["diagnostic_replays"]
         .as_array()
         .into_iter()
         .flatten()
@@ -90,13 +90,30 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         })
         .filter_map(|r| r["producer_after"]["invocation_id"].as_str())
         .collect();
-    let preliminary = !original
+    // A live fleet owner still consumes capacity when its optional diagnostic
+    // observation is unavailable. The RSS calculator must fail closed until
+    // that owner has complete accounting, rather than hide it in host overhead.
+    for row in ledger["diagnostics"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|r| r["live"] == true)
+    {
+        diagnostic_live.insert(
+            row["unit"]["InvocationID"]
+                .as_str()
+                .context("live diagnostic identity")?,
+        );
+    }
+    let original_live = original141::invocation(p).is_some_and(|id| diagnostic_live.contains(id));
+    let expanded = !diagnostic_live.is_empty();
+    let preliminary = !expanded
         && clean
         && live.len() == 5
         && free >= required
         && memory >= 192 * 1024 * 1024
         && o["vm_max_map_count"].as_u64().is_some_and(|v| v >= 4194304);
-    let (gate, action) = if original {
+    let (gate, action) = if expanded {
         (
             "expanded-fleet qualification and next disjoint runtime/resource bound",
             "Accept a clean expanded-fleet coordinated window before considering another experimental lane; stage the next disjoint repair/singleton meanwhile.",
@@ -129,16 +146,16 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     };
     Ok(
         json!({"schema":"jetstreamer-horizon-capacity-decision-v2","question":"Can I fit another disjoint lane now?",
-        "sampled_at_utc":p.sample_target_utc,"candidate":if original {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
+        "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
         "memory_concurrency_target":memory_target::report(o,live.len(),diagnostic_live.len()),
         "live_production_lanes":live.len(),"proven_production_lanes":PROVEN,"live_owners":live,
         "live_private_qualification_lanes":diagnostic_live.len(),"live_total_replay_lanes":live.len()+diagnostic_live.len(),
         "proven_point_evidence":{"path":"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T063958Z.json","sha256":"87d714a3652649a2bcf2bd0f0629d3638785e76e45c9286bfd62fb7aeb0d1b99"},
-        "private141_profile_adopted":original,"current_production_sample_clean":clean,"sampled_free_bytes":free,"sampled_memory_available_kib":memory,
-        "vm_max_map_count":o["vm_max_map_count"],"candidate_incremental_peak_bytes":if original {Value::Null} else {json!(ROOT141_PEAK)},
-        "prospective_protected_bytes":if original {Value::Null} else {json!(ROOT141_PROTECTED)},
-        "prospective_required_initial_free_bytes":if original {Value::Null} else {json!(required)},
-        "prospective_disk_headroom_bytes":if original {Value::Null} else {json!(i128::from(free)-i128::from(required))},
+        "private141_profile_adopted":original,"private141_live":original_live,"current_production_sample_clean":clean,"sampled_free_bytes":free,"sampled_memory_available_kib":memory,
+        "vm_max_map_count":o["vm_max_map_count"],"candidate_incremental_peak_bytes":if original_live {Value::Null} else {json!(ROOT141_PEAK)},
+        "prospective_protected_bytes":if original_live {Value::Null} else {json!(ROOT141_PROTECTED)},
+        "prospective_required_initial_free_bytes":if original_live {Value::Null} else {json!(required)},
+        "prospective_disk_headroom_bytes":if original_live {Value::Null} else {json!(i128::from(free)-i128::from(required))},
         "preliminary_resource_fit":preliminary,"admission_eligible":false,"limiting_gate":gate,"next_action":action,
         "source":"same accepted observer and authenticated fleet; prospective bounds require separate fresh admission",
         "new_resource_samples":0,"replay_launch_authorized":false,"remote_mutations":false} ),
@@ -188,12 +205,9 @@ mod tests {
             assert_eq!(d["live_private_qualification_lanes"], 1);
             assert_eq!(d["live_total_replay_lanes"], 1);
             assert_eq!(d["memory_concurrency_target"]["valid"], false);
-            assert!(
-                d["memory_concurrency_target"]["limiting_gate"]
-                    .as_str()
-                    .unwrap()
-                    .contains("diagnostics")
-            );
+            // A private owner without a complete production/host RSS census
+            // cannot create a memory target.
+            assert!(d["memory_concurrency_target"]["limiting_gate"].is_string());
         }
         let o = json!({"replays":[],"diagnostic_replays":[{"status":"unavailable","observation":row}],
             "filesystem":{"conservative_available_bytes":5u64<<40},
@@ -201,6 +215,45 @@ mod tests {
         assert_eq!(
             decision(&p, &o, &json!({"active":[]})).unwrap()["live_private_qualification_lanes"],
             0
+        );
+    }
+    #[test]
+    fn historical_adoption_is_not_a_live_lane_and_missing_diagnostic_rss_stays_explicit() {
+        let (p, ..) = crate::tests::fixture101();
+        let mut value = serde_json::to_value(&p).unwrap();
+        let bound = json!({"path":"/evidence.json","sha256":"a".repeat(64)});
+        let id = "b".repeat(32);
+        value["original141_root"] = json!({"trace":true,"coordinated_adoption":true,"launch":bound,"event_fleet":bound,"event_plan":bound,"invocation_id":id});
+        value["scope_101_200"]["private144_observer"] = json!(true);
+        for role in ["controller", "producer"] {
+            value["scope_101_200"]["diagnostic_ranges"][0]
+                [format!("expected_{role}_invocation_id")] = json!(private144::INVOCATION);
+        }
+        value["scope_101_200"]["diagnostic_ranges"].as_array_mut().unwrap().push(json!({"range":"141","controller_unit":"horizon-qualify-141-original-entry-trace-20261023-v1.service","producer_unit":"horizon-qualify-141-original-entry-trace-20261023-v1.service","expected_controller_invocation_id":id,"expected_producer_invocation_id":id}));
+        let p: Plan = serde_json::from_value(value).unwrap();
+        let o = json!({"replays":[],"diagnostic_replays":[],"filesystem":{"conservative_available_bytes":5u64<<40},"host_memory":{"conservative_available_kib":600u64<<20},"vm_max_map_count":4194304});
+        let terminal =
+            json!({"active":[],"diagnostics":[{"live":false,"unit":{"InvocationID":id}}]});
+        let d = decision(&p, &o, &terminal).unwrap();
+        assert_eq!(d["private141_profile_adopted"], true);
+        assert_eq!(d["private141_live"], false);
+        assert_eq!(d["live_private_qualification_lanes"], 0);
+        assert!(
+            !d["limiting_gate"]
+                .as_str()
+                .unwrap()
+                .contains("expanded-fleet")
+        );
+        let live = json!({"active":[],"diagnostics":[{"live":true,"unit":{"InvocationID":id}}]});
+        let d = decision(&p, &o, &live).unwrap();
+        assert_eq!(d["private141_live"], true);
+        assert_eq!(d["live_private_qualification_lanes"], 1);
+        assert_eq!(d["memory_concurrency_target"]["valid"], false);
+        assert!(
+            d["limiting_gate"]
+                .as_str()
+                .unwrap()
+                .contains("expanded-fleet")
         );
     }
 }

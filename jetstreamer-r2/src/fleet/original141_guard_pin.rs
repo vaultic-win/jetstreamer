@@ -1,9 +1,26 @@
 //! Pin an authenticated, actual timer-generated one-worker guard sample.
 use super::*;
 use std::os::unix::fs::PermissionsExt;
-const GUARD_UNIT: &str = "horizon-original141-root-guard-20261023-v1.service";
-const GUARD_ROOT: &str = "/var/lib/jetstreamer/horizon-original141-root-guard-20261023-v1";
-const GUARD_BIN: &str = "/usr/local/lib/jetstreamer/horizon-standalone-guard-target-handoff-20261019-v2/jetstreamer-horizon-standalone-guard";
+fn object_path(unit: &str) -> String {
+    let mut path = String::from("/org/freedesktop/systemd1/unit/");
+    for b in unit.bytes() {
+        if b.is_ascii_alphanumeric() {
+            path.push(char::from(b));
+        } else {
+            path.push_str(&format!("_{b:02x}"));
+        }
+    }
+    path
+}
+pub(in super::super) fn empty_environment_files(name: &str) -> Result<String> {
+    let out = ProcessCommand::new("busctl").args([
+        "--system", "get-property", "org.freedesktop.systemd1", &object_path(name),
+        "org.freedesktop.systemd1.Service", "EnvironmentFiles",
+    ]).output()?;
+    ensure!(out.status.success() && out.stdout == b"a(sb) 0\n",
+        "typed EnvironmentFiles is unavailable or nonempty");
+    Ok(String::new())
+}
 fn raw_clock(object: &str, interface: &str, property: &str) -> Result<u64> {
     let out = ProcessCommand::new("busctl")
         .args([
@@ -29,7 +46,7 @@ fn raw_clock(object: &str, interface: &str, property: &str) -> Result<u64> {
 }
 pub(super) fn producer_start_seconds() -> Result<u64> {
     Ok(raw_clock(
-        "/org/freedesktop/systemd1/unit/horizon_2dqualify_2d141_2doriginal_2dentry_2droot_2d20261023_2dv1_2eservice",
+        &object_path(UNIT),
         "org.freedesktop.systemd1.Service",
         "ExecMainStartTimestamp",
     )? / 1_000_000)
@@ -49,6 +66,9 @@ fn properties(name: &str, keys: &str) -> Result<BTreeMap<String, String>> {
             result.insert(k.into(), v.into()).is_none(),
             "duplicate guard property"
         );
+    }
+    if keys.split(',').any(|k| k == "EnvironmentFiles") && !result.contains_key("EnvironmentFiles") {
+        result.insert("EnvironmentFiles".into(), empty_environment_files(name)?);
     }
     Ok(result)
 }
@@ -199,7 +219,15 @@ pub(super) fn pin(
     )?;
     // Timer timestamps are human durations in systemctl output. Preserve the
     // real uint64 D-Bus value rather than interpreting display formatting.
-    timer.insert("LastTriggerUSecMonotonic".into(),raw_clock("/org/freedesktop/systemd1/unit/horizon_2doriginal141_2droot_2dguard_2d20261023_2dv1_2etimer","org.freedesktop.systemd1.Timer","LastTriggerUSecMonotonic")?.to_string());
+    timer.insert(
+        "LastTriggerUSecMonotonic".into(),
+        raw_clock(
+            &object_path(&timer_name),
+            "org.freedesktop.systemd1.Timer",
+            "LastTriggerUSecMonotonic",
+        )?
+        .to_string(),
+    );
     checked(g, gp, &service, &timer, now()?)?;
     copy_new(source, destination)?;
     ensure!(
@@ -216,6 +244,14 @@ pub(super) fn pin(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn dbus_object_paths_escape_the_exact_profile_unit() {
+        assert_eq!(
+            object_path("horizon-a_1.service"),
+            "/org/freedesktop/systemd1/unit/horizon_2da_5f1_2eservice"
+        );
+        assert!(object_path(UNIT).ends_with("_2dv1_2eservice"));
+    }
     #[test]
     fn firstfire_needs_exact_timer_invocation_command_sandbox_and_clock() {
         let gp = BoundFile {

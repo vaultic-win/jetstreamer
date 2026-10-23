@@ -7,9 +7,36 @@ const READER: &str =
 const READER_SHA: &str = "f35c32110e9a30bf4e27f11ec8b87fdd21d9e025efea4353df049d06ed199182";
 const NODE_SHA: &str = "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0";
 const FIRST_GUARD: &str = "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194";
+const TRACE_UNIT: &str = "horizon-qualify-141-original-entry-trace-20261023-v1.service";
+const TRACE_ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-original-entry-trace-20261023-v1";
+const TRACE_READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-original141-trace-reader-20261023-v2/jetstreamer-r2";
+const TRACE_READER_SHA: &str = "0805e5b0025a3338a1591a5291cfa9187927a4f8971b243130026556bcab2ecd";
+const TRACE_GUARD_SHA: &str = "35dbd4826c8947f38d50dff049345e1c3d62450eb85e41e94e326880e1898fbc";
+fn trace_disabled(trace: &bool) -> bool {
+    !trace
+}
+fn identity(s: &Profile) -> (&'static str, &'static str) {
+    if s.trace {
+        (TRACE_UNIT, TRACE_ROOT)
+    } else {
+        (UNIT, ROOT)
+    }
+}
+fn reader_binding(trace: bool) -> (&'static str, &'static str) {
+    if trace {
+        (TRACE_READER, TRACE_READER_SHA)
+    } else {
+        (READER, READER_SHA)
+    }
+}
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
+    #[serde(default, skip_serializing_if = "trace_disabled")]
+    coordinated_adoption: bool,
+    #[serde(default, skip_serializing_if = "trace_disabled")]
+    trace: bool,
     launch: Bound,
     event_fleet: Bound,
     event_plan: Bound,
@@ -18,6 +45,10 @@ pub(super) struct Profile {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
+    #[serde(default)]
+    coordinated_adoption: bool,
+    #[serde(default)]
+    trace: bool,
     schema: String,
     launch: Bound,
     event_fleet: Bound,
@@ -30,8 +61,58 @@ struct Spec {
 pub(super) fn enabled(p: &Plan) -> bool {
     p.original141_root.is_some()
 }
+pub(super) fn invocation(p: &Plan) -> Option<&str> {
+    p.original141_root
+        .as_ref()
+        .map(|s| s.invocation_id.as_str())
+}
+pub(super) fn retained144_census(p: &Plan, scope: &Scope101200) -> bool {
+    scope.diagnostic_ranges.len() == if enabled(p) { 2 } else { 1 }
+        && scope
+            .diagnostic_ranges
+            .first()
+            .is_some_and(|d| d.range == "144")
+        && scope.diagnostic_ranges.iter().skip(1).all(|d| owner(p, d))
+}
 pub(super) fn reader(p: &Plan) -> bool {
-    enabled(p) && p.tools.r2.path == Path::new(READER) && p.tools.r2.sha256 == READER_SHA
+    p.original141_root.as_ref().is_some_and(|s| {
+        let (path, sha) = reader_binding(s.trace);
+        p.tools.r2.path == Path::new(path) && p.tools.r2.sha256 == sha
+    })
+}
+// A guarded trace may finish while its new reader is being qualified. Adopt it
+// through one fresh coordinated observation, preserving the original admission
+// clock. This bounded scheduling delay cannot carry into later routine cycles.
+pub(super) fn adoption_interval(p: &Plan) -> Result<Option<u64>> {
+    let Some(s) = &p.original141_root else {
+        return Ok(None);
+    };
+    if !s.trace
+        || !s.coordinated_adoption
+        || s.event_fleet.path != p.previous_fleet.path
+        || s.event_fleet.sha256 != p.previous_fleet.sha256
+    {
+        return Ok(None);
+    }
+    read(s)?;
+    let launch = bound_json(&s.launch, false)?;
+    ensure!(
+        launch["observer"] == serde_json::to_value(&p.previous_observer)?,
+        "trace adoption cannot replace the admitted observer"
+    );
+    let old = bound_json(&p.previous_observer, false)?;
+    let interval = utc_seconds(&p.sample_target_utc)?
+        .checked_sub(utc_seconds(
+            old["recorded_at_utc"]
+                .as_str()
+                .context("admission observer time")?,
+        )?)
+        .context("adoption precedes admission")?;
+    ensure!(
+        (1800..=3600).contains(&interval),
+        "trace adoption must use one fresh >=30min, <=60min coordinated successor"
+    );
+    Ok(Some(interval))
 }
 fn iid(s: &str) -> bool {
     s.len() == 32
@@ -40,34 +121,60 @@ fn iid(s: &str) -> bool {
 }
 pub(super) fn owner(p: &Plan, d: &DiagnosticClaim) -> bool {
     p.original141_root.as_ref().is_some_and(|s| {
+        let (unit, _) = identity(s);
         d.range == "141"
-            && d.controller_unit == UNIT
-            && d.producer_unit == UNIT
+            && d.controller_unit == unit
+            && d.producer_unit == unit
             && d.expected_controller_invocation_id == s.invocation_id
             && d.expected_producer_invocation_id == s.invocation_id
             && iid(&s.invocation_id)
     })
 }
 fn claim(s: &Profile) -> Value {
-    json!({"epoch":141,"unit":UNIT,"invocation_id":s.invocation_id,"scratch_path":format!("{ROOT}/scratch"),"launch_receipt":s.launch})
+    let (unit, root) = identity(s);
+    json!({"epoch":141,"unit":unit,"invocation_id":s.invocation_id,"scratch_path":format!("{root}/scratch"),"launch_receipt":s.launch})
 }
 fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<()> {
+    let (unit, root) = identity(s);
+    if s.trace {
+        ensure!(
+            r["historical_trace_enabled"] == true
+                && r["whole_root_physical_limit_bytes"] == 256u64 << 30
+                && r["maximum_runtime_seconds"] == 1800
+                && g["producer_stop_enabled"] == true
+                && g["maximum_root_physical_bytes"] == 256u64 << 30
+                && g.get("root_physical_observation_error")
+                    .is_some_and(Value::is_null)
+                && g["root_physical_observation"]["maximum_physical_bytes"] == 256u64 << 30
+                && g["root_physical_observation"]["exceeds_budget"] == false
+                && g["root_physical_observation"]["conservative_physical_bytes"]
+                    .as_u64()
+                    .is_some_and(|n| n <= 256u64 << 30),
+            "trace141 handoff lacks bounded logging/physical guard scope"
+        );
+    }
     ensure!(
-        s.launch.path == Path::new(ROOT).join("receipts/launch.json")
+        s.launch.path == Path::new(root).join("receipts/launch.json")
             && iid(&s.invocation_id)
-            && r["schema"] == "jetstreamer-private-epoch141-original-entry-root-launch-v2"
+            && r["schema"]
+                == if s.trace {
+                    "jetstreamer-private-epoch141-original-entry-trace-launch-v2"
+                } else {
+                    "jetstreamer-private-epoch141-original-entry-root-launch-v2"
+                }
             && r["epoch"] == 141
-            && r["unit"] == UNIT
+            && r["unit"] == unit
             && r["invocation_id"] == s.invocation_id
             && r["launched"] == true
             && r["node_sha256"] == NODE_SHA
             && r["bootstrap_slot"] == 60911751
             && r["replay_start_slot"] == 60911752
             && r["terminal_root_slot"] == 61328765
-            && r["run_root"] == ROOT
+            && r["run_root"] == root
             && r["private_original_entry_root_qualification"] == true
-            && r["first_guard"]["path"] == format!("{ROOT}/receipts/first-guard.json")
-            && r["candidate_incremental_peak_bytes"] == 768u64 << 30,
+            && r["first_guard"]["path"] == format!("{root}/receipts/first-guard.json")
+            && r["candidate_incremental_peak_bytes"]
+                == if s.trace { 256u64 << 30 } else { 768u64 << 30 },
         "original141 handoff has foreign launch/owner/span"
     );
     for key in [
@@ -88,70 +195,102 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
             "original141 handoff grants authority:{key}"
         );
     }
-    ensure!(
-        e["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
-            && e["first_epoch"] == 101
-            && e["last_epoch"] == 200
-            && e["plan"].as_str() == s.event_plan.path.to_str()
-            && e["plan_sha256"] == s.event_plan.sha256
-            && e["previous_fleet"] == r["previous_fleet"]
-            && ep["previous_fleet"] == r["previous_fleet"]
-            && ep["schema"] == "jetstreamer-horizon-campaign-fleet-plan-v1"
-            && ep["first_epoch"] == 101
-            && ep["last_epoch"] == 200
-            && ep["observer"] == r["observer"]
-            && e["observer_receipt"] == r["observer"]["path"]
-            && e["observer_sha256"] == r["observer"]["sha256"]
-            && ep["admission_transition_guard"] == r["first_guard"]
-            && e["admission_transition_guard"] == r["first_guard"]
-            && e["inventory"]["anomalies"] == 0
-            && e["producer_mutations"] == false
-            && e["publication_authorized"] == false
-            && e["remote_mutations"] == false
-            && ep["gates"]["141"]["state"] == "failed-needs-repair"
-            && e["epochs"].as_array().is_some_and(|a| a
+    if s.coordinated_adoption {
+        ensure!(
+            s.trace
+                && r["previous_fleet"] == serde_json::to_value(&s.event_fleet)?
+                && e["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
+                && e["first_epoch"] == 101
+                && e["last_epoch"] == 200
+                && e["plan"].as_str() == s.event_plan.path.to_str()
+                && e["plan_sha256"] == s.event_plan.sha256
+                && ep["schema"] == "jetstreamer-horizon-campaign-fleet-plan-v1"
+                && ep["first_epoch"] == 101
+                && ep["last_epoch"] == 200
+                && ep["observer"] == r["observer"]
+                && e["observer_receipt"] == r["observer"]["path"]
+                && e["observer_sha256"] == r["observer"]["sha256"]
+                && e["inventory"]["anomalies"] == 0
+                && ep["gates"]["141"]["state"] == "failed-needs-repair"
+                && e["epochs"].as_array().is_some_and(|a| a
+                    .iter()
+                    .any(|v| v["epoch"] == 141 && v["state"] == "failed-needs-repair"))
+                && ep["diagnostics"]
+                    .as_array()
+                    .is_some_and(|a| a.iter().all(|v| v["unit"] != unit)),
+            "trace141 coordinated adoption must retain its exact accepted prelaunch predecessor"
+        );
+    } else {
+        ensure!(
+            e["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
+                && e["first_epoch"] == 101
+                && e["last_epoch"] == 200
+                && e["plan"].as_str() == s.event_plan.path.to_str()
+                && e["plan_sha256"] == s.event_plan.sha256
+                && e["previous_fleet"] == r["previous_fleet"]
+                && ep["previous_fleet"] == r["previous_fleet"]
+                && ep["schema"] == "jetstreamer-horizon-campaign-fleet-plan-v1"
+                && ep["first_epoch"] == 101
+                && ep["last_epoch"] == 200
+                && ep["observer"] == r["observer"]
+                && e["observer_receipt"] == r["observer"]["path"]
+                && e["observer_sha256"] == r["observer"]["sha256"]
+                && ep["admission_transition_guard"] == r["first_guard"]
+                && e["admission_transition_guard"] == r["first_guard"]
+                && e["inventory"]["anomalies"] == 0
+                && e["producer_mutations"] == false
+                && e["publication_authorized"] == false
+                && e["remote_mutations"] == false
+                && ep["gates"]["141"]["state"] == "failed-needs-repair"
+                && e["epochs"].as_array().is_some_and(|a| a
+                    .iter()
+                    .filter(|v| v["epoch"] == 141)
+                    .count()
+                    == 1
+                    && a.iter()
+                        .any(|v| v["epoch"] == 141 && v["state"] == "failed-needs-repair")),
+            "original141 event changes scope/predecessor/repair state"
+        );
+        let claims = ep["diagnostics"]
+            .as_array()
+            .context("original141 event diagnostics")?;
+        ensure!(
+            claims
                 .iter()
-                .filter(|v| v["epoch"] == 141)
-                .count()
-                == 1
-                && a.iter()
-                    .any(|v| v["epoch"] == 141 && v["state"] == "failed-needs-repair")),
-        "original141 event changes scope/predecessor/repair state"
-    );
-    let claims = ep["diagnostics"]
-        .as_array()
-        .context("original141 event diagnostics")?;
-    ensure!(
-        claims
-            .iter()
-            .filter(|v| v["unit"] == UNIT)
-            .eq(std::iter::once(&claim(s))),
-        "original141 event claim differs"
-    );
-    let events = e["diagnostics"]
-        .as_array()
-        .context("original141 event owner census")?;
-    ensure!(
-        events.iter().filter(|v| v["unit"]["Id"] == UNIT).count() == 1
-            && events.iter().any(|v| v["unit"]["Id"] == UNIT
-                && v["epoch"] == 141
-                && v["live"] == true
-                && v["launch_invocation_id"] == s.invocation_id
-                && v["unit"]["InvocationID"] == s.invocation_id
-                && v["unit"]["NRestarts"] == "0"
-                && v["launch_receipt"].as_str() == s.launch.path.to_str()
-                && v["launch_receipt_sha256"] == s.launch.sha256),
-        "original141 event lacks exact actual live invocation"
-    );
+                .filter(|v| v["unit"] == unit)
+                .eq(std::iter::once(&claim(s))),
+            "original141 event claim differs"
+        );
+        let events = e["diagnostics"]
+            .as_array()
+            .context("original141 event owner census")?;
+        ensure!(
+            events.iter().filter(|v| v["unit"]["Id"] == unit).count() == 1
+                && events.iter().any(|v| v["unit"]["Id"] == unit
+                    && v["epoch"] == 141
+                    && v["live"] == true
+                    && v["launch_invocation_id"] == s.invocation_id
+                    && v["unit"]["InvocationID"] == s.invocation_id
+                    && v["unit"]["NRestarts"] == "0"
+                    && v["launch_receipt"].as_str() == s.launch.path.to_str()
+                    && v["launch_receipt_sha256"] == s.launch.sha256),
+            "original141 event lacks exact actual live invocation"
+        );
+    }
     ensure!(
         g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
-            && g["guard_sha256"] == FIRST_GUARD
+            && g["guard_sha256"]
+                == if s.trace {
+                    TRACE_GUARD_SHA
+                } else {
+                    FIRST_GUARD
+                }
             && g["producer_invocation_id"] == s.invocation_id
             && g["producer"]["invocation_id"] == s.invocation_id
             && g["producer"]["restarts"] == 0
             && g["producer"]["active"] == "active"
             && g["producer"]["sub"] == "running"
-            && g["producer"]["cgroup"] == format!("/system.slice/{UNIT}")
+            && g["producer"]["cgroup"] == format!("/system.slice/{unit}")
             && g.get("trip_reason").is_some_and(Value::is_null)
             && g.get("worker_observation_error")
                 .is_some_and(Value::is_null)
@@ -203,9 +342,11 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     Ok(())
 }
 fn config_row(s: &Profile) -> Value {
-    json!({"range":"141","controller_unit":UNIT,"producer_unit":UNIT,"expected_controller_invocation_id":s.invocation_id,"expected_producer_invocation_id":s.invocation_id,"scratch_path":format!("{ROOT}/scratch"),"worker_executable_basename":"historical-worker"})
+    let (unit, root) = identity(s);
+    json!({"range":"141","controller_unit":unit,"producer_unit":unit,"expected_controller_invocation_id":s.invocation_id,"expected_producer_invocation_id":s.invocation_id,"scratch_path":format!("{root}/scratch"),"worker_executable_basename":"historical-worker"})
 }
 fn migrate(scope: &mut Scope101200, config: &mut Value, s: &Profile) -> Result<()> {
+    let (unit, _) = identity(s);
     ensure!(
         scope.private144_observer
             && scope.diagnostic_ranges.len() == 1
@@ -222,14 +363,15 @@ fn migrate(scope: &mut Scope101200, config: &mut Value, s: &Profile) -> Result<(
     rows.push(config_row(s));
     scope.diagnostic_ranges.push(DiagnosticClaim {
         range: "141".into(),
-        controller_unit: UNIT.into(),
-        producer_unit: UNIT.into(),
+        controller_unit: unit.into(),
+        producer_unit: unit.into(),
         expected_controller_invocation_id: s.invocation_id.clone(),
         expected_producer_invocation_id: s.invocation_id.clone(),
     });
     Ok(())
 }
 fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
+    let (unit, _) = identity(s);
     ensure!(
         f["gates"]["141"]["state"] == "failed-needs-repair",
         "private141 cannot close repair incident"
@@ -237,7 +379,7 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     let ds = f["diagnostics"]
         .as_array_mut()
         .context("diagnostic history")?;
-    let old: Vec<_> = ds.iter().filter(|v| v["unit"] == UNIT).collect();
+    let old: Vec<_> = ds.iter().filter(|v| v["unit"] == unit).collect();
     ensure!(
         old.is_empty() || old == vec![&c],
         "original141 conflicts with retained claim"
@@ -248,8 +390,8 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     let names = f["tracked_units"]
         .as_array_mut()
         .context("tracked history")?;
-    if !names.contains(&json!(UNIT)) {
-        names.push(json!(UNIT));
+    if !names.contains(&json!(unit)) {
+        names.push(json!(unit));
     }
     let evidence = f["gates"]["141"]["evidence"]
         .as_array_mut()
@@ -290,6 +432,7 @@ pub(super) fn consume_transition(p: &Plan, f: &mut Value) -> Result<()> {
 }
 pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) -> Result<Value> {
     let s = p.original141_root.as_ref().context("original141 profile")?;
+    let (unit, root) = identity(s);
     ensure!(
         !p.expected_epochs.contains(&141)
             && !model["ranges"]
@@ -324,9 +467,9 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
         );
     } else {
         ensure!(
-            row["producer_unit"] == UNIT
+            row["producer_unit"] == unit
                 && row["expected_producer_invocation_id"] == s.invocation_id
-                && row["scratch_path"] == format!("{ROOT}/scratch"),
+                && row["scratch_path"] == format!("{root}/scratch"),
             "original141 envelope owner changed"
         );
         for key in [
@@ -349,7 +492,7 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
                 ensure!(
                     row["error"].is_null()
                         && o["range"] == "141"
-                        && o["scratch_path"] == format!("{ROOT}/scratch")
+                        && o["scratch_path"] == format!("{root}/scratch")
                         && o["invocation_binding_stable"] == true,
                     "original141 observed identity differs"
                 );
@@ -399,6 +542,8 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
     );
     let launch = bound_json(&spec.launch, false)?;
     let s = Profile {
+        coordinated_adoption: spec.coordinated_adoption,
+        trace: spec.trace,
         launch: spec.launch,
         event_fleet: spec.event_fleet,
         event_plan: spec.event_plan,
@@ -407,38 +552,51 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
             .context("original141 invocation")?
             .into(),
     };
+    let (unit, _) = identity(&s);
     let (c, g) = read(&s)?;
-    let actual = bound_json(&s.event_plan, true)?;
-    let mut expected = bound_json(&p.fleet_template, true)?;
-    expected["previous_fleet"] = serde_json::to_value(&p.previous_fleet)?;
-    expected["output"] = json!(s.event_fleet.path);
-    expected["admission_transition_guard"] = g.clone();
-    // The launch event adds evidence and ownership only; next-action updates
-    // belong to the later ordinary cycle, not the same-sample admission delta.
-    expected["diagnostics"]
-        .as_array_mut()
-        .context("old diagnostic history")?
-        .push(c);
-    expected["tracked_units"]
-        .as_array_mut()
-        .context("old tracked history")?
-        .push(json!(UNIT));
-    expected["gates"]["141"]["evidence"]
-        .as_array_mut()
-        .context("old repair history")?
-        .extend([serde_json::to_value(&s.launch)?, g]);
-    ensure!(
-        expected == actual && actual["observer"] == serde_json::to_value(&p.previous_observer)?,
-        "original141 event changes unrelated claims/history/scalars"
-    );
+    if s.coordinated_adoption {
+        ensure!(
+            s.trace
+                && s.event_fleet.path == p.previous_fleet.path
+                && s.event_fleet.sha256 == p.previous_fleet.sha256
+                && s.event_plan.path == p.fleet_template.path
+                && s.event_plan.sha256 == p.fleet_template.sha256,
+            "coordinated trace adoption cannot replace the accepted history"
+        );
+    } else {
+        let actual = bound_json(&s.event_plan, true)?;
+        let mut expected = bound_json(&p.fleet_template, true)?;
+        expected["previous_fleet"] = serde_json::to_value(&p.previous_fleet)?;
+        expected["output"] = json!(s.event_fleet.path);
+        expected["admission_transition_guard"] = g.clone();
+        // The launch event adds evidence and ownership only; next-action updates
+        // belong to the later ordinary cycle, not the same-sample admission delta.
+        expected["diagnostics"]
+            .as_array_mut()
+            .context("old diagnostic history")?
+            .push(c);
+        expected["tracked_units"]
+            .as_array_mut()
+            .context("old tracked history")?
+            .push(json!(unit));
+        expected["gates"]["141"]["evidence"]
+            .as_array_mut()
+            .context("old repair history")?
+            .extend([serde_json::to_value(&s.launch)?, g]);
+        ensure!(
+            expected == actual && actual["observer"] == serde_json::to_value(&p.previous_observer)?,
+            "original141 event changes unrelated claims/history/scalars"
+        );
+    }
     migrate(p.scope_101_200.as_mut().context("101scope")?, config, &s)?;
     p.previous_fleet = s.event_fleet.clone();
     p.fleet_template = s.event_plan.clone();
-    p.original141_root = Some(s);
+    let (path, digest) = reader_binding(s.trace);
     p.tools.r2 = Bound {
-        path: READER.into(),
-        sha256: READER_SHA.into(),
+        path: path.into(),
+        sha256: digest.into(),
     };
+    p.original141_root = Some(s);
     p.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
     latest_fleet_unchanged(p, &bound_json(&p.previous_fleet, false)?)?;
     validate(p)
@@ -447,12 +605,49 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn trace_profile_keeps_old_history_and_uses_distinct_reader_owner_and_root() {
+        let (mut p, model, _, _, _, _, mut config, _) = crate::tests::fixture101();
+        let mut s = profile();
+        assert!(serde_json::to_value(&s).unwrap().get("trace").is_none());
+        s.trace = true;
+        s.launch.path = Path::new(TRACE_ROOT).join("receipts/launch.json");
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.private144_observer = true;
+        config["diagnostic_replays"] = json!([{"range":"144","preserved_number":u64::MAX}]);
+        let old = config["diagnostic_replays"][0].clone();
+        migrate(scope, &mut config, &s).unwrap();
+        assert_eq!(config["diagnostic_replays"][0], old);
+        assert_eq!(config["diagnostic_replays"][1]["producer_unit"], TRACE_UNIT);
+        assert_eq!(
+            config["diagnostic_replays"][1]["scratch_path"],
+            format!("{TRACE_ROOT}/scratch")
+        );
+        p.original141_root = Some(s);
+        p.tools.r2 = Bound {
+            path: TRACE_READER.into(),
+            sha256: TRACE_READER_SHA.into(),
+        };
+        assert!(reader(&p));
+        assert!(owner(
+            &p,
+            &p.scope_101_200.as_ref().unwrap().diagnostic_ranges[1]
+        ));
+        assert_eq!(
+            diagnostics(&p, &model, &config, false).unwrap()["diagnostic_replays"],
+            json!([old])
+        );
+        p.tools.r2.sha256 = READER_SHA.into();
+        assert!(!reader(&p));
+    }
     fn profile() -> Profile {
         let bound = |path: &str| Bound {
             path: path.into(),
             sha256: "a".repeat(64),
         };
         Profile {
+            coordinated_adoption: false,
+            trace: false,
             launch: bound(&format!("{ROOT}/receipts/launch.json")),
             event_fleet: bound(
                 "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/original141-event.json",
@@ -589,8 +784,7 @@ mod tests {
         f["gates"]["141"]["state"] = json!("blocked-qualification");
         assert!(fold(&mut f, claim(&s), g, &s).is_err());
     }
-    #[test]
-    fn handoff_cannot_borrow_another_event_owner_guard_or_close_the_incident() {
+    fn handoff_fixture() -> (Profile, Value, Value, Value, Value) {
         let s = profile();
         let guard =
             json!({"path":format!("{ROOT}/receipts/first-guard.json"),"sha256":"c".repeat(64)});
@@ -615,6 +809,11 @@ mod tests {
         let p = json!({"schema":"jetstreamer-horizon-campaign-fleet-plan-v1","first_epoch":101,"last_epoch":200,"previous_fleet":prior,"observer":observer,"admission_transition_guard":guard,"gates":{"141":{"state":"failed-needs-repair"}},"diagnostics":[claim(&s)]});
         let e = json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":101,"last_epoch":200,"plan":s.event_plan.path,"plan_sha256":s.event_plan.sha256,"previous_fleet":prior,"observer_receipt":observer["path"],"observer_sha256":observer["sha256"],"admission_transition_guard":guard,"inventory":{"anomalies":0},"producer_mutations":false,"publication_authorized":false,"remote_mutations":false,"epochs":[{"epoch":141,"state":"failed-needs-repair"}],"diagnostics":[{"unit":{"Id":UNIT,"InvocationID":s.invocation_id,"NRestarts":"0"},"epoch":141,"live":true,"launch_invocation_id":s.invocation_id,"launch_receipt":s.launch.path,"launch_receipt_sha256":s.launch.sha256}]});
         let g = json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_sha256":FIRST_GUARD,"producer_invocation_id":s.invocation_id,"producer":{"invocation_id":s.invocation_id,"restarts":0,"active":"active","sub":"running","cgroup":format!("/system.slice/{UNIT}")},"trip_reason":null,"worker_observation_error":null,"workers":[[10,100]],"maximum_worker_vmas":3500000,"minimum_free_bytes":3572465819078u64,"available_bytes":3572465819079u64,"remote_mutations":false,"r2_mutations":false});
+        (s, r, e, p, g)
+    }
+    #[test]
+    fn handoff_cannot_borrow_another_event_owner_guard_or_close_the_incident() {
+        let (s, r, e, p, g) = handoff_fixture();
         checked(&s, &r, &e, &p, &g).unwrap();
         for key in [
             "invocation_id",
@@ -646,6 +845,44 @@ mod tests {
         assert!(checked(&s, &r, &e, &p, &bad).is_err());
         let mut bad = g;
         bad["workers"] = json!([]);
+        assert!(checked(&s, &r, &e, &p, &bad).is_err());
+    }
+    #[test]
+    fn coordinated_trace_adoption_needs_its_exact_prelaunch_history_and_physical_guard() {
+        let (mut s, mut r, e, p, mut g) = handoff_fixture();
+        s.trace = true;
+        s.coordinated_adoption = true;
+        s.launch.path = Path::new(TRACE_ROOT).join("receipts/launch.json");
+        r["schema"] = json!("jetstreamer-private-epoch141-original-entry-trace-launch-v2");
+        r["unit"] = json!(TRACE_UNIT);
+        r["run_root"] = json!(TRACE_ROOT);
+        r["first_guard"]["path"] = json!(format!("{TRACE_ROOT}/receipts/first-guard.json"));
+        r["previous_fleet"] = serde_json::to_value(&s.event_fleet).unwrap();
+        r["historical_trace_enabled"] = json!(true);
+        r["candidate_incremental_peak_bytes"] = json!(256u64 << 30);
+        r["whole_root_physical_limit_bytes"] = json!(256u64 << 30);
+        r["maximum_runtime_seconds"] = json!(1800);
+        g["guard_sha256"] = json!(TRACE_GUARD_SHA);
+        g["producer"]["cgroup"] = json!(format!("/system.slice/{TRACE_UNIT}"));
+        g["producer_stop_enabled"] = json!(true);
+        g["maximum_root_physical_bytes"] = json!(256u64 << 30);
+        g["root_physical_observation_error"] = Value::Null;
+        g["root_physical_observation"] = json!({"maximum_physical_bytes":256u64<<30,"exceeds_budget":false,"conservative_physical_bytes":4096});
+        checked(&s, &r, &e, &p, &g).unwrap();
+        for key in [
+            "previous_fleet",
+            "historical_trace_enabled",
+            "whole_root_physical_limit_bytes",
+        ] {
+            let mut bad = r.clone();
+            bad[key] = Value::Null;
+            assert!(checked(&s, &bad, &e, &p, &g).is_err(), "{key}");
+        }
+        let mut bad = p.clone();
+        bad["diagnostics"].as_array_mut().unwrap().push(claim(&s));
+        assert!(checked(&s, &r, &e, &bad, &g).is_err());
+        let mut bad = g.clone();
+        bad["root_physical_observation"]["exceeds_budget"] = json!(true);
         assert!(checked(&s, &r, &e, &p, &bad).is_err());
     }
     #[test]

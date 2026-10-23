@@ -50,17 +50,32 @@ fn census(row: &Value, suffix: &str) -> Result<Census> {
 }
 
 fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
+    let ordinary = o["replays"].as_array().context("memory lane census")?;
     ensure!(
-        diagnostics == 0,
-        "active diagnostics need explicit RSS accounting"
-    );
-    let rows = o["replays"].as_array().context("memory lane census")?;
-    ensure!(
-        live > 0 && rows.len() == live && live <= 64,
+        live > 0 && ordinary.len() == live && live + diagnostics <= 64,
         "memory lane count differs"
+    );
+    let private: Vec<_> = o["diagnostic_replays"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| match r.get("status") {
+            Some(status) if status == "observed" => r.get("observation"),
+            Some(_) => None,
+            None => Some(r),
+        })
+        .filter(|r| {
+            r["producer_after"]["active_state"] == "active"
+                && r["producer_after"]["sub_state"] == "running"
+        })
+        .collect();
+    ensure!(
+        private.len() == diagnostics,
+        "diagnostics live census differs"
     );
     let mut processes = BTreeSet::new();
     let mut sum = 0u64;
+    let mut private_sum = 0u64;
     let mut largest = 0u64;
     let host = &o["host_resident_memory"]["after"];
     ensure!(
@@ -83,11 +98,30 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
             )
             .context("kernel resident overflow")?;
     }
-    for row in rows {
+    for (row, diagnostic) in ordinary
+        .iter()
+        .map(|r| (r, false))
+        .chain(private.into_iter().map(|r| (r, true)))
+    {
         ensure!(
             row["invocation_binding_stable"] == true,
             "unstable lane identity"
         );
+        if diagnostic {
+            for role in ["controller", "producer"] {
+                let before = &row[format!("{role}_before")];
+                let after = &row[format!("{role}_after")];
+                ensure!(
+                    before["invocation_id"]
+                        .as_str()
+                        .is_some_and(|s| !s.is_empty())
+                        && before["invocation_id"] == after["invocation_id"]
+                        && before["restarts"] == 0
+                        && after["restarts"] == 0,
+                    "diagnostics owner changed/restarted"
+                );
+            }
+        }
         let before = census(row, "before")?;
         let after = census(row, "after")?;
         ensure!(
@@ -115,7 +149,13 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
         }
         ensure!(lane > 0, "empty lane RSS");
         sum = sum.checked_add(lane).context("fleet RSS overflow")?;
-        largest = largest.max(observed_lane);
+        if diagnostic {
+            private_sum = private_sum
+                .checked_add(lane)
+                .context("diagnostics RSS overflow")?;
+        } else {
+            largest = largest.max(observed_lane);
+        }
     }
     let total = o["host_memory"]["total_kib"]
         .as_u64()
@@ -141,15 +181,29 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
         "invalid century RSS maximum or reservation"
     );
     let target = u64::try_from(u128::from(total) * 9 / 10)?;
-    let marginal = sum.div_ceil(u64::try_from(live)?);
-    let desired = target.saturating_sub(non_lane).div_ceil(marginal);
+    let production_sum = sum
+        .checked_sub(private_sum)
+        .context("production RSS subtraction")?;
+    let marginal = production_sum.div_ceil(u64::try_from(live)?);
+    // Private experiments consume capacity explicitly, but their transient RSS
+    // is not a comparable production lane size or part of host overhead.
+    let production_desired = target
+        .saturating_sub(non_lane)
+        .saturating_sub(private_sum)
+        .div_ceil(marginal);
+    let desired = production_desired
+        .checked_add(u64::try_from(diagnostics)?)
+        .context("desired count overflow")?;
+    let executing = live + diagnostics;
     Ok(
         json!({"valid":true,"target_percent":90,"desired_lanes":desired,
-        "executing_lanes":live,"lane_gap":i128::from(desired)-i128::try_from(live)?,
+        "executing_lanes":executing,"lane_gap":i128::from(desired)-i128::try_from(executing)?,
+        "executing_production_lanes":live,"executing_private_lanes":diagnostics,"desired_production_lanes":production_desired,
         "host_total_bytes":total,"host_resident_planning_bytes":used,
         "host_usage_basis":"entire host process RSS plus kernel components; unmapped file cache excluded; shared pages may count per process",
-        "aggregate_lane_rss_bytes":sum,"non_lane_resident_planning_bytes":non_lane,"kernel_resident_bytes":kernel,
-        "marginal_lane_rss_bytes":marginal,"marginal_basis":"mean current lane RSS, rounded up",
+        "aggregate_lane_rss_bytes":sum,"aggregate_production_lane_rss_bytes":production_sum,"aggregate_private_lane_rss_bytes":private_sum,
+        "non_lane_resident_planning_bytes":non_lane,"kernel_resident_bytes":kernel,
+        "marginal_lane_rss_bytes":marginal,"marginal_basis":"mean current production lane RSS, rounded up; private RSS accounted separately",
         "century_maximum_observed_lane_rss_bytes":maximum,"reservation_ceiling_bytes":reservation,
         "target_used_bytes":target,"rounding":"ceil desired lane count toward target",
         "disk_or_cpu_used_to_lower_desired_count":false,"admission_authorized":false,
@@ -159,7 +213,7 @@ fn checked(o: &Value, live: usize, diagnostics: usize) -> Result<Value> {
 
 pub(super) fn report(o: &Value, live: usize, diagnostics: usize) -> Value {
     checked(o, live, diagnostics).unwrap_or_else(|error| json!({
-        "valid":false,"target_percent":90,"executing_lanes":live,
+        "valid":false,"target_percent":90,"executing_lanes":live+diagnostics,
         "limiting_gate":format!("{error:#}"),"admission_authorized":false,
         "next_action":"Resolve RSS/host accounting from the coordinated observer; retain prior qualified scheduling evidence and all live protections."}))
 }
@@ -224,5 +278,49 @@ mod tests {
         assert_eq!(r["desired_lanes"], 6);
         o["host_resident_memory"] = Value::Null;
         assert_eq!(report(&o, 2, 0)["valid"], false);
+    }
+    #[test]
+    fn private_rss_consumes_capacity_without_changing_production_size_or_host_overhead() {
+        let mut o = fixture();
+        let mut private = o["replays"][0].clone();
+        for role in ["controller", "producer"] {
+            for point in ["before", "after"] {
+                let unit = &mut private[format!("{role}_{point}")];
+                unit["invocation_id"] = json!("d".repeat(32));
+                unit["restarts"] = json!(0);
+                unit["active_state"] = json!("active");
+                unit["sub_state"] = json!("running");
+                unit["rss"]["aggregate_rss_bytes"] = json!(250 * 1024);
+                unit["rss"]["processes"][0]["pid"] = json!(3);
+                unit["rss"]["processes"][0]["rss_bytes"] = json!(250 * 1024);
+            }
+        }
+        let host = &mut o["host_resident_memory"]["after"]["rss"];
+        host["processes"][2]["rss_bytes"] = json!(250 * 1024);
+        host["processes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"pid":4,"start_ticks":10,"rss_bytes":100*1024}));
+        host["aggregate_rss_bytes"] = json!(550 * 1024);
+        for row in [
+            private.clone(),
+            json!({"status":"observed","observation":private}),
+        ] {
+            o["diagnostic_replays"] = json!([row]);
+            let r = report(&o, 2, 1);
+            assert_eq!(r["valid"], true, "{r}");
+            assert_eq!(r["aggregate_lane_rss_bytes"], 450 * 1024);
+            assert_eq!(r["aggregate_private_lane_rss_bytes"], 250 * 1024);
+            assert_eq!(r["non_lane_resident_planning_bytes"], 100 * 1024);
+            assert_eq!(r["marginal_lane_rss_bytes"], 100 * 1024);
+            assert_eq!(r["desired_production_lanes"], 6);
+            assert_eq!(r["desired_lanes"], 7);
+            assert_eq!(r["executing_lanes"], 3);
+            assert_eq!(r["reservation_ceiling_bytes"], 150 * 1024);
+            assert_eq!(report(&o, 2, 0)["valid"], false);
+        }
+        o["diagnostic_replays"][0]["observation"]["producer_after"]["rss"]["processes"][0]["start_ticks"] =
+            json!(11);
+        assert_eq!(report(&o, 2, 1)["valid"], false);
     }
 }
