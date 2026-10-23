@@ -61,6 +61,8 @@ mod original141;
 mod private144;
 #[path = "routine_provisional141_predecessor.rs"]
 mod provisional141;
+#[path = "routine_qualification141_status.rs"]
+mod qualification141_status;
 #[path = "routine_original141_terminal.rs"]
 mod terminal141;
 
@@ -180,6 +182,8 @@ struct Plan {
     native141_audit: Option<native141::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     original141_root: Option<original141::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    qualification141_status: Option<qualification141_status::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_scans: Option<assembly144_scans::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -834,6 +838,7 @@ fn validate_templates(
     assembly144::validate(p)?;
     native141::validate(p)?;
     original141::validate(p)?;
+    qualification141_status::validate(p)?;
     census141_poh::validate(p)?;
     assembly144_scans::validate(p)?;
     publication144::validate(p)?;
@@ -1839,6 +1844,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         };
         let publication144_status = publication144::publish(p, &pipeline, &observer)?;
         let delivery160_status = delivery160::publish(p, &pipeline, &observer)?;
+        let qualification141_status = qualification141_status::publish(p, &pipeline, &observer)?;
         let parent = p.fleet_output.parent().context("fleet parent missing")?;
         if !parent.exists() {
             private_dir(parent.parent().context("fleet ancestor missing")?)?;
@@ -1849,7 +1855,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         private_dir(parent)?;
         latest_fleet_unchanged(p, &previous)?;
         child(
-            &p.tools.r2,
+            qualification141_status::fleet_reader(p),
             &[
                 "fleet-reconcile".into(),
                 fleet_bound.path.display().to_string(),
@@ -1877,7 +1883,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
             "inventory":ledger["inventory"],"capacity_decision":capacity,"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
-            "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
+            "qualification141_status":qualification141_status,"sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
     match result {
