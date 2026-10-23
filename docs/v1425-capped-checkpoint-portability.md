@@ -148,6 +148,57 @@ transition recovery. No stage authorizes stopping a healthy producer early.
 Native serialization and output continuation remain **unqualified**. No capacity
 gain from parking a live141/136 replay is demonstrated by this audit.
 
+## Staged test-only implementation
+
+`historical-runtime/v1_4_25/worker/src/checkpoint_portability_fixture.rs` now
+implements the first experiment behind `#[cfg(test)]`. Both entrypoints are
+ignored in normal suites. The fixture uses public `add_snapshot(V1_2_0)` to
+invoke the exact native private serializer, selected flushed AppendVec copies,
+the pinned status-cache serializer and in-process bzip2/tar. The child re-execs
+the exact same hashed test executable and restores with the existing worker's
+`snapshot::load_archive`. It compares the full root tuple/cache/signature, raw
+writes and outcomes through slots2and4 (slot3skipped), both terminal checkpoints,
+and an actual duplicate-signature rejection. Synthetic genesis remains test-only.
+The source/manifest bind genesis, archive and each member digest. No protocol
+export or recorder append path is added.
+
+Execution requires an initially empty, mode0700, sol-owned canonical directory
+under `/var/lib/jetstreamer-checkpoint-fixtures`. The fixture refuses `/home`
+and symlinked roots, caps selected AppendVec bytes at512MiB, checks a10GiB
+whole-fixture physical limit between bounded steps, and retains its exact
+evidence tree on success or failure for review. These checks do not replace the
+parent's OS-volume admission or external service deadline/memory/task limits.
+
+Do not run these commands until the parent admits OS-only disk growth, proves
+the Rust1.46 offline cache and grants exclusive ownership of the chosen build
+target. Use the separately admitted `CARGO_TARGET_DIR`; never overwrite a
+target owned by another agent. In a bounded read-only-source build service:
+
+```sh
+cargo +1.46.0 test --manifest-path historical-runtime/v1_4_25/Cargo.toml \
+  --release --offline --locked -j2 \
+  -p jetstreamer-historical-worker-v1-4-25 \
+  --features capped-shrink-candidate --no-run
+```
+
+Stage and hash the resulting test executable outside the shared target before
+releasing that target. Then run that exact executable in the separately admitted
+test service with no network, CPU200%, MemoryHigh12GiB/Max16GiB, no swap,
+Tasks512, a30-minute execution deadline and only the exact OS fixture root
+writable. Set `JETSTREAMER_HISTORICAL_POH_THREADS=2` and
+`JETSTREAMER_V1425_PORTABILITY_FIXTURE_ROOT` to that root; invoke:
+
+```sh
+/absolute/staged/worker-test-executable --ignored --exact \
+  runtime::checkpoint_portability_fixture::native_v12_fresh_process_raw_output_equivalence \
+  --nocapture --test-threads=1
+```
+
+Do not invoke the child test independently or run all ignored worker tests.
+Repeat with a separately built default profile only after the capped experiment
+has been reviewed and its evidence retained. The staged fixture has not yet
+been compiled or executed; source formatting is not qualification evidence.
+
 ## Existing141 deadline evidence
 
 No new poll was taken. The coordinated observer at

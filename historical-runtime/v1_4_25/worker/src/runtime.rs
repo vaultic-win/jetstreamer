@@ -1151,6 +1151,10 @@ fn normalize_instruction_error(error: InstructionError) -> WireInstructionError 
 }
 
 #[cfg(test)]
+#[path = "checkpoint_portability_fixture.rs"]
+mod checkpoint_portability_fixture;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use solana_runtime::genesis_utils::create_genesis_config_with_leader;
