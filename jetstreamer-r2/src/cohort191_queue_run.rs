@@ -299,7 +299,20 @@ fn persist(state: &mut Value) -> Result<()> {
     let history = root
         .join("history")
         .join(format!("state-{:06}.json", number(state, "revision")?));
-    fleet::persist(&history, state)?;
+    // Seal the new inode before its no-clobber publication; no published
+    // history revision is subsequently modified or chmodded.
+    let mut revision = tempfile::NamedTempFile::new_in(root.join("history"))?;
+    serde_json::to_writer_pretty(revision.as_file_mut(), state)?;
+    revision.as_file_mut().write_all(b"\n")?;
+    use std::os::unix::fs::PermissionsExt;
+    revision
+        .as_file()
+        .set_permissions(fs::Permissions::from_mode(0o444))?;
+    revision.as_file().sync_all()?;
+    revision
+        .persist_noclobber(&history)
+        .map_err(|e| anyhow!("191 immutable revision publication: {e}"))?;
+    File::open(root.join("history"))?.sync_all()?;
     // History is durable before replacing current. A crash can leave an orphan
     // history row; next startup refuses existing state/history, never replays.
     let mut tmp = tempfile::NamedTempFile::new_in(root)?;
