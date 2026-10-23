@@ -9,9 +9,9 @@
 //! scan command/maps/cwd/root/exe/fd references before deletion.
 
 use {
-    anyhow::{anyhow, ensure, Context, Result},
+    anyhow::{Context, Result, anyhow, ensure},
     serde::{Deserialize, Serialize},
-    serde_json::{json, Value},
+    serde_json::{Value, json},
     sha2::{Digest as _, Sha256},
     std::{
         collections::{BTreeMap, BTreeSet},
@@ -320,16 +320,34 @@ fn validate_warmup223_outcome(plan: &Plan, outcome: &Value) -> Result<()> {
     // Reproducibility must survive scratch deletion, independent of a stale
     // receipt saying that the source existed earlier. These inputs are sealed.
     for (path, sha) in [
-        ("/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst", "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"),
-        ("/var/lib/jetstreamer/horizon-223-warmup-e3d48954-v1/historical-worker", "b99691fd5995fe5f06e508cfd8f156b8e5cb7342ddab503fb2383e42e712d025"),
-        ("/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1/jetstreamer-node", "90474659be2a4a7d1cc9d4dfe3d5ab1587adb1b388b83163b2bf16c771624f66"),
-        ("/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1/epoch-hashes-223-prefix.txt", "9ce886d556f70e84386dbf1b2c4abc4b4fb7ea57064b903e50ff6b34479a0c15"),
-        ("/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2", "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"),
+        (
+            "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst",
+            "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665",
+        ),
+        (
+            "/var/lib/jetstreamer/horizon-223-warmup-e3d48954-v1/historical-worker",
+            "b99691fd5995fe5f06e508cfd8f156b8e5cb7342ddab503fb2383e42e712d025",
+        ),
+        (
+            "/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1/jetstreamer-node",
+            "90474659be2a4a7d1cc9d4dfe3d5ab1587adb1b388b83163b2bf16c771624f66",
+        ),
+        (
+            "/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1/epoch-hashes-223-prefix.txt",
+            "9ce886d556f70e84386dbf1b2c4abc4b4fb7ea57064b903e50ff6b34479a0c15",
+        ),
+        (
+            "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2",
+            "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+        ),
     ] {
         let path = Path::new(path);
         let m = fs::symlink_metadata(path)?;
-        ensure!(m.is_file() && m.uid() == 0 && m.mode() & 0o222 == 0
-            && file_sha256(path)? == sha, "warmup retained input differs:{}", path.display());
+        ensure!(
+            m.is_file() && m.uid() == 0 && m.mode() & 0o222 == 0 && file_sha256(path)? == sha,
+            "warmup retained input differs:{}",
+            path.display()
+        );
     }
     Ok(())
 }

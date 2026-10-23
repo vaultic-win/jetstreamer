@@ -1,5 +1,7 @@
 //! Same-sample capacity decisions. This receipt is never launch authority.
 use super::*;
+#[path = "routine_capacity186.rs"]
+mod candidate186;
 #[path = "routine_capacity_window.rs"]
 mod expanded_window;
 #[path = "routine_memory_target.rs"]
@@ -170,6 +172,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         json!({"schema":"jetstreamer-horizon-capacity-decision-v2","question":"Can I fit another disjoint lane now?",
         "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
         "memory_concurrency_target":memory_report,"expanded_fleet_window":window,
+        "capped186_budget":candidate186::report(p,o),
         "live_production_lanes":live.len(),"proven_production_lanes":PROVEN,"live_owners":live,
         "live_private_qualification_lanes":diagnostic_live.len(),"live_total_replay_lanes":live.len()+diagnostic_live.len(),
         "proven_point_evidence":{"path":"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T063958Z.json","sha256":"87d714a3652649a2bcf2bd0f0629d3638785e76e45c9286bfd62fb7aeb0d1b99"},
