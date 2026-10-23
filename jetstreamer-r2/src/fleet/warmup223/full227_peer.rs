@@ -18,6 +18,32 @@ fn effective_limit(requested: u64, page_size: u64) -> Result<u64> {
     );
     Ok(requested / page_size * page_size)
 }
+fn memory_envelope(
+    requested: &Value,
+    properties: &BTreeMap<String, String>,
+    kernel: &BTreeMap<String, u64>,
+    page_size: u64,
+) -> Result<()> {
+    for (key, file) in [
+        ("MemoryHigh", "memory.high"),
+        ("MemoryMax", "memory.max"),
+        ("MemorySwapMax", "memory.swap.max"),
+    ] {
+        let raw = requested[key]
+            .as_str()
+            .context("v2 sealed requested memory limit missing")?;
+        ensure!(
+            properties.get(key).map(String::as_str) == Some(raw),
+            "v2 full227 requested systemd memory limit changed:{key}"
+        );
+        let expected = effective_limit(raw.parse()?, page_size)?;
+        ensure!(
+            kernel.get(file) == Some(&expected),
+            "v2 full227 effective kernel memory limit changed:{file}"
+        );
+    }
+    Ok(())
+}
 fn roster(f: &Value) -> Result<&Value> {
     let rows = f["active"].as_array().context("v2 complete owner census")?;
     ensure!(
@@ -113,18 +139,28 @@ pub(super) fn protect(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     let caps = singleton227_capture::properties(lane::UNIT, "MemoryHigh,MemoryMax,MemorySwapMax")?;
     let page_size = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })
         .context("v2 kernel page size unavailable")?;
-    for key in ["MemoryHigh", "MemoryMax", "MemorySwapMax"] {
-        let requested = origin["sandbox"][key]
-            .as_str()
-            .context("v2 requested full227 memory limit missing")?
-            .parse::<u64>()?;
-        let expected = effective_limit(requested, page_size)?.to_string();
-        ensure!(
-            caps.get(key).map(String::as_str) == Some(expected.as_str()),
-            "v2 full227 hard-memory envelope changed:{key}"
-        );
-    }
-    Ok(())
+    let expected_group = format!("/system.slice/{}", lane::UNIT);
+    ensure!(
+        u["ControlGroup"] == expected_group,
+        "v2 full227 cgroup path differs"
+    );
+    let group = Path::new("/sys/fs/cgroup").join(expected_group.trim_start_matches('/'));
+    ensure!(
+        group.canonicalize()? == group,
+        "v2 full227 cgroup path redirected"
+    );
+    let kernel = ["memory.high", "memory.max", "memory.swap.max"]
+        .into_iter()
+        .map(|name| {
+            Ok((
+                name.to_owned(),
+                fs::read_to_string(group.join(name))?
+                    .trim()
+                    .parse::<u64>()?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    memory_envelope(&origin["sandbox"], &caps, &kernel, page_size)
 }
 fn remaining_memory(o: &Value, cap: u64) -> Result<u64> {
     let rows = o["diagnostic_replays"]
@@ -325,6 +361,42 @@ mod tests {
         assert_eq!(effective_limit(0, 4096).unwrap(), 0);
         assert!(effective_limit(225_000_000_000, 0).is_err());
         assert!(effective_limit(225_000_000_000, 3).is_err());
+    }
+    #[test]
+    fn requested_systemd_and_effective_kernel_caps_are_independent_gates() {
+        let requested =
+            json!({"MemoryHigh":"150000000000","MemoryMax":"225000000000","MemorySwapMax":"0"});
+        let properties = [
+            ("MemoryHigh".into(), "150000000000".into()),
+            ("MemoryMax".into(), "225000000000".into()),
+            ("MemorySwapMax".into(), "0".into()),
+        ]
+        .into_iter()
+        .collect::<BTreeMap<String, String>>();
+        let kernel = [
+            ("memory.high".into(), 149_999_996_928),
+            ("memory.max".into(), 224_999_997_440),
+            ("memory.swap.max".into(), 0),
+        ]
+        .into_iter()
+        .collect::<BTreeMap<String, u64>>();
+        memory_envelope(&requested, &properties, &kernel, 4096).unwrap();
+        for key in ["MemoryHigh", "MemoryMax", "MemorySwapMax"] {
+            let mut wrong = properties.clone();
+            wrong.insert(key.into(), "1".into());
+            assert!(memory_envelope(&requested, &wrong, &kernel, 4096).is_err());
+        }
+        for name in ["memory.high", "memory.max", "memory.swap.max"] {
+            let mut wrong = kernel.clone();
+            *wrong.get_mut(name).unwrap() += 4096;
+            assert!(memory_envelope(&requested, &properties, &wrong, 4096).is_err());
+        }
+        let mut rounded_properties = properties.clone();
+        rounded_properties.insert("MemoryHigh".into(), "149999996928".into());
+        assert!(memory_envelope(&requested, &rounded_properties, &kernel, 4096).is_err());
+        let mut unrounded_kernel = kernel.clone();
+        unrounded_kernel.insert("memory.max".into(), 225_000_000_000);
+        assert!(memory_envelope(&requested, &properties, &unrounded_kernel, 4096).is_err());
     }
     fn fleet() -> Value {
         let mut rows = super::super::OWNERS
