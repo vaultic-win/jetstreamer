@@ -288,6 +288,12 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   least 1,800 seconds after the preceding routine sample.
   Use that reference's measured-budget and time-to-sidecar policies to qualify capacity estimates
   and choose among admissible candidates; numerical epoch order alone is not a throughput policy.
+- Continuously reassess whether the campaign is maximizing safe, useful host capacity at every
+  existing 30-minute observation, user-requested status check, and authenticated lane-completion or
+  failure event. Recompute admission from current live claims rather than stale reservations,
+  promptly fill admissible capacity or start the bounded qualification needed to unlock it, and
+  record the concrete limiter for any idle capacity. Optimize verified R2 sidecars per day, not
+  utilization percentages; preserve all resource/integrity gates and add no extra routine polls.
 - Define the filesystem safety floor for a campaign century from resulting `.jet` sizes, not from
   snapshots, replay scratch, or a fixed multi-terabyte constant. For the current century use epochs
   200 through 300 inclusive. Select each epoch at most once and include only canonical complete
