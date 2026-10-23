@@ -156,9 +156,13 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
         .as_array()
         .context("207 diagnostic census")?
     {
+        if diagnostic["status"] != "observed" {
+            unavailable_is_inactive(diagnostic, f)?;
+            continue;
+        }
         ensure!(
-            diagnostic["status"] == "observed" && diagnostic["error"].is_null(),
-            "207 unobserved live diagnostic"
+            diagnostic["error"].is_null(),
+            "207 observed diagnostic has error"
         );
         rows.push(&diagnostic["observation"]);
     }
@@ -196,6 +200,24 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
         "207 resource census has an unaccounted owner"
     );
     Ok((t, required_memory))
+}
+fn unavailable_is_inactive(d: &Value, f: &Value) -> Result<()> {
+    let name = d["producer_unit"]
+        .as_str()
+        .context("207 unavailable owner")?;
+    ensure!(
+        d["status"] == "unavailable"
+            && d["observation"].is_null()
+            && !f["active"]
+                .as_array()
+                .context("207 complete active census")?
+                .iter()
+                .any(|r| {
+                    singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] == name)
+                }),
+        "207 unobserved diagnostic still owns live capacity"
+    );
+    Ok(())
 }
 fn actual_memory() -> Result<u64> {
     fs::read_to_string("/proc/meminfo")?
@@ -578,6 +600,19 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unavailable_terminal_diagnostic_is_ignored_only_outside_the_complete_live_census() {
+        let d = json!({"producer_unit":singleton227_admission::NATIVE_UNIT,"status":"unavailable","observation":null});
+        unavailable_is_inactive(&d, &json!({"active":[]})).unwrap();
+        assert!(
+            unavailable_is_inactive(
+                &d,
+                &json!({"active":[{"unit":{"Id":singleton227_admission::NATIVE_UNIT}}]})
+            )
+            .is_err()
+        );
+        assert!(unavailable_is_inactive(&d, &json!({"active":[{"unrecognized":true}]})).is_err());
+    }
     #[test]
     fn candidate_cannot_borrow_replay_or_another_profile_fingerprint() {
         let mut p = json!({"schema":"jetstreamer-private-epoch207-native-resource-plan-v1","epoch":207,"mode":"native-cold","unit":c::UNIT,"run_root":c::ROOT,
