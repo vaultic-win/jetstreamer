@@ -3352,6 +3352,8 @@ async fn main() -> Result<()> {
                 | "holding-restore-genesis-probe"
                 | "holding-inspect136"
                 | "holding-disable136-retry"
+                | "holding-check-retire136"
+                | "holding-retire136"
         )
     ) {
         return holding::run().await;

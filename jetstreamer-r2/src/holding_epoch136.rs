@@ -1,7 +1,20 @@
-//! Read-only inspection of the exact retained failed136 prefix. No retirement.
+//! Exact failed136 inspection, stopped-controller masking and separately gated
+//! authenticated-custody local retirement. No canonical publication or job resume.
 use super::*;
 #[path = "holding_epoch136_control.rs"]
 mod control;
+#[path = "holding_epoch136_retire.rs"]
+mod retire;
+
+pub(super) async fn retire_local(
+    client: &Client,
+    m: &Mapping,
+    value: Value,
+    spec: &Bound,
+    check: bool,
+) -> Result<()> {
+    retire::run(client, m, &serde_json::from_value(value)?, spec, check).await
+}
 
 pub(super) fn disable_retry(m: &Mapping, value: Value, spec: &Bound) -> Result<()> {
     control::disable(m, &serde_json::from_value(value)?, spec)

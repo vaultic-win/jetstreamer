@@ -236,6 +236,32 @@ pub(crate) fn staged_references_exact(
     staged_references_inner(roots, target, missing, terminal_fragments, false)
 }
 
+/// Read-only staged-reference census for an independently authenticated lifecycle
+/// target. This public entry point permits no fragment exclusions.
+pub fn sol_staged_path_references(target: &Path) -> Result<Value> {
+    ensure!(
+        target.is_absolute()
+            && target.parent().is_some()
+            && target != Path::new("/")
+            && target.starts_with("/home/sol/.jetstreamer-private")
+            && target.canonicalize()? == target,
+        "staged-reference target must be canonical and non-root"
+    );
+    let roots = [
+        Path::new("/etc/systemd/system"),
+        Path::new("/run/systemd/transient"),
+        Path::new("/run/systemd/system"),
+        Path::new("/home/sol/.config/systemd/user"),
+    ];
+    let mut missing = Vec::new();
+    let references = staged_references_exact(&roots, target, &mut missing, &BTreeSet::new())?;
+    Ok(
+        json!({"schema":"jetstreamer-staged-path-reference-census-v2","target":target,
+        "references":references,"missing_inactive_unit_aliases":missing,
+        "terminal_fragment_exclusions":[]}),
+    )
+}
+
 fn staged_references_inner(
     roots: &[&Path],
     target: &Path,
@@ -774,6 +800,33 @@ mod tests {
             )
             .unwrap()
             .is_empty()
+        );
+    }
+    #[test]
+    fn no_exclusion_staged_scan_preserves_consumers_until_their_unit_is_masked() {
+        let d = tempfile::tempdir().unwrap();
+        let target = d.path().join("retained-lane");
+        fs::create_dir(&target).unwrap();
+        let unit = d.path().join("old.service");
+        fs::write(
+            &unit,
+            format!(
+                "ExecStart=/reader --input={}/source.jet\n",
+                target.display()
+            ),
+        )
+        .unwrap();
+        let mut missing = Vec::new();
+        assert_eq!(
+            staged_references_exact(&[d.path()], &target, &mut missing, &BTreeSet::new()).unwrap(),
+            vec![unit.display().to_string()]
+        );
+        fs::remove_file(&unit).unwrap();
+        std::os::unix::fs::symlink("/dev/null", &unit).unwrap();
+        assert!(
+            staged_references_exact(&[d.path()], &target, &mut missing, &BTreeSet::new())
+                .unwrap()
+                .is_empty()
         );
     }
     #[test]
