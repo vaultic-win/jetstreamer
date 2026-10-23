@@ -3398,6 +3398,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-prefix204") {
         return fleet::admit_prefix204();
     }
+    if env::args().nth(1).as_deref() == Some("admit-publication203") {
+        return fleet::admit_publication203();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-handoff203") {
+        return fleet::capture_handoff203();
+    }
     if env::args().nth(1).as_deref() == Some("capture-prefix204") {
         return fleet::capture_prefix204();
     }

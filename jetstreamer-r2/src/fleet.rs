@@ -36,6 +36,7 @@ mod private144;
 mod private144_scan;
 mod private157;
 mod publication144_history;
+mod publication203;
 mod ram_auxiliary;
 mod retained220;
 mod runtime157;
@@ -86,6 +87,12 @@ pub(super) fn admit_prefix204() -> Result<()> {
 }
 pub(super) fn capture_prefix204() -> Result<()> {
     prefix204_capture::run()
+}
+pub(super) fn admit_publication203() -> Result<()> {
+    publication203::admit()
+}
+pub(super) fn capture_handoff203() -> Result<()> {
+    publication203::capture()
 }
 pub(super) fn capture_prefix205() -> Result<()> {
     prefix205_capture::run()
@@ -2010,13 +2017,24 @@ pub(super) async fn run() -> Result<()> {
                 plan.admission_transition_guard.is_none(),
                 "metadata event cannot borrow replay admission"
             );
-            publication144_history::event_predecessor(
-                &previous,
-                &plan,
-                &bound_json(binding)?,
-                sample,
-                started_seconds,
-            )?;
+            let event = bound_json(binding)?;
+            if event["schema"] == "jetstreamer-exact203-phase-handoff-v1" {
+                publication203::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else {
+                publication144_history::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            }
         } else if let Some(binding) = &plan.admission_transition_guard {
             let guard = bound_json(binding)?;
             let guard_plan = bound_json(&BoundFile {
@@ -2150,6 +2168,7 @@ pub(super) async fn run() -> Result<()> {
         );
     }
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
+    publication203::event_census(&plan, &before)?;
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
