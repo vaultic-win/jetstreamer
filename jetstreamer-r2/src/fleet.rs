@@ -34,6 +34,12 @@ mod native209_capture;
 mod native209_event;
 mod native209_full227;
 mod native209_terminal;
+mod native228;
+mod native228_admission;
+mod native228_capture;
+mod native228_event;
+mod native228_peer209;
+mod native228_terminal;
 mod original141;
 mod original141_capped;
 mod original141_freeze;
@@ -210,6 +216,18 @@ pub(super) fn capture_native209_terminal() -> Result<()> {
 pub(super) fn native209_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
     Ok((native209::UNIT.into(), native209_terminal::validate(proof)?))
 }
+pub(super) fn admit_native228_input() -> Result<()> {
+    native228_admission::run()
+}
+pub(super) fn capture_native228_input() -> Result<()> {
+    native228_capture::run()
+}
+pub(super) fn capture_native228_terminal() -> Result<()> {
+    native228_terminal::capture()
+}
+pub(super) fn native228_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    Ok((native228::UNIT.into(), native228_terminal::validate(proof)?))
+}
 pub(super) fn validate_warmup223_status_claim(value: &Value) -> Result<()> {
     warmup223::status_claim(value)
 }
@@ -222,6 +240,8 @@ pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
     let claim: PipelineClaim = serde_json::from_value(value.clone())?;
     if claim.epoch == 207 && native207::scope(&claim.phase, &claim.unit) {
         native207::claim(&claim)
+    } else if claim.epoch == 228 && native228::scope(&claim.phase, &claim.unit) {
+        native228::claim(&claim)
     } else if claim.epoch == 209 && native209::scope(&claim.phase, &claim.unit) {
         native209::claim(&claim)
     } else if claim.epoch == 223 && cold223_scan::scope(&claim.phase, &claim.unit) {
@@ -503,6 +523,9 @@ pub(super) fn pipeline_unit_range(
     if native209::scope(phase, unit) {
         return Ok(209..=209);
     }
+    if native228::scope(phase, unit) {
+        return Ok(228..=228);
+    }
     if singleton227::native_scope(phase, unit) {
         return Ok(227..=227);
     }
@@ -713,6 +736,8 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         }
         if native207::scope(&claim.phase, &claim.unit) {
             native207::live(claim, current)?;
+        } else if native228::scope(&claim.phase, &claim.unit) {
+            native228::live(claim, current)?;
         } else if native209::scope(&claim.phase, &claim.unit) {
             native209::live(claim, current)?;
         }
@@ -2309,6 +2334,16 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == native228_terminal::SCHEMA {
+                native228_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == native228::SCHEMA {
+                native228_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == native207::SCHEMA {
                 native207_event::event_predecessor(
                     &previous,
@@ -2462,6 +2497,8 @@ pub(super) async fn run() -> Result<()> {
         }
         if native207::scope(&claim.phase, &claim.unit) {
             native207::claim(claim)?;
+        } else if native228::scope(&claim.phase, &claim.unit) {
+            native228::claim(claim)?;
         } else if native209::scope(&claim.phase, &claim.unit) {
             native209::claim(claim)?;
         }
@@ -2498,6 +2535,7 @@ pub(super) async fn run() -> Result<()> {
     singleton227_terminal::terminal_census(&plan, &before)?;
     native207_terminal::census_check(&plan, &before)?;
     native209_terminal::census_check(&plan, &before)?;
+    native228_terminal::census_check(&plan, &before)?;
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native209::SCHEMA
     {
@@ -2516,6 +2554,25 @@ pub(super) async fn run() -> Result<()> {
             "native209 event requires one bound new owner"
         );
         native209_event::event_census(&previous, &before, claims[0])?;
+    }
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == native228::SCHEMA
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native228 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| native228::scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding))
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native228 event requires one bound new owner"
+        );
+        native228_event::event_census(&previous, &before, claims[0])?;
     }
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native207::SCHEMA
@@ -2627,6 +2684,7 @@ pub(super) async fn run() -> Result<()> {
         };
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
             || native209::scope(&claim.phase, &claim.unit)
+            || native228::scope(&claim.phase, &claim.unit)
             || native207::scope(&claim.phase, &claim.unit)
             || tail223_scan::scope(&claim.phase, &claim.unit)
             || cold223_scan::scope(&claim.phase, &claim.unit)
@@ -2648,6 +2706,7 @@ pub(super) async fn run() -> Result<()> {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
                         || ((tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)
+                            || native228::scope(&claim.phase, &claim.unit)
                             || native207::scope(&claim.phase, &claim.unit)
                             || cold223_scan::scope(&claim.phase, &claim.unit)
                             || singleton227::native_scope(&claim.phase, &claim.unit)

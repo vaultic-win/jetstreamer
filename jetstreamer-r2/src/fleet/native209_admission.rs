@@ -266,7 +266,7 @@ fn native227_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
     singleton227::native_live(&claim, owner)?;
     Ok(claim)
 }
-fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
+pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let (mut total, mut evidence) = singleton227_admission::auxiliary_memory(f)?;
     let (full_growth, full_evidence) = native209_full227::memory(f)?;
     total = total
@@ -314,7 +314,7 @@ fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     }
     Ok((total, evidence))
 }
-fn protected_growth(
+pub(super) fn protected_growth(
     f: &Value,
     o: &Value,
     guards: &BTreeMap<String, BoundFile>,
