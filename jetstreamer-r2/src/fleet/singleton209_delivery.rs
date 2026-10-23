@@ -92,25 +92,47 @@ fn cohort(v: &Value, a: &LocalArchive) -> Result<()> {
                 .context("209 incomplete native checkpoint hash")?;
         }
     }
-    ensure!(v["schema"]=="jetstreamer-root-cohort-publication-receipt-v2"
-        && v["manifest_fingerprint"]==c::FINGERPRINT && v["epochs"]==json!([209])
-        && gate["kind"]=="sealed-root-checkpoint-cohort" && gate["version"]==1
-        && checkpoints.len()==1 && checkpoints[0]["slot"]==90719638u64
-        && checkpoints[0]["accounts_hash"]==bytes32("3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ")?
-        && members.len()==1 && members[0]["epoch"]==209
-        && members[0]["bootstrap"]["slot"]==90287519u64
-        && members[0]["bootstrap"]["accounts_hash"]==bytes32("6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp")?
-        && members[0]["bootstrap"]["slot_complete"]==true && members[0]["terminal"]["slot_complete"]==true
-        && members[0]["terminal"]["slot"].as_u64().is_some_and(|n|(90719638..=90719999).contains(&n))
-        && v["outcome"]["kind"]=="committed" && published.len()==1 && published[0]["epoch"]==209
-        && published[0]["archive_sha256"]==a.sha256_hex
-        && v["destination"]["path_base64"]==BASE64_STANDARD.encode(a.archive_path.parent().context("209 committed output parent")?.as_os_str().as_bytes())
-        && published[0]["archive_path_base64"]==BASE64_STANDARD.encode(a.archive_path.as_os_str().as_bytes())
-        && published[0]["checksum_path_base64"]==BASE64_STANDARD.encode(a.sidecar_path.as_os_str().as_bytes())
-        && published[0]["committed_archive"]["device"]==a.identity.device
-        && published[0]["committed_archive"]["inode"]==a.identity.inode
-        && published[0]["committed_archive"]["length"]==a.length,
-        "209 cohort receipt does not preserve canonical root, native terminal and exact committed archive");
+    ensure!(
+        v["schema"] == "jetstreamer-root-cohort-publication-receipt-v2"
+            && v["manifest_fingerprint"] == c::FINGERPRINT
+            && v["epochs"] == json!([209])
+            && gate["kind"] == "sealed-root-checkpoint-cohort"
+            && gate["version"] == 1
+            && checkpoints.len() == 1
+            && checkpoints[0]["slot"] == 90719638u64
+            && checkpoints[0]["accounts_hash"]
+                == bytes32("3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ")?
+            && members.len() == 1
+            && members[0]["epoch"] == 209
+            && members[0]["bootstrap"]["slot"] == 90287519u64
+            && members[0]["bootstrap"]["accounts_hash"]
+                == bytes32("6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp")?
+            && members[0]["bootstrap"]["slot_complete"] == true
+            && members[0]["terminal"]["slot_complete"] == true
+            && members[0]["terminal"]["slot"]
+                .as_u64()
+                .is_some_and(|n| (90719638..=90719999).contains(&n))
+            && v["outcome"]["kind"] == "committed"
+            && published.len() == 1
+            && published[0]["epoch"] == 209
+            && published[0]["archive_sha256"] == a.sha256_hex
+            && v["destination"]["path_base64"]
+                == BASE64_STANDARD.encode(
+                    a.archive_path
+                        .parent()
+                        .context("209 committed output parent")?
+                        .as_os_str()
+                        .as_bytes()
+                )
+            && published[0]["archive_path_base64"]
+                == BASE64_STANDARD.encode(a.archive_path.as_os_str().as_bytes())
+            && published[0]["checksum_path_base64"]
+                == BASE64_STANDARD.encode(a.sidecar_path.as_os_str().as_bytes())
+            && published[0]["committed_archive"]["device"] == a.identity.device
+            && published[0]["committed_archive"]["inode"] == a.identity.inode
+            && published[0]["committed_archive"]["length"] == a.length,
+        "209 cohort receipt does not preserve canonical root, native terminal and exact committed archive"
+    );
     let encoded = v["publication_context_base64"]
         .as_str()
         .context("209 bound cohort context")?;
