@@ -1,13 +1,14 @@
 //! Closed admission/ownership for the first16-slot failure-context experiment.
 use super::*;
-const UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v2.service";
+const HISTORICAL_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
+const UNIT: &str = "horizon-qualify-223-warmup-resource-5072b7ba-v4.service";
 const ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v2";
-const RUNNER: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/jetstreamer-epoch223-warmup-resource";
-const RUNNER_SHA: &str = "891dda987434bfe9435d23985c764c9a940be32d34f9c552bebd0a16b5caa6fa";
-const PLAN: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/actual-plan.json";
-const PLAN_SHA: &str = "773679ba1d76444a0f8783d61c40c4ed1844773211ddaa5d48d64a0eea2e6682";
-const STATE: &str = "/var/lib/jetstreamer/horizon-warmup223-admission-v2";
+    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-5072b7ba-v4";
+const RUNNER: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-free-floor-v4/jetstreamer-epoch223-warmup-resource";
+const RUNNER_SHA: &str = "5072b7ba0c0599a8290b197fcf74bea87ed823234fbd23c2953604f65b11b8db";
+const PLAN: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-free-floor-v4/actual-plan.json";
+const PLAN_SHA: &str = "84bdae34da219005672d5cb92ecad0e6c13c14712cd3a199f9f2a272ea304216";
+const STATE: &str = "/var/lib/jetstreamer/horizon-warmup223-admission-v4";
 const OWNERS: [(&str, &str); 4] = [
     (
         "horizon-upload-203-v4-20261023-v1.service",
@@ -27,7 +28,7 @@ const OWNERS: [(&str, &str); 4] = [
     ),
 ];
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
-    phase == "private-warmup-reproduction" && unit == UNIT
+    phase == "private-warmup-reproduction" && matches!(unit, UNIT | HISTORICAL_UNIT)
 }
 fn command() -> String {
     format!(
@@ -184,8 +185,8 @@ fn inputs(f: &Value) -> Result<()> {
         "warmup native input proof differs"
     );
     let cap = bound_json(&BoundFile {
-        path: "/var/lib/jetstreamer/horizon-warmup223-parent-capability-v2/capability.json".into(),
-        sha256: "bec274c5f27d0a79a8e13dfcd1f5b3beaef82447721f6cb5e24ec45e49d55707".into(),
+        path: "/var/lib/jetstreamer/horizon-warmup223-parent-capability-v4/capability.json".into(),
+        sha256: "51dbc6a75faad044e086ac8683057588392bff8124b5c30b64a8cc826af08d14".into(),
     })?;
     ensure!(
         cap["bindings"]["self_sha256"] == RUNNER_SHA
@@ -369,7 +370,7 @@ pub(super) fn run(capture: bool) -> Result<()> {
             &json!({
             "schema":"jetstreamer-private-warmup223-admission-v1","spec":private157::binding(&binding),"self_sha256":self_sha,
             "recorded_unix_seconds":now,"observer":private157::binding(&spec.observer),"fleet":private157::binding(&spec.fleet),"guards":guards,
-            "decision":"pass","century_floor":floor,"maximum_new_memory_bytes":128u64<<30,"maximum_new_scratch_bytes":300_000_000_000u64,
+            "decision":"pass","century_floor":floor,"maximum_new_memory_bytes":128u64<<30,"scratch_planning_bytes":300_000_000_000u64,
             "required_observed_free_bytes":1_511_435_598_739u64,"expected_exec_start":command(),"replay_launch_authorized":false,
             "publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         )?;
@@ -438,6 +439,31 @@ fn sandbox(c: &PipelineClaim, current: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
+    if c.unit == HISTORICAL_UNIT {
+        let binding = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-warmup223-admission-v3/launch.json".into(),
+            sha256: "742656ca51cc60e14800ab76b379de384d3341d26696f33c7c992de772eeba6d".into(),
+        };
+        ensure!(
+            scope(&c.phase, &c.unit)
+                && c.epoch == 223
+                && c.invocation_id == "1fffc79d92ad458a9a4d334a48b40dfc"
+                && c.evidence.as_slice() == std::slice::from_ref(&binding),
+            "historical warmup claim differs"
+        );
+        let launch = bound_json(&binding)?;
+        ensure!(
+            launch["expected_exec_start"] == c.expected_exec_start,
+            "historical warmup command differs"
+        );
+        // The immutable launch hash binds every original field. Its terminal
+        // receipt remains available independently of the failed scratch tree.
+        bound_json(&BoundFile {
+            path: "/var/lib/jetstreamer/horizon-warmup223-terminal-v3/failure.json".into(),
+            sha256: "7f1671b6f74946f2fc4f2b2fd13569b59c4015739889080dc395db2191c18c73".into(),
+        })?;
+        return Ok(());
+    }
     ensure!(
         scope(&c.phase, &c.unit)
             && c.epoch == 223
@@ -477,9 +503,13 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
+    ensure!(
+        c.unit == UNIT,
+        "terminal historical warmup cannot become live"
+    );
     validate(c)?;
     sandbox(c, current)?;
-    let gu = unit("horizon-warmup223-protective-v2.service")?;
+    let gu = unit("horizon-warmup223-protective-v4.service")?;
     let iid = gu["InvocationID"]
         .as_str()
         .context("warmup protective invocation")?;
@@ -488,12 +518,12 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
         "warmup protective iid"
     );
     let binding: BoundFile = serde_json::from_value(private157::file_binding(
-        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v2")
+        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v4")
             .join(format!("sample-{iid}.json")),
     )?)?;
     let g = bound_json(&binding)?;
     let pb: BoundFile = serde_json::from_value(private157::file_binding(Path::new(
-        "/var/lib/jetstreamer/horizon-warmup223-guard-v2/guard-plan.json",
+        "/var/lib/jetstreamer/horizon-warmup223-guard-v4/guard-plan.json",
     ))?)?;
     let p = bound_json(&pb)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -513,17 +543,19 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
             && g.get("root_physical_observation_error")
                 .is_some_and(Value::is_null)
             && g["maximum_worker_vmas"] == 3_500_000
-            && g["maximum_root_physical_bytes"] == 300_000_000_000u64
+            && g["maximum_root_physical_bytes"].is_null()
+            && p.get("maximum_root_physical_bytes").is_none()
             && p["unit"] == UNIT
             && p["invocation_id"] == c.invocation_id
             && p["worker_root"] == format!("{ROOT}/scratch")
+            && g["minimum_free_bytes"] == 1_511_435_598_739u64
             && p["minimum_free_bytes"] == 1_511_435_598_739u64,
         "warmup external VMA/disk guard unavailable or tripped"
     );
     let out = ProcessCommand::new("systemctl")
         .args([
             "show",
-            "horizon-warmup223-protective-v2.timer",
+            "horizon-warmup223-protective-v4.timer",
             "--property=ActiveState",
             "--value",
         ])
@@ -583,7 +615,7 @@ pub(super) fn event_predecessor(
     let claims = p
         .pipeline_claims
         .iter()
-        .filter(|c| scope(&c.phase, &c.unit))
+        .filter(|c| c.phase == "private-warmup-reproduction" && c.unit == UNIT)
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
@@ -645,7 +677,7 @@ pub(super) fn event_census(p: &Plan, c: &BTreeMap<String, Value>) -> Result<()> 
             let claim = p
                 .pipeline_claims
                 .iter()
-                .find(|c| scope(&c.phase, &c.unit))
+                .find(|c| c.phase == "private-warmup-reproduction" && c.unit == UNIT)
                 .context("warmup event claim")?;
             validate_live(claim, &c[UNIT])?;
         }
@@ -656,6 +688,23 @@ pub(super) fn event_census(p: &Plan, c: &BTreeMap<String, Value>) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn failed_v3_stays_recognized_but_cannot_be_resurrected() {
+        assert!(scope("private-warmup-reproduction", HISTORICAL_UNIT));
+        let claim = PipelineClaim {
+            epoch: 223,
+            phase: "private-warmup-reproduction".into(),
+            unit: HISTORICAL_UNIT.into(),
+            invocation_id: "1fffc79d92ad458a9a4d334a48b40dfc".into(),
+            expected_exec_start: String::new(),
+            evidence: vec![],
+        };
+        let error = validate_live(&claim, &json!({})).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("historical warmup cannot become live"));
+        assert!(validate(&claim).is_err());
+    }
     fn fixture() -> (Spec, Value, Value) {
         let spec = Spec {
             schema: "jetstreamer-private-warmup223-admission-spec-v1".into(),
