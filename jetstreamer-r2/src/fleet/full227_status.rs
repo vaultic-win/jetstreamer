@@ -284,6 +284,57 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
         json!({"journal_invocation_id":iid,"sufficient_for_rates":false,"last":last,"counter_resets":0,"launch_journal_markers":markers,"launch_journal_sha256":hex_lower(&Sha256::digest(&out.stdout))}),
     )
 }
+fn validate_progress_counters(progress: &Value) -> Result<()> {
+    let resets = progress["counter_resets"]
+        .as_u64()
+        .context("full227 reset count missing")?;
+    if resets == 0 {
+        return Ok(());
+    }
+    // The observer adds `current` after a reset instead of current-previous.
+    // Its accumulated slot delta therefore equals last-first iff slots never
+    // reset. Transaction/account resets need not discard that independent rate.
+    let first = &progress["first"];
+    let last = &progress["last"];
+    let a = first["slot"]
+        .as_u64()
+        .context("full227 first slot missing")?;
+    let b = last["slot"].as_u64().context("full227 last slot missing")?;
+    let start = first["realtime_microseconds"]
+        .as_u64()
+        .context("full227 first clock missing")?;
+    let end = last["realtime_microseconds"]
+        .as_u64()
+        .context("full227 last clock missing")?;
+    let duration = end
+        .checked_sub(start)
+        .filter(|n| *n > 0)
+        .context("full227 invalid progress clock")?;
+    let delta = b
+        .checked_sub(a)
+        .context("full227 slot counter moved backwards")?;
+    let rate = delta as f64 / (duration as f64 / 1_000_000.0);
+    let reported = progress["slots_per_second"]
+        .as_f64()
+        .context("full227 slot rate missing")?;
+    ensure!(
+        progress["sufficient_for_rates"] == true
+            && progress["matching_markers"]
+                .as_u64()
+                .is_some_and(|n| n >= 2)
+            && (FIRST..=TERMINAL).contains(&a)
+            && (FIRST..=TERMINAL).contains(&b)
+            && first["terminal_slot"] == TERMINAL
+            && last["terminal_slot"] == TERMINAL
+            && progress["slot_delta"] == delta
+            && rate.is_finite()
+            && rate > 0.0
+            && reported.is_finite()
+            && (reported - rate).abs() <= (rate * 1e-9).max(1e-12),
+        "full227 accounting resets lack an independently monotonic slot window"
+    );
+    Ok(())
+}
 fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> {
     ensure!(
         p.initialization_allowance_millis > 0
@@ -305,10 +356,7 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
         .try_fold(0u64, |a, b| {
             a.checked_add(*b).context("full227 downstream overflow")
         })?;
-    ensure!(
-        progress["counter_resets"].as_u64() == Some(0),
-        "full227 progress counters reset"
-    );
+    validate_progress_counters(progress)?;
     let slot = progress["last"]["slot"].as_u64();
     let replay = slot.is_some_and(|n| n >= FIRST);
     let observed_slot = slot.unwrap_or(FIRST - 1);
@@ -685,6 +733,34 @@ mod tests {
         let foreign = json!({"counter_resets":0,"last":{"slot":WARMUP_FIRST-1},
             "sufficient_for_rates":false});
         assert!(estimate(&foreign, 0, &p).is_err());
+    }
+    #[test]
+    fn accounting_resets_retain_only_an_independently_proven_slot_rate() {
+        let rate = 1253.0 / 624.033594;
+        let progress = json!({"counter_resets":2,"sufficient_for_rates":true,"matching_markers":209,
+            "first":{"slot":FIRST+41,"terminal_slot":TERMINAL,"realtime_microseconds":1000000},
+            "last":{"slot":FIRST+1294,"terminal_slot":TERMINAL,"realtime_microseconds":625033594},
+            "slot_delta":1253,"slots_per_second":rate});
+        assert_eq!(
+            estimate(&progress, 1_000_000, &model()).unwrap().0,
+            "replay"
+        );
+        for (field, value) in [
+            ("slot_delta", json!(1254)),
+            ("slots_per_second", json!(rate * 2.0)),
+            ("sufficient_for_rates", json!(false)),
+            ("matching_markers", json!(1)),
+        ] {
+            let mut bad = progress.clone();
+            bad[field] = value;
+            assert!(estimate(&bad, 1_000_000, &model()).is_err(), "{field}");
+        }
+        let mut bad = progress.clone();
+        bad["last"]["slot"] = json!(FIRST);
+        assert!(estimate(&bad, 1_000_000, &model()).is_err());
+        let mut bad = progress;
+        bad["first"]["terminal_slot"] = json!(TERMINAL + 1);
+        assert!(estimate(&bad, 1_000_000, &model()).is_err());
     }
     #[test]
     fn real_progress_switches_phase_and_includes_full_tail_and_delivery() {

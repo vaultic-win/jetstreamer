@@ -79,8 +79,13 @@ They retain the full epoch estimate and provisional rate until epoch recording
 begins; a fast pre-epoch warmup does not shorten the estimate for432000slots.
 ETA includes the complete432000-slot
 epoch, its suffix and every declared downstream stage through verified sidecar
-commit. A sufficient measured rate replaces the provisional rate. Invalid
-measured rates, counter resets, unknown owners or stale samples fail closed.
+commit. A sufficient measured rate replaces the provisional rate. If transaction
+or account counters reset, retain their raw reset count and accept a slot rate
+only when the observer's accumulated slot delta exactly equals last-minus-first,
+both endpoints bind this epoch and terminal slot, and the timestamp-derived rate
+matches the reported rate. The observer's reset accumulation makes this equality
+independent proof that slots themselves never reset. Invalid rates, slot resets,
+unproved accounting resets, unknown owners or stale samples fail closed.
 When initialization exceeds its original allowance, the provisional model
 expands its remaining initialization allowance instead of pinning an overdue
 stage to zero; revise that model from new evidence at the next coordinated poll.
