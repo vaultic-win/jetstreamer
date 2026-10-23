@@ -441,7 +441,7 @@ pub(super) fn admit() -> Result<()> {
         .checked_mul(1024)
         .context("203 memory total overflow")?;
     ensure!(
-        free >= protected_bytes + (64 << 20) && memory >= total / 10 + (16u64 << 30),
+        free >= protected_bytes + (64 << 20) && memory >= total / 10 + (32u64 << 30),
         "203 local publication resource admission failed"
     );
     let after = census(&names, 201, 300)?;
@@ -474,7 +474,7 @@ pub(super) fn admit() -> Result<()> {
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"floor":private157::binding(&s.floor),
         "guards":s.guards,"publisher":s.publisher,"capability":s.capability,"publication_plan":private157::file_binding(&plan_path)?,
         "unit_census_before":before,"unit_census_after":after,"protected_free_bytes":protected_bytes,"available_disk_bytes":free,"available_memory_bytes":memory,
-        "maximum_new_disk_bytes":64u64<<20,"maximum_memory_bytes":16u64<<30,"recorded_unix_seconds":now()?,"maximum_launch_delay_seconds":900,
+        "maximum_new_disk_bytes":64u64<<20,"maximum_memory_bytes":32u64<<30,"publication_memory_max_bytes":16u64<<30,"upload_memory_max_bytes":32u64<<30,"phases_must_be_serial":true,"recorded_unix_seconds":now()?,"maximum_launch_delay_seconds":900,
         "resource_samples_taken":0,"producer_mutations":false,"replay_launch_authorized":false,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     println!("Exact203 publication admitted; no archive or remote mutation performed");
@@ -562,9 +562,9 @@ fn validate_phase_limits(name: &str, p: &BTreeMap<String, String>) -> Result<()>
     } else {
         ensure!(name == UPLOAD, "203 unknown phase sandbox");
         (
-            "4294967296",
-            "8589934592",
-            "1024",
+            "25769803776",
+            "34359738368",
+            "512",
             "strict",
             "read-only",
             "no",
