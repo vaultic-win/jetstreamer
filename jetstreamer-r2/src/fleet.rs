@@ -2575,7 +2575,28 @@ pub(super) async fn run() -> Result<()> {
     for claim in &plan.pipeline_claims {
         let current = &before[&claim.unit];
         let is_active = pipeline_live(claim, current)?;
-        let finalization = if is_active && claim.phase == "producer-finalization" {
+        let finalization = if is_active && (191..=194).contains(&claim.epoch) {
+            let mut proofs = Vec::new();
+            for b in &claim.evidence {
+                let value = bound_json(b)?;
+                if let Some(proof) = super::cohort191_delivery::fleet_proof(
+                    claim.epoch,
+                    &claim.phase,
+                    &claim.unit,
+                    &claim.invocation_id,
+                    &value,
+                    &before,
+                    sample_seconds,
+                )? {
+                    proofs.push(proof);
+                }
+            }
+            ensure!(
+                proofs.len() == 1,
+                "191 delivery claim needs exactly one native custody event"
+            );
+            proofs.remove(0)
+        } else if is_active && claim.phase == "producer-finalization" {
             super::cohort_finalization::observe(current, sample_seconds)?
         } else if is_active && claim.phase == "controller-import-handoff" {
             super::cohort_finalization::observe_handoff(current, sample_seconds)?

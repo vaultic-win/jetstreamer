@@ -809,7 +809,7 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
     let package = delivery198::seal_values(p, "public198-stage", &[("fleet-plan.json", value)])?;
     let plan = file(package.join("fleet-plan.json"), true)?;
     child(
-        &p.tools.r2,
+        cohort191_delivery::fleet_reader(p),
         &[
             "fleet-reconcile".into(),
             plan.path.display().to_string(),

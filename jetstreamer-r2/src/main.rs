@@ -3468,6 +3468,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("check-delivery-191") {
+        return cohort191_delivery::check();
+    }
     if env::args().nth(1).as_deref() == Some("observe-delivery-191") {
         return cohort191_delivery::run();
     }

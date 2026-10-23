@@ -82,6 +82,8 @@ mod assembly144_scans;
 mod assembly144_scans_recover;
 #[path = "routine_cohort191.rs"]
 mod cohort191;
+#[path = "routine_cohort191_delivery.rs"]
+mod cohort191_delivery;
 #[path = "routine_completed144.rs"]
 mod completed144;
 #[path = "routine_continuation144.rs"]
@@ -184,6 +186,8 @@ struct Plan {
     original141_root: Option<original141::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     qualification141_status: Option<qualification141_status::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cohort191_delivery: Option<cohort191_delivery::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_scans: Option<assembly144_scans::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -826,6 +830,12 @@ fn validate_templates(
         );
         epochs.remove(&160);
     }
+    if p.cohort191_delivery.is_some() {
+        cohort191_delivery::validate(p)?;
+        for epoch in 191..=194 {
+            epochs.remove(&epoch);
+        }
+    }
     if p.runtime_handoff157.is_some() {
         runtime157::validate(p)?;
         epochs.remove(&157);
@@ -1347,6 +1357,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     delivery198::derive_fleet(p, &mut fleet)?;
     delivery160::derive_fleet(p, &mut fleet)?;
     public198::derive_fleet(p, &mut fleet)?;
+    cohort191_delivery::derive_fleet(p, &mut fleet)?;
     runtime157::derive_fleet(p, &mut fleet)?;
     prefix157::derive_fleet(p, &mut fleet)?;
     prefix144::derive_fleet(p, &mut fleet)?;
@@ -1580,6 +1591,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     )?;
     let model = repair183::effective_model(p, &model)?;
     let model = repair185::effective_model(p, &model)?;
+    let model = cohort191_delivery::effective_model(p, &model)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1699,6 +1711,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         "replay_launch_authorized":false,"archive_mutations":false}),
     )?;
     let result = (|| -> Result<Value> {
+        cohort191_delivery::prepare(p, &observer)?;
         let (model, fleet) = derive(p, &model, &fleet, &observer)?;
         let model_source = write_new(&p.cycle_directory.join("model-source.json"), &model)?;
         let fleet_source = write_new(&p.cycle_directory.join("fleet-source.json"), &fleet)?;
@@ -1845,6 +1858,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         let publication144_status = publication144::publish(p, &pipeline, &observer)?;
         let delivery160_status = delivery160::publish(p, &pipeline, &observer)?;
         let qualification141_status = qualification141_status::publish(p, &pipeline, &observer)?;
+        let cohort191_status = cohort191_delivery::publish(p, &pipeline, &observer)?;
         let parent = p.fleet_output.parent().context("fleet parent missing")?;
         if !parent.exists() {
             private_dir(parent.parent().context("fleet ancestor missing")?)?;
@@ -1855,7 +1869,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         private_dir(parent)?;
         latest_fleet_unchanged(p, &previous)?;
         child(
-            qualification141_status::fleet_reader(p),
+            cohort191_delivery::fleet_reader(p),
             &[
                 "fleet-reconcile".into(),
                 fleet_bound.path.display().to_string(),
@@ -1883,7 +1897,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
             "inventory":ledger["inventory"],"capacity_decision":capacity,"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
-            "qualification141_status":qualification141_status,"sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
+            "qualification141_status":qualification141_status,"cohort191_delivery":cohort191_status,"sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
     match result {

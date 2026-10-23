@@ -183,3 +183,113 @@ live and denied-owner/check-only paths in the matching sandbox, bind a fresh
 coordinated observer/fleet and native event evidence, and let the parent make
 the explicit immutable metadata handoff. No currently deployed package can be
 named as that future tested publisher until those gates pass.
+
+## Source integration staged after `e0946ae7` (not yet built or deployed)
+
+`e0946ae7` itself contains the pure forecast and an unwired custody draft. The
+subsequent source chunk adds an opt-in `cohort191_delivery` routine profile,
+closed native custody validation in the R2 fleet and numeric pipeline publisher,
+and the compatible independent per-epoch verifier route. These are source
+candidates until the parent qualifies and seals them; no current unit, timer,
+R2 object, replay claim, or healthy owner is changed by staging this code.
+
+The optional routine profile binds `publisher`, the initial `terminal_event`,
+and an exact `/var/lib/jetstreamer/horizon-cohort191-delivery-events-*`
+`event_directory`. It consumes `event-YYYYMMDDTHHMMSSZ.json` from the same existing
+coordinated observation cutoff. An accepted native final-root/four-close event
+removes only191–194 from the ordinary model/config census; the expected ordinary
+list becomes152,153,155,156,183,184,185. Successor serialization preserves the
+profile and derives the next event name from the next scheduled sample, never
+reusing the previous ETA as a fresh observation. The existing publishers and
+pins for141/144/160/198 are retained. The new R2 reader owns only191 metadata and
+the provisional/final fleet reconciliation that must understand its claims.
+
+Missing or invalid current191 custody produces a private no-clobber incident.
+It does not stop the seven ordinary publications, private141 publication, or
+fleet/successor work. An accepted event binds exact original replay receipts,
+controller-rebind proof, original PID/IID, canonical root84239250, four archive
+closes, current artifacts, phase-owner manager start, and the original producer
+clock. Before import it does not demand a future source batch. After import it
+checks the actual native source/public batches, all manifest checkpoint hashes,
+member root summaries, source/public semantics, and controller completion
+attestation; no handwritten batch or ready receipt is admitted. Historical
+source archive files may disappear after import, and authenticated ready members
+may retire, without requiring their old private/public artifact to reappear.
+
+The normal three-word full/plugin receipts are checked at the existing uploader
+receipt directories, with deployed verifier and wrapper hashes. Zero ETA requires
+a canonical durable whole-object-readback R2 receipt, rather than a plan flag.
+Direct native upload and readback forecasts must reproduce their own phase's
+PID/IID-bound progress rate and stall age at the fixed sample cutoff. Upload
+acknowledgements never substitute for readback progress. Source revalidation tail
+estimation still fails closed until its separate progress/policy source is
+qualified. No terminal timestamp is fabricated at84239999: the trusted final
+root remains84239250 and the archive can close after its skipped tail.
+
+### Independent dispatcher contract
+
+The parent owns the new `cohort191_dispatch.rs`; no failed legacy watcher is
+restarted. The custody module exposes:
+
+```rust
+pub(super) fn dispatch_import_check(
+    source_batch: &Bound,
+    public_batch: &Bound,
+    materialized: &BTreeSet<u64>,
+) -> Result<serde_json::Value>
+```
+
+Pass the requested epoch(s) in `materialized`, so later tasks do not require an
+already independently verified/retired predecessor to remain local. This helper
+checks immutable deployment/controller-rebind inputs, native v2 batch gates,
+all four source/public archive-digest and checkpoint semantics, current requested
+public archive identities/checksums, public transaction-marker absence, and the
+current root controller's exact completion attestation. It rechecks state and
+controller before returning. It grants no launch, publication, R2 mutation or
+retirement authority and requires no imagined live verifier before PID1 launches
+one. Its returned receipt binds the actual source/public paths and digests.
+
+The independent runner profile is
+`horizon-verify-canonical-pair-dev-samjohnson191-v1` with:
+
+- Exact epoch191–194, `/home/sol/horizon`, and state
+  `/var/lib/jetstreamer/horizon-cohort191-canonical-verification-20261023-v1/epoch-N/{full,plugin}`.
+- Actual services `horizon-full-verify-N-native191-20261023-v1.service` and
+  `horizon-plugin-verify-N-native191-20261023-v1.service`.
+- Planned sealed runner
+  `/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-horizon-verify-pair`.
+- Existing qualified compatible198 readers (`verify_archive` SHA
+  `5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574`;
+  `horizon_pipeline` SHA
+  `e20892a111f8e26c8e25561a939eaf171771789753059100510c936d92092137`).
+- Independent before/after whole-archive hashes, both full checks, current plugin
+  verification, exact actual service capture, and durable real receipts mirrored
+  into the uploader's existing accepted full/plugin receipt directories.
+
+The runner authenticates its exact archive, sidecar, reader, service, plan and
+fresh observer. The dispatcher must independently call `dispatch_import_check`
+and preserve its native source/public provenance before launch. It must bind the
+runner's newly sealed SHA into the uploader's accepted wrapper allowlists. The
+runner's1TiB read-only home floor is not a growth-reservation proof or a reduction
+of replay guards or century floors. Its one64GiB verifier plus64GiB reserve check
+also does not replace the dispatcher's capacity receipt, current RSS reservation
+ceiling, concurrent compiler reservation, OS statfs and bounded state/log checks.
+
+After191 terminates, `memory_concurrency_target` remains independently computed
+from the actual current owner count and RSS census. The unchanged five-owner
+`capped186_budget` can fail closed without invalidating that four-owner memory
+envelope; it must not be fabricated by retaining191 as a fifth live replay.
+
+### Gates still required before rollout
+
+No builds/tests have run for this source chunk. Coordinate the shared build
+target first; run the meaningful native-terminal, claim-census, progress-rate,
+verifier-profile and old-profile regression tests, then seal and sandbox the
+exact new CLI routes. Qualify the parent's independent dispatch and serial upload
+configuration, actual importer/source-batch capture, all receipt-directory/hash
+allowlists, fresh same-cutoff event generation, queued ownership coverage, and
+source-revalidation tail estimates. A waiting plan is not an active verifier.
+Boundary190–191 through194–195 dispatch stays separate from sidecar publication
+and must use qualified modern readers, rather than the failed legacy watcher,
+before guarded local retirement is enabled. No512GiB remaining-growth claim is
+released until the parent authenticates the completed-cohort transition.

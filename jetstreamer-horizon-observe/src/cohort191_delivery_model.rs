@@ -1,7 +1,7 @@
-//! Candidate arithmetic for a future authenticated191–194 delivery publisher.
-//! No observation, ownership proof, receipt writing, publication or admission.
+//! Forecast arithmetic and pure terminal validation for191–194 metadata.
+//! No observation, receipt writing, publication or admission.
 //! Callers must independently authenticate every input, current phase, queue and
-//! canonical ready pair. This module is deliberately not wired into the routine.
+//! canonical ready pair. Native capture and the optional routine profile own those gates.
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -294,5 +294,183 @@ mod tests {
             remaining_millis: 5,
         };
         assert!(forecast(&p).is_err());
+    }
+}
+
+/// Pure terminal proof used before excluding this cohort from the ordinary
+/// rate-bearing census. A root at84239250 plus four closes is required; no
+/// checkpoint is invented for the skipped tail to84239999.
+pub fn validate_native_terminal(v: &serde_json::Value, cutoff: u64) -> Result<()> {
+    use serde_json::Value;
+    fn fields<'a>(message: &'a str, prefix: &str) -> Result<BTreeMap<&'a str, &'a str>> {
+        let text = message
+            .strip_prefix(prefix)
+            .context("191 native message prefix")?;
+        let text = text.split_once(" (").map_or(text, |(head, _)| head);
+        let mut result = BTreeMap::new();
+        for word in text.split_whitespace() {
+            let (key, value) = word.split_once('=').context("191 native message field")?;
+            ensure!(
+                !value.is_empty() && result.insert(key, value).is_none(),
+                "191 duplicate native field"
+            );
+        }
+        Ok(result)
+    }
+    fn integer(f: &BTreeMap<&str, &str>, key: &str) -> Result<u64> {
+        let s = f.get(key).context("191 missing native integer")?;
+        ensure!(
+            s.bytes().all(|b| b.is_ascii_digit()),
+            "191 malformed native integer"
+        );
+        Ok(s.parse()?)
+    }
+    fn owner(row: &Value, cutoff: u64) -> Result<u64> {
+        ensure!(
+            row["_SYSTEMD_UNIT"]
+                == "jetstreamer-root-sweep-e191-194-t5-20261016-v2-r2-e191-194-lane-a-1.service"
+                && row["_SYSTEMD_INVOCATION_ID"] == "ea93199ed2fa470d99de248c2a10b246"
+                && row["_PID"] == "2189644"
+                && row["_UID"] == "1001",
+            "191 native owner mismatch"
+        );
+        let time: u64 = row["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("191 native time")?
+            .parse()?;
+        ensure!(
+            time > 0
+                && time
+                    <= cutoff
+                        .checked_mul(1_000_000)
+                        .context("191 native cutoff overflow")?,
+            "191 native event is outside sample"
+        );
+        Ok(time)
+    }
+    ensure!(
+        v["trusted_root_slot"] == 84239250u64 && v["archive_terminal_slot"] == 84239999u64,
+        "191 terminal/root geometry changed"
+    );
+    let root_time = owner(&v["root"], cutoff)?;
+    let f = fields(
+        v["root"]["MESSAGE"]
+            .as_str()
+            .context("191 native checkpoint")?,
+        "historical checkpoint ",
+    )?;
+    ensure!(
+        f.len() == 10
+            && integer(&f, "slot")? == 84239250
+            && f.get("complete") == Some(&"true")
+            && f.get("accounts_hash") == Some(&"GCANVakrcunYu9VRe1WdNd7xAPKGdoZNFgpQbagdB9zq")
+            && integer(&f, "tick_height")? == (84239250 + 1) * 64,
+        "191 final canonical checkpoint differs"
+    );
+    for key in ["bank_hash", "accounts_hash", "last_blockhash"] {
+        let h = f.get(key).context("191 native hash")?;
+        ensure!(
+            (32..=44).contains(&h.len())
+                && h.bytes().all(
+                    |b| b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".contains(&b)
+                ),
+            "191 malformed native hash"
+        );
+    }
+    for key in [
+        "capitalization",
+        "transactions",
+        "writes",
+        "next_write_version",
+    ] {
+        integer(&f, key)?;
+    }
+    let closes = v["closes"]
+        .as_array()
+        .context("191 native archive closes")?;
+    ensure!(closes.len() == 4, "191 incomplete/duplicate close census");
+    let mut previous = 0;
+    for row in closes {
+        let time = owner(row, cutoff)?;
+        ensure!(time > previous, "191 closes are reordered or duplicated");
+        previous = time;
+        let f = fields(
+            row["MESSAGE"].as_str().context("191 close message")?,
+            "horizon archive complete: ",
+        )?;
+        ensure!(
+            f.len() == 8
+                && integer(&f, "slots")? == 432000
+                && integer(&f, "epochs")? == 1
+                && integer(&f, "buckets")? == 3375
+                && integer(&f, "bytes")? > 0,
+            "191 close scope differs"
+        );
+        for key in ["blocks", "txs", "tx_updates", "orphan_updates"] {
+            integer(&f, key)?;
+        }
+    }
+    ensure!(
+        previous > root_time,
+        "191 final close does not follow trusted root"
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod native_terminal_tests {
+    use super::*;
+    use serde_json::{Value, json};
+    fn fixture() -> Value {
+        let row = |time: u64, message: String| {
+            json!({"_SYSTEMD_UNIT":"jetstreamer-root-sweep-e191-194-t5-20261016-v2-r2-e191-194-lane-a-1.service",
+            "_SYSTEMD_INVOCATION_ID":"ea93199ed2fa470d99de248c2a10b246","_PID":"2189644","_UID":"1001",
+            "__REALTIME_TIMESTAMP":time.to_string(),"MESSAGE":message})
+        };
+        let root = format!(
+            "historical checkpoint slot=84239250 bank_hash=GCANVakrcunYu9VRe1WdNd7xAPKGdoZNFgpQbagdB9zq accounts_hash=GCANVakrcunYu9VRe1WdNd7xAPKGdoZNFgpQbagdB9zq last_blockhash=GCANVakrcunYu9VRe1WdNd7xAPKGdoZNFgpQbagdB9zq capitalization=1 transactions=1 tick_height={} complete=true writes=0 next_write_version=1",
+            (84239250u64 + 1) * 64
+        );
+        json!({"trusted_root_slot":84239250,"archive_terminal_slot":84239999,"root":row(4_000_000,root),
+            "closes":(1..=4).map(|n|row(n*1_000_000+1,format!("horizon archive complete: slots=432000 blocks=1 txs=1 tx_updates=1 orphan_updates=1 epochs=1 buckets=3375 bytes={n} (payload 4 uncompressed)"))).collect::<Vec<_>>()})
+    }
+    #[test]
+    fn accepts_trusted_root_and_skipped_tail_without_inventing_terminal_checkpoint() {
+        validate_native_terminal(&fixture(), 5).unwrap();
+    }
+    #[test]
+    fn rejects_foreign_invocation_pid_uid_and_backdated_cutoff() {
+        let good = fixture();
+        for (pointer, value) in [
+            ("/root/_SYSTEMD_INVOCATION_ID", json!("a".repeat(32))),
+            ("/closes/2/_PID", json!("1")),
+            ("/root/_UID", json!("0")),
+            ("/closes/3/__REALTIME_TIMESTAMP", json!("6000000")),
+        ] {
+            let mut bad = good.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(validate_native_terminal(&bad, 5).is_err(), "{pointer}");
+        }
+    }
+    #[test]
+    fn rejects_missing_reordered_duplicate_closes_and_false_root() {
+        let good = fixture();
+        let mut bad = good.clone();
+        bad["closes"].as_array_mut().unwrap().pop();
+        assert!(validate_native_terminal(&bad, 5).is_err());
+        let mut bad = good.clone();
+        bad["closes"].as_array_mut().unwrap().swap(1, 2);
+        assert!(validate_native_terminal(&bad, 5).is_err());
+        let mut bad = good.clone();
+        bad["closes"][2] = bad["closes"][1].clone();
+        assert!(validate_native_terminal(&bad, 5).is_err());
+        let mut bad = good;
+        bad["root"]["MESSAGE"] = json!(
+            bad["root"]["MESSAGE"]
+                .as_str()
+                .unwrap()
+                .replace("slot=84239250", "slot=84239999")
+        );
+        assert!(validate_native_terminal(&bad, 5).is_err());
     }
 }

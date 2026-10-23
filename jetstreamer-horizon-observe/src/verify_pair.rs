@@ -60,15 +60,23 @@ struct Plan {
     admission_observer: Option<Bound>,
 }
 
+fn local191(p: &Plan) -> bool {
+    p.schema == "horizon-verify-canonical-pair-dev-samjohnson191-v1"
+}
+fn local(p: &Plan) -> bool {
+    local191(p) || p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1"
+}
 fn validate_plan(p: &Plan) -> Result<()> {
     let local198 = p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1";
     ensure!(
-        local198 || p.schema == "horizon-verify-canonical-pair-plan-v1",
+        local(p) || p.schema == "horizon-verify-canonical-pair-plan-v1",
         "wrong schema"
     );
     ensure!(
         if local198 {
             p.epoch == 198
+        } else if local191(p) {
+            (191..=194).contains(&p.epoch)
         } else {
             (201..=300).contains(&p.epoch)
         },
@@ -84,28 +92,33 @@ fn validate_plan(p: &Plan) -> Result<()> {
     );
     ensure!(
         p.archive_directory
-            == Path::new(if local198 {
+            == Path::new(if local(p) {
                 "/home/sol/horizon"
             } else {
                 "/home/ubuntu/horizon"
             }),
         "foreign archive directory"
     );
-    if local198 {
+    if local(p) {
         ensure!(
             p.admission_observer.is_some(),
             "epoch198 requires fresh coordinated admission evidence"
         );
+        let state = if local198 {
+            PathBuf::from(
+                "/var/lib/jetstreamer/horizon-epoch198-canonical-verification-20261021-v1",
+            )
+        } else {
+            Path::new("/var/lib/jetstreamer/horizon-cohort191-canonical-verification-20261023-v1")
+                .join(format!("epoch-{}", p.epoch))
+        };
         ensure!(
-            p.expected_archive_sha256
-                == "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb"
+            (!local198
+                || p.expected_archive_sha256
+                    == "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb")
                 && p.threads_per_command <= 16
-                && p.state_directory
-                    == Path::new(
-                        "/var/lib/jetstreamer/horizon-epoch198-canonical-verification-20261021-v1"
-                    )
-                    .join(p.stage.suffix()),
-            "foreign epoch198 archive or state"
+                && p.state_directory == state.join(p.stage.suffix()),
+            "foreign local archive or verifier state"
         );
         let (name, digest) = match p.stage {
             Stage::Full => (
@@ -213,12 +226,67 @@ fn admission_value(v: &serde_json::Value, now: u64) -> Result<()> {
     Ok(())
 }
 
+// A191 verifier makes two independent scans with the already qualified large-
+// frame reader. This is a fresh verifier envelope, never replay admission or
+// evidence that any191 archive has passed either check.
+// The1TiB scalar below is only the read-only service floor. It does not
+// prove live growth reservations fit, reduce a replay guard/century floor, or
+// replace the dispatcher's independently bound capacity and compiler claims.
+fn admission191_value(v: &serde_json::Value, now: u64) -> Result<()> {
+    let time = utc_seconds(
+        v["recorded_at_utc"]
+            .as_str()
+            .context("191 admission time")?,
+    )?;
+    ensure!(
+        v["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && time <= now
+            && now - time <= 900
+            && v["cadence"]["routine_minimum_interval_enforced"] == true
+            && v["host_memory"]["conservative_available_kib"]
+                .as_u64()
+                .is_some_and(|n| n >= 128 * 1024 * 1024)
+            && v["filesystem"]["conservative_available_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= (1024u64 << 30) + (32 << 20)),
+        "191 verifier admission is stale or lacks one64GiB verifier plus64GiB reserve or read-only service disk floor"
+    );
+    let replays = v["replays"]
+        .as_array()
+        .context("191 protected replay census")?;
+    ensure!(
+        !replays.is_empty()
+            && replays
+                .iter()
+                .all(|r| r["invocation_binding_stable"] == true),
+        "191 protected replay owner changed"
+    );
+    for flag in [
+        "producer_or_controller_signals_sent",
+        "service_state_changed",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(
+            v["mutation"][flag] == false,
+            "191 admission is not observational"
+        );
+    }
+    Ok(())
+}
+fn gate_name(name: &str) -> bool {
+    [191, 192, 193, 194, 198].iter().any(|epoch| {
+        ["full", "plugin"]
+            .iter()
+            .any(|stage| name == format!("epoch-{epoch}.{stage}.ok"))
+    })
+}
 fn check_admission(p: &Plan) -> Result<()> {
     let Some(bound) = &p.admission_observer else {
         return Ok(());
     };
     ensure!(
-        p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1"
+        local(p)
             && bound.path.parent()
                 == Some(Path::new(
                     "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1"
@@ -227,10 +295,12 @@ fn check_admission(p: &Plan) -> Result<()> {
     );
     let bytes = evidence::bound_file(&bound.path, &bound.sha256, 16 << 20, false)?;
     let value: serde_json::Value = serde_json::from_slice(&bytes)?;
-    admission_value(
-        &value,
-        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-    )?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    if local191(p) {
+        admission191_value(&value, now)?;
+    } else {
+        admission_value(&value, now)?;
+    }
     for replay in value["replays"].as_array().context("admission replays")? {
         for owner in ["controller_after", "producer_after"] {
             let owner = &replay[owner];
@@ -268,7 +338,7 @@ fn check_admission(p: &Plan) -> Result<()> {
 // Executables are not JSON. Stream large plugin binaries without weakening the
 // independent, small plan/receipt limits or allocating their entire contents.
 fn verify_executable(p: &Plan) -> Result<()> {
-    let maximum = if p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
+    let maximum = if local(p) {
         512 * 1024 * 1024
     } else {
         verifier_size_limit(p.stage)
@@ -490,10 +560,7 @@ fn mirror_gate_receipt(directory: &Path, name: &str, bytes: &[u8], owner: u32) -
         m.is_dir() && m.uid() == owner && m.mode() & 0o022 == 0,
         "unsafe gate directory"
     );
-    ensure!(
-        matches!(name, "epoch-198.full.ok" | "epoch-198.plugin.ok"),
-        "foreign gate receipt"
-    );
+    ensure!(gate_name(name), "foreign gate receipt");
     let path = directory.join(name);
     if let Ok(existing) = fs::symlink_metadata(&path) {
         let mut f = open_stable(&path)?;
@@ -521,17 +588,25 @@ fn mirror_gate_receipt(directory: &Path, name: &str, bytes: &[u8], owner: u32) -
 }
 
 fn record_local198_launch(p: &Plan, args: &[String], executable: &Path) -> Result<()> {
-    if p.schema != "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
+    if !local(p) {
         return Ok(());
     }
     let phase = match p.stage {
         Stage::Full => "full-verification",
         Stage::Plugin => "plugin-verification",
     };
-    let unit = format!(
-        "horizon-{}-verify-198-native-20261021-v1.service",
-        p.stage.suffix()
-    );
+    let unit = if local191(p) {
+        format!(
+            "horizon-{}-verify-{}-native191-20261023-v1.service",
+            p.stage.suffix(),
+            p.epoch
+        )
+    } else {
+        format!(
+            "horizon-{}-verify-198-native-20261021-v1.service",
+            p.stage.suffix()
+        )
+    };
     let result = Command::new("/usr/bin/systemctl").args(["show", &unit,
         "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,ExecStart,Type,Result,ControlGroup"])
         .output()?;
@@ -580,10 +655,10 @@ fn record_local198_launch(p: &Plan, args: &[String], executable: &Path) -> Resul
     evidence::write_receipt(
         &p.state_directory.join("launch.json"),
         &serde_json::json!({
-            "schema":"horizon-epoch198-native-verification-launch-v1", "epoch":198,
+            "schema":if local191(p) {"horizon-cohort191-native-verification-launch-v1"} else {"horizon-epoch198-native-verification-launch-v1"}, "epoch":p.epoch,
             "plan":{"path":args[0],"sha256":args[1]}, "runner_sha256":args[2],
         "admission_observer":p.admission_observer,
-            "unit":state, "claim":{"epoch":198,"phase":phase,"unit":unit,
+            "unit":state, "claim":{"epoch":p.epoch,"phase":phase,"unit":unit,
             "invocation_id":invocation,"expected_exec_start":state["ExecStart"],
             "evidence":[{"path":args[0],"sha256":args[1]}]},
             "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
@@ -666,7 +741,7 @@ fn run() -> Result<()> {
         &output,
         format!("{} {} {}\n", after_hash, p.verifier.sha256, args[2]).as_bytes(),
     )?;
-    if p.schema == "horizon-verify-canonical-pair-dev-samjohnson198-v1" {
+    if local(p) {
         let directory = match p.stage {
             Stage::Full => {
                 "/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts"
@@ -677,7 +752,7 @@ fn run() -> Result<()> {
         };
         mirror_gate_receipt(
             Path::new(directory),
-            &format!("epoch-198.{}.ok", p.stage.suffix()),
+            &format!("epoch-{}.{}.ok", p.epoch, p.stage.suffix()),
             format!("{} {} {}\n", after_hash, p.verifier.sha256, args[2]).as_bytes(),
             1001,
         )?;
@@ -776,6 +851,60 @@ mod tests {
             "2026-1-21T21:28:00Z",
         ] {
             assert!(utc_seconds(clock).is_err(), "{clock}");
+        }
+    }
+    #[test]
+    fn local191_is_closed_and_retains_independent_full_and_plugin_checks() {
+        for epoch in 191..=194 {
+            for stage in [Stage::Full, Stage::Plugin] {
+                let mut p = plan(stage);
+                p.schema = "horizon-verify-canonical-pair-dev-samjohnson191-v1".into();
+                p.epoch = epoch;
+                p.archive_directory = "/home/sol/horizon".into();
+                p.admission_observer = Some(Bound {
+                    path: "/observer".into(),
+                    sha256: "c".repeat(64),
+                });
+                p.state_directory = Path::new(
+                    "/var/lib/jetstreamer/horizon-cohort191-canonical-verification-20261023-v1",
+                )
+                .join(format!("epoch-{epoch}"))
+                .join(stage.suffix());
+                p.verifier = Bound {
+                    path:Path::new("/usr/local/lib/jetstreamer/horizon-epoch198-compatible-verifiers-20261021-v1")
+                        .join(if stage == Stage::Full {"verify_archive"} else {"horizon_pipeline"}),
+                    sha256:if stage == Stage::Full {"5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574"}
+                        else {"e20892a111f8e26c8e25561a939eaf171771789753059100510c936d92092137"}.into()};
+                validate_plan(&p).unwrap();
+                let commands = commands(&p);
+                assert_eq!(commands.len(), if stage == Stage::Full { 2 } else { 1 });
+                if stage == Stage::Full {
+                    assert!(commands[1].contains(&"--internal-full".into()));
+                } else {
+                    assert!(commands[0].contains(&"--verify-only".into()));
+                }
+                p.epoch = 190;
+                assert!(validate_plan(&p).is_err());
+                p.epoch = epoch;
+                p.verifier.sha256 = "0".repeat(64);
+                assert!(validate_plan(&p).is_err());
+            }
+        }
+    }
+    #[test]
+    fn gate_receipts_cannot_escape_the_qualified191_or198_epoch_set() {
+        for epoch in [190, 195, 197, 199, 201] {
+            for stage in ["full", "plugin"] {
+                assert!(!gate_name(&format!("epoch-{epoch}.{stage}.ok")));
+            }
+        }
+        for name in [
+            "epoch-191.full.ok/other",
+            "epoch-0191.full.ok",
+            "epoch-191.boundary.ok",
+            "../epoch-191.full.ok",
+        ] {
+            assert!(!gate_name(name));
         }
     }
     #[test]

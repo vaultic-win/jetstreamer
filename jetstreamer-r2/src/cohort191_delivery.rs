@@ -1,7 +1,10 @@
 //! Closed191–194 native metadata custody. Never creates a ready/archive receipt.
 use super::*;
 use serde_json::json;
-use std::{collections::BTreeMap, process::Command};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    process::Command,
+};
 pub(super) const UNIT: &str =
     "jetstreamer-root-sweep-e191-194-t5-20261016-v2-r2-e191-194-lane-a-1.service";
 pub(super) const IID: &str = "ea93199ed2fa470d99de248c2a10b246";
@@ -37,6 +40,12 @@ pub(super) struct Claim {
     pub expected_exec_start: String,
     pub program: Option<Bound>,
 }
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct GateTool {
+    verifier: Bound,
+    wrapper: Bound,
+}
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Capture {
@@ -48,6 +57,8 @@ struct Capture {
     source_batch: Option<Bound>,
     public_batch: Option<Bound>,
     gate_receipts: BTreeMap<u64, BTreeMap<String, Bound>>,
+    gate_tools: BTreeMap<String, GateTool>,
+    ready_receipts: BTreeMap<u64, Bound>,
     output: PathBuf,
 }
 pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
@@ -82,7 +93,7 @@ fn member(path: &Path, digest: &str) -> Result<()> {
     ensure!(
         hex_lower(&Sha256::digest(read_stable_bounded(
             path,
-            256 << 20,
+            512 << 20,
             "191 pinned tool"
         )?)) == digest,
         "191 tool digest differs"
@@ -329,8 +340,90 @@ fn state_bytes() -> Result<(Vec<u8>, Value)> {
 fn decoded_path(v: &Value) -> Result<PathBuf> {
     Ok(String::from_utf8(BASE64_STANDARD.decode(v.as_str().context("191 encoded path")?)?)?.into())
 }
-fn batch(b: &Bound, public: bool) -> Result<Value> {
-    let allowed = if public { PathBuf::from(IMPORT_ROOT) } else { Path::new(LANE).join("private") };
+fn hash_bytes(text: &str) -> Result<[u8; 32]> {
+    ensure!((32..=44).contains(&text.len()), "191 manifest hash length");
+    let alphabet = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let mut result = [0u8; 32];
+    for byte in text.bytes() {
+        let mut carry = alphabet
+            .iter()
+            .position(|b| *b == byte)
+            .context("191 manifest hash alphabet")? as u32;
+        for n in result.iter_mut().rev() {
+            carry += u32::from(*n) * 58;
+            *n = (carry & 255) as u8;
+            carry >>= 8;
+        }
+        ensure!(carry == 0, "191 manifest hash overflow");
+    }
+    Ok(result)
+}
+fn root_gate(v: &Value) -> Result<()> {
+    let manifest = bound(
+        &Bound {
+            path: Path::new(DEPLOY).join("preflight-191-194-v4.json"),
+            sha256: MANIFEST_SHA.into(),
+        },
+        true,
+    )?;
+    let cohorts = manifest["manifest"]["verification_cohorts"]
+        .as_array()
+        .context("191 sealed manifest cohorts")?;
+    let selected: Vec<_> = cohorts
+        .iter()
+        .filter(|c| c["first_epoch"] == 191 && c["last_epoch"] == 194)
+        .collect();
+    ensure!(selected.len() == 1, "191 manifest cohort ambiguous");
+    let expected: Vec<_> = selected[0]["root_checkpoints"].as_array().context("191 manifest checkpoints")?
+        .iter().map(|r| Ok(json!({"slot":r["slot"],"accounts_hash":hash_bytes(r["accounts_hash"].as_str().context("191 manifest accounts hash")?)?})))
+        .collect::<Result<_>>()?;
+    let gate = &v["root_checkpoint_gate"];
+    ensure!(
+        gate["kind"] == "sealed-root-checkpoint-cohort"
+            && gate["version"] == 1
+            && gate["verified_manifest_checkpoints"] == json!(expected),
+        "191 native root gate differs from sealed manifest"
+    );
+    let members = gate["members"]
+        .as_array()
+        .context("191 root gate members")?;
+    ensure!(
+        members
+            .iter()
+            .map(|m| m["epoch"].as_u64())
+            .eq((191..=194).map(Some)),
+        "191 root gate member census"
+    );
+    for m in members {
+        for name in ["bootstrap", "terminal"] {
+            let row = &m[name];
+            let slot = row["slot"].as_u64().context("191 gate checkpoint slot")?;
+            ensure!(
+                row["slot_complete"] == true
+                    && row["tick_height"]
+                        == slot
+                            .checked_add(1)
+                            .and_then(|n| n.checked_mul(64))
+                            .context("191 gate tick overflow")?,
+                "191 native member checkpoint incomplete"
+            );
+            for hash in ["bank_hash", "accounts_hash", "last_blockhash"] {
+                let _: [u8; 32] = serde_json::from_value(row[hash].clone())?;
+            }
+        }
+        ensure!(
+            m["bootstrap"]["slot"].as_u64() <= m["terminal"]["slot"].as_u64(),
+            "191 reversed native root member"
+        );
+    }
+    Ok(())
+}
+fn batch(b: &Bound, public: bool, materialized: &BTreeSet<u64>) -> Result<Value> {
+    let allowed = if public {
+        PathBuf::from(IMPORT_ROOT)
+    } else {
+        Path::new(LANE).join("private")
+    };
     ensure!(
         b.path.starts_with(&allowed)
             && b.path
@@ -341,7 +434,12 @@ fn batch(b: &Bound, public: bool) -> Result<Value> {
     );
     let m = fs::symlink_metadata(&b.path)?;
     ensure!(
-        m.is_file() && m.uid() == 1001 && m.nlink() == 1 && m.mode() & 0o022 == 0,
+        b.path.is_absolute()
+            && b.path.canonicalize()? == b.path
+            && m.is_file()
+            && m.uid() == 1001
+            && m.nlink() == 1
+            && m.mode() & 0o022 == 0,
         "191 batch ownership differs"
     );
     let bytes = read_stable_bounded(&b.path, 4 << 20, "191 native committed batch")?;
@@ -368,6 +466,7 @@ fn batch(b: &Bound, public: bool) -> Result<Value> {
                 .eq((191..=194).map(Some))),
         "191 native batch scope/commit gate differs"
     );
+    root_gate(&v)?;
     let destination = if public {
         PathBuf::from("/home/sol/horizon")
     } else {
@@ -385,11 +484,16 @@ fn batch(b: &Bound, public: bool) -> Result<Value> {
                 && is_lower_hex(row["archive_sha256"].as_str().unwrap_or(""), 64),
             "191 batch archive binding differs"
         );
+        if !materialized.contains(&epoch) {
+            continue;
+        }
         let i = regular_identity(&path)?;
         ensure!(
             row["committed_archive"]["device"] == i.device
                 && row["committed_archive"]["inode"] == i.inode
-                && row["committed_archive"]["length"] == i.length,
+                && row["committed_archive"]["length"] == i.length
+                && row["committed_archive"]["modified_seconds"] == i.modified_seconds
+                && row["committed_archive"]["modified_nanoseconds"] == i.modified_nanoseconds,
             "191 batch artifact changed"
         );
         let checksum = read_stable_bounded(
@@ -457,6 +561,259 @@ fn program(c: &Claim, u: &Value) -> Result<()> {
     }
     Ok(())
 }
+// Receipt bytes may be written by the archive operator. Do not weaken the
+// root-only capture/model/program policy to read these separate native records.
+fn receipt_bytes(b: &Bound, uid: u32, limit: u64) -> Result<Vec<u8>> {
+    let m = fs::symlink_metadata(&b.path)?;
+    ensure!(
+        b.path.is_absolute()
+            && b.path.canonicalize()? == b.path
+            && m.is_file()
+            && m.nlink() == 1
+            && m.uid() == uid
+            && m.mode() & 0o022 == 0,
+        "unsafe191 operator receipt"
+    );
+    let bytes = read_stable_bounded(&b.path, limit, "191 operator receipt")?;
+    ensure!(
+        is_lower_hex(&b.sha256, 64) && hex_lower(&Sha256::digest(&bytes)) == b.sha256,
+        "191 operator receipt changed"
+    );
+    Ok(bytes)
+}
+fn original(b: &Bound, epoch: u64, cutoff: u64) -> Result<StatusPublicationReceipt> {
+    let bytes = receipt_bytes(b, 0, 1 << 20)?;
+    let receipt = validate_status_publication_receipt_bytes(
+        b.path.parent().context("191 origin parent")?,
+        &b.path,
+        &bytes,
+        "solana-archive-with-accounts-data",
+        epoch,
+    )?;
+    ensure!(
+        receipt.schema == STATUS_RECEIPT_SCHEMA
+            && receipt.pipeline_binding.is_none()
+            && receipt.status.phase == "replay"
+            && receipt.producer_invocation_id == IID
+            && receipt.controller_invocation_id == CID
+            && receipt.verified_unix_seconds <= cutoff,
+        "191 origin is not the authenticated original invocation/rebind"
+    );
+    let observer = Bound {
+        path: receipt.observer_receipt.clone(),
+        sha256: receipt.observer_receipt_sha256.clone(),
+    };
+    let bytes = receipt_bytes(&observer, 0, 16 << 20)?;
+    let sample = validate_observer_binding(&bytes, &observer.sha256, epoch, CID, IID)?;
+    ensure!(
+        sample == receipt.status.sampled_at_utc && fleet::utc_seconds(&sample)? <= cutoff,
+        "191 original observer/sample changed"
+    );
+    Ok(receipt)
+}
+fn ready(b: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
+    // Use the same canonical receipt validator as authenticated restore. The
+    // receipt is historical remote proof; the fleet must still re-observe the
+    // ready pair. It grants neither archive publication nor local retirement.
+    let bytes = receipt_bytes(b, 1001, 16 << 10)?;
+    ensure!(
+        b.path
+            == receipt_path(
+                Path::new("/home/sol/.jetstreamer-private/r2-receipts"),
+                epoch
+            ),
+        "191 noncanonical ready receipt"
+    );
+    let r = read_restore_receipt(
+        b.path.parent().context("191 ready parent")?,
+        "solana-archive-with-accounts-data",
+        epoch,
+    )?;
+    ensure!(
+        serde_json::from_slice::<Receipt>(&bytes)? == r
+            && r.remote_sha256_readback
+            && !r.archive_etag.is_empty()
+            && r.verified_unix_seconds <= cutoff,
+        "191 zero ETA lacks durable whole-object readback"
+    );
+    Ok(r)
+}
+fn gate(b: &Bound, epoch: u64, stage: &str, tool: &GateTool, digest: &str) -> Result<()> {
+    for t in [&tool.verifier, &tool.wrapper] {
+        ensure!(
+            t.path.starts_with("/usr/local/lib/jetstreamer"),
+            "191 undeployed gate tool"
+        );
+        member(&t.path, &t.sha256)?;
+    }
+    let directory = match stage {
+        "full" => "/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts",
+        "plugin" => "/home/sol/.jetstreamer-private/horizon-plugin-current-101-200-v2/receipts",
+        "boundary" => "/home/sol/.jetstreamer-private/boundary-audits/receipts",
+        _ => bail!("191 unknown verification gate"),
+    };
+    ensure!(
+        b.path == Path::new(directory).join(format!("epoch-{epoch}.{stage}.ok")),
+        "191 foreign gate receipt path"
+    );
+    let uid = fs::symlink_metadata(&b.path)?.uid();
+    ensure!(matches!(uid, 0 | 1001), "191 gate writer differs");
+    let bytes = receipt_bytes(b, uid, 512)?;
+    let expected = format!(
+        "{digest} {} {}\n",
+        tool.verifier.sha256, tool.wrapper.sha256
+    );
+    ensure!(
+        bytes == expected.as_bytes(),
+        "191 independent {stage} receipt differs"
+    );
+    Ok(())
+}
+fn validate_claim_set(claims: &[Claim], eta: &BTreeMap<u64, u64>) -> Result<BTreeSet<u64>> {
+    let working: BTreeSet<_> = eta
+        .iter()
+        .filter(|(_, n)| **n > 0)
+        .map(|(e, _)| *e)
+        .collect();
+    ensure!(
+        claims.iter().map(|c| c.epoch).eq(working.iter().copied()),
+        "191 missing/duplicate/reordered active owner or owner for ready member"
+    );
+    for c in claims {
+        phase_scope(c)?;
+    }
+    Ok(working)
+}
+fn validate_inputs(
+    p: &Capture,
+    forecast: &jetstreamer_horizon_observe::cohort191_delivery_model::Plan,
+    eta: &BTreeMap<u64, u64>,
+    cutoff: u64,
+) -> Result<BTreeSet<u64>> {
+    use jetstreamer_horizon_observe::cohort191_delivery_model::Work;
+    ensure!(
+        !forecast.boundary_gates_sidecar,
+        "191 boundary dispatch must remain separate from publication"
+    );
+    let working = validate_claim_set(&p.claims, eta)?;
+    ensure!(
+        p.origins.keys().copied().eq(191..=194),
+        "191 original cohort census differs"
+    );
+    ensure!(
+        p.ready_receipts
+            .keys()
+            .copied()
+            .eq(eta.iter().filter(|(_, n)| **n == 0).map(|(e, _)| *e)),
+        "191 ready receipt/zero ETA census differs"
+    );
+    ensure!(
+        p.gate_receipts.keys().all(|e| (191..=194).contains(e))
+            && p.gate_tools
+                .keys()
+                .all(|s| matches!(s.as_str(), "full" | "plugin" | "boundary")),
+        "191 foreign gate census"
+    );
+    for e in &forecast.epochs {
+        original(&p.origins[&e.epoch], e.epoch, cutoff)?;
+        if e.authenticated_ready_pair {
+            ready(&p.ready_receipts[&e.epoch], e.epoch, cutoff)?;
+            continue;
+        }
+        // Completed verification claims require actual independent receipts,
+        // even when the owner is already uploading or waiting on another gate.
+        let digest = if p.public_batch.is_some() {
+            let b = p.public_batch.as_ref().unwrap();
+            let bytes = receipt_bytes(b, 1001, 4 << 20)?;
+            let v: Value = serde_json::from_slice(&bytes)?;
+            v["outcome"]["members"]
+                .as_array()
+                .context("191 public member digests")?
+                .iter()
+                .find(|m| m["epoch"] == e.epoch)
+                .context("191 missing public digest")?["archive_sha256"]
+                .as_str()
+                .context("191 public digest")?
+                .to_owned()
+        } else {
+            String::new()
+        };
+        for (stage, work, required) in [
+            ("full", &e.full, true),
+            ("plugin", &e.plugin, true),
+            ("boundary", &e.boundary, forecast.boundary_gates_sidecar),
+        ] {
+            if required && matches!(work, Work::Complete) {
+                ensure!(
+                    is_lower_hex(&digest, 64),
+                    "191 completed gate without imported digest"
+                );
+                gate(
+                    p.gate_receipts
+                        .get(&e.epoch)
+                        .and_then(|m| m.get(stage))
+                        .context("191 gate receipt absent")?,
+                    e.epoch,
+                    stage,
+                    p.gate_tools.get(stage).context("191 gate tool absent")?,
+                    &digest,
+                )?;
+            }
+        }
+        let c = p
+            .claims
+            .iter()
+            .find(|c| c.epoch == e.epoch)
+            .context("191 working owner")?;
+        match c.phase.as_str() {
+            "producer-finalization" => ensure!(
+                matches!(forecast.finalization, Work::Active { .. })
+                    && matches!(forecast.import, Work::Queued { .. }),
+                "191 finalization forecast owner differs"
+            ),
+            "controller-import-handoff" => ensure!(
+                matches!(forecast.finalization, Work::Complete)
+                    && matches!(forecast.import, Work::Queued { .. }),
+                "191 pending import forecast differs"
+            ),
+            "local-publication" => ensure!(
+                matches!(forecast.finalization, Work::Complete)
+                    && matches!(forecast.import, Work::Active { .. }),
+                "191 import forecast owner differs"
+            ),
+            "full-verification" | "plugin-verification" => {
+                let (stage, work) = if c.phase == "full-verification" {
+                    ("full", &e.full)
+                } else {
+                    ("plugin", &e.plugin)
+                };
+                ensure!(
+                    matches!(forecast.import, Work::Complete)
+                        && matches!(work, Work::Active { .. })
+                        && c.program
+                            .as_ref()
+                            .is_some_and(|b| p.gate_tools.get(stage).is_some_and(|t| t
+                                .wrapper
+                                .path
+                                == b.path
+                                && t.wrapper.sha256 == b.sha256)),
+                    "191 verifier forecast/program differs"
+                );
+            }
+            "upload-readback" => ensure!(
+                matches!(forecast.import, Work::Complete)
+                    && matches!(e.full, Work::Complete)
+                    && matches!(e.plugin, Work::Complete)
+                    && (matches!(e.upload, Work::Active { .. })
+                        || matches!(e.readback, Work::Active { .. })
+                        || matches!(e.source_revalidation_and_sidecar, Work::Active { .. })),
+                "191 uploader forecast lacks independent gates or actual active sync"
+            ),
+            _ => bail!("191 unsupported queued/legacy owner"),
+        }
+    }
+    Ok(working)
+}
 pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
     ensure!(
         v["schema"] == EVENT_SCHEMA
@@ -474,15 +831,236 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
     ] {
         ensure!(v[flag] == false, "191 event grants {flag}");
     }
-    let claims: Vec<Claim> = serde_json::from_value(v["claims"].clone())?;
+    let plan: Bound = serde_json::from_value(v["capture_plan"].clone())?;
+    let p: Capture = serde_json::from_value(bound(&plan, true)?)?;
+    let program: PathBuf = serde_json::from_value(v["capture_program"].clone())?;
+    member(
+        &program,
+        v["capture_self_sha256"]
+            .as_str()
+            .context("191 capture executable digest")?,
+    )?;
+    for (name, expected) in [
+        ("observer", json!(p.observer)),
+        ("forecast", json!(p.forecast)),
+        ("origins", json!(p.origins)),
+        ("claims", json!(p.claims)),
+        ("source_batch", json!(p.source_batch)),
+        ("public_batch", json!(p.public_batch)),
+        ("gate_receipts", json!(p.gate_receipts)),
+        ("gate_tools", json!(p.gate_tools)),
+        ("ready_receipts", json!(p.ready_receipts)),
+    ] {
+        ensure!(
+            v[name] == expected,
+            "191 event differs from sealed capture plan:{name}"
+        );
+    }
+    let observer = bound(&p.observer, false)?;
     ensure!(
-        claims.iter().map(|c| c.epoch).eq(191..=194),
-        "191 event omits/reorders cohort"
+        v["sampled_at_utc"] == observer["recorded_at_utc"]
+            && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && fleet::utc_seconds(v["sampled_at_utc"].as_str().context("191 event time")?)?
+                == cutoff,
+        "191 event does not bind its real coordinated sample"
     );
-    for c in &claims {
-        phase_scope(c)?;
+    let forecast = serde_json::from_value(bound(&p.forecast, true)?)?;
+    let eta = jetstreamer_horizon_observe::cohort191_delivery_model::forecast(&forecast)?;
+    ensure!(
+        v["estimated_remaining_millis"] == json!(eta),
+        "191 event ETA differs from bound forecast"
+    );
+    validate_inputs(&p, &forecast, &eta, cutoff)?;
+    jetstreamer_horizon_observe::cohort191_delivery_model::validate_native_terminal(
+        &v["native_events"],
+        cutoff,
+    )?;
+    let mut records = vec![v["native_events"]["root"].clone()];
+    records.extend(
+        v["native_events"]["closes"]
+            .as_array()
+            .context("191 event closes")?
+            .iter()
+            .cloned(),
+    );
+    ensure!(
+        roots(&records, cutoff)? == v["native_events"],
+        "191 native terminal proof differs"
+    );
+    ensure!(
+        p.schema == "jetstreamer-cohort191-delivery-capture-plan-v2",
+        "191 capture plan schema differs"
+    );
+    let all_final =
+        !p.claims.is_empty() && p.claims.iter().all(|c| c.phase == "producer-finalization");
+    if all_final {
+        ensure!(
+            v["controller_handoff"].is_null()
+                && p.source_batch.is_none()
+                && p.public_batch.is_none(),
+            "191 closing parent acquired a fabricated batch"
+        );
+    } else {
+        let (bytes, state) = state_bytes()?;
+        ensure!(
+            v["controller_handoff"]["state"] == state
+                && v["controller_handoff"]["sha256"] == hex_lower(&Sha256::digest(&bytes))
+                && v["controller_handoff"]["producer_terminal"] == manager_terminal(cutoff)?,
+            "191 captured terminal/custody state changed"
+        );
+    }
+    let regenerated = capture(&p)?;
+    for (key, expected) in regenerated.as_object().context("191 regenerated event")? {
+        ensure!(
+            v[key] == *expected,
+            "191 native event differs from bound capture:{key}"
+        );
     }
     Ok(())
+}
+fn progress_remaining(rows: &[(u64, u64, u64)], total: u64, cutoff_millis: u64) -> Result<u64> {
+    ensure!(
+        rows.len() >= 2 && total > 0,
+        "191 sync has insufficient own-phase progress"
+    );
+    for pair in rows.windows(2) {
+        ensure!(
+            pair[0].0 < pair[1].0
+                && pair[0].1 < pair[1].1
+                && pair[0].2 < pair[1].2
+                && pair[1].1 <= total,
+            "191 sync progress reset, duplicate or impossible byte count"
+        );
+    }
+    let first = rows[rows.len() - 2];
+    let last = rows[rows.len() - 1];
+    let dt = last.2 - first.2;
+    let bytes = last.1 - first.1;
+    let left = total
+        .checked_sub(last.1)
+        .context("191 progress exceeds archive")?;
+    let estimate = (u128::from(left) * u128::from(dt)).div_ceil(u128::from(bytes));
+    let estimate: u64 = estimate
+        .try_into()
+        .context("191 progress projection overflow")?;
+    let stall = cutoff_millis
+        .checked_sub(last.0)
+        .context("191 progress after cutoff")?;
+    estimate
+        .max(1)
+        .checked_add(stall)
+        .context("191 stall projection overflow")
+}
+fn sync_observation(
+    c: &Claim,
+    u: &Value,
+    e: &jetstreamer_horizon_observe::cohort191_delivery_model::Epoch,
+    cutoff: u64,
+) -> Result<Value> {
+    use jetstreamer_horizon_observe::cohort191_delivery_model::Work;
+    let stage = if matches!(e.upload, Work::Active { .. }) {
+        "upload"
+    } else if matches!(e.readback, Work::Active { .. }) {
+        "readback"
+    } else {
+        bail!("191 final source revalidation requires a separately qualified progress source");
+    };
+    let result = Command::new("/usr/bin/journalctl")
+        .args([
+            "--no-pager",
+            "--output=json",
+            "-u",
+            &c.unit,
+            &format!("_SYSTEMD_INVOCATION_ID={}", c.invocation_id),
+            "--until",
+            &format!("@{cutoff}"),
+        ])
+        .output()?;
+    ensure!(
+        result.status.success() && result.stdout.len() <= 8 << 20,
+        "191 sync journal unavailable/oversized"
+    );
+    let archive = archives(c.epoch, "upload-readback");
+    let length = regular_identity(&archive)?.length;
+    let key = format!("epoch-{}.jet", c.epoch);
+    let event = if stage == "upload" {
+        "r2-upload-progress"
+    } else {
+        "r2-readback-progress"
+    };
+    let bytes = if stage == "upload" {
+        "acknowledged_bytes"
+    } else {
+        "hashed_bytes"
+    };
+    let pid = u["MainPID"].as_str().context("191 native sync PID")?;
+    let uid = fs::symlink_metadata(format!("/proc/{pid}"))?
+        .uid()
+        .to_string();
+    let mut selected = Vec::new();
+    let mut progress = Vec::new();
+    for line in result
+        .stdout
+        .split(|b| *b == b'\n')
+        .filter(|b| !b.is_empty())
+    {
+        let row: Value = serde_json::from_slice(line)?;
+        let Some(message) = row["MESSAGE"].as_str() else {
+            continue;
+        };
+        let Ok(v) = serde_json::from_str::<Value>(message) else {
+            continue;
+        };
+        if v["key"] != key || v["event"] != event {
+            continue;
+        }
+        ensure!(
+            row["_SYSTEMD_UNIT"] == c.unit
+                && row["_SYSTEMD_INVOCATION_ID"] == c.invocation_id
+                && row["_PID"] == pid
+                && row["_UID"] == uid
+                && v["total_bytes"] == length
+                && v["whole_file_sha256_verified"] == false,
+            "191 sync journal belongs to another process/object"
+        );
+        let time = row["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("191 sync timestamp")?
+            .parse::<u64>()?;
+        ensure!(
+            time > 0
+                && time
+                    <= cutoff
+                        .checked_mul(1_000_000)
+                        .context("191 progress cutoff")?,
+            "191 future progress"
+        );
+        progress.push((
+            time / 1000,
+            v[bytes].as_u64().context("191 sync byte progress")?,
+            v["elapsed_millis"].as_u64().context("191 sync elapsed")?,
+        ));
+        selected.push(row);
+    }
+    let remaining = progress_remaining(
+        &progress,
+        length,
+        cutoff.checked_mul(1000).context("191 sync clock")?,
+    )?;
+    let expected = if stage == "upload" {
+        &e.upload
+    } else {
+        &e.readback
+    };
+    ensure!(
+        matches!(expected,Work::Active {remaining_millis} if *remaining_millis == remaining),
+        "191 sync forecast is not its own measured phase rate plus stall age"
+    );
+    Ok(
+        json!({"phase":stage,"unit":c.unit,"invocation_id":c.invocation_id,"pid":pid,
+        "key":key,"total_bytes":length,"remaining_millis":remaining,"markers":selected,
+        "resource_samples":0,"integrity_receipt":false}),
+    )
 }
 fn capture(p: &Capture) -> Result<Value> {
     let o = bound(&p.observer, false)?;
@@ -495,8 +1073,7 @@ fn capture(p: &Capture) -> Result<Value> {
         p.schema == "jetstreamer-cohort191-delivery-capture-plan-v2"
             && cutoff <= now
             && now - cutoff <= 1800
-            && p.origins.keys().copied().eq(191..=194)
-            && p.claims.iter().map(|c| c.epoch).eq(191..=194),
+            && p.origins.keys().copied().eq(191..=194),
         "191 capture scope/staleness"
     );
     let history = inputs()?;
@@ -504,12 +1081,29 @@ fn capture(p: &Capture) -> Result<Value> {
     let forecast: jetstreamer_horizon_observe::cohort191_delivery_model::Plan =
         serde_json::from_value(bound(&p.forecast, true)?)?;
     let eta = jetstreamer_horizon_observe::cohort191_delivery_model::forecast(&forecast)?;
+    let working = validate_inputs(p, &forecast, &eta, cutoff)?;
     let mut census = BTreeMap::new();
+    let mut sync_observations = BTreeMap::new();
     for c in &p.claims {
         phase_scope(c)?;
         let u = fleet::unit(&c.unit)?;
         live(&u, c)?;
         program(c, &u)?;
+        ensure!(
+            pipeline_status::manager_start(&c.unit, &c.invocation_id)?
+                <= cutoff
+                    .checked_mul(1000)
+                    .context("191 phase clock overflow")?,
+            "191 phase began after coordinated sample; do not backdate"
+        );
+        if c.phase == "upload-readback" {
+            let e = forecast
+                .epochs
+                .iter()
+                .find(|e| e.epoch == c.epoch)
+                .context("191 sync forecast row")?;
+            sync_observations.insert(c.epoch, sync_observation(c, &u, e, cutoff)?);
+        }
         census.insert(c.unit.clone(), u);
     }
     let producer = fleet::unit(UNIT)?;
@@ -519,7 +1113,8 @@ fn capture(p: &Capture) -> Result<Value> {
             == prefix(&history["current_units"][CONTROLLER]["ExecStart"]),
         "191 controller command/rebind changed"
     );
-    let all_final = p.claims.iter().all(|c| c.phase == "producer-finalization");
+    let all_final =
+        !p.claims.is_empty() && p.claims.iter().all(|c| c.phase == "producer-finalization");
     let state = if all_final {
         ensure!(
             producer["MainPID"] == "2189644"
@@ -550,18 +1145,24 @@ fn capture(p: &Capture) -> Result<Value> {
         );
         let (bytes, s) = state_bytes()?;
         let a = &s["assignments"]["lane-a"];
+        let pending = p.claims.iter().any(|c| {
+            matches!(
+                c.phase.as_str(),
+                "controller-import-handoff" | "local-publication"
+            )
+        });
         let source = batch(
             p.source_batch
                 .as_ref()
                 .context("191 source batch required")?,
             false,
+            &if pending {
+                working.clone()
+            } else {
+                BTreeSet::new()
+            },
         )?;
-        if p.claims.iter().any(|c| {
-            matches!(
-                c.phase.as_str(),
-                "controller-import-handoff" | "local-publication"
-            )
-        }) {
+        if pending {
             ensure!(
                 a["first_epoch"] == 191
                     && a["last_epoch"] == 194
@@ -598,6 +1199,7 @@ fn capture(p: &Capture) -> Result<Value> {
                     .as_ref()
                     .context("191 imported public batch required")?,
                 true,
+                &working,
             )?;
             let complete = &s["completed"]["191-194"];
             ensure!(
@@ -635,11 +1237,25 @@ fn capture(p: &Capture) -> Result<Value> {
             "191 owner changed during capture"
         );
     }
+    let origin_start = pipeline_status::manager_start(UNIT, IID)?;
+    let elapsed = cutoff
+        .checked_mul(1000)
+        .context("191 sample clock overflow")?
+        .checked_sub(origin_start)
+        .context("191 original producer starts after sample")?;
+    let mut artifacts = BTreeMap::new();
+    for c in &p.claims {
+        let path = archives(c.epoch, &c.phase);
+        let identity = regular_identity(&path)?;
+        artifacts.insert(
+            c.epoch,
+            json!({"path":path,"length":identity.length,"identity":identity}),
+        );
+    }
     let v = json!({"schema":EVENT_SCHEMA,"first_epoch":191,"last_epoch":194,"sampled_at_utc":sample,"sample_unix_seconds":cutoff,
         "observer":p.observer,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
-        "native_events":events,"controller":controller,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
-        "gate_receipts":p.gate_receipts,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
-    validate_event(&v, cutoff)?;
+        "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"controller":controller,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
+        "gate_receipts":p.gate_receipts,"gate_tools":p.gate_tools,"ready_receipts":p.ready_receipts,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
     Ok(v)
 }
 pub(super) fn run() -> Result<()> {
@@ -669,6 +1285,11 @@ pub(super) fn run() -> Result<()> {
     let mut v = capture(&p)?;
     v["capture_plan"] = json!(b);
     v["capture_self_sha256"] = json!(a[6]);
+    v["capture_program"] = json!(fs::read_link("/proc/self/exe")?);
+    validate_event(
+        &v,
+        fleet::utc_seconds(v["sampled_at_utc"].as_str().context("191 sample")?)?,
+    )?;
     if a.len() == 8 {
         println!("191 capture preflight passed; no writes");
         return Ok(());
@@ -706,4 +1327,199 @@ pub(super) fn fleet_proof(
     live(&census[unit], c)?;
     program(c, &census[unit])?;
     Ok(Some(evidence.clone()))
+}
+
+pub(super) fn check() -> Result<()> {
+    let a: Vec<_> = env::args().collect();
+    ensure!(
+        a.len() == 5 && a[3] == "--event-sha256" && unsafe { libc::geteuid() } == 0,
+        "check-delivery-191 EVENT --event-sha256 SHA"
+    );
+    let v = bound(
+        &Bound {
+            path: a[2].clone().into(),
+            sha256: a[4].clone(),
+        },
+        false,
+    )?;
+    let cutoff = fleet::utc_seconds(v["sampled_at_utc"].as_str().context("191 event sample")?)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        cutoff <= now && now - cutoff <= 1800,
+        "191 event is stale/future"
+    );
+    validate_event(&v, cutoff)?;
+    let claims: Vec<Claim> = serde_json::from_value(v["claims"].clone())?;
+    for c in claims {
+        let u = fleet::unit(&c.unit)?;
+        live(&u, &c)?;
+        program(&c, &u)?;
+        ensure!(u == v["unit_census"][&c.unit], "191 event owner changed");
+    }
+    println!("191 native delivery custody passed; no writes");
+    Ok(())
+}
+
+/// Pre-launch custody gate for the independent191 full/plugin dispatcher.
+/// Does not launch, reserve resources, mint verifier receipts, or mutate R2.
+pub(super) fn dispatch_import_check(
+    source_batch: &Bound,
+    public_batch: &Bound,
+    materialized: &BTreeSet<u64>,
+) -> Result<Value> {
+    ensure!(
+        !materialized.is_empty() && materialized.iter().all(|e| (191..=194).contains(e)),
+        "191 dispatch materialized epoch scope differs"
+    );
+    let history = inputs()?;
+    let controller = fleet::unit(CONTROLLER)?;
+    ensure!(
+        controller["InvocationID"] == CID
+            && controller["NRestarts"] == "0"
+            && controller["ActiveState"] == "active"
+            && controller["SubState"] == "running"
+            && prefix(&controller["ExecStart"])
+                == prefix(&history["current_units"][CONTROLLER]["ExecStart"]),
+        "191 import controller/rebind changed"
+    );
+    let (bytes, state) = state_bytes()?;
+    let source = batch(source_batch, false, &BTreeSet::new())?;
+    let public = batch(public_batch, true, materialized)?;
+    ensure!(
+        source["root_checkpoint_gate"] == public["root_checkpoint_gate"],
+        "191 import changed native root-checkpoint semantics"
+    );
+    for n in 0..4 {
+        ensure!(
+            source["outcome"]["members"][n]["archive_sha256"]
+                == public["outcome"]["members"][n]["archive_sha256"],
+            "191 import changed archive semantics"
+        );
+    }
+    let complete = &state["completed"]["191-194"];
+    let destination = fs::symlink_metadata("/home/sol/horizon")?;
+    let receipt = fs::symlink_metadata(&public_batch.path)?;
+    ensure!(
+        complete["first_epoch"] == 191
+            && complete["last_epoch"] == 194
+            && complete["epochs"] == json!([191, 192, 193, 194])
+            && complete["receipt"].as_str() == public_batch.path.to_str()
+            && complete["receipt_sha256"] == public_batch.sha256
+            && complete["destination_identity"]["device"] == destination.dev()
+            && complete["destination_identity"]["inode"] == destination.ino()
+            && complete["receipt_identity"]["device"] == receipt.dev()
+            && complete["receipt_identity"]["inode"] == receipt.ino()
+            && complete["receipt_identity"]["length"] == receipt.len()
+            && complete["receipt_identity"]["modified_seconds"] == receipt.mtime()
+            && complete["receipt_identity"]["modified_nanoseconds"] == receipt.mtime_nsec(),
+        "191 public import lacks the exact native root-controller attestation"
+    );
+    for name in [
+        ".jetstreamer-archive-batch",
+        ".jetstreamer-archive-batch-outcome",
+    ] {
+        ensure!(
+            fs::symlink_metadata(Path::new("/home/sol/horizon").join(name))
+                .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+            "191 public transaction pending"
+        );
+    }
+    ensure!(
+        state_bytes()?.0 == bytes && fleet::unit(CONTROLLER)? == controller,
+        "191 import custody changed during dispatch admission"
+    );
+    Ok(
+        json!({"schema":"jetstreamer-cohort191-import-custody-v2","source_batch":source_batch,
+        "public_batch":public_batch,"materialized_epochs":materialized,"public_members":public["outcome"]["members"],
+        "controller":controller,"controller_state_sha256":hex_lower(&Sha256::digest(&bytes)),
+        "native_import_attestation":complete,"publication_authorized":false,"launch_authorized":false,
+        "r2_mutations":false,"new_resource_samples":0}),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn claim(epoch: u64) -> Claim {
+        Claim {
+            epoch,
+            phase: "producer-finalization".into(),
+            unit: UNIT.into(),
+            invocation_id: IID.into(),
+            expected_exec_start: "bound command".into(),
+            program: None,
+        }
+    }
+    #[test]
+    fn remaining_member_census_cannot_hide_queued_or_claim_ready_epochs() {
+        let eta = BTreeMap::from([(191, 0), (192, 1), (193, 2), (194, 3)]);
+        let good = vec![claim(192), claim(193), claim(194)];
+        assert_eq!(
+            validate_claim_set(&good, &eta).unwrap(),
+            BTreeSet::from([192, 193, 194])
+        );
+        let mut bad = good.clone();
+        bad.pop();
+        assert!(validate_claim_set(&bad, &eta).is_err());
+        let mut bad = good.clone();
+        bad.insert(0, claim(191));
+        assert!(validate_claim_set(&bad, &eta).is_err());
+        let mut bad = good.clone();
+        bad[1] = bad[0].clone();
+        assert!(validate_claim_set(&bad, &eta).is_err());
+        let mut bad = good;
+        bad.swap(0, 1);
+        assert!(validate_claim_set(&bad, &eta).is_err());
+    }
+    #[test]
+    fn a_failed_legacy_watcher_is_not_a_native191_verifier() {
+        let mut c = claim(191);
+        c.phase = "full-verification".into();
+        c.unit = "jetstreamer-horizon-audit-epochs182-200-v5.service".into();
+        assert!(phase_scope(&c).is_err());
+        c.unit = "horizon-full-verify-191-native191-20261023-v1.service".into();
+        assert!(phase_scope(&c).is_err()); // No native-program binding.
+        c.program = Some(Bound {
+            path: "/usr/local/lib/jetstreamer/tool".into(),
+            sha256: "a".repeat(64),
+        });
+        phase_scope(&c).unwrap();
+        c.invocation_id = "unknown".into();
+        assert!(phase_scope(&c).is_err());
+    }
+    #[test]
+    fn upload_and_readback_have_independent_rates_and_stall_age() {
+        let upload = [(1000, 10, 1000), (2000, 20, 2000)];
+        let readback = [(1000, 10, 1000), (3000, 20, 3000)];
+        assert_eq!(progress_remaining(&upload, 100, 2500).unwrap(), 8500);
+        assert_eq!(progress_remaining(&readback, 100, 3500).unwrap(), 16500);
+        assert_eq!(progress_remaining(&readback, 100, 5500).unwrap(), 18500);
+        assert!(progress_remaining(&upload[..1], 100, 2500).is_err());
+        assert!(progress_remaining(&[(1000, 20, 1000), (2000, 10, 2000)], 100, 2500).is_err());
+        assert!(progress_remaining(&[(1000, 10, 1000), (2000, 110, 2000)], 100, 2500).is_err());
+        assert!(progress_remaining(&readback, 100, 2999).is_err());
+    }
+    #[test]
+    fn capture_cannot_grant_publication_or_fabricate_current_time() {
+        let base = json!({"schema":EVENT_SCHEMA,"first_epoch":191,"last_epoch":194,
+            "sample_unix_seconds":1,"resource_samples":0,"publication_authorized":false,
+            "replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
+        for flag in [
+            "publication_authorized",
+            "replay_launch_authorized",
+            "r2_mutations",
+            "archive_readiness_claimed",
+        ] {
+            let mut bad = base.clone();
+            bad[flag] = json!(true);
+            assert!(format!("{:#}", validate_event(&bad, 1).unwrap_err()).contains(flag));
+        }
+        assert!(validate_event(&base, 2).is_err());
+    }
+    #[test]
+    fn manifest_hash_decoder_rejects_invalid_alphabet_and_overflow() {
+        assert_eq!(hash_bytes(&"1".repeat(32)).unwrap(), [0; 32]);
+        assert!(hash_bytes(&"0".repeat(32)).is_err());
+        assert!(hash_bytes(&"z".repeat(44)).is_err());
+    }
 }

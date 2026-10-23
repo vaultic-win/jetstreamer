@@ -29,6 +29,7 @@ fn utc_string(seconds: u64) -> Result<String> {
 pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()> {
     is_101(p)?;
     qualification141_status::completion(p, c)?;
+    cohort191_delivery::completion(p, c)?;
     ensure!(
         c["schema"] == "jetstreamer-horizon-routine-cycle-completion-v1"
             && c["sampled_at_utc"] == p.sample_target_utc

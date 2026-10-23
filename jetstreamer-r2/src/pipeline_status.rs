@@ -128,6 +128,11 @@ impl Binding {
                     &self.invocation_id,
                     &self.origin_unit,
                     &self.origin_invocation_id
+                ) || super::cohort191_delivery::binding(
+                    &self.unit,
+                    &self.invocation_id,
+                    &self.origin_unit,
+                    &self.origin_invocation_id
                 ) || (self.unit == super::cohort_finalization::CONTROLLER
                     && self.invocation_id == super::cohort_finalization::CONTROLLER_INVOCATION
                     && self.origin_unit == super::cohort_finalization::UNIT
@@ -210,7 +215,12 @@ fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
                         && plan.binding.origin_unit == super::cohort198_finalization::UNIT
                         && plan.binding.origin_invocation_id
                             == "e5612ef00a5b4fcab04df2c13a6b35b0")
-                    || exact144_binding(plan))
+                    || exact144_binding(plan)
+                    || super::cohort191_delivery::origin(
+                        plan.epoch,
+                        &plan.binding.origin_unit,
+                        &plan.binding.origin_invocation_id
+                    ))
                 && plan.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
             "foreign-owned pipeline receipt directory is not an exact160/198/144 profile"
@@ -403,7 +413,7 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
     ensure!(micros > 0, "manager start time is zero");
     Ok(micros / 1000)
 }
-fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
+pub(super) fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
     ensure!(
         unit_name(unit) && hex_id(invocation, 32),
         "invalid manager start identity"
@@ -599,7 +609,47 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
         plan.binding.live_matches(&current[&plan.binding.unit]),
         "pipeline invocation or exact command is not live"
     );
-    if plan.binding.claim_phase == "producer-finalization" {
+    if (191..=194).contains(&plan.epoch) {
+        ensure!(
+            super::cohort191_delivery::origin(
+                plan.epoch,
+                &plan.binding.origin_unit,
+                &plan.binding.origin_invocation_id
+            ),
+            "191 changed original clock"
+        );
+        let mut proofs = Vec::new();
+        for b in &plan.estimate_evidence {
+            let v = bound_json(b)?;
+            if let Some(proof) = super::cohort191_delivery::fleet_proof(
+                plan.epoch,
+                &plan.binding.claim_phase,
+                &plan.binding.unit,
+                &plan.binding.invocation_id,
+                &v,
+                &current,
+                fleet::utc_seconds(fleet["sampled_at_utc"].as_str().context("191 sample")?)?,
+            )? {
+                ensure!(
+                    proof["estimated_remaining_millis"][plan.epoch.to_string()]
+                        == plan.estimated_remaining_millis,
+                    "191 publication ETA differs from native forecast"
+                );
+                ensure!(
+                    proof["observer"]
+                        == json!({"path":plan.observer.path,"sha256":plan.observer.sha256})
+                        && proof["origins"][plan.epoch.to_string()]
+                            == json!({"path":plan.origin_launch.path,"sha256":plan.origin_launch.sha256}),
+                    "191 publication observer/origin differs from native custody"
+                );
+                proofs.push(proof);
+            }
+        }
+        ensure!(
+            proofs.len() == 1,
+            "191 publication requires one exact native custody event"
+        );
+    } else if plan.binding.claim_phase == "producer-finalization" {
         super::cohort_finalization::observe(
             &current[&plan.binding.unit],
             fleet::utc_seconds(
@@ -609,7 +659,8 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             )?,
         )?;
     }
-    if plan.binding.claim_phase == "controller-import-handoff" {
+    if !(191..=194).contains(&plan.epoch) && plan.binding.claim_phase == "controller-import-handoff"
+    {
         super::cohort_finalization::observe_handoff(
             &current[&plan.binding.unit],
             fleet::utc_seconds(
