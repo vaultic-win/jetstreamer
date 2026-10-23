@@ -91,9 +91,9 @@ impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
-            | ("local-publication", "publication")
-            | ("producer-finalization", "finalization")
-            | ("controller-import-handoff", "publication")
+            | ("local-publication", "verification" | "publication")
+            | ("producer-finalization", "verification" | "finalization")
+            | ("controller-import-handoff", "verification" | "publication")
             | ("upload-readback", "upload" | "readback") => (),
             ("upload-readback", "queued-upload") => ensure!(
                 epoch == 144 && self.unit == UPLOAD144 && self.origin_unit == PUB144,
@@ -871,6 +871,26 @@ mod tests {
         p.binding.origin_invocation_id = "b".repeat(32);
         assert!(receipt_directory_owner(&p).is_err());
         assert!(p.binding.validate(160, "finalization").is_err());
+    }
+    #[test]
+    fn dashboard_verification_spelling_preserves_finalization_and_handoff_ownership() {
+        let mut p = directory_plan();
+        p.binding.validate(198, "verification").unwrap();
+        assert!(p.binding.validate(197, "verification").is_err());
+        assert!(p.binding.validate(198, "upload").is_err());
+        p.binding.origin_invocation_id = "a".repeat(32);
+        assert!(p.binding.validate(198, "verification").is_err());
+
+        let mut p = directory_plan();
+        p.epoch = 160;
+        p.binding.unit = super::super::cohort160_handoff::CONTROLLER.into();
+        p.binding.invocation_id = super::super::cohort160_handoff::IID.into();
+        p.binding.origin_unit = super::super::cohort160_finalization::UNIT.into();
+        p.binding.origin_invocation_id = super::super::cohort160_finalization::IID.into();
+        p.binding.claim_phase = "controller-import-handoff".into();
+        p.binding.validate(160, "verification").unwrap();
+        p.binding.origin_invocation_id = "b".repeat(32);
+        assert!(p.binding.validate(160, "verification").is_err());
     }
     #[test]
     fn foreign_directory_policy_is_exact198_only_and_defaults_to_root() {

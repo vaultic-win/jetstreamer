@@ -12,8 +12,13 @@ unique root systemd manager start event for that original invocation. The
 delivery stage must have started before the coordinated sample; do not backdate
 a new handoff onto an earlier sample.
 
-Supported claim/status phases are `local-publication`/`publication` and
-`upload-readback`/`upload` or `readback`. A positive MainPID, zero restarts and
+New dashboard reports use `verification` for `full-verification`,
+`plugin-verification`, `local-publication`, `producer-finalization` and
+`controller-import-handoff` claims, and `upload` or `readback` for an
+`upload-readback` claim. The reader accepts only `replay`, `verification`,
+`upload`, `readback`. Legacy `publication`/`finalization` receipt spellings
+remain readable for custody and cleanup; they must not be chosen for new
+dashboard models. A positive MainPID, zero restarts and
 the exact live fleet claim are mandatory. Bind the complete before/after unit
 census. Explicit same-epoch publisher/uploader peers may be terminal, but no
 competing peer may be live. Other fleet identities must remain unchanged.
@@ -45,16 +50,17 @@ poll loop. A completion or authenticated handoff is a lifecycle event; an old
 ETA is never evidence that a delivery stage remains live.
 
 For the exact sealed 216–219 legacy producer, the separately qualified
-`producer-finalization` claim maps to status phase `finalization`. The origin
+`producer-finalization` claim uses dashboard phase `verification` (legacy
+receipt spelling `finalization`). The origin
 unit/invocation must remain the same producer. Both fleet reconciliation and
 status census authenticate the final checkpoint/verification/archive-close
 journal events and parent digest. This is an estimate through import and all
 remaining independent verification, upload and readback, not replay progress
-or a ready archive assertion. Update phase-capable status readers and completion
-cleanup binaries through their normal immutable deployment handoff before
-publishing this new phase; do not leave an old reader rejecting its receipts.
+or a ready archive assertion. Preserve the detailed internal claim while using
+the consumer's supported coarse phase; a status phase grants no archive authority.
 
-The same exact cohort has a `controller-import-handoff`/`publication` binding
+The same exact cohort has a `controller-import-handoff`/`verification` binding
+(legacy receipt spelling `publication`)
 after its parent cleanly succeeds but before the controller launches its
 serialized importer. It pins the original controller/script, pending state,
 completed producer, exact committed batch receipt and pre-sample terminal
@@ -64,8 +70,9 @@ producer's, not the controller's. This observation never wakes, restarts or
 launches the controller or claims that the public import has finished.
 
 Fleet status classification distinguishes live receipt ownership from an actual
-production claim. A private qualification may still own an old status receipt,
-but that does not make its production countdown valid. `owner_binding_matches`
+production claim. An active private qualification may own a useful operational
+countdown without becoming a production replay or a publishable archive. Exact
+qualification publishers bind that ownership and freshness separately. `owner_binding_matches`
 records ownership separately from `production_claim_eligible` and ETA freshness.
 This classification grants no deletion authority: a live diagnostic owner must
 not be passed off as terminal to use inactive-owner cleanup.
