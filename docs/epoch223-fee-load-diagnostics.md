@@ -51,3 +51,41 @@ bounded invocation with an exact guard. Preserve the old failed invocation and
 artifacts. Use the captured transaction and canonical source metadata to resolve
 the discrepancy; do not weaken loading, writability, fee collection, checkpoint
 or full/plugin gates to continue replay.
+
+## Reproduced warmup and finalized transaction
+
+On 2026-10-23, invocation `e94cafadd43a4ad1bacea7da20d2cb4b` restored the
+cold snapshot and reproduced the native error at bank slot 96,335,539. Its
+failure and complete journal are preserved under
+`/var/lib/jetstreamer/horizon-warmup223-terminal-v4`; this attempt ended on the
+native fee/load result, without a supervisor scan failure or a completed target.
+The first fatal transaction is
+`1waA5SJxAYc1BxmbgscTLfkYuvEUy6VeFpgNceqoYkGDMqLao6QQMZV2ewQ1vuUVEmXSj1GenoByrPtWxTqt6X9`.
+
+The raw finalized `getTransaction` response reports the same slot, a successful
+transaction (`meta.err: null`), fee 5,000, a legacy message, and header counts
+1 required signature / 0 readonly signed / 4 readonly unsigned accounts.
+Its exact response SHA-256 is
+`11f1a2c2a5e9255f1b0100103a3f3e563c7ca4f0440278e1e6083f365afd2261`.
+Preserve the raw bytes; do not roundtrip balance arrays through floating point.
+
+The native post-commit trace records account index 8, the Token program
+`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`, as executable, owned by
+`BPFLoader2111111111111111111111111111111111`, writable, passed to an
+instruction, and not a top-level invoked program. Index 18,
+`9KEPoZmtHUrBbhWN1v1KWLMkkvwY6WLtAVUCPRtRjP4z`, is writable and executable
+under the upgradeable loader. Both account keys match the finalized message.
+The pinned v1.6.25 loader rejects the writable executable condition and also
+rejects writable upgradeable-owned accounts without that loader in the message;
+the pinned v1.6.20 loader lacks those rejection branches. The observations
+support a historical runtime-boundary discrepancy, rather than a fee-payer
+diagnosis, but remain post-commit observations rather than loaded preimages.
+
+Do not repeat the unchanged v1.6.25 cold warmup or launch its long prefix.
+Qualify a v1.6.20 prefix ending at the independently known 96,767,522 root,
+including the independently audited hard-fork markers, or a genuinely supported
+retained-prefix recovery route. Keep the v1.6.25 suffix comparison separate:
+its successful tail does not qualify the earlier runtime. Cold-input capability,
+SourceExact outcomes, canonical root, native restart/cursor mapping, assembly,
+independent full/plugin verification and publication gates still apply. No
+runtime promotion or completed-epoch claim follows from this diagnostic.

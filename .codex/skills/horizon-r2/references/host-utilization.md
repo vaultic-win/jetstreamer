@@ -134,6 +134,12 @@ For a failure before archive recording begins, prefer an explicit bounded warmup
 Bind the cold bootstrap and enforce its entry limit in the worker when parent progress can run
 ahead of execution. Retain the native fatal result and trace; a bounded diagnostic is neither a
 repaired epoch nor authority to relax its runtime or publication gates.
+After a bounded reproduction captures the native fatal transaction, compare its exact signature,
+slot, raw message and finalized result before choosing another runtime experiment. Preserve raw
+RPC bytes and distinguish post-commit trace observations from loaded account preimages. A newer
+worker passing a short suffix does not qualify it for an older cold prefix; follow independently
+checkpointed era boundaries rather than repeating an unchanged failing warmup or suppressing the
+native error. See [the epoch223 investigation](../../../../docs/epoch223-fee-load-diagnostics.md).
 
 Measure restore baseline separately from settled replay growth: physical and apparent scratch,
 file count, VMAs, CPU, memory peak/events, I/O pressure, transactions and account updates. Bind the
