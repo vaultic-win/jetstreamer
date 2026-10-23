@@ -4,6 +4,36 @@ use std::os::unix::fs::PermissionsExt;
 const GUARD_UNIT: &str = "horizon-original141-root-guard-20261023-v1.service";
 const GUARD_ROOT: &str = "/var/lib/jetstreamer/horizon-original141-root-guard-20261023-v1";
 const GUARD_BIN: &str = "/usr/local/lib/jetstreamer/horizon-standalone-guard-target-handoff-20261019-v2/jetstreamer-horizon-standalone-guard";
+fn raw_clock(object: &str, interface: &str, property: &str) -> Result<u64> {
+    let out = ProcessCommand::new("busctl")
+        .args([
+            "--system",
+            "get-property",
+            "org.freedesktop.systemd1",
+            object,
+            interface,
+            property,
+        ])
+        .output()?;
+    ensure!(
+        out.status.success() && out.stdout.len() < 256,
+        "raw systemd clock unavailable"
+    );
+    let value = std::str::from_utf8(&out.stdout)?
+        .trim()
+        .strip_prefix("t ")
+        .context("systemd clock is not uint64")?
+        .parse::<u64>()?;
+    ensure!(value > 0, "systemd clock has not fired");
+    Ok(value)
+}
+pub(super) fn producer_start_seconds() -> Result<u64> {
+    Ok(raw_clock(
+        "/org/freedesktop/systemd1/unit/horizon_2dqualify_2d141_2doriginal_2dentry_2droot_2d20261023_2dv1_2eservice",
+        "org.freedesktop.systemd1.Service",
+        "ExecMainStartTimestamp",
+    )? / 1_000_000)
+}
 fn properties(name: &str, keys: &str) -> Result<BTreeMap<String, String>> {
     let out = ProcessCommand::new("systemctl")
         .args(["show", name, "--no-pager", &format!("--property={keys}")])
@@ -163,10 +193,13 @@ pub(super) fn pin(
         "Id,InvocationID,User,Type,Restart,RemainAfterExit,KillMode,NRestarts,Result,ExecMainStatus,MainPID,ActiveState,SubState,ProtectSystem,ProtectHome,PrivateNetwork,PrivateTmp,NoNewPrivileges,EnvironmentFiles,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,TriggeredBy,ExecMainStartTimestampMonotonic,ExecStart,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,TimeoutStartUSec",
     )?;
     let timer_name = GUARD_UNIT.replace(".service", ".timer");
-    let timer = properties(
+    let mut timer = properties(
         &timer_name,
         "Id,ActiveState,SubState,Unit,LastTriggerUSecMonotonic",
     )?;
+    // Timer timestamps are human durations in systemctl output. Preserve the
+    // real uint64 D-Bus value rather than interpreting display formatting.
+    timer.insert("LastTriggerUSecMonotonic".into(),raw_clock("/org/freedesktop/systemd1/unit/horizon_2doriginal141_2droot_2dguard_2d20261023_2dv1_2etimer","org.freedesktop.systemd1.Timer","LastTriggerUSecMonotonic")?.to_string());
     checked(g, gp, &service, &timer, now()?)?;
     copy_new(source, destination)?;
     ensure!(

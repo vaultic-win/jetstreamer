@@ -713,6 +713,7 @@ pub(super) fn capture() -> Result<()> {
     for key in DENIED {
         r[*key] = json!(false);
     }
+    r["actual_start_unix_seconds"] = json!(guard_pin::producer_start_seconds()?);
     shape(&r, &c)?;
     bindings(&r, &p, &a)?;
     first_guard(&c, &r, &g, &bound_json(&gp)?)?;
