@@ -2143,6 +2143,16 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"]
+                == "jetstreamer-private-epoch223-native-v1620-terminal-event-v1"
+            {
+                cold223_scan::native20_terminal_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == "jetstreamer-exact203-phase-handoff-v1" {
                 publication203::event_predecessor(
                     &previous,
@@ -2303,6 +2313,7 @@ pub(super) async fn run() -> Result<()> {
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
+    cold223_scan::native20_terminal_census(&plan, &before)?;
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
