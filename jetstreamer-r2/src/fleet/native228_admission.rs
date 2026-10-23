@@ -297,6 +297,13 @@ fn terminal209_current(current: &BTreeMap<String, Value>, proof: Option<&Value>)
     }
     Ok(())
 }
+fn launchable_peers(terminal223: Option<&BoundFile>) -> Result<()> {
+    ensure!(
+        terminal223.is_none(),
+        "228 launch requires a fleet already reconciled past terminal223; capture/event carry-forward is not qualified"
+    );
+    Ok(())
+}
 fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let (extra, mut evidence) = super::native228_full209::memory(f)?;
     let (base, rest) = super::native228_peer209::memory(&without_full209(f)?)?;
@@ -351,6 +358,7 @@ fn protected_floor(
 pub(super) fn run() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("admit-native228-input")?;
     let s: Spec = serde_json::from_value(bound_json(&binding)?)?;
+    launchable_peers(s.terminal223.as_ref())?;
     ensure!(
         s.schema == "jetstreamer-private-epoch228-native-admission-spec-v1"
             && s.mode == "native-cold"
@@ -553,6 +561,16 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn production_admission_denies_unqualified_terminal223_capture_and_event_carry_forward() {
+        launchable_peers(None).unwrap();
+        let proof = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-warmup223-native20-terminal-58ab-v2/proof.json"
+                .into(),
+            sha256: "6790592b9188e7c4a3d32171a326b743f84fc6c5b5ad07f94182c104876b7028".into(),
+        };
+        assert!(launchable_peers(Some(&proof)).is_err());
+    }
     #[test]
     fn every_already_bound_guard_floor_survives_admission_arithmetic() {
         let root = tempfile::tempdir().unwrap();

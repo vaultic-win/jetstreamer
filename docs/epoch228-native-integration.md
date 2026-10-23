@@ -94,3 +94,11 @@ remain armed throughout admission, so a lower arithmetic estimate cannot release
 their reserve. The original334 observer/fleet plus actual terminal223v2 proof are
 covered by a separate root-only metadata regression test; it creates no sample,
 Bank, producer, archive or remote operation.
+
+Production dispatch restriction: `terminal223: Some(...)` is rejected until its
+capture and launch-event carry-forward are qualified end to end. The334 arithmetic
+regression above is metadata validation only. Its prepared334 specs are review
+artifacts, not launchable inputs. Use a new accepted observation/fleet that already
+reconciles terminal223, omit `terminal223`, and bind every spec field to that new
+observation. Never rebind334 evidence to335 or another sample. The335-only initial
+sealed helper handoff must likewise use a spec with `terminal223` omitted.
