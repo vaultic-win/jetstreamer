@@ -41,3 +41,21 @@ admission. Its reserve/VMA guard must use the reviewed own-tree guard with a
 invocation cannot masquerade as the actual prefix command. Registration still
 grants no independent prefix, native restart, full epoch, sidecar or publication
 qualification; fresh admission and a proven actual guard remain required.
+
+`jetstreamer-r2 admit-prefix205 SPEC --spec-sha256 HEX --self-sha256 HEX`
+issues only the separate resource admission. Run from a root-owned immutable
+deployment with a sealed specification. Bind the accepted201–300 fleet and its
+same fresh observer, thirteen-pair century-floor census, exact completed203/225
+guard handoff, actual205 input capability, fresh no-trip protective guard receipts
+and pending resource plan. The writer independently rechecks the complete live
+owner census before and after actual disk/memory/VMA checks and preserves both
+original producer identities. It requires real RSS history from the current
+century, computes its1.5× reservation and checks the90% host-memory target.
+It cannot synthesize RSS from cgroup cache statistics or the initial estimate.
+
+The output binds all evidence and has a900-second launch freshness bound. Retrying
+the exact same specification preserves the existing matching receipt; it never
+renews its timestamp, overwrites a conflict or starts a duplicate job. Fleet
+registration checks the launch/admission timing relationship. Issuance starts
+no producer, sends no signal and makes no R2 mutation. The live guarded producer,
+its sandbox and its first real timer fire remain separate deployment steps.

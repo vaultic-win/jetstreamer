@@ -116,6 +116,16 @@ pub(super) fn bindings(c: &DiagnosticClaim, r: &Value) -> Result<()> {
         "205 bound resource plan differs"
     );
     let a = bound_json(&serde_json::from_value(r["admission"].clone())?)?;
+    let admitted = a["recorded_unix_seconds"]
+        .as_u64()
+        .context("205 admission time")?;
+    let launched = r["recorded_unix_seconds"]
+        .as_u64()
+        .context("205 launch time")?;
+    ensure!(
+        launched >= admitted && launched - admitted <= 900,
+        "205 launch used stale or future admission"
+    );
     ensure!(
         a["schema"] == "jetstreamer-private-epoch205-capped-prefix-admission-v1"
             && a["admitted"] == true
