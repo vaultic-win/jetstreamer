@@ -28,7 +28,7 @@ mod profile {
     pub const RESULT_SCHEMA: &str = "jetstreamer-private-epoch223-warmup-resource-v1";
     pub const STOP_SCHEMA: &str = "jetstreamer-private-epoch223-warmup-stop-v1";
     pub const UNIT_PREFIX: &str = "horizon-qualify-223-warmup-resource-";
-    pub const ROOT_PREFIX: &str = "qualification-223-v1625-warmup-";
+    pub const ROOT_PREFIX: &str = "qualification-223-v1625-prefix-warmup-";
 }
 mod bounded_resource_runner {
     include!("bounded_resource_runner.rs");
@@ -66,11 +66,19 @@ mod bounded_resource_runner {
             bindings: &Value,
             _command: &Command,
         ) -> Result<()> {
+            let mut planning = command(p);
+            let result = planning.arg("--epoch223-prefix-preflight").output()?;
+            ensure!(
+                result.status.success(),
+                "actual parent planning rejected warmup scope: {}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            let report = planning_report(std::str::from_utf8(&result.stdout)?, &p.worker)?;
             persist(
                 &p.run_root.join("receipts/capability.json"),
                 &json!({
                 "schema":"jetstreamer-private-epoch223-warmup-input-capability-v1","invocation_id":iid,
-                "bindings":bindings,"node_sha256":PARENT_SHA,"worker_sha256":WORKER,
+                "bindings":bindings,"node_sha256":PARENT_SHA,"worker_sha256":WORKER,"parent_planning_report":report,
                 "snapshot_sha256":SNAPSHOT,"worker_entry_start":INITIAL_REPLAY,"worker_entry_end_exclusive":TARGET+1,
                 "parent_requested_root":TERMINAL,"input_hashes_and_private_paths_verified":true,
                 "worker_started":false,"entry_replay":false,"resource_observation_performed":false,
@@ -126,6 +134,33 @@ mod bounded_resource_runner {
             }
             Ok(())
         }
+    }
+    fn planning_report(text: &str, worker: &Path) -> Result<Value> {
+        ensure!(text.len() <= 1 << 20, "parent planning output too large");
+        let reports = text
+            .lines()
+            .filter_map(|s| serde_json::from_str::<Value>(s).ok())
+            .filter(|v| v["schema"] == "jetstreamer-private-epoch223-prefix-planning-preflight-v1")
+            .collect::<Vec<_>>();
+        ensure!(
+            reports.len() == 1,
+            "missing/duplicate parent planning report"
+        );
+        let report = reports.into_iter().next().unwrap();
+        ensure!(
+            report["epoch"] == 223
+                && report["bootstrap_slot"] == 96_335_538u64
+                && report["terminal_slot"] == TERMINAL
+                && report["pre_worker_barrier_reached"] == true
+                && report["runtime_checkpoint_policy_validated"] == true
+                && report["worker_profile_validated"] == true
+                && report["worker_executable"].as_str() == worker.to_str()
+                && report["worker_spawned"] == false
+                && report["archive_created"] == false
+                && report["publication_authorized"] == false,
+            "parent planning envelope differs"
+        );
+        Ok(report)
     }
     pub(super) fn entry() {
         main_with_storage(&WarmupStorage {
@@ -185,6 +220,18 @@ mod bounded_resource_runner {
                 };
                 assert!(validate_plan(&bad).is_err());
             }
+        }
+        #[test]
+        fn capability_requires_the_actual_parent_barrier_and_no_worker() {
+            let report = json!({"schema":"jetstreamer-private-epoch223-prefix-planning-preflight-v1","epoch":223,"bootstrap_slot":96335538,
+                "terminal_slot":TERMINAL,"pre_worker_barrier_reached":true,"runtime_checkpoint_policy_validated":true,
+                "worker_profile_validated":true,"worker_executable":"/sealed/worker","worker_spawned":false,"archive_created":false,"publication_authorized":false});
+            planning_report(&report.to_string(), Path::new("/sealed/worker")).unwrap();
+            assert!(planning_report("", Path::new("/sealed/worker")).is_err());
+            let mut bad = report.clone();
+            bad["worker_spawned"] = json!(true);
+            assert!(planning_report(&bad.to_string(), Path::new("/sealed/worker")).is_err());
+            assert!(planning_report(&report.to_string(), Path::new("/different/worker")).is_err());
         }
     }
 }

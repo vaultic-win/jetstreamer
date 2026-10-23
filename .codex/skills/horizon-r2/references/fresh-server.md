@@ -133,6 +133,11 @@ strings, and never roundtrip them through JavaScript numbers (capitalization can
 If the failure is in predecessor warmup, the ordinary epoch-output qualification CLI may
 reject an end slot before the epoch starts; use a separately reviewed private warmup path
 rather than extending the run through an entire epoch just to reach an admissible output.
+Before admitting that diagnostic, exercise the actual parent's no-worker planning barrier
+with the exact private ledger/output/scratch namespace, checkpoint file and candidate worker.
+Readable inputs and a successful worker-only loader test do not prove the parent accepts the
+launch scope. Preserve a rejected namespace as a failed preparation; correct the wrapper's
+private paths rather than relaxing the parent's publication or checkpoint restrictions.
 
 For native fee/load failures, capture the exact signature, slot, message account roles,
 effective writability, owners and executable flags before selecting a fix. In historical
