@@ -97,3 +97,20 @@ OS filesystem on this host. Cleaning them does not free replay space on
 `/home/sol`. Likewise, a small successful transport probe is not evidence that
 a large job restore fits; ordinary restoration still needs its complete-growth
 admission and artifact-specific retirement/restoration gates remain separate.
+
+`holding-inspect136` is a read-only source inspection for the exact retained
+99,718,944,924-byte failed epoch136 partial. Its plan schema is
+`jetstreamer-horizon-holding-inspect136-plan-v2`, with only `mapping`, `terminal`
+and `qualification` bindings. Source path, original device/inode, size, owner,
+mode and failure lineage are compiled into the tool. It requires the original
+controller and producer inactive with zero restarts and no relaunch/handoff
+triggers, no process references to the old lane, the original sealed failure
+and stopped-owner receipts, the qualified `node_02/` transport and no adjacent
+sidecar. It computes SHA-256 and multipart ETag, rechecks source metadata and
+closed ownership, then fsyncs a private holding-eligibility receipt. It uses no
+credentials or R2 requests, copies no source bytes and cannot remove the prefix.
+The receipt deliberately retains `local_retirement_authorized: false` and
+requires separate staged-reference and retirement review. Feed only this
+separately sealed eligibility proof to the ordinary no-clobber holding park
+operation; neither inspection nor backup repairs epoch136 or qualifies it for
+canonical publication or job resume.
