@@ -94,3 +94,45 @@ timings, and a bounded scratch census before the temporary native state is
 removed. A missing scratch measurement fails the diagnostic rather than
 becoming a smaller resource claim. These observations are restore-only evidence,
 not qualification of a full cold epoch's peak.
+
+## Separate 419-slot continuation
+
+The native-only comparison passed on 2026-10-23 against the complete retained
+prefix. The separate `epoch203-checkpoint-continuation-diagnostic` feature builds
+`jetstreamer-node` for the exact remaining slots 88,127,581–88,127,999. It does
+not promote epoch 203 in the ordinary runtime registry and cannot be combined
+with other native-restore, continuation, or qualification modes.
+
+The CLI requires only epoch 203, one explicit `--verify`, a private destination,
+and the separately hashed `--checkpoint-continuation-plan` and
+`--checkpoint-continuation-plan-sha256`. The strict plan schema is
+`jetstreamer-private-epoch203-checkpoint-continuation-plan-v1`; consult
+`jetstreamer-node/src/checkpoint_continuation203.rs` for its exact input bindings.
+It pins the unchanged capped-shrink worker, complete prefix and manifest,
+successful raw native result, snapshot and genesis. Preserve the raw native
+JSON bytes: its capitalization is a u64 beyond JavaScript's exact number range.
+
+A fresh, separately sealed `jetstreamer-epoch203-continuation-admission-v1`
+must cover the complete prefix-reread/restore/suffix/assembly path while
+protecting the current fleet's growth and century floor. The experimental
+minimum is 256 GiB, not the prior native-only 192-GiB envelope; neither value
+qualifies a full cold-epoch peak. Keep the unit dormant until full admission,
+exact-package capability checks and invocation-bound reserve/VMA protection
+are available. Use a fresh owner-only
+`/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-*` root and the
+separate mode-0600 `checkpoint-continuation-203.lock` lease. Run a persistent,
+non-restarting `horizon-qualify-203-checkpoint-continuation-*.service` as UID 1000.
+
+The executing suffix worker repeats the complete native checkpoint comparison,
+zero-bootstrap-write and initialized-cursor barrier before receiving any entry.
+The canonical root remains slot 88,127,580; do not invent a trusted terminal
+root at 88,127,999. Private V4 assembly preserves both source generations and
+their independent write-version mappings and records the exact snapshot handoff.
+It never appends to or modifies the retained prefix.
+
+Passing suffix and assembly produce private evidence only. Independent final
+archive and current-plugin verification, a reviewed exact-203 V4 publication
+admission, and authenticated R2 upload/readback remain separate gates. No
+canonical sidecar, ordinary import, publication, retirement, or remote mutation
+is authorized by this feature. Never borrow epoch 213's whitelist or flatten
+the restarted V4 provenance to uninterrupted V1/V2.
