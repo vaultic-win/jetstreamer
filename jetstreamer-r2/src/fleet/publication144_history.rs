@@ -99,9 +99,112 @@ pub(super) fn validate(p: &Plan, census: &BTreeMap<String, Value>) -> Result<boo
     }
     Ok(true)
 }
+pub(super) fn event_predecessor(
+    previous: &Value,
+    p: &Plan,
+    proof: &Value,
+    sample: &str,
+    now: u64,
+) -> Result<()> {
+    let event = proof["sampled_at_utc"]
+        .as_str()
+        .context("metadata event clock")?;
+    let seconds = utc_seconds(event)?;
+    let upload: Vec<_> = p
+        .pipeline_claims
+        .iter()
+        .filter(|c| namespace(c) && c.unit == UPLOAD)
+        .collect();
+    ensure!(
+        p.first_epoch == 101
+            && p.last_epoch == 200
+            && upload.len() == 1
+            && previous["schema"] == SCHEMA
+            && previous["first_epoch"] == 101
+            && previous["last_epoch"] == 200
+            && previous["sampled_at_utc"] == sample
+            && previous["observer_receipt"].as_str() == p.observer.path.to_str()
+            && previous["observer_sha256"] == p.observer.sha256
+            && previous["assigned_range"].is_null()
+            && previous["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| n < seconds)
+            && previous["active"].as_array().is_some_and(|a| !a
+                .iter()
+                .any(|v| v["epoch"] == 144 && v["phase"] == "upload-readback")),
+        "event must advance actual owner after the same accepted resource sample,not repeat an upload refresh"
+    );
+    let u = upload[0];
+    let b = p.metadata_event.as_ref().context("event binding")?;
+    ensure!(
+        is_canonical_utc(event)
+            && seconds > utc_seconds(sample)?
+            && seconds <= now
+            && now - seconds <= 300
+            && b.path
+                == Path::new("/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1")
+                    .join(format!("event-progress-{}.json", seconds * 1000))
+            && proof["schema"] == "jetstreamer-exact144-authenticated-child-progress-v2"
+            && proof["phase_handoff_event"] == true
+            && proof["epoch"] == 144
+            && proof["self_sha256"]
+                == "3133c3bea1a6c18bd9cfef9fe3c12f8a4d156c655eb130859f39ec04c858f0aa"
+            && proof["observer"]["path"].as_str() == p.observer.path.to_str()
+            && proof["observer"]["sha256"] == p.observer.sha256
+            && proof["owner"]["Id"] == UPLOAD
+            && proof["owner"]["InvocationID"] == u.invocation_id
+            && u.evidence.len() == 2
+            && proof["delivery_launch"]["path"].as_str() == u.evidence[1].path.to_str()
+            && proof["delivery_launch"]["sha256"] == u.evidence[1].sha256
+            && proof["forecast"]["sampled_at_millis"] == seconds * 1000
+            && proof["resource_samples_taken"] == 0
+            && proof["remote_mutations"] == false
+            && proof["r2_mutations"] == false,
+        "metadata event lost authentic fresh child,forecast or original resource evidence"
+    );
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn metadata_handoff_advances_event_clock_without_faking_resource_sample() {
+        let time = utc_seconds("2026-10-23T00:49:14Z").unwrap();
+        let p:Plan=serde_json::from_value(json!({"schema":"jetstreamer-horizon-campaign-fleet-plan-v1","first_epoch":101,"last_epoch":200,
+            "observer":{"path":"/observer","sha256":"a".repeat(64)},"output":"/out","status_receipt_directory":"/receipts","gates":{},"tracked_units":[],
+            "metadata_event":{"path":format!("/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1/event-progress-{}.json",time*1000),"sha256":"c".repeat(64)},
+            "pipeline_claims":[{"epoch":144,"unit":UPLOAD,"phase":"upload-readback","invocation_id":"d".repeat(32),"expected_exec_start":"exact",
+                "evidence":[{"path":ORIGIN,"sha256":ORIGIN_SHA},{"path":"/upload","sha256":"b".repeat(64)}]}]})).unwrap();
+        let before = json!({"schema":SCHEMA,"first_epoch":101,"last_epoch":200,"sampled_at_utc":"2026-10-23T00:28:00Z",
+            "observer_receipt":"/observer","observer_sha256":"a".repeat(64),"recorded_unix_seconds":time-60,"active":[]});
+        let proof = json!({"schema":"jetstreamer-exact144-authenticated-child-progress-v2","epoch":144,"phase_handoff_event":true,
+            "self_sha256":"3133c3bea1a6c18bd9cfef9fe3c12f8a4d156c655eb130859f39ec04c858f0aa","sampled_at_utc":"2026-10-23T00:49:14Z",
+            "observer":{"path":"/observer","sha256":"a".repeat(64)},"owner":{"Id":UPLOAD,"InvocationID":"d".repeat(32)},
+            "delivery_launch":{"path":"/upload","sha256":"b".repeat(64)},"forecast":{"sampled_at_millis":time*1000},
+            "resource_samples_taken":0,"remote_mutations":false,"r2_mutations":false});
+        event_predecessor(&before, &p, &proof, "2026-10-23T00:28:00Z", time + 1).unwrap();
+        for key in ["observer_sha256", "sampled_at_utc", "recorded_unix_seconds"] {
+            let mut bad = before.clone();
+            bad[key] = json!("foreign");
+            assert!(
+                event_predecessor(&bad, &p, &proof, "2026-10-23T00:28:00Z", time + 1).is_err(),
+                "{key}"
+            );
+        }
+        let mut repeated = before.clone();
+        repeated["active"] = json!([{"epoch":144,"phase":"upload-readback"}]);
+        assert!(
+            event_predecessor(&repeated, &p, &proof, "2026-10-23T00:28:00Z", time + 1).is_err()
+        );
+        assert!(
+            event_predecessor(&before, &p, &proof, "2026-10-23T00:28:00Z", time + 301).is_err()
+        );
+        let mut counterfeit = proof.clone();
+        counterfeit["resource_samples_taken"] = json!(1);
+        assert!(
+            event_predecessor(&before, &p, &counterfeit, "2026-10-23T00:28:00Z", time + 1).is_err()
+        );
+    }
     #[test]
     fn exact_real_publisher_is_distinct_from_private_scan_or_foreign_publication() {
         let c: PipelineClaim = serde_json::from_value(
