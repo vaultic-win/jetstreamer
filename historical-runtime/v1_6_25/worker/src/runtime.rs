@@ -31,6 +31,32 @@ use std::{cmp, collections::HashMap, env, ops::Range, path::Path, sync::Arc};
 use tempfile::TempDir;
 
 const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
+
+// Read-only diagnostics for an already-fatal native fee/load result. These are
+// post-commit observations, never a preimage or authority to skip a transaction.
+fn fee_load_diagnostics(
+    bank: &Bank,
+    transaction: &Transaction,
+    index: usize,
+    error: &TransactionError,
+) -> String {
+    use std::fmt::Write;
+    let mut text=format!("historical fee-load trace: bank_slot={} transaction_index={} signature={:?} error={:?} header={:?} account_observation=after_native_commit\n",
+        bank.slot(),index,transaction.signatures.first().map(|s|s.to_string()),error,transaction.message.header);
+    for (index, key) in transaction.message.account_keys.iter().enumerate() {
+        let called = transaction
+            .message
+            .instructions
+            .iter()
+            .any(|i| i.program_id_index as usize == index);
+        let account = bank.get_account(key);
+        let _=writeln!(&mut text,"historical fee-load account: index={} key={} effective_writable={} called_program={} passed_to_instruction={} non_loader_key={} present={} owner={:?} executable={:?} lamports={:?}",
+            index,key,transaction.message.is_writable(index),called,
+            transaction.message.is_key_passed_to_program(index),transaction.message.is_non_loader_key(key,index),account.is_some(),
+            account.as_ref().map(|a|a.owner.to_string()),account.as_ref().map(|a|a.executable),account.as_ref().map(|a|a.lamports));
+    }
+    text
+}
 // The epoch-215 terminal checkpoint is the bootstrap for this candidate.
 // Admit entries only through epoch 232 while later epochs remain independently
 // checkpoint-qualified.
@@ -482,6 +508,17 @@ impl RuntimeState {
                     .enumerate()
                     .find_map(|(index, result)| result.as_ref().err().map(|error| (index, error)))
                 {
+                    if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
+                        eprint!(
+                            "{}",
+                            fee_load_diagnostics(
+                                &self.bank,
+                                &wave_transactions[wave_index],
+                                wave.start + wave_index,
+                                error
+                            )
+                        );
+                    }
                     return Err(format!(
                         "entry fee collection failed for transaction {}: {:?}",
                         wave.start + wave_index,
@@ -2398,6 +2435,34 @@ mod tests {
             state.process_entry(request).unwrap_err(),
             "entry fee collection failed for transaction 0: AccountLoadedTwice"
         );
+    }
+
+    #[test]
+    fn fee_failure_diagnostics_preserve_bank_state_and_mark_post_commit_observations() {
+        let (state, payer) = test_state(2, Some(4));
+        let recipient = Keypair::new();
+        let transaction = system_transaction::transfer(
+            &payer,
+            &recipient.pubkey(),
+            1,
+            state.bank.last_blockhash(),
+        );
+        let balance = state.bank.get_balance(&payer.pubkey());
+        let tick = state.bank.tick_height();
+        let diagnostic = fee_load_diagnostics(
+            &state.bank,
+            &transaction,
+            7,
+            &TransactionError::InvalidWritableAccount,
+        );
+        assert!(diagnostic.contains("transaction_index=7"));
+        assert!(diagnostic.contains("error=InvalidWritableAccount"));
+        assert!(diagnostic.contains("account_observation=after_native_commit"));
+        assert!(diagnostic.contains(&format!("key={}", payer.pubkey())));
+        assert!(diagnostic.contains("effective_writable=true"));
+        assert!(diagnostic.contains("called_program=true"));
+        assert_eq!(state.bank.get_balance(&payer.pubkey()), balance);
+        assert_eq!(state.bank.tick_height(), tick);
     }
 
     #[test]

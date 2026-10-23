@@ -164,6 +164,11 @@ the normal work-conserving backfill path rather than waiting for another status 
 
 Use event-driven systemd dependencies or timers for completion, guard, verifier, and uploader work
 instead of frequent polling. Routine coordinated observations remain at least 1,800 seconds apart.
+A completed stage may hand off promptly using a separately bound phase-event receipt against the
+latest accepted resource sample. Preserve that sample's original clock, bind the prior stage's
+clean terminal proof and the new live command/invocation, and retain the complete fleet history.
+The event clock is not a new resource observation or launch permission. Clear an event selector
+when constructing the next normal-cycle plan, while retaining its evidence and owner history.
 
 ## Prioritize time to verified sidecar
 

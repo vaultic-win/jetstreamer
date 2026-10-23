@@ -65,3 +65,27 @@ the actual203 verification receipt, archive digest/length, fresh fleet/inventory
 and resource admission independently. Moving the additional private verification
 copy must preserve the original assembly and all evidence. Authenticated R2
 delivery, sidecar commit and adjacent-boundary retirement remain separate stages.
+
+`jetstreamer-r2 admit-publication203` issues the separate fresh resource admission
+and prepares `publication-plan.json` after the actual final verification receipt
+and exact scanner PID1 completion exist. Its sealed spec binds the accepted
+observer/fleet, recomputed century floor, all three replay guard receipts, exact
+publisher and filesystem capability. It preserves225/205/204 by invocation,
+authoritative PID and immutable command identity, and allows only a rename of the
+additional verified copy,64MiB metadata growth and a16GiB publisher (the retained213
+publication used an8GiB high/16GiB hard limit and peaked at8GiB). It neither
+opens archive bytes nor starts a job. Seal its exact generated plan with the
+native deployment sealer before publication. Repeated matching admissions reuse
+the original record and deadline; they do not renew permission or replay work.
+
+`capture-handoff203` records the actual live local-publication or upload/readback
+invocation only after the previous stage has cleanly completed. The compiled
+commands restrict publication to the exact203 plan and delivery to epoch203,
+the actual full/plugin runner allowlists and deferred local retirement. The
+event retains the previous resource sample's clock and advances a separate phase
+event clock. A matching `metadata_event` permits immediate fleet reconciliation
+without an extra resource poll, while preserving every earlier pipeline and
+diagnostic claim. Its complete census rejects a live or failed prior stage.
+It does not authorize publication, upload or any remote mutation. Remove the
+event selector when constructing the next normal30-minute fleet plan; keep its
+evidence and pipeline history. These events never fabricate a new resource sample.
