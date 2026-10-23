@@ -77,6 +77,11 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         .as_array()
         .into_iter()
         .flatten()
+        .filter_map(|r| match r.get("status") {
+            Some(status) if status == "observed" => r.get("observation"),
+            Some(_) => None,
+            None => Some(r), // Preserve pre-wrapper receipts.
+        })
         .filter(|r| {
             r["invocation_binding_stable"] == true
                 && r["producer_after"]["active_state"] == "active"
@@ -169,5 +174,33 @@ mod tests {
         assert_eq!(d["admission_eligible"], false);
         assert_eq!(d["preliminary_resource_fit"], false);
         assert!(d["limiting_gate"].as_str().unwrap().contains("stability"));
+    }
+    #[test]
+    fn wrapped_diagnostics_count_live_owners_without_hiding_them_in_memory_overhead() {
+        let (p, ..) = crate::tests::fixture101();
+        let row = json!({"invocation_binding_stable":true,
+            "producer_after":{"invocation_id":"b".repeat(32),"active_state":"active","sub_state":"running","restarts":0}});
+        for diagnostic in [row.clone(), json!({"status":"observed","observation":row})] {
+            let o = json!({"replays":[],"diagnostic_replays":[diagnostic],
+                "filesystem":{"conservative_available_bytes":5u64<<40},
+                "host_memory":{"conservative_available_kib":600u64<<20},"vm_max_map_count":4194304});
+            let d = decision(&p, &o, &json!({"active":[]})).unwrap();
+            assert_eq!(d["live_private_qualification_lanes"], 1);
+            assert_eq!(d["live_total_replay_lanes"], 1);
+            assert_eq!(d["memory_concurrency_target"]["valid"], false);
+            assert!(
+                d["memory_concurrency_target"]["limiting_gate"]
+                    .as_str()
+                    .unwrap()
+                    .contains("diagnostics")
+            );
+        }
+        let o = json!({"replays":[],"diagnostic_replays":[{"status":"unavailable","observation":row}],
+            "filesystem":{"conservative_available_bytes":5u64<<40},
+            "host_memory":{"conservative_available_kib":600u64<<20},"vm_max_map_count":4194304});
+        assert_eq!(
+            decision(&p, &o, &json!({"active":[]})).unwrap()["live_private_qualification_lanes"],
+            0
+        );
     }
 }
