@@ -1,3 +1,5 @@
+#[cfg(feature = "epoch141-freeze-component-diagnostic")]
+mod epoch141_freeze_trace;
 mod leader_schedule;
 mod poh_backend;
 mod runtime;

@@ -1,4 +1,7 @@
 //! Original immutable profile, retained for existing receipts.
+const PACKAGE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-original-parent-20261023-v1";
+const WORKER_SHA: &str = "abe395d482174e490833928c7343a33d135d8572096faf873ce3103c35fe520d";
+const WORKER_ENTRY_TERMINAL: Option<u64> = None;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch141-original-entry-root-launch-v2";
 pub(super) const UNIT: &str = "horizon-qualify-141-original-entry-root-20261023-v1.service";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-original-entry-root-20261023-v1";

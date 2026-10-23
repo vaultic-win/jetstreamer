@@ -23,6 +23,7 @@ mod native141;
 mod native144;
 mod native203;
 mod original141;
+mod original141_freeze;
 mod original141_trace;
 mod ownroot203_rebase;
 mod prefix144;
@@ -74,6 +75,15 @@ pub(super) fn capture_original141_trace() -> Result<()> {
 }
 pub(super) fn prepare_original141_trace() -> Result<()> {
     original141_trace::prepare()
+}
+pub(super) async fn admit_original141_freeze() -> Result<()> {
+    original141_freeze::admit().await
+}
+pub(super) fn capture_original141_freeze() -> Result<()> {
+    original141_freeze::capture()
+}
+pub(super) fn prepare_original141_freeze() -> Result<()> {
+    original141_freeze::prepare()
 }
 
 pub(super) fn prepare_private_prefix157() -> Result<()> {
@@ -678,6 +688,7 @@ fn validate_same_sample_admission(
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
+        141 if original141_freeze::namespace(claim) => original141_freeze::GUARD_SHA,
         141 if original141_trace::namespace(claim) => original141_trace::GUARD_SHA,
         141 if original141::namespace(claim) => original141::GUARD_SHA,
         140 if native_restore_140(claim) => {
@@ -770,7 +781,7 @@ fn validate_same_sample_admission(
             && guard
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
-            && if original141_trace::namespace(claim) {
+            && if original141_trace::namespace(claim) || original141_freeze::namespace(claim) {
                 guard.get("canary_target_error").is_some_and(Value::is_null)
                     && guard["bounded_measurement"] == false
                     && guard.get("bounded_canary").is_some_and(Value::is_null)
@@ -827,7 +838,7 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
-    if original141_trace::namespace(claim) {
+    if original141_trace::namespace(claim) || original141_freeze::namespace(claim) {
         // The profile validator independently binds the exact canonical root.
         claim
             .scratch_path
@@ -876,7 +887,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
-    if original141_trace::namespace(claim) {
+    if original141_freeze::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| original141_freeze::guard_matches(claim, &r, plan))
+    } else if original141_trace::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| original141_trace::guard_matches(claim, &r, plan))
     } else if original141::namespace(claim) {
@@ -977,6 +991,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if original141_freeze::namespace(claim) || receipt["schema"] == original141_freeze::SCHEMA {
+        return original141_freeze::launch(receipt, claim);
+    }
     if original141_trace::namespace(claim) || receipt["schema"] == original141_trace::SCHEMA {
         return original141_trace::launch(receipt, claim);
     }
@@ -1690,7 +1707,7 @@ pub(super) fn census(
             || ram_entry_owner(name)
             || assigned_diagnostic
             || assigned_pipeline
-            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name)))
+            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name) || original141_freeze::unit_name(name)))
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
@@ -2123,6 +2140,7 @@ pub(super) async fn run() -> Result<()> {
             || census141_poh::namespace(claim)
             || original141::namespace(claim)
             || original141_trace::namespace(claim)
+            || original141_freeze::namespace(claim)
         {
             ensure!(
                 plan.gates[&141].state == "failed-needs-repair",
@@ -2366,6 +2384,9 @@ pub(super) async fn run() -> Result<()> {
             if original141_trace::namespace(claim) {
                 original141_trace::validate_live(claim, current)?;
             }
+            if original141_freeze::namespace(claim) {
+                original141_freeze::validate_live(claim, current)?;
+            }
             if census141_poh::namespace(claim) {
                 census141_poh::validate_live(claim, current)?;
             }
@@ -2457,7 +2478,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if original141_trace::namespace(claim) {
+            let phase = if original141_freeze::namespace(claim) {
+                "private-original-entry-freeze-components"
+            } else if original141_trace::namespace(claim) {
                 "private-original-entry-trace-repair"
             } else if original141::namespace(claim) {
                 "private-original-entry-root-qualification"
@@ -2553,6 +2576,7 @@ pub(super) async fn run() -> Result<()> {
                         || census141_poh::namespace(c)
                         || original141::namespace(c)
                         || original141_trace::namespace(c)
+                        || original141_freeze::namespace(c)
                 }))
             {
                 state = private_qualification_inventory_state(gate.state.as_str());

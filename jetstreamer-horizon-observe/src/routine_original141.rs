@@ -13,18 +13,29 @@ const TRACE_READER: &str =
     "/usr/local/lib/jetstreamer/horizon-original141-trace-reader-20261023-v2/jetstreamer-r2";
 const TRACE_READER_SHA: &str = "0805e5b0025a3338a1591a5291cfa9187927a4f8971b243130026556bcab2ecd";
 const TRACE_GUARD_SHA: &str = "35dbd4826c8947f38d50dff049345e1c3d62450eb85e41e94e326880e1898fbc";
+const FREEZE_UNIT: &str =
+    "horizon-qualify-141-original-entry-freeze-components-20261023-v1.service";
+const FREEZE_ROOT: &str =
+    "/home/sol/.jetstreamer-private/epoch141-original-entry-freeze-components-20261023-v1";
+const FREEZE_READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-original141-freeze-reader-20261023-v1/jetstreamer-r2";
+const FREEZE_READER_SHA: &str = "d96fb78b85ee92e00560515ecafc48bc5f4b6f8ef148eed71221dced3af65517";
 fn trace_disabled(trace: &bool) -> bool {
     !trace
 }
 fn identity(s: &Profile) -> (&'static str, &'static str) {
-    if s.trace {
+    if s.freeze_components {
+        (FREEZE_UNIT, FREEZE_ROOT)
+    } else if s.trace {
         (TRACE_UNIT, TRACE_ROOT)
     } else {
         (UNIT, ROOT)
     }
 }
-fn reader_binding(trace: bool) -> (&'static str, &'static str) {
-    if trace {
+fn reader_binding(s: &Profile) -> (&'static str, &'static str) {
+    if s.freeze_components {
+        (FREEZE_READER, FREEZE_READER_SHA)
+    } else if s.trace {
         (TRACE_READER, TRACE_READER_SHA)
     } else {
         (READER, READER_SHA)
@@ -33,6 +44,8 @@ fn reader_binding(trace: bool) -> (&'static str, &'static str) {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
+    #[serde(default, skip_serializing_if = "trace_disabled")]
+    freeze_components: bool,
     #[serde(default, skip_serializing_if = "trace_disabled")]
     coordinated_adoption: bool,
     #[serde(default, skip_serializing_if = "trace_disabled")]
@@ -45,6 +58,8 @@ pub(super) struct Profile {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
+    #[serde(default)]
+    freeze_components: bool,
     #[serde(default)]
     coordinated_adoption: bool,
     #[serde(default)]
@@ -61,6 +76,11 @@ struct Spec {
 pub(super) fn enabled(p: &Plan) -> bool {
     p.original141_root.is_some()
 }
+pub(super) fn freeze_enabled(p: &Plan) -> bool {
+    p.original141_root
+        .as_ref()
+        .is_some_and(|s| s.freeze_components)
+}
 pub(super) fn invocation(p: &Plan) -> Option<&str> {
     p.original141_root
         .as_ref()
@@ -76,7 +96,7 @@ pub(super) fn retained144_census(p: &Plan, scope: &Scope101200) -> bool {
 }
 pub(super) fn reader(p: &Plan) -> bool {
     p.original141_root.as_ref().is_some_and(|s| {
-        let (path, sha) = reader_binding(s.trace);
+        let (path, sha) = reader_binding(s);
         p.tools.r2.path == Path::new(path) && p.tools.r2.sha256 == sha
     })
 }
@@ -136,6 +156,14 @@ fn claim(s: &Profile) -> Value {
 }
 fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<()> {
     let (unit, root) = identity(s);
+    if s.freeze_components {
+        ensure!(
+            s.trace
+                && r["worker_freeze_component_diagnostic"] == true
+                && r["worker_entry_terminal_slot"] == 60912004,
+            "freeze141 requires its separately bounded worker"
+        );
+    }
     if s.trace {
         ensure!(
             r["historical_trace_enabled"] == true
@@ -158,7 +186,11 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
             && iid(&s.invocation_id)
             && r["schema"]
                 == if s.trace {
-                    "jetstreamer-private-epoch141-original-entry-trace-launch-v2"
+                    if s.freeze_components {
+                        "jetstreamer-private-epoch141-original-entry-freeze-components-launch-v2"
+                    } else {
+                        "jetstreamer-private-epoch141-original-entry-trace-launch-v2"
+                    }
                 } else {
                     "jetstreamer-private-epoch141-original-entry-root-launch-v2"
                 }
@@ -370,6 +402,61 @@ fn migrate(scope: &mut Scope101200, config: &mut Value, s: &Profile) -> Result<(
     });
     Ok(())
 }
+fn replace_terminal_trace(
+    p: &mut Plan,
+    config: &mut Value,
+    next: &Profile,
+    fleet: &Value,
+) -> Result<()> {
+    let old = p.original141_root.as_ref().context("old trace profile")?;
+    ensure!(
+        old.trace && !old.freeze_components && next.freeze_components && next.trace,
+        "only terminal trace to bounded freeze observer replacement is supported"
+    );
+    let (old_unit, _) = identity(old);
+    let terminal: Vec<_> = fleet["diagnostics"]
+        .as_array()
+        .context("terminal diagnostic census")?
+        .iter()
+        .filter(|d| d["unit"]["Id"] == old_unit)
+        .collect();
+    ensure!(
+        terminal.len() == 1
+            && terminal[0]["live"] == false
+            && terminal[0]["unit"]["InvocationID"] == old.invocation_id
+            && terminal[0]["unit"]["MainPID"] == "0"
+            && terminal[0]["unit"]["NRestarts"] == "0"
+            && terminal[0]["unit"]["ActiveState"] == "failed"
+            && terminal[0]["unit"]["SubState"] == "failed"
+            && terminal[0]["unit"]["Result"] == "exit-code"
+            && terminal[0]["unit"]["ExecMainStatus"] == "1",
+        "cannot replace a live, restarted, foreign or unresolved trace owner"
+    );
+    let scope = p.scope_101_200.as_ref().context("diagnostic scope")?;
+    ensure!(
+        retained144_census(p, scope) && owner(p, &scope.diagnostic_ranges[1]),
+        "old diagnostic scope changed"
+    );
+    let rows = config["diagnostic_replays"]
+        .as_array_mut()
+        .context("diagnostic config")?;
+    ensure!(
+        rows.len() == 2 && rows[0]["range"] == "144" && rows[1] == config_row(old),
+        "cannot drop or change retained diagnostic history"
+    );
+    rows[1] = config_row(next);
+    let (unit, _) = identity(next);
+    p.scope_101_200.as_mut().unwrap().diagnostic_ranges[1] = DiagnosticClaim {
+        range: "141".into(),
+        controller_unit: unit.into(),
+        producer_unit: unit.into(),
+        expected_controller_invocation_id: next.invocation_id.clone(),
+        expected_producer_invocation_id: next.invocation_id.clone(),
+    };
+    // No fleet history is removed: fold() appends the new claim to the complete
+    // previous fleet template, which retains the old terminal trace and launch.
+    Ok(())
+}
 fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     let (unit, _) = identity(s);
     ensure!(
@@ -401,9 +488,15 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
             evidence.push(b);
         }
     }
-    f["gates"]["141"]["next_action"] = json!(
-        "Preserve exact private original-entry root qualification60911751..61328765 and guard/observer ownership. Capture actual terminal/checkpoint result promptly; partial-root success is not full141 or a sidecar ETA. Keep incident open through complete-span qualification and verified ready pair."
-    );
+    f["gates"]["141"]["next_action"] = if s.freeze_components {
+        json!(
+            "Capture the bounded worker's frozen Bank components at60911999 and60912004 and its native terminal result. Compare parent/account-delta/signature-count/blockhash/hardfork inputs and epoch-transition rewards/clock/collector. A worker stop at60912004 is diagnostic evidence, not the parent's61328765 checkpoint or full141 recovery. Preserve both earlier failed roots and keep incident open through a verified ready pair."
+        )
+    } else {
+        json!(
+            "Preserve exact private original-entry root qualification60911751..61328765 and guard/observer ownership. Capture actual terminal/checkpoint result promptly; partial-root success is not full141 or a sidecar ETA. Keep incident open through complete-span qualification and verified ready pair."
+        )
+    };
     Ok(())
 }
 pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
@@ -525,10 +618,7 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
 }
 pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> {
     ensure!(
-        !enabled(p)
-            && is_101(p)?
-            && publication144::composite_reader(p)
-            && p.repair185_handoff.is_some(),
+        is_101(p)? && publication144::composite_reader(p) && p.repair185_handoff.is_some(),
         "original141 needs accepted five-lane history"
     );
     let spec: Spec = serde_json::from_value(bound_json(b, true)?)?;
@@ -542,6 +632,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
     );
     let launch = bound_json(&spec.launch, false)?;
     let s = Profile {
+        freeze_components: spec.freeze_components,
         coordinated_adoption: spec.coordinated_adoption,
         trace: spec.trace,
         launch: spec.launch,
@@ -552,6 +643,10 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
             .context("original141 invocation")?
             .into(),
     };
+    ensure!(
+        !enabled(p) || s.freeze_components,
+        "only a separately qualified freeze diagnostic can replace the terminal trace observer"
+    );
     let (unit, _) = identity(&s);
     let (c, g) = read(&s)?;
     if s.coordinated_adoption {
@@ -588,10 +683,15 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
             "original141 event changes unrelated claims/history/scalars"
         );
     }
-    migrate(p.scope_101_200.as_mut().context("101scope")?, config, &s)?;
+    if enabled(p) {
+        let previous = bound_json(&p.previous_fleet, false)?;
+        replace_terminal_trace(p, config, &s, &previous)?;
+    } else {
+        migrate(p.scope_101_200.as_mut().context("101scope")?, config, &s)?;
+    }
     p.previous_fleet = s.event_fleet.clone();
     p.fleet_template = s.event_plan.clone();
-    let (path, digest) = reader_binding(s.trace);
+    let (path, digest) = reader_binding(&s);
     p.tools.r2 = Bound {
         path: path.into(),
         sha256: digest.into(),
@@ -605,6 +705,47 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn freeze_observer_replacement_requires_the_exact_terminal_trace_and_preserves_144() {
+        let (mut p, _, mut config) = fixture();
+        let old = p.original141_root.as_mut().unwrap();
+        old.trace = true;
+        old.launch.path = Path::new(TRACE_ROOT).join("receipts/launch.json");
+        config["diagnostic_replays"][1] = config_row(old);
+        let old_id = old.invocation_id.clone();
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.diagnostic_ranges[1].controller_unit = TRACE_UNIT.into();
+        scope.diagnostic_ranges[1].producer_unit = TRACE_UNIT.into();
+        let first = config["diagnostic_replays"][0].clone();
+        let mut next = profile();
+        next.trace = true;
+        next.freeze_components = true;
+        next.coordinated_adoption = true;
+        next.invocation_id = "c".repeat(32);
+        next.launch.path = Path::new(FREEZE_ROOT).join("receipts/launch.json");
+        let ledger = json!({"diagnostics":[{"live":false,"unit":{"Id":TRACE_UNIT,"InvocationID":old_id,"MainPID":"0","NRestarts":"0","ActiveState":"failed","SubState":"failed","Result":"exit-code","ExecMainStatus":"1"}}]});
+        for (pointer, value) in [
+            ("/diagnostics/0/live", json!(true)),
+            ("/diagnostics/0/unit/MainPID", json!("1")),
+            ("/diagnostics/0/unit/InvocationID", json!("a".repeat(32))),
+        ] {
+            let mut bad = ledger.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                replace_terminal_trace(&mut p, &mut config, &next, &bad).is_err(),
+                "{pointer}"
+            );
+        }
+        replace_terminal_trace(&mut p, &mut config, &next, &ledger).unwrap();
+        assert_eq!(config["diagnostic_replays"][0], first);
+        assert_eq!(
+            config["diagnostic_replays"][1]["producer_unit"],
+            FREEZE_UNIT
+        );
+        p.original141_root = Some(next);
+        assert!(retained144_census(&p, p.scope_101_200.as_ref().unwrap()));
+        assert!(freeze_enabled(&p));
+    }
     #[test]
     fn trace_profile_keeps_old_history_and_uses_distinct_reader_owner_and_root() {
         let (mut p, model, _, _, _, _, mut config, _) = crate::tests::fixture101();
@@ -646,6 +787,7 @@ mod tests {
             sha256: "a".repeat(64),
         };
         Profile {
+            freeze_components: false,
             coordinated_adoption: false,
             trace: false,
             launch: bound(&format!("{ROOT}/receipts/launch.json")),

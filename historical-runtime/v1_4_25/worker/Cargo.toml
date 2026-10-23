@@ -17,6 +17,9 @@ epoch144-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-sna
 # Read-only clock inspection of the original failed cohort's exact bootstrap.
 epoch140-original-bootstrap-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
 epoch141-boundary-consumer-diagnostic = ["serde_json"]
+# Closed cold-bootstrap diagnostic. Stops in the worker after freezing60912004;
+# it cannot finish an ordinary epoch or promote a runtime route.
+epoch141-freeze-component-diagnostic = ["serde_json"]
 
 [[bin]]
 name = "jetstreamer-epoch141-boundary-consumer"

@@ -96,6 +96,8 @@ impl RuntimeState {
                 // Reject out-of-era archives from their committed filename
                 // before spending resources extracting or decoding them.
                 validate_candidate_snapshot_slot(archive_slot)?;
+                #[cfg(feature = "epoch141-freeze-component-diagnostic")]
+                crate::epoch141_freeze_trace::bootstrap(archive_slot)?;
                 let loaded = snapshot::load_archive(
                     archive_path_ref,
                     &state_dir,
@@ -103,6 +105,8 @@ impl RuntimeState {
                     &additional_builtins,
                 )?;
                 validate_candidate_snapshot_slot(loaded.bank.slot())?;
+                #[cfg(feature = "epoch141-freeze-component-diagnostic")]
+                crate::epoch141_freeze_trace::bootstrap(loaded.bank.slot())?;
                 let source = InitializedSource::SnapshotArchive {
                     archive_path: archive_path.clone(),
                     expected_accounts_hash: loaded.expected_accounts_hash.as_ref().to_vec(),
@@ -546,6 +550,8 @@ impl RuntimeState {
     }
 
     fn advance_to(&mut self, slot: u64) -> Result<Vec<AccountWrite>, String> {
+        #[cfg(feature = "epoch141-freeze-component-diagnostic")]
+        crate::epoch141_freeze_trace::transition(self.bank.slot(), slot)?;
         if !self.bank.is_complete() {
             return Err(format!(
                 "cannot advance incomplete bank at slot {} (tick height {}, max {})",
@@ -555,6 +561,10 @@ impl RuntimeState {
             ));
         }
         let mut writes = self.freeze_root_and_drain()?;
+        #[cfg(feature = "epoch141-freeze-component-diagnostic")]
+        if crate::epoch141_freeze_trace::terminal(self.bank.slot()) {
+            return Err("epoch141 freeze-component diagnostic captured terminal60912004; bounded stop before any later Bank or entry".to_string());
+        }
         let child_poh_start = self.bank.last_blockhash();
         let leader = leader_schedule::slot_leader(&self.bank, slot, &mut self.leader_schedules)?;
         let child = Bank::new_from_parent(&self.bank, &leader, slot);
@@ -579,6 +589,8 @@ impl RuntimeState {
             ));
         }
         self.bank.freeze();
+        #[cfg(feature = "epoch141-freeze-component-diagnostic")]
+        crate::epoch141_freeze_trace::record(&self.bank)?;
         let mut writes = self.drain_writes(None)?;
         self.bank.squash();
         // Bank::squash does not currently store accounts, but draining again
