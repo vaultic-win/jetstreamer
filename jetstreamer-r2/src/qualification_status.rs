@@ -143,6 +143,7 @@ fn policy141(b: &Bound) -> Result<Value> {
                     && proof["unit"] == PROFILES[3].unit
                     && proof["invocation_id"] == PROFILES[3].iid
                     && proof["terminal_root_slot"] == PROFILES[3].execution_terminal
+                    && proof["maximum_runtime_seconds"] == 432_000
                     && proof["worker_sha256"]
                         == "fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759"
                     && proof["node_sha256"]
@@ -356,6 +357,51 @@ fn remaining(row: &Value, p: &Profile, allowance: u64) -> Result<u64> {
         .checked_add(allowance)
         .context("qualification ETA overflow")
 }
+fn deadline141(row: &Value, p: &Profile, elapsed_millis: u64) -> Result<Value> {
+    ensure!(
+        p.first == 141 && p.last == 141,
+        "foreign141 deadline profile"
+    );
+    let slot = row["useful_work"]["last"]["slot"]
+        .as_u64()
+        .context("141 deadline slot missing")?;
+    let rate = row["useful_work"]["slots_per_second"]
+        .as_f64()
+        .context("141 deadline rate missing")?;
+    ensure!(
+        row["useful_work"]["sufficient_for_rates"] == true
+            && slot <= p.execution_terminal
+            && rate.is_finite()
+            && rate > 0.0,
+        "141 deadline needs a valid root rate"
+    );
+    let maximum_runtime_millis = 432_000_000u64;
+    let remaining_runtime_millis = maximum_runtime_millis
+        .checked_sub(elapsed_millis)
+        .context("141 runtime cap is already exhausted")?;
+    let projection = ((p.execution_terminal - slot) as f64 * 1000.0 / rate).ceil();
+    ensure!(
+        projection.is_finite() && projection >= 0.0 && projection < u64::MAX as f64,
+        "141 root runtime projection overflow"
+    );
+    let projected_root_replay_millis = projection as u64;
+    ensure!(
+        projected_root_replay_millis < remaining_runtime_millis,
+        "141 root projection {projected_root_replay_millis}ms does not fit remaining runtime cap {remaining_runtime_millis}ms; preserve the live owner and repair the ETA basis, never assume runtime extension or qualified resume"
+    );
+    Ok(
+        json!({"schema":"jetstreamer-qualification141-runtime-window-v2",
+        "maximum_runtime_millis":maximum_runtime_millis,
+        "elapsed_execution_millis":elapsed_millis,
+        "remaining_runtime_millis":remaining_runtime_millis,
+        "projected_root_replay_millis":projected_root_replay_millis,
+        "root_replay_margin_millis":remaining_runtime_millis-projected_root_replay_millis,
+        "root_projection_excludes_terminal_work":true,
+        "root_projection_is_measured_bound":false,
+        "suffix_runs_in_current_invocation":false,
+        "runtime_extension_authorized":false,"runtime_checkpoint_resume_qualified":false}),
+    )
+}
 fn jet(p: &Profile, epoch: u64) -> Result<u64> {
     let name = if p.first == 141 {
         "private.jet".to_string()
@@ -468,6 +514,7 @@ pub(super) async fn run() -> Result<()> {
     );
     let mut states = Vec::new();
     let mut owners = BTreeMap::new();
+    let mut execution141_window = None;
     for profile in PROFILES
         .iter()
         .filter(|profile| epochs.contains(&profile.first))
@@ -475,6 +522,9 @@ pub(super) async fn run() -> Result<()> {
         let row = observed(&o, profile)?;
         owners.insert(profile.unit, live(profile, &f)?);
         let elapsed = elapsed(profile, seconds)?;
+        if profile.first == 141 {
+            execution141_window = Some(deadline141(row, profile, elapsed)?);
+        }
         for epoch in profile.first..=profile.last {
             states.push(EpochStatus {
                 epoch,
@@ -516,7 +566,8 @@ pub(super) async fn run() -> Result<()> {
             &json!({"schema":if epochs == [141] {"jetstreamer-qualification141-status-estimate-v2"} else {"jetstreamer-qualification-status-estimate-v1"},"plan_sha256":plan_bound.sha256,
             "observer_sha256":p.observer.sha256,"fleet_sha256":p.fleet.sha256,"estimate_basis":p.estimate_basis,
             "downstream_allowance_millis":p.downstream_allowance_millis,"epoch141_delivery_policy":p.epoch141_delivery_policy,
-            "separate_suffix_slots":if epochs == [141] {15234} else {0},"statuses":states,"archive_or_sidecar_mutation_authorized":false}),
+            "separate_suffix_slots":if epochs == [141] {15234} else {0},"execution141_window":execution141_window,
+            "statuses":states,"archive_or_sidecar_mutation_authorized":false}),
         )?;
     }
     if args.len() == 8 {
@@ -585,6 +636,43 @@ pub(super) async fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn epoch141_deadline_separates_root_runtime_from_future_suffix_and_delivery() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":60926156},"slots_per_second":1.0021996518807004}});
+        let v = deadline141(&row, p, 13_936_388).unwrap();
+        assert_eq!(v["remaining_runtime_millis"], 418_063_612u64);
+        assert_eq!(v["projected_root_replay_millis"], 401_725_345u64);
+        assert_eq!(v["root_replay_margin_millis"], 16_338_267u64);
+        assert_eq!(v["suffix_runs_in_current_invocation"], false);
+        assert_eq!(v["runtime_extension_authorized"], false);
+        assert_eq!(v["runtime_checkpoint_resume_qualified"], false);
+        assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 546_525_910);
+    }
+    #[test]
+    fn epoch141_infeasible_or_exhausted_runtime_cannot_publish_a_fresh_countdown() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":p.execution_terminal-100},"slots_per_second":2.0}});
+        assert!(deadline141(&row, p, 432_000_000 - 50_001).is_ok());
+        assert!(deadline141(&row, p, 432_000_000 - 50_000).is_err());
+        assert!(deadline141(&row, p, 432_000_000).is_err());
+        assert!(deadline141(&row, p, 432_000_001).is_err());
+        for (key, value) in [
+            ("slots_per_second", json!(0)),
+            ("slots_per_second", json!(-1)),
+            ("sufficient_for_rates", json!(false)),
+        ] {
+            let mut bad = row.clone();
+            bad["useful_work"][key] = value;
+            assert!(deadline141(&bad, p, 1).is_err());
+        }
+        let mut bad = row;
+        bad["useful_work"]["last"]["slot"] = json!(p.execution_terminal + 1);
+        assert!(deadline141(&bad, p, 1).is_err());
+        assert!(deadline141(&bad, &PROFILES[0], 1).is_err());
+    }
     #[test]
     fn eta_includes_every_queued_slot_and_downstream_work() {
         let p = &PROFILES[2];

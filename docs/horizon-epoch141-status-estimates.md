@@ -43,6 +43,15 @@ neither terminality nor cleanup or remaining-growth release. Structural plan and
 tool validation still fail closed. Investigate this incident promptly; repeated
 incidents are not an acceptable substitute for repairing or retiring the status.
 
+The deadline check also binds the launch's five-day runtime cap and compares
+remaining root replay at the sampled rate with its remaining execution window.
+The private estimate records the projected root time and margin separately from
+the future suffix and delivery allowances. A projection reaching or exceeding
+the cap fails into the same durable ETA incident; it does not extend the runtime,
+qualify checkpoint recovery, stop a live worker or authorize status deletion.
+Passing this check is a point projection which excludes terminal work, not a
+measured completion bound.
+
 ## Stopping-root terminal handoff
 
 The distinct capped141 lifecycle package may be sealed at
