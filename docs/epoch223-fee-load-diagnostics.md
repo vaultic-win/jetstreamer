@@ -149,6 +149,17 @@ drains it. Periodic warmup progress alone cannot trigger a successful capture.
 The worker still rejects slot17 before decoding or mutation; neither the stop
 nor the diagnostic resource receipt qualifies the known root or publication.
 
+The separate `epoch223-v1620-root-prefix-resource` utility profile prepares the
+full native20 prefix using the exact long worker and both canonical roots. Its
+300-GB scratch planning allowance is separate from output, host reserve and
+other owners' growth; it does not inherit the older25 worker's shrink-debt
+reservation. A planning-only `--storage-capability` requires the actual parent
+pre-worker barrier. The independent prefix rereader binds the native20 private
+namespace to that full worker and revision and rejects the first16-slot worker
+and native25 substitutions. Neither profile can claim restart, suffix,
+assembly, full-epoch verification or publication. Keep the full prefix dormant
+until the bounded warmup and fresh full-fleet admission/guards pass.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain
