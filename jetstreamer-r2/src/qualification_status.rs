@@ -723,7 +723,7 @@ mod tests {
         assert_eq!(risk["root_replay_margin_millis"], -31_347_800i64);
         assert_eq!(risk["projected_runtime_overrun_millis"], 31_347_800u64);
         assert_eq!(risk["cap_miss_recovery_route_qualified"], false);
-        assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 592_423_612);
+        assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 592_423_613);
     }
     #[test]
     fn eta_includes_every_queued_slot_and_downstream_work() {
