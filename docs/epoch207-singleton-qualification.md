@@ -77,3 +77,33 @@ private cohort state and output, with its first actual worker fire proven.
 Native bootstrap, both canonical root checks, complete native terminal/output,
 independent full/current-plugin checks and authenticated upload/readback/sidecar
 commit remain separate required evidence. Keep the epoch208source incident open.
+
+## Optimized native input stage
+
+The ignored `runtime::tests::native_epoch207_cold_input_matches_canonical_accounts_commitment`
+test uses the unchanged capped v1.6.16 runtime and exact rustc1.51.0 release
+profile. It accepts only an empty owner-private
+`/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-*/scratch`,
+passed as `JETSTREAMER_EPOCH207_V1616_TEST_SCRATCH`. It hashes the exact retained
+8,474,139,490-byte bootstrap and20,144-byte genesis before loading, restores into
+that private scratch and freezes only bootstrap slot89,423,444. It requires the
+canonical accounts hash, no bootstrap writes, and unchanged write cursor,
+capitalization and transaction count. No entry replay occurs.
+
+Build this test in a separate target cache with `cargo +1.51.0 test --release
+--locked --offline -p jetstreamer-historical-worker-v1-6-16 --no-run`.
+Capture the compiler artifact's optimized test executable and list the exact
+ignored test with `--exact --ignored --list` before any execution. A listed
+test is not a native input proof. Do not substitute an old debug harness.
+
+Native cold planning uses128GiB hard/112GiB high memory,300GB decimal disk
+planning,8explicitly bound CPUs,2700seconds, no restart/network and zero entries.
+Root must coordinate fresh complete-fleet admission before the actual job,
+including any live native227disk-growth and128GiB memory claim. Use a separately
+sealed closed207profile of the shared exact MainPID/executable/VMA native guard;
+never rename this executable to `historical-worker` or borrow227's sealed guard.
+The approved-native pipeline status origin must bind the exact unit/invocation,
+canonical matching UTC/Unix clocks, sealed inputs and current guard/admission
+evidence. Its dashboard phase is `verification`; every qualification/publication
+gate remains closed. The89523820MD5/auth incident remains separate from this
+bootstrap-only check.

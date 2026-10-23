@@ -2962,6 +2962,118 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn native_epoch207_cold_input_matches_canonical_accounts_commitment() {
+        use sha2::{Digest, Sha256};
+        use std::{fs, io::Read, os::unix::fs::MetadataExt};
+        const INPUT: &str =
+            "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2";
+        const SNAPSHOT: &str =
+            "snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst";
+        const SLOT: u64 = 89_423_444;
+        let scratch = env::var("JETSTREAMER_EPOCH207_V1616_TEST_SCRATCH")
+            .expect("explicit isolated207test scratch required");
+        let path = Path::new(&scratch);
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
+        let root = path.parent().unwrap();
+        assert_eq!(
+            root.parent(),
+            Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        );
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("native-input207-v1616-capped-"));
+        for directory in &[root, path] {
+            let metadata = fs::symlink_metadata(directory).unwrap();
+            assert!(metadata.is_dir());
+            assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+            assert_eq!(metadata.mode() & 0o077, 0);
+            assert_eq!(fs::canonicalize(directory).unwrap(), *directory);
+        }
+        assert!(fs::read_dir(path).unwrap().next().is_none());
+        for (name, size, expected) in &[
+            (
+                SNAPSHOT,
+                8_474_139_490u64,
+                "8af3cd20c8f9820dacd25932fc6b7938193e0d1a5dc83d8ddd59dfeea69b2ddc",
+            ),
+            (
+                "genesis.tar.bz2",
+                20_144u64,
+                "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+            ),
+        ] {
+            let input = Path::new(INPUT).join(name);
+            let metadata = fs::symlink_metadata(&input).unwrap();
+            assert!(metadata.is_file());
+            assert_eq!(metadata.uid(), 0);
+            assert_eq!(metadata.mode() & 0o222, 0);
+            assert_eq!(metadata.nlink(), 1);
+            assert_eq!(metadata.len(), *size);
+            assert_eq!(fs::canonicalize(&input).unwrap(), input);
+            let mut file = fs::File::open(&input).unwrap();
+            let mut hash = Sha256::new();
+            let mut bytes = vec![0u8; 1024 * 1024];
+            loop {
+                let n = file.read(&mut bytes).unwrap();
+                if n == 0 {
+                    break;
+                }
+                hash.input(&bytes[..n]);
+            }
+            assert_eq!(format!("{:x}", hash.result()), *expected);
+            let after = file.metadata().unwrap();
+            assert_eq!(
+                (
+                    metadata.dev(),
+                    metadata.ino(),
+                    metadata.len(),
+                    metadata.mtime(),
+                    metadata.mtime_nsec()
+                ),
+                (
+                    after.dev(),
+                    after.ino(),
+                    after.len(),
+                    after.mtime(),
+                    after.mtime_nsec()
+                )
+            );
+        }
+        let (mut state, initialized) = RuntimeState::initialize(
+            INPUT,
+            &jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+                archive_path: Path::new(INPUT).join(SNAPSHOT).to_str().unwrap().to_owned(),
+            },
+            Some(&scratch),
+        )
+        .unwrap();
+        assert_eq!(initialized.slot, SLOT);
+        let transactions = state.bank.transaction_count();
+        let capitalization = state.bank.capitalization();
+        let checkpoint = state.freeze_checkpoint(SLOT).unwrap();
+        assert!(checkpoint.slot_complete && checkpoint.writes.is_empty());
+        assert_eq!(checkpoint.slot, SLOT);
+        assert_eq!(
+            checkpoint.next_write_version,
+            initialized.next_write_version
+        );
+        assert_eq!(checkpoint.transaction_count, transactions);
+        assert_eq!(checkpoint.capitalization, capitalization);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px"
+        );
+        println!("epoch207-v1616-native-input slot={} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transaction_count={} tick_height={} next_write_version={} replay_entries=0 bootstrap_writes=0",
+            checkpoint.slot,Hash::new(&checkpoint.bank_hash),Hash::new(&checkpoint.accounts_hash),
+            Hash::new(&checkpoint.last_blockhash),checkpoint.capitalization,checkpoint.transaction_count,
+            checkpoint.tick_height,checkpoint.next_write_version);
+    }
+
+    #[test]
+    #[ignore]
     fn initializes_and_checkpoints_v1_6_16_boundary_snapshot() {
         let archive = std::env::var("JETSTREAMER_SNAPSHOT_86831488")
             .expect("set JETSTREAMER_SNAPSHOT_86831488");
