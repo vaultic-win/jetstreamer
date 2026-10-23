@@ -87,3 +87,31 @@ no replay, route-promotion, publication, or R2 authority. An actual source adapt
 must still preserve transaction order, PoH verification and exact finalized
 parent relationships, consume the complete authenticated census, and pass the
 private canonical-root path before promotion is considered.
+
+## Complete pinned-SDK read-only consumer diagnostic
+
+The separately gated `epoch141-boundary-consumer-diagnostic` worker feature
+builds `jetstreamer-epoch141-boundary-consumer`. Invoke Cargo from the historical
+`worker/` directory: pinned Cargo rejects feature selection at the virtual
+workspace root. The executable has one fixed input, the sealed readable candidate
+`horizon-epoch141-boundary-input-candidate-20261022-v1/boundaries.json`, with the
+independently pinned collected SHA-256 `e371b3546d62e5fdac79a497607b61ea2647c3c5d410157b3ff456709f78be4a`.
+It accepts only `--self-sha256 HEX`, rehashes its running executable, opens the
+input without following a symlink, and requires a root-owned, non-writable,
+single-link regular file below the 32-MiB cap. Descriptor/path identity is checked
+again after consumption.
+
+Using the pinned v1.4.25 SDK `Hash`, it strictly decodes all 18,283 groups and
+84,597 boundaries, enforces ordered in-scope targets and exact parent-jump counts,
+requires canonical 64-tick ordinals and base58 encodings, and rejects zero or
+globally repeated hashes. Synthetic complete-census tests also reject missing or
+reordered targets, invalid parent arithmetic, wrong ordinals, duplicate/invalid/
+zero hashes, foreign parents and unknown fields.
+
+Run a separately sealed binary in a nonrestarting, read-only, network-disabled
+sandbox; no credentials or writable campaign paths are needed. Its stdout is a
+diagnostic result, not a durable qualification receipt. Preserve the exact unit
+invocation, result, executable digest and stdout separately before using this
+as qualification evidence. The program loads no Bank, executes no transactions,
+reads no source entries, and is not connected to the replay worker. Full source
+adaptation and actual canonical-root qualification remain independent gates.

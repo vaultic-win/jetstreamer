@@ -16,6 +16,12 @@ epoch140-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-sna
 epoch144-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
 # Read-only clock inspection of the original failed cohort's exact bootstrap.
 epoch140-original-bootstrap-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
+epoch141-boundary-consumer-diagnostic = ["serde_json"]
+
+[[bin]]
+name = "jetstreamer-epoch141-boundary-consumer"
+path = "src/epoch141_boundary_consumer_bin.rs"
+required-features = ["epoch141-boundary-consumer-diagnostic"]
 
 [[bin]]
 name = "jetstreamer-epoch140-original-bootstrap-clock"
