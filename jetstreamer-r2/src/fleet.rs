@@ -2463,8 +2463,12 @@ pub(super) async fn run() -> Result<()> {
             "terminal_outcome_requires_canary_receipt":!is_active}));
     }
     let mut remote_entries = Vec::new();
-    for epoch in plan.first_epoch..=plan.last_epoch {
-        let remote = inventory_epoch(&s3, &r2, epoch).await?;
+    let requested_epochs = (plan.first_epoch..=plan.last_epoch).collect::<Vec<_>>();
+    let remote_inventory =
+        inventory_batch::collect(&requested_epochs, |epoch| inventory_epoch(&s3, &r2, epoch))
+            .await?;
+    for remote in remote_inventory {
+        let epoch = remote.epoch;
         ensure!(
             !matches!(
                 remote.state,

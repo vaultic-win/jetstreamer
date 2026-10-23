@@ -68,6 +68,7 @@ mod cohort198_handoff;
 mod cohort_finalization;
 mod fleet;
 mod inactive_status;
+mod inventory_batch;
 mod pipeline_status;
 mod readback_progress;
 mod reserve_scratch;
@@ -3427,14 +3428,9 @@ async fn main() -> Result<()> {
     let r2 = r2_config_from_env()?;
     let client = s3_client(&r2);
     if config.command == Command::Inventory {
-        let mut entries = Vec::with_capacity(config.epochs.len());
-        for &epoch in &config.epochs {
-            entries.push(
-                inventory_epoch(&client, &r2, epoch)
-                    .await
-                    .with_context(|| format!("epoch {epoch} R2 inventory failed"))?,
-            );
-        }
+        let epochs = config.epochs.iter().copied().collect::<Vec<_>>();
+        let entries =
+            inventory_batch::collect(&epochs, |epoch| inventory_epoch(&client, &r2, epoch)).await?;
         let report = inventory_report(entries);
         println!("{}", serde_json::to_string_pretty(&report)?);
         ensure!(

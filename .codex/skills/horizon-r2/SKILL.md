@@ -227,6 +227,10 @@ not stall otherwise admissible ordinary campaign work.
   once out of band. Write each result as a durable no-clobber private receipt that binds the observer
   receipt, the previous fleet receipt, the authenticated R2 inventory, and every service identity it
   reports.
+  Batch independent authenticated inventory reads with bounded concurrency and deterministic epoch
+  order to shorten this cycle. Keep the complete inventory, anomaly checks, observer freshness and
+  before/after owner checks; a failed lookup must not produce a partial accepted ledger. This does
+  not increase replay or uploader concurrency or add another observation loop.
 - Classify every campaign epoch into exactly one operational state: `remote-ready`, `live-replay`,
   `post-replay-pipeline`, `staged-admissible`, `blocked-qualification`, `failed-needs-repair`, or
   `not-yet-staged`. For every non-ready epoch record the concrete next action and the evidence or
