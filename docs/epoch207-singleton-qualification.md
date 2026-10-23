@@ -1,5 +1,9 @@
 # Epoch207 independent singleton qualification
 
+See [the exact root-metadata unblock and independent 209–212 preparation](epoch207-root-metadata-unblock.md)
+after the native bootstrap proof passes. The missing 89523820 MD5 remains a separate
+authenticated-generation metadata gate.
+
 The retained complete-span focused plan enters epoch208 through slot90,287,519.
 That route includes the known missing source boundaries at89,856,117/89,856,121.
 Its failure to qualify does not require epoch207 itself to include that interval.

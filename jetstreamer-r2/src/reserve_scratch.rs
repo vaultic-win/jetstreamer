@@ -500,7 +500,7 @@ fn scan_references(root: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-fn tree(path: &Path, uid: u32) -> Result<Value> {
+pub(crate) fn tree(path: &Path, uid: u32) -> Result<Value> {
     validate_mounts(&fs::read_to_string("/proc/self/mountinfo")?, path)?;
     let root = directory_for_uid(path, uid)?;
     let mut pending = vec![path.to_path_buf()];

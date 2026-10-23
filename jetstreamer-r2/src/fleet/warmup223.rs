@@ -1,6 +1,93 @@
 //! Closed admission/ownership for the first16-slot failure-context experiment.
 use super::*;
+mod full227_peer;
+mod guard_receipt;
 mod native20;
+mod native20_v2;
+mod terminal;
+mod terminal_v2;
+pub(super) const TERMINAL_SCHEMA: &str = terminal::SCHEMA;
+pub(super) const TERMINAL_SCHEMA_V2: &str = terminal_v2::SCHEMA;
+pub(super) fn completed_guard_binding(
+    name: &str,
+    directory: &Path,
+    minimum: u64,
+    now: u64,
+) -> Result<Value> {
+    let selected = guard_receipt::select(name, directory, minimum, now, 1800)?;
+    Ok(json!({"binding":private157::binding(&selected.binding),"history":selected.history}))
+}
+pub(super) fn capture_terminal() -> Result<()> {
+    let a: Vec<_> = env::args().collect();
+    ensure!(a.len() == 7, "warmup terminal capture arguments");
+    let s: Value = serde_json::from_slice(&read_stable_bounded(
+        Path::new(&a[2]),
+        1 << 20,
+        "warmup terminal dispatch",
+    )?)?;
+    if s["schema"] == "jetstreamer-warmup223-native20-terminal-spec-v2" {
+        return terminal_v2::capture();
+    }
+    terminal::capture()
+}
+pub(super) fn terminal_identity(v: &Value) -> Result<(String, String)> {
+    if v["schema"] == TERMINAL_SCHEMA_V2 {
+        return terminal_v2::validate(v);
+    }
+    terminal::validate(v)
+}
+pub(super) fn terminal_owner(proof: &Value, owner: &Value) -> Result<()> {
+    let (_, iid) = terminal_identity(proof)?;
+    let command = proof["terminal_manager"]["ExecStart"]
+        .as_str()
+        .context("warmup proved terminal command")?;
+    let clean = if proof["schema"] == TERMINAL_SCHEMA_V2 {
+        terminal_v2::terminal_shape(owner, &iid, command)?
+    } else {
+        terminal::terminal_shape(owner, &iid, command)?
+    };
+    ensure!(
+        clean == (proof["terminal_outcome"] == "bounded-warmup-complete")
+            && owner["Result"] == proof["terminal_manager"]["Result"]
+            && owner["ExecMainStatus"] == proof["terminal_manager"]["ExecMainStatus"],
+        "warmup current terminal outcome differs from proof"
+    );
+    Ok(())
+}
+pub(super) fn terminal_predecessor(
+    previous: &Value,
+    p: &Plan,
+    proof: &Value,
+    sample: &str,
+    now: u64,
+) -> Result<()> {
+    if proof["schema"] == TERMINAL_SCHEMA_V2 {
+        return terminal_v2::predecessor(previous, p, proof, sample, now);
+    }
+    terminal::predecessor(previous, p, proof, sample, now)
+}
+pub(super) fn terminal_census(p: &Plan, current: &BTreeMap<String, Value>) -> Result<()> {
+    terminal_v2::census_check(p, current)?;
+    terminal::census_check(p, current)
+}
+pub(super) fn terminal_not_replaced(proof: &Value) -> Result<()> {
+    if proof["schema"] == TERMINAL_SCHEMA_V2 {
+        let (_, iid) = terminal_v2::validate(proof)?;
+        return terminal_v2::no_later_invocation(
+            &iid,
+            proof["journal_summary"]["started_unix_microseconds"]
+                .as_u64()
+                .context("v2 terminal start")?,
+        );
+    }
+    let (_, iid) = terminal::validate(proof)?;
+    terminal::no_later_invocation(
+        &iid,
+        proof["journal_summary"]["started_unix_microseconds"]
+            .as_u64()
+            .context("warmup terminal start")?,
+    )
+}
 const HISTORICAL_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
 const UNIT: &str = "horizon-qualify-223-warmup-resource-5072b7ba-v4.service";
 const ROOT: &str =
@@ -30,13 +117,21 @@ const OWNERS: [(&str, &str); 4] = [
 ];
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
     native20::scope(phase, unit)
+        || native20_v2::scope(phase, unit)
         || (phase == "private-warmup-reproduction" && matches!(unit, UNIT | HISTORICAL_UNIT))
 }
 pub(super) fn status_claim(v: &Value) -> Result<()> {
+    if v["unit"] == native20_v2::UNIT {
+        return native20_v2::status_claim(v);
+    }
     native20::status_claim(v)
 }
-pub(super) fn status_jet_path() -> PathBuf {
-    native20::status_jet_path()
+pub(super) fn status_jet_path(unit: &str) -> Result<PathBuf> {
+    match unit {
+        native20::UNIT => Ok(native20::status_jet_path()),
+        native20_v2::UNIT => Ok(native20_v2::status_jet_path()),
+        _ => anyhow::bail!("unregistered native20 status unit"),
+    }
 }
 fn command() -> String {
     format!(
@@ -282,6 +377,10 @@ pub(super) fn run(capture: bool) -> Result<()> {
     {
         return native20::run(capture, binding, self_sha);
     }
+    if bound_json(&binding)?["schema"] == "jetstreamer-private-warmup223-native20-admission-spec-v2"
+    {
+        return native20_v2::run(capture, binding, self_sha);
+    }
     let spec: Spec = serde_json::from_value(bound_json(&binding)?)?;
     let o = bound_json(&spec.observer)?;
     let f = bound_json(&spec.fleet)?;
@@ -451,6 +550,9 @@ fn sandbox(c: &PipelineClaim, current: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
+    if native20_v2::scope(&c.phase, &c.unit) {
+        return native20_v2::validate(c);
+    }
     if native20::scope(&c.phase, &c.unit) {
         return native20::validate(c);
     }
@@ -518,6 +620,9 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
+    if native20_v2::scope(&c.phase, &c.unit) {
+        return native20_v2::validate_live(c, current);
+    }
     if native20::scope(&c.phase, &c.unit) {
         return native20::validate_live(c, current);
     }
@@ -592,7 +697,9 @@ pub(super) fn event_predecessor(
     sampled: &str,
     now: u64,
 ) -> Result<()> {
-    let event_unit = if proof["unit"] == native20::UNIT {
+    let event_unit = if proof["unit"] == native20_v2::UNIT {
+        native20_v2::UNIT
+    } else if proof["unit"] == native20::UNIT {
         native20::UNIT
     } else {
         UNIT
@@ -691,7 +798,9 @@ pub(super) fn event_census(p: &Plan, c: &BTreeMap<String, Value>) -> Result<()> 
     if let Some(binding) = &p.metadata_event {
         let proof = bound_json(binding)?;
         if proof["schema"] == "jetstreamer-private-warmup223-launch-v1" {
-            let event_unit = if proof["unit"] == native20::UNIT {
+            let event_unit = if proof["unit"] == native20_v2::UNIT {
+                native20_v2::UNIT
+            } else if proof["unit"] == native20::UNIT {
                 native20::UNIT
             } else {
                 UNIT
@@ -701,7 +810,9 @@ pub(super) fn event_census(p: &Plan, c: &BTreeMap<String, Value>) -> Result<()> 
                     .as_ref()
                     .context("warmup event prior fleet")?,
             )?;
-            if event_unit == native20::UNIT {
+            if event_unit == native20_v2::UNIT {
+                native20_v2::event_protected(&f, c)?;
+            } else if event_unit == native20::UNIT {
                 native20::event_protected(&f, c)?;
             } else {
                 protected(&f, c)?;
@@ -720,6 +831,26 @@ pub(super) fn event_census(p: &Plan, c: &BTreeMap<String, Value>) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native20_versions_keep_distinct_unit_root_and_status_identity() {
+        for (unit, root) in [
+            (native20::UNIT, native20::ROOT),
+            (native20_v2::UNIT, native20_v2::ROOT),
+        ] {
+            assert!(scope("private-warmup-reproduction", unit));
+            assert!(!scope("private-cold-snapshot-verification", unit));
+            assert_eq!(
+                status_jet_path(unit).unwrap(),
+                Path::new(root).join("output/epoch-223.jet")
+            );
+        }
+        assert_ne!(native20::UNIT, native20_v2::UNIT);
+        assert_ne!(native20::ROOT, native20_v2::ROOT);
+        assert!(
+            status_jet_path("horizon-qualify-223-v1620-warmup-resource-unregistered-v3.service")
+                .is_err()
+        );
+    }
     #[test]
     fn failed_v3_stays_recognized_but_cannot_be_resurrected() {
         assert!(scope("private-warmup-reproduction", HISTORICAL_UNIT));

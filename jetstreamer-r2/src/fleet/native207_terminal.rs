@@ -1,0 +1,406 @@
+//! Independently qualify the completed input test; never rerun its Bank.
+use super::native207 as c;
+use super::*;
+pub(super) const SCHEMA: &str = "jetstreamer-private-epoch207-native-terminal-proof-v1";
+const ORIGIN_PATH: &str = "/var/lib/jetstreamer/horizon-207-native-capture-actual-v1/intent.json";
+const ORIGIN_SHA: &str = "855d38347ae35ab10bb9284a001f60a23660ef51586a57fe1b0716153a15f030";
+const JOURNAL_PATH: &str =
+    "/var/lib/jetstreamer/horizon-native207-terminal-raw-f5aec51a-v1/journal.json";
+const JOURNAL_SHA: &str = "1b07444505298400d95f9981118f6ecf963ca7d20acc9570baee95f2dc9e39aa";
+
+pub(super) fn terminal_shape(u: &Value, iid: &str) -> Result<()> {
+    ensure!(
+        u["Id"] == c::UNIT
+            && u["LoadState"] == "loaded"
+            && u["ActiveState"] == "inactive"
+            && u["SubState"] == "dead"
+            && u["MainPID"] == "0"
+            && u["NRestarts"] == "0"
+            && (u["InvocationID"] == "" || u["InvocationID"] == iid)
+            && u["Result"] == "success"
+            && u["ExecMainStatus"] == "0",
+        "207 terminal owner is live, replaced, restarted or unsuccessful"
+    );
+    Ok(())
+}
+fn journal(binding: &BoundFile, iid: &str, pid: u64) -> Result<(Value, u64)> {
+    ensure!(
+        binding.path == Path::new(JOURNAL_PATH) && binding.sha256 == JOURNAL_SHA,
+        "207 journal is not the preserved exact attempt"
+    );
+    let bytes = read_stable_bounded(&binding.path, 16 << 20, "207 terminal journal")?;
+    ensure!(
+        hex_lower(&Sha256::digest(&bytes)) == binding.sha256,
+        "207 terminal journal digest differs"
+    );
+    let rows = serde_json::Deserializer::from_slice(&bytes)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    journal_rows(rows, iid, pid)
+}
+fn journal_rows(rows: Vec<Value>, iid: &str, pid: u64) -> Result<(Value, u64)> {
+    ensure!(
+        !rows.is_empty() && rows.len() <= 4096,
+        "207 terminal journal bounds"
+    );
+    let rows = rows
+        .into_iter()
+        .filter(|r| {
+            r["_SYSTEMD_INVOCATION_ID"] == iid || (r["_PID"] == "1" && r["INVOCATION_ID"] == iid)
+        })
+        .collect::<Vec<_>>();
+    ensure!(
+        rows.iter()
+            .filter(|r| r["_PID"] != "1")
+            .all(|r| r["_PID"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(pid)),
+        "207 foreign child PID"
+    );
+    let checkpoint = native207_capture::marker(&rows, iid)?;
+    let clock = rows
+        .iter()
+        .find(|r| {
+            r["_PID"] == "1" && r["MESSAGE"] == format!("{}: Deactivated successfully.", c::UNIT)
+        })
+        .and_then(|r| r["__REALTIME_TIMESTAMP"].as_str())
+        .context("207 terminal clock")?
+        .parse::<u64>()?;
+    Ok((checkpoint, clock))
+}
+pub(super) fn validate(proof: &Value) -> Result<String> {
+    ensure!(
+        proof["schema"] == SCHEMA
+            && proof["epoch"] == 207
+            && proof["unit"] == c::UNIT
+            && proof["native_input_qualified"] == true
+            && proof["resource_samples_taken"] == 0,
+        "207 terminal proof scope"
+    );
+    c::no_authority(proof)?;
+    let origin_binding: BoundFile = serde_json::from_value(proof["running_origin"].clone())?;
+    ensure!(
+        origin_binding.path == Path::new(ORIGIN_PATH) && origin_binding.sha256 == ORIGIN_SHA,
+        "207 terminal origin is not the approved attempt"
+    );
+    let origin = c::immutable_json(&origin_binding)?;
+    let iid = origin["invocation_id"].as_str().context("207 origin IID")?;
+    let pid = origin["main_pid"].as_u64().context("207 origin PID")?;
+    let claim = PipelineClaim {
+        epoch: 207,
+        phase: "private-cold-snapshot-verification".into(),
+        unit: c::UNIT.into(),
+        invocation_id: iid.into(),
+        expected_exec_start: origin["expected_exec_start"]
+            .as_str()
+            .context("207 original command")?
+            .into(),
+        evidence: vec![origin_binding],
+    };
+    c::claim(&claim)?;
+    ensure!(
+        proof["invocation_id"] == iid && proof["main_pid"] == pid,
+        "207 terminal origin substituted"
+    );
+    let (checkpoint, clock) =
+        journal(&serde_json::from_value(proof["journal"].clone())?, iid, pid)?;
+    let start = origin["producer_started_unix_millis"]
+        .as_u64()
+        .context("207 original start")?;
+    ensure!(
+        clock / 1000 >= start
+            && clock / 1000 - start <= 2_700_000
+            && proof["terminal_unix_microseconds"] == clock
+            && proof["native_marker"] == checkpoint
+            && proof["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| n >= clock / 1_000_000),
+        "207 bounded terminal tuple/clock differs"
+    );
+    terminal_shape(&proof["terminal_manager"], iid)?;
+    Ok(iid.into())
+}
+pub(super) fn find(f: &Value) -> Result<(BoundFile, String)> {
+    let p: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: f["plan"].as_str().context("207 proof fleet plan")?.into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("207 proof fleet plan digest")?
+            .into(),
+    })?)?;
+    let candidates = p
+        .gates
+        .get(&207)
+        .context("207 gate missing")?
+        .evidence
+        .iter()
+        .filter(|b| {
+            b.path.file_name().is_some_and(|n| n == "proof.json")
+                && b.path
+                    .parent()
+                    .and_then(Path::file_name)
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("horizon-native207-terminal-proof-"))
+        })
+        .collect::<Vec<_>>();
+    ensure!(
+        candidates.len() == 1,
+        "207 requires one accepted terminal proof"
+    );
+    let b = candidates[0];
+    let iid = validate(&c::immutable_json(b)?)?;
+    terminal_shape(&f["unit_census"][c::UNIT], &iid)?;
+    Ok((
+        BoundFile {
+            path: b.path.clone(),
+            sha256: b.sha256.clone(),
+        },
+        iid,
+    ))
+}
+pub(super) fn predecessor(
+    previous: &Value,
+    p: &Plan,
+    proof: &Value,
+    sampled: &str,
+    now: u64,
+) -> Result<()> {
+    validate(proof)?;
+    let recorded = proof["recorded_unix_seconds"]
+        .as_u64()
+        .context("207 proof capture clock")?;
+    ensure!(
+        p.first_epoch == 201
+            && p.last_epoch == 300
+            && p.admission_transition_guard.is_none()
+            && previous["sampled_at_utc"] == sampled
+            && proof["sampled_at_utc"] == sampled
+            && proof["observer"] == private157::binding(&p.observer)
+            && p.previous_fleet
+                .as_ref()
+                .is_some_and(|b| proof["fleet"] == private157::binding(b))
+            && recorded <= now
+            && now - recorded <= 300
+            && previous["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|t| t < recorded),
+        "207 terminal event replaced/staled resource history"
+    );
+    let old: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: previous["plan"].as_str().context("207 prior plan")?.into(),
+        sha256: previous["plan_sha256"]
+            .as_str()
+            .context("207 prior digest")?
+            .into(),
+    })?)?;
+    ensure!(
+        old.pipeline_claims
+            .iter()
+            .filter(|claim| claim.unit == c::UNIT
+                && claim.invocation_id == proof["invocation_id"]
+                && claim
+                    .evidence
+                    .first()
+                    .is_some_and(|b| private157::binding(b) == proof["running_origin"]))
+            .count()
+            == 1,
+        "207 terminal proof lacks its exact registered origin"
+    );
+    ensure!(
+        p.schema == old.schema
+            && p.observer == old.observer
+            && p.pipeline_claims == old.pipeline_claims
+            && p.tracked_units == old.tracked_units
+            && p.status_receipt_directory == old.status_receipt_directory
+            && p.runtime_handoff157 == old.runtime_handoff157
+            && p.continuation203_runtime_extension == old.continuation203_runtime_extension
+            && p.epoch203_ram_auxiliary.is_none()
+            && old.epoch203_ram_auxiliary.is_none()
+            && p.diagnostics.len() == old.diagnostics.len()
+            && old
+                .diagnostics
+                .iter()
+                .all(|d| p.diagnostics.iter().any(|n| n.epoch == d.epoch
+                    && n.unit == d.unit
+                    && n.invocation_id == d.invocation_id
+                    && n.scratch_path == d.scratch_path
+                    && n.launch_receipt == d.launch_receipt))
+            && p.gates.len() == old.gates.len(),
+        "207 terminal changed unrelated owner/configuration"
+    );
+    for (epoch, g) in &old.gates {
+        let n = p.gates.get(epoch).context("207 terminal gate omitted")?;
+        ensure!(
+            n.state == g.state
+                && g.evidence.iter().all(|e| n.evidence.contains(e))
+                && (*epoch == 207 || (n.evidence == g.evidence && n.next_action == g.next_action)),
+            "207 terminal changed completion/unrelated gates"
+        );
+        if *epoch == 207 {
+            ensure!(
+                n.evidence
+                    .iter()
+                    .all(|e| g.evidence.contains(e) || p.metadata_event.as_ref() == Some(e)),
+                "207 terminal added unrelated evidence"
+            );
+        }
+    }
+    Ok(())
+}
+pub(super) fn census_check(p: &Plan, current: &BTreeMap<String, Value>) -> Result<()> {
+    let Some(b) = &p.metadata_event else {
+        return Ok(());
+    };
+    let proof = bound_json(b)?;
+    if proof["schema"] != SCHEMA {
+        return Ok(());
+    }
+    let iid = validate(&proof)?;
+    terminal_shape(current.get(c::UNIT).context("207 owner omitted")?, &iid)?;
+    Ok(())
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Spec {
+    schema: String,
+    running_origin: BoundFile,
+    journal: BoundFile,
+    observer: BoundFile,
+    fleet: BoundFile,
+    output: PathBuf,
+}
+pub(super) fn capture() -> Result<()> {
+    let (b, self_sha) = publication203::parsed_args("capture-native207-terminal")?;
+    let s: Spec = serde_json::from_value(bound_json(&b)?)?;
+    ensure!(
+        s.schema == "jetstreamer-native207-terminal-capture-spec-v1"
+            && s.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
+            && s.output
+                .parent()
+                .and_then(Path::file_name)
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("horizon-native207-terminal-proof-"))
+            && s.output.file_name().is_some_and(|n| n == "proof.json"),
+        "207 terminal output scope"
+    );
+    if s.output.try_exists()? {
+        let old = c::immutable_json(&serde_json::from_value(private157::file_binding(
+            &s.output,
+        )?)?)?;
+        ensure!(
+            old["capture_spec"] == private157::binding(&b)
+                && old["capture_helper_sha256"] == self_sha,
+            "207 terminal retry conflicts"
+        );
+        validate(&old)?;
+        return Ok(());
+    }
+    let origin = c::immutable_json(&s.running_origin)?;
+    let f = bound_json(&s.fleet)?;
+    let o = bound_json(&s.observer)?;
+    ensure!(
+        f["observer_sha256"] == s.observer.sha256 && f["sampled_at_utc"] == o["recorded_at_utc"],
+        "207 terminal observer/fleet differs"
+    );
+    let p: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: f["plan"].as_str().context("207 accepted plan")?.into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("207 accepted digest")?
+            .into(),
+    })?)?;
+    ensure!(
+        p.pipeline_claims
+            .iter()
+            .filter(|c| c.unit == c::UNIT
+                && c.invocation_id == origin["invocation_id"]
+                && c.evidence.first() == Some(&s.running_origin))
+            .count()
+            == 1,
+        "207 terminal lacks original registered claim"
+    );
+    let iid = origin["invocation_id"]
+        .as_str()
+        .context("207 original IID")?;
+    let pid = origin["main_pid"].as_u64().context("207 original PID")?;
+    let (checkpoint, clock) = journal(&s.journal, iid, pid)?;
+    let before = unit(c::UNIT)?;
+    let mut proof = json!({"schema":SCHEMA,"epoch":207,"unit":c::UNIT,"invocation_id":iid,"main_pid":pid,
+        "running_origin":private157::binding(&s.running_origin),"journal":private157::binding(&s.journal),
+        "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"sampled_at_utc":f["sampled_at_utc"],
+        "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"terminal_unix_microseconds":clock,
+        "native_marker":checkpoint,"terminal_manager":before,"capture_spec":private157::binding(&b),"capture_helper_sha256":self_sha,
+        "native_input_qualified":true,"resource_samples_taken":0});
+    for key in [
+        "entry_replay",
+        "replay_launch_authorized",
+        "runtime_promotion_authorized",
+        "full_epoch_qualified",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        proof[key] = json!(false);
+    }
+    validate(&proof)?;
+    ensure!(
+        unit(c::UNIT)? == before,
+        "207 terminal owner changed during capture"
+    );
+    private157::immutable_receipt(&s.output, &proof)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn cleared_owner_is_not_a_replacement_restart_or_collected_unit() {
+        let iid = "a".repeat(32);
+        let u = json!({"Id":c::UNIT,"LoadState":"loaded","ActiveState":"inactive","SubState":"dead", "MainPID":"0","NRestarts":"0","InvocationID":"","Result":"success","ExecMainStatus":"0"});
+        terminal_shape(&u, &iid).unwrap();
+        for (k, v) in [
+            ("InvocationID", json!("b".repeat(32))),
+            ("MainPID", json!("42")),
+            ("NRestarts", json!("1")),
+            ("LoadState", json!("not-found")),
+            ("Result", json!("exit-code")),
+            ("ExecMainStatus", json!("1")),
+            ("ActiveState", json!("active")),
+        ] {
+            let mut bad = u.clone();
+            bad[k] = v;
+            assert!(terminal_shape(&bad, &iid).is_err(), "{k}");
+        }
+    }
+    #[test]
+    fn terminal_parser_keeps_consensus_integer_and_requires_original_child_and_order() {
+        let iid = "a".repeat(32);
+        let child = |msg: &str, t: &str| json!({"_PID":"42","_SYSTEMD_UNIT":c::UNIT,"_SYSTEMD_INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":t,"MESSAGE":msg});
+        let rows = vec![
+            child(
+                "epoch207-v1616-native-input slot=89423444 bank_hash=EzH8ssxUMpcqku5DUXiMhvmdXEtvr6HveAv9dM2Vsiib accounts_hash=3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px last_blockhash=C3UvZbEzYj5vvQnogdekZcGhmvWfmonYWfn2xW2KAV7Y capitalization=500584876715315613 transaction_count=22383626920 tick_height=5723100480 next_write_version=86171593405 replay_entries=0 bootstrap_writes=0",
+                "10",
+            ),
+            child(
+                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 56 filtered out; finished in 452.73s",
+                "20",
+            ),
+            json!({"_PID":"1","UNIT":c::UNIT,"INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":"30","MESSAGE":format!("{}: Deactivated successfully.",c::UNIT)}),
+        ];
+        let (tuple, clock) = journal_rows(rows.clone(), &iid, 42).unwrap();
+        assert_eq!(tuple["capitalization"], "500584876715315613");
+        assert_eq!(clock, 30);
+        assert!(journal_rows(rows.clone(), &iid, 43).is_err());
+        assert!(journal_rows(rows.clone(), &"b".repeat(32), 42).is_err());
+        for i in 0..rows.len() {
+            let mut bad = rows.clone();
+            bad.remove(i);
+            assert!(journal_rows(bad, &iid, 42).is_err());
+        }
+        let mut duplicate = rows.clone();
+        duplicate.push(rows[2].clone());
+        assert!(journal_rows(duplicate, &iid, 42).is_err());
+        let mut wrong = rows;
+        wrong[0]["MESSAGE"] = json!("epoch207-v1616-native-input slot=1");
+        assert!(journal_rows(wrong, &iid, 42).is_err());
+    }
+}

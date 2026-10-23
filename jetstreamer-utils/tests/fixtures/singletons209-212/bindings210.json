@@ -1,0 +1,16 @@
+{
+  "epoch": 210,
+  "preflight_manifest_fingerprint": "sha256:63e4f6b5f858ed636b2c22bc15f971d0f4a1009b50f39f66b779df782060976d",
+  "bootstrap": {
+    "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst#1628731675837475",
+    "size": 8579041139,
+    "md5_base64": "pBPdxBtyTOt6A7LhXryC8Q==",
+    "crc32c_base64": "rBQmbQ=="
+  },
+  "terminal": {
+    "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst#1628983801891966",
+    "size": 8731506223,
+    "md5_base64": "mMBeym4d6L8xRT8awzc+Kg==",
+    "crc32c_base64": "4Sr/GA=="
+  }
+}

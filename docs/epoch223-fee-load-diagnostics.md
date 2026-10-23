@@ -167,8 +167,11 @@ cooperative parent and first16-entry worker. It reserves a 300-GB scratch
 increment, starts only above 2.3-TB free disk and 608-GiB MemAvailable, and stops
 its own group below the protected 2-TB/480-GiB floors. The actual systemd owner
 requires 128-GiB maximum/112-GiB high memory, zero swap, no restart and the exact
-private scratch/output root. This envelope admits only the three unchanged
-204/205/225 owners plus registered native207. Full227 or any other live owner
+private scratch/output root. This envelope admits the three unchanged
+204/205/225 owners, with either the exact registered live native207 or its
+independently authenticated successful terminal207 proof and a complete census
+showing only those three remaining owners. The optional native207 path retains
+the same reserves. Full227 or any other live owner
 requires a fresh complete claim calculation; this package is not approval to
 reuse an old census.
 
@@ -191,6 +194,23 @@ test receipt. Include evidence and a positive current best estimate through
 prefix, suffix/restart, assembly, full/plugin verification, upload and readback
 to the canonical sidecar.
 
+Guard admission and native20 capture select the latest completed oneshot from
+its PID1 manager history. A guard's current `InvocationID` may name a newly
+started invocation whose `sample-IID.json` is not written yet, or may already
+be cleared. Require the exact start, printed receipt, successful deactivation
+and completed job events for the selected invocation, with matching unit,
+boot identity, receipt bytes, ordered clocks and the existing freshness bound.
+Bind PID1's full finished-job command to the immutable executable hash and
+current exact `ExecStart`; any available kernel `_EXE`/`_CMDLINE` must agree.
+Those optional kernel fields can disappear when a short guard exits before
+journald reads `/proc`. Keep the default `systemd-run` command description for
+this guard so PID1 preserves its full command. Preserve that history in
+admission/launch evidence.
+An incomplete newer invocation does not hide the latest completed success; a
+later failure or protective stop prevents fallback to an older success. The
+existing guard fingerprints, producer identity, timer and resource gates still
+apply unchanged. This is a guard-history read, not another resource poll.
+
 Refresh that same status model only from each existing 30-minute coordinated
 observation, with its current fleet bindings and measured file size. Do not add
 a second polling timer. At `resource.json`/`failure.json` or actual manager
@@ -202,8 +222,119 @@ owner instead. The warmup result is not an uploaded epoch: canonical completion
 still requires all independent archive gates, and completion cleanup follows
 sidecar commit.
 
+### Native20 terminal-event adapter
+
+`capture-warmup223-terminal` consumes a sealed
+`jetstreamer-warmup223-native20-terminal-spec-v1` with `running_origin`,
+`observer`, `fleet` bindings and an `output` named `proof.json` under a fresh
+root-private `/var/lib/jetstreamer/horizon-warmup223-native20-terminal-*`
+directory. Run it only after the existing `systemctl start --wait` handle or
+another genuine manager event reports termination. It reads manager history
+and terminal metadata, without taking another resource observation.
+
+Capture preserves exact journal bytes and the actual resource/failure output
+no-clobber, retaining its original path and digest. A failed invocation with
+no output records confirmed absence rather than inventing a failure receipt.
+Success requires its original registered launch, exact bounded worker/input
+fingerprints, clean manager termination, successful resource receipt and the
+verified complete-slot marker. Failure and cleared-IID termination are supported.
+The earlier unregistered failed startup is retained as separate hash-bound
+operator/manager/journal history. Every full-prefix, native-restart, suffix,
+assembly, full/plugin, runtime-promotion, sidecar and R2 gate remains false.
+
+The metadata event keeps the accepted observer sample and all existing owner
+claims. Only epoch223's next action/evidence may advance; its repair gate stays
+`failed-needs-repair`. The inactive adapter authenticates that event and the
+original status owner even if systemd cleared its IID, rejects live/restarted/
+replacement owners, and rechecks latest PID1 history for a later invocation.
+Ordinary conditional status deletion, authenticated absence, repair-backlog and
+no-active-handoff checks remain mandatory. Terminal metadata never counts as
+archive or sidecar completion.
+
+### Resume and drain after the cooperative native20 target
+
+The preserved attempt `13a5f755a196442e991c6930b410c04f` reached the exact
+96,335,554 complete-slot target. Its resource runner then sent SIGINT to a
+parent that had already set its shared shutdown flag before SIGSTOP. The
+parent's normal second-interrupt handler force-exited130. That attempt remains
+failed; its target marker and captured resources do not qualify a clean warmup.
+Keep its proof and terminal history unchanged.
+
+The corrected runner selects `cooperative-resume-only` only for the native20
+runtime, sealed cooperative parent99f643ff, first16 worker52d6c86a and exact
+96,335,539–96,335,554 interval with parent terminal96,767,522. It first observes
+the parent's own stopped state within a five-second bound, then freezes the
+whole owned group and durably captures the resource/stop intent. Waiting for
+the self-stop prevents racing a still-pending parent SIGSTOP against resume.
+The runner sends SIGCONT without another interrupt and retains the existing
+120-second drainage bound. Runtime/external stops retain their prior signal
+handling. v1.6.25 and every other profile retain resume-plus-SIGINT behavior
+and unchanged receipt fields. Cooperative receipts and planning capability
+identify their selected protocol explicitly.
+
+The controlled success gate remains unchanged: target observed, no external
+signal, no capture/guard/drainage error and an actual child return code0or1.
+Exit130 remains fatal. Bank-free process tests reproduce the old130 failure,
+exercise freeze/capture/resume/natural drainage through the real measure loop,
+and check that all archive/publication authority stays false.
+
+Before another actual attempt, build and seal a distinctly versioned runner,
+new plan, unit, private root, admission/origin and invocation-bound guard. Bind
+the new runner digest through the fleet, status and terminal-reader registry;
+do not overwrite or reuse the failed attempt. Precreate all five owner-private
+directories: root, `scratch`, `output`, `receipts`, `ledger`. Repeat the exact
+planning capability and obtain fresh complete-fleet admission including the
+already-running full227; the old three-owner/native207 envelope is not launch
+approval. Only a successful new bounded native warmup can support the separate
+full-prefix admission. Prefix, suffix/restart, assembly, full/plugin, upload,
+readback and canonical sidecar gates remain independent.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain
 outstanding until their respective invocations succeed. A16-slot result is not
 a measured full-prefix peak or an epoch archive.
+
+## Cooperative native20 v2 retry preparation
+
+The v2 runner is separately sealed at
+`/var/lib/jetstreamer/horizon-223-v1620-warmup-cooperative-8457f800-v2`:
+runner SHA256 `8457f800789027054f118e783d2b3aba7a6a3294801b77734d30fda056f28f25`,
+actual-plan SHA256 `928482470656dac32cfc4e0ca686b0b025c9f5cbbd4c8fc0bb302ed21cebbe68`.
+Its actual owner is
+`horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service`, with an independent
+`qualification-223-v1620-prefix-warmup-8457f800-v2` private root and all five
+required directories already prepared. Its service is sealed but not installed
+or started by preparation.
+
+The no-worker planning capability passed in the v5 capability namespace and is
+sealed at `/var/lib/jetstreamer/horizon-warmup223-native20-capability-v5/capability.json`,
+SHA256 `955bb371ec8543fab27811f5cb0ed3c72f26134706daaeab041105666999f164`.
+It explicitly binds `cooperative-resume-only`, parent99f643ff and first16
+worker52d6c86a. No native replay or resource admission follows from that result.
+
+`admit-warmup223`/`capture-warmup223` route the separate
+`jetstreamer-private-warmup223-native20-admission-spec-v2` to the v2 admission
+state. The accepted census must contain exactly the three unchanged old owners
+and registered full227 invocation `a10f37b57711425a81633c62c66438d5`.
+Admission validates its original launch, current command/caps and a freshly
+completed protective guard, then reserves its full remaining hard-memory
+headroom and its entire471,798,691,840-byte disk envelope without scratch credit.
+The existing reviewed old-three growth calculation and current century floor
+are added independently. If that exceeds the sealed2-TB protected floor or the
+sampled expanded memory envelope, admission fails; raise/requalify the generation
+instead of hiding a peer or reducing a healthy guard. Root owns the fresh
+observation/admission and any actual dispatch.
+
+V2 uses `horizon-warmup223-native20-admission-v2`,
+`horizon-warmup223-native20-guard-v2/guard-plan.json`,
+`horizon-warmup223-native20-guard-receipts-v2`, and the matching
+`horizon-warmup223-native20-protective-v2.service`/`.timer` namespaces.
+The guard plan requires the actual new IID and must be sealed after start; keep
+the default full-command systemd-run description. Status lookup selects the
+jet root by exact approved unit, and PID1 Started-clock support is constrained
+to the two native20 owners. V2 terminal capture uses
+`jetstreamer-warmup223-native20-terminal-spec-v2` and preserves the previous
+failed13a5 terminal proof alongside its own exact journal/output. V1 launch,
+status and terminal support remain available independently; neither generation
+can borrow the other's runner, plan, root or result identity.
