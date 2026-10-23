@@ -1,12 +1,13 @@
 //! Closed admission/ownership for the first16-slot failure-context experiment.
 use super::*;
-const UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v1.service";
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-warmup-a1f6239d-v1";
-const RUNNER: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-a1f6239d-v1/jetstreamer-epoch223-warmup-resource";
-const RUNNER_SHA: &str = "2cd6c258ec5ac0c777aa6622373a55adea5cd9d6cf438bb76a3e4d1af81900a7";
-const PLAN: &str = "/var/lib/jetstreamer/horizon-warmup223-actual-plan-v1/plan.json";
-const PLAN_SHA: &str = "8fd3214faa31d58dcfb907cd6149df430e022108c7ba692656d3fc6ab0cd72b1";
-const STATE: &str = "/var/lib/jetstreamer/horizon-warmup223-admission-v1";
+const UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v2.service";
+const ROOT: &str =
+    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v2";
+const RUNNER: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/jetstreamer-epoch223-warmup-resource";
+const RUNNER_SHA: &str = "891dda987434bfe9435d23985c764c9a940be32d34f9c552bebd0a16b5caa6fa";
+const PLAN: &str = "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/actual-plan.json";
+const PLAN_SHA: &str = "773679ba1d76444a0f8783d61c40c4ed1844773211ddaa5d48d64a0eea2e6682";
+const STATE: &str = "/var/lib/jetstreamer/horizon-warmup223-admission-v2";
 const OWNERS: [(&str, &str); 4] = [
     (
         "horizon-upload-203-v4-20261023-v1.service",
@@ -183,14 +184,15 @@ fn inputs(f: &Value) -> Result<()> {
         "warmup native input proof differs"
     );
     let cap = bound_json(&BoundFile {
-        path: "/var/lib/jetstreamer/horizon-cycle315-input223-proof-v1/warmup-capability.json"
-            .into(),
-        sha256: "ffc974e45b49b791687df30946f73d5495827c7df99e4a68eda03c1ed0294e63".into(),
+        path: "/var/lib/jetstreamer/horizon-warmup223-parent-capability-v2/capability.json".into(),
+        sha256: "bec274c5f27d0a79a8e13dfcd1f5b3beaef82447721f6cb5e24ec45e49d55707".into(),
     })?;
     ensure!(
         cap["bindings"]["self_sha256"] == RUNNER_SHA
             && cap["worker_started"] == false
-            && cap["input_hashes_and_private_paths_verified"] == true,
+            && cap["input_hashes_and_private_paths_verified"] == true
+            && cap["parent_planning_report"]["pre_worker_barrier_reached"] == true
+            && cap["parent_planning_report"]["worker_spawned"] == false,
         "warmup input capability differs"
     );
     let p = bound_json(&BoundFile {
@@ -477,7 +479,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
     sandbox(c, current)?;
-    let gu = unit("horizon-warmup223-protective-v1.service")?;
+    let gu = unit("horizon-warmup223-protective-v2.service")?;
     let iid = gu["InvocationID"]
         .as_str()
         .context("warmup protective invocation")?;
@@ -486,12 +488,12 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
         "warmup protective iid"
     );
     let binding: BoundFile = serde_json::from_value(private157::file_binding(
-        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v1")
+        &Path::new("/var/lib/jetstreamer/horizon-warmup223-guard-receipts-v2")
             .join(format!("sample-{iid}.json")),
     )?)?;
     let g = bound_json(&binding)?;
     let pb: BoundFile = serde_json::from_value(private157::file_binding(Path::new(
-        "/var/lib/jetstreamer/horizon-warmup223-guard-v1/guard-plan.json",
+        "/var/lib/jetstreamer/horizon-warmup223-guard-v2/guard-plan.json",
     ))?)?;
     let p = bound_json(&pb)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -521,7 +523,7 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     let out = ProcessCommand::new("systemctl")
         .args([
             "show",
-            "horizon-warmup223-protective-v1.timer",
+            "horizon-warmup223-protective-v2.timer",
             "--property=ActiveState",
             "--value",
         ])
