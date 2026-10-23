@@ -8,10 +8,7 @@ use solana_runtime::{
     genesis_utils::create_genesis_config_with_leader,
     snapshot_utils::{add_snapshot, serialize_status_cache, SnapshotVersion},
 };
-use solana_sdk::{
-    signature::Signature,
-    system_program, system_transaction,
-};
+use solana_sdk::{signature::Signature, system_program, system_transaction};
 use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
@@ -387,7 +384,13 @@ fn native_v12_fresh_process_raw_output_equivalence() {
     }
     let duplicate = request(&state, 5, &[rooted_tx.clone()]);
     let duplicate_error = state.process_entry(duplicate.clone()).unwrap_err();
-    assert!(duplicate_error.contains("AlreadyProcessed"));
+    assert_eq!(
+        duplicate_error,
+        format!(
+            "entry fee collection failed for transaction 0: {:?}",
+            TransactionError::DuplicateSignature,
+        )
+    );
     let plan = Plan {
         schema: "test-only-v1425-native-v12-portability-v2".into(),
         capped: cfg!(feature = "capped-shrink-candidate"),
