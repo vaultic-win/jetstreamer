@@ -168,7 +168,10 @@ pub(super) fn matches(
 ) -> bool {
     epoch == 223
         && receipt.epoch == 223
-        && receipt.status.phase == "qualification"
+        && matches!(
+            receipt.status.phase.as_str(),
+            "verification" | "qualification"
+        )
         && receipt.status.jet_size_bytes == 0
         && receipt.controller_invocation_id == IID
         && receipt.producer_invocation_id == IID
@@ -181,7 +184,12 @@ pub(super) fn matches(
 pub(super) fn inactive_owner(
     publication: &StatusPublicationReceipt,
 ) -> Result<Option<(String, String)>> {
-    if publication.epoch != 223 || publication.status.phase != "qualification" {
+    if publication.epoch != 223
+        || !matches!(
+            publication.status.phase.as_str(),
+            "verification" | "qualification"
+        )
+    {
         return Ok(None);
     }
     ensure!(
@@ -314,7 +322,7 @@ pub(super) async fn run() -> Result<()> {
         elapsed_execution_millis: elapsed,
         estimated_remaining_millis: remaining(&p.stage_allowance_millis, elapsed)?,
         sampled_at_utc: p.sampled_at_utc.clone(),
-        phase: "qualification".into(),
+        phase: "verification".into(),
     };
     if p.estimate_receipt.exists() {
         let saved: Value = serde_json::from_slice(&read_stable_bounded(
@@ -332,7 +340,7 @@ pub(super) async fn run() -> Result<()> {
         ensure!(
             status.epoch == 223
                 && status.sampled_at_utc == p.sampled_at_utc
-                && status.phase == "qualification"
+                && status.phase == "verification"
                 && status.jet_size_bytes == 0,
             "native223 saved estimate scope"
         );
