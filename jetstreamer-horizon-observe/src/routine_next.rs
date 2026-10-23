@@ -81,7 +81,7 @@ pub(super) fn derive_next(
             .checked_add(1800)
             .context("time overflow")?,
     )?;
-    let old_stamp = stamp(&p.sample_target_utc);
+    let old_stamp = stamp(scheduled_target(p)?);
     let next_stamp = stamp(&next_time);
     let (observer_package, cycle_package, next_observer) = if host101 {
         let legacy_config = Path::new("/usr/local/lib/jetstreamer").join(format!(
@@ -142,7 +142,7 @@ pub(super) fn derive_next(
     ensure!(
         config["schema"] == "jetstreamer-horizon-live-resource-sample-config-v2"
             && config["output"].as_str() == p.observer.to_str()
-            && config["not_before_utc"] == p.sample_target_utc
+            && config["not_before_utc"] == scheduled_target(p)?
             && config["minimum_interval_seconds"] == 1800
             && config
                 .get("observation_reason")
@@ -157,6 +157,7 @@ pub(super) fn derive_next(
     let observer_sha = sha(&encoded(&next_config)?);
     let mut next: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     next.sample_target_utc = next_time;
+    next.delayed_schedule_utc = None;
     next.observer = serde_json::from_value(next_config["output"].clone())?;
     next.observer_config = Bound {
         path: observer_package.join("observer.json"),
@@ -819,6 +820,19 @@ mod tests {
         assert!(next.scope_101_200.unwrap().private144_observer);
         assert_eq!(next.tools.r2.path, Path::new(private144::WRITER));
         assert_eq!(next.tools.r2.sha256, private144::WRITER_SHA);
+    }
+
+    #[test]
+    fn delayed_successor_uses_actual_time_without_repeating_recovery() {
+        let (mut p, pb, mut c, config) = fixture_101();
+        p.delayed_schedule_utc = Some(p.sample_target_utc.clone());
+        p.sample_target_utc = "2026-10-21T08:39:58Z".into();
+        c["sampled_at_utc"] = json!(p.sample_target_utc);
+        let (next, cfg, _, _) = derive_next(&p, &pb, &c, &config).unwrap();
+        assert_eq!(next.sample_target_utc, "2026-10-21T09:09:58Z");
+        assert_eq!(cfg["not_before_utc"], next.sample_target_utc);
+        assert!(next.delayed_schedule_utc.is_none());
+        assert_eq!(cfg["previous_sample"], p.observer.to_str().unwrap());
     }
 
     #[test]

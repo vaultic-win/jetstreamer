@@ -103,6 +103,10 @@ struct Tools {
 struct Plan {
     schema: String,
     sample_target_utc: String,
+    // Explicit recovery of an already-recorded late sample, never a new scan.
+    // All derived metadata uses sample_target_utc (the actual observation time).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    delayed_schedule_utc: Option<String>,
     endpoint_sha256: String,
     bucket: String,
     observer: PathBuf,
@@ -645,12 +649,13 @@ fn validate_templates(
         "invalid cycle scope"
     );
     ensure!(p.cycle_unit == cycle_unit(p)?, "routine unit name mismatch");
-    let target = utc_seconds(&p.sample_target_utc)?;
     let old_time = old_observer["recorded_at_utc"]
         .as_str()
         .context("old observer time missing")?;
+    let scheduled = scheduled_target(p)?;
     ensure!(
-        target.checked_sub(utc_seconds(old_time)?) == Some(controller_recovery::interval(p)?),
+        utc_seconds(scheduled)?.checked_sub(utc_seconds(old_time)?)
+            == Some(controller_recovery::interval(p)?),
         "routine target must follow its qualified predecessor interval"
     );
     ensure!(
@@ -828,6 +833,22 @@ fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> 
             && observer["cadence"]["observation_reason"] == "routine",
         "observer scope, cadence or predecessor mismatch"
     );
+    if p.delayed_schedule_utc.is_some() {
+        ensure!(
+            observer["cadence"]["configured_not_before_utc"] == scheduled_target(p)?
+                && observer["cadence"]["observed_interval_seconds"].as_u64()
+                    == Some(
+                        target
+                            .checked_sub(utc_seconds(
+                                model["sample_target_utc"]
+                                    .as_str()
+                                    .context("previous model time")?
+                            )?)
+                            .context("observation precedes model")?
+                    ),
+            "late sample does not bind its original schedule and actual interval"
+        );
+    }
     let observed = observer["replays"]
         .as_array()
         .context("observer census missing")?;
@@ -940,11 +961,25 @@ fn validate_diagnostics(p: &Plan, model: &Value, value: &Value, observed: bool) 
     Ok(())
 }
 
+fn scheduled_target(p: &Plan) -> Result<&str> {
+    let Some(scheduled) = p.delayed_schedule_utc.as_deref() else {
+        return Ok(&p.sample_target_utc);
+    };
+    let delay = utc_seconds(&p.sample_target_utc)?
+        .checked_sub(utc_seconds(scheduled)?)
+        .context("late sample precedes schedule")?;
+    ensure!(
+        (1..=300).contains(&delay),
+        "late sample exceeds bounded recovery window"
+    );
+    Ok(scheduled)
+}
+
 fn validate_observer_config(p: &Plan, model: &Value, config: &Value) -> Result<()> {
     ensure!(
         config["schema"] == "jetstreamer-horizon-live-resource-sample-config-v2"
             && config["output"].as_str() == p.observer.to_str()
-            && config["not_before_utc"] == p.sample_target_utc
+            && config["not_before_utc"] == scheduled_target(p)?
             && config["minimum_interval_seconds"] == 1800
             && config["previous_sample"].as_str() == p.previous_observer.path.to_str()
             && (config["observation_reason"].is_null()
@@ -2618,6 +2653,39 @@ mod tests {
         assert!(validate_templates(&p, &model, &fleet, &prior, &est, &old).is_err());
         p.expected_epochs = vec![206, 206];
         assert!(validate_templates(&p, &model, &fleet, &prior, &est, &old).is_err());
+    }
+
+    #[test]
+    fn delayed_sample_preserves_actual_time_and_original_schedule() {
+        let (mut p, model, fleet, prior, est, old, config, mut observer) = fixture();
+        let scheduled = p.sample_target_utc.clone();
+        p.delayed_schedule_utc = Some(scheduled.clone());
+        p.sample_target_utc = "2026-10-20T10:36:40Z".into();
+        p.cycle_unit = cycle_unit(&p).unwrap();
+        p.cycle_directory =
+            "/var/lib/jetstreamer/horizon-routine-cycles-v1/20261020T103640Z-v1".into();
+        p.estimate_output =
+            "/private/estimates/horizon-r2-status-estimates-20261020T103640Z-cohort-gated-v5.json"
+                .into();
+        p.fleet_output = "/var/lib/jetstreamer/horizon-campaign-fleet/20261020T103640Z-rust-v1/fleet-ledger.json".into();
+        validate_templates(&p, &model, &fleet, &prior, &est, &old).unwrap();
+        observer["recorded_at_utc"] = json!(p.sample_target_utc);
+        observer["cadence"]["configured_not_before_utc"] = json!(scheduled);
+        observer["cadence"]["observed_interval_seconds"] = json!(1918);
+        validate_observer_config(&p, &model, &config).unwrap();
+        let now = utc_seconds(&p.sample_target_utc).unwrap() + 60;
+        validate_observation(&p, &model, &observer, now).unwrap();
+        observer["cadence"]["observed_interval_seconds"] = json!(1800);
+        assert!(validate_observation(&p, &model, &observer, now).is_err());
+        observer["cadence"]["observed_interval_seconds"] = json!(1918);
+        observer["recorded_at_utc"] = json!(scheduled);
+        assert!(validate_observation(&p, &model, &observer, now).is_err());
+        p.sample_target_utc = "2026-10-20T10:39:43Z".into();
+        assert!(scheduled_target(&p).is_err());
+        p.sample_target_utc = "2026-10-20T10:34:41Z".into();
+        assert!(scheduled_target(&p).is_err());
+        p.sample_target_utc = scheduled;
+        assert!(scheduled_target(&p).is_err());
     }
 
     #[test]

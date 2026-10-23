@@ -517,6 +517,8 @@ struct Plan {
     // same observer. This is not authority for another resource observation.
     #[serde(default)]
     admission_transition_guard: Option<BoundFile>,
+    #[serde(default)]
+    metadata_event: Option<BoundFile>,
 }
 
 fn validate_same_sample_admission(
@@ -1890,7 +1892,19 @@ pub(super) async fn run() -> Result<()> {
     );
     let previous_fleet = if let Some(previous) = &plan.previous_fleet {
         let previous = bound_json(previous)?;
-        if let Some(binding) = &plan.admission_transition_guard {
+        if let Some(binding) = &plan.metadata_event {
+            ensure!(
+                plan.admission_transition_guard.is_none(),
+                "metadata event cannot borrow replay admission"
+            );
+            publication144_history::event_predecessor(
+                &previous,
+                &plan,
+                &bound_json(binding)?,
+                sample,
+                started_seconds,
+            )?;
+        } else if let Some(binding) = &plan.admission_transition_guard {
             let guard = bound_json(binding)?;
             let guard_plan = bound_json(&BoundFile {
                 path: guard["plan"].as_str().context("guard plan missing")?.into(),
@@ -1913,7 +1927,7 @@ pub(super) async fn run() -> Result<()> {
         previous
     } else {
         ensure!(
-            plan.admission_transition_guard.is_none(),
+            plan.admission_transition_guard.is_none() && plan.metadata_event.is_none(),
             "admission transition requires predecessor"
         );
         Value::Null
@@ -2432,6 +2446,12 @@ pub(super) async fn run() -> Result<()> {
     let changes = transitions(&previous_fleet, &after, &entries);
     let receipt = json!({"schema":SCHEMA,"first_epoch":plan.first_epoch,"last_epoch":plan.last_epoch,"sampled_at_utc":sample,"observer_receipt":plan.observer.path,"observer_sha256":plan.observer.sha256,"previous_fleet":plan.previous_fleet.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"plan":plan_bound.path,"plan_sha256":plan_bound.sha256,"admission_transition_guard":plan.admission_transition_guard.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"inventory":inventory,"unit_census":after,"active":active,"diagnostics":diagnostics,"transitions":changes,"epochs":entries,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"remote_mutations":false,"producer_mutations":false,"publication_authorized":false});
     let mut receipt = receipt;
+    if let Some(event) = &plan.metadata_event {
+        let proof = bound_json(event)?;
+        receipt["metadata_event"] = json!({"path":event.path,"sha256":event.sha256});
+        receipt["metadata_event_sampled_at_utc"] = proof["sampled_at_utc"].clone();
+        receipt["new_resource_samples"] = json!(0);
+    }
     receipt["pipelines"] = json!(pipelines);
     receipt["terminal_replays"] = json!(terminal_replays);
     receipt["auxiliary_diagnostics"] = json!(auxiliary_diagnostics);
