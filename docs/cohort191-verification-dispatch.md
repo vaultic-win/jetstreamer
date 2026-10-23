@@ -15,8 +15,10 @@ being completed in its separate source worktree.
 
 The separately sealed verification spec uses
 `horizon-verify-canonical-pair-dev-samjohnson191-v1`. Its path is fixed beneath
-`/usr/local/lib/jetstreamer/horizon-cohort191-verification-plans-20261023-v1`,
-named `epoch-N-full.json` or `epoch-N-plugin.json`. The wrapper path is fixed at
+`/usr/local/lib/jetstreamer/horizon-cohort191-verification-plan-N-STAGE-20261023-v1/plan.json`,
+where STAGE is full or plugin. Seal each package only when that task receives
+fresh admission; never freeze future observer hashes in a single initial bundle.
+The wrapper path is fixed at
 `/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/`
 `jetstreamer-horizon-verify-pair`; its SHA is separately bound. Qualified198
 full/plugin reader hashes remain unchanged. The native wrapper independently
@@ -47,8 +49,9 @@ pipeline metadata allowance independently; no live growth claim is reduced.
 
 Admission binds a fresh, same-sample v2 observer and actual routine completion.
 The memory condition is current host RSS planning plus its complete memory
-reservation ceiling, one64GiB verifier, a possible16GiB modern compiler and the
-1GiB dispatcher. It uses the independently computed memory target; an invalid
+reservation ceiling, one64GiB verifier, a possible16GiB modern compiler,
+2GiB for the queue and its short dispatcher, and a possible2GiB uploader. It
+uses the independently computed memory target; an invalid
 capped186 replay budget must not be substituted or weakened. It retains the
 exact old228833779142-byte OS budget and reserves520MiB for all eight bounded
 verification tasks/dispatcher evidence. The coordinator must explicitly include

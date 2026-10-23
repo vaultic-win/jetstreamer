@@ -11,7 +11,7 @@ use std::{
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-verification-dispatch-20261023-v1";
 const STATE: &str = "/var/lib/jetstreamer/horizon-cohort191-canonical-verification-20261023-v1";
 const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-horizon-verify-pair";
-const PLANS: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-verification-plans-20261023-v1";
+const PLANS: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-verification-plan";
 const OLD_OS_PROTECTED: u64 = 228_833_779_142;
 const OS_BUDGET: (&str, &str) = (
     "/usr/local/lib/jetstreamer/horizon-v1425-portability-os-budget-20261023-v2/budget.json",
@@ -75,7 +75,11 @@ fn validate(p: &Plan, spec: &Value) -> Result<()> {
             && p.program.path == Path::new(PROGRAM)
             && is_lower_hex(&p.program.sha256, 64)
             && p.verifier_plan.path
-                == Path::new(PLANS).join(format!("epoch-{}-{}.json", p.epoch, p.stage.name()))
+                == PathBuf::from(format!(
+                    "{PLANS}-{}-{}-20261023-v1/plan.json",
+                    p.epoch,
+                    p.stage.name()
+                ))
             && p.output_directory
                 == Path::new(ROOT).join(format!("epoch-{}-{}", p.epoch, p.stage.name())),
         "foreign191 verifier dispatch"
@@ -186,11 +190,11 @@ fn resources(p: &Plan, o: &Value, c: &Value, now: u64) -> Result<()> {
     let total = m["host_total_bytes"].as_u64().context("191 total memory")?;
     let need = resident
         .checked_add(reserve)
-        .and_then(|n| n.checked_add(81 * GIB))
+        .and_then(|n| n.checked_add(84 * GIB))
         .context("191 memory overflow")?;
     ensure!(
         m["valid"] == true && need <= total,
-        "191 lacks protected growth +64GiB verifier +16GiB compiler +1GiB dispatcher envelope"
+        "191 lacks protected growth +64GiB verifier +16GiB compiler +2GiB queue/dispatcher +2GiB uploader envelope"
     );
     ensure!(
         o["host_memory"]["conservative_available_kib"]
@@ -605,7 +609,7 @@ mod tests {
             source_batch: bound("/native/source"),
             public_batch: bound("/native/public"),
             program: bound(PROGRAM),
-            verifier_plan: bound(&format!("{PLANS}/epoch-191-full.json")),
+            verifier_plan: bound(&format!("{PLANS}-191-full-20261023-v1/plan.json")),
             observer,
             routine_completion: bound("/native/cycle"),
             other_pending_os_growth_bytes: 0,
@@ -657,11 +661,11 @@ mod tests {
         let sample = "2026-10-23T22:56:00Z";
         let now = utc(sample).unwrap();
         let o = json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":sample,"cadence":{"routine_minimum_interval_enforced":true},"host_memory":{"conservative_available_kib":192u64*1024*1024}});
-        let mut c = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","sampled_at_utc":sample,"observer":p.observer,"capacity_decision":{"sampled_at_utc":sample,"memory_concurrency_target":{"valid":true,"host_resident_planning_bytes":500*GIB,"reservation_ceiling_bytes":180*GIB,"host_total_bytes":761*GIB}}});
+        let mut c = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","sampled_at_utc":sample,"observer":p.observer,"capacity_decision":{"sampled_at_utc":sample,"memory_concurrency_target":{"valid":true,"host_resident_planning_bytes":500*GIB,"reservation_ceiling_bytes":180*GIB,"host_total_bytes":764*GIB}}});
         resources(&p, &o, &c, now).unwrap();
-        c["capacity_decision"]["memory_concurrency_target"]["host_total_bytes"] = json!(760 * GIB);
+        c["capacity_decision"]["memory_concurrency_target"]["host_total_bytes"] = json!(763 * GIB);
         assert!(resources(&p, &o, &c, now).is_err());
-        c["capacity_decision"]["memory_concurrency_target"]["host_total_bytes"] = json!(761 * GIB);
+        c["capacity_decision"]["memory_concurrency_target"]["host_total_bytes"] = json!(764 * GIB);
         assert!(resources(&p, &o, &c, now + 901).is_err());
         c["observer"]["sha256"] = json!("b".repeat(64));
         assert!(resources(&p, &o, &c, now).is_err());
