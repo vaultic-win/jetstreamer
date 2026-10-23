@@ -2,6 +2,7 @@ mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
 mod epoch141_original_entry;
+mod epoch207_singleton;
 mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
@@ -5528,7 +5529,7 @@ fn plan_runtime_spans_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<Vec<compatibility::RuntimeSpan>, String> {
-    if focused_qualification {
+    if focused_qualification || epoch207_singleton::selected(&range) {
         compatibility::plan_focused_qualification_runtime_spans(range, allow_candidate_runtime)
     } else {
         compatibility::plan_runtime_spans(range, allow_candidate_runtime)
@@ -5540,7 +5541,7 @@ fn plan_replay_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<Vec<compatibility::ReplaySegment>, String> {
-    if focused_qualification {
+    if focused_qualification || epoch207_singleton::selected(&range) {
         compatibility::plan_focused_qualification_replay(range, allow_candidate_runtime)
     } else {
         compatibility::plan_replay(range, allow_candidate_runtime)
@@ -5552,7 +5553,7 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    if focused_qualification {
+    if focused_qualification || epoch207_singleton::selected(&range) {
         compatibility::select_focused_qualification_runtime(range, allow_candidate_runtime)
     } else {
         compatibility::select_runtime(range, allow_candidate_runtime)
@@ -5565,7 +5566,7 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    if focused_qualification {
+    if focused_qualification || epoch207_singleton::selected(&output_range) {
         compatibility::select_focused_qualification_runtime_with_snapshot_warmup(
             replay_start,
             output_range,
@@ -5843,9 +5844,10 @@ fn root_checkpoint_cohort_runtime(
     let mut terminal_selection: Option<compatibility::RuntimeSelection> = None;
     for epoch in start_epoch..=end_epoch {
         let (start, end_inclusive) = epoch_to_slot_range(epoch);
-        let spans = compatibility::plan_runtime_spans(
+        let spans = plan_runtime_spans_for_invocation(
             start..end_inclusive.saturating_add(1),
             allow_candidate_runtime,
+            false,
         )?;
         for span in &spans {
             let selection = runtime_span_selection(span)?;
@@ -6751,9 +6753,14 @@ fn replay_start_for_bootstrap(
 }
 
 fn archive_generation_profile() -> String {
+    #[cfg(feature = "epoch207-singleton-qualification")]
+    let route = "epoch207-singleton-qualification-v1";
     #[cfg(feature = "epoch141-original-entry-qualification")]
     let route = "epoch141-original-entry-qualification-v1";
-    #[cfg(not(feature = "epoch141-original-entry-qualification"))]
+    #[cfg(not(any(
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch207-singleton-qualification"
+    )))]
     let route = "old-faithful-to-horizon-v2";
     format!(
         "jetstreamer-node/{}/{route}@{}",
@@ -14312,9 +14319,10 @@ fn validated_cohort_epoch_archive(
     chain_evidence: Option<&mut ArchiveChainEvidence>,
 ) -> Result<Option<jetstreamer_node::archive_checksum::ValidatedArchiveFile>, String> {
     let (slot_start, slot_end_inclusive) = epoch_to_slot_range(epoch);
-    let spans = compatibility::plan_runtime_spans(
+    let spans = plan_runtime_spans_for_invocation(
         slot_start..slot_end_inclusive.saturating_add(1),
         allow_candidate_runtime,
+        false,
     )?;
     if spans.len() == 1 {
         let selection = runtime_span_selection(&spans[0])?;
@@ -19500,6 +19508,7 @@ async fn main() {
     let mut range_info: Option<(u64, u64)> = None;
     let mut replay_scratch: Option<PathBuf> = None;
     let mut root_checkpoint_cohort = false;
+    let mut epoch207_singleton_preflight = false;
     let mut recover_staged_only = false;
     let mut recover_staged_cohort_only = false;
     let mut recover_unreceipted_root_cohort_only = false;
@@ -19583,6 +19592,14 @@ async fn main() {
             }
         } else if let Some(path) = arg.strip_prefix("--replay-scratch=") {
             replay_scratch = Some(PathBuf::from(path));
+        } else if arg == "--epoch207-singleton-preflight" {
+            if !cfg!(feature = "epoch207-singleton-qualification") || epoch207_singleton_preflight {
+                eprintln!(
+                    "epoch207 singleton preflight requires the exclusive qualification build and may appear only once"
+                );
+                exit(2);
+            }
+            epoch207_singleton_preflight = true;
         } else if arg == "--root-checkpoint-cohort" {
             if root_checkpoint_cohort {
                 eprintln!("duplicate --root-checkpoint-cohort option");
@@ -19892,6 +19909,32 @@ async fn main() {
         );
         exit(2);
     }
+    if cfg!(feature = "epoch207-singleton-qualification")
+        && let Err(error) = epoch207_singleton::validate_launch(
+            start_epoch,
+            end_epoch,
+            explicit_verify,
+            verify_option_count,
+            root_checkpoint_cohort,
+            env_truthy("JETSTREAMER_ALLOW_CANDIDATE_RUNTIME"),
+            recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease
+                || qualification_end_slot.is_some()
+                || horizon_output.is_some()
+                || epoch_hashes.is_some()
+                || range_info.is_some()
+                || replay_scratch.is_some()
+                || env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+            &dest_dir,
+            snapshot_archive_override.as_deref(),
+        )
+        .and_then(|_| epoch207_singleton::validate_filesystem(&dest_dir))
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     let cohort_bootstrap_override = root_checkpoint_cohort
         .then(|| snapshot_archive_override.take())
         .flatten();
@@ -20195,6 +20238,31 @@ async fn main() {
     {
         eprintln!("error: {error}");
         exit(1);
+    }
+    if cfg!(feature = "epoch207-singleton-qualification") {
+        let plan = cohort_plan.as_ref().expect("207 requires its exact cohort");
+        if let Err(error) = epoch207_singleton::validate_plan(plan) {
+            eprintln!("error: {error}");
+            exit(2);
+        }
+        if epoch207_singleton_preflight {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "schema":"jetstreamer-private-epoch207-singleton-preflight-v1",
+                    "epoch":207,"bootstrap_slot":epoch207_singleton::BOOTSTRAP,
+                    "output_slot_start":epoch207_singleton::START,
+                    "output_slot_end_exclusive":epoch207_singleton::END,
+                    "canonical_root_slots":epoch207_singleton::ROOTS.map(|(slot,_)| slot),
+                    "manifest_fingerprint":plan.fingerprint,
+                    "runtime":"solana-v1.6.16","candidate_only":true,
+                    "full_epoch_replay_qualified":false,"snapshot_restored":false,
+                    "worker_started":false,"replay_entries":0,
+                    "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
+                })
+            );
+            return;
+        }
     }
     if recover_staged_cohort_only {
         let receipt_directory = batch_receipt_directory
@@ -21885,6 +21953,74 @@ mod early_snapshot_tests {
                 Some(&BankHashExpectation::LegacyAccountsHash(expected_hash))
             );
         }
+    }
+
+    #[cfg(feature = "epoch207-singleton-qualification")]
+    #[test]
+    fn epoch207_singleton_cohort_keeps_registry_closed_and_binds_both_roots() {
+        assert!(compatibility::plan_runtime_spans(89_424_000..89_856_000, true).is_err());
+        let selection = root_checkpoint_cohort_runtime(207, 207, true).unwrap();
+        assert_eq!(
+            selection.backend,
+            compatibility::RuntimeBackend::SolanaV1_6_16
+        );
+        assert!(root_checkpoint_cohort_runtime(207, 207, false).is_err());
+        assert!(root_checkpoint_cohort_runtime(207, 208, true).is_err());
+        let snapshot = |slot: u64, hash: &str| {
+            let uri = format!("{DEFAULT_BUCKET}/{slot}/snapshot-{slot}-{hash}.tar.zst");
+            serde_json::json!({"slot":slot,"anchor_slot":slot,"accounts_hash":hash,
+                "generation":1,"size":1,"source":"root","extension":".tar.zst",
+                "crc32c":"AAAAAA==","md5_hash":null,"uri":uri,
+                "versioned_uri":format!("{uri}#1")})
+        };
+        let mut manifest = serde_json::json!({"schema":COHORT_MANIFEST_SCHEMA,"bucket":DEFAULT_BUCKET,
+        "epoch_slots":432000,"first_epoch":207,"last_epoch":207,"verification_cohorts":[{
+            "first_epoch":207,"last_epoch":207,"runtime":"solana-v1.6.16",
+            "accepted_extensions":[".tar.bz2",".tar.zst"],"publication_gate":COHORT_PUBLICATION_GATE,
+            "bootstrap":snapshot(89_423_444,"3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px"),
+            "root_checkpoints":epoch207_singleton::ROOTS.map(|(slot,hash)|snapshot(slot,hash))
+        }]});
+        let parse = |manifest: &serde_json::Value| {
+            let fingerprint = cohort_manifest_fingerprint(manifest).unwrap();
+            root_checkpoint_cohort_plan_from_report(
+                serde_json::json!({"manifest":manifest,
+                "manifest_fingerprint":fingerprint}),
+                &fingerprint,
+                207,
+                207,
+                selection,
+            )
+        };
+        let plan = parse(&manifest).unwrap();
+        epoch207_singleton::validate_plan(&plan).unwrap();
+        let mut bad = plan.clone();
+        bad.root_checkpoints.remove(0);
+        assert!(epoch207_singleton::validate_plan(&bad).is_err());
+        let mut bad = plan.clone();
+        bad.root_checkpoints[1].accounts_hash = Hash::new_unique().to_string();
+        assert!(epoch207_singleton::validate_plan(&bad).is_err());
+        manifest["verification_cohorts"][0]["root_checkpoints"]
+            .as_array_mut()
+            .unwrap()
+            .push(snapshot(
+                90_287_519,
+                "6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp",
+            ));
+        assert!(
+            parse(&manifest).is_err(),
+            "208root must remain outside this singleton"
+        );
+        assert!(validate_root_cohort_epoch_membership(&[207], &[207]).is_ok());
+        assert!(
+            after_root_cohort_publication_gate(
+                1,
+                1,
+                false,
+                Err("terminal incomplete".into()),
+                || Ok(())
+            )
+            .is_err()
+        );
     }
 
     fn historical_checkpoint(

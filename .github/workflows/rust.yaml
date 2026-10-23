@@ -70,6 +70,10 @@ jobs:
             scope: "-p jetstreamer-node"
             flags: "--features epoch213-checkpoint-continuation-diagnostic"
             examples: false
+          - name: node-epoch207-singleton-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch207-singleton-qualification"
+            examples: false
           - name: node-epoch223-qualification
             scope: "-p jetstreamer-node"
             flags: "--features epoch223-v1-6-25-qualification"
