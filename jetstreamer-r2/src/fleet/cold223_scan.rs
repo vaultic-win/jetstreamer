@@ -7,28 +7,73 @@ const PLAN_SHA: &str = "73dbfebae627bc2fe8b57c70ec32904d6ff1912fa7909ea9864967d0
 const SELF_SHA: &str = "01050839a5804e6004d42a4d9fa218e507c3818ed3ffaf1841f43fbb6ba90ca1";
 const STATE: &str =
     "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-cold-actual-v1";
-pub(super) fn scope(phase: &str, unit: &str) -> bool {
-    phase == "private-cold-snapshot-verification" && unit == UNIT
+struct Profile {
+    unit: &'static str,
+    binary: &'static str,
+    plan: &'static str,
+    plan_sha: &'static str,
+    self_sha: &'static str,
+    state: &'static str,
+    test_sha: &'static str,
+    intent_schema: &'static str,
+    plan_schema: &'static str,
 }
+const OLD: Profile = Profile {
+    unit: UNIT,
+    binary: BINARY,
+    plan: PLAN,
+    plan_sha: PLAN_SHA,
+    self_sha: SELF_SHA,
+    state: STATE,
+    test_sha: "d685cbbe8ad720e1bff567ebbcfbd92d92e47f16d798e74783c06e0114c0b92f",
+    intent_schema: "jetstreamer-private-epoch223-cold-v1625-ram-snapshot-intent-v1",
+    plan_schema: "jetstreamer-private-epoch223-cold-ram-snapshot-test-plan-v1",
+};
+const WARMUP: Profile = Profile {
+    unit: "archive-223-warmup-snapshot-actual-v1.service",
+    binary: "/var/lib/jetstreamer/horizon-223-warmup-native-supervisor-f9d60b79-v1/jetstreamer-horizon-ram-snapshot-test",
+    plan: "/var/lib/jetstreamer/horizon-223-warmup-native-actual-plan312-v1/plan.json",
+    plan_sha: "314b247ae34e31124c53619350ae08bb0d18064c65911d55417ea77fb91e4e8a",
+    self_sha: "ee11783c692f16761f656161ec3ae47323e21f517d75634fc2929b260d8c0523",
+    state: "/var/lib/jetstreamer/horizon-ram-snapshot-tests/ram-snapshot-test-223-warmup-actual-v1",
+    test_sha: "647665f8abc11570f40d0fac45c4e17dbe7c1c86a0a91da5700fe03fc3f4ab67",
+    intent_schema: "jetstreamer-private-epoch223-warmup-v1625-ram-snapshot-intent-v1",
+    plan_schema: "jetstreamer-private-epoch223-warmup-native-input-plan-v1",
+};
+fn profile(unit: &str) -> Result<&'static Profile> {
+    match unit {
+        UNIT => Ok(&OLD),
+        n if n == WARMUP.unit => Ok(&WARMUP),
+        _ => anyhow::bail!("unknown223nativeinput owner"),
+    }
+}
+pub(super) fn scope(phase: &str, unit: &str) -> bool {
+    phase == "private-cold-snapshot-verification" && profile(unit).is_ok()
+}
+#[cfg(test)]
 fn command() -> String {
+    profile_command(&OLD)
+}
+fn profile_command(p: &Profile) -> String {
     format!(
-        "{{ path={BINARY} ; argv[]={BINARY} {PLAN} --plan-sha256 {PLAN_SHA} --self-sha256 {SELF_SHA}"
+        "{{ path={} ; argv[]={} {} --plan-sha256 {} --self-sha256 {}",
+        p.binary, p.binary, p.plan, p.plan_sha, p.self_sha
     )
 }
 fn checked(c: &PipelineClaim, intent: &Value) -> Result<()> {
+    let p = profile(&c.unit)?;
     ensure!(
         c.epoch == 223
             && scope(&c.phase, &c.unit)
             && c.expected_exec_start
                 .split_once(" ; ignore_errors=")
                 .map(|(s, _)| s)
-                == Some(command().as_str())
-            && intent["schema"] == "jetstreamer-private-epoch223-cold-v1625-ram-snapshot-intent-v1"
+                == Some(profile_command(p).as_str())
+            && intent["schema"] == p.intent_schema
             && intent["invocation_id"] == c.invocation_id
-            && intent["plan_sha256"] == PLAN_SHA
-            && intent["self_sha256"] == SELF_SHA
-            && intent["test_sha256"]
-                == "d685cbbe8ad720e1bff567ebbcfbd92d92e47f16d798e74783c06e0114c0b92f"
+            && intent["plan_sha256"] == p.plan_sha
+            && intent["self_sha256"] == p.self_sha
+            && intent["test_sha256"] == p.test_sha
             && intent["snapshot_sha256"]
                 == "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"
             && intent["genesis_sha256"]
@@ -44,25 +89,27 @@ fn checked(c: &PipelineClaim, intent: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
+    let p = profile(&c.unit)?;
     ensure!(
-        c.evidence.len() == 1 && c.evidence[0].path == Path::new(STATE).join("intent.json"),
+        c.evidence.len() == 1 && c.evidence[0].path == Path::new(p.state).join("intent.json"),
         "private223 cold snapshot needs its exact durable supervisor intent"
     );
     checked(c, &bound_json(&c.evidence[0])?)?;
     let plan = bound_json(&BoundFile {
-        path: PLAN.into(),
-        sha256: PLAN_SHA.into(),
+        path: p.plan.into(),
+        sha256: p.plan_sha.into(),
     })?;
     ensure!(
         plan["mode"] == "snapshot-tests"
-            && plan["unit"] == UNIT
-            && plan["schema"] == "jetstreamer-private-epoch223-cold-ram-snapshot-test-plan-v1",
+            && plan["unit"] == p.unit
+            && plan["schema"] == p.plan_schema,
         "private223 cold snapshot plan differs"
     );
     Ok(())
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
+    let p = profile(&c.unit)?;
     ensure!(
         current["Type"] == "oneshot",
         "private223 cold snapshot must be oneshot"
@@ -99,7 +146,7 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
             "AmbientCapabilities",
             "cap_dac_override cap_kill cap_setgid cap_setuid",
         ),
-        ("ReadWritePaths", STATE),
+        ("ReadWritePaths", p.state),
         ("TimeoutStartUSec", "35min"),
         (
             "TemporaryFileSystem",
@@ -118,6 +165,40 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn warmup_input_owner_retains_its_own_plan_worker_and_no_entry_authority() {
+        let c = PipelineClaim {
+            epoch: 223,
+            phase: "private-cold-snapshot-verification".into(),
+            unit: WARMUP.unit.into(),
+            invocation_id: "b".repeat(32),
+            expected_exec_start: format!("{} ; ignore_errors=no }}", profile_command(&WARMUP)),
+            evidence: vec![],
+        };
+        let intent = json!({"schema":WARMUP.intent_schema,"invocation_id":c.invocation_id,
+            "plan_sha256":WARMUP.plan_sha,"self_sha256":WARMUP.self_sha,"test_sha256":WARMUP.test_sha,
+            "snapshot_sha256":"301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665",
+            "genesis_sha256":"133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+            "maximum_memory_bytes":128u64<<30,"tmpfs_bytes":512u64<<30,"entry_replay":false,
+            "publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        checked(&c, &intent).unwrap();
+        assert_eq!(pipeline_unit_range(&c.phase, &c.unit).unwrap(), 223..=223);
+        for (key, value) in [
+            ("plan_sha256", json!(OLD.plan_sha)),
+            ("self_sha256", json!(OLD.self_sha)),
+            ("test_sha256", json!(OLD.test_sha)),
+            ("entry_replay", json!(true)),
+        ] {
+            let mut bad = intent.clone();
+            bad[key] = value;
+            assert!(checked(&c, &bad).is_err());
+        }
+        assert!(!scope(
+            &c.phase,
+            "archive-223-warmup-snapshot-capability-v1.service"
+        ));
+        assert!(pipeline_unit_range("upload-readback", &c.unit).is_err());
+    }
     #[test]
     fn exact_cold_snapshot_owner_cannot_borrow_tail_or_delivery_authority() {
         let c = PipelineClaim {
