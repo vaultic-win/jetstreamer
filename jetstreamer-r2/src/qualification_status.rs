@@ -761,12 +761,12 @@ mod tests {
         let row = json!({"useful_work":{"sufficient_for_rates":true,
             "last":{"slot":p.execution_terminal-100},"slots_per_second":2.0}});
         assert_eq!(
-            remaining(&row, p, 3600_000).unwrap(),
-            (100 + 15234) * 500 + 3600_000
+            remaining(&row, p, 3_600_000).unwrap(),
+            (100 + 15234) * 500 + 3_600_000
         );
         let mut bad = row;
         bad["useful_work"]["last"]["slot"] = json!(p.execution_terminal + 1);
-        assert!(remaining(&bad, p, 3600_000).is_err());
+        assert!(remaining(&bad, p, 3_600_000).is_err());
         let mut policy = json!({"schema":"jetstreamer-epoch141-sidecar-planning-v2","epoch":141,
             "live_execution_terminal_slot":61328765,"epoch_terminal_slot":61343999,"separate_suffix_slots":15234,
             "root_invocation_continues_through_suffix":false,"runtime_checkpoint_resume_qualified":false,
