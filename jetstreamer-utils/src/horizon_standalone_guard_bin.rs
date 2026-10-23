@@ -19,6 +19,8 @@ use {
 
 #[path = "horizon_standalone_guard_handoff.rs"]
 mod handoff;
+#[path = "horizon_standalone_guard_root.rs"]
+mod root_budget;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -30,6 +32,8 @@ struct Plan {
     minimum_free_bytes: u64,
     worker_root: PathBuf,
     maximum_worker_vmas: u64,
+    #[serde(default)]
+    maximum_root_physical_bytes: Option<u64>,
     receipt_directory: PathBuf,
     #[serde(default)]
     bounded_measurement: Option<handoff::BoundedMeasurement>,
@@ -573,15 +577,19 @@ fn supported_unit(plan: &Plan) -> bool {
         && plan.maximum_worker_vmas == 3_500_000
         && plan.bounded_measurement.is_none()
         && plan.bounded_canary.is_none()
+        && plan.maximum_root_physical_bytes.is_none()
 }
 
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
     let args: Vec<_> = env::args().collect();
     ensure!(
-        args.len() == 6 && args[2] == "--plan-sha256" && args[4] == "--self-sha256",
-        "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX"
+        (args.len() == 6 || (args.len() == 7 && args[6] == "--root-capability-only"))
+            && args[2] == "--plan-sha256"
+            && args[4] == "--self-sha256",
+        "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX [--root-capability-only]"
     );
+    let capability_only = args.len() == 7;
     ensure!(digest(&args[3]) && digest(&args[5]), "invalid digest");
     let executable = fs::read("/proc/self/exe")?;
     ensure!(
@@ -617,6 +625,17 @@ fn run() -> Result<()> {
             && plan.maximum_worker_vmas > 0,
         "invalid standalone guard plan"
     );
+    ensure!(
+        plan.maximum_root_physical_bytes.is_none_or(|n| n > 0),
+        "root physical budget must be nonzero"
+    );
+    ensure!(
+        !capability_only
+            || (plan.maximum_root_physical_bytes.is_some()
+                && plan.bounded_canary.is_none()
+                && plan.bounded_measurement.is_none()),
+        "root capability needs an explicit own-tree budget and no target-stop profile"
+    );
     for path in [&plan.filesystem, &plan.worker_root, &plan.receipt_directory] {
         ensure!(
             path.is_absolute() && path.canonicalize()? == *path && path.is_dir(),
@@ -648,6 +667,10 @@ fn run() -> Result<()> {
         Err(error) => return Err(error.into()),
     };
     let before = sample(&plan.unit)?;
+    ensure!(
+        !capability_only || (intent.is_none() && active(&before)),
+        "root capability cannot recover stop intents or inspect a terminal owner"
+    );
     // systemd may collect a successfully stopped transient unit before the next
     // timer fire. Absence is accepted only for a previously authenticated stop
     // intent, with the exact old cgroup now absent. Never apply this exception
@@ -720,6 +743,17 @@ fn run() -> Result<()> {
     // never evidence that the unit has no worker.
     let error = observed_workers.as_ref().err().map(ToString::to_string);
     let worker_list = observed_workers.unwrap_or_default();
+    let root_observation = if active(&before) {
+        plan.maximum_root_physical_bytes
+            .map(|limit| root_budget::observe(&plan.worker_root, limit))
+    } else {
+        None
+    };
+    let root_error = root_observation
+        .as_ref()
+        .and_then(|r| r.as_ref().err())
+        .map(ToString::to_string);
+    let root_observation = root_observation.and_then(Result::ok);
     let target_observation = if active(&before) && error.is_none() {
         plan.bounded_canary
             .as_ref()
@@ -768,6 +802,10 @@ fn run() -> Result<()> {
         Some("resume-stop-intent")
     } else if error.is_some() {
         Some("worker-observation-failed")
+    } else if root_error.is_some() {
+        Some("root-physical-observation-failed")
+    } else if root_observation.as_ref().is_some_and(|r| r.exceeds_budget) {
+        Some("root-physical-budget")
     } else if active(&before) {
         measurement_trip_reason(
             available,
@@ -795,11 +833,25 @@ fn run() -> Result<()> {
         "plan":args[1],"plan_sha256":args[3],"guard_sha256":args[5],"guard_invocation_id":invocation,
         "producer":after,"producer_invocation_id":plan.invocation_id,"available_bytes":available,
         "minimum_free_bytes":plan.minimum_free_bytes,"maximum_worker_vmas":plan.maximum_worker_vmas,
+        "producer_stop_enabled":!capability_only,"maximum_root_physical_bytes":plan.maximum_root_physical_bytes,
+        "root_physical_observation":root_observation,"root_physical_observation_error":root_error,
         "workers":worker_list,"worker_observation_error":error,"trip_reason":reason,
         "bounded_measurement":plan.bounded_measurement.is_some(),
         "bounded_canary":plan.bounded_canary,"canary_target_stop_valid":valid_target,"canary_target_error":target_error,
         "target_handoff":handoff_evidence,"target_handoff_error":handoff_error,
         "remote_mutations":false,"r2_mutations":false,"scratch_deleted":false});
+    if publish_root_capability(capability_only, &evidence, reason, |capability| {
+        persist(
+            &plan
+                .receipt_directory
+                .join(format!("root-capability-{invocation}.json")),
+            capability,
+        )?;
+        println!("{capability}");
+        Ok(())
+    })? {
+        return Ok(());
+    }
     persist(
         &plan
             .receipt_directory
@@ -867,6 +919,31 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+// A successful capability is handled here; a failed capability propagates an
+// error here. Neither outcome can fall through to the protective stop path.
+fn publish_root_capability<F>(
+    enabled: bool,
+    evidence: &Value,
+    reason: Option<&str>,
+    publish: F,
+) -> Result<bool>
+where
+    F: FnOnce(&Value) -> Result<()>,
+{
+    if !enabled {
+        return Ok(false);
+    }
+    let capability = json!({"schema":"jetstreamer-horizon-root-budget-capability-v1",
+        "sample":evidence,"passed":reason.is_none(),"producer_signaled":false,
+        "stop_authorized":false,"protective_guard_proven":false,"remote_mutations":false,"r2_mutations":false});
+    publish(&capability)?;
+    ensure!(
+        reason.is_none(),
+        "root budget capability failed; producer was not signaled"
+    );
+    Ok(true)
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error:#}");
@@ -878,6 +955,37 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
+    fn root_capability_never_falls_through_to_the_producer_stop_path() {
+        use std::cell::Cell;
+        let published = Cell::new(false);
+        assert!(
+            !publish_root_capability(false, &json!({}), Some("reserve"), |_| {
+                published.set(true);
+                Ok(())
+            })
+            .unwrap()
+        );
+        assert!(!published.get());
+        assert!(
+            publish_root_capability(true, &json!({"producer_stop_enabled":false}), None, |r| {
+                assert_eq!(r["passed"], true);
+                assert_eq!(r["stop_authorized"], false);
+                published.set(true);
+                Ok(())
+            })
+            .unwrap()
+        );
+        assert!(published.get());
+        assert!(
+            publish_root_capability(true, &json!({}), Some("root-physical-budget"), |r| {
+                assert_eq!(r["passed"], false);
+                assert_eq!(r["protective_guard_proven"], false);
+                Ok(())
+            })
+            .is_err()
+        );
+    }
+    #[test]
     fn native203_guard_namespace_is_exact_and_keeps_all_resource_gates() {
         let mut p = Plan {
             schema: "jetstreamer-horizon-standalone-guard-plan-v1".into(),
@@ -887,6 +995,7 @@ mod tests {
             minimum_free_bytes: 2_687_830_606_739,
             worker_root: "/home/ubuntu/.jetstreamer-private/epoch203-native-0158-v1".into(),
             maximum_worker_vmas: 3_500_000,
+            maximum_root_physical_bytes: None,
             receipt_directory: "/sealed/receipts".into(),
             bounded_measurement: None,
             bounded_canary: None,
