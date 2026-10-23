@@ -95,6 +95,9 @@ Check the actual worker's export capability before launching a costly test. Some
 workers implement `FreezeCheckpoint` but reject `ExportSnapshot`; implement and test the missing
 native export in an isolated candidate rather than stopping a healthy producer to discover this.
 Keep the original runtime and inputs available until fresh-process continuation is proven.
+Inspect native serializer helpers for bank mutation and automatic archive retention/purge behavior.
+Use an isolated empty staging directory, preserve pre-export consensus hashes/cursors, and verify
+them afterward; never point a helper that purges older snapshots at campaign or holding artifacts.
 
 For continuation equivalence, compare the checkpoint's bank/accounts hashes, slot and entry
 cursor, transaction count and write-version cursor, then compare resumed output with an
