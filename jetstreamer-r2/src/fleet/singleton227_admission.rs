@@ -67,16 +67,38 @@ fn native223_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
     Ok(claim)
 }
 fn native207_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
-    let owner=active_owner(row)?;
-    ensure!(row["epoch"]==207 && owner["Id"]==native207::UNIT
-        && row["phase"]=="private-cold-snapshot-verification" && row["ordinary_replay_claim"]==false,
-        "227 unknown native207 auxiliary");
-    let plan:Plan=serde_json::from_value(bound_json(&BoundFile{path:f["plan"].as_str().context("227207 fleet plan")?.into(),sha256:f["plan_sha256"].as_str().context("227207 fleet plan SHA")?.into()})?)?;
-    let claims=plan.pipeline_claims.iter().filter(|c|c.unit==native207::UNIT).collect::<Vec<_>>();
-    ensure!(claims.len()==1,"227207 needs exactly one registered origin");
-    let claim:PipelineClaim=serde_json::from_value(serde_json::to_value(claims[0])?)?;
-    ensure!(claim.invocation_id==owner["InvocationID"] && claim.evidence==serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,"227207 accepted owner differs");
-    native207::live(&claim,owner)?;Ok(claim)
+    let owner = active_owner(row)?;
+    ensure!(
+        row["epoch"] == 207
+            && owner["Id"] == native207::UNIT
+            && row["phase"] == "private-cold-snapshot-verification"
+            && row["ordinary_replay_claim"] == false,
+        "227 unknown native207 auxiliary"
+    );
+    let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: f["plan"].as_str().context("227207 fleet plan")?.into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("227207 fleet plan SHA")?
+            .into(),
+    })?)?;
+    let claims = plan
+        .pipeline_claims
+        .iter()
+        .filter(|c| c.unit == native207::UNIT)
+        .collect::<Vec<_>>();
+    ensure!(
+        claims.len() == 1,
+        "227207 needs exactly one registered origin"
+    );
+    let claim: PipelineClaim = serde_json::from_value(serde_json::to_value(claims[0])?)?;
+    ensure!(
+        claim.invocation_id == owner["InvocationID"]
+            && claim.evidence == serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,
+        "227207 accepted owner differs"
+    );
+    native207::live(&claim, owner)?;
+    Ok(claim)
 }
 fn remaining_hard_memory(cap: u64, charge: u64) -> Result<u64> {
     ensure!(
@@ -85,27 +107,69 @@ fn remaining_hard_memory(cap: u64, charge: u64) -> Result<u64> {
     );
     Ok(cap - charge)
 }
-fn native207_guard(g:&Value,p:&Value,plan:&BoundFile,claim:&PipelineClaim,origin:&Value,sample:u64,now:u64)->Result<()> {
-    let clock=g["recorded_unix_seconds"].as_u64().context("227207 guard clock")?;
-    ensure!(clock>=sample && clock<=now && now-clock<=1800
-        && g["schema"]=="jetstreamer-horizon-standalone-guard-sample-v1"
-        && g["guard_sha256"]==native207::GUARD_SHA && g["plan_sha256"]==plan.sha256
-        && p["unit"]==native207::UNIT && p["invocation_id"]==claim.invocation_id && p["worker_root"]==native207::ROOT
-        && p["maximum_root_physical_bytes"]==native207::SCRATCH && p["maximum_worker_vmas"]==3500000
-        && g["producer_invocation_id"]==claim.invocation_id && g["producer"]["invocation_id"]==claim.invocation_id
-        && g["producer"]["pid"]==origin["main_pid"] && g["producer"]["cgroup"]==format!("/system.slice/{}",claim.unit)
-        && g["producer"]["active"]=="active" && g["producer"]["sub"]=="running" && g["producer"]["restarts"]==0
-        && g["native_main"]==p["native_main"] && g["native_main"]["sha256"]==native207::TEST_SHA
-        && g["native_main"]["main_pid"]==origin["main_pid"] && g["producer_stop_enabled"]==true
-        && g["maximum_root_physical_bytes"]==native207::SCRATCH
-        && g["root_physical_observation"]["maximum_physical_bytes"]==native207::SCRATCH
-        && g["root_physical_observation"]["exceeds_budget"]==false
-        && g["root_physical_observation"]["conservative_physical_bytes"].as_u64().is_some_and(|n|n<=native207::SCRATCH)
-        && g["maximum_worker_vmas"]==3500000 && g["workers"].as_array().is_some_and(|v|v.len()==1)
-        && g["workers"][0][0]==origin["main_pid"] && g["workers"][0][1].as_u64().is_some_and(|n|n>0 && n<3500000)
-        && ["trip_reason","worker_observation_error","root_physical_observation_error","canary_target_error"].iter().all(|k|g.get(*k).is_some_and(Value::is_null))
-        && g["available_bytes"].as_u64().zip(g["minimum_free_bytes"].as_u64()).is_some_and(|(a,b)|a>=b)
-        && g["remote_mutations"]==false && g["r2_mutations"]==false,"227207 protective guard stale, substituted or tripped");
+fn native207_guard(
+    g: &Value,
+    p: &Value,
+    plan: &BoundFile,
+    claim: &PipelineClaim,
+    origin: &Value,
+    sample: u64,
+    now: u64,
+) -> Result<()> {
+    let clock = g["recorded_unix_seconds"]
+        .as_u64()
+        .context("227207 guard clock")?;
+    ensure!(
+        clock >= sample
+            && clock <= now
+            && now - clock <= 1800
+            && g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && g["guard_sha256"] == native207::GUARD_SHA
+            && g["plan_sha256"] == plan.sha256
+            && p["unit"] == native207::UNIT
+            && p["invocation_id"] == claim.invocation_id
+            && p["worker_root"] == native207::ROOT
+            && p["maximum_root_physical_bytes"] == native207::SCRATCH
+            && p["maximum_worker_vmas"] == 3500000
+            && g["producer_invocation_id"] == claim.invocation_id
+            && g["producer"]["invocation_id"] == claim.invocation_id
+            && g["producer"]["pid"] == origin["main_pid"]
+            && g["producer"]["cgroup"] == format!("/system.slice/{}", claim.unit)
+            && g["producer"]["active"] == "active"
+            && g["producer"]["sub"] == "running"
+            && g["producer"]["restarts"] == 0
+            && g["native_main"] == p["native_main"]
+            && g["native_main"]["sha256"] == native207::TEST_SHA
+            && g["native_main"]["main_pid"] == origin["main_pid"]
+            && g["producer_stop_enabled"] == true
+            && g["maximum_root_physical_bytes"] == native207::SCRATCH
+            && g["root_physical_observation"]["maximum_physical_bytes"] == native207::SCRATCH
+            && g["root_physical_observation"]["exceeds_budget"] == false
+            && g["root_physical_observation"]["conservative_physical_bytes"]
+                .as_u64()
+                .is_some_and(|n| n <= native207::SCRATCH)
+            && g["maximum_worker_vmas"] == 3500000
+            && g["workers"].as_array().is_some_and(|v| v.len() == 1)
+            && g["workers"][0][0] == origin["main_pid"]
+            && g["workers"][0][1]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n < 3500000)
+            && [
+                "trip_reason",
+                "worker_observation_error",
+                "root_physical_observation_error",
+                "canary_target_error"
+            ]
+            .iter()
+            .all(|k| g.get(*k).is_some_and(Value::is_null))
+            && g["available_bytes"]
+                .as_u64()
+                .zip(g["minimum_free_bytes"].as_u64())
+                .is_some_and(|(a, b)| a >= b)
+            && g["remote_mutations"] == false
+            && g["r2_mutations"] == false,
+        "227207 protective guard stale, substituted or tripped"
+    );
     Ok(())
 }
 pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
@@ -118,9 +182,17 @@ pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         if row["epoch"] != 223 && row["epoch"] != 207 {
             continue;
         }
-        let claim = if row["epoch"]==207 { native207_claim(f,row)? } else { native223_claim(f, row)? };
+        let claim = if row["epoch"] == 207 {
+            native207_claim(f, row)?
+        } else {
+            native223_claim(f, row)?
+        };
         let owner = active_owner(row)?;
-        if row["epoch"]==207 { native207::live(&claim,owner)?; } else { cold223_scan::validate_live(&claim, owner)?; }
+        if row["epoch"] == 207 {
+            native207::live(&claim, owner)?;
+        } else {
+            cold223_scan::validate_live(&claim, owner)?;
+        }
         let group = owner["ControlGroup"]
             .as_str()
             .context("227 auxiliary cgroup")?;
@@ -245,24 +317,30 @@ pub(super) fn protected_growth(
             "227 duplicate/restarted owner"
         );
         let epoch = row["epoch"].as_u64().context("227 owner epoch")?;
-        if epoch==207 {
-            let claim=native207_claim(f,row)?;
-            let binding=guards.get(unit).context("227 native207 needs current protective guard")?;
-            let g=bound_json(binding)?;let origin=bound_json(&claim.evidence[0])?;
-            let plan:BoundFile=serde_json::from_value(origin["guard_plan"].clone())?;
-            let p=bound_json(&plan)?;
-            native207_guard(&g,&p,&plan,&claim,&origin,sample,now)?;
+        if epoch == 207 {
+            let claim = native207_claim(f, row)?;
+            let binding = guards
+                .get(unit)
+                .context("227 native207 needs current protective guard")?;
+            let g = bound_json(binding)?;
+            let origin = bound_json(&claim.evidence[0])?;
+            let plan: BoundFile = serde_json::from_value(origin["guard_plan"].clone())?;
+            let p = bound_json(&plan)?;
+            native207_guard(&g, &p, &plan, &claim, &origin, sample, now)?;
             // A post-observation native launch has no sampled scratch credit.
             // Keep its complete guard-enforced disk envelope reserved; never
             // invent missing telemetry or use an old allocation after reclaim.
-            let remaining=native207::SCRATCH;
-            growth=growth.checked_add(remaining).context("227207 disk growth overflow")?;
+            let remaining = native207::SCRATCH;
+            growth = growth
+                .checked_add(remaining)
+                .context("227207 disk growth overflow")?;
             measurements.push(json!({"epoch":207,"unit":unit,"invocation_id":claim.invocation_id,
                 "origin":private157::binding(&claim.evidence[0]),"guard":private157::binding(binding),
                 "guard_observed_physical_bytes":g["root_physical_observation"]["conservative_physical_bytes"],
                 "current_output_allocated_bytes":0,"scratch_growth_credit_bytes":0,"remaining_growth_bytes":remaining,
                 "accounting":"full guard-enforced cap; zero credit for missing or potentially reclaimed scratch allocation"}));
-            replay_guards.insert(unit.to_owned());continue;
+            replay_guards.insert(unit.to_owned());
+            continue;
         }
         if epoch == 223 {
             let claim = native223_claim(f, row)?;
@@ -665,21 +743,44 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
         .iter()
         .filter(|r| r["epoch"] != 223 && r["epoch"] != 207)
         .collect::<Vec<_>>();
-    let mut rows=Vec::new();
+    let mut rows = Vec::new();
     for row in all_rows {
-        if row["status"]=="observed" {
-            if row["observation"]["producer_after"]["unit"]==native207::UNIT {
-                let owners=active.iter().filter(|r|r["epoch"]==207).collect::<Vec<_>>();
-                ensure!(owners.len()==1 && row["observation"]["invocation_binding_stable"]==true
-                    && row["observation"]["producer_after"]["invocation_id"]==active_owner(owners[0])?["InvocationID"],"227207 sampled identity differs");
-            } else { rows.push(row); }
+        if row["status"] == "observed" {
+            if row["observation"]["producer_after"]["unit"] == native207::UNIT {
+                let owners = active
+                    .iter()
+                    .filter(|r| r["epoch"] == 207)
+                    .collect::<Vec<_>>();
+                ensure!(
+                    owners.len() == 1
+                        && row["observation"]["invocation_binding_stable"] == true
+                        && row["observation"]["producer_after"]["invocation_id"]
+                            == active_owner(owners[0])?["InvocationID"],
+                    "227207 sampled identity differs"
+                );
+            } else {
+                rows.push(row);
+            }
         } else {
-            let unit=row["producer_unit"].as_str().context("227 unavailable diagnostic unit")?;
-            let prior=&f["unit_census"][unit];
-            ensure!(unit==NATIVE_UNIT && row["status"]=="unavailable" && row["observation"].is_null()
-                && prior["MainPID"]=="0" && prior["NRestarts"]=="0"
-                && matches!((prior["ActiveState"].as_str(),prior["SubState"].as_str()),(Some("inactive"),Some("dead"))|(Some("failed"),Some("failed")))
-                && !active.iter().any(|r|active_owner(r).map_or(true,|v|v["Id"]==unit)),"227 unavailable diagnostic remains active or unregistered");
+            let unit = row["producer_unit"]
+                .as_str()
+                .context("227 unavailable diagnostic unit")?;
+            let prior = &f["unit_census"][unit];
+            ensure!(
+                unit == NATIVE_UNIT
+                    && row["status"] == "unavailable"
+                    && row["observation"].is_null()
+                    && prior["MainPID"] == "0"
+                    && prior["NRestarts"] == "0"
+                    && matches!(
+                        (prior["ActiveState"].as_str(), prior["SubState"].as_str()),
+                        (Some("inactive"), Some("dead")) | (Some("failed"), Some("failed"))
+                    )
+                    && !active
+                        .iter()
+                        .any(|r| active_owner(r).map_or(true, |v| v["Id"] == unit)),
+                "227 unavailable diagnostic remains active or unregistered"
+            );
         }
     }
     ensure!(
@@ -1023,13 +1124,17 @@ mod tests {
             "replays":[],"diagnostic_replays":[{"status":"observed","error":null,"observation":{"invocation_binding_stable":true,"producer_before":{"invocation_id":"x"},"producer_after":{"invocation_id":"x","restarts":0},"worker_after":{"matching_workers":1,"vmas":100}}}]});
         let f = json!({"schema":SCHEMA,"first_epoch":201,"last_epoch":300,"observer_receipt":"/observer.json","observer_sha256":"a".repeat(64),"sampled_at_utc":stamp,"inventory":{"anomalies":0},"active":[{"epoch":204,"producer":{"InvocationID":"x"}}]});
         assert!(sample(&s, &o, &f, now, 1000).is_ok());
-        let mut terminal_o=o.clone();
-        terminal_o["diagnostic_replays"].as_array_mut().unwrap().push(json!({"status":"unavailable","producer_unit":NATIVE_UNIT,"observation":null}));
-        let mut terminal_f=f.clone();
-        terminal_f["unit_census"][NATIVE_UNIT]=json!({"MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead"});
-        assert!(sample(&s,&terminal_o,&terminal_f,now,1000).is_ok());
-        terminal_f["unit_census"][NATIVE_UNIT]["MainPID"]=json!("42");
-        assert!(sample(&s,&terminal_o,&terminal_f,now,1000).is_err());
+        let mut terminal_o = o.clone();
+        terminal_o["diagnostic_replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"status":"unavailable","producer_unit":NATIVE_UNIT,"observation":null}));
+        let mut terminal_f = f.clone();
+        terminal_f["unit_census"][NATIVE_UNIT] =
+            json!({"MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead"});
+        assert!(sample(&s, &terminal_o, &terminal_f, now, 1000).is_ok());
+        terminal_f["unit_census"][NATIVE_UNIT]["MainPID"] = json!("42");
+        assert!(sample(&s, &terminal_o, &terminal_f, now, 1000).is_err());
         assert!(sample(&s, &o, &f, now + 1801, 1000).is_err());
         for pointer in [
             "/lane_rss_history/200/maximum_observed_lane_rss_bytes",
@@ -1048,15 +1153,32 @@ mod tests {
     #[test]
     fn native207_growth_guard_never_borrows_another_iid_or_disables_safety() {
         let claim:PipelineClaim=serde_json::from_value(json!({"epoch":207,"phase":"private-cold-snapshot-verification","unit":native207::UNIT,"invocation_id":"a".repeat(32),"expected_exec_start":"x","evidence":[]})).unwrap();
-        let plan=BoundFile{path:"/guard-plan.json".into(),sha256:"b".repeat(64)};
-        let origin=json!({"main_pid":42});
-        let p=json!({"unit":native207::UNIT,"invocation_id":claim.invocation_id,"worker_root":native207::ROOT,"maximum_root_physical_bytes":native207::SCRATCH,"maximum_worker_vmas":3500000,"native_main":{"sha256":native207::TEST_SHA,"main_pid":42}});
-        let g=json!({"recorded_unix_seconds":1000,"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_sha256":native207::GUARD_SHA,"plan_sha256":plan.sha256,
+        let plan = BoundFile {
+            path: "/guard-plan.json".into(),
+            sha256: "b".repeat(64),
+        };
+        let origin = json!({"main_pid":42});
+        let p = json!({"unit":native207::UNIT,"invocation_id":claim.invocation_id,"worker_root":native207::ROOT,"maximum_root_physical_bytes":native207::SCRATCH,"maximum_worker_vmas":3500000,"native_main":{"sha256":native207::TEST_SHA,"main_pid":42}});
+        let g = json!({"recorded_unix_seconds":1000,"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_sha256":native207::GUARD_SHA,"plan_sha256":plan.sha256,
             "producer_invocation_id":claim.invocation_id,"producer":{"invocation_id":claim.invocation_id,"pid":42,"cgroup":format!("/system.slice/{}",claim.unit),"active":"active","sub":"running","restarts":0},
             "native_main":p["native_main"],"producer_stop_enabled":true,"maximum_root_physical_bytes":native207::SCRATCH,
             "root_physical_observation":{"maximum_physical_bytes":native207::SCRATCH,"exceeds_budget":false,"conservative_physical_bytes":1000},"maximum_worker_vmas":3500000,"workers":[[42,100]],
             "trip_reason":null,"worker_observation_error":null,"root_physical_observation_error":null,"canary_target_error":null,"available_bytes":2000,"minimum_free_bytes":1000,"remote_mutations":false,"r2_mutations":false});
-        native207_guard(&g,&p,&plan,&claim,&origin,999,1001).unwrap();
-        for(pointer,value)in[("/producer_invocation_id",json!("c".repeat(32))),("/producer_stop_enabled",json!(false)),("/guard_sha256",json!("d".repeat(64))),("/root_physical_observation/exceeds_budget",json!(true)),("/workers/0/1",json!(3500000)),("/trip_reason",json!("disk"))]{let mut bad=g.clone();*bad.pointer_mut(pointer).unwrap()=value;assert!(native207_guard(&bad,&p,&plan,&claim,&origin,999,1001).is_err(),"{pointer}");}
+        native207_guard(&g, &p, &plan, &claim, &origin, 999, 1001).unwrap();
+        for (pointer, value) in [
+            ("/producer_invocation_id", json!("c".repeat(32))),
+            ("/producer_stop_enabled", json!(false)),
+            ("/guard_sha256", json!("d".repeat(64))),
+            ("/root_physical_observation/exceeds_budget", json!(true)),
+            ("/workers/0/1", json!(3500000)),
+            ("/trip_reason", json!("disk")),
+        ] {
+            let mut bad = g.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                native207_guard(&bad, &p, &plan, &claim, &origin, 999, 1001).is_err(),
+                "{pointer}"
+            );
+        }
     }
 }
