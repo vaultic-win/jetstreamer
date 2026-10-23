@@ -22,6 +22,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 Some(
                     "/usr/local/lib/jetstreamer/horizon-epoch141-status-tools-20261023-v1/jetstreamer-r2"
                         | "/usr/local/lib/jetstreamer/horizon-epoch141-lifecycle-tools-20261023-v2/jetstreamer-r2"
+                        | "/usr/local/lib/jetstreamer/horizon-epoch141-deadline-tools-20261023-v2/jetstreamer-r2"
                 )
             )
             && !p.expected_epochs.contains(&141),
