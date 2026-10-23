@@ -53,6 +53,8 @@ mod repair183_fleet_recovery;
 #[path = "routine_repair185_fleet_recovery.rs"]
 mod repair185_fleet_recovery;
 
+#[path = "routine_capacity.rs"]
+mod capacity;
 #[path = "routine_original141.rs"]
 mod original141;
 #[path = "routine_private144.rs"]
@@ -287,6 +289,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.controller_rebind.is_some() && original141::enabled(p) {
+        return "controller-rebind-original141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if p.controller_rebind.is_some() {
         return "controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -1829,11 +1834,12 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             ledger["inventory"]["anomalies"] == 0,
             "fleet reports remote anomalies; operator investigation required"
         );
+        let capacity = capacity::decision(p, &observed, &ledger)?;
         Ok(
             json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":plan_bound,"self_sha256":self_sha,
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
-            "inventory":ledger["inventory"],"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
+            "inventory":ledger["inventory"],"capacity_decision":capacity,"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
             "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();

@@ -3292,10 +3292,15 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 #[tokio::main]
 async fn main() -> Result<()> {
     match env::args().nth(1).as_deref() {
+        Some("prepare-original141-layout") => return fleet::prepare_original141(),
+        Some("capture-original141-launch") => return fleet::capture_original141(),
         Some("prepare-continuation203-layout") => return fleet::prepare_continuation203_layout(),
         Some("probe-continuation203-inputs") => return fleet::probe_continuation203_inputs(),
         Some("capture-continuation203-launch") => return fleet::capture_continuation203_launch(),
         _ => {}
+    }
+    if env::args().nth(1).as_deref() == Some("admit-original141") {
+        return fleet::admit_original141().await;
     }
     if env::args().nth(1).as_deref() == Some("admit-continuation203") {
         return fleet::admit_continuation203();

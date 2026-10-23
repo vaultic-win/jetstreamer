@@ -41,6 +41,16 @@ mod tail223_scan;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
 
+pub(super) async fn admit_original141() -> Result<()> {
+    original141::admit().await
+}
+pub(super) fn capture_original141() -> Result<()> {
+    original141::capture()
+}
+pub(super) fn prepare_original141() -> Result<()> {
+    original141::prepare()
+}
+
 pub(super) fn prepare_private_prefix157() -> Result<()> {
     private157::prepare()
 }

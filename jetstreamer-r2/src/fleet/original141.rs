@@ -1,5 +1,16 @@
 //! Closed private original-entry root qualification. Never a full epoch or ETA.
 use super::*;
+#[path = "original141_ops.rs"]
+mod ops;
+pub(super) async fn admit() -> Result<()> {
+    ops::admit().await
+}
+pub(super) fn capture() -> Result<()> {
+    ops::capture()
+}
+pub(super) fn prepare() -> Result<()> {
+    ops::prepare()
+}
 
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch141-original-entry-root-launch-v2";
 pub(super) const UNIT: &str = "horizon-qualify-141-original-entry-root-20261023-v1.service";
@@ -48,7 +59,8 @@ fn invocation(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 fn command(v: &Value) -> Option<&str> {
-    v.as_str()?.split_once(" ; ignore_errors=").map(|(s, _)| s)
+    let (command, tail) = v.as_str()?.split_once(" ; ignore_errors=")?;
+    tail.starts_with("no ").then_some(command)
 }
 fn expected_command() -> String {
     let node = format!("{PACKAGE}/jetstreamer-node");
@@ -123,7 +135,7 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
             && p["checkpoints"]["sha256"] == CHECKPOINTS_SHA
             && p["bootstrap_slot"] == 60911751
             && p["terminal_root_slot"] == 61328765
-            && p["expected_exec_start"] == r["expected_exec_start"]
+            && command(&p["expected_exec_start"]) == command(&r["expected_exec_start"])
             && p["admission"] == r["admission"]
             && p["maximum_runtime_seconds"] == MAX_RUNTIME
             && p["candidate_incremental_peak_bytes"] == PEAK
@@ -267,6 +279,7 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
         ("NoNewPrivileges", "yes"),
         ("CapabilityBoundingSet", ""),
         ("AmbientCapabilities", ""),
+        ("EnvironmentFiles", ""),
     ] {
         ensure!(
             p.get(key) == Some(&value),
@@ -290,7 +303,7 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
 pub(super) fn validate_live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
     launch(&bound_json(&c.launch_receipt)?, c)?;
     live_shape(c, v)?;
-    let o=ProcessCommand::new("systemctl").args(["show",UNIT,"--no-pager","--property=User,Type,Restart,KillMode,Delegate,RuntimeMaxUSec,CPUQuotaPerSecUSec,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,UMask,ProtectSystem,ProtectHome,PrivateTmp,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,Environment"]).output()?;
+    let o=ProcessCommand::new("systemctl").args(["show",UNIT,"--no-pager","--property=User,Type,Restart,KillMode,Delegate,RuntimeMaxUSec,CPUQuotaPerSecUSec,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,UMask,ProtectSystem,ProtectHome,PrivateTmp,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,Environment,EnvironmentFiles"]).output()?;
     ensure!(
         o.status.success() && o.stdout.len() <= 16384,
         "original141 sandbox read failed"
@@ -477,6 +490,7 @@ mod tests {
             ("NoNewPrivileges", "yes"),
             ("CapabilityBoundingSet", ""),
             ("AmbientCapabilities", ""),
+            ("EnvironmentFiles", ""),
             ("ReadWritePaths", writable.as_str()),
             ("Environment", env.as_str()),
         ]);

@@ -3,8 +3,8 @@ use super::*;
 const UNIT: &str = "horizon-qualify-141-original-entry-root-20261023-v1.service";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-original-entry-root-20261023-v1";
 const READER: &str =
-    "/usr/local/lib/jetstreamer/horizon-original141-fleet-reader-20261023-v1/jetstreamer-r2";
-const READER_SHA: &str = "bd3d4c790fed117cd90d12323f28adde664bc10fbe188d29e973556f76d91afa";
+    "/usr/local/lib/jetstreamer/horizon-original141-fleet-reader-20261023-v2/jetstreamer-r2";
+const READER_SHA: &str = "97b65c2fe933d6f765dcbbd3e781626d12021f5ec21eb162b2fe20df3210fef8";
 const NODE_SHA: &str = "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0";
 const FIRST_GUARD: &str = "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194";
 #[derive(Debug, Deserialize, Serialize)]
@@ -483,6 +483,13 @@ mod tests {
         let (p, model, config) = fixture();
         assert!(is_101(&p).unwrap());
         assert!(reader(&p));
+        let mut composite = fixture().0;
+        composite.controller_rebind = Some(Bound {
+            path: "/proof.json".into(),
+            sha256: "a".repeat(64),
+        });
+        assert!(crate::generation_101(&composite).starts_with("controller-rebind-original141-"));
+        assert_ne!(crate::generation_101(&composite), crate::generation_101(&p));
         let old = diagnostics(&p, &model, &config, false).unwrap();
         assert_eq!(
             old["diagnostic_replays"],
@@ -642,9 +649,9 @@ mod tests {
         assert!(checked(&s, &r, &e, &p, &bad).is_err());
     }
     #[test]
-    #[ignore = "root exact sealed0559 five-lane templates only; no sampling, remote requests or writes"]
+    #[ignore = "root exact sealed0709 controller-rebound five-lane templates only; no sampling, remote requests or writes"]
     fn actual_five_lane_and_private_census_compatibility() {
-        let b=Bound{path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261023T055958Z-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/cycle-plan.json".into(),sha256:"3d4dcc3a297eb73cb1d07567bf1df3a6d889a029a1480178b390b8d32d656d40".into()};
+        let b=Bound{path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261023T070958Z-controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/cycle-plan.json".into(),sha256:"b2b5c98aacf9b732449bcb24cbaf3e2d5b100b7e52e43264ada8371465c44012".into()};
         let mut p: Plan = serde_json::from_value(bound_json(&b, true).unwrap()).unwrap();
         assert!(!enabled(&p));
         validate_templates(
@@ -662,6 +669,7 @@ mod tests {
         let s = profile();
         migrate(p.scope_101_200.as_mut().unwrap(), &mut config, &s).unwrap();
         p.original141_root = Some(s);
+        assert!(crate::generation_101(&p).starts_with("controller-rebind-original141-"));
         p.tools.r2 = Bound {
             path: READER.into(),
             sha256: READER_SHA.into(),
