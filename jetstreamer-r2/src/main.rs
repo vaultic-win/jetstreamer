@@ -3460,6 +3460,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("capped141-terminal-capture") {
+        return inactive_status::capture_capped141_terminal();
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-native223") {
         return native223_status::run().await;
     }

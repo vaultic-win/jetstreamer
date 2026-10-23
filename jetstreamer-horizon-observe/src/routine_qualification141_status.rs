@@ -17,10 +17,13 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && original141::capped_enabled(p)
             && p.public198_delivery.is_some()
             && original141::invocation(p) == Some("e639f007d482464f8a251455659d2ede")
-            && s.publisher.path
-                == Path::new(
+            && matches!(
+                s.publisher.path.to_str(),
+                Some(
                     "/usr/local/lib/jetstreamer/horizon-epoch141-status-tools-20261023-v1/jetstreamer-r2"
+                        | "/usr/local/lib/jetstreamer/horizon-epoch141-lifecycle-tools-20261023-v2/jetstreamer-r2"
                 )
+            )
             && !p.expected_epochs.contains(&141),
         "foreign141 status profile or duplicate estimate"
     );
@@ -85,6 +88,50 @@ pub(super) fn fleet_reader(p: &Plan) -> &Bound {
         .unwrap_or(&p.tools.r2)
 }
 pub(super) fn publish(p: &Plan, prior_pipeline: &Value, observer: &Bound) -> Result<Value> {
+    publish_with(
+        p,
+        observer,
+        || publish_current(p, prior_pipeline, observer),
+        write_new,
+    )
+}
+fn publish_with(
+    p: &Plan,
+    observer: &Bound,
+    attempt: impl FnOnce() -> Result<Value>,
+    persist: impl FnOnce(&Path, &Value) -> Result<Bound>,
+) -> Result<Value> {
+    if p.qualification141_status.is_none() {
+        return Ok(json!({"enabled":false}));
+    }
+    // Structural validation remains fatal in validate_plan. An operational
+    // failure in this private lane must not suppress the other eleven statuses,
+    // final fleet reconciliation or the single successor cadence. In particular,
+    // failure here is never evidence of terminality or permission to delete.
+    match attempt() {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            let incident = persist(
+                &p.cycle_directory
+                    .join("qualification141-status-incident.json"),
+                &json!({"schema":"jetstreamer-qualification141-status-incident-v2",
+                    "epoch":141,"sampled_at_utc":p.sample_target_utc,"observer":observer,
+                    "invocation_id":"e639f007d482464f8a251455659d2ede",
+                    "error":format!("{error:#}"),"status_refresh_succeeded":false,
+                    "previous_status_must_not_be_presented_as_current":true,
+                    "terminality_established":false,"inactive_cleanup_authorized":false,
+                    "remaining_growth_released":false,"repair_must_remain_open":true,
+                    "next_action":"Inspect the preserved child failure and current owner. Repair an active owner's estimate; for positive capped141 termination, capture native manager evidence and reconcile the complete replacement/downstream claim census before conditional inactive cleanup. Preserve prefix/checkpoint bytes; root61328765 still leaves15234 suffix slots. No unavailable sample, missing rate or timeout proves inactivity.",
+                    "replay_launch_authorized":false,"publication_authorized":false}),
+            )?;
+            Ok(
+                json!({"enabled":true,"refresh_outcome":"incident","incident":incident,
+                "new_resource_samples":0,"publication_authorized":false}),
+            )
+        }
+    }
+}
+fn publish_current(p: &Plan, prior_pipeline: &Value, observer: &Bound) -> Result<Value> {
     let Some(s) = &p.qualification141_status else {
         return Ok(json!({"enabled":false}));
     };
@@ -171,6 +218,17 @@ pub(super) fn completion(p: &Plan, c: &Value) -> Result<()> {
                 && c["qualification141_status"]["publication_authorized"] == false,
             "completion omits current141 operational status"
         );
+        if c["qualification141_status"]["refresh_outcome"] == "incident" {
+            let b: Bound =
+                serde_json::from_value(c["qualification141_status"]["incident"].clone())?;
+            let r = bound_json(&b, false)?;
+            validate_incident(p, &r)?;
+            ensure!(
+                r["observer"] == c["observer"],
+                "141 incident is not bound to the cycle observer"
+            );
+            return Ok(());
+        }
         let b: Bound = serde_json::from_value(c["qualification141_status"]["publication"].clone())?;
         let r = bound_json(&b, false)?;
         ensure!(
@@ -182,4 +240,113 @@ pub(super) fn completion(p: &Plan, c: &Value) -> Result<()> {
         );
     }
     Ok(())
+}
+fn validate_incident(p: &Plan, r: &Value) -> Result<()> {
+    ensure!(
+        r["schema"] == "jetstreamer-qualification141-status-incident-v2"
+            && r["epoch"] == 141
+            && r["sampled_at_utc"] == p.sample_target_utc
+            && r["invocation_id"] == "e639f007d482464f8a251455659d2ede"
+            && r["error"].as_str().is_some_and(|s| !s.trim().is_empty())
+            && r["status_refresh_succeeded"] == false
+            && r["previous_status_must_not_be_presented_as_current"] == true
+            && r["terminality_established"] == false
+            && r["inactive_cleanup_authorized"] == false
+            && r["remaining_growth_released"] == false
+            && r["repair_must_remain_open"] == true
+            && r["replay_launch_authorized"] == false
+            && r["publication_authorized"] == false,
+        "141 operational incident cannot establish terminality, release growth or authorize cleanup"
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn unavailable_private_eta_records_incident_without_failing_other_cycle_work() {
+        let (mut p, ..) = super::super::tests::fixture101();
+        let dummy = Bound {
+            path: "/sealed/dummy".into(),
+            sha256: "a".repeat(64),
+        };
+        p.qualification141_status = Some(Profile {
+            publisher: dummy.clone(),
+            delivery_policy: dummy.clone(),
+        });
+        let result = publish_with(
+            &p,
+            &dummy,
+            || anyhow::bail!("private owner stopped or rate unavailable"),
+            |path, incident| {
+                assert_eq!(
+                    path,
+                    p.cycle_directory
+                        .join("qualification141-status-incident.json")
+                );
+                validate_incident(&p, incident)?;
+                assert_eq!(incident["observer"], serde_json::to_value(&dummy)?);
+                Ok(Bound {
+                    path: path.into(),
+                    sha256: sha(&serde_json::to_vec(incident)?),
+                })
+            },
+        )
+        .unwrap();
+        assert_eq!(result["refresh_outcome"], "incident");
+        assert_eq!(result["new_resource_samples"], 0);
+        assert!(result["publication"].is_null());
+        assert_eq!(result["publication_authorized"], false);
+        // If durable incident writing itself fails, reporting success would hide
+        // the dashboard accuracy incident and remains forbidden.
+        assert!(
+            publish_with(
+                &p,
+                &dummy,
+                || anyhow::bail!("no rate"),
+                |_, _| anyhow::bail!("disk failure")
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn status_failure_is_a_same_sample_incident_never_terminal_or_cleanup_authority() {
+        let (p, ..) = super::super::tests::fixture101();
+        let incident = json!({"schema":"jetstreamer-qualification141-status-incident-v2",
+            "epoch":141,"sampled_at_utc":p.sample_target_utc,
+            "invocation_id":"e639f007d482464f8a251455659d2ede","error":"no sufficient rate",
+            "status_refresh_succeeded":false,"previous_status_must_not_be_presented_as_current":true,
+            "terminality_established":false,"inactive_cleanup_authorized":false,
+            "remaining_growth_released":false,"repair_must_remain_open":true,
+            "replay_launch_authorized":false,"publication_authorized":false});
+        validate_incident(&p, &incident).unwrap();
+        for key in [
+            "status_refresh_succeeded",
+            "terminality_established",
+            "inactive_cleanup_authorized",
+            "remaining_growth_released",
+            "replay_launch_authorized",
+            "publication_authorized",
+        ] {
+            let mut bad = incident.clone();
+            bad[key] = json!(true);
+            assert!(validate_incident(&p, &bad).is_err(), "accepted{key}");
+        }
+        for (key, value) in [
+            ("epoch", json!(144)),
+            ("sampled_at_utc", json!("2026-01-01T00:00:00Z")),
+            ("invocation_id", json!("replacement")),
+            ("error", json!("")),
+            ("repair_must_remain_open", json!(false)),
+            (
+                "previous_status_must_not_be_presented_as_current",
+                json!(false),
+            ),
+        ] {
+            let mut bad = incident.clone();
+            bad[key] = value;
+            assert!(validate_incident(&p, &bad).is_err(), "accepted{key}");
+        }
+    }
 }

@@ -3,6 +3,7 @@ use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
+mod capped141;
 mod metadata_cycle;
 mod missing157;
 mod natural144;
@@ -10,6 +11,9 @@ mod preserved144;
 mod publication144;
 pub(super) fn prepare_publication144_preservation() -> Result<()> {
     publication144::prepare()
+}
+pub(super) fn capture_capped141_terminal() -> Result<()> {
+    capped141::capture()
 }
 
 pub(super) fn private144_terminal_manager_proof(current: &Value) -> Result<()> {
@@ -188,6 +192,25 @@ fn validate_fleet(fleet: &Value, plan: &Plan, now: u64) -> Result<()> {
         !active.iter().any(|entry| entry["epoch"] == plan.epoch),
         "epoch has active downstream or replay work"
     );
+    if let Some(diagnostics) = fleet.get("diagnostics") {
+        ensure!(
+            !diagnostics
+                .as_array()
+                .context("fleet diagnostic census invalid")?
+                .iter()
+                .any(|entry| {
+                    entry["live"] == true
+                        && (entry["epoch"] == plan.epoch
+                            || entry["scope_first_epoch"]
+                                .as_u64()
+                                .zip(entry["scope_last_epoch"].as_u64())
+                                .is_some_and(|(first, last)| {
+                                    first <= plan.epoch && plan.epoch <= last
+                                }))
+                }),
+            "epoch has active private replacement or diagnostic work"
+        );
+    }
     let epochs = fleet["epochs"].as_array().context("fleet epochs missing")?;
     let entry: Vec<_> = epochs
         .iter()
@@ -352,6 +375,11 @@ fn fresh_census(
     if natural144 {
         natural144::validate_current(&current, terminal_fleet, owners)?;
     }
+    let capped141 = capped141::recognized(terminal_fleet);
+    if capped141 {
+        ensure!(plan.epoch == 141, "foreign capped141 cleanup epoch");
+        capped141::validate_current(&current, terminal_fleet, owners)?;
+    }
     let reserve = reserve_owner_evidence(terminal_fleet, owners)?;
     if let Some(stop) = &reserve {
         stop.validate(
@@ -366,7 +394,7 @@ fn fresh_census(
             .context("owner omitted from complete census")?;
         if preserved_delivery.is_some() {
             preserved144::terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
-        } else if !preserved && !missing157 && !natural144 && reserve.is_none() {
+        } else if !preserved && !missing157 && !natural144 && !capped141 && reserve.is_none() {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
         }
         no_pending_owner_trigger(name, value["LoadState"] == "not-found")?;
@@ -537,7 +565,10 @@ pub(super) async fn run() -> Result<()> {
     no_local_delivery(&plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
-    let history_time = if natural144::recognized(&history) {
+    let history_time = if capped141::recognized(&history) {
+        ensure!(plan.epoch == 141, "foreign capped141 terminal evidence");
+        capped141::time(&history)?
+    } else if natural144::recognized(&history) {
         ensure!(
             plan.epoch == 144
                 && plan.terminal_fleet.path
@@ -827,6 +858,14 @@ mod tests {
         ] {
             let mut bad = fleet.clone();
             bad["active"] = json!([{"epoch":224,"phase":phase}]);
+            assert!(validate_fleet(&bad, &plan, 1792469200).is_err());
+        }
+        for claim in [
+            json!({"epoch":224,"live":true}),
+            json!({"epoch":223,"scope_first_epoch":223,"scope_last_epoch":225,"live":true}),
+        ] {
+            let mut bad = fleet.clone();
+            bad["diagnostics"] = json!([claim]);
             assert!(validate_fleet(&bad, &plan, 1792469200).is_err());
         }
         for state in [

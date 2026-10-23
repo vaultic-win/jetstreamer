@@ -34,6 +34,88 @@ reader pin remain unchanged. The141 publication is recorded separately in the
 completion, and successor preparation requires that evidence when enabled.
 No new observation, timer, replay owner, guard or archive mutation is introduced.
 
+The lifecycle hardening patch records a durable
+`jetstreamer-qualification141-status-incident-v2` when the optional141 publisher
+fails operationally. The eleven ordinary statuses, final fleet reconciliation,
+and normal successor cadence continue. The incident binds the exact sample and
+owner and says explicitly that the old ETA is no longer current. It establishes
+neither terminality nor cleanup or remaining-growth release. Structural plan and
+tool validation still fail closed. Investigate this incident promptly; repeated
+incidents are not an acceptable substitute for repairing or retiring the status.
+
+## Stopping-root terminal handoff
+
+The distinct capped141 lifecycle package may be sealed at
+`/usr/local/lib/jetstreamer/horizon-epoch141-lifecycle-tools-20261023-v2`.
+Never replace the already deployed v1 package. The coordinating parent owns
+deployment, terminal event handling, R2 mutation and the next routine plan.
+
+1. Preserve the prefix, checkpoint, original-entry sources, failed-root bytes,
+   guard evidence and open141 repair. A clean process exit is not checkpoint
+   qualification; even a verified61328765 root still leaves15234 suffix slots.
+2. After a positive terminal event, use the sealed Rust command
+   `capped141-terminal-capture PLAN --plan-sha256 HEX --self-sha256 HEX`.
+   Its closed plan contains only schema
+   `jetstreamer-capped141-terminal-capture-plan-v2`, `launch` (exact original
+   launch path/SHA), and an absent `output` beneath the root-owned private
+   `receipts` directory. It validates the exact native launch/command, zero
+   restarts, disabled restart policy, PID0 and a matching latest trusted PID1
+   manager start/terminal lifecycle twice before fsyncing no-clobber evidence.
+   A collected transient unit requires the exact authenticated launch and latest
+   trusted PID1 terminal lifecycle; disappearance alone cannot pass. Loaded
+   terminal units additionally require their retained native command and disabled
+   restart policy. A missing rate, unavailable observer or timeout of a metadata
+   command cannot pass. Captured process failure from an actual manager timeout
+   remains distinct from a metadata-probe timeout.
+3. Reconcile the complete assigned101–200 claim census, including queued starts,
+   downstream tasks and authenticated other-host handoffs. If a real successor
+   exists, bind that owner and model its actual supported phase and remaining
+   delivery gates. Preserve its status; never delete on the former root's exit.
+4. With no successor or downstream claim, use existing reviewed
+   `status-retire-inactive` with the captured `terminal_fleet`, a fresh accepted
+   `fleet`, the exact latest authenticated `publication`, preserved open
+   `repair_backlog`, canonical directories and new private intent/completion
+   paths. Existing full-census/recheck, no canonical local/remote delivery,
+   latest receipt/payload/ETag, conditional deletion and authenticated absence
+   gates all remain mandatory. The new profile only authenticates this native
+   owner's terminal history; it does not bypass any deletion gate. Run
+   `--check-only` in the equivalent sandbox first. A completed same-invocation
+   metadata oneshot may normalize only its own census row via its bound cycle
+   completion; any other claim change still rejects cleanup.
+5. Make an explicit immutable successor transition. Once cleanup is authenticated,
+   disable the141 status hook until a supported active replacement is adopted.
+   Retain terminal diagnostic history and its open repair, and preserve the
+   single coordinated cadence. Do not silently drop original141 diagnostics
+   or reuse the old `f9c...` terminal-recovery profile for this `e639...` owner.
+6. Retire only the stopped private producer's *future growth reservation* through
+   an explicit freshly bound full census/protection transition. Account for all
+   retained physical bytes and every remaining producer/guard; preserve historical
+   launch and guard claims. The terminal evidence and status cleanup deliberately
+   set `remaining_growth_released:false`. They authorize no admission, scratch
+   retirement, reservation deletion, guard weakening, or new replay. That separate
+   transition must pass the existing admission/protection gates before capacity
+   can be reassigned.
+
+The terminal-capture plan has this exact shape (choose a new absent output each
+time rather than replacing retained evidence):
+
+```json
+{
+  "schema": "jetstreamer-capped141-terminal-capture-plan-v2",
+  "launch": {
+    "path": "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1/receipts/launch.json",
+    "sha256": "fddefbddec6d98f344f9b7c2411cfcf874fee365e1af9fa4a6b380745021e28f"
+  },
+  "output": "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1/receipts/terminal-manager-v2.json"
+}
+```
+
+The capture command intentionally has no R2 or credential access. Qualify its
+denied-live-owner path under `PrivateNetwork=yes` before wiring an event handler;
+capture must fail without writing evidence while the exact producer is running.
+The existing inactive-cleanup command has a separate authenticated-network
+preflight and never derives inactivity from capture failure.
+
 For a first one-off status, seal the policy and a publisher plan with current
 `observer`/`fleet` bindings, the private status receipt directory,
 `downstream_allowance_millis: {"141": 129600000}`, an absent private

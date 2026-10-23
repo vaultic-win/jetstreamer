@@ -86,8 +86,24 @@ pub(super) fn validate(
                 "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T173800Z-prefix157-v1/completion.json",
             )
         && b.sha256 == "e5e208fc27ed7207fefe1300eaff8adeca7a5ee36187b9a236c42e58a2f5d8fb";
+    let cycle: Bound = serde_json::from_value(c["plan"].clone())?;
+    let p = bound_json(&cycle)?;
+    let capped141 = plan.epoch == 141
+        && capped141::recognized(&bound_json(&plan.terminal_fleet)?)
+        && p["schema"] == "jetstreamer-horizon-routine-cycle-101-200-plan-v2"
+        && p["original141_root"]["capped_root"] == true
+        && p["original141_root"]["invocation_id"] == "e639f007d482464f8a251455659d2ede"
+        && plan.fleet.path.parent()
+            == Some(Path::new(
+                "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1",
+            ))
+        && p["cycle_directory"].as_str().is_some_and(|directory| {
+            let directory = Path::new(directory);
+            directory.starts_with("/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2")
+                && b.path == directory.join("completion.json")
+        });
     ensure!(
-        (pinned157 || pinned144)
+        (pinned157 || pinned144 || capped141)
             && c["schema"] == "jetstreamer-horizon-routine-cycle-completion-v1"
             && c["fleet"]["path"].as_str() == plan.fleet.path.to_str()
             && c["fleet"]["sha256"] == plan.fleet.sha256
@@ -110,8 +126,6 @@ pub(super) fn validate(
             "metadata completion grants unrelated authority"
         );
     }
-    let cycle: Bound = serde_json::from_value(c["plan"].clone())?;
-    let p = bound_json(&cycle)?;
     ensure!(
         p["sample_target_utc"] == c["sampled_at_utc"]
             && p["fleet_output"].as_str() == plan.fleet.path.to_str(),
