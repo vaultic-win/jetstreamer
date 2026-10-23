@@ -48,6 +48,12 @@ are mandatory. No copying/unpacking an entire shared cache or writing under home
 
 ## OS admission: preserve every existing allocation
 
+Parent review correction: the old budget's8GiB compiler and10GiB fixture
+claims remain protected until independently qualified allocation closures.
+Natural process completion alone does not reassign either claim. New roots
+below need distinct claims; do not use the older228,833,779,142-byte baseline
+as authorization to allocate another22GiB. No such closure is currently proven.
+
 Retain the immutable base budget
 `/usr/local/lib/jetstreamer/horizon-v1425-portability-os-budget-20261023-v2/budget.json`,
 SHA256`2e95927a3c49972630c9de458e32359a859b90de7b0fa9b195d6dbb1083ed620`.
@@ -56,19 +62,21 @@ supplement must bind it and the new exact profiles while preserving:
 
 | Reservation | Bytes |
 |---|---:|
-| Retained free-space floor |205,211,459,014|
-| Modern growth reservation |4,294,967,296(4GiB)|
+| Complete retained budget, including old modern/compiler/fixture claims |228,833,779,142|
 | New legacy build, staging, guard and receipts |8,589,934,592(8GiB)|
-| Combined qualification/retained test root |10,737,418,240(10GiB)|
-| Required initial available space |228,833,779,142|
+| New combined qualification/retained test root |10,737,418,240(10GiB)|
+| Required initial available space |248,161,131,974|
 
-Thus new reserved growth is23,622,320,128bytes(22GiB), with **zero reduction** of
-the retained floor. Free-space readings already include existing allocations;
+Thus additional reserved growth is19,327,352,832bytes(18GiB), with **zero reduction**
+of any old claim or the retained floor. Any new modern guard-tool build needs
+its separately reviewed incremental allowance as well. Free-space readings already include existing allocations;
 do not subtract retained fixture/cache/build bytes twice or claim a reclaim.
 Preserve all prior legacy targets, immutable packages, failed/successful fixtures,
 audit inputs and the other candidate lineages. The current cache census must
 establish actual headroom; no old237GB/234GB observation is a fresh admission.
-If current available space is below228,833,779,142, do not start this proposal.
+If current available space is below248,161,131,974, do not start this combined
+proposal. An authenticated closure may justify a separately reviewed successor
+budget; this document cannot release or reassign an old claim itself.
 
 Use a new root-owned canonical OS parent
 `/var/lib/jetstreamer-v1425-export-build-20261023-v1`, device2304, with `target/`
@@ -87,9 +95,14 @@ It contains default/capped ordinary-test temp roots, dedicated initially empty
 0700fresh-fixture roots and all retained attempt evidence. Its combined cap is
 10GiB across both profiles, not10GiB per lane. Run everything serially.
 
-Build guard minimum available:220,243,844,550bytes(floor+4GiBmodern+10GiBtests).
-Fixture guard minimum:209,506,426,310bytes(floor+4GiBmodern), with the full8GiB
-build/staging reservation already accounted for and its parent still capped.
+Build guard minimum available:239,571,197,382bytes(complete old baseline plus
+the new10GiB test claim). Fixture guard minimum remains237,423,713,734bytes
+(complete old baseline plus new8GiB build claim) until an independently bound
+phase transition proves all new default/capped compiler/staging work terminal
+and sealed, with no queued/replacement compiler or remaining future allocation.
+Only that transition may release the new compiler's unspent future growth,
+reducing the fixture guard minimum to228,833,779,142bytes; all physical build
+artifacts and the capped build parent remain retained. Old claims stay protected.
 Take fresh completion-event admission before each phase/attempt, retaining every
 previous byte. Do not borrow the modern4GiB reservation merely because no modern
 builder is currently running.
