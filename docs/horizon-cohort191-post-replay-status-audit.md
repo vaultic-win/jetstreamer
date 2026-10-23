@@ -293,3 +293,23 @@ Boundary190–191 through194–195 dispatch stays separate from sidecar publicat
 and must use qualified modern readers, rather than the failed legacy watcher,
 before guarded local retirement is enabled. No512GiB remaining-growth claim is
 released until the parent authenticates the completed-cohort transition.
+
+The import controller is allowed to return naturally once `all_complete()` has
+rehash-verified the public cohort. Both custody capture and dispatch admission
+now accept its exact retained inactive/dead exit0 lifecycle, requiring the same
+CID/command, zero restarts, no job/cgroup, real manager start, one trusted PID1
+successful-deactivation event, and the exact original controller's native
+`all sealed cohorts 191-194 are public` message before that event. Pending import
+still requires a live original controller. This does not fabricate an active
+controller claim after import.
+
+Before systemd clears or collects terminal fields, the new exact Rust command
+`capture-controller-terminal-191 --self-sha256 SHA` can preserve the actual retained
+manager properties and those native/PID1 events no-clobber at
+`/var/lib/jetstreamer/horizon-cohort191-controller-terminal-20261023-v1/terminal.json`.
+It also binds the root controller state digest and qualified deployed reader.
+A later collected or terminal-fields-cleared state requires that real prior
+capture, the same state digest, re-observed terminal history, and no replacement
+job/cgroup. Missing capture, changed invocation, restart, failed status or
+unexplained disappearance fails closed. No such command has been executed as
+part of this source work.

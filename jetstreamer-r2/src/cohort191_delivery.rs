@@ -323,6 +323,334 @@ fn manager_terminal(cutoff: u64) -> Result<Value> {
     );
     Ok(own[end].clone())
 }
+const CONTROLLER_TERMINAL: &str =
+    "/var/lib/jetstreamer/horizon-cohort191-controller-terminal-20261023-v1/terminal.json";
+fn terminal_controller_shape(v: &Value, history: &Value) -> Result<()> {
+    ensure!(
+        v["Id"] == CONTROLLER
+            && v["LoadState"] == "loaded"
+            && v["InvocationID"] == CID
+            && v["NRestarts"] == "0"
+            && v["ActiveState"] == "inactive"
+            && v["SubState"] == "dead"
+            && v["MainPID"] == "0"
+            && v["Result"] == "success"
+            && v["ExecMainStatus"] == "0"
+            && matches!(v["ExecMainCode"].as_str(), Some("1" | "exited"))
+            && v["Job"] == "0"
+            && v["ControlGroup"] == ""
+            && v["SuccessExitStatus"] == ""
+            && prefix(&v["ExecStart"])
+                == prefix(&history["current_units"][CONTROLLER]["ExecStart"]),
+        "191 controller is not its exact retained natural exit0/no-job/no-cgroup lifecycle"
+    );
+    Ok(())
+}
+fn cleared_controller_shape(v: &Value, history: &Value) -> Result<()> {
+    ensure!(
+        v["Id"] == CONTROLLER
+            && v["ActiveState"] == "inactive"
+            && v["SubState"] == "dead"
+            && v["MainPID"] == "0"
+            && v["NRestarts"] == "0"
+            && v["Job"] == "0"
+            && v["ControlGroup"] == ""
+            && v["Result"] == "success"
+            && v["ExecMainStatus"] == "0",
+        "191 inactive controller has failure/restart/job/cgroup ambiguity"
+    );
+    ensure!(
+        (v["LoadState"] == "not-found" && v["InvocationID"] == "")
+            || (v["LoadState"] == "loaded"
+                && v["InvocationID"] == CID
+                && matches!(v["ExecMainCode"].as_str(), Some("0" | ""))
+                && v["SuccessExitStatus"] == ""
+                && prefix(&v["ExecStart"])
+                    == prefix(&history["current_units"][CONTROLLER]["ExecStart"])),
+        "191 inactive controller is not a collected/cleared original invocation"
+    );
+    Ok(())
+}
+fn controller_properties() -> Result<Value> {
+    let mut current = fleet::unit(CONTROLLER)?;
+    let result = Command::new("/usr/bin/systemctl")
+        .args([
+            "show",
+            CONTROLLER,
+            "--no-pager",
+            "--property=Job,ExecMainCode,SuccessExitStatus",
+        ])
+        .output()?;
+    ensure!(
+        result.status.success() && result.stdout.len() <= 8192,
+        "191 controller terminal properties unavailable"
+    );
+    let mut keys = BTreeSet::new();
+    for line in std::str::from_utf8(&result.stdout)?.lines() {
+        let (key, value) = line.split_once('=').context("191 controller property")?;
+        ensure!(
+            ["Job", "ExecMainCode", "SuccessExitStatus"].contains(&key) && keys.insert(key),
+            "191 duplicate/foreign controller terminal property"
+        );
+        current[key] = json!(value);
+    }
+    ensure!(
+        keys.len() == 3,
+        "191 controller terminal properties incomplete"
+    );
+    Ok(current)
+}
+fn controller_manager_end(rows: &[Value], cutoff: u64) -> Result<Value> {
+    let own: Vec<_> = rows
+        .iter()
+        .filter(|r| r["UNIT"] == CONTROLLER && r["_PID"] == "1" && r["_UID"] == "0")
+        .collect();
+    let end: Vec<_> = own
+        .iter()
+        .copied()
+        .filter(|r| {
+            r["INVOCATION_ID"] == CID
+                && r["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+                && r["MESSAGE"] == format!("{CONTROLLER}: Deactivated successfully.")
+        })
+        .collect();
+    ensure!(
+        end.len() == 1,
+        "191 controller clean PID1 terminal missing/duplicated"
+    );
+    let time: u64 = end[0]["__REALTIME_TIMESTAMP"]
+        .as_str()
+        .context("191 controller end clock")?
+        .parse()?;
+    ensure!(
+        time > 0
+            && time
+                <= cutoff
+                    .checked_mul(1_000_000)
+                    .context("191 controller cutoff overflow")?,
+        "191 controller terminal after sample"
+    );
+    for row in own {
+        let t: u64 = row["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("191 controller manager clock")?
+            .parse()?;
+        if t >= time {
+            ensure!(
+                row["INVOCATION_ID"].as_str().is_none_or(|s| s == CID)
+                    && !row["MESSAGE"]
+                        .as_str()
+                        .is_some_and(|s| s.starts_with("Starting ")
+                            || s.starts_with("Started ")
+                            || s.contains("Failed")
+                            || s.contains("Main process exited")),
+                "191 controller failed/replaced/restarted after completion"
+            );
+        }
+    }
+    Ok((*end[0]).clone())
+}
+fn controller_terminal_events(history: &Value, cutoff: u64) -> Result<Value> {
+    let result = Command::new("/usr/bin/journalctl")
+        .args([
+            "_PID=1",
+            "_UID=0",
+            &format!("UNIT={CONTROLLER}"),
+            "--no-pager",
+            "-o",
+            "json",
+            "-n",
+            "128",
+        ])
+        .output()?;
+    ensure!(
+        result.status.success() && result.stdout.len() <= 2 << 20,
+        "191 controller manager history unavailable"
+    );
+    let rows = serde_json::Deserializer::from_slice(&result.stdout)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let end = controller_manager_end(&rows, cutoff)?;
+    let pid = history["current_units"][CONTROLLER]["MainPID"]
+        .as_str()
+        .context("191 original controller PID")?;
+    let result = Command::new("/usr/bin/journalctl")
+        .args([
+            "--no-pager",
+            "-o",
+            "json",
+            &format!("_SYSTEMD_UNIT={CONTROLLER}"),
+            &format!("_SYSTEMD_INVOCATION_ID={CID}"),
+            &format!("_PID={pid}"),
+            "_UID=0",
+            "--grep=^all sealed cohorts 191-194 are public$",
+            "-n",
+            "8",
+        ])
+        .output()?;
+    ensure!(
+        result.status.success() && result.stdout.len() <= 65536,
+        "191 natural completion journal unavailable"
+    );
+    let messages = serde_json::Deserializer::from_slice(&result.stdout)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        messages.len() == 1,
+        "191 natural all-public controller message absent/ambiguous"
+    );
+    let message = &messages[0];
+    let time: u64 = message["__REALTIME_TIMESTAMP"]
+        .as_str()
+        .context("191 all-public clock")?
+        .parse()?;
+    let start = pipeline_status::manager_start(CONTROLLER, CID)?;
+    let end_time: u64 = end["__REALTIME_TIMESTAMP"].as_str().unwrap().parse()?;
+    ensure!(
+        message["_SYSTEMD_UNIT"] == CONTROLLER
+            && message["_SYSTEMD_INVOCATION_ID"] == CID
+            && message["_PID"] == pid
+            && message["_UID"] == "0"
+            && message["MESSAGE"] == "all sealed cohorts 191-194 are public"
+            && start
+                .checked_mul(1000)
+                .context("191 controller start overflow")?
+                <= time
+            && time < end_time,
+        "191 natural completion message is not the exact original controller before exit"
+    );
+    Ok(json!({"manager_start_unix_millis":start,"all_public":message,"terminal":end}))
+}
+fn controller_lifecycle(
+    current: &Value,
+    history: &Value,
+    cutoff: u64,
+    require_live: bool,
+) -> Result<Value> {
+    if current["LoadState"] == "loaded" && current["ActiveState"] == "active" {
+        ensure!(
+            current["InvocationID"] == CID
+                && current["NRestarts"] == "0"
+                && current["SubState"] == "running"
+                && current["MainPID"]
+                    .as_str()
+                    .is_some_and(|s| s.parse::<u64>().is_ok_and(|n| n > 0))
+                && prefix(&current["ExecStart"])
+                    == prefix(&history["current_units"][CONTROLLER]["ExecStart"]),
+            "191 active import controller/rebind changed"
+        );
+        let actual = controller_properties()?;
+        ensure!(
+            actual["Job"] == "0" && fleet::unit(CONTROLLER)? == *current,
+            "191 live controller has a queued job/replacement"
+        );
+        return Ok(json!({"kind":"live-original-controller","unit":actual}));
+    }
+    ensure!(
+        !require_live,
+        "191 pending import has no live original controller"
+    );
+    let events = controller_terminal_events(history, cutoff)?;
+    let actual = controller_properties()?;
+    ensure!(
+        fleet::unit(CONTROLLER)? == *current,
+        "191 controller changed while checking terminal lifecycle"
+    );
+    if terminal_controller_shape(&actual, history).is_ok() {
+        return Ok(
+            json!({"kind":"retained-natural-terminal-controller","unit":actual,"events":events}),
+        );
+    }
+    cleared_controller_shape(&actual, history)?;
+    let path = Path::new(CONTROLLER_TERMINAL);
+    let bytes = read_stable_bounded(path, 2 << 20, "191 previously captured terminal controller")?;
+    let b = Bound {
+        path: path.into(),
+        sha256: hex_lower(&Sha256::digest(&bytes)),
+    };
+    let proof = bound(&b, false)?;
+    ensure!(
+        proof["schema"] == "jetstreamer-cohort191-controller-terminal-v2"
+            && proof["events"] == events
+            && proof["root_controller_state_sha256"]
+                == hex_lower(&Sha256::digest(&state_bytes()?.0))
+            && proof["publication_authorized"] == false
+            && proof["launch_authorized"] == false
+            && proof["r2_mutations"] == false
+            && proof["resource_samples"] == 0
+            && proof["capture_program"]
+                == "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2",
+        "191 collected controller lacks a real exact terminal capture"
+    );
+    member(
+        Path::new(proof["capture_program"].as_str().unwrap()),
+        proof["capture_self_sha256"]
+            .as_str()
+            .context("191 terminal capture digest")?,
+    )?;
+    terminal_controller_shape(&proof["manager_snapshot"], history)?;
+    Ok(
+        json!({"kind":"collected-natural-terminal-controller","unit":actual,"events":events,"terminal_capture":b}),
+    )
+}
+/// Capture actual retained manager exit0 properties before PID1 collects them.
+/// Never invent this receipt from controller state or a completion message alone.
+pub(super) fn capture_controller_terminal() -> Result<()> {
+    let a: Vec<_> = env::args().collect();
+    ensure!(
+        a.len() == 4 && a[2] == "--self-sha256" && unsafe { libc::geteuid() } == 0,
+        "capture-controller-terminal-191 --self-sha256 SHA"
+    );
+    let executable = fs::read_link("/proc/self/exe")?;
+    ensure!(
+        executable
+            == Path::new(
+                "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2"
+            ),
+        "191 terminal capture must use qualified deployed reader"
+    );
+    member(&executable, &a[3])?;
+    let history = inputs()?;
+    let before = controller_properties()?;
+    terminal_controller_shape(&before, &history)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let events = controller_terminal_events(&history, now)?;
+    let (bytes, state) = state_bytes()?;
+    ensure!(
+        state["completed"]["191-194"]["first_epoch"] == 191
+            && state["completed"]["191-194"]["last_epoch"] == 194
+            && state["assignments"]
+                .as_object()
+                .is_some_and(|a| a.is_empty())
+            && state["import_owner"].is_null(),
+        "191 natural terminal controller lacks its completed import state"
+    );
+    ensure!(
+        controller_properties()? == before && state_bytes()?.0 == bytes,
+        "191 terminal capture raced owner/state"
+    );
+    let output = Path::new(CONTROLLER_TERMINAL);
+    let parent = output.parent().unwrap();
+    if !parent.try_exists()? {
+        fs::create_dir(parent)?;
+        fs::set_permissions(parent, fs::Permissions::from_mode(0o700))?;
+        File::open(parent.parent().unwrap())?.sync_all()?;
+    }
+    let metadata = fs::symlink_metadata(parent)?;
+    ensure!(
+        metadata.is_dir() && metadata.uid() == 0 && metadata.mode() & 0o077 == 0,
+        "191 terminal capture output directory is not root-private"
+    );
+    fleet::persist(
+        output,
+        &json!({"schema":"jetstreamer-cohort191-controller-terminal-v2",
+        "manager_snapshot":before,"events":events,"capture_program":executable,"capture_self_sha256":a[3],
+        "root_controller_state_sha256":hex_lower(&Sha256::digest(&bytes)),"publication_authorized":false,
+        "launch_authorized":false,"r2_mutations":false,"resource_samples":0}),
+    )?;
+    println!("{}", output.display());
+    Ok(())
+}
 fn state_bytes() -> Result<(Vec<u8>, Value)> {
     let m = fs::symlink_metadata(STATE)?;
     ensure!(
@@ -1138,13 +1466,18 @@ fn capture(p: &Capture) -> Result<Value> {
     }
     let producer = fleet::unit(UNIT)?;
     let controller = fleet::unit(CONTROLLER)?;
-    ensure!(
-        prefix(&controller["ExecStart"])
-            == prefix(&history["current_units"][CONTROLLER]["ExecStart"]),
-        "191 controller command/rebind changed"
-    );
+
     let all_final =
         !p.claims.is_empty() && p.claims.iter().all(|c| c.phase == "producer-finalization");
+    let require_live_controller = all_final
+        || p.claims.iter().any(|c| {
+            matches!(
+                c.phase.as_str(),
+                "controller-import-handoff" | "local-publication"
+            )
+        });
+    let controller_history =
+        controller_lifecycle(&controller, &history, cutoff, require_live_controller)?;
     let state = if all_final {
         ensure!(
             producer["MainPID"] == "2189644"
@@ -1284,7 +1617,7 @@ fn capture(p: &Capture) -> Result<Value> {
     }
     let v = json!({"schema":EVENT_SCHEMA,"first_epoch":191,"last_epoch":194,"sampled_at_utc":sample,"sample_unix_seconds":cutoff,
         "observer":p.observer,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
-        "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"controller":controller,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
+        "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"controller":controller,"controller_lifecycle":controller_history,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
         "gate_receipts":p.gate_receipts,"gate_tools":p.gate_tools,"ready_receipts":p.ready_receipts,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
     Ok(v)
 }
@@ -1403,15 +1736,8 @@ pub(super) fn dispatch_import_check(
     );
     let history = inputs()?;
     let controller = fleet::unit(CONTROLLER)?;
-    ensure!(
-        controller["InvocationID"] == CID
-            && controller["NRestarts"] == "0"
-            && controller["ActiveState"] == "active"
-            && controller["SubState"] == "running"
-            && prefix(&controller["ExecStart"])
-                == prefix(&history["current_units"][CONTROLLER]["ExecStart"]),
-        "191 import controller/rebind changed"
-    );
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let lifecycle = controller_lifecycle(&controller, &history, now, false)?;
     let (bytes, state) = state_bytes()?;
     let source = batch(source_batch, false, &BTreeSet::new())?;
     let public = batch(public_batch, true, materialized)?;
@@ -1455,13 +1781,15 @@ pub(super) fn dispatch_import_check(
         );
     }
     ensure!(
-        state_bytes()?.0 == bytes && fleet::unit(CONTROLLER)? == controller,
+        state_bytes()?.0 == bytes
+            && fleet::unit(CONTROLLER)? == controller
+            && controller_properties()? == lifecycle["unit"],
         "191 import custody changed during dispatch admission"
     );
     Ok(
         json!({"schema":"jetstreamer-cohort191-import-custody-v2","source_batch":source_batch,
         "public_batch":public_batch,"materialized_epochs":materialized,"public_members":public["outcome"]["members"],
-        "controller":controller,"controller_state_sha256":hex_lower(&Sha256::digest(&bytes)),
+        "controller":controller,"controller_lifecycle":lifecycle,"controller_state_sha256":hex_lower(&Sha256::digest(&bytes)),
         "native_import_attestation":complete,"publication_authorized":false,"launch_authorized":false,
         "r2_mutations":false,"new_resource_samples":0}),
     )
@@ -1545,6 +1873,70 @@ mod tests {
             assert!(format!("{:#}", validate_event(&bad, 1).unwrap_err()).contains(flag));
         }
         assert!(validate_event(&base, 2).is_err());
+    }
+    fn terminal_controller_fixture() -> (Value, Value) {
+        let command = "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /sealed/controller --execute ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0 }";
+        (
+            json!({"Id":CONTROLLER,"LoadState":"loaded","InvocationID":CID,"NRestarts":"0",
+            "ActiveState":"inactive","SubState":"dead","MainPID":"0","Result":"success","ExecMainStatus":"0",
+            "ExecMainCode":"1","Job":"0","ControlGroup":"","SuccessExitStatus":"","ExecStart":command}),
+            json!({"current_units":{CONTROLLER:{"ExecStart":command}}}),
+        )
+    }
+    #[test]
+    fn natural_terminal_controller_needs_real_exit0_and_exact_retained_identity() {
+        let (good, history) = terminal_controller_fixture();
+        terminal_controller_shape(&good, &history).unwrap();
+        for (key, value) in [
+            ("InvocationID", "replacement"),
+            ("NRestarts", "1"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+            ("ExecMainCode", "0"),
+            ("Job", "23"),
+            ("ControlGroup", "/new/job"),
+            ("ActiveState", "failed"),
+            ("ExecStart", "changed"),
+            ("SuccessExitStatus", "1"),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = json!(value);
+            assert!(terminal_controller_shape(&bad, &history).is_err(), "{key}");
+        }
+        let mut collected = good.clone();
+        collected["LoadState"] = json!("not-found");
+        collected["InvocationID"] = json!("");
+        assert!(terminal_controller_shape(&collected, &history).is_err());
+        cleared_controller_shape(&collected, &history).unwrap(); // Shape alone is NOT terminal proof.
+        let mut cleared = good;
+        cleared["ExecMainCode"] = json!("0");
+        assert!(terminal_controller_shape(&cleared, &history).is_err());
+        cleared_controller_shape(&cleared, &history).unwrap(); // Requires the prior actual capture as well.
+    }
+    #[test]
+    fn natural_controller_pid1_proof_rejects_missing_duplicate_failed_and_restarted_history() {
+        let event = json!({"UNIT":CONTROLLER,"_PID":"1","_UID":"0","INVOCATION_ID":CID,
+            "MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{CONTROLLER}: Deactivated successfully."),
+            "__REALTIME_TIMESTAMP":"1000000"});
+        assert_eq!(controller_manager_end(&[event.clone()], 2).unwrap(), event);
+        assert!(controller_manager_end(&[], 2).is_err());
+        assert!(controller_manager_end(&[event.clone(), event.clone()], 2).is_err());
+        assert!(controller_manager_end(&[event.clone()], 0).is_err());
+        for (key, value) in [
+            ("_PID", "2"),
+            ("_UID", "1001"),
+            ("INVOCATION_ID", "replacement"),
+            ("MESSAGE", "failed"),
+        ] {
+            let mut bad = event.clone();
+            bad[key] = json!(value);
+            assert!(controller_manager_end(&[bad], 2).is_err(), "{key}");
+        }
+        let mut restarted = event.clone();
+        restarted["MESSAGE"] = json!("Started replacement");
+        restarted["MESSAGE_ID"] = json!("other");
+        restarted["__REALTIME_TIMESTAMP"] = json!("1500000");
+        assert!(controller_manager_end(&[event, restarted], 2).is_err());
     }
     #[test]
     fn manifest_hash_decoder_rejects_invalid_alphabet_and_overflow() {
