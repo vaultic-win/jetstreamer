@@ -2,6 +2,24 @@
 
 ## Exact admitted 183–184 repair adoption
 
+The optional `repair185_handoff` extends an already accepted four-lane profile
+with the independently publishable epoch185 singleton. It binds the exact
+`e185-full-20261023-v1-r2` producer, staged controller, original185 capability,
+fresh full768GiB admission and actual timer-fired guard proof. Its guard floor
+is3503746342342bytes (the century floor plus four older full768GiB claims), with
+the unchanged800000VMA stop. The fifth model has terminal80351999, zero queued
+replay slots and12h downstream allowance. Retain the original185 reserve-stop
+repair history until a verified ready pair; launch is not recovery.
+
+Use the distinct `repair185-repair183-...` generation and full five-range,
+eleven-epoch census. Initial185 snapshot restoration may explicitly omit only
+185 from estimates while retaining its full live claim and every healthy ETA;
+require zero markers/resets, no first/last/rate, and one readable guarded worker.
+An established replay may not revert to this bootstrap exception. Receipt/model
+validation and successor preparation remain offline; active-cycle preflight
+separately authenticates both actual reserve guards. Never track recurring guard
+invocations as stable replay owners or restart healthy work during adoption.
+
 The optional `repair183_handoff` binding is metadata-only and restricted to the
 new `readerfix-full-20261023` controller/producer pair. Its immutable owner-only
 `handoff.json` uses `jetstreamer-horizon-repair183-live-monitor-handoff-v1` and
@@ -10,6 +28,31 @@ siblings, the prelaunch observer, the complete admission receipt, original
 package capability and a separately sealed actual guard first-fire receipt.
 It must explicitly deny replay/publication/remote authority and new samples.
 No handoff can exist merely from a planned unit or successful admission.
+
+An initial snapshot restore may have no replay progress markers yet. For this
+exact admitted and guard-protected pair only, preserve the complete four-range
+observer and fleet census while estimating and refreshing just the three
+rate-bearing ranges. Require stable zero-restart owners, one readable worker
+below the VMA ceiling, zero markers/resets, and absent first/last/rate values.
+Record `unestimated_bootstrap_epochs: [183, 184]` explicitly; do not invent a
+terminal, rate, or countdown. The immutable model keeps the handoff evidence
+and full expected observer census. The next cycle re-adopts the pair only from
+that bound bootstrap predecessor, and publishes both estimates once real
+progress is available. Missing progress after the epoch184 transition is an
+error, not a bootstrap exception. Never resample to repair a metadata rejection.
+
+The exact October23 02:29 metadata transaction has a separate fleet-tail recovery
+mode (`--check-repair183-fleet-recovery`, then `--recover-repair183-fleet`). It
+binds the failed invocation, rejected child, observer, immutable models and eight
+successful authenticated status receipts. The v2 recovery seals a correction
+removing only the two183–184 guard service/timer observations from the fleet's
+stable replay-unit census: their minute-by-minute invocations legitimately change
+during an inventory read. Replay owners remain fully identity-stable; the actual
+guard and timer are authenticated separately through the sealed handoff and live
+guard checks. Recovery reuses the original model, sample, reader and statuses,
+authenticates fresh inventory, writes the missing fleet/completion, and carries
+the corrected plan into the next prepared cycle. It never republishes replay
+statuses, samples resources, restarts a producer or weakens a ready-pair gate.
 
 The first-fire receipt schema is
 `jetstreamer-horizon-repair183-guard-first-fire-v1`. Require the actual timer-fired

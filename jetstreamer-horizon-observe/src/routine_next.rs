@@ -39,7 +39,7 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                 == p.cycle_directory.join("sealed/eta-model.json").to_str()
             && (c["fleet_plan"]["path"].as_str()
                 == p.cycle_directory.join("sealed/fleet-plan.json").to_str()
-                || public198::promoted(p, c)?),
+                || public198::promoted(p, c)? || repair183_fleet_recovery::completed_plan(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [
@@ -59,10 +59,23 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
         "not a completed unambiguous metadata owner"
     );
+    let bootstrap_count = if c["unestimated_bootstrap_epochs"].is_null() {
+        0
+    } else {
+        let binding: Bound = serde_json::from_value(c["model"].clone())?;
+        let model = bound_json(&binding, true)?;
+        if c["unestimated_bootstrap_epochs"] == json!([183,184]) {
+            ensure!(repair183::bootstrap_model(p, &model), "unbound bootstrap omission");
+            2
+        } else {
+            ensure!(c["unestimated_bootstrap_epochs"] == json!([185]) && repair185::bootstrap_model(p, &model), "foreign bootstrap omission");
+            1
+        }
+    };
     ensure!(
         c["status_publications"]
             .as_array()
-            .is_some_and(|a| a.len() == p.expected_epochs.len()),
+            .is_some_and(|a| a.len() + bootstrap_count == p.expected_epochs.len()),
         "completion status census differs"
     );
     Ok(())
@@ -318,6 +331,7 @@ pub(super) fn prepare(
     publication144::upgrade_reader(&mut next);
     native144_recovery::consume(&mut next, &completion)?;
     public160_recovery::consume(&mut next, &completion)?;
+    repair183_fleet_recovery::consume(&mut next, &completion)?;
     delivery160::consume(&mut next)?;
     if mode == "--prepare-next-public160-timing" {
         ensure!(
@@ -362,6 +376,8 @@ pub(super) fn prepare(
             &delivery198::preparation_model(&next, &model, delivery_spec)?,
         )?,
     )?;
+    let effective = repair183::effective_model(&next, &effective)?;
+    let effective = repair185::effective_model(&next, &effective)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     if prefix_spec.is_none() || mode == "--prepare-next-completed144" {

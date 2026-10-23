@@ -1,9 +1,9 @@
 //! Exact admitted repair183-184 observer/model adoption; never replay authority.
 use super::*;
 const CONTROLLER: &str =
-    "jetstreamer-epochs183-184-readerfix-full-20261023-controller-v1-r2.service";
+    "jetstreamer-epochs183-184-readerfix-full-20261023-controller-v2-r2.service";
 const PRODUCER: &str =
-    "jetstreamer-root-sweep-e183-184-readerfix-full-20261023-v1-r2-e183-184-lane-a-1.service";
+    "jetstreamer-root-sweep-e183-184-full-20261023-v2-r2-e183-184-lane-a-1.service";
 const GUARD: &str = "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.service";
 const GUARD_SCRIPT: &str = "/usr/local/lib/jetstreamer/adaptive-reserve-epochs191-194-20261016-v1/guard-adaptive-replay-reserve.py";
 const GUARD_SHA: &str = "b62e58f5be764935a679408e1fcc446a9768170109a6639c87fd01571b9f2b62";
@@ -100,19 +100,19 @@ fn guard(h: &Handoff, v: &Value) -> Result<()> {
             && v["stop_completion_absent"] == true
             && s["armed"] == true
             && s["trip"] == false
-            && s["controller_active"] == true
-            && s["producer_active"] == true
-            && s["controller_invocation_id"] == h.controller_invocation_id
-            && s["producer_invocation_id"] == h.producer_invocation_id
-            && s["controller_restarts"] == 0
-            && s["producer_restarts"] == 0
+            && s["controller"]["active_state"] == "active"
+            && s["producer"]["active_state"] == "active"
+            && s["controller"]["invocation_id"] == h.controller_invocation_id
+            && s["producer"]["invocation_id"] == h.producer_invocation_id
+            && s["controller"]["restarts"] == 0
+            && s["producer"]["restarts"] == 0
             && s["minimum_free_bytes"] == GUARD_FLOOR
             && s["available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= GUARD_FLOOR)
             && s["maximum_worker_vmas"] == 800000
-            && s["worker_count"] == 1
-            && s["worker_vmas"]
+            && s["producer"]["worker_count"] == 1
+            && s["producer"]["worker_vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n <= 800000),
         "repair183 guard first-fire proof differs"
@@ -250,8 +250,11 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
         "repair183 admission does not bind the exact prelaunch observer"
     );
     guard(&h, &bound_json(&h.guard_first_fire, true)?)?;
-    live_guard(&h)?;
     Ok(Some(h))
+}
+pub(super) fn validate_live(p: &Plan) -> Result<()> {
+    if let Some(h) = proof(p)? { live_guard(&h)?; }
+    Ok(())
 }
 pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> {
     if let Some(h) = proof(p)? {
@@ -268,6 +271,15 @@ pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> 
 fn apply(model: &Value, h: &Handoff) -> Result<Value> {
     scope(h)?;
     let mut v = model.clone();
+    if v["unestimated_bootstrap_epochs"] == json!([183,184]) {
+        v.as_object_mut().context("repair183 model object")?.remove("unestimated_bootstrap_epochs");
+    }
+    if let Some(census) = v.get_mut("expected_observer_ranges") {
+        let census = census.as_array_mut().context("repair183 observer census")?;
+        if !census.contains(&json!("183-184")) {
+            census.push(json!("183-184"));
+        }
+    }
     let ranges = v["ranges"].as_array_mut().context("repair183 ranges")?;
     let indices: Vec<_> = ranges
         .iter()
@@ -332,9 +344,16 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
         .iter()
         .any(|r| r["range"] == "183-184");
     if !already {
+        let continued_bootstrap = bootstrap_model(p, model);
+        if continued_bootstrap {
+            let prior = bound_json(&p.previous_observer, false)?;
+            let checked = observation(model, &h, &prior)?;
+            ensure!(checked["unestimated_bootstrap_epochs"] == json!([183,184]),
+                "repair183 bootstrap predecessor changed");
+        }
         ensure!(
-            h.observer_before_launch.path == p.previous_observer.path
-                && h.observer_before_launch.sha256 == p.previous_observer.sha256,
+            continued_bootstrap || (h.observer_before_launch.path == p.previous_observer.path
+                && h.observer_before_launch.sha256 == p.previous_observer.sha256),
             "repair183 initial predecessor differs"
         );
     }
@@ -356,8 +375,6 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     for unit in [
         CONTROLLER.to_owned(),
         PRODUCER.to_owned(),
-        GUARD.to_owned(),
-        GUARD.replace(".service", ".timer"),
     ] {
         let value = json!(unit);
         if !tracked.contains(&value) {
@@ -421,6 +438,25 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
             );
         }
     }
+    if o["useful_work"]["last"].is_null() {
+        ensure!(o["useful_work"]["first"].is_null()
+            && o["useful_work"]["matching_markers"] == 0
+            && o["useful_work"]["counter_resets"] == 0
+            && o["useful_work"]["sufficient_for_rates"] == false
+            && o["useful_work"]["slots_per_second"].is_null()
+            && v["ranges"].as_array().unwrap().iter().find(|r| r["range"] == "183-184").unwrap()["terminal_slot"] == FIRST_END,
+            "repair183 absent progress is not initial bootstrap");
+        for point in ["before", "after"] {
+            let worker = &o[format!("worker_{point}")];
+            ensure!(worker["matching_workers"] == 1
+                && worker["executable_beneath_bound_scratch"] == true
+                && worker["vmas"].as_u64().is_some_and(|n| n > 0 && n <= 800000),
+                "repair183 bootstrap worker is not protected");
+        }
+        v["ranges"].as_array_mut().unwrap().retain(|r| r["range"] != "183-184");
+        v["unestimated_bootstrap_epochs"] = json!([183,184]);
+        return Ok(v);
+    }
     let terminal = o["useful_work"]["last"]["terminal_slot"]
         .as_u64()
         .context("repair183 observed terminal")?;
@@ -442,9 +478,27 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
     Ok(v)
 }
 
+pub(super) fn bootstrap_model(p: &Plan, model: &Value) -> bool {
+    p.repair183_handoff.as_ref().is_some_and(|b|
+        model["unestimated_bootstrap_epochs"] == json!([183,184])
+        && model["ranges"].as_array().is_some_and(|rs| rs.len() == 3 && !rs.iter().any(|r| r["range"] == "183-184"))
+        && model["expected_observer_ranges"].as_array().is_some_and(|rs| rs.len() == 4 && rs.contains(&json!("183-184")))
+        && model["evidence"].as_array().is_some_and(|es| es.contains(&serde_json::to_value(b).unwrap())))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn producer_namespace_fits_the_pinned_controller_id_limit() {
+        let id = PRODUCER
+            .strip_prefix("jetstreamer-root-sweep-")
+            .unwrap()
+            .strip_suffix("-e183-184-lane-a-1.service")
+            .unwrap();
+        assert!(id.len() <= 32);
+        assert!(id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-'));
+    }
     fn h() -> Handoff {
         serde_json::from_value(json!({"schema":"jetstreamer-horizon-repair183-live-monitor-handoff-v1","controller_invocation_id":"a".repeat(32),"producer_invocation_id":"b".repeat(32),"archive_directory":format!("{ROOT}/destination-x/work/root-cohort-183-184/run-1/archives"),"scratch_path":format!("{ROOT}/destination-x/work/root-cohort-183-184/run-1/scratch"),"observer_before_launch":{"path":"/sample","sha256":"c".repeat(64)},"admission":{"path":"/admit","sha256":"d".repeat(64)},"guard_first_fire":{"path":"/guard","sha256":"e".repeat(64)},"capability":{"path":"/usr/local/lib/jetstreamer/horizon-epochs183-184-package-capability-20261020-v1/capability.json","sha256":"b98120a9a2697fd4bb004df8ebae67594222185db5e4f3cfe2474ce42333ca45"},"new_resource_samples":0,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false})).unwrap()
     }
@@ -462,6 +516,9 @@ mod tests {
         );
         assert_eq!(new["sentinel"], u64::MAX);
         assert_eq!(apply(&new, &h()).unwrap(), new);
+        let mut other_bootstrap = new;
+        other_bootstrap["unestimated_bootstrap_epochs"] = json!([185]);
+        assert_eq!(apply(&other_bootstrap, &h()).unwrap()["unestimated_bootstrap_epochs"], json!([185]));
     }
     #[test]
     fn wrong_scope_authority_owner_and_allowance_fail_closed() {
@@ -489,14 +546,14 @@ mod tests {
     #[test]
     fn guard_receipt_requires_true_timer_fire_exact_owners_budget_and_one_worker() {
         let h = h();
-        let good = json!({"schema":"jetstreamer-horizon-repair183-guard-first-fire-v1","admission":h.admission,"unit":GUARD,"invocation_id":"f".repeat(32),"actual_timer_fired_success":true,"exit_status":0,"restarts":0,"stop_intent_absent":true,"stop_completion_absent":true,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"sample":{"armed":true,"trip":false,"controller_active":true,"producer_active":true,"controller_invocation_id":h.controller_invocation_id,"producer_invocation_id":h.producer_invocation_id,"controller_restarts":0,"producer_restarts":0,"minimum_free_bytes":GUARD_FLOOR,"available_bytes":GUARD_FLOOR+1,"maximum_worker_vmas":800000,"worker_count":1,"worker_vmas":1000}});
+        let good = json!({"schema":"jetstreamer-horizon-repair183-guard-first-fire-v1","admission":h.admission,"unit":GUARD,"invocation_id":"f".repeat(32),"actual_timer_fired_success":true,"exit_status":0,"restarts":0,"stop_intent_absent":true,"stop_completion_absent":true,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"sample":{"armed":true,"trip":false,"controller":{"active_state":"active","invocation_id":h.controller_invocation_id,"restarts":0},"producer":{"active_state":"active","invocation_id":h.producer_invocation_id,"restarts":0,"worker_count":1,"worker_vmas":1000},"minimum_free_bytes":GUARD_FLOOR,"available_bytes":GUARD_FLOOR+1,"maximum_worker_vmas":800000}});
         guard(&h, &good).unwrap();
         for path in [
             "/actual_timer_fired_success",
             "/stop_intent_absent",
             "/sample/armed",
-            "/sample/controller_active",
-            "/sample/producer_active",
+            "/sample/controller/active_state",
+            "/sample/producer/active_state",
         ] {
             let mut bad = good.clone();
             *bad.pointer_mut(path).unwrap() = json!(false);
@@ -504,17 +561,50 @@ mod tests {
         }
         for (path, value) in [
             ("/sample/trip", json!(true)),
-            ("/sample/worker_count", json!(0)),
-            ("/sample/worker_vmas", json!(800001)),
+            ("/sample/producer/worker_count", json!(0)),
+            ("/sample/producer/worker_vmas", json!(800001)),
             ("/sample/minimum_free_bytes", json!(GUARD_FLOOR - 1)),
             ("/sample/available_bytes", json!(GUARD_FLOOR - 1)),
-            ("/sample/producer_invocation_id", json!("0".repeat(32))),
+            ("/sample/producer/invocation_id", json!("0".repeat(32))),
             ("/replay_launch_authorized", json!(true)),
         ] {
             let mut bad = good.clone();
             *bad.pointer_mut(path).unwrap() = value;
             assert!(guard(&h, &bad).is_err());
         }
+    }
+    #[test]
+    fn initial_bootstrap_keeps_full_census_but_never_invents_a_rate_or_terminal() {
+        let h = h();
+        let point = |unit: &str, id: &str| json!({"unit":unit,"invocation_id":id,"restarts":0,"active_state":"active"});
+        let worker = json!({"matching_workers":1,"executable_beneath_bound_scratch":true,"vmas":366000});
+        let o = json!({"replays":[{"range":"183-184","scratch_path":h.scratch_path,"invocation_binding_stable":true,
+            "controller_before":point(CONTROLLER,&h.controller_invocation_id),"controller_after":point(CONTROLLER,&h.controller_invocation_id),
+            "producer_before":point(PRODUCER,&h.producer_invocation_id),"producer_after":point(PRODUCER,&h.producer_invocation_id),
+            "worker_before":worker,"worker_after":worker,"useful_work":{"first":null,"last":null,"matching_markers":0,"counter_resets":0,"sufficient_for_rates":false,"slots_per_second":null}}]});
+        let mut m = model();
+        m["expected_observer_ranges"] = json!(["152-153","155-156","191-194"]);
+        let filtered = observation(&m, &h, &o).unwrap();
+        assert_eq!(filtered["ranges"], m["ranges"]);
+        assert_eq!(filtered["expected_observer_ranges"].as_array().unwrap().len(), 4);
+        assert_eq!(filtered["unestimated_bootstrap_epochs"], json!([183,184]));
+        for (path, value) in [
+            ("/replays/0/useful_work/matching_markers", json!(1)),
+            ("/replays/0/useful_work/counter_resets", json!(1)),
+            ("/replays/0/useful_work/sufficient_for_rates", json!(true)),
+            ("/replays/0/useful_work/slots_per_second", json!(1)),
+            ("/replays/0/worker_after/matching_workers", json!(0)),
+            ("/replays/0/worker_after/vmas", json!(800001)),
+            ("/replays/0/producer_after/restarts", json!(1)),
+        ] {
+            let mut bad = o.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(observation(&m, &h, &bad).is_err(), "{path}");
+        }
+        let mut advanced = apply(&m, &h).unwrap();
+        advanced["ranges"][3]["terminal_slot"] = json!(FINAL_END);
+        advanced["ranges"][3]["epoch_additional_replay_slots"] = json!({"183":0,"184":0});
+        assert!(observation(&advanced, &h, &o).is_err());
     }
     #[test]
     fn epoch184_transition_preserves_gate_allowances_and_rejects_owner_reset() {

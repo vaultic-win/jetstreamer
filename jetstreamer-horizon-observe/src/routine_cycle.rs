@@ -44,6 +44,8 @@ mod fleet_tail_recovery;
 mod public160;
 #[path = "routine_public160_recovery.rs"]
 mod public160_recovery;
+#[path = "routine_repair183_fleet_recovery.rs"]
+mod repair183_fleet_recovery;
 #[path = "routine_public160_timing.rs"]
 mod public160_timing;
 #[path = "routine_public198.rs"]
@@ -84,6 +86,8 @@ mod prefix157;
 mod publication144;
 #[path = "routine_repair183.rs"]
 mod repair183;
+#[path = "routine_repair185.rs"]
+mod repair185;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -111,6 +115,8 @@ struct Plan {
     delayed_schedule_utc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repair183_handoff: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repair185_handoff: Option<Bound>,
     endpoint_sha256: String,
     bucket: String,
     observer: PathBuf,
@@ -252,6 +258,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.repair185_handoff.is_some() {
+        return "repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
+    }
     if p.repair183_handoff.is_some() {
         return "repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -756,6 +765,7 @@ fn validate_templates(
     assembly144_scans::validate(p)?;
     publication144::validate(p)?;
     repair183::extend_epochs(p, &mut epochs)?;
+    repair185::extend_epochs(p, &mut epochs)?;
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -863,7 +873,7 @@ fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> 
     let modeled = model["ranges"].as_array().context("model census missing")?;
     ensure!(
         observed.len()
-            == modeled.len()
+            == modeled.len() + usize::from(repair183::bootstrap_model(p, model)) + usize::from(repair185::bootstrap_model(p, model))
                 + p.scope_101_200
                     .as_ref()
                     .map_or(0, |s| if s.private144_observer {
@@ -1259,6 +1269,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     assembly144_scans::derive_fleet(p, &mut fleet)?;
     publication144::derive_fleet(p, &mut fleet)?;
     repair183::derive_fleet(p, &mut fleet)?;
+    repair185::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1435,14 +1446,22 @@ fn verify_estimates(
             "invalid estimate integers"
         );
     }
-    ensure!(
-        seen.len() == p.expected_epochs.len(),
+    let modeled_epochs: BTreeSet<_> = model["ranges"].as_array().context("estimate model ranges")?
+        .iter().flat_map(|r| r["epochs"].as_array().into_iter().flatten())
+        .filter_map(Value::as_u64).collect();
+    let expected: BTreeSet<_> = p.expected_epochs.iter().copied().collect();
+    ensure!(seen == modeled_epochs
+        && (seen == expected || (repair183::bootstrap_model(p, model)
+            && expected.difference(&seen).copied().collect::<BTreeSet<_>>() == BTreeSet::from([183,184]))
+            || (repair185::bootstrap_model(p, model) && expected.difference(&seen).copied().collect::<BTreeSet<_>>() == BTreeSet::from([185]))),
         "estimate census incomplete"
     );
     Ok(entries.clone())
 }
 
 fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Result<()> {
+    repair183::validate_live(p)?;
+    repair185::validate_live(p)?;
     let model = bound_json(&p.model_template, true)?;
     let fleet = bound_json(&p.fleet_template, true)?;
     let previous = bound_json(&p.previous_fleet, false)?;
@@ -1458,6 +1477,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         )?,
     )?;
     let model = repair183::effective_model(p, &model)?;
+    let model = repair185::effective_model(p, &model)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1484,6 +1504,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     assembly144_scans::derive_fleet(p, &mut fleet.clone())?;
     publication144::derive_fleet(p, &mut fleet.clone())?;
     repair183::derive_fleet(p, &mut fleet.clone())?;
+    repair185::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1534,6 +1555,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             let checked = terminal_handoff::for_observation(p, &model, &observed)?;
             let checked = cohort191::for_observation(p, &checked, &observed)?;
             let checked = repair183::for_observation(p, &checked, &observed)?;
+            let checked = repair185::for_observation(p, &checked, &observed)?;
             validate_observation(
                 p,
                 &checked,
@@ -1556,6 +1578,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     let model = terminal_handoff::for_observation(p, &model, &observed)?;
     let model = cohort191::for_observation(p, &model, &observed)?;
     let model = repair183::for_observation(p, &model, &observed)?;
+    let model = repair185::for_observation(p, &model, &observed)?;
     validate_observation(
         p,
         &model,
@@ -1753,7 +1776,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":plan_bound,"self_sha256":self_sha,
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
-            "inventory":ledger["inventory"],"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
+            "inventory":ledger["inventory"],"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
             "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
@@ -1834,6 +1857,8 @@ fn main() {
                             | "--check-native144-recovery"
                             | "--recover-public160"
                             | "--check-public160-recovery"
+                            | "--recover-repair183-fleet"
+                            | "--check-repair183-fleet-recovery"
                             | "--prepare-next-terminal157"
                             | "--prepare-next-private144"
                             | "--prepare-package-recovery"
@@ -1856,6 +1881,9 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| a == "--recover-repair183-fleet" || a == "--check-repair183-fleet-recovery") {
+            return repair183_fleet_recovery::run(&plan, &bound, &args[5], args[6] == "--check-repair183-fleet-recovery");
+        }
         if args.get(6).is_some_and(|a| {
             matches!(
                 a.as_str(),
@@ -2422,6 +2450,35 @@ mod tests {
         assert_eq!(receipt["success"], true);
         assert_eq!(receipt["stdout"]["text"], "ok");
         assert_eq!(receipt["stderr"]["truncated"], false);
+    }
+
+    #[test]
+    fn bootstrap_estimates_may_omit_only_the_exact_unestimated_pair() {
+        let (mut p, _, _, _, _, _, _, _) = fixture();
+        let handoff = Bound { path: "/sealed/handoff.json".into(), sha256: "d".repeat(64) };
+        p.repair183_handoff = Some(handoff.clone());
+        p.expected_epochs = vec![152,153,155,156,183,184,191,192,193,194];
+        let ranges = json!([
+            {"range":"152-153","epochs":[152,153],"archive_directory":"/a","expected_controller_invocation_id":"a","expected_producer_invocation_id":"b"},
+            {"range":"155-156","epochs":[155,156],"archive_directory":"/b","expected_controller_invocation_id":"a","expected_producer_invocation_id":"b"},
+            {"range":"191-194","epochs":[191,192,193,194],"archive_directory":"/c","expected_controller_invocation_id":"a","expected_producer_invocation_id":"b"}]);
+        let model = json!({"ranges":ranges,"expected_observer_ranges":["152-153","155-156","191-194","183-184"],
+            "evidence":[handoff],"unestimated_bootstrap_epochs":[183,184]});
+        let observer = Bound { path: "/sample".into(), sha256: "e".repeat(64) };
+        let entries: Vec<_> = model["ranges"].as_array().unwrap().iter().flat_map(|r|
+            r["epochs"].as_array().unwrap().iter().map(|n| json!({"epoch":n,"archive_directory":r["archive_directory"],
+                "expected_controller_invocation_id":"a","expected_producer_invocation_id":"b","elapsed_execution_millis":1,"estimated_remaining_millis":2}))).collect();
+        let estimates = json!({"schema":"jetstreamer-horizon-r2-status-estimates-v5","sampled_at_utc":p.sample_target_utc,
+            "observer_sha256":observer.sha256,"estimates":entries});
+        assert_eq!(verify_estimates(&p, &model, &observer, &estimates).unwrap().len(), 8);
+        let mut missing = estimates.clone();
+        missing["estimates"].as_array_mut().unwrap().pop();
+        assert!(verify_estimates(&p, &model, &observer, &missing).is_err());
+        let mut unbound = model.clone();
+        unbound["evidence"] = json!([]);
+        assert!(verify_estimates(&p, &unbound, &observer, &estimates).is_err());
+        p.expected_epochs.push(185);
+        assert!(verify_estimates(&p, &model, &observer, &estimates).is_err());
     }
 
     fn fixture() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
