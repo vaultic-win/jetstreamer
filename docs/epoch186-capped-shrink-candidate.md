@@ -45,3 +45,25 @@ It binds `/home/sol/.jetstreamer-private`, bootstrap 80351283 and terminal root
 remaining 460 epoch slots. The experimental scratch stop in the profile is not
 a qualified full cold-epoch budget. A capability receipt grants no replay,
 runtime promotion, complete-epoch, sidecar or R2 authority.
+
+The 101–200 routine coordinator reports `capped186_budget` alongside its memory
+target and expanded-fleet window. The prospective whole-root stop is 512 GiB,
+including output; this remains an experimental stop rather than a demonstrated
+full cold-epoch peak. The report retains the five production growth claims and
+their earlier scratch maxima, checks current scratch against those claims, and
+adds the live capped141 run's remaining growth separately. It credits only the
+smaller of that run's two physical scratch measurements against its 512 GiB stop;
+indices and archive output receive no consumption credit. It never removes an
+existing reservation or changes a running guard.
+
+At the accepted 2026-10-23 14:56 sample, the five-lane baseline was
+3,572,465,819,078 bytes, capped141's conservatively remaining growth was
+531,032,023,040 bytes, and the prospective186 stop added549,755,813,888 bytes.
+Against4,175,301,214,208 free bytes this left a477,952,441,798-byte deficit.
+Recompute this from each accepted sample; do not omit141 because its current
+scratch is small. A disk-fit result is still planning evidence only. Fresh
+admission must revalidate current guards, floor, growth, source capability,
+claims and resource sharing, with a sealed invocation-bound launch and capture
+path before replay. Verified offload or a separately admitted bounded resource
+experiment can resolve a missing execution envelope while preserving the
+memory-selected concurrency target.

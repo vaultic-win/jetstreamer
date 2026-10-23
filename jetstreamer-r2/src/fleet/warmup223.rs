@@ -700,9 +700,11 @@ mod tests {
             evidence: vec![],
         };
         let error = validate_live(&claim, &json!({})).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("historical warmup cannot become live"));
+        assert!(
+            error
+                .to_string()
+                .contains("historical warmup cannot become live")
+        );
         assert!(validate(&claim).is_err());
     }
     fn fixture() -> (Spec, Value, Value) {

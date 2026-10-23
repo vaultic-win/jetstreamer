@@ -131,6 +131,9 @@ pub(super) fn invocation(p: &Plan) -> Option<&str> {
         .as_ref()
         .map(|s| s.invocation_id.as_str())
 }
+pub(super) fn launch_binding(p: &Plan) -> Option<&Bound> {
+    p.original141_root.as_ref().map(|s| &s.launch)
+}
 pub(super) fn retained144_census(p: &Plan, scope: &Scope101200) -> bool {
     scope.diagnostic_ranges.len() == if enabled(p) { 2 } else { 1 }
         && scope
