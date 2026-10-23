@@ -67,6 +67,7 @@ mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
 mod fleet;
+mod holding;
 mod inactive_status;
 mod inventory_batch;
 mod pipeline_status;
@@ -2157,13 +2158,53 @@ async fn upload_archive(
     overwrite_existing: bool,
 ) -> Result<(String, String)> {
     let key = format!("epoch-{}.jet", local.epoch);
+    upload_object(
+        client,
+        bucket,
+        ObjectUpload {
+            key: &key,
+            epoch: Some(local.epoch),
+            path: &local.archive_path,
+            identity: local.identity,
+            length: local.length,
+            sha256: &local.sha256_hex,
+            format: "jet",
+        },
+        part_size,
+        concurrency,
+        overwrite_existing,
+    )
+    .await
+}
+
+// Shared byte transport only. Each caller owns its namespace, provenance,
+// integrity and mutation policy. Holding never creates a canonical archive.
+struct ObjectUpload<'a> {
+    key: &'a str,
+    epoch: Option<u64>,
+    path: &'a Path,
+    identity: FileIdentity,
+    length: u64,
+    sha256: &'a str,
+    format: &'a str,
+}
+
+async fn upload_object(
+    client: &Client,
+    bucket: &str,
+    local: ObjectUpload<'_>,
+    part_size: u64,
+    concurrency: usize,
+    overwrite_existing: bool,
+) -> Result<(String, String)> {
+    let key = local.key.to_owned();
     let created = client
         .create_multipart_upload()
         .bucket(bucket)
         .key(&key)
         .content_type("application/octet-stream")
-        .metadata("sha256", &local.sha256_hex)
-        .metadata("horizon-format", "jet")
+        .metadata("sha256", local.sha256)
+        .metadata("horizon-format", local.format)
         .metadata("multipart-part-size", part_size.to_string())
         .send()
         .await
@@ -2199,7 +2240,7 @@ async fn upload_archive(
                 let bucket = bucket.to_owned();
                 let key = key.clone();
                 let upload_id = upload_id.clone();
-                let path = local.archive_path.clone();
+                let path = local.path.to_path_buf();
                 let expected = local.identity;
                 let offset = part_index * part_size;
                 let length = usize::try_from((local.length - offset).min(part_size))?;
@@ -3292,6 +3333,12 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some("holding-park" | "holding-restore")
+    ) {
+        return holding::run().await;
+    }
     match env::args().nth(1).as_deref() {
         Some("prepare-original141-capped-layout") => return fleet::prepare_original141_capped(),
         Some("capture-original141-capped-launch") => return fleet::capture_original141_capped(),
