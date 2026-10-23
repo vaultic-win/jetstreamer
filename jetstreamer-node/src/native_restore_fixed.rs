@@ -36,9 +36,9 @@ use {
 };
 
 use super::profile::{
-    ADMISSION_SCHEMA, BOOTSTRAP, BOOTSTRAP_HASH, EPOCH, GENESIS, INPUT_SCHEMA, LEASE_PATH,
-    PLAN_SCHEMA, PREFIX, RECEIPT_SCHEMA, ROOT_HASH, RUN_PREFIX, SLOT, SNAPSHOT, SNAPSHOT_NAME,
-    SNAPSHOT_SIZE, START, UNIT_PREFIX, WORKER,
+    ADMISSION_SCHEMA, BOOTSTRAP, BOOTSTRAP_HASH, EPOCH, GENERATION_PROFILE, GENESIS, INPUT_SCHEMA,
+    LEASE_PATH, PLAN_SCHEMA, PREFIX, RECEIPT_SCHEMA, ROOT_HASH, RUN_PREFIX, SLOT, SNAPSHOT,
+    SNAPSHOT_NAME, SNAPSHOT_SIZE, START, UNIT_PREFIX, WORKER,
 };
 // Recompute the real century floor and all older growth at admission. This
 // thirteen-sample baseline and restore-only experiment are rejection minima,
@@ -138,7 +138,7 @@ fn expectation(m: &HistoricalSegmentManifest, pass: &Value) -> Result<()> {
             && m.terminal.slot == SLOT
             && m.bootstrap.accounts_hash == BOOTSTRAP_HASH
             && m.bootstrap_archive_sha256.is_none()
-            && m.runtime.generation_profile == "jetstreamer-node/historical-replay-v1"
+            && m.runtime.generation_profile == GENERATION_PROFILE
             && m.runtime.runtime_profile == "solana-v1.6.16"
             && m.runtime.runtime_revision == "86c26f843276581509c3434acc2efbf4202c44e0"
             && m.runtime.runtime_admission == SegmentRuntimeAdmission::Candidate
@@ -520,7 +520,7 @@ mod tests {
         let hash = |n| Hash::new_from_array([n; 32]).to_string();
         serde_json::from_value(json!({"schema_version":1,"epoch":EPOCH,
             "output_slot_start":START,"output_slot_count":SLOT-START+1,
-            "runtime":{"generation_profile":"jetstreamer-node/historical-replay-v1",
+            "runtime":{"generation_profile":GENERATION_PROFILE,
                 "runtime_profile":"solana-v1.6.16","runtime_admission":"candidate",
                 "runtime_revision":"86c26f843276581509c3434acc2efbf4202c44e0",
                 "runtime_toolchain":"rustc 1.51.0","runtime_target":"x86_64-unknown-linux-gnu",
@@ -572,6 +572,32 @@ mod tests {
             candidate_incremental_peak_bytes: MINIMUM_PEAK,
             minimum_free_bytes: MINIMUM_FLOOR + MINIMUM_PEAK,
         }
+    }
+    #[test]
+    fn actual203_prefix_receipts_pin_the_recorded_producer_generation() {
+        if EPOCH != 203 {
+            return; // A205 prefix has not yet completed; never borrow203 proof.
+        }
+        let m: HistoricalSegmentManifest = serde_json::from_str(include_str!(
+            "../tests/fixtures/epoch203-capped-shrink-root.manifest.json"
+        ))
+        .unwrap();
+        let reader: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/epoch203-capped-shrink-root.validation.json"
+        ))
+        .unwrap();
+        expectation(&m, &reader).unwrap();
+        assert_eq!(
+            sha256_hex_string(&m.content_sha256().unwrap()),
+            "16a62e1b4a4acc3c222f50486c13336215a5e0d18c38bc1dbaa8a2c66f337643"
+        );
+        let mut wrong = m.clone();
+        wrong.runtime.generation_profile = "jetstreamer-node/historical-replay-v1".into();
+        // Even an internally consistent reader cannot promote the old invented
+        // profile, an adjacent producer build or another epoch's provenance.
+        assert!(expectation(&wrong, &pass(&wrong)).is_err());
+        wrong.runtime.generation_profile = format!("{GENERATION_PROFILE}-other");
+        assert!(expectation(&wrong, &pass(&wrong)).is_err());
     }
     #[test]
     fn exact_fixed_prefix_binds_complete_independent_reader_content() {

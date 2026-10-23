@@ -5,6 +5,29 @@
 diagnostic only. It never sends replay entries, produces a suffix or archive,
 creates a canonical sidecar, promotes a runtime, or touches R2.
 
+The fleet's separately closed `horizon-native-203-0158-v1.service` registration
+can observe a future restore-only attempt using the separately sealed, fixed-profile
+`a4acd558…` probe. It rehashes the outer plan, input/admission bindings and complete independent
+reader evidence; checks the exact live command and unprivileged sandbox; and
+admits only a real one-worker guard transition. Its 192-GiB trial envelope,
+128-GiB memory ceiling and 75-minute runtime limit do not qualify a full replay
+peak. Registration is not launch/admission authority: fresh complete fleet and
+resource evidence, a separately sealed admission, real input capability, and
+first-fire guard proof remain required. The lane has no sidecar ETA and cannot
+borrow the epoch-213 suffix or assembly contract.
+
+The original `da3b015a…` preparation was rejected by a real-input no-worker
+capability on 2026-10-23: its synthetic fixture expected
+`jetstreamer-node/historical-replay-v1`, whereas the complete independently read
+prefix records the pinned producer profile
+`jetstreamer-node/0.7.0/old-faithful-to-horizon-v2@3de96e71010a8a2f5e629f666227b137483bff7b`.
+The corrected203 expectation pins that exact recorded identity; it does not
+accept arbitrary generation strings or edit retained evidence. The real producer
+manifest and independent reader receipt are regression fixtures, including
+rejection of the old placeholder and another generation even with a newly
+consistent typed-manifest digest. The shared205 comparator retains its prior
+closed expectation until its own completed prefix supplies actual evidence.
+
 The scope is the current capped-shrink worker `4aeca563…`, the independently
 verified prefix from 87,696,000 through the canonical root 88,127,580, and the
 generation-bound 8,215,471,895-byte restart snapshot `d3114597…`. The snapshot

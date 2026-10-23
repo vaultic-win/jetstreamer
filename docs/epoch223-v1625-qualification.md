@@ -6,6 +6,18 @@ v1.6.20 restart-marker correction does not establish that its known failure at
 but recorded no epoch-223 tail archive. Do not repeat a long v1.6.20 run or
 pretend the old epoch-224 artifact contains those missing writes.
 
+The cold known-root prefix attempt `5c5a9e56…` subsequently failed on
+2026-10-23 during pre-output warmup from snapshot 96,335,538: the batch spanning
+slot 96,335,539 entry 515 through slot 96,335,541 entry 5 returned
+`InvalidWritableAccount` from fee collection. Snapshot restore/freeze success and
+the later 477-slot tail comparison therefore do not qualify v1.6.25 for this
+whole prefix. The vendored v1.6.25 account loader adds writable executable and
+upgradeable-owned account rejection checks absent from v1.6.20; identifying
+that difference is not yet proof of the exact transaction's cause. Preserve the
+failure, inspect the canonical transaction and account state, and qualify the
+correct historical prefix/restart route before retrying. Do not suppress the
+error or weaken SourceExact, checkpoint, or publication checks.
+
 Build both the historical v1.6.25 worker and parent with only
 `epoch223-v1-6-25-qualification`. Their ordinary default routes are unchanged.
 The parent identifies the exact upstream v1.6.25 revision, executable and
