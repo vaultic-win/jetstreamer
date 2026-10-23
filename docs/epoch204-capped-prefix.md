@@ -22,3 +22,18 @@ launch still needs independent fresh fleet/memory admission, disjoint ownership,
 and a proven invocation-bound protective guard. Native checkpoint comparison,
 suffix replay, complete V4 assembly, full/current-plugin verification and
 publication remain separate qualifications.
+
+The `jetstreamer-r2 admit-prefix204` command requires the actual203 scan admission,
+the exact no-spawn204 capability, a fresh complete fleet/observer pair, and fresh
+225/205 protective guard receipts. It preserves both replay invocations and the
+actual203 scan, checks their configured and kernel memory limits, uses this
+century's1.5× aggregate-RSS allowance for the new lane, and repeats the complete
+census before writing an immutable admission. The protected disk allowance is
+the recomputed century floor plus640GiB for225,300GB for205 and128GiB for the scan;
+the candidate adds300GB scratch plus160GiB output/margin. The scan's completion
+or handoff requires reconciliation before this exact admission can be reused.
+
+`capture-prefix204` separately verifies the actual new invocation, exact command,
+live sandbox,300GB own-root/VMA guard and the first real protective timer fire's
+PID1 success. Fleet registration is observational and grants no new replay or
+publication authority. Neither command can borrow205's capability or receipts.
