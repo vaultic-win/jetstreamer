@@ -592,9 +592,25 @@ fn fleet_owners(f: &Value) -> Result<std::collections::BTreeMap<String, String>>
     {
         if row["producer"].is_object() {
             insert(&row["producer"])?;
-            insert(&row["controller"])?;
+            if row["controller"].is_object() {
+                insert(&row["controller"])?;
+            } else {
+                ensure!(
+                    row["ordinary_replay_claim"] == false
+                        && f["diagnostics"]
+                            .as_array()
+                            .context("private holding census")?
+                            .iter()
+                            .any(|d| d["live"] == true
+                                && d["unit"]["Id"] == row["producer"]["Id"]
+                                && d["unit"]["InvocationID"] == row["producer"]["InvocationID"]),
+                    "controllerless holding owner lacks its live private diagnostic binding"
+                );
+            }
         } else if row["unit"].is_object() {
             insert(&row["unit"])?;
+        } else {
+            bail!("unrecognized active holding owner shape");
         }
     }
     for row in f["diagnostics"]

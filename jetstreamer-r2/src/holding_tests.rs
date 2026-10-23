@@ -289,6 +289,16 @@ fn admission_owner_derivation_deduplicates_cohorts_and_keeps_private_diagnostics
     changed["diagnostics"][0]["unit"]["NRestarts"] = json!("1");
     assert!(fleet_owners(&changed).is_err());
     assert!(fleet_owners(&json!({"active":[],"diagnostics":[]})).is_err());
+    let controllerless = json!({"active":[{"producer":private,"ordinary_replay_claim":false}],
+        "diagnostics":[{"live":true,"unit":private}]});
+    assert_eq!(fleet_owners(&controllerless).unwrap().len(), 1);
+    let mut missing = controllerless.clone();
+    missing["diagnostics"] = json!([]);
+    assert!(fleet_owners(&missing).is_err());
+    missing = controllerless;
+    missing["active"][0]["ordinary_replay_claim"] = json!(true);
+    assert!(fleet_owners(&missing).is_err());
+    assert!(fleet_owners(&json!({"active":[{}],"diagnostics":[]})).is_err());
     assert!(
         serde_json::from_value::<RestoreAdmission>(json!({
             "schema":"jetstreamer-horizon-holding-restore-admission-plan-v2",
@@ -298,6 +308,23 @@ fn admission_owner_derivation_deduplicates_cohorts_and_keeps_private_diagnostics
             "minimum_free_bytes":0
         }))
         .is_err()
+    );
+}
+
+#[test]
+#[ignore = "root exact accepted1626 fleet; read-only native evidence, no sampling or remote access"]
+fn actual_accepted_fleet_includes_all_five_controllers_producers_and_private141() {
+    let fleet = Bound {
+        path: "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261023T162600Z.json"
+            .into(),
+        sha256: "c2520b7705df263e74aef11b20c81c2bf9375eec262868f87a0c9582988c0a85".into(),
+    };
+    let f = evidence(&fleet, false).unwrap();
+    let owners = fleet_owners(&f).unwrap();
+    assert_eq!(owners.len(), 11);
+    assert_eq!(
+        owners["horizon-qualify-141-original-entry-capped-root-20261023-v1.service"],
+        "e639f007d482464f8a251455659d2ede"
     );
 }
 
