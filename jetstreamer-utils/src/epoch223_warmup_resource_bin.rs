@@ -21,6 +21,8 @@ mod profile {
     pub const MAX_SCRATCH: u64 = 300_000_000_000;
     pub const MAX_RUNTIME: u64 = 3600;
     pub const ENFORCED_FREE: u64 = 1_511_435_598_739;
+    pub const MEMORY_RESERVE: u64 = 448u64 << 30;
+    pub const INITIAL_AVAILABLE: u64 = 576u64 << 30;
     pub const SNAPSHOT_SIZE: u64 = 9_815_262_303;
     pub const SNAPSHOT: &str = "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665";
     pub const SNAPSHOT_NAME: &str =

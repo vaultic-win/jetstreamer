@@ -97,7 +97,7 @@ fn absent_jet(path: &Path, origin: &Path, epoch: u64, expected: u64) -> Result<(
     );
     Ok(())
 }
-fn selected_clock(
+pub(super) fn selected_clock(
     observer: &Value,
     origin: &Value,
     fleet: &Value,

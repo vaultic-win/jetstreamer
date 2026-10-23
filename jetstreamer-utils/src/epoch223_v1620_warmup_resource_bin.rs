@@ -17,10 +17,12 @@ mod profile {
     pub const TARGET: u64 = 96_335_554;
     pub const TERMINAL: u64 = 96_767_522;
     pub const INITIAL_REPLAY: u64 = 96_335_539;
-    pub const MINIMUM_FREE: u64 = 548_289_182_611;
+    pub const MINIMUM_FREE: u64 = 2_300_000_000_000;
     pub const MAX_SCRATCH: u64 = 300_000_000_000;
     pub const MAX_RUNTIME: u64 = 3600;
-    pub const ENFORCED_FREE: u64 = 1_511_435_598_739;
+    pub const ENFORCED_FREE: u64 = 2_000_000_000_000;
+    pub const MEMORY_RESERVE: u64 = 480u64 << 30;
+    pub const INITIAL_AVAILABLE: u64 = 608u64 << 30;
     pub const SNAPSHOT_SIZE: u64 = 9_815_262_303;
     pub const SNAPSHOT: &str = "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665";
     pub const SNAPSHOT_NAME: &str =

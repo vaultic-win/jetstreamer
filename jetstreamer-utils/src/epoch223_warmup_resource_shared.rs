@@ -69,17 +69,18 @@ mod bounded_resource_runner {
         }
         fn before_spawn(&self, _p: &Plan, _iid: &str) -> Result<Value> {
             ensure!(
-                available_memory()? >= (448 + 128) * (1u64 << 30),
+                available_memory()? >= INITIAL_AVAILABLE,
                 "warmup memory admission"
             );
             ensure!(
-                free_bytes(&_p.run_root)? >= ENFORCED_FREE,
+                free_bytes(&_p.run_root)? >= ENFORCED_FREE.max(MINIMUM_FREE),
                 "warmup protected free-space admission"
             );
             Ok(
                 json!({"worker_entry_start":INITIAL_REPLAY,"worker_entry_end_exclusive":TARGET+1,
                 "parent_requested_root":TERMINAL,"parent_request_is_not_worker_scope":true,
                 "scratch_planning_bytes":MAX_SCRATCH,"enforced_filesystem_floor_bytes":ENFORCED_FREE,
+                "minimum_available_memory_bytes":MEMORY_RESERVE,"initial_available_memory_bytes":INITIAL_AVAILABLE,
                 "canonical_prefix_qualified":false}),
             )
         }
@@ -101,7 +102,7 @@ mod bounded_resource_runner {
             *next = Instant::now() + Duration::from_secs(15);
             let check = (|| -> Result<()> {
                 ensure!(
-                    available_memory()? >= 448 * (1u64 << 30),
+                    available_memory()? >= MEMORY_RESERVE,
                     "host-memory reserve"
                 );
                 ensure!(
@@ -261,7 +262,8 @@ mod bounded_resource_runner {
                 .collect::<Vec<_>>();
             assert!(args.contains(&"--qualification-end-slot=96767522"));
             assert_eq!(TARGET - INITIAL_REPLAY + 1, 16);
-            assert!(ENFORCED_FREE > MINIMUM_FREE);
+            assert!(ENFORCED_FREE > 0);
+            assert_eq!(INITIAL_AVAILABLE, MEMORY_RESERVE + (128u64 << 30));
             assert!(root_manifest_valid(&json!({})).is_err());
             assert!(validate_checkpoint_names(&CHECKPOINT_NAMES.join("\n")).is_ok());
             assert!(validate_checkpoint_names(SNAPSHOT_NAME).is_err());

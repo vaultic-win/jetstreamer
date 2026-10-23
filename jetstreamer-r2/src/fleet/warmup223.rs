@@ -1,5 +1,6 @@
 //! Closed admission/ownership for the first16-slot failure-context experiment.
 use super::*;
+mod native20;
 const HISTORICAL_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
 const UNIT: &str = "horizon-qualify-223-warmup-resource-5072b7ba-v4.service";
 const ROOT: &str =
@@ -28,7 +29,14 @@ const OWNERS: [(&str, &str); 4] = [
     ),
 ];
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
-    phase == "private-warmup-reproduction" && matches!(unit, UNIT | HISTORICAL_UNIT)
+    native20::scope(phase, unit)
+        || (phase == "private-warmup-reproduction" && matches!(unit, UNIT | HISTORICAL_UNIT))
+}
+pub(super) fn status_claim(v: &Value) -> Result<()> {
+    native20::status_claim(v)
+}
+pub(super) fn status_jet_path() -> PathBuf {
+    native20::status_jet_path()
 }
 fn command() -> String {
     format!(
@@ -270,6 +278,10 @@ pub(super) fn run(capture: bool) -> Result<()> {
     } else {
         "admit-warmup223"
     })?;
+    if bound_json(&binding)?["schema"] == "jetstreamer-private-warmup223-native20-admission-spec-v1"
+    {
+        return native20::run(capture, binding, self_sha);
+    }
     let spec: Spec = serde_json::from_value(bound_json(&binding)?)?;
     let o = bound_json(&spec.observer)?;
     let f = bound_json(&spec.fleet)?;
@@ -439,6 +451,9 @@ fn sandbox(c: &PipelineClaim, current: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
+    if native20::scope(&c.phase, &c.unit) {
+        return native20::validate(c);
+    }
     if c.unit == HISTORICAL_UNIT {
         let binding = BoundFile {
             path: "/var/lib/jetstreamer/horizon-warmup223-admission-v3/launch.json".into(),
@@ -503,6 +518,9 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
+    if native20::scope(&c.phase, &c.unit) {
+        return native20::validate_live(c, current);
+    }
     ensure!(
         c.unit == UNIT,
         "terminal historical warmup cannot become live"
@@ -574,6 +592,11 @@ pub(super) fn event_predecessor(
     sampled: &str,
     now: u64,
 ) -> Result<()> {
+    let event_unit = if proof["unit"] == native20::UNIT {
+        native20::UNIT
+    } else {
+        UNIT
+    };
     ensure!(
         p.first_epoch == 201
             && p.last_epoch == 300
@@ -615,7 +638,7 @@ pub(super) fn event_predecessor(
     let claims = p
         .pipeline_claims
         .iter()
-        .filter(|c| c.phase == "private-warmup-reproduction" && c.unit == UNIT)
+        .filter(|c| c.phase == "private-warmup-reproduction" && c.unit == event_unit)
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
@@ -627,7 +650,7 @@ pub(super) fn event_predecessor(
         p.metadata_event.as_ref() == claim.evidence.first()
             && claim.invocation_id == proof["invocation_id"]
             && p.pipeline_claims.len() == old.pipeline_claims.len() + 1
-            && !old.pipeline_claims.iter().any(|c| c.unit == UNIT)
+            && !old.pipeline_claims.iter().any(|c| c.unit == event_unit)
             && old
                 .pipeline_claims
                 .iter()
@@ -635,7 +658,7 @@ pub(super) fn event_predecessor(
         "warmup event changed pipeline history"
     );
     let mut tracks = old.tracked_units.iter().cloned().collect::<BTreeSet<_>>();
-    tracks.insert(UNIT.into());
+    tracks.insert(event_unit.into());
     ensure!(
         tracks == p.tracked_units.iter().cloned().collect::<BTreeSet<_>>()
             && p.diagnostics.len() == old.diagnostics.len()
@@ -668,18 +691,27 @@ pub(super) fn event_census(p: &Plan, c: &BTreeMap<String, Value>) -> Result<()> 
     if let Some(binding) = &p.metadata_event {
         let proof = bound_json(binding)?;
         if proof["schema"] == "jetstreamer-private-warmup223-launch-v1" {
+            let event_unit = if proof["unit"] == native20::UNIT {
+                native20::UNIT
+            } else {
+                UNIT
+            };
             let f = bound_json(
                 p.previous_fleet
                     .as_ref()
                     .context("warmup event prior fleet")?,
             )?;
-            protected(&f, c)?;
+            if event_unit == native20::UNIT {
+                native20::event_protected(&f, c)?;
+            } else {
+                protected(&f, c)?;
+            }
             let claim = p
                 .pipeline_claims
                 .iter()
-                .find(|c| c.phase == "private-warmup-reproduction" && c.unit == UNIT)
+                .find(|c| c.phase == "private-warmup-reproduction" && c.unit == event_unit)
                 .context("warmup event claim")?;
-            validate_live(claim, &c[UNIT])?;
+            validate_live(claim, &c[event_unit])?;
         }
     }
     Ok(())
