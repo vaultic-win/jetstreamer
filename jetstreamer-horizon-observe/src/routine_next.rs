@@ -62,10 +62,15 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
     let bootstrap_count = if c["unestimated_bootstrap_epochs"].is_null() {
         0
     } else {
-        ensure!(c["unestimated_bootstrap_epochs"] == json!([183,184]), "foreign bootstrap omission");
         let binding: Bound = serde_json::from_value(c["model"].clone())?;
-        ensure!(repair183::bootstrap_model(p, &bound_json(&binding, true)?), "unbound bootstrap omission");
-        2
+        let model = bound_json(&binding, true)?;
+        if c["unestimated_bootstrap_epochs"] == json!([183,184]) {
+            ensure!(repair183::bootstrap_model(p, &model), "unbound bootstrap omission");
+            2
+        } else {
+            ensure!(c["unestimated_bootstrap_epochs"] == json!([185]) && repair185::bootstrap_model(p, &model), "foreign bootstrap omission");
+            1
+        }
     };
     ensure!(
         c["status_publications"]
@@ -372,6 +377,7 @@ pub(super) fn prepare(
         )?,
     )?;
     let effective = repair183::effective_model(&next, &effective)?;
+    let effective = repair185::effective_model(&next, &effective)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     if prefix_spec.is_none() || mode == "--prepare-next-completed144" {

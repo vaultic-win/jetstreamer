@@ -271,7 +271,9 @@ pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> 
 fn apply(model: &Value, h: &Handoff) -> Result<Value> {
     scope(h)?;
     let mut v = model.clone();
-    v.as_object_mut().context("repair183 model object")?.remove("unestimated_bootstrap_epochs");
+    if v["unestimated_bootstrap_epochs"] == json!([183,184]) {
+        v.as_object_mut().context("repair183 model object")?.remove("unestimated_bootstrap_epochs");
+    }
     if let Some(census) = v.get_mut("expected_observer_ranges") {
         let census = census.as_array_mut().context("repair183 observer census")?;
         if !census.contains(&json!("183-184")) {
@@ -514,6 +516,9 @@ mod tests {
         );
         assert_eq!(new["sentinel"], u64::MAX);
         assert_eq!(apply(&new, &h()).unwrap(), new);
+        let mut other_bootstrap = new;
+        other_bootstrap["unestimated_bootstrap_epochs"] = json!([185]);
+        assert_eq!(apply(&other_bootstrap, &h()).unwrap()["unestimated_bootstrap_epochs"], json!([185]));
     }
     #[test]
     fn wrong_scope_authority_owner_and_allowance_fail_closed() {

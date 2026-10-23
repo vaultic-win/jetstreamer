@@ -2,6 +2,24 @@
 
 ## Exact admitted 183–184 repair adoption
 
+The optional `repair185_handoff` extends an already accepted four-lane profile
+with the independently publishable epoch185 singleton. It binds the exact
+`e185-full-20261023-v1-r2` producer, staged controller, original185 capability,
+fresh full768GiB admission and actual timer-fired guard proof. Its guard floor
+is3503746342342bytes (the century floor plus four older full768GiB claims), with
+the unchanged800000VMA stop. The fifth model has terminal80351999, zero queued
+replay slots and12h downstream allowance. Retain the original185 reserve-stop
+repair history until a verified ready pair; launch is not recovery.
+
+Use the distinct `repair185-repair183-...` generation and full five-range,
+eleven-epoch census. Initial185 snapshot restoration may explicitly omit only
+185 from estimates while retaining its full live claim and every healthy ETA;
+require zero markers/resets, no first/last/rate, and one readable guarded worker.
+An established replay may not revert to this bootstrap exception. Receipt/model
+validation and successor preparation remain offline; active-cycle preflight
+separately authenticates both actual reserve guards. Never track recurring guard
+invocations as stable replay owners or restart healthy work during adoption.
+
 The optional `repair183_handoff` binding is metadata-only and restricted to the
 new `readerfix-full-20261023` controller/producer pair. Its immutable owner-only
 `handoff.json` uses `jetstreamer-horizon-repair183-live-monitor-handoff-v1` and
