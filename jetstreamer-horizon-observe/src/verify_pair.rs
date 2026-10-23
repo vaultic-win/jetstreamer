@@ -741,7 +741,7 @@ fn run() -> Result<()> {
         &output,
         format!("{} {} {}\n", after_hash, p.verifier.sha256, args[2]).as_bytes(),
     )?;
-    if local(p) {
+    if local(&p) {
         let directory = match p.stage {
             Stage::Full => {
                 "/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts"

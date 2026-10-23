@@ -316,10 +316,11 @@ pub(super) fn check_resources(
     )
 }
 fn bounded_command(program: &str, args: &[String], maximum: usize) -> Result<Vec<u8>> {
-    // Regular private output gives a hard bounded read and a service timeout;
-    // never pipe a potentially full stderr stream while waiting for its child.
-    let mut out = tempfile::tempfile_in(ROOT)?;
-    let mut err = tempfile::tempfile_in(ROOT)?;
+    // Anonymous files in PrivateTmp keep short read-only clients independent
+    // of the dispatch evidence directory, which is read-only in sync services.
+    // Never pipe a potentially full stderr stream while waiting for its child.
+    let mut out = tempfile::tempfile()?;
+    let mut err = tempfile::tempfile()?;
     let mut child = Command::new(program)
         .args(args)
         .env_clear()
@@ -779,5 +780,15 @@ mod tests {
     fn utc_rejects_normalized_or_noncanonical_dates() {
         assert!(utc("2026-02-30T00:00:00Z").is_err());
         assert!(utc("2026-10-23T22:56:00Zjunk").is_err());
+    }
+    #[test]
+    fn resource_client_capture_needs_only_private_tmp_and_enforces_output_bound() {
+        // Runs as the unprivileged build UID with dispatch ROOT read-only.
+        // No operational plan, unit, process census or R2 access is involved.
+        assert_eq!(
+            bounded_command("/usr/bin/printf", &["bounded".into()], 7).unwrap(),
+            b"bounded"
+        );
+        assert!(bounded_command("/usr/bin/printf", &["oversized".into()], 3).is_err());
     }
 }
