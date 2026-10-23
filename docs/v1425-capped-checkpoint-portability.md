@@ -259,6 +259,46 @@ fixture root, re-admit the OS floor with all retained allocations, and seal the
 new actualIID/PID/startticks/monotonic watcher plan and exact watcher unit. Neither
 the real barrier package nor its sealed review authorizes production resume.
 
+### One authorized guarded fixture result
+
+The real guarded attempt completed successfully in fixture invocation
+`e1f9211414d1485b9f290f34c7c8e774`, with watcher
+`f1d49ce2a6cd45c99eb3b7043708452d`. The unchanged native fixture executable
+and every semantic assertion passed. The original launcherPID1182622 is the
+native fixture's recorded creatorPID, and the restoring childPID is1183181.
+The first durable no-trip sample and fresh root-owned atomic release preceded
+execution. The watcher produced natural completion without a stop intent, and
+trusted PID1 journal history binds its exact invocation to successful exit.
+Its inactive manager fields were subsequently cleared; the collector uses the
+preserved journal history, rather than treating empty current fields as identity
+evidence.
+
+No `authenticated-exec-observed.json` exists for this invocation: the test
+completed between the watcher's five-second samples. Do not claim a separate
+observed execution sample. The pre-release guard readiness, live watcher check,
+release binding, native child proof and natural terminal receipt are retained.
+The post-terminal bound guard check found4,771,840physical fixture bytes and
+234,735,509,504available OS bytes, above the209,506,426,310minimum including
+the conservative modern-growth reservation.
+
+The closed Rust collector independently decoded the native fixed-width bincode
+child marker, bound its plan/executable/archive hashes and original creatorPID,
+required the exact first/release/natural/postcheck evidence and successful PID1
+watcher history, and fsynced a private no-clobber result. Its result and all10
+bound evidence members are sealed in
+`/usr/local/lib/jetstreamer/horizon-v1425-guarded-fixture-result-e1f9211414d1485b9f290f34c7c8e774`.
+`guarded-synthetic-result.json`SHA256 is
+`7f3c2c49778d32f95cb44f0247e195f752ccb5180078f0f468418b1f1028f2b9`.
+
+The prior unguarded semantic success remains intact in private custody under
+`/var/lib/jetstreamer-v1425-native-fixture-semantic-retained-20261023-v1`;
+its completionSHA256 is
+`151624b7a10e1be8b2ea81cd610d936abdd66ab3c69f9a2418af6966eb2f9053`.
+All failed trees remain retained too. This experiment establishes only the
+bounded synthetic capped native checkpoint/continuation equivalence described
+above. Production export, live replay stopping/resume, writer append recovery,
+mainnet qualification, publication and R2 lifecycle remain unqualified.
+
 ## Existing141 deadline evidence
 
 No new poll was taken. The coordinated observer at
