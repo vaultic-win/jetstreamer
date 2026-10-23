@@ -100,19 +100,19 @@ fn guard(h: &Handoff, v: &Value) -> Result<()> {
             && v["stop_completion_absent"] == true
             && s["armed"] == true
             && s["trip"] == false
-            && s["controller_active"] == true
-            && s["producer_active"] == true
-            && s["controller_invocation_id"] == h.controller_invocation_id
-            && s["producer_invocation_id"] == h.producer_invocation_id
-            && s["controller_restarts"] == 0
-            && s["producer_restarts"] == 0
+            && s["controller"]["active_state"] == "active"
+            && s["producer"]["active_state"] == "active"
+            && s["controller"]["invocation_id"] == h.controller_invocation_id
+            && s["producer"]["invocation_id"] == h.producer_invocation_id
+            && s["controller"]["restarts"] == 0
+            && s["producer"]["restarts"] == 0
             && s["minimum_free_bytes"] == GUARD_FLOOR
             && s["available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= GUARD_FLOOR)
             && s["maximum_worker_vmas"] == 800000
-            && s["worker_count"] == 1
-            && s["worker_vmas"]
+            && s["producer"]["worker_count"] == 1
+            && s["producer"]["worker_vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n <= 800000),
         "repair183 guard first-fire proof differs"
@@ -499,14 +499,14 @@ mod tests {
     #[test]
     fn guard_receipt_requires_true_timer_fire_exact_owners_budget_and_one_worker() {
         let h = h();
-        let good = json!({"schema":"jetstreamer-horizon-repair183-guard-first-fire-v1","admission":h.admission,"unit":GUARD,"invocation_id":"f".repeat(32),"actual_timer_fired_success":true,"exit_status":0,"restarts":0,"stop_intent_absent":true,"stop_completion_absent":true,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"sample":{"armed":true,"trip":false,"controller_active":true,"producer_active":true,"controller_invocation_id":h.controller_invocation_id,"producer_invocation_id":h.producer_invocation_id,"controller_restarts":0,"producer_restarts":0,"minimum_free_bytes":GUARD_FLOOR,"available_bytes":GUARD_FLOOR+1,"maximum_worker_vmas":800000,"worker_count":1,"worker_vmas":1000}});
+        let good = json!({"schema":"jetstreamer-horizon-repair183-guard-first-fire-v1","admission":h.admission,"unit":GUARD,"invocation_id":"f".repeat(32),"actual_timer_fired_success":true,"exit_status":0,"restarts":0,"stop_intent_absent":true,"stop_completion_absent":true,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"sample":{"armed":true,"trip":false,"controller":{"active_state":"active","invocation_id":h.controller_invocation_id,"restarts":0},"producer":{"active_state":"active","invocation_id":h.producer_invocation_id,"restarts":0,"worker_count":1,"worker_vmas":1000},"minimum_free_bytes":GUARD_FLOOR,"available_bytes":GUARD_FLOOR+1,"maximum_worker_vmas":800000}});
         guard(&h, &good).unwrap();
         for path in [
             "/actual_timer_fired_success",
             "/stop_intent_absent",
             "/sample/armed",
-            "/sample/controller_active",
-            "/sample/producer_active",
+            "/sample/controller/active_state",
+            "/sample/producer/active_state",
         ] {
             let mut bad = good.clone();
             *bad.pointer_mut(path).unwrap() = json!(false);
@@ -514,11 +514,11 @@ mod tests {
         }
         for (path, value) in [
             ("/sample/trip", json!(true)),
-            ("/sample/worker_count", json!(0)),
-            ("/sample/worker_vmas", json!(800001)),
+            ("/sample/producer/worker_count", json!(0)),
+            ("/sample/producer/worker_vmas", json!(800001)),
             ("/sample/minimum_free_bytes", json!(GUARD_FLOOR - 1)),
             ("/sample/available_bytes", json!(GUARD_FLOOR - 1)),
-            ("/sample/producer_invocation_id", json!("0".repeat(32))),
+            ("/sample/producer/invocation_id", json!("0".repeat(32))),
             ("/replay_launch_authorized", json!(true)),
         ] {
             let mut bad = good.clone();
