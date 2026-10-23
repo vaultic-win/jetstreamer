@@ -258,6 +258,16 @@ pub(super) fn run() -> Result<()> {
     c::native(&serde_json::from_value(a["native_input"].clone())?)?;
     let manager = guard_manager(&g, &s.guard_plan)?;
     let f = bound_json(&serde_json::from_value(a["fleet"].clone())?)?;
+    let observer: BoundFile = serde_json::from_value(a["observer"].clone())?;
+    let fleet: BoundFile = serde_json::from_value(a["fleet"].clone())?;
+    let terminal223: Option<BoundFile> = serde_json::from_value(a["terminal223"].clone())?;
+    let peer223 = singleton209_peer223::prepare(
+        terminal223.as_ref(),
+        &f,
+        &bound_json(&observer)?,
+        &observer,
+        &fleet,
+    )?;
     let mut names = f["unit_census"]
         .as_object()
         .context("209 full prior unit census")?
@@ -268,7 +278,7 @@ pub(super) fn run() -> Result<()> {
     let before = census(&names, 201, 300)?;
     let mut prior = before.clone();
     prior.remove(c::UNIT);
-    singleton227_admission::owners(&f, &prior)?;
+    singleton209_peer223::owners(&f, &prior, peer223.as_ref())?;
     let u = before.get(c::UNIT).context("209 full producer omitted")?;
     ensure!(
         u["InvocationID"] == iid
@@ -291,6 +301,7 @@ pub(super) fn run() -> Result<()> {
     let evidence = json!({"capability":a["capability"],"native_input":a["native_input"],"resource_plan":a["resource_plan"],
         "admission":private157::binding(&s.admission),"guard":private157::binding(&s.guard),"guard_plan":private157::binding(&s.guard_plan),
         "guard_manager":manager,"sandbox":props,"observer":a["observer"],"fleet":a["fleet"],
+        "terminal223":a["terminal223"],"terminal223_accounting":a["terminal223_accounting"],
         "recorded_unix_seconds":now,"sampled_at_utc":publication203::utc(now)?,"resource_samples_taken":0,
         "capture_spec":private157::binding(&binding),"capture_helper_sha256":self_sha,
         "evidence":{"units":[{"unit":c::UNIT,"invocation_id":iid,"restarts":0,"load_state":"loaded","active_state":"active","sub_state":"running",
@@ -324,5 +335,6 @@ pub(super) fn run() -> Result<()> {
         before == census(&names, 201, 300)?,
         "209 full capture owner census changed"
     );
+    singleton209_peer223::owners(&f, &prior, peer223.as_ref())?;
     private157::immutable_receipt(&s.output, &v)
 }

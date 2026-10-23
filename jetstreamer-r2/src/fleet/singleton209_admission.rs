@@ -9,6 +9,8 @@ struct Spec {
     fleet: BoundFile,
     capability: BoundFile,
     native_input: BoundFile,
+    #[serde(default)]
+    terminal223: Option<BoundFile>,
     resource_plan: BoundFile,
     protected_guards: BTreeMap<String, BoundFile>,
     output: PathBuf,
@@ -254,6 +256,11 @@ pub(super) fn run() -> Result<()> {
     empty_root()?;
     let o = bound_json(&s.observer)?;
     let f = bound_json(&s.fleet)?;
+    let peer223 =
+        singleton209_peer223::prepare(s.terminal223.as_ref(), &f, &o, &s.observer, &s.fleet)?;
+    let (arithmetic_fleet, arithmetic_observer) =
+        singleton209_peer223::arithmetic(&f, &o, peer223.as_ref())?;
+    let arithmetic_guards = singleton209_peer223::guards(&s.protected_guards, peer223.as_ref());
     let p = native209::immutable_json(&s.resource_plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = utc_seconds(
@@ -263,8 +270,13 @@ pub(super) fn run() -> Result<()> {
     )?;
     let floor = singleton227_admission::century_floor_for(&f, 209)?;
     let free_before = singleton227_admission::disk_free()?;
-    let (growth, measurements) =
-        native209_admission::protected_growth(&f, &o, &s.protected_guards, t, now)?;
+    let (growth, measurements) = native209_admission::protected_growth(
+        &arithmetic_fleet,
+        &arithmetic_observer,
+        &arithmetic_guards,
+        t,
+        now,
+    )?;
     let computed = floor
         .checked_add(growth)
         .context("209 full protected growth overflow")?;
@@ -279,8 +291,15 @@ pub(super) fn run() -> Result<()> {
         .checked_add(c::PEAK)
         .context("209 full initial free overflow")?;
     candidate(&p, protected, required)?;
-    let (_, required_memory) = sample(&s, &o, &f, &native, now, required)?;
-    let (aux, aux_evidence) = native209_admission::auxiliary_memory(&f)?;
+    let (_, required_memory) = sample(
+        &s,
+        &arithmetic_observer,
+        &arithmetic_fleet,
+        &native,
+        now,
+        required,
+    )?;
+    let (aux, aux_evidence) = native209_admission::auxiliary_memory(&arithmetic_fleet)?;
     let required_memory = required_memory
         .checked_add(aux)
         .context("209 full protected memory overflow")?;
@@ -300,7 +319,7 @@ pub(super) fn run() -> Result<()> {
     names.insert(c::UNIT.into());
     names.insert(native209::UNIT.into());
     let before = census(&names, 201, 300)?;
-    singleton227_admission::owners(&f, &before)?;
+    singleton209_peer223::owners(&f, &before, peer223.as_ref())?;
     let iid = native["invocation_id"]
         .as_str()
         .context("209 full native IID")?;
@@ -316,7 +335,7 @@ pub(super) fn run() -> Result<()> {
             .is_some_and(|u| !diagnostic_stage_running(u)),
         "209 full owner already live"
     );
-    let caps = singleton227_admission::limits(&f)?;
+    let caps = singleton227_admission::limits(&arithmetic_fleet)?;
     let memory = native209_admission::actual_memory()?;
     let free = free_before.min(singleton227_admission::disk_free()?);
     ensure!(
@@ -329,7 +348,7 @@ pub(super) fn run() -> Result<()> {
         "209 full actual envelope unavailable"
     );
     let after = census(&names, 201, 300)?;
-    singleton227_admission::owners(&f, &after)?;
+    singleton209_peer223::owners(&f, &after, peer223.as_ref())?;
     native209_terminal::terminal_shape(
         after
             .get(native209::UNIT)
@@ -337,13 +356,25 @@ pub(super) fn run() -> Result<()> {
         iid,
     )?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    sample(&s, &o, &f, &native, now, required)?;
-    let (after_growth, after_measurements) =
-        native209_admission::protected_growth(&f, &o, &s.protected_guards, t, now)?;
-    let (after_aux, after_aux_evidence) = native209_admission::auxiliary_memory(&f)?;
+    sample(
+        &s,
+        &arithmetic_observer,
+        &arithmetic_fleet,
+        &native,
+        now,
+        required,
+    )?;
+    let (after_growth, after_measurements) = native209_admission::protected_growth(
+        &arithmetic_fleet,
+        &arithmetic_observer,
+        &arithmetic_guards,
+        t,
+        now,
+    )?;
+    let (after_aux, after_aux_evidence) = native209_admission::auxiliary_memory(&arithmetic_fleet)?;
     ensure!(
         before == after
-            && caps == singleton227_admission::limits(&f)?
+            && caps == singleton227_admission::limits(&arithmetic_fleet)?
             && after_growth <= growth
             && after_aux <= aux
             && singleton227_admission::disk_free()? >= required
@@ -360,7 +391,8 @@ pub(super) fn run() -> Result<()> {
         "available_memory_bytes":memory,"available_disk_bytes":free});
     let evidence = json!({"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),
         "capability":private157::binding(&s.capability),"native_input":private157::binding(&s.native_input),"resource_plan":private157::binding(&s.resource_plan),
-        "protected_guards":s.protected_guards,"fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,
+        "protected_guards":s.protected_guards,"terminal223":s.terminal223.as_ref().map(private157::binding),
+        "terminal223_accounting":singleton209_peer223::evidence(peer223.as_ref()),"fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,
         "all_immutable_inputs_rehashed":true,"snapshot_restored":false,"producer_started":false,"resource_samples_taken":0,
         "recorded_unix_seconds":now,"maximum_launch_delay_seconds":900,"spec_sha256":binding.sha256,"self_sha256":self_sha});
     for (key, value) in evidence
@@ -422,6 +454,7 @@ mod tests {
             fleet,
             capability: empty(),
             native_input,
+            terminal223: None,
             resource_plan: empty(),
             protected_guards: BTreeMap::new(),
             output: "/unused-metadata-test-only".into(),

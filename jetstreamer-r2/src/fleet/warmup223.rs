@@ -27,6 +27,24 @@ pub(super) fn terminal_identity(v: &Value) -> Result<(String, String)> {
     }
     terminal::validate(v)
 }
+pub(super) fn terminal_owner(proof: &Value, owner: &Value) -> Result<()> {
+    let (_, iid) = terminal_identity(proof)?;
+    let command = proof["terminal_manager"]["ExecStart"]
+        .as_str()
+        .context("warmup proved terminal command")?;
+    let clean = if proof["schema"] == TERMINAL_SCHEMA_V2 {
+        terminal_v2::terminal_shape(owner, &iid, command)?
+    } else {
+        terminal::terminal_shape(owner, &iid, command)?
+    };
+    ensure!(
+        clean == (proof["terminal_outcome"] == "bounded-warmup-complete")
+            && owner["Result"] == proof["terminal_manager"]["Result"]
+            && owner["ExecMainStatus"] == proof["terminal_manager"]["ExecMainStatus"],
+        "warmup current terminal outcome differs from proof"
+    );
+    Ok(())
+}
 pub(super) fn terminal_predecessor(
     previous: &Value,
     p: &Plan,
@@ -819,10 +837,10 @@ mod tests {
         }
         assert_ne!(native20::UNIT, native20_v2::UNIT);
         assert_ne!(native20::ROOT, native20_v2::ROOT);
-        assert!(
-            status_jet_path("horizon-qualify-223-v1620-warmup-resource-unregistered-v3.service")
-                .is_err()
-        );
+        assert!(status_jet_path(
+            "horizon-qualify-223-v1620-warmup-resource-unregistered-v3.service"
+        )
+        .is_err());
     }
     #[test]
     fn failed_v3_stays_recognized_but_cannot_be_resurrected() {
@@ -836,11 +854,9 @@ mod tests {
             evidence: vec![],
         };
         let error = validate_live(&claim, &json!({})).unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("historical warmup cannot become live")
-        );
+        assert!(error
+            .to_string()
+            .contains("historical warmup cannot become live"));
         assert!(validate(&claim).is_err());
     }
     fn fixture() -> (Spec, Value, Value) {

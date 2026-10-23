@@ -63,9 +63,26 @@ no-clobber receipt is produced. No proposed value substitutes for an execution.
 The historical terminal-from333 fleet contains four owners. It is not current
 launch authority after another owner starts. In particular, a live223v2 repair
 is rejected until its exact registered envelope/guard/memory model is supported
-or its independently validated terminal proof and reconciled fleet are bound.
+or its independently validated terminal proof is bound through optional
+`terminal223` in the admission spec. That binding must validate the existing
+`jetstreamer-private-warmup223-native20-terminal-v2` validator, exact actual
+IID `58ab3d9221a6452685b8eab3ceabdb49`, original v2 runner/plan/origin,
+preserved journal and controlled result gates. Its observer and predecessor
+fleet must equal this admission's accepted pair, so the saved334 live sample
+can carry forward only after that actual owner terminates. A proof supplied
+for another observation, origin, invocation or warmup profile is rejected.
+
+The helper preserves the complete original fleet and unit census as evidence;
+only derived arithmetic excludes the positively terminal owner/sample/guard.
+It grants no credit for retained disk or presumed memory reclamation. Actual
+free space and memory remain bracketed before/after, every other owner remains
+protected, and the existing terminal-owner/no-later-invocation checks run
+before/after admission and launch capture. Capture and status binding retain
+the exact terminal proof and accounting evidence. This path never starts or
+terminates223 and does not qualify its prefix or close its repair.
+
 Do not omit223, pretend it is the older native-only profile, subtract its
-reservation, or launch against the old333 receipt. Freshness remains1800seconds;
+reservation while live, or launch against the old333 receipt. Freshness remains1800seconds;
 the225GB reservation must also fit the century's1.5x observed RSS ceiling and
 the90percent host-memory target after protected hard-memory growth.
 

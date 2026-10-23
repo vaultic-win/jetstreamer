@@ -161,6 +161,8 @@ pub(super) fn bindings(c: &DiagnosticClaim, launch: &Value) -> Result<()> {
             && a["capability"] == launch["capability"]
             && a["native_input"] == launch["native_input"]
             && a["resource_plan"] == launch["resource_plan"]
+            && a["terminal223"] == launch["terminal223"]
+            && a["terminal223_accounting"] == launch["terminal223_accounting"]
             && a["protected_existing_floor_bytes"] == launch["guard_minimum_free_bytes"]
             && a["required_initial_free_bytes"] == launch["required_initial_free_bytes"]
             && a["fresh_complete_census_passed"] == true
@@ -170,7 +172,24 @@ pub(super) fn bindings(c: &DiagnosticClaim, launch: &Value) -> Result<()> {
             && started - admitted <= 900,
         "209 full singleton admission substituted or stale"
     );
-    no_publication(&a)
+    no_publication(&a)?;
+    if !a["terminal223"].is_null() {
+        let observer: BoundFile = serde_json::from_value(a["observer"].clone())?;
+        let fleet: BoundFile = serde_json::from_value(a["fleet"].clone())?;
+        let terminal: BoundFile = serde_json::from_value(a["terminal223"].clone())?;
+        let peer = singleton209_peer223::prepare(
+            Some(&terminal),
+            &bound_json(&fleet)?,
+            &bound_json(&observer)?,
+            &observer,
+            &fleet,
+        )?;
+        ensure!(
+            a["terminal223_accounting"] == singleton209_peer223::evidence(peer.as_ref()),
+            "209 full singleton terminal223 accounting changed"
+        );
+    }
+    Ok(())
 }
 pub(super) fn guard_matches(c: &DiagnosticClaim, launch: &Value, p: &Value) -> bool {
     launch_matches(c, launch)
