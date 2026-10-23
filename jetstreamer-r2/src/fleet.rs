@@ -83,6 +83,7 @@ mod tail223;
 mod tail223_scan;
 mod warmup223;
 mod warmup223_input_capture;
+mod warmup223_retire;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
 
@@ -97,6 +98,9 @@ pub(super) fn capture_warmup223_input() -> Result<()> {
 }
 pub(super) fn capture_warmup223_terminal() -> Result<()> {
     warmup223::capture_terminal()
+}
+pub(super) fn retire_warmup223_scratch() -> Result<()> {
+    warmup223_retire::run()
 }
 pub(super) fn warmup223_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
     warmup223::terminal_identity(proof)
