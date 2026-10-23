@@ -25,6 +25,10 @@ const LEGACY_ROOT: &str =
     "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/legacy-v1-4-25";
 const MIN_FREE: u64 = 220_243_844_550;
 const MAX_LEGACY: u64 = 11_232_206_848;
+const BUILD_ALIASES: [&str; 2] = [
+    "release/build/jemalloc-sys-8e59224338bed73f/out/build/lib/libjemalloc.so",
+    "debug/build/jemalloc-sys-d7a0337ead603603/out/build/lib/libjemalloc.so",
+];
 
 #[derive(Clone, Copy)]
 enum Profile {
@@ -393,17 +397,88 @@ fn available(path: &Path) -> Result<u64> {
 fn exceeds(free: u64, minimum: u64, physical: u64, maximum: u64) -> bool {
     free < minimum || physical > maximum
 }
-fn tree_sample(root: &Path, maximum: u64, device: u64) -> Result<Value> {
+fn alias_catalog(root: &Path, aliases: &[&str], device: u64, uid: u32) -> Result<Vec<Value>> {
+    let mut catalog = Vec::new();
+    for relative in aliases {
+        ensure!(
+            Path::new(relative)
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_))),
+            "unsafe compiled alias"
+        );
+        let path = root.join(relative);
+        let before = fs::symlink_metadata(&path)?;
+        let parent = path.parent().context("compiled alias parent")?;
+        ensure!(
+            before.file_type().is_symlink()
+                && before.dev() == device
+                && before.uid() == uid
+                && before.nlink() == 1
+                && fs::read_link(&path)? == Path::new("libjemalloc.so.2")
+                && parent.canonicalize()? == parent,
+            "compiled internal alias differs"
+        );
+        let target = parent.join("libjemalloc.so.2");
+        let m = fs::symlink_metadata(&target)?;
+        ensure!(
+            target.canonicalize()? == target
+                && m.is_file()
+                && m.dev() == device
+                && m.uid() == uid
+                && m.nlink() == 1
+                && m.mode() & 0o002 == 0,
+            "compiled alias does not name a canonical owned sibling"
+        );
+        let after = fs::symlink_metadata(&path)?;
+        ensure!(
+            before.ino() == after.ino()
+                && before.dev() == after.dev()
+                && fs::read_link(&path)? == Path::new("libjemalloc.so.2"),
+            "compiled alias changed"
+        );
+        catalog.push(json!({"relative_path":relative,"literal_target":"libjemalloc.so.2","symlink_device":before.dev(),
+            "symlink_inode":before.ino(),"uid":before.uid(),"target":target,"target_device":m.dev(),
+            "target_inode":m.ino(),"target_uid":m.uid(),"target_gid":m.gid(),"target_mode":m.mode()&0o7777,
+            "target_length":m.len(),"target_physical_bytes":m.blocks()*512,"target_mtime":m.mtime(),"target_mtime_nsec":m.mtime_nsec(),
+            "traversal_followed_alias":false,"target_inside_censused_tree":true}));
+    }
+    Ok(catalog)
+}
+fn tree_with_aliases(
+    root: &Path,
+    maximum: u64,
+    device: u64,
+    aliases: &[&str],
+    uid: u32,
+) -> Result<Value> {
     ensure!(
         fs::metadata(root)?.dev() == device,
         "experiment tree on wrong device"
     );
-    let tree = serde_json::to_value(root_budget::observe(root, maximum)?)?;
+    let before = alias_catalog(root, aliases, device, uid)?;
+    let mut tree = serde_json::to_value(root_budget::observe(root, maximum)?)?;
+    let after = alias_catalog(root, aliases, device, uid)?;
     ensure!(
-        tree["first"]["symlinks"] == 0 && tree["second"]["symlinks"] == 0,
-        "experiment tree contains aliases"
+        before == after
+            && tree["first"]["symlinks"] == aliases.len()
+            && tree["second"]["symlinks"] == aliases.len(),
+        "experiment tree contains unapproved or changing aliases"
     );
+    tree["verified_internal_aliases"] = json!(after);
     Ok(tree)
+}
+fn tree_sample(root: &Path, maximum: u64, device: u64) -> Result<Value> {
+    tree_with_aliases(
+        root,
+        maximum,
+        device,
+        if root == Path::new(LEGACY_ROOT) {
+            &BUILD_ALIASES
+        } else {
+            &[]
+        },
+        1001,
+    )
 }
 fn sample(profile: Profile) -> Result<Value> {
     let free = available(Path::new("/var/lib"))?;
@@ -656,6 +731,16 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore]
+    fn actual_legacy_storage_capability() {
+        let observed = sample(Profile::Build).unwrap();
+        assert_eq!(observed["trip"], false);
+        persist(Path::new("/var/lib/jetstreamer-v1425-os-guard-bootstrap-20261023-v1/actual-legacy-storage-capability.json"),
+            &json!({"schema":"jetstreamer-v1425-os-guard-legacy-storage-capability-v2",
+            "budget_sha256":BUDGET_SHA,"source_and_legacy_tree_readonly":true,"sample":observed,
+            "unit_stop_authorized":false,"compiler_started":false,"replay_signal_authorized":false,"r2_mutations":false})).unwrap();
+    }
     fn owned_fixture() -> Value {
         json!({"Id":BUILD_UNIT,"LoadState":"loaded","InvocationID":"a".repeat(32),
         "ExecMainStartTimestampMonotonic":"123","NRestarts":"0","Restart":"no","KillMode":"control-group","Delegate":"no",
@@ -691,6 +776,40 @@ mod tests {
         assert!(tree_sample(&d.path().join("missing"), 1 << 20, dev).is_err());
         std::os::unix::fs::symlink("/", d.path().join("alias")).unwrap();
         assert!(tree_sample(d.path(), 1 << 20, dev).is_err());
+    }
+    #[test]
+    fn only_closed_canonical_sibling_aliases_are_counted_without_following() {
+        let d = tempfile::tempdir().unwrap();
+        let dev = fs::metadata(d.path()).unwrap().dev();
+        let uid = unsafe { libc::geteuid() };
+        fs::write(d.path().join("libjemalloc.so.2"), vec![7u8; 8192]).unwrap();
+        std::os::unix::fs::symlink("libjemalloc.so.2", d.path().join("libjemalloc.so")).unwrap();
+        let a = tree_with_aliases(d.path(), 1 << 20, dev, &["libjemalloc.so"], uid).unwrap();
+        assert_eq!(
+            a["verified_internal_aliases"][0]["traversal_followed_alias"],
+            false
+        );
+        assert!(a["conservative_physical_bytes"].as_u64().unwrap() >= 8192);
+        let outside = tempfile::tempdir().unwrap();
+        fs::hard_link(
+            d.path().join("libjemalloc.so.2"),
+            outside.path().join("external-link"),
+        )
+        .unwrap();
+        assert!(tree_with_aliases(d.path(), 1 << 20, dev, &["libjemalloc.so"], uid).is_err());
+        fs::remove_file(outside.path().join("external-link")).unwrap();
+        assert!(tree_with_aliases(d.path(), 1 << 20, dev, &["libjemalloc.so"], uid + 1).is_err());
+        std::os::unix::fs::symlink("libjemalloc.so.2", d.path().join("unapproved")).unwrap();
+        assert!(tree_with_aliases(d.path(), 1 << 20, dev, &["libjemalloc.so"], uid).is_err());
+        fs::remove_file(d.path().join("unapproved")).unwrap();
+        fs::remove_file(d.path().join("libjemalloc.so")).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", d.path().join("libjemalloc.so")).unwrap();
+        assert!(tree_with_aliases(d.path(), 1 << 20, dev, &["libjemalloc.so"], uid).is_err());
+        fs::remove_file(d.path().join("libjemalloc.so")).unwrap();
+        std::os::unix::fs::symlink("libjemalloc.so.2", d.path().join("libjemalloc.so")).unwrap();
+        fs::remove_file(d.path().join("libjemalloc.so.2")).unwrap();
+        std::os::unix::fs::symlink("/etc/passwd", d.path().join("libjemalloc.so.2")).unwrap();
+        assert!(tree_with_aliases(d.path(), 1 << 20, dev, &["libjemalloc.so"], uid).is_err());
     }
     #[test]
     fn cleared_manager_identity_needs_durable_exact_stop_lineage() {

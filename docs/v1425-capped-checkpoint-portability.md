@@ -175,7 +175,7 @@ target. Use the separately admitted `CARGO_TARGET_DIR`; never overwrite a
 target owned by another agent. In a bounded read-only-source build service:
 
 ```sh
-cargo +1.46.0 test --manifest-path historical-runtime/v1_4_25/Cargo.toml \
+cargo +1.46.0 test --manifest-path historical-runtime/v1_4_25/worker/Cargo.toml \
   --release --offline --locked -j2 \
   -p jetstreamer-historical-worker-v1-4-25 \
   --features capped-shrink-candidate --no-run
