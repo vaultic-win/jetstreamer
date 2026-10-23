@@ -132,6 +132,9 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             && r["terminal_root_slot"] == 61328765
             && r["run_root"] == ROOT
             && r["maximum_runtime_seconds"] == MAX_RUNTIME
+            && r["actual_start_unix_seconds"].as_u64().is_some_and(
+                |t| t > 0 && r["recorded_unix_seconds"].as_u64().is_some_and(|n| t <= n)
+            )
             && r["candidate_incremental_peak_bytes"] == PEAK
             && r["required_guard_minimum_free_bytes"]
                 .as_u64()
@@ -190,11 +193,11 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
     let at = a["recorded_unix_seconds"]
         .as_u64()
         .context("admission clock")?;
-    let lt = r["recorded_unix_seconds"]
+    let lt = r["actual_start_unix_seconds"]
         .as_u64()
-        .context("launch clock")?;
+        .context("actual producer start clock")?;
     ensure!(
-        at <= lt && lt - at <= 900,
+        at <= lt && lt - at <= 900 && r["recorded_unix_seconds"].as_u64().is_some_and(|n| lt <= n),
         "stale/future original141 admission"
     );
     for value in [p, a] {
@@ -369,6 +372,7 @@ mod tests {
         r["first_guard"] =
             json!({"path":format!("{ROOT}/receipts/first-guard.json"),"sha256":"1".repeat(64)});
         r["checkpoints_sha256"] = json!(CHECKPOINTS_SHA);
+        r["actual_start_unix_seconds"] = json!(1200);
         p["checkpoints"] = json!({"path":CHECKPOINTS,"sha256":CHECKPOINTS_SHA});
         for v in [&mut r, &mut p, &mut a] {
             for key in DENIED {

@@ -118,7 +118,9 @@ pub(super) fn derive_next(
         ensure!(
             p.observer == Path::new(OBSERVERS_101).join(format!("sample-{old_stamp}.json"))
                 && ((p.epoch198_delivery.is_none() && p.observer_config.path == legacy_config)
-                    || p.observer_config.path == prepared_config),
+                    || p.observer_config.path == prepared_config
+                    || terminal141::matches(p)
+                    || provisional141::candidate(p)),
             "101observer/config is outside its exact manual or prepared namespace"
         );
         (
@@ -173,6 +175,7 @@ pub(super) fn derive_next(
         "not an unchanged ordinary routine config"
     );
     let mut next_config = config.clone();
+    terminal141::next_config(p, &mut next_config)?;
     next_config["not_before_utc"] = json!(next_time);
     next_config["previous_sample"] = json!(p.observer);
     next_config["output"] = json!(next_observer);

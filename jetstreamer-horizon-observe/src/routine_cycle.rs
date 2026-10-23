@@ -59,6 +59,10 @@ mod capacity;
 mod original141;
 #[path = "routine_private144.rs"]
 mod private144;
+#[path = "routine_provisional141_predecessor.rs"]
+mod provisional141;
+#[path = "routine_original141_terminal.rs"]
+mod terminal141;
 
 #[path = "routine_controller_rebind.rs"]
 mod controller_rebind;
@@ -608,10 +612,17 @@ fn newer_fleet_in_scope(
 
 fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
     if is_101(p)? {
+        let canonical = provisional141::canonical_predecessor(p, previous)?;
+        let expected = canonical.as_ref().unwrap_or(&p.previous_fleet);
+        let canonical_value = canonical
+            .as_ref()
+            .map(|b| bound_json(b, false))
+            .transpose()?;
+        let previous = canonical_value.as_ref().unwrap_or(previous);
         let root = Path::new(FLEET_ROOT_101);
         private_dir(root)?;
         ensure!(
-            p.previous_fleet.path.parent() == Some(root),
+            expected.path.parent() == Some(root),
             "foreign101fleet predecessor namespace"
         );
         for entry in fs::read_dir(root)? {
@@ -630,9 +641,9 @@ fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
                 value["first_epoch"] == 101 && value["last_epoch"] == 200,
                 "foreign fleet inside101namespace"
             );
-            if entry.path() == p.previous_fleet.path {
+            if entry.path() == expected.path {
                 ensure!(
-                    sha(&read_checked(&entry.path(), LIMIT, 0, false)?) == p.previous_fleet.sha256,
+                    sha(&read_checked(&entry.path(), LIMIT, 0, false)?) == expected.sha256,
                     "fleet predecessor changed during census"
                 );
                 continue;
@@ -737,7 +748,8 @@ fn validate_templates(
         ensure!(
             previous["first_epoch"] == 101
                 && previous["last_epoch"] == 200
-                && p.previous_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101)),
+                && (p.previous_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101))
+                    || provisional141::canonical_predecessor(p, previous)?.is_some()),
             "foreign101fleet predecessor"
         );
     }
@@ -874,6 +886,8 @@ fn validate_templates(
 }
 
 fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> Result<()> {
+    let filtered = terminal141::observation(p, observer)?;
+    let observer = &filtered;
     let target = utc_seconds(&p.sample_target_utc)?;
     ensure!(
         target <= now && now - target <= 1800,
@@ -1042,6 +1056,8 @@ fn scheduled_target(p: &Plan) -> Result<&str> {
 }
 
 fn validate_observer_config(p: &Plan, model: &Value, config: &Value) -> Result<()> {
+    let filtered = terminal141::config(p, config)?;
+    let config = &filtered;
     ensure!(
         config["schema"] == "jetstreamer-horizon-live-resource-sample-config-v2"
             && config["output"].as_str() == p.observer.to_str()
@@ -1320,6 +1336,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     repair183::derive_fleet(p, &mut fleet)?;
     repair185::derive_fleet(p, &mut fleet)?;
     original141::derive_fleet(p, &mut fleet)?;
+    terminal141::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1567,6 +1584,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     repair183::derive_fleet(p, &mut fleet.clone())?;
     repair185::derive_fleet(p, &mut fleet.clone())?;
     original141::derive_fleet(p, &mut fleet.clone())?;
+    terminal141::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
