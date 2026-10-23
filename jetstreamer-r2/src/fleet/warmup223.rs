@@ -206,6 +206,61 @@ fn inputs(f: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn century_floor(f: &Value) -> Result<Value> {
+    let binding = BoundFile {
+        path: "/var/lib/jetstreamer/horizon-century-floor-032716-thirteen-v1/floor.json".into(),
+        sha256: "b77b70205043c49d4c8ead819c7938e4eb461a43e5547d45af60ca0054e55271".into(),
+    };
+    let old = bound_json(&binding)?;
+    let mut census = old["census"].as_array().context("century census")?.clone();
+    let mut unique = BTreeSet::new();
+    let mut sum = 0u64;
+    for row in &census {
+        let epoch = row["epoch"].as_u64().context("century epoch")?;
+        ensure!(
+            (200..=300).contains(&epoch) && epoch != 203 && unique.insert(epoch),
+            "century census scope"
+        );
+        sum = sum
+            .checked_add(
+                row["jet_size_bytes"]
+                    .as_u64()
+                    .filter(|n| *n > 0)
+                    .context("century size")?,
+            )
+            .context("century sum overflow")?;
+    }
+    ensure!(
+        census.len() == 13
+            && old["sample_count"] == 13
+            && old["sum_jet_size_bytes"] == sum
+            && old["floor_bytes"]
+                == sum
+                    .checked_mul(2)
+                    .context("century floor overflow")?
+                    .div_ceil(13),
+        "prior century floor differs"
+    );
+    if delivery_complete(f) {
+        sum = sum
+            .checked_add(103_802_397_352)
+            .context("new century sum overflow")?;
+        census.push(json!({"epoch":203,"jet_size_bytes":103_802_397_352u64,"archive_sha256":"7efb3b28b2761cd646d20fa282d87c508249488fd0fb27ce8e033a1aed7d39ad",
+            "r2_receipt_path":"/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-203.r2.json","r2_receipt_sha256":"d4222cd99f521700c12bb8227722d1cbecf90c5c1f48d66a22b7bb65f20d26c4"}));
+    }
+    let floor = sum
+        .checked_mul(2)
+        .context("new century floor overflow")?
+        .div_ceil(census.len() as u64);
+    ensure!(
+        floor <= 248_289_182_611,
+        "new floor exceeds this candidate's protected floor"
+    );
+    Ok(
+        json!({"schema":"horizon-century-floor-recomputation-v1","century_first_epoch":200,"century_last_epoch":300,
+        "sample_count":census.len(),"sum_jet_size_bytes":sum,"floor_bytes":floor,"census":census,"previous_floor_evidence":private157::binding(&binding)}),
+    )
+}
 pub(super) fn run(capture: bool) -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args(if capture {
         "capture-warmup223"
@@ -218,6 +273,7 @@ pub(super) fn run(capture: bool) -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let sampled = sample(&spec, &o, &f, now)?;
     inputs(&f)?;
+    let floor = century_floor(&f)?;
     let before = census(&names(&f)?, 201, 300)?;
     protected(&f, &before)?;
     let own = &before[UNIT];
@@ -311,7 +367,7 @@ pub(super) fn run(capture: bool) -> Result<()> {
             &json!({
             "schema":"jetstreamer-private-warmup223-admission-v1","spec":private157::binding(&binding),"self_sha256":self_sha,
             "recorded_unix_seconds":now,"observer":private157::binding(&spec.observer),"fleet":private157::binding(&spec.fleet),"guards":guards,
-            "decision":"pass","maximum_new_memory_bytes":128u64<<30,"maximum_new_scratch_bytes":300_000_000_000u64,
+            "decision":"pass","century_floor":floor,"maximum_new_memory_bytes":128u64<<30,"maximum_new_scratch_bytes":300_000_000_000u64,
             "required_observed_free_bytes":1_511_435_598_739u64,"expected_exec_start":command(),"replay_launch_authorized":false,
             "publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         )?;
