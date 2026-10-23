@@ -59,3 +59,12 @@ renews its timestamp, overwrites a conflict or starts a duplicate job. Fleet
 registration checks the launch/admission timing relationship. Issuance starts
 no producer, sends no signal and makes no R2 mutation. The live guarded producer,
 its sandbox and its first real timer fire remain separate deployment steps.
+
+`jetstreamer-r2 capture-prefix205 SPEC --spec-sha256 HEX --self-sha256 HEX`
+records that separate deployment only after the original protected owners remain
+unchanged, the real new unit matches its exact command/sandbox, and its new guard
+timer has produced a no-trip one-worker receipt with matching PID1 completion.
+It binds the admission, resource plan, actual worker/guard identity, guard plan,
+service sandbox and timer evidence before writing the private launch receipt.
+Exact repeated capture is a no-op; a conflicting prior receipt is preserved and
+rejected. It never starts or restarts the producer or promotes publication.

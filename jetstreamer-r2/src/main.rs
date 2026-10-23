@@ -3395,6 +3395,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-prefix205") {
         return fleet::admit_prefix205();
     }
+    if env::args().nth(1).as_deref() == Some("capture-prefix205") {
+        return fleet::capture_prefix205();
+    }
     if env::args().nth(1).as_deref() == Some("status-retire-inactive") {
         return inactive_status::run().await;
     }

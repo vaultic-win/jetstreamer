@@ -27,6 +27,7 @@ mod ownroot203_rebase;
 mod prefix144;
 mod prefix205;
 mod prefix205_admission;
+mod prefix205_capture;
 mod prefix223;
 mod private144;
 mod private144_scan;
@@ -76,6 +77,9 @@ pub(super) fn admit_continuation203() -> Result<()> {
 }
 pub(super) fn admit_prefix205() -> Result<()> {
     prefix205_admission::run()
+}
+pub(super) fn capture_prefix205() -> Result<()> {
+    prefix205_capture::run()
 }
 pub(super) fn prepare_continuation203_layout() -> Result<()> {
     continuation203_ops::layout()
