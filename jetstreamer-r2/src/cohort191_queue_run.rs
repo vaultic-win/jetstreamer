@@ -452,7 +452,35 @@ fn sync_args(epoch: u64, plan: &Bound, self_sha: &str) -> Vec<String> {
         self_sha.into(),
     ]
 }
+fn resource_fields(s: &Value) -> Result<(Bound, Bound, u64)> {
+    let observer = binding(&s["observer"])?;
+    let completion = binding(&s["routine_completion"])?;
+    ensure!(
+        is_lower_hex(&observer.sha256, 64) && is_lower_hex(&completion.sha256, 64),
+        "191 sync resource receipt digest malformed"
+    );
+    Ok((
+        observer,
+        completion,
+        number(s, "other_pending_os_growth_bytes")?,
+    ))
+}
+fn resource_admission(s: &Value, a: &Value) -> Result<Value> {
+    for key in [
+        "observer",
+        "routine_completion",
+        "other_pending_os_growth_bytes",
+    ] {
+        ensure!(
+            a[key] == s[key],
+            "191 sync intake/resource plan binding differs:{key}"
+        );
+    }
+    let (observer, completion, other) = resource_fields(s)?;
+    crate::cohort191_dispatch::check_resources(&observer, &completion, other)
+}
 fn validate_sync(s: &Value, plan: &Bound, iid: &str, row: &Value) -> Result<()> {
+    resource_fields(s)?;
     let e = number(row, "epoch")?;
     ensure!(
         s["schema"] == "jetstreamer-cohort191-sync-plan-v2"
@@ -515,6 +543,11 @@ fn launch_sync(
     fleet::persist(
         &out.join("intent.json"),
         &json!({"schema":"jetstreamer-cohort191-sync-intent-v2","admission":ab,"sync_plan":sb,"argv":sync_args(epoch,&sb,&program.sha256),"r2_mutation_authorized_by_admission":true,"delete_local":false,"overwrite_existing":false}),
+    )?;
+    let resources = resource_admission(&s, a)?;
+    fleet::persist(
+        &out.join("prelaunch-resources.json"),
+        &json!({"schema":"jetstreamer-cohort191-sync-prelaunch-resources-v1","sync_plan":sb,"admission":ab,"observer":s["observer"],"routine_completion":s["routine_completion"],"other_pending_os_growth_bytes":s["other_pending_os_growth_bytes"],"resource_admission":resources,"recorded_unix_millis":now_ms()?}),
     )?;
     command(
         "/usr/bin/systemd-run",
@@ -683,6 +716,11 @@ pub(super) fn sync_verified() -> Result<()> {
         "191 sync plan is not this queue's fresh admission"
     );
     sync_inputs(&s, &qp, iid, row)?;
+    custody::bound(&sb, true)?;
+    executable(&program)?;
+    // The shared checker revalidates existing actors and84GiB combined spare
+    // envelope against these actual same-cutoff receipts. It samples no replay.
+    let resources = resource_admission(&s, &admitted)?;
     let u = manager(&sync_unit(epoch))?;
     let pid = u64::from(std::process::id());
     let start = ticks(pid)?;
@@ -706,12 +744,10 @@ pub(super) fn sync_verified() -> Result<()> {
     let exec = normal_sync_argv(epoch);
     fleet::persist(
         &sync_dir(epoch).join("launch.json"),
-        &json!({"schema":"jetstreamer-cohort191-sync-launch-v2","epoch":epoch,"queue_plan":qp,"queue_invocation_id":iid,"sync_plan":sb,"admission":admission,"native_owner":u,"process_identity":{"pid":pid,"start_ticks":start},"program":program,"exec_argv":exec,"source_batch":s["source_batch"],"public_batch":s["public_batch"],"source_revalidation_policy":s["source_revalidation_policy"],"full_receipt":s["full_receipt"],"plugin_receipt":s["plugin_receipt"],"recorded_unix_millis":now_ms()?}),
+        &json!({"schema":"jetstreamer-cohort191-sync-launch-v2","epoch":epoch,"queue_plan":qp,"queue_invocation_id":iid,"sync_plan":sb,"admission":admission,"native_owner":u,"process_identity":{"pid":pid,"start_ticks":start},"program":program,"exec_argv":exec,"source_batch":s["source_batch"],"public_batch":s["public_batch"],"source_revalidation_policy":s["source_revalidation_policy"],"full_receipt":s["full_receipt"],"plugin_receipt":s["plugin_receipt"],"observer":s["observer"],"routine_completion":s["routine_completion"],"other_pending_os_growth_bytes":s["other_pending_os_growth_bytes"],"resource_admission":resources,"prelaunch_resources":bound_path(&sync_dir(epoch).join("prelaunch-resources.json"),1<<20,0)?,"recorded_unix_millis":now_ms()?}),
     )?;
-    // Repeat actual native gates and the immutable plan check at exec boundary.
-    sync_inputs(&s, &qp, iid, row)?;
-    custody::bound(&sb, true)?;
-    executable(&program)?;
+    // All native gates and fresh resource identities were rechecked above;
+    // only the fsynced authenticated launch publication separates them from exec.
     Err(Process::new(PROGRAM).args(&exec[1..]).exec().into())
 }
 
@@ -1136,7 +1172,7 @@ mod tests {
             sha256: "a".repeat(64),
         };
         let row = json!({"epoch":191,"archive_sha256":"b".repeat(64),"archive_length":100,"full_receipt":{"path":"/full","sha256":"c".repeat(64)},"plugin_receipt":{"path":"/plugin","sha256":"d".repeat(64)}});
-        let spec = json!({"schema":"jetstreamer-cohort191-sync-plan-v2","queue_plan":plan,"queue_invocation_id":"e".repeat(32),"epoch":191,"program":{"path":PROGRAM,"sha256":"f".repeat(64)},"archive_sha256":row["archive_sha256"],"archive_length":100,"full_receipt":row["full_receipt"],"plugin_receipt":row["plugin_receipt"],"output_directory":sync_dir(191)});
+        let spec = json!({"schema":"jetstreamer-cohort191-sync-plan-v2","queue_plan":plan,"queue_invocation_id":"e".repeat(32),"epoch":191,"program":{"path":PROGRAM,"sha256":"f".repeat(64)},"archive_sha256":row["archive_sha256"],"archive_length":100,"full_receipt":row["full_receipt"],"plugin_receipt":row["plugin_receipt"],"output_directory":sync_dir(191),"observer":{"path":"/observer","sha256":"1".repeat(64)},"routine_completion":{"path":"/completion","sha256":"2".repeat(64)},"other_pending_os_growth_bytes":0});
         validate_sync(&spec, &plan, &"e".repeat(32), &row).unwrap();
         for (key, value) in [
             ("queue_invocation_id", json!("f".repeat(32))),
@@ -1197,6 +1233,24 @@ mod tests {
                 eligible(&state(&[stage, "queued-upload", "queued-upload", "ready"])),
                 Vec::<(usize, &str)>::new()
             );
+        }
+    }
+    #[test]
+    fn sync_resource_fields_are_required_and_intake_cannot_substitute_them() {
+        let s = json!({"observer":{"path":"/observer","sha256":"a".repeat(64)},"routine_completion":{"path":"/completion","sha256":"b".repeat(64)},"other_pending_os_growth_bytes":123});
+        assert_eq!(resource_fields(&s).unwrap().2, 123);
+        for key in [
+            "observer",
+            "routine_completion",
+            "other_pending_os_growth_bytes",
+        ] {
+            let mut missing = s.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(resource_fields(&missing).is_err());
+            let mut mismatch = s.clone();
+            mismatch[key] = Value::Null;
+            // Mismatch returns before the shared checker can read any files.
+            assert!(resource_admission(&s, &mismatch).is_err());
         }
     }
 }
