@@ -359,6 +359,8 @@ struct RecorderState {
     slot_end_inclusive: Slot,
     assemblies: BTreeMap<Slot, SlotAssembly>,
     block_metas: BTreeMap<Slot, BufferedBlockMeta>,
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    original_entry_counts: BTreeMap<Slot, u64>,
     last_emitted: Option<Slot>,
     last_emitted_blockhash: Option<Hash>,
     expected_initial_parent: Option<(Slot, Hash)>,
@@ -408,6 +410,8 @@ impl HorizonRecorder {
                 slot_end_inclusive: slot_start + slot_count - 1,
                 assemblies: BTreeMap::new(),
                 block_metas: BTreeMap::new(),
+                #[cfg(feature = "epoch141-original-entry-qualification")]
+                original_entry_counts: BTreeMap::new(),
                 last_emitted: None,
                 last_emitted_blockhash: None,
                 expected_initial_parent,
@@ -424,6 +428,37 @@ impl HorizonRecorder {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, RecorderState> {
         self.state.lock().expect("horizon recorder lock poisoned")
+    }
+
+    /// Bind a complete byte/PoH-verified original slot's actual entry count.
+    /// Only the separate private141adapter calls this; all other source block
+    /// metadata stays unchanged, including transaction counts and rewards.
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    pub fn record_original_entry_count(&self, slot: Slot, count: u64) -> Result<(), String> {
+        let mut state = self.lock();
+        if slot < state.slot_start {
+            return Ok(());
+        } // Unrecorded warmup.
+        if state.finished
+            || slot > state.slot_end_inclusive
+            || state.last_emitted.is_some_and(|last| slot <= last)
+            || count == 0
+            || count > 262_144
+        {
+            return Err("cannot change original entry count for emitted/out-of-range slot".into());
+        }
+        if state
+            .original_entry_counts
+            .get(&slot)
+            .is_some_and(|old| *old != count)
+        {
+            return Err("conflicting verified original entry counts".into());
+        }
+        state.original_entry_counts.insert(slot, count);
+        if let Some(meta) = state.block_metas.get_mut(&slot) {
+            meta.entry_count = count;
+        }
+        Ok(())
     }
 
     /// Logs writer progress every `LOG_PROGRESS_EVERY_N_SLOTS` slots.
@@ -490,6 +525,12 @@ impl HorizonRecorder {
         });
         let blockhash = Hash::from_str(blockhash)
             .unwrap_or_else(|err| panic!("horizon: unparseable blockhash for slot {slot}: {err}"));
+        #[cfg(feature = "epoch141-original-entry-qualification")]
+        let entry_count = state
+            .original_entry_counts
+            .get(&slot)
+            .copied()
+            .unwrap_or(entry_count);
         let meta = BufferedBlockMeta {
             parent_slot,
             parent_blockhash,
@@ -1095,6 +1136,80 @@ mod tests {
             .expect("spawn test thread")
             .join()
             .expect("join test thread");
+    }
+
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[test]
+    fn original_count_binding_handles_both_metadata_orders_without_changing_transactions() {
+        let presence = presence_map(
+            100,
+            &[SlotPresenceState::Present, SlotPresenceState::Present],
+        );
+        let directory = tempfile::tempdir().unwrap();
+        let recorder = HorizonRecorder::create(
+            &directory.path().join("private.jet"),
+            1,
+            100,
+            2,
+            presence,
+            None,
+            None,
+        )
+        .unwrap();
+        let parent = Hash::new_unique().to_string();
+        let final_hash = Hash::new_unique().to_string();
+        let rewards = KeyedRewardsAndNumPartitions {
+            keyed_rewards: vec![],
+            num_partitions: None,
+        };
+        recorder.record_block_meta(
+            100,
+            99,
+            &parent,
+            &final_hash,
+            &rewards,
+            Some(123),
+            Some(456),
+            2,
+            1,
+        );
+        recorder.record_original_entry_count(100, 4).unwrap();
+        recorder.record_block_meta(
+            100,
+            99,
+            &parent,
+            &final_hash,
+            &rewards,
+            Some(123),
+            Some(456),
+            2,
+            1,
+        );
+        recorder.record_original_entry_count(101, 8).unwrap();
+        recorder.record_block_meta(
+            101,
+            100,
+            &final_hash,
+            &parent,
+            &rewards,
+            Some(124),
+            Some(457),
+            3,
+            2,
+        );
+        {
+            let state = recorder.lock();
+            assert_eq!(state.block_metas[&100].entry_count, 4);
+            assert_eq!(state.block_metas[&100].executed_transaction_count, 2);
+            assert_eq!(state.block_metas[&100].block_time, Some(123));
+            assert_eq!(state.block_metas[&101].entry_count, 8);
+            assert_eq!(state.block_metas[&101].executed_transaction_count, 3);
+        }
+        assert!(recorder.record_original_entry_count(100, 5).is_err());
+        assert!(recorder.record_original_entry_count(102, 4).is_err());
+        recorder.record_original_entry_count(99, 4).unwrap(); // Unrecorded warmup.
+        recorder.lock().last_emitted = Some(100);
+        assert!(recorder.record_original_entry_count(100, 4).is_err());
     }
 
     fn recorder_end_to_end_body() {

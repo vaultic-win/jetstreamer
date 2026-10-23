@@ -82,3 +82,50 @@ corresponding transaction status/index attribution, and send the original
 entries through the normal strict worker checks. No partial source slot may
 mutate a Bank first. Private canonical-root and ordinary full/plugin/publication
 qualification remain outstanding even after bundle preparation succeeds.
+
+## Separate parent qualification adapter
+
+Build `jetstreamer-node` with only the diagnostic feature
+`epoch141-original-entry-qualification`. Ordinary builds reject its input flags;
+the diagnostic build rejects ordinary execution and unrelated diagnostic modes.
+Its four explicit inputs are:
+
+- `--epoch141-original-index=PATH`
+- `--epoch141-original-index-sha256=HEX`
+- `--epoch141-original-data=PATH`
+- `--epoch141-original-data-sha256=HEX`
+
+The only admitted CLI shape is epoch 141, explicit snapshot verification,
+bootstrap 60911751, replay start 60911752 and qualification end 61328765, with
+explicit output/destination/scratch descendants of the private root. Cohort,
+recovery, carried-state and handoff routes remain forbidden. This checkpoint
+artifact ends before the full epoch end: it is not a full epoch 141 archive and
+must not receive a production plugin receipt, canonical sidecar or publication.
+Its generation profile is distinct from ordinary old-faithful-to-horizon output.
+
+The scheduler holds every recovery target until source block metadata, all
+declared entries and the entire transaction sequence are present. Decoded source
+parent/previous/final hashes must match the bundle anchors. It checks contiguous
+transaction grouping, encodes every current-SDK legacy transaction to canonical
+wire bytes and passes the full original-entry/source/PoH binding before consuming
+one source transaction. It then maps original entry groups to the exact owned
+source transactions and their status, fee-reconstruction and ancillary metadata.
+Only the source entry count is replaced in buffered archive block metadata;
+transaction count, rewards, hashes and timestamps remain unchanged. Both orders
+of metadata arrival are supported, but emitted metadata cannot be rewritten.
+
+Normal strict worker checks remain unchanged. Original ticks, hashes and work
+counts are sent through the existing historical protocol; no PoH-bypass message
+or synthesized hidden tick is introduced. Scheduler accounting still describes
+the complete source stream while worker/recorder entry indexes describe the
+original entries. A source parent edge may not mark any pinned recovery target
+skipped, and completion requires exact equality between the full target census
+and the uniquely byte/PoH-matched target set, including unrecorded warmup.
+
+Partial-source/mid-slot resume and duplicate recovery targets are unqualified
+and fail closed; this is a fresh, non-restarting qualification route. Passing
+unit tests or the ignored real-first-target wire-conversion regression does not
+admit replay, prove the canonical Bank root or promote the normal runtime route.
+The actual sealed parent/input capability probe, fresh resource admission,
+invocation-bound reserve/VMA guard and canonical-root qualification still precede
+any full-span and publication work.

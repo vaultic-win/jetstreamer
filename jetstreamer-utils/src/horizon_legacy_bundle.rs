@@ -215,6 +215,7 @@ fn open_immutable(path: &Path, maximum: u64) -> Result<(File, Identity), String>
 }
 
 /// An authenticated open bundle descriptor plus its exact immutable index.
+#[derive(Debug)]
 pub struct OriginalEntryBundle {
     data: File,
     path: PathBuf,
@@ -231,6 +232,28 @@ pub struct OriginalSlot {
 }
 
 impl OriginalEntryBundle {
+    /// Every independently pinned visible target, including snapshot warmup.
+    pub fn targets(&self) -> impl Iterator<Item = u64> + '_ {
+        self.index.slots.iter().map(|record| record.slot)
+    }
+    /// Inspect a target's authenticated anchors without rereading its data.
+    /// This does not prove any independent source transaction equivalence.
+    pub fn expectation(&self, slot: u64) -> Option<PohExpectation> {
+        let index = self
+            .index
+            .slots
+            .binary_search_by_key(&slot, |s| s.slot)
+            .ok()?;
+        let record = &self.index.slots[index];
+        Some(PohExpectation {
+            slot: record.slot,
+            parent_slot: record.parent_slot,
+            parent_hash: decode_hash(&record.parent_hash_hex).expect("validated index hash"),
+            final_hash: decode_hash(&record.final_hash_hex).expect("validated index hash"),
+            ticks_per_slot: self.index.ticks_per_slot,
+            hashes_per_tick: self.index.hashes_per_tick,
+        })
+    }
     /// Authenticate both members, stream-hash all data, and retain the open inode.
     /// The guard runs at each1MiBchunk; any error returns no usable bundle.
     pub fn open(
