@@ -50,6 +50,7 @@ mod shrink_root203;
 mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
+mod singleton227_event;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
@@ -2195,6 +2196,14 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == "jetstreamer-private-epoch227-native-input-running-v1" {
+                singleton227_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == "jetstreamer-exact203-phase-handoff-v1" {
                 publication203::event_predecessor(
                     &previous,
@@ -2359,6 +2368,7 @@ pub(super) async fn run() -> Result<()> {
     warmup223::event_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
+    singleton227_event::event_census(&plan, &before)?;
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
