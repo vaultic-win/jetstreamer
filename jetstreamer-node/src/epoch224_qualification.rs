@@ -84,8 +84,8 @@ mod tests {
 
     #[test]
     fn terminal_is_the_exact_later_root_not_an_unchecked_epoch_end() {
-        assert!(OUTPUT_END_SLOT > 97_199_999);
-        assert!(OUTPUT_END_SLOT < 97_632_000);
+        const { assert!(OUTPUT_END_SLOT > 97_199_999) };
+        const { assert!(OUTPUT_END_SLOT < 97_632_000) };
         assert!(
             validate_launch(224, 224, Some((BOOTSTRAP_SLOT, 97_199_617)), false, false).is_err()
         );
