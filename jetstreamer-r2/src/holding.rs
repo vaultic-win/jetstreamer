@@ -3,6 +3,8 @@
 use super::*;
 use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
+#[path = "holding_epoch136.rs"]
+mod epoch136;
 
 const HOST: &str = "dev-samjohnson";
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";
@@ -1099,7 +1101,7 @@ pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136 SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -1143,6 +1145,9 @@ pub(super) async fn run() -> Result<()> {
     );
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
+    if args[1] == "holding-inspect136" {
+        return epoch136::inspect(&m, &serde_json::from_value(v)?, &spec);
+    }
     if args[1] == "holding-admit-restore" {
         return admit_restore(&m, &serde_json::from_value(v)?, &spec);
     }
