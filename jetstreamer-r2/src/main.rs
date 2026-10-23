@@ -3392,6 +3392,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("estimate-readback203") {
         return fleet::estimate_readback203();
     }
+    if env::args().nth(1).as_deref() == Some("capture-warmup223-input") {
+        return fleet::capture_warmup223_input();
+    }
     if env::args().nth(1).as_deref() == Some("extend-continuation203-runtime") {
         return fleet::extend_continuation203_runtime();
     }
