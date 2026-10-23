@@ -3353,7 +3353,10 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("prepare-private-prefix157") {
         return fleet::prepare_private_prefix157();
     }
-    if env::args().nth(1).as_deref() == Some("probe-transport-217") {
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some("probe-transport-217" | "probe-transport-203")
+    ) {
         return transport_probe::run().await;
     }
     if matches!(

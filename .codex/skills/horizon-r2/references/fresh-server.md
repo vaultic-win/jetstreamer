@@ -124,6 +124,23 @@ evidence for a later reviewed registry change, not permission to publish by itse
 
 ## Qualify the next unsupported era
 
+Keep native input qualification separate from entry replay. A successful cold-snapshot
+load/freeze test establishes only the exact tested worker/input pair; it does not reproduce
+the chain or close a failed epoch. Seal its complete journal and terminal result before the
+next diagnostic, preserve consensus counters as exact Rust integers or original message
+strings, and never roundtrip them through JavaScript numbers (capitalization can exceed
+2^53). Bind the next experiment to that worker digest and the smallest useful entry range.
+If the failure is in predecessor warmup, the ordinary epoch-output qualification CLI may
+reject an end slot before the epoch starts; use a separately reviewed private warmup path
+rather than extending the run through an entire epoch just to reach an admissible output.
+
+For native fee/load failures, capture the exact signature, slot, message account roles,
+effective writability, owners and executable flags before selecting a fix. In historical
+v1.6.25, `InvalidWritableAccount` can arise when loading a writable executable or
+upgradeable-loader-owned account; the `fee_collection_results` label alone does not prove
+the fee payer is wrong. Label post-commit diagnostics as such rather than treating them as
+pre-execution account evidence. Preserve the native failure; never skip the transaction.
+
 1. Start with the smallest useful canary at the first unsupported slot. Use release history and
    snapshot creator metadata only to shortlist exact Solana candidates; neither is execution
    evidence.

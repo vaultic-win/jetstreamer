@@ -185,6 +185,16 @@ when constructing the next normal-cycle plan, while retaining its evidence and o
 
 ## Prioritize time to verified sidecar
 
+When delivery is slow, inspect the actual sealed reader and its bound progress evidence
+before increasing concurrency: an ordered whole-object hash may already use parallel range
+GETs. Keep healthy readback running while testing a small, bounded, authenticated GET-only
+range against identical local bytes. Bind the object length/ETag and range, retain transport
+timings privately, and keep probe results separate from whole-object verification receipts.
+A fast range or address-family comparison does not prove sustained archive throughput or
+authorize sidecar publication. Apply a transport change only to a newly qualified deployment;
+do not restart a healthy upload merely to try it. Use existing progress records for the
+comparison and keep routine resource observations on the single 30-minute cadence.
+
 Dispatch available independent verification, upload and readback work promptly; do not start extra
 replay at the expense of starving already-complete archives in the delivery queue. Among disjoint,
 compatible candidates that pass fresh admission, compare expected time until the authenticated
