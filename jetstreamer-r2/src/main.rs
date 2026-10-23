@@ -3381,6 +3381,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("fleet-reconcile") {
         return fleet::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("estimate-readback203") {
+        return fleet::estimate_readback203();
+    }
     if env::args().nth(1).as_deref() == Some("extend-continuation203-runtime") {
         return fleet::extend_continuation203_runtime();
     }
