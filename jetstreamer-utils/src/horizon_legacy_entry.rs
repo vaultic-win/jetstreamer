@@ -17,7 +17,7 @@ const MAX_SIGNATURES: usize = 65_536;
 const MAX_TRANSACTION_BYTES: usize = 1232;
 
 /// One decoded entry's claimed hash and independently derived signature mixin.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DiagnosticEntry {
     /// Claimed hash work; not yet executed or verified by this decoder.
     pub num_hashes: u64,
@@ -36,6 +36,25 @@ pub struct DiagnosticEntryBatch {
     /// Entries in their original serialized order.
     pub entries: Vec<DiagnosticEntry>,
     /// Exact serialized-vector length, excluding verified zero padding.
+    pub serialized_bytes: usize,
+}
+
+/// Lossless, borrowed legacy transactions for a separately qualified source adapter.
+/// These bytes have passed only structural decoding, not runtime or signature gates.
+#[derive(Debug, Eq, PartialEq)]
+pub struct DiagnosticWireEntry<'a> {
+    /// Structurally decoded hash-work claim, entry hash, count, and signature mixin.
+    pub metadata: DiagnosticEntry,
+    /// Original legacy Transaction encodings in their original entry order.
+    pub transactions: Vec<&'a [u8]>,
+}
+
+/// A bounded, lossless entry-vector view with verified zero padding excluded.
+#[derive(Debug, Eq, PartialEq)]
+pub struct DiagnosticWireEntryBatch<'a> {
+    /// Entries and borrowed transaction bytes, without reordering or normalization.
+    pub entries: Vec<DiagnosticWireEntry<'a>>,
+    /// Original serialized-vector length before its verified zero padding.
     pub serialized_bytes: usize,
 }
 
@@ -165,6 +184,39 @@ fn merkle_root(mut leaves: Vec<[u8; 32]>) -> [u8; 32] {
 /// padding. It does not execute num_hashes or validate transaction signatures,
 /// message sanitization, tick counts, canonical boundaries or final blockhashes.
 pub fn decode_v1_4_25_padded_entries(bytes: &[u8]) -> Result<DiagnosticEntryBatch, String> {
+    decode_entries(bytes, false).map(|parsed| parsed.metadata)
+}
+
+/// Preserve exact canonical bincode transaction slices without reserialization.
+/// All original decoder bounds and rejection rules still apply. This is not a
+/// production recovery route or permission to replace source entries.
+pub fn decode_v1_4_25_padded_wire_entries(
+    bytes: &[u8],
+) -> Result<DiagnosticWireEntryBatch<'_>, String> {
+    let ParsedEntries {
+        metadata: batch,
+        transactions,
+    } = decode_entries(bytes, true)?;
+    Ok(DiagnosticWireEntryBatch {
+        serialized_bytes: batch.serialized_bytes,
+        entries: batch
+            .entries
+            .into_iter()
+            .zip(transactions)
+            .map(|(metadata, transactions)| DiagnosticWireEntry {
+                metadata,
+                transactions,
+            })
+            .collect(),
+    })
+}
+
+struct ParsedEntries<'a> {
+    metadata: DiagnosticEntryBatch,
+    transactions: Vec<Vec<&'a [u8]>>,
+}
+
+fn decode_entries(bytes: &[u8], retain_wire: bool) -> Result<ParsedEntries<'_>, String> {
     if bytes.len() > MAX_BATCH_BYTES {
         return Err("legacy entry batch exceeds byte bound".into());
     }
@@ -174,6 +226,7 @@ pub fn decode_v1_4_25_padded_entries(bytes: &[u8]) -> Result<DiagnosticEntryBatc
         return Err("empty or impossible legacy entry-vector length".into());
     }
     let mut entries = Vec::with_capacity(count);
+    let mut wire_entries = Vec::new();
     let mut total_transactions = 0;
     let mut total_signatures = 0;
     for _ in 0..count {
@@ -182,8 +235,16 @@ pub fn decode_v1_4_25_padded_entries(bytes: &[u8]) -> Result<DiagnosticEntryBatc
         let transaction_count = reader.length(MAX_TRANSACTIONS - total_transactions)?;
         total_transactions += transaction_count;
         let mut leaves = Vec::new();
+        let mut wire_transactions = Vec::new();
         for _ in 0..transaction_count {
+            let start = reader.position;
             reader.transaction(&mut leaves, MAX_SIGNATURES - total_signatures)?;
+            if retain_wire {
+                wire_transactions.push(&bytes[start..reader.position]);
+            }
+        }
+        if retain_wire {
+            wire_entries.push(wire_transactions);
         }
         total_signatures += leaves.len();
         if total_signatures > MAX_SIGNATURES {
@@ -200,15 +261,73 @@ pub fn decode_v1_4_25_padded_entries(bytes: &[u8]) -> Result<DiagnosticEntryBatc
     if bytes[serialized_bytes..].iter().any(|byte| *byte != 0) {
         return Err("nonzero legacy entry-batch padding".into());
     }
-    Ok(DiagnosticEntryBatch {
-        entries,
-        serialized_bytes,
+    Ok(ParsedEntries {
+        metadata: DiagnosticEntryBatch {
+            entries,
+            serialized_bytes,
+        },
+        transactions: wire_entries,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lossless_wire_matches_pinned_sdk_golden_and_diagnostic_metadata() {
+        let transactions = vec![
+            transaction(Some(1)),
+            transaction(Some(2)),
+            transaction(Some(3)),
+        ];
+        let raw = batch(&transactions);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&raw)),
+            "b3d19c5653173ed4150e6806bce35848b044a734058acaeff645064a8e06f773"
+        );
+        let mut padded = raw.clone();
+        padded.resize(1051, 0);
+        let decoded = decode_v1_4_25_padded_wire_entries(&padded).unwrap();
+        let metadata = decode_v1_4_25_padded_entries(&padded).unwrap();
+        assert_eq!(decoded.serialized_bytes, raw.len());
+        assert_eq!(decoded.entries.len(), 1);
+        assert_eq!(decoded.entries[0].metadata, metadata.entries[0]);
+        assert_eq!(
+            decoded.entries[0].transactions,
+            transactions.iter().map(Vec::as_slice).collect::<Vec<_>>()
+        );
+        let mut roundtrip = 1_u64.to_le_bytes().to_vec();
+        for entry in decoded.entries {
+            roundtrip.extend_from_slice(&entry.metadata.num_hashes.to_le_bytes());
+            roundtrip.extend_from_slice(&entry.metadata.hash);
+            roundtrip.extend_from_slice(&(entry.transactions.len() as u64).to_le_bytes());
+            for transaction in entry.transactions {
+                roundtrip.extend_from_slice(transaction);
+            }
+        }
+        assert_eq!(roundtrip, raw);
+    }
+
+    #[test]
+    fn wire_decoder_keeps_tick_unsigned_and_rejection_semantics() {
+        for transactions in [vec![], vec![transaction(None)]] {
+            let raw = batch(&transactions);
+            let wire = decode_v1_4_25_padded_wire_entries(&raw).unwrap();
+            assert_eq!(wire.entries[0].transactions.len(), transactions.len());
+            assert_eq!(
+                wire.entries[0].metadata.signature_mixin.is_some(),
+                !transactions.is_empty()
+            );
+            for malformed in [
+                raw[..raw.len() - 1].to_vec(),
+                [raw.clone(), vec![1]].concat(),
+            ] {
+                assert!(decode_v1_4_25_padded_entries(&malformed).is_err());
+                assert!(decode_v1_4_25_padded_wire_entries(&malformed).is_err());
+            }
+        }
+    }
 
     fn batch(transactions: &[Vec<u8>]) -> Vec<u8> {
         let mut bytes = 1_u64.to_le_bytes().to_vec();
