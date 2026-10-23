@@ -581,6 +581,18 @@ fn supported_unit(plan: &Plan) -> bool {
             && plan.bounded_measurement.is_none()
             && plan.bounded_canary.is_none();
     }
+    if plan.unit == "horizon-singleton-209-capped-4aeca563-v1.service" {
+        return cfg!(feature = "epoch209-singleton-guard")
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1",
+                )
+            && plan.maximum_root_physical_bytes == Some(471_798_691_840)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -1133,6 +1145,40 @@ mod tests {
             bad[key] = replacement;
             let bad: Plan = serde_json::from_value(bad).unwrap();
             assert!(validate_plan(&bad).is_err(), "{key}");
+        }
+    }
+    #[test]
+    fn full209_plan_requires_its_own_feature_and_exact_private_cohort_root() {
+        let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon-singleton-209-capped-4aeca563-v1.service","invocation_id":"a".repeat(32),
+            "filesystem":"/","minimum_free_bytes":1,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1",
+            "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":471_798_691_840u64,
+            "receipt_directory":"/sealed/receipts"});
+        let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            validate_plan(&plan).is_ok(),
+            cfg!(feature = "epoch209-singleton-guard")
+        );
+        for (pointer, replacement) in [
+            (
+                "/unit",
+                json!("horizon-singleton-210-capped-4aeca563-v1.service"),
+            ),
+            (
+                "/worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1"),
+            ),
+            ("/maximum_root_physical_bytes", json!(300_000_000_000u64)),
+            ("/maximum_worker_vmas", json!(3_500_001)),
+            ("/filesystem", json!("/tmp")),
+        ] {
+            let mut bad = value.clone();
+            *bad.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{pointer}"
+            );
         }
     }
     #[test]

@@ -3462,6 +3462,18 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-full227") {
         return fleet::publish_full227_status().await;
     }
+    if env::args().nth(1).as_deref() == Some("status-publish-full209") {
+        return fleet::publish_full209_status().await;
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-singleton209-inputs") {
+        return fleet::prepare_singleton209_inputs();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-singleton209") {
+        return fleet::admit_singleton209();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-singleton209") {
+        return fleet::capture_singleton209();
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-native223") {
         return native223_status::run().await;
     }

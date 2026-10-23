@@ -13,7 +13,7 @@ struct Spec {
     protected_guards: BTreeMap<String, BoundFile>,
     output: PathBuf,
 }
-fn sealed_file(path: &Path, sha: &str, bytes: Option<u64>) -> Result<()> {
+pub(super) fn sealed_file(path: &Path, sha: &str, bytes: Option<u64>) -> Result<()> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
         "209 noncanonical input"
@@ -201,7 +201,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
     );
     Ok((t, required_memory))
 }
-fn unavailable_is_inactive(d: &Value, f: &Value) -> Result<()> {
+pub(super) fn unavailable_is_inactive(d: &Value, f: &Value) -> Result<()> {
     let name = d["producer_unit"]
         .as_str()
         .context("209 unavailable owner")?;
@@ -219,7 +219,7 @@ fn unavailable_is_inactive(d: &Value, f: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn actual_memory() -> Result<u64> {
+pub(super) fn actual_memory() -> Result<u64> {
     fs::read_to_string("/proc/meminfo")?
         .lines()
         .find_map(|l| {

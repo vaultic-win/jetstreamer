@@ -19,6 +19,7 @@ mod continuation203;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
+mod full209_status;
 mod full227_status;
 mod native141;
 mod native144;
@@ -65,6 +66,10 @@ mod retained220;
 mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
+mod singleton209;
+mod singleton209_admission;
+mod singleton209_capability;
+mod singleton209_capture;
 mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
@@ -98,6 +103,23 @@ pub(super) fn warmup223_terminal_not_replaced(proof: &Value) -> Result<()> {
 }
 pub(super) async fn publish_full227_status() -> Result<()> {
     full227_status::run().await
+}
+pub(super) async fn publish_full209_status() -> Result<()> {
+    full209_status::run().await
+}
+pub(super) fn full209_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    full209_status::inactive_owner(receipt)
+}
+pub(super) fn prepare_singleton209_inputs() -> Result<()> {
+    singleton209_capability::run()
+}
+pub(super) fn admit_singleton209() -> Result<()> {
+    singleton209_admission::run()
+}
+pub(super) fn capture_singleton209() -> Result<()> {
+    singleton209_capture::run()
 }
 pub(super) fn full227_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
@@ -469,6 +491,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     }
     if singleton227::namespace(claim) {
         singleton227::bindings(claim, &launch)?;
+    }
+    if singleton209::namespace(claim) {
+        singleton209::bindings(claim, &launch)?;
     }
     Ok(launch)
 }
@@ -892,6 +917,7 @@ fn validate_same_sample_admission(
         205 if prefix205::namespace(claim) => prefix205::GUARD_SHA,
         204 if prefix204::namespace(claim) => prefix204::GUARD_SHA,
         227 if singleton227::namespace(claim) => singleton227::SINGLETON_GUARD_SHA,
+        209 if singleton209::namespace(claim) => singleton209::GUARD_SHA,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
         203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
@@ -1110,6 +1136,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if singleton227::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| singleton227::guard_matches(claim, &r, plan))
+    } else if singleton209::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| singleton209::guard_matches(claim, &r, plan))
     } else if prefix223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
@@ -1256,6 +1285,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let prefix_205 = receipt["schema"] == prefix205::SCHEMA;
     let prefix_204 = receipt["schema"] == prefix204::SCHEMA;
     let singleton_227 = receipt["schema"] == singleton227::SCHEMA;
+    let singleton_209 = receipt["schema"] == singleton209::SCHEMA;
+    ensure!(
+        !singleton209::namespace(claim) || singleton_209,
+        "capped209 namespace requires its own full singleton schema"
+    );
     ensure!(
         !singleton227::namespace(claim) || singleton_227,
         "capped227 namespace requires its own full singleton schema"
@@ -1317,6 +1351,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || prefix_205
             || prefix_204
             || singleton_227
+            || singleton_209
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -1330,7 +1365,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if singleton_227 {
+    let scope_valid = if singleton_209 {
+        singleton209::launch_matches(claim, receipt)
+    } else if singleton_227 {
         singleton227::launch_matches(claim, receipt)
     } else if prefix_204 {
         prefix204::launch_matches(claim, receipt)
@@ -2872,6 +2909,14 @@ pub(super) async fn run() -> Result<()> {
                     "capped227 live command changed"
                 );
             }
+            if singleton209::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    singleton209::same_command(&current["ExecStart"]),
+                    "capped209 live command changed"
+                );
+                singleton209::bindings(claim, &launch)?;
+            }
             if shrink_budget225::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -3067,6 +3112,7 @@ pub(super) async fn run() -> Result<()> {
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
+                        || full209_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                 });
