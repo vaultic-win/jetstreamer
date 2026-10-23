@@ -330,7 +330,10 @@ impl RuntimeState {
             )));
         }
 
-        if cfg!(feature = "epoch223-prefix-qualification") && self.enforce_candidate_range {
+        if (cfg!(feature = "epoch223-prefix-qualification")
+            || cfg!(feature = "epoch227-capped-qualification"))
+            && self.enforce_candidate_range
+        {
             for request in &requests {
                 validate_candidate_entry_slot(request.slot)
                     .map_err(ProcessEntriesError::Runtime)?;
@@ -778,7 +781,9 @@ impl RuntimeState {
             self.accounts_shrink_consumed_budget,
             ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
         );
-        if cfg!(feature = "epoch223-prefix-qualification") {
+        if cfg!(feature = "epoch223-prefix-qualification")
+            || cfg!(feature = "epoch227-capped-qualification")
+        {
             // Match the pinned validator background-service debt cap. This
             // reclaims storage without generating account writes or Bank state.
             self.accounts_shrink_consumed_budget = self
@@ -867,6 +872,9 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(feature = "epoch227-capped-qualification") && slot != 98_063_464 {
+        return Err("epoch227 capped requires the exact cold snapshot98063464".into());
+    }
     if cfg!(feature = "epoch223-prefix-qualification") && slot != 96_335_538 {
         return Err("epoch223 prefix requires the exact cold snapshot96335538".into());
     }
@@ -892,7 +900,11 @@ fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
+    if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
+        98_063_481
+    } else if cfg!(feature = "epoch227-capped-qualification") {
+        98_496_000
+    } else if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
         96_335_555
     } else if cfg!(feature = "epoch223-prefix-qualification") {
         96_767_523
@@ -904,7 +916,9 @@ fn effective_max_supported_entry_slot_exclusive() -> u64 {
 }
 
 fn effective_min_supported_entry_slot() -> u64 {
-    if cfg!(feature = "epoch223-prefix-qualification") {
+    if cfg!(feature = "epoch227-capped-qualification") {
+        98_063_465
+    } else if cfg!(feature = "epoch223-prefix-qualification") {
         96_335_539
     } else {
         MIN_SUPPORTED_ENTRY_SLOT
@@ -1665,7 +1679,11 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        if cfg!(feature = "epoch223-prefix-qualification") {
+        if cfg!(feature = "epoch227-capped-qualification") {
+            assert!(validate_candidate_snapshot_slot(98_063_464).is_ok());
+            assert!(validate_candidate_snapshot_slot(98_063_463).is_err());
+            assert!(validate_candidate_snapshot_slot(98_063_465).is_err());
+        } else if cfg!(feature = "epoch223-prefix-qualification") {
             assert!(validate_candidate_snapshot_slot(96_335_538).is_ok());
             assert!(validate_candidate_snapshot_slot(96_767_522).is_err());
         } else {
@@ -1683,7 +1701,11 @@ mod tests {
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
+            if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
+                98_063_481
+            } else if cfg!(feature = "epoch227-capped-qualification") {
+                98_496_000
+            } else if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
                 96_335_555
             } else if cfg!(feature = "epoch223-prefix-qualification") {
                 96_767_523
@@ -1693,6 +1715,39 @@ mod tests {
                 MAX_SUPPORTED_SLOT_EXCLUSIVE
             }
         );
+    }
+
+    #[cfg(feature = "epoch227-capped-qualification")]
+    #[test]
+    fn epoch227_refuses_out_of_scope_batches_before_decoding_or_bank_mutation() {
+        let (mut state, _) = test_state(1, Some(2));
+        state.enforce_candidate_range = true;
+        let before = (
+            state.bank.slot(),
+            state.bank.hash(),
+            state.bank.transaction_count(),
+            state.write_cursor,
+        );
+        for slot in &[98_063_464, effective_max_supported_entry_slot_exclusive()] {
+            let request = EntryRequest {
+                slot: *slot,
+                entry_index: 0,
+                num_hashes: 0,
+                hash: vec![],
+                transactions: vec![vec![255]],
+            };
+            let error = state.process_entries(vec![request]).unwrap_err();
+            assert!(error.contains("outside"), "{}", error);
+            assert_eq!(
+                before,
+                (
+                    state.bank.slot(),
+                    state.bank.hash(),
+                    state.bank.transaction_count(),
+                    state.write_cursor,
+                )
+            );
+        }
     }
 
     #[cfg(feature = "epoch223-prefix-qualification")]
@@ -1845,7 +1900,86 @@ mod tests {
             checkpoint.tick_height,checkpoint.next_write_version);
     }
 
-    #[cfg(feature = "epoch223-prefix-qualification")]
+    #[cfg(feature = "epoch227-capped-warmup-diagnostic")]
+    #[test]
+    #[ignore]
+    fn native_epoch227_cold_input_matches_canonical_accounts_commitment() {
+        use sha2::{Digest, Sha256};
+        use std::{
+            fs,
+            io::Read,
+            os::unix::fs::{MetadataExt, PermissionsExt},
+        };
+        let (snapshot, ledger, scratch_env, prefix, size, digest_expected, slot, accounts_hash) = (
+            "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst",
+            "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1",
+            "JETSTREAMER_EPOCH227_V1620_TEST_SCRATCH", "native-input227-v1620-",
+            10_261_480_487u64,
+            "77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07",
+            98_063_464u64, "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR",
+        );
+        let scratch = env::var(scratch_env).expect("explicit isolated test scratch required");
+        let path = Path::new(&scratch);
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
+        let root = path.parent().unwrap();
+        assert_eq!(
+            root.parent(),
+            Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        );
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with(prefix));
+        let metadata = fs::symlink_metadata(path).unwrap();
+        assert!(
+            metadata.is_dir()
+                && metadata.uid() == unsafe { libc::geteuid() }
+                && metadata.permissions().mode() & 0o077 == 0
+        );
+        assert_eq!(fs::canonicalize(path).unwrap(), path);
+        assert!(fs::read_dir(path).unwrap().next().is_none());
+        let mut file = fs::File::open(snapshot).unwrap();
+        assert_eq!(file.metadata().unwrap().len(), size);
+        let mut digest = Sha256::new();
+        let mut buffer = vec![0u8; 1024 * 1024];
+        loop {
+            let n = file.read(&mut buffer).unwrap();
+            if n == 0 {
+                break;
+            }
+            digest.input(&buffer[..n]);
+        }
+        assert_eq!(format!("{:x}", digest.result()), digest_expected);
+        let initial = jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+            archive_path: snapshot.into(),
+        };
+        let (mut state, initialized) =
+            RuntimeState::initialize(ledger, &initial, Some(&scratch)).unwrap();
+        assert_eq!(initialized.slot, slot);
+        let original_transactions = state.bank.transaction_count();
+        let checkpoint = state.freeze_checkpoint(slot).unwrap();
+        assert!(checkpoint.slot_complete && checkpoint.writes.is_empty());
+        assert_eq!(
+            checkpoint.next_write_version,
+            initialized.next_write_version
+        );
+        assert_eq!(checkpoint.transaction_count, original_transactions);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            accounts_hash
+        );
+        println!("epoch227-v1620-native-input slot={} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transaction_count={} tick_height={} next_write_version={} replay_entries=0 bootstrap_writes=0",
+            checkpoint.slot,Hash::new(&checkpoint.bank_hash),Hash::new(&checkpoint.accounts_hash),
+            Hash::new(&checkpoint.last_blockhash),checkpoint.capitalization,checkpoint.transaction_count,
+            checkpoint.tick_height,checkpoint.next_write_version);
+    }
+
+    #[cfg(any(
+        feature = "epoch223-prefix-qualification",
+        feature = "epoch227-capped-qualification"
+    ))]
     #[test]
     fn prefix_shrink_caps_debt_without_changing_consensus_state_or_write_cursor() {
         let (mut state, mint) = test_state(1, Some(2));
