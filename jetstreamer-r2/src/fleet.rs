@@ -162,6 +162,9 @@ pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
         bail!("native input status claim is not a registered closed profile")
     }
 }
+pub(super) fn capture_native223_input() -> Result<()> {
+    cold223_scan::capture_native20_input()
+}
 pub(super) fn admit_publication203() -> Result<()> {
     publication203::admit()
 }
