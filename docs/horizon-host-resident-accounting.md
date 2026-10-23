@@ -49,3 +49,19 @@ grants no launch, stop, restart, archive or R2 mutation authority. Fresh
 invocation-bound admission, pressure relief where required, the century disk
 floor, one experimental extra lane and a later clean expanded sample remain
 independent requirements.
+
+Each capacity decision also reports `expanded_fleet_window` while a private
+experimental replay is live. It compares the current and hash-bound predecessor
+v2 receipts at least 1,800 seconds apart. The complete production and private
+owner sets must match; controller/producer invocations, worker processes and
+scratch claims must remain stable, with useful execution progress, valid RSS,
+bounded VMAs and no new hard-memory-limit or OOM events. An unavailable private
+observation or a replacement with the same lane count cannot qualify the window.
+
+A qualified window advances the next action to current guard/floor review and
+explicit operating-point promotion. It does not itself promote the operating
+point or admit another producer. This keeps a live diagnostic from causing an
+indefinite “awaiting expanded sample” hold after the required evidence exists.
+Guard receipts, protected remaining growth, the century floor and fresh candidate
+admission remain separate checks. Both the comparison and the memory target use
+existing accepted bytes and take no additional resource samples.

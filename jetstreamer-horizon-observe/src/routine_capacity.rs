@@ -1,5 +1,7 @@
 //! Same-sample capacity decisions. This receipt is never launch authority.
 use super::*;
+#[path = "routine_capacity_window.rs"]
+mod expanded_window;
 #[path = "routine_memory_target.rs"]
 mod memory_target;
 const PROVEN: u64 = 5;
@@ -107,13 +109,33 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     }
     let original_live = original141::invocation(p).is_some_and(|id| diagnostic_live.contains(id));
     let expanded = !diagnostic_live.is_empty();
+    let memory_report = memory_target::report(o, live.len(), diagnostic_live.len());
+    // A live experimental lane must not create a permanent qualification hold.
+    // Compare the actual complete fleet across accepted receipts, without a new
+    // resource observation. This establishes window evidence only: current
+    // guard/floor review and fresh candidate admission remain independent.
+    let window = if expanded {
+        let previous = if clean && memory_report["valid"] == true {
+            bound_json(&p.previous_observer, false)?
+        } else {
+            Value::Null
+        };
+        expanded_window::report(o, &previous, &live, &diagnostic_live, clean, &memory_report)
+    } else {
+        Value::Null
+    };
     let preliminary = !expanded
         && clean
         && live.len() == 5
         && free >= required
         && memory >= 192 * 1024 * 1024
         && o["vm_max_map_count"].as_u64().is_some_and(|v| v >= 4194304);
-    let (gate, action) = if expanded {
+    let (gate, action) = if expanded && window["qualified"] == true {
+        (
+            "expanded operating-point guard/floor review and epoch186 fresh guarded admission",
+            "The complete expanded fleet has a clean comparable observation window. Bind current no-trip guards and century-floor/growth evidence to an explicit operating-point promotion, then freshly admit the staged disjoint capped186 candidate. Do not repeat the awaiting-window hold or grant launch authority from this receipt.",
+        )
+    } else if expanded {
         (
             "expanded-fleet qualification and next disjoint runtime/resource bound",
             "Accept a clean expanded-fleet coordinated window before considering another experimental lane; stage the next disjoint repair/singleton meanwhile.",
@@ -147,7 +169,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     Ok(
         json!({"schema":"jetstreamer-horizon-capacity-decision-v2","question":"Can I fit another disjoint lane now?",
         "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
-        "memory_concurrency_target":memory_target::report(o,live.len(),diagnostic_live.len()),
+        "memory_concurrency_target":memory_report,"expanded_fleet_window":window,
         "live_production_lanes":live.len(),"proven_production_lanes":PROVEN,"live_owners":live,
         "live_private_qualification_lanes":diagnostic_live.len(),"live_total_replay_lanes":live.len()+diagnostic_live.len(),
         "proven_point_evidence":{"path":"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T063958Z.json","sha256":"87d714a3652649a2bcf2bd0f0629d3638785e76e45c9286bfd62fb7aeb0d1b99"},
