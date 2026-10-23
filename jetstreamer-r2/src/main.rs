@@ -3375,6 +3375,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("fleet-reconcile") {
         return fleet::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("extend-continuation203-runtime") {
+        return fleet::extend_continuation203_runtime();
+    }
     if env::args().nth(1).as_deref() == Some("status-retire-inactive") {
         return inactive_status::run().await;
     }

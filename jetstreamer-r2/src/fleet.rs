@@ -18,6 +18,7 @@ mod continuation144_protection;
 mod continuation203;
 mod continuation203_admission;
 mod continuation203_ops;
+mod continuation203_runtime;
 mod native141;
 mod native144;
 mod native203;
@@ -67,6 +68,9 @@ pub(super) fn probe_continuation203_inputs() -> Result<()> {
 }
 pub(super) fn capture_continuation203_launch() -> Result<()> {
     continuation203_ops::capture()
+}
+pub(super) fn extend_continuation203_runtime() -> Result<()> {
+    continuation203_runtime::run()
 }
 pub(super) fn prepare_continuation144_layout() -> Result<()> {
     continuation144::prepare_layout()
@@ -535,6 +539,8 @@ struct Plan {
     admission_transition_guard: Option<BoundFile>,
     #[serde(default)]
     metadata_event: Option<BoundFile>,
+    #[serde(default)]
+    continuation203_runtime_extension: Option<BoundFile>,
 }
 
 fn validate_same_sample_admission(
@@ -2204,7 +2210,11 @@ pub(super) async fn run() -> Result<()> {
                 native203::validate_live(claim, current)?;
             }
             if continuation203::namespace(claim) {
-                continuation203::validate_live(claim, current)?;
+                continuation203::validate_live(
+                    claim,
+                    current,
+                    plan.continuation203_runtime_extension.as_ref(),
+                )?;
             }
             if native141::namespace(claim) {
                 native141::validate_live(claim, current)?;
@@ -2489,6 +2499,9 @@ pub(super) async fn run() -> Result<()> {
         receipt["metadata_event"] = json!({"path":event.path,"sha256":event.sha256});
         receipt["metadata_event_sampled_at_utc"] = proof["sampled_at_utc"].clone();
         receipt["new_resource_samples"] = json!(0);
+    }
+    if let Some(extension) = &plan.continuation203_runtime_extension {
+        receipt["continuation203_runtime_extension"] = private157::binding(extension);
     }
     receipt["pipelines"] = json!(pipelines);
     receipt["terminal_replays"] = json!(terminal_replays);

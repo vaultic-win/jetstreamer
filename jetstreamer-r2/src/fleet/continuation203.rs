@@ -191,7 +191,11 @@ pub(super) fn guard_matches(c: &DiagnosticClaim, r: &Value, p: &Value) -> bool {
         && p.get("bounded_canary").is_none_or(Value::is_null)
         && p.get("bounded_measurement").is_none_or(Value::is_null)
 }
-pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> {
+pub(super) fn validate_live(
+    c: &DiagnosticClaim,
+    current: &Value,
+    extension: Option<&BoundFile>,
+) -> Result<()> {
     let r = checked_diagnostic_launch(c)?;
     ensure!(
         current["Type"] == "exec"
@@ -202,9 +206,18 @@ pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> 
             && command(&current["ExecStart"]) == command(&r["expected_exec_start"]),
         "203 live continuation command/owner differs"
     );
-    live_limits()
+    let runtime = if let Some(bound) = extension {
+        super::continuation203_runtime::validate_receipt(&bound_json(bound)?, c, current)?;
+        "12h"
+    } else {
+        "3h"
+    };
+    live_limits_for(runtime)
 }
 pub(super) fn live_limits() -> Result<()> {
+    live_limits_for("3h")
+}
+pub(super) fn live_limits_for(runtime: &str) -> Result<()> {
     let out = ProcessCommand::new("systemctl").args(["show", UNIT, "--no-pager",
         "--property=User,Group,Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,PrivateMounts,NoNewPrivileges,UMask,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,Environment"]).output()?;
     ensure!(
@@ -216,9 +229,14 @@ pub(super) fn live_limits() -> Result<()> {
         let (k, v) = line.split_once('=').context("203 limit line")?;
         ensure!(limits.insert(k, v).is_none(), "duplicate203 limit");
     }
-    validate_limits(&limits)
+    validate_limits_for(&limits, runtime)
 }
+#[cfg(test)]
 fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
+    validate_limits_for(l, "3h")
+}
+fn validate_limits_for(l: &BTreeMap<&str, &str>, runtime: &str) -> Result<()> {
+    ensure!(matches!(runtime, "3h" | "12h"), "203 invalid runtime bound");
     for (k, v) in [
         ("User", "ubuntu"),
         ("Group", "ubuntu"),
@@ -230,7 +248,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
         ("MemoryHigh", "103079215104"),
         ("MemoryMax", "137438953472"),
         ("MemorySwapMax", "0"),
-        ("RuntimeMaxUSec", "3h"),
+        ("RuntimeMaxUSec", runtime),
         ("CPUQuotaPerSecUSec", "8s"),
         ("ProtectSystem", "strict"),
         ("ProtectHome", "read-only"),
@@ -451,6 +469,15 @@ mod tests {
             bad.insert(key, "foreign");
             assert!(validate_limits(&bad).is_err(), "{key}");
         }
+        l.insert("RuntimeMaxUSec", "12h");
+        assert!(validate_limits(&l).is_err()); // No extension evidence means original3h.
+        validate_limits_for(&l, "12h").unwrap();
+        for key in l.keys() {
+            let mut bad = l.clone();
+            bad.insert(key, "foreign");
+            assert!(validate_limits_for(&bad, "12h").is_err(), "extended:{key}");
+        }
+        assert!(validate_limits_for(&l, "infinity").is_err());
         assert_eq!(r["current_sidecar_eta_valid"], false);
     }
 }
