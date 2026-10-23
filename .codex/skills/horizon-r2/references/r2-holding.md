@@ -51,8 +51,12 @@ storage for eligible closed files, not live POSIX scratch and not a publication 
 The user authorizes this lifecycle for campaign jobs: **checkpoint and stop → upload and verify →
 delete exact local copies → restore and verify → resume**. This extends holding eligibility to a
 stopped job's closed checkpoint/scratch set after its real restore path has been qualified. It
-does not authorize deleting or overwriting any R2 object. For the current host the user supplied
-`foundation_node_01/`; use its durable host mapping and check prefix ownership before first write.
+does not authorize deleting or overwriting any R2 object. Prefixes belong to their explicitly
+authorized hosts: `dev-samjohnson` uses the user-provided `node_02/`, recorded in
+`/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json`.
+`foundation_node_01/` belongs to a different server's authorization and is not a default.
+Use each host's durable mapping and check prefix ownership before first write; other hosts still
+require their own user-provided mapping. A mapping does not establish transport or resume qualification.
 
 - Use a durable job ID and transition journal with exclusive ownership. Bind epoch/phase, exact
   original invocation and runtime/worker/package hashes, checkpoint position and restart cursor,

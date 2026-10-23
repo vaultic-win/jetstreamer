@@ -229,6 +229,105 @@ fn restore_admission_cannot_omit_private_growth_owners_or_bind_a_stale_fleet() {
     assert!(restore_basis(&a, &c, &different, BASE_RESERVE + 512 * (1u64 << 30), now).is_err());
 }
 
+#[test]
+fn restore_admission_requires_the_entire_restore_above_complete_protection() {
+    assert_eq!(
+        admission_bytes(BASE_RESERVE, 42, BASE_RESERVE + 42).unwrap(),
+        BASE_RESERVE + 42
+    );
+    assert!(admission_bytes(BASE_RESERVE, 42, BASE_RESERVE + 41).is_err());
+    assert!(admission_bytes(BASE_RESERVE - 1, 42, u64::MAX).is_err());
+    assert!(admission_bytes(BASE_RESERVE, 0, u64::MAX).is_err());
+    assert!(admission_bytes(u64::MAX, 42, u64::MAX).is_err());
+    // The lower five-lane baseline cannot conceal the remaining private141 claim.
+    let protected = BASE_RESERVE + (512u64 << 30);
+    assert!(admission_bytes(protected, 20144, BASE_RESERVE + 20144).is_err());
+}
+
+#[test]
+fn separate_os_volume_probe_cannot_select_a_job_or_change_its_reserve() {
+    let c = json!({"sha256":GENESIS_PROBE_SHA,"length":20144,
+        "source":"/home/sol/.jetstreamer-private/holding-public-genesis-fixture-20261023-v1/genesis.tar.bz2"});
+    genesis_probe_scope(&c, GENESIS_PROBE_FLOOR).unwrap();
+    for (key, value) in [
+        ("sha256", json!("a".repeat(64))),
+        ("length", json!(20145)),
+        (
+            "source",
+            json!("/home/sol/.jetstreamer-private/job/epoch-136.jet"),
+        ),
+    ] {
+        let mut bad = c.clone();
+        bad[key] = value;
+        assert!(
+            genesis_probe_scope(&bad, GENESIS_PROBE_FLOOR).is_err(),
+            "{key}"
+        );
+    }
+    assert!(genesis_probe_scope(&c, 0).is_err());
+    assert!(genesis_probe_scope(&c, GENESIS_PROBE_FLOOR - 1).is_err());
+}
+
+#[test]
+fn admission_owner_derivation_deduplicates_cohorts_and_keeps_private_diagnostics() {
+    let unit = |name: &str, id: char| {
+        json!({"Id":name,"InvocationID":id.to_string().repeat(32),
+        "ActiveState":"active","SubState":"running","NRestarts":"0"})
+    };
+    let ordinary = unit("ordinary.service", 'a');
+    let private = unit("private.service", 'b');
+    let f = json!({"active":[{"producer":ordinary,"controller":ordinary},
+        {"producer":ordinary,"controller":ordinary}],
+        "diagnostics":[{"live":true,"unit":private},{"live":false,"unit":{}}]});
+    let owners = fleet_owners(&f).unwrap();
+    assert_eq!(owners.len(), 2);
+    assert_eq!(owners["private.service"], "b".repeat(32));
+    let mut changed = f.clone();
+    changed["active"][1]["producer"]["InvocationID"] = json!("c".repeat(32));
+    assert!(fleet_owners(&changed).is_err());
+    changed = f;
+    changed["diagnostics"][0]["unit"]["NRestarts"] = json!("1");
+    assert!(fleet_owners(&changed).is_err());
+    assert!(fleet_owners(&json!({"active":[],"diagnostics":[]})).is_err());
+    let controllerless = json!({"active":[{"producer":private,"ordinary_replay_claim":false}],
+        "diagnostics":[{"live":true,"unit":private}]});
+    assert_eq!(fleet_owners(&controllerless).unwrap().len(), 1);
+    let mut missing = controllerless.clone();
+    missing["diagnostics"] = json!([]);
+    assert!(fleet_owners(&missing).is_err());
+    missing = controllerless;
+    missing["active"][0]["ordinary_replay_claim"] = json!(true);
+    assert!(fleet_owners(&missing).is_err());
+    assert!(fleet_owners(&json!({"active":[{}],"diagnostics":[]})).is_err());
+    assert!(
+        serde_json::from_value::<RestoreAdmission>(json!({
+            "schema":"jetstreamer-horizon-holding-restore-admission-plan-v2",
+            "mapping":{"path":"/sealed/map","sha256":"a".repeat(64)},
+            "custody":{"path":"/sealed/custody","sha256":"b".repeat(64)},
+            "capacity_completion":{"path":"/accepted/completion.json","sha256":"c".repeat(64)},
+            "minimum_free_bytes":0
+        }))
+        .is_err()
+    );
+}
+
+#[test]
+#[ignore = "root exact accepted1626 fleet; read-only native evidence, no sampling or remote access"]
+fn actual_accepted_fleet_includes_all_five_controllers_producers_and_private141() {
+    let fleet = Bound {
+        path: "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261023T162600Z.json"
+            .into(),
+        sha256: "c2520b7705df263e74aef11b20c81c2bf9375eec262868f87a0c9582988c0a85".into(),
+    };
+    let f = evidence(&fleet, false).unwrap();
+    let owners = fleet_owners(&f).unwrap();
+    assert_eq!(owners.len(), 11);
+    assert_eq!(
+        owners["horizon-qualify-141-original-entry-capped-root-20261023-v1.service"],
+        "e639f007d482464f8a251455659d2ede"
+    );
+}
+
 fn accept(listener: &std::net::TcpListener) -> std::net::TcpStream {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
