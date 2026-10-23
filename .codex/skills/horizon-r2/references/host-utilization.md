@@ -19,6 +19,13 @@ another lane:
 - I/O pressure, major faults, memory pressure, and any current verifier, uploader, or snapshot
   activity that materially contends with replay.
 
+Linking a dormant systemd unit triggers a manager reload, which can clear the display-only
+timestamps and PID embedded in `ExecStart` while the invocation and authoritative `MainPID`
+remain live. Use the reviewed command-identity comparison for that case: exact executable,
+arguments and `ignore_errors`, alongside unchanged invocation ID, `MainPID`, state and restart
+count. Preserve raw observations. Do not treat display metadata loss as a restart, or normalize
+away an actual command or owner change.
+
 Choose the desired lane count from memory alone, targeting 90% of total host memory used. Estimate
 the marginal lane RSS from this century's observations, subtract measured non-lane usage once, and
 update the count from actual host usage at the regular observation. Track the difference between

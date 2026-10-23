@@ -192,8 +192,33 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
     );
     Ok((sampled, reservation))
 }
+pub(super) fn check_previous_owners(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
+    // Linking the dormant unit reloads PID1 and clears ExecStart's display-only
+    // times/PID. Retain raw observations; normalize only the three exact older
+    // commands in this in-memory comparison, never invocation IDs or MainPID.
+    let old = f["unit_census"]
+        .as_object()
+        .context("204 predecessor census missing")?;
+    let mut view = c.clone();
+    for name in [LIVE205, LIVE225, SCANNER] {
+        let previous = old.get(name).context("204 predecessor owner missing")?;
+        let current = view.get_mut(name).context("204 current owner missing")?;
+        let expected = previous["ExecStart"]
+            .as_str()
+            .context("204 previous command missing")?;
+        let observed = current["ExecStart"]
+            .as_str()
+            .context("204 current command missing")?;
+        ensure!(
+            pipeline_status::same_exec_start(expected, observed),
+            "204 protected command changed:{name}"
+        );
+        current["ExecStart"] = previous["ExecStart"].clone();
+    }
+    snapshot144::check_owners(f, &view)
+}
 fn owners(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
-    snapshot144::check_owners(f, c)?;
+    check_previous_owners(f, c)?;
     for (name, u) in c {
         if diagnostic_stage_running(u) {
             ensure!(
@@ -572,6 +597,21 @@ mod tests {
         }
         let fleet = json!({"unit_census":current,"active":current.values().map(|u|json!({"unit":u})).collect::<Vec<_>>()});
         owners(&fleet, &current).unwrap();
+        let mut displayed = current.clone();
+        let original = "{ path=/sealed/scan ; argv[]=/sealed/scan plan ; ignore_errors=no ; start_time=[Fri 2026-10-23 09:29:00 UTC] ; stop_time=[n/a] ; pid=123 ; code=(null) ; status=0/0 }";
+        let cleared = "{ path=/sealed/scan ; argv[]=/sealed/scan plan ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+        let mut expected = fleet.clone();
+        expected["unit_census"][SCANNER]["ExecStart"] = json!(original);
+        for row in expected["active"].as_array_mut().unwrap() {
+            if row["unit"]["Id"] == SCANNER {
+                row["unit"]["ExecStart"] = json!(original);
+            }
+        }
+        displayed.get_mut(SCANNER).unwrap()["ExecStart"] = json!(cleared);
+        owners(&expected, &displayed).unwrap();
+        displayed.get_mut(SCANNER).unwrap()["ExecStart"] =
+            json!(cleared.replace("/sealed/scan plan", "/sealed/scan other"));
+        assert!(owners(&expected, &displayed).is_err());
         let mut changed = current.clone();
         changed.get_mut(SCANNER).unwrap()["InvocationID"] = json!(IID205);
         assert!(owners(&fleet, &changed).is_err());
