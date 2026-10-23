@@ -29,6 +29,8 @@ epoch223-root-prefix-resource = []
 epoch224-bounded-resource = []
 # Dormant exact epoch205 checkpoint-prefix measurement; no ordinary replay.
 epoch205-bounded-resource = []
+# Private capped-shrink prefix ending at epoch205's independently known checkpoint.
+epoch205-shrink-root-prefix-resource = []
 
 [lib]
 name = "jetstreamer_utils"
@@ -227,6 +229,11 @@ required-features = ["epoch203-shrink-root-prefix-resource"]
 [[bin]]
 name = "jetstreamer-epoch213-private-verify"
 path = "src/epoch213_private_verify_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch205-shrink-root-prefix-resource"
+path = "src/epoch205_shrink_root_prefix_resource_bin.rs"
+required-features = ["epoch205-shrink-root-prefix-resource"]
 
 [[bin]]
 name = "jetstreamer-epoch144-private-verify"
