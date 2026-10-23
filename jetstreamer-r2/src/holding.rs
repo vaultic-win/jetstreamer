@@ -1,4 +1,4 @@
-//! Append-only custody of closed public-chain artifacts. No local retirement,
+//! Append-only custody of closed public-chain artifacts. No replay-data retirement,
 //! canonical sidecar, runtime checkpoint or job-resume authority.
 use super::*;
 use serde_json::json;
@@ -1101,7 +1101,7 @@ pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136 SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -1147,6 +1147,9 @@ pub(super) async fn run() -> Result<()> {
     lock.flush()?;
     if args[1] == "holding-inspect136" {
         return epoch136::inspect(&m, &serde_json::from_value(v)?, &spec);
+    }
+    if args[1] == "holding-disable136-retry" {
+        return epoch136::disable_retry(&m, v, &spec);
     }
     if args[1] == "holding-admit-restore" {
         return admit_restore(&m, &serde_json::from_value(v)?, &spec);

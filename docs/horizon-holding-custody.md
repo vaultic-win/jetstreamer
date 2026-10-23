@@ -114,3 +114,29 @@ requires separate staged-reference and retirement review. Feed only this
 separately sealed eligibility proof to the ordinary no-clobber holding park
 operation; neither inspection nor backup repairs epoch136 or qualifies it for
 canonical publication or job resume.
+
+`holding-disable136-retry` retires only the configuration of the already-stopped
+original136–147 controller. Its plan schema is
+`jetstreamer-horizon-holding-disable136-retry-plan-v2`, with `mapping`, `terminal`,
+`qualification` and `archived_unit` bindings. It requires the exact original
+failure lineage, no live/restarted owner or relaunch/handoff trigger, and the
+separately sealed controller configuration with compiled SHA-256. It fsyncs an
+intent under
+`/var/lib/jetstreamer/horizon-terminal136-controller-retirement-20261023-v1`,
+moves that exact configuration inode there without replacing anything, fsyncs
+both parents, and masks only the original service with a `/dev/null` symlink.
+After manager reload it proves that service remains stopped and masked. It
+preserves the sealed backup and moved original, handles a crash between move
+and mask, and rejects differing bytes, an occupied retained path or another
+symlink. A durable completion records the transition. It neither signals a
+producer nor removes replay data, changes active service limits or repairs136.
+
+Run this only in its separate root sandbox with write access to that exact
+receipt/configuration-retention directory, the holding state lock, and
+`/etc/systemd/system` for the fixed service path. A full holding backup owns the
+same exclusive transition lock; let it complete before the configuration action.
+Keep the old controller masked during subsequent artifact-specific retirement
+so its obsolete staged definition cannot consume a removed local prefix. The
+archive still requires authenticated custody, fresh reference checks and a
+separately qualified local-retirement path; masking is not archive deletion
+authority. Healthy controllers and their immutable deployments remain in place.
