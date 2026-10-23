@@ -19,6 +19,9 @@ pub(super) fn properties(unit: &str) -> Result<BTreeMap<String, String>> {
         "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,CPUAffinity,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,ExecMainPID,ExecMainStartTimestampMonotonic,ExecMainStatus,Result,ActiveState,SubState,NRestarts,ExecStart",
     )
 }
+fn native_affinity(value: &str) -> bool {
+    matches!(value, "0-7" | "0 1 2 3 4 5 6 7")
+}
 pub(super) fn sandbox(p: &BTreeMap<String, String>) -> Result<()> {
     require(
         p,
@@ -33,7 +36,6 @@ pub(super) fn sandbox(p: &BTreeMap<String, String>) -> Result<()> {
             ("MemoryMax", "137438953472"),
             ("MemorySwapMax", "0"),
             ("CPUQuotaPerSecUSec", "8s"),
-            ("CPUAffinity", "0 1 2 3 4 5 6 7"),
             ("TasksMax", "512"),
             ("RuntimeMaxUSec", "45min"),
             ("ProtectHome", "read-only"),
@@ -46,6 +48,10 @@ pub(super) fn sandbox(p: &BTreeMap<String, String>) -> Result<()> {
             ("NRestarts", "0"),
         ],
     )?;
+    ensure!(
+        p.get("CPUAffinity").is_some_and(|v| native_affinity(v)),
+        "207 native CPU affinity differs"
+    );
     let expected = [
         "RUST_MIN_STACK=134217728".into(),
         "SOLANA_RAYON_THREADS=8".into(),
@@ -470,6 +476,21 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn systemd_cpu_affinity_renderings_are_equivalent_only_for_the_exact_eight_cpu_set() {
+        assert!(native_affinity("0-7"));
+        assert!(native_affinity("0 1 2 3 4 5 6 7"));
+        for wrong in [
+            "",
+            "0-8",
+            "1-8",
+            "0 1 2 3 4 5 6",
+            "0 1 2 3 4 5 6 7 7",
+            "0 1 2 3 4 5 6 7 8",
+        ] {
+            assert!(!native_affinity(wrong), "{wrong}");
+        }
+    }
     #[test]
     fn protection_cannot_mix_owners_admissions_guards_or_budget_exceptions() {
         let iid = "a".repeat(32);
