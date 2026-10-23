@@ -185,7 +185,7 @@ pub(super) fn run() -> Result<()> {
         .collect::<BTreeSet<_>>();
     names.insert(UNIT.into());
     let before = census(&names, 201, 300)?;
-    snapshot144::check_owners(&f, &before)?;
+    prefix204_admission::check_previous_owners(&f, &before)?;
     let u = before.get(UNIT).context("204 producer absent")?;
     let iid = u["InvocationID"].as_str().context("204 producer IID")?;
     let claim = DiagnosticClaim {
@@ -290,7 +290,7 @@ pub(super) fn run() -> Result<()> {
     )?;
     let proof = manager(&g, &s.guard_plan)?;
     let after = census(&names, 201, 300)?;
-    snapshot144::check_owners(&f, &after)?;
+    prefix204_admission::check_previous_owners(&f, &after)?;
     ensure!(before == after, "204 owner census changed during capture");
     r["guard"] = private157::binding(&s.guard);
     r["guard_plan"] = private157::binding(&s.guard_plan);
