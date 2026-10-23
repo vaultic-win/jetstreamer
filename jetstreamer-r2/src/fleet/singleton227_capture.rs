@@ -2,7 +2,7 @@
 use super::*;
 use super::{singleton227 as c, singleton227_admission as admission};
 const GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-ownroot203-capability-8623b37c-v1/jetstreamer-horizon-standalone-guard";
-const NATIVE_GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-native227-main-guard-f1e24452-v1/jetstreamer-horizon-standalone-guard";
+const NATIVE_GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-native227-main-guard-e53a03e5-v2/jetstreamer-horizon-standalone-guard";
 const TEST: &str = "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test";
 const TEST_SHA: &str = "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3";
 #[derive(Deserialize)]

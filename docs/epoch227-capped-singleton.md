@@ -162,17 +162,19 @@ Use persistent safety services/timers named
 the reviewed immutable own-tree guard, with only its private receipt directory
 writable, root UID, private network,1GiB hard memory, one CPU and256 tasks.
 Capture requires the exact guard invocation's PID1 successful completion and
-an active waiting safety timer. Native qualification never authorizes a replay
-or an R2 status object. Register a public in-flight status only after the entry
-lane actually starts and has a valid coordinated observer/ETA binding.
+an active waiting safety timer. Native qualification never authorizes entry
+replay or archive publication. Register active native input verification in the
+campaign fleet and publish its dashboard status through the generic reviewed
+verification publisher, binding the live native origin and accepted fleet.
+Use the coordinated observer and ETA binding when entry replay actually starts.
 
 The native harness must be the optimized historical rustc1.51 build at
 `/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test`,
 SHA-256 `1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3`.
 The earlier debug harness remains preserved and is not qualified for this launch.
 The new native guard is sealed at
-`/var/lib/jetstreamer/horizon-native227-main-guard-f1e24452-v1`, SHA-256
-`f1e24452d93cf014a7a54ee443e9a1c8266ea94881b57f65203384a72abe4647`.
+`/var/lib/jetstreamer/horizon-native227-main-guard-e53a03e5-v2`, SHA-256
+`e53a03e5a97ace54439db60ee3776117af68beebb892d03f34cfa8cceef118d9`.
 Entry replay retains its independently reviewed old guard/hash.
 
 Set `native_running:true` in a native capture spec to create a protected live
