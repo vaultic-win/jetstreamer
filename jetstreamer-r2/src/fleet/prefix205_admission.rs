@@ -63,7 +63,11 @@ fn guard(g: &Value, epoch: u64, sample: u64, now: u64) -> Result<()> {
             && g["producer"]["kill_mode"] == "control-group"
             && g["producer"]["delegated"] == false
             && g["producer"]["pid"].as_u64().is_some_and(|n| n > 0)
-            && g["producer_stop_enabled"] == true
+            && if epoch == 203 {
+                g["producer_stop_enabled"] == true
+            } else {
+                g.get("producer_stop_enabled").is_none()
+            }
             && g["maximum_worker_vmas"] == 3500000
             && [
                 "trip_reason",
@@ -450,10 +454,13 @@ mod tests {
             "minimum_free_bytes":317008659347u64,"available_bytes":3_000_000_000_000u64,
             "producer_invocation_id":IID225,"producer":{"invocation_id":IID225,"cgroup":format!("/system.slice/{LIVE225}"),
                 "active":"active","sub":"running","restarts":0,"result":"success","load_state":"loaded",
-                "restart_policy":"no","kill_mode":"control-group","delegated":false,"pid":123},"producer_stop_enabled":true,
+                "restart_policy":"no","kill_mode":"control-group","delegated":false,"pid":123},
             "maximum_worker_vmas":3500000,"trip_reason":null,"worker_observation_error":null,"canary_target_error":null,
             "workers":[[123,400000]],"remote_mutations":false,"r2_mutations":false});
         guard(&g, 225, 999, 1001).unwrap();
+        let mut wrong_protocol = g.clone();
+        wrong_protocol["producer_stop_enabled"] = json!(false);
+        assert!(guard(&wrong_protocol, 225, 999, 1001).is_err());
         assert!(guard(&g, 203, 999, 1001).is_err());
         let mut bad = g.clone();
         bad.as_object_mut().unwrap().remove("trip_reason");
