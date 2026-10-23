@@ -111,3 +111,52 @@ exact227 admission/launch contract to the Rust fleet tools, binding current
 observation, native proof, capability, guard and service sandbox. Keep the service
 dormant until integration and first-fire proof pass; then register epoch227 in
 the single30-minute status-publication and downstream handoff cycle.
+
+The separate `singleton227`, `singleton227_admission` and
+`singleton227_capture` Rust fleet modules implement that closed contract.
+The campaign owner wires their declarations and CLI forwarding functions in
+the shared fleet/main modules. Admission CLI shape is
+`admit-singleton227 SPEC --spec-sha256 HEX --self-sha256 HEX`; capture has the
+same shape with `capture-singleton227`. Both require an immutable root-owned
+helper. The admission spec binds `schema`, `mode` (`native-cold` or `replay`),
+`observer`, `fleet`, `capability`, optional `native_input`, `resource_plan`,
+`protected_guards` keyed by every live replay unit, and private `output`.
+Each binding is `{path,sha256}`. Native-cold mode forbids a preexisting native
+qualification; replay mode requires the actual successful qualified receipt.
+
+The resource plan schema is
+`jetstreamer-private-epoch227-singleton-resource-plan-v1`. Bind `epoch:227`,
+`mode`, exact `unit`/`run_root`, `candidate_incremental_peak_bytes`,
+`maximum_scratch_bytes:300000000000`, `guard_minimum_free_bytes`,
+`required_initial_free_bytes`, exact `worker_sha256`/`snapshot_sha256`, and false
+`publication_authorized`/`r2_mutations`. Derive the protected floor from the
+accepted complete authenticated inventory and all active owner's reviewed
+envelopes, then seal this plan; do not transcribe a stale floor from another
+attempt. Output must be an absent `admission.json` beneath a root-private
+`/var/lib/jetstreamer/horizon-227-admission-*` directory. Exact repeated specs
+recover the existing receipt without renewing freshness.
+
+Capture specs bind `schema`, `mode`, `admission`, `guard`, `guard_plan`, and an
+absent private `output` beneath `/var/lib/jetstreamer/horizon-227-capture-*`.
+The native zero-entry service has its own review template,
+`epoch227-native-input-service.service`, and exact unit name
+`horizon-native-input-227-capped-710f6523-v1.service`. It uses disk scratch,
+112/128GiB high/hard memory caps, eight CPUs and a45-minute execution ceiling.
+Its guard uses the entire native attempt root, a300GB physical cap and the
+admission's exact protected floor. The reviewed standalone guard intentionally
+recognizes no entry worker in this native test; native capture requires zero
+entry workers and an actual successful terminal test, not a replay-worker claim.
+The test's hard memory/time ceilings and the bound kernel VMA admission remain
+independent. Native capture binds the successful test journal to the exact guard
+invocation/PID, preserves raw consensus integers, checks the canonical bootstrap
+commitment and requires zero replay entries and bootstrap writes.
+
+Use persistent safety services/timers named
+`horizon-native227-protective-v1.service/.timer` for cold input and
+`horizon-singleton227-protective-v1.service/.timer` for entry replay. They run
+the reviewed immutable own-tree guard, with only its private receipt directory
+writable, root UID, private network,1GiB hard memory, one CPU and256 tasks.
+Capture requires the exact guard invocation's PID1 successful completion and
+an active waiting safety timer. Native qualification never authorizes a replay
+or an R2 status object. Register a public in-flight status only after the entry
+lane actually starts and has a valid coordinated observer/ETA binding.
