@@ -149,3 +149,26 @@ guard fire: same-sample fleet admission still requires exactly one authenticated
 worker under that root and the exact separately sealed generic guard. Guard
 protection may exceed the older-growth/century-floor bound, never fall below it.
 There is no automatic launch trigger or sidecar ETA in this registration.
+
+`jetstreamer-r2 admit-continuation203 SPEC --spec-sha256 HEX --self-sha256 HEX`
+is a separate root-only, immutable-binary admission issuer, not a launcher.
+Its strict `jetstreamer-epoch203-continuation-admission-spec-v1` binds the
+accepted 201–300 fleet and its complete observer/plan, thirteen-sample century
+floor, original native admission, successful native result, controlled205
+terminal measurement, fresh225 guard, exact sealed parent and full-path resource
+policy. A changed census requires new qualification rather than invented debt
+release. The 256-GiB trial comprises 64 GiB native copy/restore/indexes, 16 GiB
+suffix/archive growth, 112 GiB assembly, 16 GiB independent verification scratch
+and 48 GiB margin. This is a guarded experimental budget, not a full cold-epoch
+peak qualification.
+
+`--check-only` verifies those bound inputs without current service/resource
+observations, writes or launch. Issuing an actual receipt additionally requires
+a persistent systemd invocation, two complete live-owner censuses, actual free
+space, available memory/CPU/VMA gates and still-fresh settled host-pressure
+evidence. It preserves all older225 growth and the prior conservative protected
+floor; its required guard floor also protects every byte outside the candidate's
+trial envelope at admission. The private no-clobber receipt leaves exact input
+capability, real-worker guard first fire, ordinary replay and publication gates
+independent. Do not issue it early while launch prerequisites remain unresolved:
+the parent rechecks its fifteen-minute clock after the full prefix reread.
