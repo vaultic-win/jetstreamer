@@ -56,6 +56,8 @@ pub(crate) struct Plan {
 /// Plans cannot select an implementation. Existing binaries use DiskStorage;
 /// no RAM path, mount operation or relaxed resource gate is introduced here.
 pub(crate) trait StorageHooks {
+    fn progress_slot(&self,line:&str)->Option<u64> {progress_slot(line)}
+    fn progress_counters(&self,line:&str)->Option<Value> {progress_counters(line)}
     fn capability_only(&self)->bool {false}
     fn capability_result(&self,_p:&Plan,_invocation:&str,_bindings:&Value,_command:&Command)->Result<()> {
         anyhow::bail!("storage capability path is unsupported")
@@ -920,14 +922,14 @@ fn measure(
                 Ok(Ok(line)) => {
                     print!("{line}");
                     std::io::stdout().flush()?;
-                    if let Some(mut counters) = progress_counters(&line) {
+                    if let Some(mut counters) = storage.progress_counters(&line) {
                         counters["elapsed_millis"] = json!(started.elapsed().as_millis());
                         if first_progress.is_none() {
                             first_progress = Some(counters.clone());
                         }
                         last_progress = Some(counters);
                     }
-                    if let Some(slot) = progress_slot(&line) {
+                    if let Some(slot) = storage.progress_slot(&line) {
                         observed = Some(observed.unwrap_or(slot).max(slot));
                         if stop_at.is_none() && slot >= p.target_slot {
                             ensure!(

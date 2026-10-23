@@ -138,6 +138,17 @@ checks in the actual planning preflight. The v1.6.20 warmup cannot qualify the
 known root or borrow v1.6.25 evidence. Its compilation and unit tests do not
 replace fresh coordinated admission and invocation-bound VMA protection.
 
+The first16-entry v1.6.20 diagnostic also requires the hash-bound cooperative
+parent stop. Only the exact sealed narrow worker enables this stop; the full
+prefix worker does not. The parent splits its transport batch after96,335,554,
+without adding that slot to the canonical checkpoint set. After SourceExact
+outcomes, account writes and the complete-slot response have passed, it requests
+orderly shutdown, emits the private completion marker and stops itself. The
+supervisor freezes the full process group, captures resources, then resumes and
+drains it. Periodic warmup progress alone cannot trigger a successful capture.
+The worker still rejects slot17 before decoding or mutation; neither the stop
+nor the diagnostic resource receipt qualifies the known root or publication.
+
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain

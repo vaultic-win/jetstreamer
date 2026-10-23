@@ -292,6 +292,7 @@ pub(crate) struct HistoricalReplay {
     cursor: Arc<ReplayCursor>,
     progress: Arc<ReplayProgress>,
     live_start_slot: Slot,
+    diagnostic_warmup_target: Option<Slot>,
 }
 
 struct HistoricalReplayState {
@@ -320,10 +321,25 @@ impl HistoricalReplay {
     ) -> Result<Self, String> {
         let current_slot = client.initialized().slot;
         let initialized_source = client.initialized().source;
-        let checkpoint_slots = snapshot_verifier
+        let checkpoint_slots: BTreeSet<Slot> = snapshot_verifier
             .as_ref()
             .map(|verifier| verifier.legacy_checkpoint_slots().into_iter().collect())
             .unwrap_or_default();
+        let diagnostic_warmup_target = bounded_epoch223_warmup_target(
+            client.executable_sha256(),
+            current_slot,
+            live_start_slot,
+        );
+        if diagnostic_warmup_target.is_some() && !client.supports_entry_batches() {
+            return Err("bounded epoch223 warmup requires the approved batched worker".into());
+        }
+        if diagnostic_warmup_target.is_some()
+            && (!checkpoint_slots.contains(&96_335_538) || !checkpoint_slots.contains(&96_767_522))
+        {
+            return Err(
+                "bounded epoch223 warmup retains both real canonical checkpoint gates".into(),
+            );
+        }
         let replay = Self {
             state: Mutex::new(HistoricalReplayState {
                 client: Some(client),
@@ -339,6 +355,7 @@ impl HistoricalReplay {
             cursor,
             progress,
             live_start_slot,
+            diagnostic_warmup_target,
         };
 
         // A loaded snapshot is already a complete bank, so prove and retain it
@@ -425,6 +442,7 @@ impl HistoricalReplay {
             cursor,
             progress,
             live_start_slot,
+            diagnostic_warmup_target: None,
         })
     }
 
@@ -620,11 +638,15 @@ impl HistoricalReplay {
             });
         }
 
-        let checkpoints = self
+        let mut checkpoints = self
             .checkpoint_slots
             .lock()
             .expect("historical checkpoint set lock poisoned")
             .clone();
+        // Transport boundary only: do not add a synthetic canonical checkpoint.
+        if let Some(target) = self.diagnostic_warmup_target {
+            checkpoints.insert(target);
+        }
         for batch in partition_entry_batches(encoded, &checkpoints) {
             if self.failure.shutdown_requested() {
                 return;
@@ -800,6 +822,7 @@ impl HistoricalReplay {
                         if slot_complete && self.take_checkpoint_slot(slot) {
                             checkpoint_after = Some(slot);
                         }
+                        self.pause_completed_bounded_warmup(slot, slot_complete)?;
 
                         current_outcomes.clear();
                         outcomes_verified = false;
@@ -1155,6 +1178,49 @@ impl HistoricalReplay {
             );
         }
     }
+    fn pause_completed_bounded_warmup(&self, slot: Slot, complete: bool) -> Result<(), String> {
+        cooperate_bounded_warmup_stop(&self.failure, self.diagnostic_warmup_target, slot, complete)
+    }
+}
+fn cooperate_bounded_warmup_stop(
+    failure: &ReplayFailure,
+    target: Option<Slot>,
+    slot: Slot,
+    complete: bool,
+) -> Result<(), String> {
+    if target != Some(slot) || !complete {
+        return Ok(());
+    }
+    // Every outcome/write was checked before reaching this complete-slot
+    // response. Never enqueue the worker's first forbidden batch. The
+    // reviewed supervisor captures the stopped group, then resumes/drains it.
+    failure.shutdown.store(true, Ordering::SeqCst);
+    info!(target: "jetstreamer_node", "private epoch223 warmup complete slot={slot} complete=true");
+    std::io::Write::flush(&mut std::io::stderr())
+        .map_err(|e| format!("bounded warmup marker flush: {e}"))?;
+    if unsafe { libc::raise(libc::SIGSTOP) } != 0 {
+        return Err("bounded warmup cooperative stop failed".into());
+    }
+    Ok(())
+}
+
+fn bounded_epoch223_warmup_target(
+    worker: [u8; 32],
+    bootstrap: Slot,
+    live_start: Slot,
+) -> Option<Slot> {
+    // Only the separately sealed sixteen-slot worker, never a full prefix or
+    // another runtime. Ordinary builds cannot activate the cooperative stop.
+    const WORKER: [u8; 32] = [
+        0x52, 0xd6, 0xc8, 0x6a, 0x81, 0x03, 0xb8, 0x96, 0x5c, 0xa6, 0x8e, 0xad, 0x96, 0xaf, 0x47,
+        0x1a, 0x78, 0x99, 0xa0, 0xa0, 0xe6, 0xe6, 0x9c, 0x48, 0x98, 0x9b, 0x39, 0xfd, 0x5d, 0x92,
+        0x2f, 0x0c,
+    ];
+    (cfg!(feature = "epoch223-v1-6-20-prefix-qualification")
+        && worker == WORKER
+        && bootstrap == 96_335_538
+        && live_start == 96_336_000)
+        .then_some(96_335_554)
 }
 
 fn ready_entry_signature(entry: &ReadyEntry) -> Option<String> {
@@ -1365,6 +1431,90 @@ fn assemble_evidence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bounded_warmup_selection_is_exact_and_never_applies_to_full_prefix_worker() {
+        let bytes = |text: &str| {
+            std::array::from_fn(|i| u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).unwrap())
+        };
+        let worker = bytes("52d6c86a8103b8965ca68ead96af471a7899a0a0e6e69c48989b39fd5d922f0c");
+        assert_eq!(
+            bounded_epoch223_warmup_target(worker, 96_335_538, 96_336_000),
+            cfg!(feature = "epoch223-v1-6-20-prefix-qualification").then_some(96_335_554)
+        );
+        assert!(bounded_epoch223_warmup_target(worker, 96_335_537, 96_336_000).is_none());
+        assert!(bounded_epoch223_warmup_target(worker, 96_335_538, 96_336_001).is_none());
+        assert!(
+            bounded_epoch223_warmup_target(
+                bytes("a651b7a6ee3c0d4f8359e1ea6cfcb96becf259d440ee744beb173b264de6af20"),
+                96_335_538,
+                96_336_000
+            )
+            .is_none()
+        );
+    }
+    #[test]
+    fn bounded_warmup_transport_split_does_not_create_a_canonical_checkpoint() {
+        let canonical = BTreeSet::from([96_335_538, 96_767_522]);
+        let mut transport = canonical.clone();
+        transport.insert(96_335_554);
+        let batches = partition_entry_batches(
+            vec![
+                encoded_ready(96_335_554, 0, 0),
+                encoded_ready(96_335_554, 1, 0),
+                encoded_ready(96_335_555, 0, 0),
+            ],
+            &transport,
+        );
+        assert_eq!(
+            batch_slots(&batches),
+            vec![vec![96_335_554, 96_335_554], vec![96_335_555]]
+        );
+        assert_eq!(canonical, BTreeSet::from([96_335_538, 96_767_522]));
+    }
+    #[test]
+    fn bounded_warmup_stop_child() {
+        if std::env::var("JETSTREAMER_TEST_BOUNDED_WARMUP_CHILD").as_deref() != Ok("yes") {
+            return;
+        }
+        let shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let failure = ReplayFailure::new(shutdown.clone());
+        cooperate_bounded_warmup_stop(&failure, Some(96_335_554), 96_335_554, true).unwrap();
+        assert!(shutdown.load(Ordering::SeqCst));
+        assert!(failure.error_message().is_none());
+    }
+    #[test]
+    fn bounded_warmup_cooperatively_stops_until_supervisor_resumes_then_drains() {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "historical_replay::tests::bounded_warmup_stop_child",
+                "--nocapture",
+            ])
+            .env("JETSTREAMER_TEST_BOUNDED_WARMUP_CHILD", "yes")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let pid = i32::try_from(child.id()).unwrap();
+        let returned = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let guard = returned.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            if !guard.load(Ordering::SeqCst) {
+                unsafe {
+                    libc::kill(pid, libc::SIGKILL);
+                }
+            }
+        });
+        let mut status = 0;
+        let waited = unsafe { libc::waitpid(pid, &mut status, libc::WUNTRACED) };
+        returned.store(true, Ordering::SeqCst);
+        assert_eq!(waited, pid);
+        assert!(libc::WIFSTOPPED(status));
+        assert_eq!(libc::WSTOPSIG(status), libc::SIGSTOP);
+        assert_eq!(unsafe { libc::kill(pid, libc::SIGCONT) }, 0);
+        assert!(child.wait().unwrap().success());
+    }
 
     fn encoded_ready(
         slot: Slot,
