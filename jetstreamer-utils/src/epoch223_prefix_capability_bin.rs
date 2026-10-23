@@ -227,11 +227,12 @@ fn report(text: &str) -> Result<Value> {
     Ok(v)
 }
 fn preseed(p: &Plan) -> Result<()> {
-    for path in [
-        p.probe_root.clone(),
-        p.probe_root.join("ledger"),
-        p.probe_root.join("output"),
-    ] {
+    directory(&p.probe_root, 1000, true)?;
+    ensure!(
+        fs::read_dir(&p.probe_root)?.next().is_none(),
+        "probe root not empty"
+    );
+    for path in [p.probe_root.join("ledger"), p.probe_root.join("output")] {
         fs::create_dir(&path)?;
         fs::set_permissions(&path, fs::Permissions::from_mode(0o700))?;
         let c = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())?;
@@ -239,9 +240,6 @@ fn preseed(p: &Plan) -> Result<()> {
             unsafe { libc::chown(c.as_ptr(), 1000, 1000) } == 0,
             "probe owner"
         );
-        if path == p.probe_root {
-            continue;
-        }
         let mut input = OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW)
@@ -355,10 +353,10 @@ fn run() -> Result<()> {
     scope(&p)?;
     directory(&p.receipt_directory, 0, true)?;
     directory(p.probe_root.parent().context("probe parent")?, 1000, true)?;
+    directory(&p.probe_root, 1000, true)?;
     ensure!(
-        fs::symlink_metadata(&p.probe_root)
-            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
-        "probe exists or unreadable"
+        fs::read_dir(&p.probe_root)?.next().is_none(),
+        "probe root not empty"
     );
     for name in ["capability.json", "probe.log"] {
         ensure!(
