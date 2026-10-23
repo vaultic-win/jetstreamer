@@ -315,6 +315,27 @@ not stall otherwise admissible ordinary campaign work.
   participating host within its own assigned range; never infer another host's capacity from local
   observations. Optimize verified R2 sidecars per day, preserve every safety/integrity gate, and add
   no extra autonomous routine polls.
+- Select the desired active lane count from **memory utilization alone**, targeting **90% of
+  system memory** as the user requested. Use observed aggregate lane RSS and actual host usage,
+  including non-lane usage once; the 1.5× RSS reservation is a scheduling allowance, not a second
+  utilization target. Prefer controlled oversubscription toward that target. Do not turn disk or
+  CPU estimates into a lower desired lane count: handle disk pressure by checkpointing/parking
+  a selected job in the host's R2 holding area, and manage CPU/I/O sharing within the existing
+  controls. Compatibility, integrity, invocation-bound guards and the century disk safety floor
+  still govern execution. Prepare and verify the pressure-relief path before relying on it.
+  Read [references/r2-holding.md](references/r2-holding.md) for the idempotent checkpoint/stop,
+  upload/readback, local retirement, restore and resume lifecycle. Freezing alone retains RSS;
+  releasing memory requires a supported durable checkpoint-and-stop path. Record any missing
+  recovery capability as work to implement, not an excuse to retain obsolete lane reservations.
+- Track process RSS for each lane inside that same observation, including the parent and its
+  worker processes once each. Record the process census, current aggregate lane RSS, per-process
+  RSS high-water marks, and the largest valid aggregate lane RSS observed for the current century.
+  Do not substitute cgroup `memory.peak` or sum process high-water marks as a concurrent lane peak.
+  Use **1.5 times the century's maximum observed lane RSS** as the per-lane memory reservation
+  ceiling, superseding the earlier 2-times rule. The user's initial RSS estimate for epochs 200–300
+  is **150 GB decimal**, giving an initial **225 GB decimal memory reservation per lane**; the
+  separate scratch estimate remains 300 GB. Replace the seed with valid observed lane RSS as it
+  accumulates. Read the memory policy in [references/host-utilization.md](references/host-utilization.md).
 - Prefer capped-shrink workers for new replays when that exact runtime/worker profile is supported.
   Bind the capped worker's actual digest and settings in the sealed package, capability evidence,
   admission and guard; never substitute a worker beneath a live job. Preserve healthy existing
@@ -339,8 +360,10 @@ not stall otherwise admissible ordinary campaign work.
   Record the exact epoch/length census, arithmetic, rounded byte floor, and evidence digests. When a
   controller accepts only whole GiB, pass `ceil(floor_bytes / 2^30)`. Keep invocation-bound projected
   remaining growth as a separate admission term; do not relabel the sum of those claims as the safety
-  floor. Admit a candidate only when current free bytes minus all evidence-backed active remaining
-  growth and the candidate's projected incremental peak still leaves this century floor intact.
+  floor. When the memory-selected concurrency would exhaust local space, checkpoint and offload
+  selected work through the verified holding lifecycle to maintain this floor and make room.
+  Do not launch a job without adequate local execution space or a working pressure-relief path;
+  retain the memory-selected target while implementing the missing transition.
 - Plan ordinary missing work as independently replayable and independently publishable singleton
   epochs. Generate fresh manifests with `--target-cohort-epochs=1`, seal one epoch per replay claim,
   and keep multiple disjoint singletons running concurrently up to fresh CPU, memory, VMA, I/O, and

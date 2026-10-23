@@ -46,6 +46,42 @@ storage for eligible closed files, not live POSIX scratch and not a publication 
   publication before a job can consume it. Account for full restoration space and time in admission;
   parked bytes are not immediately available local inputs.
 
+## Idempotent stopped-job offload and resume
+
+The user authorizes this lifecycle for campaign jobs: **checkpoint and stop → upload and verify →
+delete exact local copies → restore and verify → resume**. This extends holding eligibility to a
+stopped job's closed checkpoint/scratch set after its real restore path has been qualified. It
+does not authorize deleting or overwriting any R2 object. For the current host the user supplied
+`foundation_node_01/`; use its durable host mapping and check prefix ownership before first write.
+
+- Use a durable job ID and transition journal with exclusive ownership. Bind epoch/phase, exact
+  original invocation and runtime/worker/package hashes, checkpoint position and restart cursor,
+  source lineage, every file's relative path/length/hash/mode, and restoration requirements.
+  Preserve raw consensus bytes and exact integers. A SIGSTOP image is not a portable checkpoint;
+  open mappings and RAM-only state must be durably captured by the supported runtime first.
+- Qualify the lifecycle on an isolated bounded job before using it as pressure relief. Verify that
+  it resumes after the recorded checkpoint with correct cursor/lineage, without duplicated or
+  skipped output, then passes independent content/checkpoint validation. Compare with uninterrupted
+  execution where feasible. A round-trip byte copy alone does not prove replay resumption.
+- Journal intent before each mutation, completion after durable proof. Re-entering a completed
+  phase must revalidate its exact evidence and become a no-op; an interrupted phase reconciles
+  actual state and continues. Never restart a healthy duplicate, signal an unrelated/reused PID,
+  overwrite a key, or discard a valid checkpoint to make a retry pass. Conflict means preserve
+  both sides and diagnose. Conditional create/readback and content-addressed keys make uploads
+  retryable: an existing matching object is reused after verification, a mismatch is a hard error.
+- Stop only the chosen exact job after checkpoint completion; prove it terminal and its mappings
+  closed. For memory pressure, this releases RAM; freezing without stopping retains RSS. Upload
+  the complete immutable restore set no-clobber and verify all bytes plus the manifest. Fsync its
+  private custody receipt before deleting any local member. Deletion is authorized only for those
+  exact backed-up members, after the fresh reference check, and is retry-safe when already absent.
+  Preserve receipt, manifest, transition journal and any independent integrity evidence locally.
+- Restore into private staging with sufficient space. Reuse already matching restored members,
+  reject conflicting paths, verify every manifest entry and whole-file hash, restore required
+  permissions, and commit the complete set atomically/no-clobber. Resume exactly one new invocation
+  from the recorded checkpoint; install/prove its guard and bind the replacement invocation in the
+  fleet. Repeated resume requests must discover that invocation rather than launch another one.
+  A stopped/parked job stays in the repair/active-work ledger with an executable resumption action.
+
 ## Integration with the control loop
 
 Keep holding objects outside canonical inventory/readiness accounting. Record parked artifacts,

@@ -1,8 +1,8 @@
 # Horizon host utilization
 
 Use this guidance whenever choosing replay concurrency, resuming a host, replacing a completed
-lane, or deciding whether the machine can safely do more work. The objective is verified,
-upload-ready epoch throughput per wall-clock day, not a high instantaneous CPU or RAM percentage.
+lane, or deciding whether the machine can safely do more work. The user's concurrency policy targets
+90% system-memory utilization; measure verified upload throughput as the useful outcome as well.
 
 ## Establish the operating point
 
@@ -19,11 +19,14 @@ another lane:
 - I/O pressure, major faults, memory pressure, and any current verifier, uploader, or snapshot
   activity that materially contends with replay.
 
-The safe target is the minimum capacity allowed by all of those limits, further bounded by runtime
-compatibility, non-overlapping work, and available invocation-bound guards. Free RAM, free disk, or
-low load alone never establishes the target. Conversely, do not let conservative static CPU or RAM
-estimates strand capacity when exact multi-window evidence supports a fresh sealed admission
-generation under unchanged hard ceilings and reserves.
+Choose the desired lane count from memory alone, targeting 90% of total host memory used. Estimate
+the marginal lane RSS from this century's observations, subtract measured non-lane usage once, and
+update the count from actual host usage at the regular observation. Track the difference between
+the desired count and the executing count. CPU/I/O govern sharing and throughput, while disk
+pressure triggers checkpoint/offload/restore actions; they do not silently lower the desired count.
+Prefer controlled oversubscription, with explicit selected victims and tested pressure-relief paths.
+Runtime compatibility, non-overlapping ownership, integrity, VMA protection and the century disk floor
+remain execution requirements. Missing recovery support is a concrete implementation task.
 
 Call the highest concurrency demonstrated by a clean coordinated observation under equivalent
 runtime, lane shape, reserve policy, and guard settings the **proven operating point**. A valid
@@ -32,6 +35,36 @@ restarts, preserves the century `.jet`-derived filesystem floor, and remains bel
 Do not transfer a proven count between materially different machines or lane shapes without new evidence.
 
 ## Qualify measured admission budgets
+
+### Memory reservations from lane RSS
+
+Observe RSS in the existing 30-minute resource sample, with the ordinary user-requested status
+exception. Count each process in the invocation-bound lane once, including its parent and worker;
+when controller and producer are the same unit, do not add their identical measurements twice.
+Bind process IDs and start times and reject a changing/incomplete census for capacity decisions.
+Record per-process `VmRSS` and `VmHWM`, and sum current `VmRSS` for the lane. RSS includes resident
+file-backed pages; cgroup memory additionally accounts for file cache and is a separate metric.
+Individual process high-water marks may occur at different times, so their sum is not a measured
+concurrent lane peak. Assembly/restore/verifier roles should remain labeled separately from settled
+replay when comparing lane shapes.
+
+The user's policy is a per-lane scheduling memory reservation **no greater than 1.5× the maximum
+valid aggregate lane RSS observed in that century**, superseding the earlier2× multiplier. Use
+integer bytes and compute `floor(3 * maximum_lane_rss_bytes / 2)` with checked arithmetic; do not
+round a whole-GiB reservation above the ceiling. For epochs200–300 the initial user-selected RSS
+estimate is150,000,000,000B, so the initial memory reservation is225,000,000,000B per lane. This is
+an estimate until replaced by observed aggregate RSS; it is separate from the300GB scratch budget.
+Maintain the century maximum from durable identity-valid samples, without silently resetting it
+when a lane finishes or a new observer is deployed. Other centuries need their own RSS history.
+
+Use this policy in newly sealed scheduling/admission generations. Preserve healthy producers and
+their existing hard cgroup limits; scheduling reservations and hard stop limits are different.
+Reassess inherited fixed reservations rather than counting both the RSS allowance and an older
+per-lane allowance. Account for measured host/kernel overhead once, alongside distinct concurrent
+verification/restore work, and document any genuine host reserve; do not hide extra per-lane
+headroom in a repeated host reserve. Capacity still has to satisfy actual available memory,
+pressure, disk, CPU, VMA and compatibility gates. An invalid RSS sample grants no capacity increase;
+keep the last valid century evidence, diagnose the telemetry, and retain normal protection.
 
 ### Capped-shrink scratch estimates by century
 
@@ -46,9 +79,10 @@ neither impose their larger projection on a capped candidate nor erase the evide
 Keep the scratch estimate separate from archive output, cached or restored inputs, assembly/copy,
 verification staging and margin. Count overlapping phases at their incremental peak and avoid
 double-counting an already protected allocation. The twice-average-`.jet` century floor remains a
-separate host reserve. Record both the capacity implied by disk and the smaller count allowed by
-CPU, protected memory, VMAs, I/O, compatibility and guards; report that count alongside the number
-actually running. A directory name or unused R2 holding prefix has freed no local capacity.
+separate host reserve. Record the memory-selected target, actual executing count, local disk
+headroom and any checkpoint/offload transition needed to reach that target. CPU/I/O statistics
+inform sharing and useful throughput; compatibility and guards still have to qualify each job.
+A directory name or unused R2 holding prefix has freed no local capacity.
 
 Reassess the estimate with each existing coordinated observation. If measured scratch approaches or
 exceeds the planning allowance, stop increasing concurrency, preserve the healthy work and update
@@ -80,6 +114,15 @@ the normal work-conserving backfill path rather than waiting for another status 
 
 ## Keep the host work-conserving
 
+- Before an oversubscribed admission, select the lowest-cost resumable victim and bind its actual
+  invocation, checkpoint procedure, pressure trigger and idempotent recovery plan. For memory
+  pressure, checkpoint and stop that job to release its RSS; SIGSTOP/systemd freeze alone is not
+  memory reclamation. For disk pressure, checkpoint/stop and park its closed files under the
+  approved host prefix, authenticate complete readback, then retire the exact local copies.
+  Restore and resume when pressure permits. Use the lifecycle in [r2-holding.md](r2-holding.md).
+  Do not label a job resumable until its actual checkpoint/restore route has passed a bounded
+  round-trip experiment. Keep unsupported healthy producers running while developing that route
+  against isolated work. No arbitrary live-mmap eviction or unqualified process serialization.
 - Maintain one disjoint next candidate in a dormant, no-trigger state whenever missing compatible
   work remains. Preflight its manifest, immutable package, cached input, isolated GCloud identity,
   controller configuration, hashes, and capability evidence while current lanes run. Preparation

@@ -27,6 +27,7 @@ use {
 const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2";
 mod append_log;
 mod host_pressure;
+mod rss;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_PREVIOUS_SAMPLE_BYTES: u64 = 4 * 1024 * 1024;
@@ -143,6 +144,7 @@ struct UnitObservation {
     memory_peak_bytes: u64,
     control_group: PathBuf,
     cgroup: CgroupObservation,
+    rss: rss::Report,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1194,6 +1196,7 @@ fn observe_unit_for_role(
             .to_str()
             .ok_or_else(|| anyhow!("non-UTF-8 control group for {unit}"))?,
     )?;
+    let rss = rss::capture(&cgroup.path, &control_group);
     let observation = UnitObservation {
         unit: unit.to_owned(),
         invocation_id: required_property(&properties, "InvocationID", unit)?.to_owned(),
@@ -1207,6 +1210,7 @@ fn observe_unit_for_role(
         memory_peak_bytes: numeric_property(&properties, "MemoryPeak", unit)?,
         control_group,
         cgroup,
+        rss,
     };
     ensure!(observation.load_state == "loaded", "{unit} is not loaded");
     ensure!(
@@ -1927,7 +1931,7 @@ fn run(config: Config) -> Result<()> {
     let next_observation = started_unix
         .checked_add(config.minimum_interval_seconds)
         .ok_or_else(|| anyhow!("next-observation timestamp overflow"))?;
-    let value = serde_json::json!({
+    let mut value = serde_json::json!({
         "schema": OUTPUT_SCHEMA,
         "recorded_at_utc": format_utc(started_unix)?,
         "completed_at_utc": format_utc(completed_unix)?,
@@ -1978,6 +1982,7 @@ fn run(config: Config) -> Result<()> {
             "r2_mutations": false,
         }
     });
+    value["lane_rss_history"] = rss::history(&previous_value, &value)?;
     write_no_clobber(&config.output, &value)
 }
 
@@ -2196,6 +2201,7 @@ mod tests {
             main_pid: 42,
             memory_current_bytes: 0,
             memory_peak_bytes: 0,
+            rss: rss::Report::default(),
             control_group: "/system.slice/test.service".into(),
             cgroup: CgroupObservation {
                 path: "/sys/fs/cgroup/system.slice/test.service".into(),
@@ -2819,6 +2825,7 @@ mod tests {
             main_pid: 1,
             memory_current_bytes: 0,
             memory_peak_bytes: 0,
+            rss: rss::Report::default(),
             control_group: PathBuf::from("/system.slice/producer.service"),
             cgroup: CgroupObservation {
                 path: PathBuf::from("/sys/fs/cgroup/system.slice/producer.service"),
