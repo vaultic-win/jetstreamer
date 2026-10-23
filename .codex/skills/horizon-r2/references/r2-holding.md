@@ -82,6 +82,38 @@ does not authorize deleting or overwriting any R2 object. For the current host t
   fleet. Repeated resume requests must discover that invocation rather than launch another one.
   A stopped/parked job stays in the repair/active-work ledger with an executable resumption action.
 
+## Qualifying replay portability
+
+Track qualification separately for each exact worker/runtime and output format. Record the last
+successful stage, immutable evidence, the next bounded experiment, and its resource limit. Use
+these stages: native checkpoint export; fresh-process restore and continued replay; output
+continuation equivalence; authenticated holding round trip; interrupted-transition recovery.
+Passing an earlier stage does not imply a later one passed. In particular, a checkpoint hash or
+an archive assembled from an existing source is not proof of a portable runtime checkpoint.
+
+Check the actual worker's export capability before launching a costly test. Some historical
+workers implement `FreezeCheckpoint` but reject `ExportSnapshot`; implement and test the missing
+native export in an isolated candidate rather than stopping a healthy producer to discover this.
+Keep the original runtime and inputs available until fresh-process continuation is proven.
+
+For continuation equivalence, compare the checkpoint's bank/accounts hashes, slot and entry
+cursor, transaction count and write-version cursor, then compare resumed output with an
+uninterrupted bounded replay. Include the output writer's own recovery state: a restorable bank
+alone does not establish that the partial `.jet` can be appended without duplication or loss.
+Preserve raw consensus bytes and use independent full/plugin verification before publication.
+
+Exercise interruption after remote completion but before receipt persistence, during local
+retirement, during restore, and after launch but before launch-receipt persistence. Recovery must
+reconcile matching existing objects/files and the exact live invocation, preserving conflicts
+and preventing duplicate jobs. Use disposable isolated fixtures; do not inject failures into
+healthy campaign jobs or delete remote test objects without separate authority.
+
+During unattended work, advance the next bounded stage while healthy jobs run and refine these
+instructions from the observed result. Keep experiment completion events separate from routine
+replay observation, retain the 30-minute cadence, and prioritize delivery of already-verified
+epochs over an optional experiment competing for the same resources. Report the qualified stage
+accurately; authorized holding space adds no demonstrated replay capacity until recovery works.
+
 ## Integration with the control loop
 
 Keep holding objects outside canonical inventory/readiness accounting. Record parked artifacts,

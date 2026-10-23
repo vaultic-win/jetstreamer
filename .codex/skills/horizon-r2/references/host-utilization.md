@@ -35,6 +35,15 @@ Prefer controlled oversubscription, with explicit selected victims and tested pr
 Runtime compatibility, non-overlapping ownership, integrity, VMA protection and the century disk floor
 remain execution requirements. Missing recovery support is a concrete implementation task.
 
+When the coordinated observer provides a host resident census, follow
+`docs/horizon-host-resident-accounting.md`: subtract invocation-matched lane RSS from that same
+census once and include kernel resident allocations. Do not derive non-lane resident usage by
+subtracting lane RSS from `MemTotal - MemAvailable`; reclaimable mapped pages make those bases
+inconsistent. Count private diagnostic replays and active delivery stages explicitly. If the
+deployed target calculator does not support those owners, record the target as unavailable and
+the missing accounting as the next task; do not reuse a different campaign's calculated target
+or fill an older receipt with a new resource read.
+
 Call the highest concurrency demonstrated by a clean coordinated observation under equivalent
 runtime, lane shape, reserve policy, and guard settings the **proven operating point**. A valid
 sample binds every live invocation and scratch tree before and after measurement, reports zero
