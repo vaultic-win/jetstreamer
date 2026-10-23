@@ -255,4 +255,33 @@ mod tests {
         assert_eq!(f["unit_census"][UNIT]["InvocationID"], IID);
         assert_eq!(f["active"].as_array().unwrap().len(), 5);
     }
+    #[test]
+    #[ignore = "root-only actual terminal223v2/334 metadata proof; no current owner/resource/process query or network"]
+    fn root_actual_terminal223v2_proof_preserves334_and_excludes_only_completed_peer_arithmetic() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let fleet=BoundFile{path:"/var/lib/jetstreamer/horizon-campaign-fleet/20261023T225300Z-v334/fleet-ledger.json".into(),sha256:"cbb5d8ef13b2f458203b5d2513271483a60c1f8e94cb83616252a137516f029f".into()};
+        let observer=BoundFile{path:"/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/horizon-live-resource-sample-20261023T225300Z-diagnostics-v334.json".into(),sha256:"8feba0f946418de1e67959fc97148333b467348e256101a02a571af0aef614d8".into()};
+        let proof = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-warmup223-native20-terminal-58ab-v2/proof.json"
+                .into(),
+            sha256: "6790592b9188e7c4a3d32171a326b743f84fc6c5b5ad07f94182c104876b7028".into(),
+        };
+        let f = bound_json(&fleet).unwrap();
+        let o = bound_json(&observer).unwrap();
+        let peer = prepare(Some(&proof), &f, &o, &observer, &fleet)
+            .unwrap()
+            .unwrap();
+        let (arithmetic, observed) = arithmetic(&f, &o, Some(&peer)).unwrap();
+        assert_eq!(f["active"].as_array().unwrap().len(), 5);
+        assert_eq!(arithmetic["active"].as_array().unwrap().len(), 4);
+        assert_eq!(arithmetic["unit_census"], f["unit_census"]);
+        assert_eq!(observed["filesystem"], o["filesystem"]);
+        assert_eq!(peer.proof["bounded_warmup_complete"], true);
+        let mut bad = f.clone();
+        bad["active"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|r| r["epoch"] != 223);
+        assert!(prepare(Some(&proof), &bad, &o, &observer, &fleet).is_err());
+    }
 }
