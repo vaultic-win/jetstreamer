@@ -22,6 +22,10 @@ mod continuation203_runtime;
 mod native141;
 mod native144;
 mod native203;
+mod native207;
+mod native207_admission;
+mod native207_capture;
+mod native207_event;
 mod original141;
 mod original141_capped;
 mod original141_freeze;
@@ -150,11 +154,19 @@ pub(super) fn admit_singleton227() -> Result<()> {
 pub(super) fn capture_singleton227() -> Result<()> {
     singleton227_capture::run()
 }
+pub(super) fn admit_native207_input() -> Result<()> {
+    native207_admission::run()
+}
+pub(super) fn capture_native207_input() -> Result<()> {
+    native207_capture::run()
+}
 /// The native status publisher shares the exact fleet registration gates;
 /// a metadata countdown cannot register or qualify a new native attempt.
 pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
     let claim: PipelineClaim = serde_json::from_value(value.clone())?;
-    if claim.epoch == 223 && cold223_scan::scope(&claim.phase, &claim.unit) {
+    if claim.epoch == 207 && native207::scope(&claim.phase, &claim.unit) {
+        native207::claim(&claim)
+    } else if claim.epoch == 223 && cold223_scan::scope(&claim.phase, &claim.unit) {
         cold223_scan::validate(&claim)
     } else if claim.epoch == 227 && singleton227::native_scope(&claim.phase, &claim.unit) {
         singleton227::native_claim(&claim)
@@ -427,6 +439,9 @@ pub(super) fn pipeline_unit_range(
     if private144_scan::scope(phase, unit) {
         return Ok(144..=144);
     }
+    if native207::scope(phase, unit) {
+        return Ok(207..=207);
+    }
     if singleton227::native_scope(phase, unit) {
         return Ok(227..=227);
     }
@@ -634,6 +649,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
         }
         if singleton227::native_scope(&claim.phase, &claim.unit) {
             singleton227::native_live(claim, current)?;
+        }
+        if native207::scope(&claim.phase, &claim.unit) {
+            native207::live(claim, current)?;
         }
         if warmup223::scope(&claim.phase, &claim.unit) {
             warmup223::validate_live(claim, current)?;
@@ -2202,6 +2220,14 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == native207::SCHEMA {
+                native207_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == "jetstreamer-private-epoch227-native-input-running-v1" {
                 singleton227_event::event_predecessor(
                     &previous,
@@ -2345,6 +2371,9 @@ pub(super) async fn run() -> Result<()> {
         if singleton227::native_scope(&claim.phase, &claim.unit) {
             singleton227::native_claim(claim)?;
         }
+        if native207::scope(&claim.phase, &claim.unit) {
+            native207::claim(claim)?;
+        }
         if warmup223::scope(&claim.phase, &claim.unit) {
             warmup223::validate(claim)?;
         }
@@ -2374,6 +2403,25 @@ pub(super) async fn run() -> Result<()> {
     warmup223::event_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == native207::SCHEMA
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native207 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| native207::scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding))
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native207 event requires one bound new owner"
+        );
+        native207_event::event_census(&previous, &before, claims[0])?;
+    }
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
     {
@@ -2464,6 +2512,7 @@ pub(super) async fn run() -> Result<()> {
             Value::Null
         };
         let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
+            || native207::scope(&claim.phase, &claim.unit)
             || tail223_scan::scope(&claim.phase, &claim.unit)
             || cold223_scan::scope(&claim.phase, &claim.unit)
             || singleton227::native_scope(&claim.phase, &claim.unit)
@@ -2483,6 +2532,7 @@ pub(super) async fn run() -> Result<()> {
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
                         || ((tail223_scan::scope(&claim.phase, &claim.unit)
+                            || native207::scope(&claim.phase, &claim.unit)
                             || cold223_scan::scope(&claim.phase, &claim.unit)
                             || singleton227::native_scope(&claim.phase, &claim.unit)
                             || warmup223::scope(&claim.phase, &claim.unit))

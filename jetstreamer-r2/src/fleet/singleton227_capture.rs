@@ -17,7 +17,7 @@ struct Spec {
     #[serde(default)]
     native_running: bool,
 }
-fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+pub(super) fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     let out = ProcessCommand::new("/usr/bin/systemctl")
         .args(["show", unit, "--no-pager", &format!("--property={fields}")])
         .output()?;
@@ -35,7 +35,7 @@ fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     }
     Ok(p)
 }
-fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> Result<()> {
+pub(super) fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> Result<()> {
     for (k, v) in values {
         ensure!(
             p.get(*k).map(String::as_str) == Some(*v),
@@ -44,7 +44,7 @@ fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> Result<()> 
     }
     Ok(())
 }
-fn journal(unit: &str) -> Result<(Vec<Value>, String)> {
+pub(super) fn journal(unit: &str) -> Result<(Vec<Value>, String)> {
     let out = ProcessCommand::new("/usr/bin/journalctl")
         .args([
             "--unit",

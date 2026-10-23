@@ -18,7 +18,7 @@ struct Spec {
     protected_guards: BTreeMap<String, BoundFile>,
     output: PathBuf,
 }
-fn active_owner(row: &Value) -> Result<&Value> {
+pub(super) fn active_owner(row: &Value) -> Result<&Value> {
     match (row.get("producer"), row.get("unit"), row.get("controller")) {
         (Some(p), None, None) => Ok(p),
         (None, Some(p), None) => Ok(p),
@@ -73,7 +73,7 @@ fn remaining_hard_memory(cap: u64, charge: u64) -> Result<u64> {
     );
     Ok(cap - charge)
 }
-fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
+pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut total = 0u64;
     let mut evidence = Vec::new();
     for row in f["active"]
@@ -128,6 +128,13 @@ fn available_memory() -> Result<u64> {
         .context("227 available memory overflow")
 }
 fn century_floor(f: &Value) -> Result<u64> {
+    century_floor_for(f, 227)
+}
+pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> {
+    ensure!(
+        matches!(candidate_epoch, 207 | 227),
+        "unregistered native candidate century"
+    );
     let inventory = &f["inventory"];
     ensure!(
         inventory["schema"] == "jetstreamer-horizon-r2-inventory-v1"
@@ -150,7 +157,7 @@ fn century_floor(f: &Value) -> Result<u64> {
             (201..=300).contains(&epoch) && seen.insert(epoch),
             "227 duplicate/foreign inventory epoch"
         );
-        if epoch == 227 {
+        if epoch == candidate_epoch {
             ensure!(
                 row["state"] == "missing",
                 "227 already has a remote object; do not start a duplicate lane"
@@ -184,7 +191,7 @@ fn century_floor(f: &Value) -> Result<u64> {
         .context("227 century floor overflow")?
         .div_ceil(count))
 }
-fn protected_growth(
+pub(super) fn protected_growth(
     f: &Value,
     observer: &Value,
     guards: &BTreeMap<String, BoundFile>,
@@ -416,7 +423,7 @@ fn protected_growth(
         measurements,
     ))
 }
-fn disk_free() -> Result<u64> {
+pub(super) fn disk_free() -> Result<u64> {
     let path = CString::new("/")?;
     let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     ensure!(
@@ -476,7 +483,7 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()>
     }
     Ok(())
 }
-fn limits(f: &Value) -> Result<Value> {
+pub(super) fn limits(f: &Value) -> Result<Value> {
     let mut result = serde_json::Map::new();
     for row in f["active"].as_array().context("227 active cap census")? {
         let owner = active_owner(row)?;
@@ -877,6 +884,27 @@ mod tests {
         let mut completed = f.clone();
         completed["inventory"]["entries"][26] = json!({"epoch":227,"state":"ready-pair"});
         assert!(century_floor(&completed).is_err());
+    }
+    #[test]
+    fn shared_floor_checks_the_exact_registered_candidate_not_another_epoch() {
+        let f = inventory();
+        assert!(
+            century_floor_for(&f, 207).is_err(),
+            "207 is already ready in this fixture"
+        );
+        assert!(
+            century_floor_for(&f, 208).is_err(),
+            "no generic candidate admission"
+        );
+        let mut f = f;
+        f["inventory"]["entries"][6] = json!({"epoch":207,"state":"missing"});
+        f["inventory"]["ready_pairs"] = json!(13);
+        assert!(century_floor_for(&f, 207).is_ok());
+        let mut f = f;
+        f["inventory"]["entries"][26] = json!({"epoch":227,"state":"ready-pair","archive_length":1,"sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)});
+        f["inventory"]["ready_pairs"] = json!(14);
+        assert!(century_floor_for(&f, 207).is_ok());
+        assert!(century_floor(&f).is_err());
     }
     #[test]
     fn owner_shape_never_silently_drops_an_auxiliary_or_controller() {
