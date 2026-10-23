@@ -148,7 +148,7 @@ mod tests {
     }
     #[test]
     fn target_and_tail_do_not_claim_epoch226_completion() {
-        assert!(OUTPUT_END_SLOT > 97_631_999 && OUTPUT_END_SLOT < 98_063_999);
+        const { assert!(OUTPUT_END_SLOT > 97_631_999 && OUTPUT_END_SLOT < 98_063_999) };
         assert_eq!(OUTPUT_END_SLOT - 97_200_000 + 1, 863_465);
         assert_eq!(97_631_999 - 97_631_459, 540);
     }

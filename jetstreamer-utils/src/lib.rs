@@ -19,6 +19,9 @@ pub mod horizon_legacy_poh;
 /// Lossless diagnostic source-transaction equivalence and original-entry PoH binding.
 pub mod horizon_legacy_source;
 
+/// Immutable, bounded original-entry bundle input for private epoch141 qualification.
+pub mod horizon_legacy_bundle;
+
 /// Raw diagnostic acquisition independent of strict legacy recovery qualification.
 pub mod horizon_legacy_acquisition;
 /// Non-authorizing byte interpretation of an acquired legacy target, preserving connectivity.

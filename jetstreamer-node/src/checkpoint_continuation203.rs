@@ -183,278 +183,6 @@ fn admission(p: &Plan, v: &Value, now: u64) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    const NATIVE_CURSOR: u64 = 83_354_404_203;
-    fn prefix() -> HistoricalSegmentManifest {
-        let bytes = include_bytes!("../tests/fixtures/epoch203-capped-shrink-root.manifest.json");
-        assert_eq!(
-            <[u8; 32]>::from(Sha256::digest(bytes)),
-            sha(MANIFEST_SHA).unwrap()
-        );
-        serde_json::from_slice(bytes).unwrap()
-    }
-    fn proof() -> ValidatedPrefix {
-        ValidatedPrefix {
-            manifest: prefix(),
-            snapshot: "/snapshot".into(),
-            runner_started: std::time::Instant::now(),
-            native_barrier_millis: std::sync::atomic::AtomicU64::new(u64::MAX),
-        }
-    }
-    fn native_summary() -> SegmentCheckpointSummary {
-        let mut s = prefix().terminal;
-        s.write_count = 0;
-        s.next_write_version = NATIVE_CURSOR;
-        s
-    }
-    fn plan() -> Plan {
-        let b = |file: &str, hash: &str| Evidence {
-            path: Path::new("/sealed").join(file),
-            sha256: hash.into(),
-        };
-        Plan {
-            schema: "jetstreamer-private-epoch203-checkpoint-continuation-plan-v1".into(),
-            epoch: EPOCH,
-            producer_unit: "horizon-qualify-203-checkpoint-continuation-test.service".into(),
-            node_sha256: "a".repeat(64),
-            prefix_archive: b("prefix.jet", PREFIX_SHA),
-            prefix_manifest: b("prefix.segment.json", MANIFEST_SHA),
-            native_probe: b("native.json", NATIVE_SHA),
-            restart_snapshot: b(
-                "snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
-                SNAPSHOT_SHA,
-            ),
-            worker: b("worker", WORKER_SHA),
-            genesis_archive: b("genesis.tar.bz2", GENESIS_SHA),
-            admission_receipt: b("admission.json", &"b".repeat(64)),
-            run_root: Path::new(PRIVATE_ROOT).join("checkpoint-continuation-203-test"),
-            minimum_free_bytes: PROTECTED + MINIMUM_PEAK,
-        }
-    }
-    fn admitted(p: &Plan) -> Value {
-        json!({"schema":"jetstreamer-epoch203-continuation-admission-v1","admitted":true,
-            "private_continuation_and_assembly_only":true,"epoch":EPOCH,"node_sha256":p.node_sha256,
-            "prefix_sha256":PREFIX_SHA,"snapshot_sha256":SNAPSHOT_SHA,"native_result_sha256":NATIVE_SHA,
-            "worker_sha256":WORKER_SHA,"remaining_slots":419,"candidate_incremental_peak_bytes":MINIMUM_PEAK,
-            "protected_existing_floor_bytes":PROTECTED,"recorded_unix_seconds":1000,
-            "required_guard_minimum_free_bytes":PROTECTED,"experimental_peak_guard_includes_other_fleet_allocations":true,
-            "ordinary_replay_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,
-            "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false})
-    }
-    #[test]
-    fn exact203_span_keeps_canonical_root_and_rejects_other_epochs_or_holes() {
-        let p = proof();
-        assert_eq!(END - ROOT, 419);
-        assert_eq!(END - START + 1, 432000);
-        assert!(p.covers_trusted_root(EPOCH, ROOT, ROOT + 1, END));
-        for (e, b, s, n) in [
-            (213, ROOT, ROOT + 1, END),
-            (204, ROOT, ROOT + 1, END),
-            (EPOCH, ROOT - 1, ROOT + 1, END),
-            (EPOCH, ROOT, ROOT + 2, END),
-            (EPOCH, ROOT, ROOT + 1, END + 1),
-        ] {
-            assert!(!p.covers_trusted_root(e, b, s, n));
-        }
-        let mut p = proof();
-        p.manifest.terminal.slot -= 1;
-        assert!(!p.covers_trusted_root(EPOCH, ROOT, ROOT + 1, END));
-        let mut p = proof();
-        p.manifest.runtime.generation_profile.push('x');
-        assert!(!p.covers_trusted_root(EPOCH, ROOT, ROOT + 1, END));
-    }
-    #[test]
-    fn unpromoted_registry_remains_closed_to_ordinary203_replay() {
-        assert!(select_runtime_for_invocation(ROOT + 1..END + 1, true, false).is_err());
-        let selected = select_runtime_for_invocation(ROOT + 1..END + 1, true, true).unwrap();
-        assert_eq!(
-            selected.backend,
-            compatibility::RuntimeBackend::SolanaV1_6_16
-        );
-        assert!(select_runtime_for_invocation(ROOT + 1..END + 1, false, true).is_err());
-    }
-    #[test]
-    fn actual_native_receipt_is_bit_exact_and_does_not_authorize_replay() {
-        let bytes = include_bytes!("../tests/fixtures/epoch203-native-root-comparison.json");
-        assert_eq!(
-            <[u8; 32]>::from(Sha256::digest(bytes)),
-            sha(NATIVE_SHA).unwrap()
-        );
-        let v: Value = serde_json::from_slice(bytes).unwrap();
-        native_proof(&v, &prefix()).unwrap();
-        assert_eq!(
-            v["native_result"]["native_checkpoint"]["capitalization"].as_u64(),
-            Some(499961377837934321)
-        );
-        for (k, bad) in [
-            ("passed", json!(false)),
-            ("replay_entries_sent", json!(1)),
-            ("publication_authorized", json!(true)),
-            ("prefix_manifest_content_sha256", json!("f".repeat(64))),
-            ("worker_sha256", json!("f".repeat(64))),
-        ] {
-            let mut changed = v.clone();
-            changed[k] = bad;
-            assert!(native_proof(&changed, &prefix()).is_err(), "{k}");
-        }
-    }
-    #[test]
-    fn actual_suffix_barrier_checks_every_consensus_field_and_preserves_native_cursor() {
-        let p = proof();
-        let native = native_summary();
-        let worker = sha(WORKER_SHA).unwrap();
-        assert_ne!(
-            native.next_write_version,
-            p.manifest.terminal.next_write_version
-        );
-        p.check_native(&native, worker, NATIVE_CURSOR, 64).unwrap();
-        let changes: [fn(&mut SegmentCheckpointSummary); 10] = [
-            |v| v.slot += 1,
-            |v| v.bank_hash.push('x'),
-            |v| v.accounts_hash.push('x'),
-            |v| v.last_blockhash.push('x'),
-            |v| v.capitalization += 1,
-            |v| v.transaction_count += 1,
-            |v| v.tick_height += 1,
-            |v| v.slot_complete = false,
-            |v| v.write_count = 1,
-            |v| v.next_write_version += 1,
-        ];
-        for change in changes {
-            let mut bad = native.clone();
-            change(&mut bad);
-            assert!(p.check_native(&bad, worker, NATIVE_CURSOR, 64).is_err());
-        }
-        assert!(p.check_native(&native, worker, NATIVE_CURSOR, 63).is_err());
-        assert!(p.check_native(&native, [0; 32], NATIVE_CURSOR, 64).is_err());
-    }
-    #[test]
-    fn executing_barrier_can_only_record_success_once() {
-        let p = proof();
-        let s = native_summary();
-        let hash = |v: &str| v.parse::<Hash>().unwrap().to_bytes();
-        let mut actual = historical::HistoricalCheckpoint {
-            slot: s.slot,
-            bank_hash: hash(&s.bank_hash),
-            accounts_hash: hash(&s.accounts_hash),
-            last_blockhash: hash(&s.last_blockhash),
-            capitalization: s.capitalization,
-            transaction_count: s.transaction_count,
-            tick_height: s.tick_height,
-            slot_complete: true,
-            writes: vec![],
-            next_write_version: NATIVE_CURSOR,
-        };
-        actual.capitalization += 1;
-        assert!(
-            p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), NATIVE_CURSOR, 64)
-                .is_err()
-        );
-        assert_eq!(p.native_barrier_millis.load(Ordering::SeqCst), u64::MAX);
-        actual.capitalization -= 1;
-        p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), NATIVE_CURSOR, 64)
-            .unwrap();
-        assert_ne!(p.native_barrier_millis.load(Ordering::SeqCst), u64::MAX);
-        assert!(
-            p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), NATIVE_CURSOR, 64)
-                .is_err()
-        );
-    }
-    #[test]
-    fn full_path_admission_cannot_borrow_native_only_budget_or_mutation_authority() {
-        let p = plan();
-        validate_plan(&p, &p.run_root.join("ledger")).unwrap();
-        let v = admitted(&p);
-        admission(&p, &v, 1900).unwrap();
-        assert!(admission(&p, &v, 1901).is_err());
-        assert!(admission(&p, &v, 999).is_err());
-        for (k, bad) in [
-            (
-                "schema",
-                json!("jetstreamer-epoch203-native-admission-receipt-v1"),
-            ),
-            ("candidate_incremental_peak_bytes", json!(192u64 << 30)),
-            ("protected_existing_floor_bytes", json!(PROTECTED - 1)),
-            ("node_sha256", json!("f".repeat(64))),
-            ("remaining_slots", json!(420)),
-            ("retirement_authorized", json!(true)),
-            ("remote_mutations", json!(true)),
-            ("publication_authorized", json!(true)),
-        ] {
-            let mut changed = v.clone();
-            changed[k] = bad;
-            assert!(admission(&p, &changed, 1000).is_err(), "{k}");
-        }
-        let mut smaller = plan();
-        smaller.minimum_free_bytes = PROTECTED + (192 << 30);
-        assert!(validate_plan(&smaller, &smaller.run_root.join("ledger")).is_err());
-    }
-    #[test]
-    fn plan_and_cli_cannot_enable_neighbor_replay_or_canonical_output() {
-        assert_eq!(
-            validate_cli((203, 203), Some(true), 1, true, false).is_ok(),
-            cfg!(feature = "epoch203-checkpoint-continuation-diagnostic")
-        );
-        for (range, verify, count, destination, forbidden) in [
-            ((213, 213), Some(true), 1, true, false),
-            ((203, 204), Some(true), 1, true, false),
-            ((203, 203), None, 1, true, false),
-            ((203, 203), Some(true), 2, true, false),
-            ((203, 203), Some(true), 1, false, false),
-            ((203, 203), Some(true), 1, true, true),
-        ] {
-            assert!(validate_cli(range, verify, count, destination, forbidden).is_err());
-        }
-        let mut p = plan();
-        p.worker.sha256 = "f".repeat(64);
-        assert!(validate_plan(&p, &p.run_root.join("ledger")).is_err());
-        let mut encoded = serde_json::to_value(plan()).unwrap();
-        encoded["publication_authorized"] = json!(true);
-        assert!(serde_json::from_value::<Plan>(encoded).is_err());
-    }
-    #[test]
-    fn v4_preserves_both_generations_and_only_normalizes_local_write_versions() {
-        let p = prefix();
-        let mut s = p.clone();
-        s.bootstrap = native_summary();
-        s.bootstrap_archive_sha256 = Some(sha(SNAPSHOT_SHA).unwrap());
-        s.output_slot_start = ROOT + 1;
-        s.output_slot_count = END - ROOT;
-        s.terminal.slot = END;
-        s.terminal.tick_height = (END + 1) * 64;
-        s.terminal.write_count = 0;
-        s.terminal.next_write_version = NATIVE_CURSOR + 100;
-        s.emitted_raw_write_versions = NATIVE_CURSOR..NATIVE_CURSOR + 100;
-        s.archive_sha256 = [7; 32];
-        s.runtime
-            .generation_profile
-            .push_str("-independent-suffix-test");
-        let v = provenance(&p, &s).unwrap();
-        assert_eq!(v.base.requested_slot_count, 432000);
-        assert_eq!(v.base.runtime_segments[1].slot_count, 419);
-        assert_eq!(v.base.runtime_segments[0].write_versions.archive_start, 0);
-        assert_eq!(
-            v.base.runtime_segments[1].write_versions.archive_start,
-            p.emitted_raw_write_versions.end - p.emitted_raw_write_versions.start
-        );
-        assert_ne!(
-            v.base.runtime_segments[0].generation_profile,
-            v.base.runtime_segments[1].generation_profile
-        );
-        assert_ne!(
-            v.base.handoffs[0].predecessor.next_write_version,
-            v.base.handoffs[0].successor.next_write_version
-        );
-        s.output_slot_start += 1;
-        assert!(provenance(&p, &s).is_err());
-        s.output_slot_start -= 1;
-        s.runtime.runtime_admission = SegmentRuntimeAdmission::Verified;
-        assert!(provenance(&p, &s).is_err());
-    }
-}
-
 fn scope(m: &HistoricalSegmentManifest) -> bool {
     m.epoch == EPOCH
         && m.output_slot_start == START
@@ -954,4 +682,276 @@ pub(crate) async fn run(
     write_new(&p.run_root.join("receipts/continuation.json"), &bytes)?;
     info!("private203 continuation assembled; final/plugin/import/publication gates remain closed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    const NATIVE_CURSOR: u64 = 83_354_404_203;
+    fn prefix() -> HistoricalSegmentManifest {
+        let bytes = include_bytes!("../tests/fixtures/epoch203-capped-shrink-root.manifest.json");
+        assert_eq!(
+            <[u8; 32]>::from(Sha256::digest(bytes)),
+            sha(MANIFEST_SHA).unwrap()
+        );
+        serde_json::from_slice(bytes).unwrap()
+    }
+    fn proof() -> ValidatedPrefix {
+        ValidatedPrefix {
+            manifest: prefix(),
+            snapshot: "/snapshot".into(),
+            runner_started: std::time::Instant::now(),
+            native_barrier_millis: std::sync::atomic::AtomicU64::new(u64::MAX),
+        }
+    }
+    fn native_summary() -> SegmentCheckpointSummary {
+        let mut s = prefix().terminal;
+        s.write_count = 0;
+        s.next_write_version = NATIVE_CURSOR;
+        s
+    }
+    fn plan() -> Plan {
+        let b = |file: &str, hash: &str| Evidence {
+            path: Path::new("/sealed").join(file),
+            sha256: hash.into(),
+        };
+        Plan {
+            schema: "jetstreamer-private-epoch203-checkpoint-continuation-plan-v1".into(),
+            epoch: EPOCH,
+            producer_unit: "horizon-qualify-203-checkpoint-continuation-test.service".into(),
+            node_sha256: "a".repeat(64),
+            prefix_archive: b("prefix.jet", PREFIX_SHA),
+            prefix_manifest: b("prefix.segment.json", MANIFEST_SHA),
+            native_probe: b("native.json", NATIVE_SHA),
+            restart_snapshot: b(
+                "snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
+                SNAPSHOT_SHA,
+            ),
+            worker: b("worker", WORKER_SHA),
+            genesis_archive: b("genesis.tar.bz2", GENESIS_SHA),
+            admission_receipt: b("admission.json", &"b".repeat(64)),
+            run_root: Path::new(PRIVATE_ROOT).join("checkpoint-continuation-203-test"),
+            minimum_free_bytes: PROTECTED + MINIMUM_PEAK,
+        }
+    }
+    fn admitted(p: &Plan) -> Value {
+        json!({"schema":"jetstreamer-epoch203-continuation-admission-v1","admitted":true,
+            "private_continuation_and_assembly_only":true,"epoch":EPOCH,"node_sha256":p.node_sha256,
+            "prefix_sha256":PREFIX_SHA,"snapshot_sha256":SNAPSHOT_SHA,"native_result_sha256":NATIVE_SHA,
+            "worker_sha256":WORKER_SHA,"remaining_slots":419,"candidate_incremental_peak_bytes":MINIMUM_PEAK,
+            "protected_existing_floor_bytes":PROTECTED,"recorded_unix_seconds":1000,
+            "required_guard_minimum_free_bytes":PROTECTED,"experimental_peak_guard_includes_other_fleet_allocations":true,
+            "ordinary_replay_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,
+            "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false})
+    }
+    #[test]
+    fn exact203_span_keeps_canonical_root_and_rejects_other_epochs_or_holes() {
+        let p = proof();
+        assert_eq!(END - ROOT, 419);
+        assert_eq!(END - START + 1, 432000);
+        assert!(p.covers_trusted_root(EPOCH, ROOT, ROOT + 1, END));
+        for (e, b, s, n) in [
+            (213, ROOT, ROOT + 1, END),
+            (204, ROOT, ROOT + 1, END),
+            (EPOCH, ROOT - 1, ROOT + 1, END),
+            (EPOCH, ROOT, ROOT + 2, END),
+            (EPOCH, ROOT, ROOT + 1, END + 1),
+        ] {
+            assert!(!p.covers_trusted_root(e, b, s, n));
+        }
+        let mut p = proof();
+        p.manifest.terminal.slot -= 1;
+        assert!(!p.covers_trusted_root(EPOCH, ROOT, ROOT + 1, END));
+        let mut p = proof();
+        p.manifest.runtime.generation_profile.push('x');
+        assert!(!p.covers_trusted_root(EPOCH, ROOT, ROOT + 1, END));
+    }
+    #[test]
+    fn unpromoted_registry_remains_closed_to_ordinary203_replay() {
+        assert!(select_runtime_for_invocation(ROOT + 1..END + 1, true, false).is_err());
+        let selected = select_runtime_for_invocation(ROOT + 1..END + 1, true, true).unwrap();
+        assert_eq!(
+            selected.backend,
+            compatibility::RuntimeBackend::SolanaV1_6_16
+        );
+        assert!(select_runtime_for_invocation(ROOT + 1..END + 1, false, true).is_err());
+    }
+    #[test]
+    fn actual_native_receipt_is_bit_exact_and_does_not_authorize_replay() {
+        let bytes = include_bytes!("../tests/fixtures/epoch203-native-root-comparison.json");
+        assert_eq!(
+            <[u8; 32]>::from(Sha256::digest(bytes)),
+            sha(NATIVE_SHA).unwrap()
+        );
+        let v: Value = serde_json::from_slice(bytes).unwrap();
+        native_proof(&v, &prefix()).unwrap();
+        assert_eq!(
+            v["native_result"]["native_checkpoint"]["capitalization"].as_u64(),
+            Some(499961377837934321)
+        );
+        for (k, bad) in [
+            ("passed", json!(false)),
+            ("replay_entries_sent", json!(1)),
+            ("publication_authorized", json!(true)),
+            ("prefix_manifest_content_sha256", json!("f".repeat(64))),
+            ("worker_sha256", json!("f".repeat(64))),
+        ] {
+            let mut changed = v.clone();
+            changed[k] = bad;
+            assert!(native_proof(&changed, &prefix()).is_err(), "{k}");
+        }
+    }
+    #[test]
+    fn actual_suffix_barrier_checks_every_consensus_field_and_preserves_native_cursor() {
+        let p = proof();
+        let native = native_summary();
+        let worker = sha(WORKER_SHA).unwrap();
+        assert_ne!(
+            native.next_write_version,
+            p.manifest.terminal.next_write_version
+        );
+        p.check_native(&native, worker, NATIVE_CURSOR, 64).unwrap();
+        let changes: [fn(&mut SegmentCheckpointSummary); 10] = [
+            |v| v.slot += 1,
+            |v| v.bank_hash.push('x'),
+            |v| v.accounts_hash.push('x'),
+            |v| v.last_blockhash.push('x'),
+            |v| v.capitalization += 1,
+            |v| v.transaction_count += 1,
+            |v| v.tick_height += 1,
+            |v| v.slot_complete = false,
+            |v| v.write_count = 1,
+            |v| v.next_write_version += 1,
+        ];
+        for change in changes {
+            let mut bad = native.clone();
+            change(&mut bad);
+            assert!(p.check_native(&bad, worker, NATIVE_CURSOR, 64).is_err());
+        }
+        assert!(p.check_native(&native, worker, NATIVE_CURSOR, 63).is_err());
+        assert!(p.check_native(&native, [0; 32], NATIVE_CURSOR, 64).is_err());
+    }
+    #[test]
+    fn executing_barrier_can_only_record_success_once() {
+        let p = proof();
+        let s = native_summary();
+        let hash = |v: &str| v.parse::<Hash>().unwrap().to_bytes();
+        let mut actual = historical::HistoricalCheckpoint {
+            slot: s.slot,
+            bank_hash: hash(&s.bank_hash),
+            accounts_hash: hash(&s.accounts_hash),
+            last_blockhash: hash(&s.last_blockhash),
+            capitalization: s.capitalization,
+            transaction_count: s.transaction_count,
+            tick_height: s.tick_height,
+            slot_complete: true,
+            writes: vec![],
+            next_write_version: NATIVE_CURSOR,
+        };
+        actual.capitalization += 1;
+        assert!(
+            p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), NATIVE_CURSOR, 64)
+                .is_err()
+        );
+        assert_eq!(p.native_barrier_millis.load(Ordering::SeqCst), u64::MAX);
+        actual.capitalization -= 1;
+        p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), NATIVE_CURSOR, 64)
+            .unwrap();
+        assert_ne!(p.native_barrier_millis.load(Ordering::SeqCst), u64::MAX);
+        assert!(
+            p.verify_native_checkpoint(&actual, sha(WORKER_SHA).unwrap(), NATIVE_CURSOR, 64)
+                .is_err()
+        );
+    }
+    #[test]
+    fn full_path_admission_cannot_borrow_native_only_budget_or_mutation_authority() {
+        let p = plan();
+        validate_plan(&p, &p.run_root.join("ledger")).unwrap();
+        let v = admitted(&p);
+        admission(&p, &v, 1900).unwrap();
+        assert!(admission(&p, &v, 1901).is_err());
+        assert!(admission(&p, &v, 999).is_err());
+        for (k, bad) in [
+            (
+                "schema",
+                json!("jetstreamer-epoch203-native-admission-receipt-v1"),
+            ),
+            ("candidate_incremental_peak_bytes", json!(192u64 << 30)),
+            ("protected_existing_floor_bytes", json!(PROTECTED - 1)),
+            ("node_sha256", json!("f".repeat(64))),
+            ("remaining_slots", json!(420)),
+            ("retirement_authorized", json!(true)),
+            ("remote_mutations", json!(true)),
+            ("publication_authorized", json!(true)),
+        ] {
+            let mut changed = v.clone();
+            changed[k] = bad;
+            assert!(admission(&p, &changed, 1000).is_err(), "{k}");
+        }
+        let mut smaller = plan();
+        smaller.minimum_free_bytes = PROTECTED + (192 << 30);
+        assert!(validate_plan(&smaller, &smaller.run_root.join("ledger")).is_err());
+    }
+    #[test]
+    fn plan_and_cli_cannot_enable_neighbor_replay_or_canonical_output() {
+        assert_eq!(
+            validate_cli((203, 203), Some(true), 1, true, false).is_ok(),
+            cfg!(feature = "epoch203-checkpoint-continuation-diagnostic")
+        );
+        for (range, verify, count, destination, forbidden) in [
+            ((213, 213), Some(true), 1, true, false),
+            ((203, 204), Some(true), 1, true, false),
+            ((203, 203), None, 1, true, false),
+            ((203, 203), Some(true), 2, true, false),
+            ((203, 203), Some(true), 1, false, false),
+            ((203, 203), Some(true), 1, true, true),
+        ] {
+            assert!(validate_cli(range, verify, count, destination, forbidden).is_err());
+        }
+        let mut p = plan();
+        p.worker.sha256 = "f".repeat(64);
+        assert!(validate_plan(&p, &p.run_root.join("ledger")).is_err());
+        let mut encoded = serde_json::to_value(plan()).unwrap();
+        encoded["publication_authorized"] = json!(true);
+        assert!(serde_json::from_value::<Plan>(encoded).is_err());
+    }
+    #[test]
+    fn v4_preserves_both_generations_and_only_normalizes_local_write_versions() {
+        let p = prefix();
+        let mut s = p.clone();
+        s.bootstrap = native_summary();
+        s.bootstrap_archive_sha256 = Some(sha(SNAPSHOT_SHA).unwrap());
+        s.output_slot_start = ROOT + 1;
+        s.output_slot_count = END - ROOT;
+        s.terminal.slot = END;
+        s.terminal.tick_height = (END + 1) * 64;
+        s.terminal.write_count = 0;
+        s.terminal.next_write_version = NATIVE_CURSOR + 100;
+        s.emitted_raw_write_versions = NATIVE_CURSOR..NATIVE_CURSOR + 100;
+        s.archive_sha256 = [7; 32];
+        s.runtime
+            .generation_profile
+            .push_str("-independent-suffix-test");
+        let v = provenance(&p, &s).unwrap();
+        assert_eq!(v.base.requested_slot_count, 432000);
+        assert_eq!(v.base.runtime_segments[1].slot_count, 419);
+        assert_eq!(v.base.runtime_segments[0].write_versions.archive_start, 0);
+        assert_eq!(
+            v.base.runtime_segments[1].write_versions.archive_start,
+            p.emitted_raw_write_versions.end - p.emitted_raw_write_versions.start
+        );
+        assert_ne!(
+            v.base.runtime_segments[0].generation_profile,
+            v.base.runtime_segments[1].generation_profile
+        );
+        assert_ne!(
+            v.base.handoffs[0].predecessor.next_write_version,
+            v.base.handoffs[0].successor.next_write_version
+        );
+        s.output_slot_start += 1;
+        assert!(provenance(&p, &s).is_err());
+        s.output_slot_start -= 1;
+        s.runtime.runtime_admission = SegmentRuntimeAdmission::Verified;
+        assert!(provenance(&p, &s).is_err());
+    }
 }

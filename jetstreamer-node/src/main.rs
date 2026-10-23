@@ -1,11 +1,32 @@
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
+mod epoch141_original_entry;
 mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
 mod failed_prefix220;
+
+#[cfg(all(
+    feature = "epoch141-original-entry-qualification",
+    any(
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("epoch141 original-entry qualification requires its own exclusive build");
 
 #[cfg(all(
     feature = "epoch203-checkpoint-continuation-diagnostic",
@@ -3440,6 +3461,8 @@ struct TransactionScheduler {
     resume_target: Mutex<Option<ResumeTarget>>,
     restart_tracker: Arc<RestartTracker>,
     empty_slot_buffer_gap_limit: u64,
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    original_entries: Option<Mutex<jetstreamer_utils::horizon_legacy_bundle::OriginalEntryBundle>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3463,6 +3486,10 @@ struct SchedulerState {
     /// metadata when a firehose retry re-delivers a block.
     decoded_parents: Vec<Option<Slot>>,
     highest_seen_slot: Slot,
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    original_expected: HashSet<Slot>,
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    original_matched: HashSet<Slot>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -3518,6 +3545,13 @@ impl TransactionScheduler {
         empty_slot_buffer_gap_limit: u64,
     ) -> Self {
         let canonical_slot_count = presence.states.len();
+        #[cfg(feature = "epoch141-original-entry-qualification")]
+        let original_entries = epoch141_original_entry::take_bundle();
+        #[cfg(feature = "epoch141-original-entry-qualification")]
+        let original_expected = original_entries
+            .as_ref()
+            .map(|bundle| bundle.targets().collect())
+            .unwrap_or_default();
         Self {
             state: Mutex::new(SchedulerState {
                 last_finalized_slot: start_slot.saturating_sub(1),
@@ -3528,12 +3562,59 @@ impl TransactionScheduler {
                 canonical_slots: vec![CanonicalSlotState::Unknown; canonical_slot_count],
                 decoded_parents: vec![None; canonical_slot_count],
                 highest_seen_slot: start_slot.saturating_sub(1),
+                #[cfg(feature = "epoch141-original-entry-qualification")]
+                original_expected,
+                #[cfg(feature = "epoch141-original-entry-qualification")]
+                original_matched: HashSet::new(),
             }),
             presence,
             resume_target: Mutex::new(None),
             restart_tracker,
             empty_slot_buffer_gap_limit,
+            #[cfg(feature = "epoch141-original-entry-qualification")]
+            original_entries: original_entries.map(Mutex::new),
         }
+    }
+
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    fn authenticate_original_source_metadata(
+        &self,
+        slot: Slot,
+        parent: Slot,
+        parent_hash: &str,
+        final_hash: &str,
+    ) -> Result<(), String> {
+        let Some(bundle) = &self.original_entries else {
+            return Ok(());
+        };
+        let expected = bundle
+            .lock()
+            .map_err(|_| "original bundle lock poisoned")?
+            .expectation(slot);
+        let Some(expected) = expected else {
+            return Ok(());
+        };
+        let parent_hash = parent_hash
+            .parse::<Hash>()
+            .map_err(|e| format!("invalid source parent hash: {e}"))?;
+        let final_hash = final_hash
+            .parse::<Hash>()
+            .map_err(|e| format!("invalid source final hash: {e}"))?;
+        if parent != expected.parent_slot
+            || parent_hash.to_bytes() != expected.parent_hash
+            || final_hash.to_bytes() != expected.final_hash
+        {
+            return Err(format!(
+                "source metadata disagrees with original entry anchors at slot {slot}"
+            ));
+        }
+        let mut state = self.state.lock().map_err(|_| "scheduler lock poisoned")?;
+        state
+            .slots
+            .entry(slot)
+            .or_default()
+            .original_source_anchors_verified = true;
+        Ok(())
     }
 
     #[allow(dead_code)]
@@ -3683,6 +3764,12 @@ impl TransactionScheduler {
         let gap_end = slot.min(self.presence.end_inclusive.saturating_add(1));
 
         for skipped in gap_start..gap_end {
+            #[cfg(feature = "epoch141-original-entry-qualification")]
+            if state.original_expected.contains(&skipped) {
+                return Err(format!(
+                    "source parent edge marks independently pinned original target {skipped} skipped"
+                ));
+            }
             let index = self
                 .canonical_slot_index(skipped)
                 .expect("parent gap clipped to scheduler range");
@@ -3945,6 +4032,14 @@ impl TransactionScheduler {
 
     fn verify_complete(&self, end_inclusive: Slot) -> Result<(), String> {
         let state = self.state.lock().expect("transaction scheduler lock");
+        #[cfg(feature = "epoch141-original-entry-qualification")]
+        if state.original_matched != state.original_expected {
+            return Err(format!(
+                "incomplete original source census: {} matched, {} required",
+                state.original_matched.len(),
+                state.original_expected.len()
+            ));
+        }
         let mut slot = state.current_slot;
         while slot <= end_inclusive {
             match self.canonical_slot_state_locked(&state, slot) {
@@ -4137,6 +4232,37 @@ impl TransactionScheduler {
                 break;
             };
 
+            #[cfg(feature = "epoch141-original-entry-qualification")]
+            let original = if let Some(bundle) = &self.original_entries {
+                let mut bundle = bundle.lock().map_err(|_| "original bundle lock poisoned")?;
+                if bundle.expectation(current_slot).is_some() {
+                    if !epoch141_original_entry::complete_source(buffer)? {
+                        break;
+                    }
+                    Some(
+                        bundle
+                            .read_slot(current_slot)?
+                            .ok_or("original target disappeared")?,
+                    )
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            #[cfg(feature = "epoch141-original-entry-qualification")]
+            let mut drained = match original {
+                Some(original) => {
+                    if state.original_matched.contains(&current_slot) {
+                        return Err("original source target replayed twice".into());
+                    }
+                    let drained = epoch141_original_entry::adapt(buffer, &original)?;
+                    state.original_matched.insert(current_slot);
+                    drained
+                }
+                None => buffer.drain_ready_entries(current_slot)?,
+            };
+            #[cfg(not(feature = "epoch141-original-entry-qualification"))]
             let mut drained = buffer.drain_ready_entries(current_slot)?;
             ready.append(&mut drained);
             if state.highest_seen_slot > current_slot
@@ -4178,10 +4304,16 @@ struct SlotExecutionBuffer {
     processed_entry_count: u64,
     expected_tx_count: Option<u64>,
     expected_entry_count: Option<u64>,
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    original_source_anchors_verified: bool,
 }
 
 impl SlotExecutionBuffer {
     fn reset_for_restart(&mut self) {
+        #[cfg(feature = "epoch141-original-entry-qualification")]
+        {
+            self.original_source_anchors_verified = false;
+        }
         self.txs.clear();
         self.pending_entries.clear();
         self.next_entry_index = 0;
@@ -4925,6 +5057,16 @@ impl BlockMetadataNotifier for BankBlockMetadataNotifier {
             .lock()
             .expect("firehose gate lock poisoned");
         self.progress.note_block_meta_slot(slot);
+        #[cfg(feature = "epoch141-original-entry-qualification")]
+        if let Err(error) = self.scheduler.authenticate_original_source_metadata(
+            slot,
+            parent_slot,
+            _parent_blockhash,
+            _blockhash,
+        ) {
+            self.failure.record(error);
+            return;
+        }
         match self.scheduler.record_block_metadata(
             parent_slot,
             slot,
@@ -6588,8 +6730,12 @@ fn replay_start_for_bootstrap(
 }
 
 fn archive_generation_profile() -> String {
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    let route = "epoch141-original-entry-qualification-v1";
+    #[cfg(not(feature = "epoch141-original-entry-qualification"))]
+    let route = "old-faithful-to-horizon-v2";
     format!(
-        "jetstreamer-node/{}/old-faithful-to-horizon-v2@{}",
+        "jetstreamer-node/{}/{route}@{}",
         env!("CARGO_PKG_VERSION"),
         env!("JETSTREAMER_BUILD_REVISION")
     )
@@ -11661,6 +11807,16 @@ async fn run_geyser_replay(
             ledger_dir,
         )?;
     }
+    #[cfg(feature = "epoch141-original-entry-qualification")]
+    epoch141_original_entry::validate_execution(
+        epoch,
+        bootstrap.slot()?,
+        qualification.map(|p| p.end_inclusive).unwrap_or(0),
+        carried_state.is_some()
+            || checkpoint_restart.is_some()
+            || retain_runtime_state
+            || handoff_export_directory.is_some(),
+    )?;
     if let Some(prefix) = checkpoint_restart {
         prefix.validate_invocation(
             epoch,
@@ -19311,6 +19467,7 @@ async fn main() {
     let mut verify_option_count = 0usize;
     let mut horizon_output: Option<PathBuf> = None;
     let mut qualification_end_slot: Option<Slot> = None;
+    let mut epoch141_original_cli = epoch141_original_entry::Cli::default();
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
     let mut epoch223_prefix_preflight = false;
@@ -19385,6 +19542,11 @@ async fn main() {
                     eprintln!("invalid --qualification-end-slot '{slot}': {err}");
                     exit(2);
                 }
+            }
+        } else if epoch141_original_entry::recognizes(&arg) {
+            if let Err(error) = epoch141_original_cli.parse(&arg) {
+                eprintln!("{error}");
+                exit(2);
             }
         } else if let Some(path) = arg.strip_prefix("--epoch-hashes=") {
             epoch_hashes = Some(PathBuf::from(path));
@@ -19727,6 +19889,24 @@ async fn main() {
             exit(2);
         }
     };
+    if let Err(error) = epoch141_original_entry::configure(
+        epoch141_original_cli,
+        start_epoch,
+        end_epoch,
+        qualification.map(|p| (p.bootstrap_slot, p.replay_start, p.end_inclusive)),
+        root_checkpoint_cohort
+            || recover_staged_only
+            || recover_staged_cohort_only
+            || recover_unreceipted_root_cohort_only
+            || inherited_epoch_lease,
+        horizon_output
+            .as_deref()
+            .zip(replay_scratch.as_deref())
+            .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
+    ) {
+        eprintln!("{error}");
+        exit(2);
+    }
     if cfg!(feature = "epoch223-v1-6-25-qualification")
         && let Err(error) = epoch223_qualification::validate_launch(
             start_epoch,

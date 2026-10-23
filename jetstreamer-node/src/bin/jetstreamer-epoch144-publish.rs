@@ -894,7 +894,7 @@ mod tests {
     }
     #[test]
     fn inherited_protection_is_not_relabelled_as_the_century_floor() {
-        assert!(PROTECTED > 205211459014 + 2473901162496);
+        const { assert!(PROTECTED > 205211459014 + 2473901162496) };
         assert_eq!(PROTECTED + LENGTH + MARGIN, 4850948146290);
     }
     #[test]

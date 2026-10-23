@@ -240,6 +240,99 @@ fn terminal() -> Result<()> {
     Ok(())
 }
 
+async fn capture_boundaries(output: &Path, self_sha: &str) -> Result<()> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+    let mut blocks = Vec::new();
+    for slot in [62207999u64, 62639999] {
+        let request = json!({"jsonrpc":"2.0","id":slot,"method":"getBlock","params":[slot,{"commitment":"finalized","transactionDetails":"none","rewards":false}]});
+        let mut response = client
+            .post("https://api.mainnet-beta.solana.com")
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            ensure!(bytes.len() + chunk.len() <= 16384, "RPC response too large");
+            bytes.extend_from_slice(&chunk);
+        }
+        let value: Value = serde_json::from_slice(&bytes)?;
+        let blockhash = value["result"]["blockhash"]
+            .as_str()
+            .context("finalized boundary block absent")?;
+        let _: solana_hash::Hash = blockhash.parse()?;
+        ensure!(
+            value["jsonrpc"] == "2.0"
+                && value["id"] == slot
+                && value.get("error").is_none()
+                && value["result"]["parentSlot"]
+                    .as_u64()
+                    .is_some_and(|n| n < slot),
+            "wrong finalized RPC result"
+        );
+        blocks.push(json!({"slot":slot,"blockhash":blockhash,"request":request,"raw_response":std::str::from_utf8(&bytes)?,"raw_response_sha256":evidence::sha(&bytes)}));
+    }
+    write_receipt(
+        output,
+        &json!({"schema":"jetstreamer-private144-finalized-boundaries-v2","epoch":144,"rpc":"https://api.mainnet-beta.solana.com",
+        "tool_sha256":self_sha,"blocks":blocks,"accounts_root_qualification_authorized":false,"runtime_admission_authorized":false,
+        "canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+    )?;
+    Ok(())
+}
+#[tokio::main]
+async fn main() -> Result<()> {
+    let a: Vec<_> = std::env::args().collect();
+    if a.len() == 5 && a[1] == "--capture-boundaries" && a[3] == "--self-sha256" {
+        ensure!(unsafe { libc::geteuid() } == 0, "root required");
+        evidence::bound_file(
+            &std::fs::read_link("/proc/self/exe")?,
+            &a[4],
+            128 << 20,
+            true,
+        )?;
+        return capture_boundaries(Path::new(&a[2]), &a[4]).await;
+    }
+    ensure!(
+        a.len() == 6
+            && a[2] == "--plan-sha256"
+            && a[4] == "--self-sha256"
+            && unsafe { libc::geteuid() } == 0,
+        "usage: jetstreamer-epoch144-provenance-expectation PLAN --plan-sha256 SHA --self-sha256 SHA (root)"
+    );
+    let exe = std::fs::read_link("/proc/self/exe")?;
+    evidence::bound_file(&exe, &a[5], 128 << 20, true)?;
+    let p: Plan = serde_json::from_slice(&evidence::bound_file(
+        Path::new(&a[1]),
+        &a[3],
+        1 << 20,
+        true,
+    )?)?;
+    ensure!(
+        p.schema == "jetstreamer-private144-provenance-plan-v2"
+            && p.prefix_manifest.sha256 == PREFIX_MANIFEST,
+        "foreign144 expectation plan"
+    );
+    terminal()?;
+    let prefix: HistoricalSegmentManifest = serde_json::from_slice(&read(&p.prefix_manifest)?)?;
+    let suffix: HistoricalSegmentManifest = serde_json::from_slice(&read(&p.suffix_manifest)?)?;
+    let v: Value = serde_json::from_slice(&read(&p.producer_outcome)?)?;
+    let bytes = encode_archive_provenance(&derive(&prefix, &suffix, &v)?)?;
+    terminal()?;
+    evidence::write_receipt(
+        &p.output,
+        &json!({"schema":"jetstreamer-private-epoch144-provenance-expectation-v2","epoch":144,
+        "prefix_manifest":p.prefix_manifest,"suffix_manifest":p.suffix_manifest,"producer_outcome":p.producer_outcome,
+        "tool_sha256":a[5],"expected_provenance_sha256":evidence::sha(&bytes),"expected_provenance_encoded_bytes":bytes.len(),
+        "source_manifest_scope_validated":true,"assembled_target_opened":false,"source_archives_rehashed":false,
+        "independent_final_archive_verification_passed":false,"current_plugin_verification_passed":false,
+        "runtime_admission_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,96 +451,4 @@ mod tests {
         );
         assert_eq!(original.base.handoffs, recovery.base.handoffs);
     }
-}
-async fn capture_boundaries(output: &Path, self_sha: &str) -> Result<()> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()?;
-    let mut blocks = Vec::new();
-    for slot in [62207999u64, 62639999] {
-        let request = json!({"jsonrpc":"2.0","id":slot,"method":"getBlock","params":[slot,{"commitment":"finalized","transactionDetails":"none","rewards":false}]});
-        let mut response = client
-            .post("https://api.mainnet-beta.solana.com")
-            .json(&request)
-            .send()
-            .await?
-            .error_for_status()?;
-        let mut bytes = Vec::new();
-        while let Some(chunk) = response.chunk().await? {
-            ensure!(bytes.len() + chunk.len() <= 16384, "RPC response too large");
-            bytes.extend_from_slice(&chunk);
-        }
-        let value: Value = serde_json::from_slice(&bytes)?;
-        let blockhash = value["result"]["blockhash"]
-            .as_str()
-            .context("finalized boundary block absent")?;
-        let _: solana_hash::Hash = blockhash.parse()?;
-        ensure!(
-            value["jsonrpc"] == "2.0"
-                && value["id"] == slot
-                && value.get("error").is_none()
-                && value["result"]["parentSlot"]
-                    .as_u64()
-                    .is_some_and(|n| n < slot),
-            "wrong finalized RPC result"
-        );
-        blocks.push(json!({"slot":slot,"blockhash":blockhash,"request":request,"raw_response":std::str::from_utf8(&bytes)?,"raw_response_sha256":evidence::sha(&bytes)}));
-    }
-    write_receipt(
-        output,
-        &json!({"schema":"jetstreamer-private144-finalized-boundaries-v2","epoch":144,"rpc":"https://api.mainnet-beta.solana.com",
-        "tool_sha256":self_sha,"blocks":blocks,"accounts_root_qualification_authorized":false,"runtime_admission_authorized":false,
-        "canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
-    )?;
-    Ok(())
-}
-#[tokio::main]
-async fn main() -> Result<()> {
-    let a: Vec<_> = std::env::args().collect();
-    if a.len() == 5 && a[1] == "--capture-boundaries" && a[3] == "--self-sha256" {
-        ensure!(unsafe { libc::geteuid() } == 0, "root required");
-        evidence::bound_file(
-            &std::fs::read_link("/proc/self/exe")?,
-            &a[4],
-            128 << 20,
-            true,
-        )?;
-        return capture_boundaries(Path::new(&a[2]), &a[4]).await;
-    }
-    ensure!(
-        a.len() == 6
-            && a[2] == "--plan-sha256"
-            && a[4] == "--self-sha256"
-            && unsafe { libc::geteuid() } == 0,
-        "usage: jetstreamer-epoch144-provenance-expectation PLAN --plan-sha256 SHA --self-sha256 SHA (root)"
-    );
-    let exe = std::fs::read_link("/proc/self/exe")?;
-    evidence::bound_file(&exe, &a[5], 128 << 20, true)?;
-    let p: Plan = serde_json::from_slice(&evidence::bound_file(
-        Path::new(&a[1]),
-        &a[3],
-        1 << 20,
-        true,
-    )?)?;
-    ensure!(
-        p.schema == "jetstreamer-private144-provenance-plan-v2"
-            && p.prefix_manifest.sha256 == PREFIX_MANIFEST,
-        "foreign144 expectation plan"
-    );
-    terminal()?;
-    let prefix: HistoricalSegmentManifest = serde_json::from_slice(&read(&p.prefix_manifest)?)?;
-    let suffix: HistoricalSegmentManifest = serde_json::from_slice(&read(&p.suffix_manifest)?)?;
-    let v: Value = serde_json::from_slice(&read(&p.producer_outcome)?)?;
-    let bytes = encode_archive_provenance(&derive(&prefix, &suffix, &v)?)?;
-    terminal()?;
-    evidence::write_receipt(
-        &p.output,
-        &json!({"schema":"jetstreamer-private-epoch144-provenance-expectation-v2","epoch":144,
-        "prefix_manifest":p.prefix_manifest,"suffix_manifest":p.suffix_manifest,"producer_outcome":p.producer_outcome,
-        "tool_sha256":a[5],"expected_provenance_sha256":evidence::sha(&bytes),"expected_provenance_encoded_bytes":bytes.len(),
-        "source_manifest_scope_validated":true,"assembled_target_opened":false,"source_archives_rehashed":false,
-        "independent_final_archive_verification_passed":false,"current_plugin_verification_passed":false,
-        "runtime_admission_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
-    )?;
-    Ok(())
 }
