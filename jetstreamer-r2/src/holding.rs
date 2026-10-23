@@ -1,4 +1,4 @@
-//! Append-only custody of closed public-chain artifacts. No replay-data retirement,
+//! Append-only custody and separately scoped backed partial136 retirement. No
 //! canonical sidecar, runtime checkpoint or job-resume authority.
 use super::*;
 use serde_json::json;
@@ -1163,6 +1163,8 @@ pub(super) async fn run() -> Result<()> {
         "holding-restore-genesis-probe" => {
             restore_genesis_probe(&client, &m, &serde_json::from_value(v)?).await
         }
+        "holding-check-retire136" => epoch136::retire_local(&client, &m, v, &spec, true).await,
+        "holding-retire136" => epoch136::retire_local(&client, &m, v, &spec, false).await,
         _ => bail!("unsupported holding action"),
     }
 }
