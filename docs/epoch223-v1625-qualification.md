@@ -60,6 +60,29 @@ resource measurement is not a full-prefix peak bound. Preserve every existing
 artifact and do not treat the current diagnostic tail as a reusable qualified
 suffix before those obligations are proven.
 
+The separately opt-in `epoch223-root-prefix-resource` utility profile pins
+the sealed prefix parent `d2cb8dd8…`, unchanged worker `fde3ba53…`, cold
+snapshot `301110ca…`, two Rayon threads and natural parent completion at
+96,767,522. It cannot run the 477-slot tail or request the unknown full-epoch
+terminal. Both bootstrap and terminal Bank/accounts commitments, exact output
+coverage and absent sidecar are required in its producer manifest. A progress
+line alone never completes the attempt. The existing epoch203 profiles retain
+their own compile-bound scope and are not replaced.
+
+Its 72-hour runtime and 1,280-GiB terminal scratch bounds are diagnostic caps,
+not measured full-prefix peak qualification. Fresh admission must reserve the
+complete conservative 1,536-GiB incremental envelope (scratch plus archive and
+buffers), all older live growth, and the current century floor. Its startup
+minimum of 2,584,751,391,635 bytes is only a rejection baseline: thirteen-sample
+floor 248,289,182,611 + unchanged225 growth640GiB + candidate1536GiB. It does
+not account for a still-live203 owner; do not launch before fresh full-fleet
+admission proves every claim fits. Bind the exact producer to a proven actual
+free-space/VMA guard, protecting older claims. No new launch, guard or automatic
+admission trigger is installed merely by adding this utility. Preserve the
+existing203/225 workers and their guards. After natural success, independently
+reread the prefix; producer success still grants no restart, assembly, complete
+epoch, plugin, canonical-sidecar or publication authority.
+
 The independent reader has a separate closed prefix profile for
 `qualification-223-v1625-prefix-*/output/epoch-223.jet`, output slots
 96,336,000–96,767,522, the exact candidate worker digest and upstream revision.
@@ -95,6 +118,17 @@ descriptor already did. Bind and test both identities. The pre-worker report
 must now validate that profile and resolve its worker executable as well.
 The old static era label includes v1.6.20; the selected descriptor is v1.6.25,
 as asserted by the actual bootstrap-selector regression and new preflight.
+
+The distinct `--epoch223-prefix-preflight` flag admits only the exact cold
+prefix96335538..96767522 and its prefix namespace. It cannot be combined with
+either tail flag. It retains both independent checkpoint obligations and
+returns a `jetstreamer-private-epoch223-prefix-planning-preflight-v1` report
+only at the actual replay entrypoint's pre-worker barrier. Like tail preflight,
+it requires preseeded genesis, forbids ledger extraction and performs no worker
+spawn, entries or archive creation. It is package capability evidence, never
+snapshot-content verification or resource admission. A rebuilt parent needs
+new immutable digest bindings before any supervisor may use it; do not edit
+the older sealed package or treat its tail-only flag as prefix capability.
 
 The new worker feature restores the two future restart markers 96,542,804 and
 96,542,805 using the same native algorithm tested in the v1.6.20 correction.

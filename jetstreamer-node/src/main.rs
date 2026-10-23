@@ -11601,8 +11601,14 @@ async fn run_geyser_replay(
     checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
     epoch223_tail_mode: epoch223_qualification::TailMode,
 ) -> Result<ReplayRunOutcome, String> {
-    let tail_comparison = epoch223_tail_mode != epoch223_qualification::TailMode::Disabled;
-    if tail_comparison {
+    let prefix_preflight =
+        epoch223_tail_mode == epoch223_qualification::TailMode::PrefixPlanningPreflight;
+    let tail_comparison = matches!(
+        epoch223_tail_mode,
+        epoch223_qualification::TailMode::Comparison
+            | epoch223_qualification::TailMode::PlanningPreflight
+    );
+    if tail_comparison || prefix_preflight {
         if !cfg!(feature = "epoch223-v1-6-25-qualification")
             || carried_state.is_some()
             || audited_cohort_bootstrap.is_some()
@@ -11622,8 +11628,14 @@ async fn run_geyser_replay(
             false,
             Some((ledger_dir, &horizon_output, replay_scratch_dir)),
         )?;
+        epoch223_qualification::validate_prefix_preflight(
+            prefix_preflight,
+            tail_comparison,
+            false,
+            qualification,
+        )?;
         epoch223_qualification::validate_tail_mode(
-            true,
+            tail_comparison,
             epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight,
             focused,
             ledger_dir,
@@ -11730,6 +11742,20 @@ async fn run_geyser_replay(
             execution.descriptor.bootstrap,
         )?;
     }
+    if prefix_preflight {
+        epoch223_qualification::validate_tail_runtime(&execution)?;
+        let verifier = snapshot_verifier
+            .as_ref()
+            .ok_or("prefix preflight requires both canonical checkpoints")?;
+        epoch223_qualification::validate_prefix_expectations(
+            &verifier
+                .expected
+                .iter()
+                .map(|e| (*e.key(), *e.value()))
+                .collect(),
+            qualification.expect("prefix plan validated"),
+        )?;
+    }
     if qualification.is_some() || execution.admission == compatibility::AdmissionLevel::Candidate {
         let Some(verifier) = snapshot_verifier.as_ref() else {
             return Err(format!(
@@ -11830,14 +11856,18 @@ async fn run_geyser_replay(
     // The real execution and planning-only paths share every no-worker gate
     // above, including candidate checkpoint policy. Never return earlier in
     // top-level CLI planning: that hid the second gate in the failed v2 launch.
-    if tail_comparison {
+    if tail_comparison || prefix_preflight {
         historical_worker_profile(runtime_descriptor)?;
         let executable = configured_historical_worker_executable(runtime_descriptor)?;
-        if epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight {
-            let mut report = epoch223_qualification::planning_report(
-                qualification.expect("tail plan validated"),
-                &execution,
-            );
+        if epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight
+            || prefix_preflight
+        {
+            let plan = qualification.expect("private plan validated");
+            let mut report = if prefix_preflight {
+                epoch223_qualification::prefix_planning_report(plan, &execution)
+            } else {
+                epoch223_qualification::planning_report(plan, &execution)
+            };
             report["worker_profile_validated"] = serde_json::json!(true);
             report["worker_executable"] = serde_json::json!(executable);
             return Ok(ReplayRunOutcome::PlanningPreflight(report));
@@ -19263,6 +19293,7 @@ async fn main() {
     let mut qualification_end_slot: Option<Slot> = None;
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
+    let mut epoch223_prefix_preflight = false;
     // Internal flags set by the range supervisor when spawning per-epoch
     // children: pre-fetched snapshot hashes (so the child never touches
     // gcloud) and the overall range for the child's overall-progress line.
@@ -19282,7 +19313,10 @@ async fn main() {
     let mut continuation_plan: Option<PathBuf> = None;
     let mut continuation_plan_sha256: Option<String> = None;
     for arg in args {
-        if arg == "--epoch223-tail-comparison" || arg == "--epoch223-tail-preflight" {
+        if arg == "--epoch223-tail-comparison"
+            || arg == "--epoch223-tail-preflight"
+            || arg == "--epoch223-prefix-preflight"
+        {
             if !cfg!(feature = "epoch223-v1-6-25-qualification") {
                 eprintln!(
                     "epoch223 tail flags require the isolated epoch223-v1-6-25-qualification build"
@@ -19291,8 +19325,10 @@ async fn main() {
             }
             let flag = if arg == "--epoch223-tail-comparison" {
                 &mut epoch223_tail_comparison
-            } else {
+            } else if arg == "--epoch223-tail-preflight" {
                 &mut epoch223_tail_preflight
+            } else {
+                &mut epoch223_prefix_preflight
             };
             if std::mem::replace(flag, true) {
                 eprintln!("duplicate {arg}");
@@ -19676,6 +19712,14 @@ async fn main() {
         )
         .and_then(|_| epoch223_qualification::validate_filesystem(dest_dir.as_path()))
         .and_then(|_| {
+            epoch223_qualification::validate_prefix_preflight(
+                epoch223_prefix_preflight,
+                epoch223_tail_comparison,
+                epoch223_tail_preflight,
+                qualification,
+            )
+        })
+        .and_then(|_| {
             epoch223_qualification::validate_tail_mode(
                 epoch223_tail_comparison,
                 epoch223_tail_preflight,
@@ -19685,7 +19729,7 @@ async fn main() {
         })
         .and_then(|_| {
             epoch223_qualification::validate_preflight_io(
-                epoch223_tail_preflight,
+                epoch223_tail_preflight || epoch223_prefix_preflight,
                 env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
                 &dest_dir,
             )
@@ -21253,7 +21297,9 @@ async fn main() {
                 .map(Path::new),
             epoch < end_epoch,
             None,
-            if epoch223_tail_preflight {
+            if epoch223_prefix_preflight {
+                epoch223_qualification::TailMode::PrefixPlanningPreflight
+            } else if epoch223_tail_preflight {
                 epoch223_qualification::TailMode::PlanningPreflight
             } else if epoch223_tail_comparison {
                 epoch223_qualification::TailMode::Comparison

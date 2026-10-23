@@ -598,21 +598,39 @@ fn execute_prepared(storage:&dyn StorageHooks,p:&Plan,invocation:&str,cgroup:&Pa
 
 fn root_manifest_valid(m: &Value) -> Result<()> {
     ensure!(
-        NATURAL_ROOT_FINISH && EPOCH == 203 && TARGET == TERMINAL,
+        NATURAL_ROOT_FINISH && matches!(EPOCH, 203 | 223) && TARGET == TERMINAL,
         "root completion is not a target-stop profile"
     );
+    // Compile-bound scopes, never plan-selectable runtime/checkpoint policy.
+    // Keep the existing203 contract unchanged;223 additionally binds both Banks.
+    let scope_matches = match EPOCH {
+        203 => {
+            m["output_slot_start"] == 87_696_000u64
+                && m["output_slot_count"] == 431_581u64
+                && m["runtime"]["runtime_profile"] == "solana-v1.6.16"
+                && m["bootstrap"]["slot"] == 87_695_515u64
+                && m["terminal"]["slot"] == 88_127_580u64
+                && m["terminal"]["accounts_hash"] == "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf"
+        }
+        223 => {
+            m["output_slot_start"] == 96_336_000u64
+                && m["output_slot_count"] == 431_523u64
+                && m["runtime"]["runtime_profile"] == "solana-v1.6.25"
+                && m["bootstrap"]["slot"] == 96_335_538u64
+                && m["bootstrap"]["accounts_hash"] == "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE"
+                && m["bootstrap"]["bank_hash"] == "8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F"
+                && m["terminal"]["slot"] == 96_767_522u64
+                && m["terminal"]["accounts_hash"] == "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7"
+                && m["terminal"]["bank_hash"] == "EWtQnBfEHcQ5hASVyH6u3LXT6WLu5MwWML6VKGg4MdxB"
+        }
+        _ => false,
+    };
     ensure!(
-        m["schema_version"] == 1
-            && m["epoch"] == 203
-            && m["output_slot_start"] == 87_696_000u64
-            && m["output_slot_count"] == 431_581u64
+        scope_matches && m["schema_version"] == 1
+            && m["epoch"] == EPOCH
             && m["worker_executable_sha256"] == WORKER
-            && m["runtime"]["runtime_profile"] == "solana-v1.6.16"
-            && m["bootstrap"]["slot"] == 87_695_515u64
             && m["bootstrap"]["slot_complete"] == true
-            && m["terminal"]["slot"] == 88_127_580u64
             && m["terminal"]["slot_complete"] == true
-            && m["terminal"]["accounts_hash"] == "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf"
             && m["archive_sha256"]
                 .as_str()
                 .is_some_and(|s| digest(s) && s != "0".repeat(64)),
@@ -629,7 +647,7 @@ fn root_checkpoint_marker(line: &str) -> bool {
     };
     prefix.starts_with('[')
         && prefix.contains(" INFO ")
-        && body.split_whitespace().next() == Some("88127580")
+        && body.split_whitespace().next() == Some(TERMINAL.to_string().as_str())
         && body.split_whitespace().any(|s| s == "complete=true")
 }
 

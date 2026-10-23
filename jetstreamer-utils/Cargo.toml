@@ -23,6 +23,8 @@ epoch203-shrink-budget-resource = []
 epoch203-root-prefix-resource = []
 # Same canonical root and safety envelope, separately pinned capped-shrink worker.
 epoch203-shrink-root-prefix-resource = ["epoch203-root-prefix-resource"]
+# Closed private cold epoch223 prefix ending at the independently known root.
+epoch223-root-prefix-resource = []
 # Private fixed-span epoch224 measurement against its pinned v1.6.25 package.
 epoch224-bounded-resource = []
 # Dormant exact epoch205 checkpoint-prefix measurement; no ordinary replay.
@@ -62,6 +64,11 @@ path = "src/focused_package_attest_bin.rs"
 [[bin]]
 name = "jetstreamer-epoch223-tail-attest"
 path = "src/epoch223_tail_attest_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-root-prefix-resource"
+path = "src/epoch223_root_prefix_resource_bin.rs"
+required-features = ["epoch223-root-prefix-resource"]
 
 [[bin]]
 name = "jetstreamer-gcs-metadata-observe"

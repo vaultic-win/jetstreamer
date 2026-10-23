@@ -52,6 +52,34 @@ pub(crate) enum TailMode {
     Disabled,
     Comparison,
     PlanningPreflight,
+    PrefixPlanningPreflight,
+}
+
+pub(crate) fn validate_prefix_preflight(
+    enabled: bool,
+    tail_comparison: bool,
+    tail_preflight: bool,
+    plan: Option<QualificationPlan>,
+) -> Result<(), String> {
+    if enabled && (tail_comparison || tail_preflight || !plan.is_some_and(is_known_root_prefix)) {
+        return Err("epoch223 prefix preflight requires only the exact cold-to-known-root prefix; tail flags and full-epoch terminals are forbidden".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn prefix_planning_report(
+    plan: QualificationPlan,
+    selection: &compatibility::RuntimeSelection,
+) -> serde_json::Value {
+    let mut report = planning_report(plan, selection);
+    report["schema"] =
+        serde_json::json!("jetstreamer-private-epoch223-prefix-planning-preflight-v1");
+    report["output_slot_count"] = serde_json::json!(431_523);
+    report["canonical_terminal_required"] = serde_json::json!(true);
+    report["terminal_canonical_root_independently_known"] = serde_json::json!(true);
+    report["tail_comparison_only"] = serde_json::json!(false);
+    report["known_root_prefix_planning_only"] = serde_json::json!(true);
+    report
 }
 
 pub(crate) fn planning_report(
@@ -373,6 +401,110 @@ mod tests {
             output_slot_start: TAIL_BOOTSTRAP + 1,
             end_inclusive: OUTPUT_END,
         }
+    }
+    #[tokio::test]
+    #[cfg(feature = "epoch223-v1-6-25-qualification")]
+    async fn actual_prefix_planning_barrier_requires_both_roots_and_creates_nothing() {
+        use crate::{ReplayBootstrap, ReplayCursor, RestartTracker, SnapshotVerifier};
+        use std::sync::{Arc, atomic::AtomicBool};
+        let root = std::path::PathBuf::from(format!(
+            "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-barrier-test-{}",
+            std::process::id()
+        ));
+        let plan = QualificationPlan {
+            epoch: 223,
+            bootstrap_slot: COLD_BOOTSTRAP,
+            replay_start: COLD_BOOTSTRAP + 1,
+            output_slot_start: 96_336_000,
+            end_inclusive: TAIL_BOOTSTRAP,
+        };
+        let expected = BTreeMap::from([
+            (
+                COLD_BOOTSTRAP,
+                BankHashExpectation::LegacyAccountsHash(
+                    "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE"
+                        .parse()
+                        .unwrap(),
+                ),
+            ),
+            (
+                TAIL_BOOTSTRAP,
+                BankHashExpectation::LegacyAccountsHash(
+                    "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7"
+                        .parse()
+                        .unwrap(),
+                ),
+            ),
+        ]);
+        for missing in [None, Some(COLD_BOOTSTRAP), Some(TAIL_BOOTSTRAP)] {
+            assert!(!root.exists());
+            let mut checkpoints = expected.clone();
+            if let Some(slot) = missing {
+                checkpoints.remove(&slot);
+            }
+            let shutdown = Arc::new(AtomicBool::new(false));
+            let outcome = crate::run_geyser_replay(
+                223,true,&root.join("ledger"),&root.join("scratch"),
+                &ReplayBootstrap::SnapshotArchive(Path::new("/absent/snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst").into()),
+                shutdown.clone(),Arc::new(ReplayCursor::new()),Arc::new(RestartTracker::new()),
+                Some(Arc::new(SnapshotVerifier::new(checkpoints,Some(shutdown)))),
+                root.join("output/epoch-223.jet"),Some(plan),None,None,None,None,None,None,false,None,
+                TailMode::PrefixPlanningPreflight).await;
+            assert!(
+                !root.exists(),
+                "prefix planning created worker or archive state"
+            );
+            if missing.is_some() {
+                assert!(outcome.is_err());
+                continue;
+            }
+            let crate::ReplayRunOutcome::PlanningPreflight(report) = outcome.unwrap() else {
+                panic!("prefix preflight must never report replay completion");
+            };
+            assert_eq!(
+                report["schema"],
+                "jetstreamer-private-epoch223-prefix-planning-preflight-v1"
+            );
+            for key in [
+                "canonical_terminal_required",
+                "terminal_canonical_root_independently_known",
+                "pre_worker_barrier_reached",
+                "runtime_checkpoint_policy_validated",
+                "worker_profile_validated",
+            ] {
+                assert_eq!(report[key], true, "{key}");
+            }
+            assert_eq!(report["output_slot_count"], 431523);
+            for key in [
+                "worker_spawned",
+                "archive_created",
+                "tail_comparison_only",
+                "replay_launch_authorized",
+                "canonical_sidecar_authorized",
+                "publication_authorized",
+                "r2_mutations",
+            ] {
+                assert_eq!(report[key], false, "{key}");
+            }
+        }
+    }
+    #[test]
+    fn prefix_preflight_never_borrows_tail_or_full_epoch_authority() {
+        let plan = QualificationPlan {
+            epoch: 223,
+            bootstrap_slot: COLD_BOOTSTRAP,
+            replay_start: COLD_BOOTSTRAP + 1,
+            output_slot_start: 96_336_000,
+            end_inclusive: TAIL_BOOTSTRAP,
+        };
+        validate_prefix_preflight(true, false, false, Some(plan)).unwrap();
+        assert!(validate_prefix_preflight(true, true, false, Some(plan)).is_err());
+        assert!(validate_prefix_preflight(true, false, true, Some(plan)).is_err());
+        assert!(validate_prefix_preflight(true, false, false, None).is_err());
+        assert!(validate_prefix_preflight(true, false, false, Some(tail_plan())).is_err());
+        let mut full = plan;
+        full.end_inclusive = OUTPUT_END;
+        assert!(validate_prefix_preflight(true, false, false, Some(full)).is_err());
     }
     #[test]
     fn cold_epoch_still_requires_missing_terminal_but_private_prefix_binds_known_root() {
