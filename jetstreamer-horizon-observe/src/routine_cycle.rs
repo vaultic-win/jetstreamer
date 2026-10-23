@@ -59,6 +59,8 @@ mod capacity;
 mod original141;
 #[path = "routine_private144.rs"]
 mod private144;
+#[path = "routine_original141_terminal.rs"]
+mod terminal141;
 
 #[path = "routine_controller_rebind.rs"]
 mod controller_rebind;
@@ -874,6 +876,8 @@ fn validate_templates(
 }
 
 fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> Result<()> {
+    let filtered = terminal141::observation(p, observer)?;
+    let observer = &filtered;
     let target = utc_seconds(&p.sample_target_utc)?;
     ensure!(
         target <= now && now - target <= 1800,
@@ -1042,6 +1046,8 @@ fn scheduled_target(p: &Plan) -> Result<&str> {
 }
 
 fn validate_observer_config(p: &Plan, model: &Value, config: &Value) -> Result<()> {
+    let filtered = terminal141::config(p, config)?;
+    let config = &filtered;
     ensure!(
         config["schema"] == "jetstreamer-horizon-live-resource-sample-config-v2"
             && config["output"].as_str() == p.observer.to_str()
@@ -1320,6 +1326,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     repair183::derive_fleet(p, &mut fleet)?;
     repair185::derive_fleet(p, &mut fleet)?;
     original141::derive_fleet(p, &mut fleet)?;
+    terminal141::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1567,6 +1574,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     repair183::derive_fleet(p, &mut fleet.clone())?;
     repair185::derive_fleet(p, &mut fleet.clone())?;
     original141::derive_fleet(p, &mut fleet.clone())?;
+    terminal141::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output

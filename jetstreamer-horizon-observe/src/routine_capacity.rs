@@ -70,6 +70,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         .checked_add(ROOT141_PEAK)
         .context("capacity arithmetic")?;
     let original = original141::enabled(p);
+    let terminal_repair = terminal141::failure_recorded(ledger);
     let diagnostic_live: BTreeSet<_> = o["diagnostic_replays"]
         .as_array()
         .into_iter()
@@ -108,6 +109,11 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
             "candidate disk/memory/VMA envelope",
             "Recompute current growth maxima and exact limiting resource; qualify the smallest bounded alternative that fits without reducing reserves.",
         )
+    } else if terminal_repair {
+        (
+            "epoch186 runtime/input readiness and fresh guarded admission; epoch141 execution mismatch remains a priority repair",
+            "Extract and diagnose the sealed failed141 transaction/account evidence. Freshly qualify/admit the disjoint compatible186 singleton while repairing141; do not blindly rerun the failed141 worker or scale another experimental lane before a clean expanded sample.",
+        )
     } else {
         (
             "private141 fresh admission, actual one-worker guard fire, and fleet handoff",
@@ -116,7 +122,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     };
     Ok(
         json!({"schema":"jetstreamer-horizon-capacity-decision-v2","question":"Can I fit another disjoint lane now?",
-        "sampled_at_utc":p.sample_target_utc,"candidate":if original {"next disjoint qualified repair/singleton"} else {"private epoch141 original-entry partial-root qualification"},
+        "sampled_at_utc":p.sample_target_utc,"candidate":if original {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
         "live_production_lanes":live.len(),"proven_production_lanes":PROVEN,"live_owners":live,
         "live_private_qualification_lanes":diagnostic_live.len(),"live_total_replay_lanes":live.len()+diagnostic_live.len(),
         "proven_point_evidence":{"path":"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T063958Z.json","sha256":"87d714a3652649a2bcf2bd0f0629d3638785e76e45c9286bfd62fb7aeb0d1b99"},
