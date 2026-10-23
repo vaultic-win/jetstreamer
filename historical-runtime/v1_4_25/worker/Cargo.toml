@@ -10,6 +10,9 @@ build = "build.rs"
 # Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
 # SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
 poh-force-soft = ["sha2-fast/force-soft"]
+# Match the pinned AccountsBackgroundService debt cap in a separately qualified
+# worker; existing uncapped workers and default builds remain unchanged.
+capped-shrink-candidate = []
 # Read-only fixed-input serialized clock inspection; no native restoration or replay.
 epoch140-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
 # Separate exact-input observation; reuses only the read-only typed layout helper.

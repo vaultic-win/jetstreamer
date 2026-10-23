@@ -23,6 +23,7 @@ mod native141;
 mod native144;
 mod native203;
 mod original141;
+mod original141_capped;
 mod original141_freeze;
 mod original141_trace;
 mod original141_vote_prefix;
@@ -98,6 +99,15 @@ pub(super) fn capture_original141_vote_prefix() -> Result<()> {
 }
 pub(super) fn prepare_original141_vote_prefix() -> Result<()> {
     original141_vote_prefix::prepare()
+}
+pub(super) async fn admit_original141_capped() -> Result<()> {
+    original141_capped::admit().await
+}
+pub(super) fn capture_original141_capped() -> Result<()> {
+    original141_capped::capture()
+}
+pub(super) fn prepare_original141_capped() -> Result<()> {
+    original141_capped::prepare()
 }
 
 pub(super) fn prepare_private_prefix157() -> Result<()> {
@@ -708,6 +718,7 @@ fn validate_same_sample_admission(
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
+        141 if original141_capped::namespace(claim) => original141_capped::GUARD_SHA,
         141 if original141_vote_prefix::namespace(claim) => original141_vote_prefix::GUARD_SHA,
         141 if original141_freeze::namespace(claim) => original141_freeze::GUARD_SHA,
         141 if original141_trace::namespace(claim) => original141_trace::GUARD_SHA,
@@ -805,6 +816,7 @@ fn validate_same_sample_admission(
             && if original141_trace::namespace(claim)
                 || original141_freeze::namespace(claim)
                 || original141_vote_prefix::namespace(claim)
+                || original141_capped::namespace(claim)
             {
                 guard.get("canary_target_error").is_some_and(Value::is_null)
                     && guard["bounded_measurement"] == false
@@ -865,6 +877,7 @@ fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
     if original141_trace::namespace(claim)
         || original141_freeze::namespace(claim)
         || original141_vote_prefix::namespace(claim)
+        || original141_capped::namespace(claim)
     {
         // The profile validator independently binds the exact canonical root.
         claim
@@ -914,6 +927,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if original141_capped::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| original141_capped::guard_matches(claim, &r, plan));
+    }
     if original141_vote_prefix::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| original141_vote_prefix::guard_matches(claim, &r, plan));
@@ -1022,6 +1039,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if original141_capped::namespace(claim) || receipt["schema"] == original141_capped::SCHEMA {
+        return original141_capped::launch(receipt, claim);
+    }
     if original141_vote_prefix::namespace(claim)
         || receipt["schema"] == original141_vote_prefix::SCHEMA
     {
@@ -1743,7 +1763,7 @@ pub(super) fn census(
             || ram_entry_owner(name)
             || assigned_diagnostic
             || assigned_pipeline
-            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name) || original141_freeze::unit_name(name) || original141_vote_prefix::unit_name(name)))
+            || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name) || original141_freeze::unit_name(name) || original141_vote_prefix::unit_name(name) || original141_capped::unit_name(name)))
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
@@ -2180,6 +2200,7 @@ pub(super) async fn run() -> Result<()> {
             || original141_trace::namespace(claim)
             || original141_freeze::namespace(claim)
             || original141_vote_prefix::namespace(claim)
+            || original141_capped::namespace(claim)
         {
             ensure!(
                 plan.gates[&141].state == "failed-needs-repair",
@@ -2435,6 +2456,9 @@ pub(super) async fn run() -> Result<()> {
             if original141_vote_prefix::namespace(claim) {
                 original141_vote_prefix::validate_live(claim, current)?;
             }
+            if original141_capped::namespace(claim) {
+                original141_capped::validate_live(claim, current)?;
+            }
             if census141_poh::namespace(claim) {
                 census141_poh::validate_live(claim, current)?;
             }
@@ -2526,7 +2550,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if original141_vote_prefix::namespace(claim) {
+            let phase = if original141_capped::namespace(claim) {
+                "private-original-entry-capped-root-qualification"
+            } else if original141_vote_prefix::namespace(claim) {
                 "private-original-entry-vote-prefix"
             } else if original141_freeze::namespace(claim) {
                 "private-original-entry-freeze-components"
@@ -2628,6 +2654,7 @@ pub(super) async fn run() -> Result<()> {
                         || original141_trace::namespace(c)
                         || original141_freeze::namespace(c)
                         || original141_vote_prefix::namespace(c)
+                        || original141_capped::namespace(c)
                 }))
             {
                 state = private_qualification_inventory_state(gate.state.as_str());
