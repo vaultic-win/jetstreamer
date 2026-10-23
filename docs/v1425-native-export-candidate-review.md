@@ -51,6 +51,11 @@ unchanged and intentionally reject this synthetic fixture. Testing that complete
 production initialization path requires a separately reviewed, trusted bounded
 mainnet-compatible input, or a separately approved test-only process seam.
 No synthetic production initialization selector was introduced.
+The read-only snapshot-clock binaries also include runtime tests but do not
+contain Worker. The two actual-dispatch tests are therefore enabled only without
+those three diagnostic feature flags; normal default and capped worker profiles
+include them. Read-only diagnostic wrappers retain the native helper tests and
+cannot acquire an artificial worker dispatcher through this test seam.
 
 ## Validation performed and still required
 

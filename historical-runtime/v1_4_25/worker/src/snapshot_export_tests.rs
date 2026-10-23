@@ -117,6 +117,11 @@ fn native_export_failed_freeze_and_batch_emission_clear_old_seal() {
 }
 
 #[test]
+#[cfg(not(any(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic",
+    feature = "epoch140-original-bootstrap-clock-diagnostic"
+)))]
 fn native_export_real_dispatch_invalidates_on_ping_and_streaming_error() {
     use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody};
     let (state, output, checkpoint) = native_export_ready();

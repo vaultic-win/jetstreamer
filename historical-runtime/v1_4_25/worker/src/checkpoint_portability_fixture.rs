@@ -302,6 +302,11 @@ fn native_v12_fresh_process_raw_output_equivalence() {
 
 #[test]
 #[ignore]
+#[cfg(not(any(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic",
+    feature = "epoch140-original-bootstrap-clock-diagnostic"
+)))]
 fn native_export_dispatch_fresh_process_raw_output_equivalence() {
     run_fixture(true);
 }
@@ -378,80 +383,9 @@ fn run_fixture(via_dispatch: bool) {
             .map(|s| fs::metadata(s.get_path()).unwrap().len())
             .sum();
         assert!(selected_bytes <= MAX_SELECTED_BYTES);
-        // cfg(test) injection only: exercise the unchanged real request dispatcher,
-        // without adding a synthetic Initialize selector to the production worker.
-        let mut worker = crate::Worker {
-            hello_complete: false,
-            state: Some(state),
-        };
-        use jetstreamer_historical_protocol::{
-            Request, RequestBody, ResponseBody, PROTOCOL_VERSION,
-        };
-        let (hello, stop) = worker.handle(Request {
-            id: 1,
-            body: RequestBody::Hello {
-                protocol_version: PROTOCOL_VERSION,
-            },
-        });
-        assert!(!stop);
-        assert!(matches!(hello.body, ResponseBody::Handshake(_)));
-        let (frozen, stop) = worker.handle(Request {
-            id: 2,
-            body: RequestBody::FreezeCheckpoint { slot: 1 },
-        });
-        assert!(!stop);
-        let checkpoint = match frozen.body {
-            ResponseBody::Checkpoint(c) => c,
-            other => panic!("unexpected freeze response: {:?}", other),
-        };
-        let (response, stop) = worker.handle(Request {
-            id: 3,
-            body: RequestBody::ExportSnapshot {
-                slot: 1,
-                output_directory: root.to_str().unwrap().into(),
-                expected_accounts_hash: checkpoint.accounts_hash,
-            },
-        });
-        assert!(!stop);
-        let exported = match response.body {
-            ResponseBody::SnapshotExported(s) => s,
-            other => panic!("unexpected export response: {:?}", other),
-        };
-        state = worker.state.take().unwrap();
-        let archive = measure(root, Path::new(&exported.archive_path));
-        assert_eq!(archive.length, exported.archive_size);
-        assert_eq!(archive.sha256, exported.archive_sha256);
-        let stages: Vec<_> = fs::read_dir(root)
-            .unwrap()
-            .map(|e| e.unwrap().path())
-            .filter(|p| {
-                p.file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .starts_with("jetstreamer-native-export-")
-            })
-            .collect();
-        assert_eq!(stages.len(), 1);
-        let staging = &stages[0];
-        private(staging);
-        let mut paths = vec![
-            staging.join("snapshots/1/1"),
-            staging.join("snapshots/status_cache"),
-            staging.join("version"),
-            staging.join("export-manifest.bin"),
-        ];
-        paths.extend(
-            fs::read_dir(staging.join("accounts"))
-                .unwrap()
-                .map(|e| e.unwrap().path()),
-        );
-        let members = paths.iter().map(|p| measure(staging, p)).collect();
-        (
-            archive,
-            members,
-            staging.file_name().unwrap().to_str().unwrap().to_string(),
-        )
+        let (next_state, archive, members, staging) = export_via_worker_dispatch(root, state);
+        state = next_state;
+        (archive, members, staging)
     } else {
         let (archive, members) = native_export(root, &state);
         (archive, members, "native-staging".to_string())
@@ -631,4 +565,100 @@ fn fresh_process_restore_child() {
             false, // production resume authority
         ),
     );
+}
+
+#[cfg(not(any(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic",
+    feature = "epoch140-original-bootstrap-clock-diagnostic"
+)))]
+fn export_via_worker_dispatch(
+    root: &Path,
+    mut state: RuntimeState,
+) -> (RuntimeState, Member, Vec<Member>, String) {
+    // cfg(test) injection only: exercise the unchanged real request dispatcher,
+    // without adding a synthetic Initialize selector to the production worker.
+    let mut worker = crate::Worker {
+        hello_complete: false,
+        state: Some(state),
+    };
+    use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody, PROTOCOL_VERSION};
+    let (hello, stop) = worker.handle(Request {
+        id: 1,
+        body: RequestBody::Hello {
+            protocol_version: PROTOCOL_VERSION,
+        },
+    });
+    assert!(!stop);
+    assert!(matches!(hello.body, ResponseBody::Handshake(_)));
+    let (frozen, stop) = worker.handle(Request {
+        id: 2,
+        body: RequestBody::FreezeCheckpoint { slot: 1 },
+    });
+    assert!(!stop);
+    let checkpoint = match frozen.body {
+        ResponseBody::Checkpoint(c) => c,
+        other => panic!("unexpected freeze response: {:?}", other),
+    };
+    let (response, stop) = worker.handle(Request {
+        id: 3,
+        body: RequestBody::ExportSnapshot {
+            slot: 1,
+            output_directory: root.to_str().unwrap().into(),
+            expected_accounts_hash: checkpoint.accounts_hash,
+        },
+    });
+    assert!(!stop);
+    let exported = match response.body {
+        ResponseBody::SnapshotExported(s) => s,
+        other => panic!("unexpected export response: {:?}", other),
+    };
+    state = worker.state.take().unwrap();
+    let archive = measure(root, Path::new(&exported.archive_path));
+    assert_eq!(archive.length, exported.archive_size);
+    assert_eq!(archive.sha256, exported.archive_sha256);
+    let stages: Vec<_> = fs::read_dir(root)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("jetstreamer-native-export-")
+        })
+        .collect();
+    assert_eq!(stages.len(), 1);
+    let staging = &stages[0];
+    private(staging);
+    let mut paths = vec![
+        staging.join("snapshots/1/1"),
+        staging.join("snapshots/status_cache"),
+        staging.join("version"),
+        staging.join("export-manifest.bin"),
+    ];
+    paths.extend(
+        fs::read_dir(staging.join("accounts"))
+            .unwrap()
+            .map(|e| e.unwrap().path()),
+    );
+    let members = paths.iter().map(|p| measure(staging, p)).collect();
+    (
+        state,
+        archive,
+        members,
+        staging.file_name().unwrap().to_str().unwrap().to_string(),
+    )
+}
+
+#[cfg(any(
+    feature = "epoch140-snapshot-clock-diagnostic",
+    feature = "epoch144-snapshot-clock-diagnostic",
+    feature = "epoch140-original-bootstrap-clock-diagnostic"
+))]
+fn export_via_worker_dispatch(
+    _root: &Path,
+    _state: RuntimeState,
+) -> (RuntimeState, Member, Vec<Member>, String) {
+    panic!("actual dispatch fixture requires the worker test target, not a read-only diagnostic wrapper");
 }
