@@ -766,8 +766,25 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
                 .as_str()
                 .context("227 unavailable diagnostic unit")?;
             let prior = &f["unit_census"][unit];
+            let known_terminal = if unit == NATIVE_UNIT {
+                true
+            } else if unit == "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service" {
+                let event: BoundFile = serde_json::from_value(f["metadata_event"].clone())?;
+                let proof = bound_json(&event)?;
+                let (expected_unit, expected_iid) = warmup223::terminal_identity(&proof)?;
+                ensure!(
+                    expected_unit == unit
+                        && row["expected_producer_invocation_id"] == expected_iid
+                        && proof["terminal_manager"] == *prior,
+                    "227 unavailable warmup is not its authenticated terminal owner"
+                );
+                warmup223::terminal_not_replaced(&proof)?;
+                true
+            } else {
+                false
+            };
             ensure!(
-                unit == NATIVE_UNIT
+                known_terminal
                     && row["status"] == "unavailable"
                     && row["observation"].is_null()
                     && prior["MainPID"] == "0"
