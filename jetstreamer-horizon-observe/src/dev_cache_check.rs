@@ -1,4 +1,4 @@
-//! Exact reproducible cache evidence, with separately bound retirement for two
+//! Exact reproducible cache evidence, with separately bound retirement for
 //! fixed cache profiles. Never runs Cargo or selects archives/replay scratch.
 use {
     crate::{
@@ -27,6 +27,11 @@ const SOL_TARGET: &str = "/home/sol/workspace/jetstreamer/target/debug";
 const SOL_PROFILE: &str = "jetstreamer-horizon-sol-dev-cache-check-plan-v1";
 const SOL_RELEASE_DEPS: &str = "/home/sol/workspace/jetstreamer/target/release/deps";
 const SOL_RELEASE_DEPS_PROFILE: &str = "jetstreamer-horizon-sol-release-deps-cache-check-plan-v1";
+const SOL_PRIVATE_DEBUG: &str = "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/debug";
+const SOL_PRIVATE_DEBUG_DEPS: &str =
+    "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/debug/deps";
+const SOL_PRIVATE_DEBUG_DEPS_PROFILE: &str =
+    "jetstreamer-horizon-sol-private-debug-deps-cache-check-plan-v2";
 const TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/debug";
 const UBUNTU_DEBUG_DEPS: &str = "/home/ubuntu/workspace/jetstreamer/target/debug/deps";
 const UBUNTU_DEBUG_DEPS_PROFILE: &str = "jetstreamer-horizon-ubuntu-debug-deps-cache-check-plan-v1";
@@ -36,6 +41,7 @@ fn cache_target(schema: &str) -> Result<&'static Path> {
     match schema {
         SOL_PROFILE => Ok(Path::new(SOL_TARGET)),
         SOL_RELEASE_DEPS_PROFILE => Ok(Path::new(SOL_RELEASE_DEPS)),
+        SOL_PRIVATE_DEBUG_DEPS_PROFILE => Ok(Path::new(SOL_PRIVATE_DEBUG_DEPS)),
         UBUNTU_DEBUG_DEPS_PROFILE => Ok(Path::new(UBUNTU_DEBUG_DEPS)),
         "jetstreamer-horizon-dev-cache-check-plan-v1" => Ok(Path::new(TARGET)),
         "jetstreamer-horizon-release-cache-check-plan-v1" => Ok(Path::new(RELEASE_TARGET)),
@@ -99,7 +105,10 @@ fn validate_plan(p: &Plan) -> Result<()> {
             || cache_target(&p.schema)? == Path::new(SELECTED225_TARGET)
             || matches!(
                 p.schema.as_str(),
-                SOL_PROFILE | SOL_RELEASE_DEPS_PROFILE | UBUNTU_DEBUG_DEPS_PROFILE
+                SOL_PROFILE
+                    | SOL_RELEASE_DEPS_PROFILE
+                    | SOL_PRIVATE_DEBUG_DEPS_PROFILE
+                    | UBUNTU_DEBUG_DEPS_PROFILE
             ),
         "retirement is restricted to fixed qualified caches"
     );
@@ -337,6 +346,11 @@ fn relative_cache_literal(target: &Path) -> &'static [u8] {
     }
 }
 fn relative_cache_reference(bytes: &[u8], target: &Path) -> bool {
+    if target == Path::new(SOL_PRIVATE_DEBUG_DEPS) {
+        // An executable elsewhere in this exact debug profile can load deps
+        // later. Other repositories and the active release profile are distinct.
+        return process_references::encoded_reference(bytes, SOL_PRIVATE_DEBUG.as_bytes(), true);
+    }
     if target == Path::new(UBUNTU_DEBUG_DEPS) {
         // A same-workspace debug binary may load deps later. An absolute
         // private build elsewhere is not a reference to this cache merely
@@ -400,12 +414,18 @@ fn retire_tree(target: &Path, device: u64, inode: u64) -> Result<()> {
     Ok(())
 }
 fn retirement_matches(prior: &Value, tree: &Value, profile: &str) -> Result<()> {
+    let schema = if profile == SOL_PRIVATE_DEBUG_DEPS_PROFILE {
+        "jetstreamer-horizon-dev-cache-check-v2"
+    } else {
+        "jetstreamer-horizon-dev-cache-check-v1"
+    };
     ensure!(
-        prior["schema"] == "jetstreamer-horizon-dev-cache-check-v1"
+        prior["schema"] == schema
             && matches!(
                 profile,
                 SOL_PROFILE
                     | SOL_RELEASE_DEPS_PROFILE
+                    | SOL_PRIVATE_DEBUG_DEPS_PROFILE
                     | UBUNTU_DEBUG_DEPS_PROFILE
                     | "jetstreamer-horizon-selected225-dev-cache-check-plan-v1"
             )
@@ -480,8 +500,9 @@ pub fn run() -> Result<()> {
     let p: Plan = serde_json::from_value(bound_json(&pb)?)?;
     validate_plan(&p)?;
     let sol_deps = p.schema == SOL_RELEASE_DEPS_PROFILE;
+    let sol_private_deps = p.schema == SOL_PRIVATE_DEBUG_DEPS_PROFILE;
     let ubuntu_deps = p.schema == UBUNTU_DEBUG_DEPS_PROFILE;
-    let sol = p.schema == SOL_PROFILE || sol_deps;
+    let sol = p.schema == SOL_PROFILE || sol_deps || sol_private_deps;
     let locked = sol || ubuntu_deps;
     let repo = if sol { SOL_REPO } else { REPO };
     ensure!(
@@ -490,55 +511,65 @@ pub fn run() -> Result<()> {
         "source revision is not preserved/clean"
     );
     let target = cache_target(&p.schema)?;
-    let historical_lock_sha256 =
-        if target == Path::new(TARGET) || target == Path::new(RELEASE_TARGET) || sol || ubuntu_deps
-        {
+    let historical_lock_sha256 = if sol_private_deps {
+        // This fixed private build root is outside the source checkout;
+        // do not claim the unrelated ignored workspace target is selected.
+        ensure!(
+            !target.starts_with(repo) && !Path::new(repo).starts_with(target),
+            "private cache overlaps tracked source"
+        );
+        None
+    } else if target == Path::new(TARGET)
+        || target == Path::new(RELEASE_TARGET)
+        || sol
+        || ubuntu_deps
+    {
+        git(
+            repo,
+            &[
+                "check-ignore",
+                if ubuntu_deps {
+                    "target/debug/deps"
+                } else if sol_deps {
+                    "target/release/deps"
+                } else if target == Path::new(TARGET) || sol {
+                    "target/debug"
+                } else {
+                    "target/release"
+                },
+            ],
+        )?;
+        None
+    } else {
+        // This isolated historical target is untracked rather than ignored.
+        // Bind its exact fixed scope and retain the tracked legacy lockfile.
+        ensure!(
             git(
                 repo,
                 &[
-                    "check-ignore",
-                    if ubuntu_deps {
-                        "target/debug/deps"
-                    } else if sol_deps {
-                        "target/release/deps"
-                    } else if target == Path::new(TARGET) || sol {
-                        "target/debug"
-                    } else {
-                        "target/release"
-                    },
-                ],
-            )?;
-            None
-        } else {
-            // This isolated historical target is untracked rather than ignored.
-            // Bind its exact fixed scope and retain the tracked legacy lockfile.
-            ensure!(
-                git(
-                    repo,
-                    &[
-                        "ls-files",
-                        "--",
-                        ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
-                    ]
-                )?
-                .is_empty(),
-                "selected cache contains tracked source"
-            );
-            ensure!(
-                git(
-                    repo,
-                    &["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"]
-                )? == b"historical-runtime/v1_6_25/Cargo.lock\n",
-                "legacy lockfile is not preserved by source revision"
-            );
-            Some(
-                hash_file(
-                    &Path::new(repo).join("historical-runtime/v1_6_25/Cargo.lock"),
-                    16 << 20,
-                )?
-                .0,
-            )
-        };
+                    "ls-files",
+                    "--",
+                    ".codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug"
+                ]
+            )?
+            .is_empty(),
+            "selected cache contains tracked source"
+        );
+        ensure!(
+            git(
+                repo,
+                &["ls-files", "--", "historical-runtime/v1_6_25/Cargo.lock"]
+            )? == b"historical-runtime/v1_6_25/Cargo.lock\n",
+            "legacy lockfile is not preserved by source revision"
+        );
+        Some(
+            hash_file(
+                &Path::new(repo).join("historical-runtime/v1_6_25/Cargo.lock"),
+                16 << 20,
+            )?
+            .0,
+        )
+    };
     let lock = Path::new(repo).join("Cargo.lock");
     ensure!(
         hash_file(&lock, 16 << 20)?.0 == p.cargo_lock_sha256,
@@ -551,30 +582,34 @@ pub fn run() -> Result<()> {
         no_builders(Path::new("/proc"))?;
         // Retain the release profile lock outside the selected deps subtree.
         // Deleting deps must never unlink the lock held against a new build.
-        Some(cargo_profile_lock(if sol_deps || ubuntu_deps {
-            target.parent().context("release profile parent")?
-        } else {
-            target
-        })?)
+        Some(cargo_profile_lock(
+            if sol_deps || sol_private_deps || ubuntu_deps {
+                target.parent().context("release profile parent")?
+            } else {
+                target
+            },
+        )?)
     } else {
         None
     };
     let mut missing = Vec::new();
-    let staged = staged_references(
-        &[
-            Path::new("/etc/systemd/system"),
-            Path::new("/run/systemd/transient"),
-            Path::new("/run/systemd/system"),
-            Path::new(if sol {
-                "/home/sol/.config/systemd/user"
-            } else {
-                "/home/ubuntu/.config/systemd/user"
-            }),
-        ],
-        target,
-        &mut missing,
-    )?;
-    let scan = process_references::scan(Path::new("/proc"), target)?;
+    let staged_roots = [
+        Path::new("/etc/systemd/system"),
+        Path::new("/run/systemd/transient"),
+        Path::new("/run/systemd/system"),
+        Path::new(if sol {
+            "/home/sol/.config/systemd/user"
+        } else {
+            "/home/ubuntu/.config/systemd/user"
+        }),
+    ];
+    let staged = staged_references(&staged_roots, target, &mut missing)?;
+    let reference_scope = if sol_private_deps {
+        Path::new(SOL_PRIVATE_DEBUG)
+    } else {
+        target
+    };
+    let scan = process_references::scan(Path::new("/proc"), reference_scope)?;
     ensure!(
         staged.is_empty() && scan.references.is_empty(),
         "cache has live or staged references: {:?} {:?}",
@@ -599,7 +634,7 @@ pub fn run() -> Result<()> {
     }
     persist(
         &p.output,
-        &json!({"schema":"jetstreamer-horizon-dev-cache-check-v1","self_sha256":a[5],"plan":{"path":pb.path,"sha256":pb.sha256},
+        &json!({"schema":if sol_private_deps {"jetstreamer-horizon-dev-cache-check-v2"} else {"jetstreamer-horizon-dev-cache-check-v1"},"self_sha256":a[5],"plan":{"path":pb.path,"sha256":pb.sha256},
         "source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,"cache_profile":p.schema,"historical_lock_sha256":historical_lock_sha256,"cache":tree,"process_scan":scan,"staged_unit_references":staged,"missing_inactive_unit_aliases":missing,
         "retirement_authorized":false,"archive_deletion_authorized":false,"replay_scratch_deletion_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
@@ -609,7 +644,7 @@ pub fn run() -> Result<()> {
         persist(
             &parent.join("intent.json"),
             &json!({
-                "schema":if ubuntu_deps {"jetstreamer-private-ubuntu-debug-deps-retirement-intent-v1"} else if sol_deps {"jetstreamer-private-sol-release-deps-retirement-intent-v1"} else if sol { "jetstreamer-private-sol-debug-retirement-intent-v1" } else { "jetstreamer-private-selected225-debug-retirement-intent-v1" },
+                "schema":if sol_private_deps {"jetstreamer-private-sol-private-debug-deps-retirement-intent-v2"} else if ubuntu_deps {"jetstreamer-private-ubuntu-debug-deps-retirement-intent-v1"} else if sol_deps {"jetstreamer-private-sol-release-deps-retirement-intent-v1"} else if sol { "jetstreamer-private-sol-debug-retirement-intent-v1" } else { "jetstreamer-private-selected225-debug-retirement-intent-v1" },
                 "prior_check":{"path":r.prior_check.path,"sha256":r.prior_check.sha256},
                 "current_check":{"path":p.output,"sha256":check_sha},
                 "cache":tree,"r2_mutations":false,"archive_deletion_authorized":false
@@ -618,17 +653,23 @@ pub fn run() -> Result<()> {
         if locked {
             no_builders(Path::new("/proc"))?;
             ensure!(
-                process_references::scan(Path::new("/proc"), target)?
+                process_references::scan(Path::new("/proc"), reference_scope)?
                     .references
                     .is_empty(),
                 "new live cache reference before removal"
             );
+            if sol_private_deps {
+                ensure!(
+                    staged_references(&staged_roots, target, &mut Vec::new())?.is_empty(),
+                    "new staged debug-profile reference before removal"
+                );
+            }
         }
         retire_tree(target, root.dev(), root.ino())?;
         persist(
             &parent.join("completion.json"),
             &json!({
-                "schema":if ubuntu_deps {"jetstreamer-private-ubuntu-debug-deps-retirement-completion-v1"} else if sol_deps {"jetstreamer-private-sol-release-deps-retirement-completion-v1"} else if sol { "jetstreamer-private-sol-debug-retirement-completion-v1" } else { "jetstreamer-private-selected225-debug-retirement-completion-v1" },
+                "schema":if sol_private_deps {"jetstreamer-private-sol-private-debug-deps-retirement-completion-v2"} else if ubuntu_deps {"jetstreamer-private-ubuntu-debug-deps-retirement-completion-v1"} else if sol_deps {"jetstreamer-private-sol-release-deps-retirement-completion-v1"} else if sol { "jetstreamer-private-sol-debug-retirement-completion-v1" } else { "jetstreamer-private-selected225-debug-retirement-completion-v1" },
                 "cache":tree,"cache_absent":true,"source_commit":p.source_commit,
                 "current_check":{"path":p.output,"sha256":check_sha},
                 "r2_mutations":false,"archive_deletion_authorized":false,
@@ -643,6 +684,61 @@ pub fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sol_private_debug_deps_is_closed_and_cannot_borrow_workspace_cache_proof() {
+        let p = Plan {
+            schema: SOL_PRIVATE_DEBUG_DEPS_PROFILE.into(),
+            source_commit: "a".repeat(40),
+            cargo_lock_sha256: "b".repeat(64),
+            output: "/var/lib/jetstreamer/horizon-dev-cache-check-private-debug-deps/check.json"
+                .into(),
+            retirement: Some(Retirement {
+                prior_check: Bound {
+                    path: "/sealed/check.json".into(),
+                    sha256: "c".repeat(64),
+                },
+            }),
+        };
+        validate_plan(&p).unwrap();
+        assert_eq!(
+            cache_target(&p.schema).unwrap(),
+            Path::new(SOL_PRIVATE_DEBUG_DEPS)
+        );
+        assert_eq!(
+            cache_target(&p.schema).unwrap().parent(),
+            Some(Path::new(SOL_PRIVATE_DEBUG))
+        );
+        for suffix in ["/worker", "/deps/lib.so"] {
+            assert!(relative_cache_reference(
+                format!("ExecStart={SOL_PRIVATE_DEBUG}{suffix}\n").as_bytes(),
+                Path::new(SOL_PRIVATE_DEBUG_DEPS)
+            ));
+        }
+        for command in [
+            "ExecStart=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/worker\n",
+            "ExecStart=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/debug-sibling/worker\n",
+            "ExecStart=/home/sol/workspace/jetstreamer/target/debug/worker\n",
+        ] {
+            assert!(!relative_cache_reference(
+                command.as_bytes(),
+                Path::new(SOL_PRIVATE_DEBUG_DEPS)
+            ));
+        }
+        let tree = json!({"device":1,"inode":2,"entries":3});
+        let mut prior = json!({"schema":"jetstreamer-horizon-dev-cache-check-v2","cache_profile":SOL_PRIVATE_DEBUG_DEPS_PROFILE,
+            "cache":tree,"process_scan":{"references":[]},"staged_unit_references":[],"r2_mutations":false,"archive_deletion_authorized":false});
+        retirement_matches(&prior, &tree, SOL_PRIVATE_DEBUG_DEPS_PROFILE).unwrap();
+        prior["schema"] = json!("jetstreamer-horizon-dev-cache-check-v1");
+        assert!(retirement_matches(&prior, &tree, SOL_PRIVATE_DEBUG_DEPS_PROFILE).is_err());
+        assert!(
+            serde_json::from_value::<Plan>(
+                json!({"schema":p.schema,"source_commit":p.source_commit,
+            "cargo_lock_sha256":p.cargo_lock_sha256,"output":p.output,"target":SOL_PRIVATE_DEBUG})
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn exact_staged_census_never_borrows_cache_literal_or_implicit_exclusions() {
