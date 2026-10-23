@@ -235,7 +235,7 @@ fn manager(g: &Value, plan: &BoundFile) -> Result<Value> {
         json!({"properties":p,"timer":timer,"manager_completion":successful[0],"journal_sha256":sha}),
     )
 }
-fn marker(rows: &[Value], iid: &str) -> Result<Value> {
+pub(super) fn marker(rows: &[Value], iid: &str) -> Result<Value> {
     let mut found = None;
     let mut success = None;
     let mut terminal = None;

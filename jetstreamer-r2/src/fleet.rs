@@ -26,6 +26,7 @@ mod native207;
 mod native207_admission;
 mod native207_capture;
 mod native207_event;
+mod native207_terminal;
 mod original141;
 mod original141_capped;
 mod original141_freeze;
@@ -166,6 +167,12 @@ pub(super) fn admit_native207_input() -> Result<()> {
 }
 pub(super) fn capture_native207_input() -> Result<()> {
     native207_capture::run()
+}
+pub(super) fn capture_native207_terminal() -> Result<()> {
+    native207_terminal::capture()
+}
+pub(super) fn native207_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    Ok((native207::UNIT.into(), native207_terminal::validate(proof)?))
 }
 pub(super) fn validate_warmup223_status_claim(value: &Value) -> Result<()> {
     warmup223::status_claim(value)
@@ -2243,6 +2250,8 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == native207_terminal::SCHEMA {
+                native207_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native207::SCHEMA {
                 native207_event::event_predecessor(
                     &previous,
@@ -2427,6 +2436,7 @@ pub(super) async fn run() -> Result<()> {
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
     singleton227_terminal::terminal_census(&plan, &before)?;
+    native207_terminal::census_check(&plan, &before)?;
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native207::SCHEMA
     {

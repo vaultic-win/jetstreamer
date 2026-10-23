@@ -83,11 +83,11 @@ fn active_unit(r: &Value) -> &Value {
         &r["unit"]
     }
 }
-fn checked_owners(f: &Value) -> Result<PipelineClaim> {
+fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
     let rows = f["active"].as_array().context("native20 active census")?;
     ensure!(
-        rows.len() == 4,
-        "native20 envelope admits only three old replays and native207; recompute for any other owner"
+        matches!(rows.len(), 3 | 4),
+        "native20 envelope admits only three old replays and optional authenticated native207"
     );
     for (name, iid) in super::OWNERS.into_iter().skip(1) {
         ensure!(
@@ -105,6 +105,11 @@ fn checked_owners(f: &Value) -> Result<PipelineClaim> {
         .iter()
         .filter(|r| active_unit(r)["Id"] == native207::UNIT)
         .collect::<Vec<_>>();
+    if rows.len() == 3 {
+        ensure!(native.is_empty(), "native20 protected old owner omitted");
+        native207_terminal::find(f)?;
+        return Ok(None);
+    }
     ensure!(
         native.len() == 1
             && native[0]["epoch"] == 207
@@ -135,7 +140,7 @@ fn checked_owners(f: &Value) -> Result<PipelineClaim> {
         "native20 native207 registered evidence differs"
     );
     native207::claim(&c)?;
-    Ok(c)
+    Ok(Some(c))
 }
 fn names(f: &Value) -> Result<BTreeSet<String>> {
     let mut n = f["unit_census"]
@@ -168,11 +173,15 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
             "native20 old owner changed"
         );
     }
-    native207::live(
-        &native,
-        c.get(native207::UNIT)
-            .context("native20 live native207 missing")?,
-    )?;
+    let native_owner = c
+        .get(native207::UNIT)
+        .context("native20 native207 census missing")?;
+    if let Some(native) = native {
+        native207::live(&native, native_owner)?;
+    } else {
+        let (_, iid) = native207_terminal::find(f)?;
+        native207_terminal::terminal_shape(native_owner, &iid)?;
+    }
     for (name, u) in c {
         ensure!(
             !diagnostic_stage_running(u)

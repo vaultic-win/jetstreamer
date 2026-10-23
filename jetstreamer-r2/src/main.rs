@@ -3498,6 +3498,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-native207-input") {
         return fleet::capture_native207_input();
     }
+    if env::args().nth(1).as_deref() == Some("capture-native207-terminal") {
+        return fleet::capture_native207_terminal();
+    }
     if env::args().nth(1).as_deref() == Some("estimate-readback203") {
         return fleet::estimate_readback203();
     }
