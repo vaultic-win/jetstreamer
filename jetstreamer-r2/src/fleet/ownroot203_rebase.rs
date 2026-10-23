@@ -843,10 +843,17 @@ pub(super) fn capture() -> Result<()> {
             OLD_SERVICE225,
         ])
         .output()?;
-    ensure!(
-        stopped.status.success(),
-        "could not retire exact superseded guards"
-    );
+    let stop_record = json!({"command_success":stopped.status.success(),"exit_code":stopped.status.code(),
+        "stdout":String::from_utf8_lossy(&stopped.stdout),"stderr":String::from_utf8_lossy(&stopped.stderr)});
+    private157::immutable_receipt(
+        &Path::new(STATE).join("stop-command-outcome.json"),
+        &stop_record,
+    )?;
+    // A collected transient service can make a batch stop return nonzero after
+    // its timer was successfully stopped. Only exact terminal/kernel evidence,
+    // after the durable intent and replacement proofs, admits that outcome.
+    let retired = retired_old_guards()
+        .with_context(|| format!("old guardian retirement incomplete: {stop_record}"))?;
     ensure!(
         !timer_active(OLD_TIMER203)?
             && !timer_active(OLD_TIMER225)?
@@ -869,15 +876,266 @@ pub(super) fn capture() -> Result<()> {
         "older225_remaining_bytes":REMAINING225,"new203_own_root_physical_limit_bytes":c::PEAK,
         "exact_new_protective_fires_proven":true,"only_superseded_guard_units_retired":true,
         "producer_restarted":false,"producer_signaled_by_handoff":false,"producer_hard_limits_changed":false,
+        "stop_command":stop_record,"retired_guard_states":retired,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false,
         "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()}),
     )?;
     println!("203/225 guardian handoff complete; producers preserved, no new replay admission");
     Ok(())
 }
+fn terminal_guard_shape(v: &Value, service: bool) -> Result<()> {
+    ensure!(
+        matches!(v["LoadState"].as_str(), Some("loaded" | "not-found"))
+            && v["ActiveState"] == "inactive"
+            && v["SubState"] == "dead",
+        "superseded guard is not terminal"
+    );
+    if service {
+        ensure!(
+            v["MainPID"] == "0"
+                && v["NRestarts"] == "0"
+                && v["ControlGroup"].as_str().is_some_and(str::is_empty),
+            "old guardian retains a process/cgroup"
+        );
+    }
+    Ok(())
+}
+fn retired_old_guards() -> Result<Value> {
+    let mut states = serde_json::Map::new();
+    for name in [OLD_TIMER203, OLD_SERVICE203, OLD_TIMER225, OLD_SERVICE225] {
+        let o = ProcessCommand::new("systemctl")
+            .args([
+                "show",
+                name,
+                "--no-pager",
+                "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,ControlGroup",
+            ])
+            .output()?;
+        let mut v = serde_json::Map::new();
+        for line in std::str::from_utf8(&o.stdout)?.lines() {
+            let (k, val) = line.split_once('=').context("old guardian state")?;
+            ensure!(
+                v.insert(k.into(), json!(val)).is_none(),
+                "duplicate guardian state"
+            );
+        }
+        let v = Value::Object(v);
+        ensure!(v["Id"] == name, "old guardian identity differs");
+        let service = name.ends_with(".service");
+        terminal_guard_shape(&v, service)?;
+        if service {
+            let group = Path::new("/sys/fs/cgroup/system.slice").join(name);
+            match fs::symlink_metadata(&group) {
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                _ => anyhow::bail!(
+                    "old guardian kernel cgroup still present/unreadable:{}",
+                    group.display()
+                ),
+            }
+        }
+        states.insert(name.into(), v);
+    }
+    Ok(Value::Object(states))
+}
+fn latest_guard(dir: &str) -> Result<(BoundFile, Value)> {
+    for key in ["stop-intent.json", "stop-completion.json"] {
+        ensure!(
+            !Path::new(dir).join(key).try_exists()?,
+            "new protective guard has tripped"
+        );
+    }
+    let mut best: Option<(u64, BoundFile, Value)> = None;
+    for entry in fs::read_dir(dir)? {
+        let e = entry?;
+        if !e
+            .file_name()
+            .to_str()
+            .is_some_and(|s| s.starts_with("sample-") && s.ends_with(".json"))
+        {
+            continue;
+        }
+        let b: BoundFile = serde_json::from_value(private157::file_binding(&e.path())?)?;
+        let v = bound_json(&b)?;
+        let t = v["recorded_unix_seconds"]
+            .as_u64()
+            .context("guard sample time")?;
+        if best.as_ref().is_none_or(|(old, _, _)| t > *old) {
+            best = Some((t, b, v));
+        }
+    }
+    let (_, b, v) = best.context("no normal replacement guard sample")?;
+    Ok((b, v))
+}
+fn recovery_intent(v: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == "jetstreamer-ownroot203-retire-guard-intent-v1"
+            && v["helper_sha256"]
+                == "af949ba3a038fa9ea25baf1c8f7f1c820b508df3924c3adf506938e07dfdc2d2"
+            && v["policy"]["path"] == format!("{DEST}/policy.json")
+            && v["policy"]["sha256"]
+                == "1c72102ae9e9659a27860158b225c53548560fb0b7261654740e5cca0de65dc9"
+            && v["handoff_spec"]["sha256"]
+                == "0ce49b0bb427edfa253f1bc764fd5e819216996a51ab997614afd72a76b5bbd2"
+            && v["stop_only"]
+                == json!([OLD_TIMER203, OLD_SERVICE203, OLD_TIMER225, OLD_SERVICE225])
+            && v["producer_signal_authorized"] == false,
+        "not the exact qualified intent-only handoff"
+    );
+    Ok(())
+}
+pub(super) fn recover() -> Result<()> {
+    let a: Vec<_> = env::args().collect();
+    ensure!(
+        a.len() == 7
+            && a[3] == "--intent-sha256"
+            && a[5] == "--self-sha256"
+            && unsafe { libc::geteuid() } == 0,
+        "usage: recover-ownroot203-handoff INTENT --intent-sha256 SHA --self-sha256 SHA"
+    );
+    let m = fs::symlink_metadata(fs::read_link("/proc/self/exe")?)?;
+    ensure!(
+        m.uid() == 0
+            && m.nlink() == 1
+            && m.mode() & 0o222 == 0
+            && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == a[6],
+        "handoff recovery helper unsealed"
+    );
+    let ib = BoundFile {
+        path: a[2].clone().into(),
+        sha256: a[4].clone(),
+    };
+    ensure!(
+        ib.path == Path::new(STATE).join("retire-old-intent.json")
+            && ib.sha256 == "fd804b8effb2eec4e8ad96cfecda645148d4152b0dfe976a192611de3f8e8e96",
+        "recovery is bound to one exact failed handoff"
+    );
+    let intent = bound_json(&ib)?;
+    recovery_intent(&intent)?;
+    let pb: BoundFile = serde_json::from_value(intent["policy"].clone())?;
+    let p = bound_json(&pb)?;
+    let s: Spec = serde_json::from_value(bound_json(&serde_json::from_value(p["spec"].clone())?)?)?;
+    bindings(&s)?;
+    let h: Handoff = serde_json::from_value(bound_json(&serde_json::from_value(
+        intent["handoff_spec"].clone(),
+    )?)?)?;
+    ensure!(
+        private157::binding(&h.guard203) == intent["guard203"]
+            && private157::binding(&h.guard225) == intent["guard225"],
+        "intent fire bindings differ"
+    );
+    let g203 = bound_json(&h.guard203)?;
+    let g225 = bound_json(&h.guard225)?;
+    let started = p["recorded_unix_seconds"].as_u64().context("policy time")?;
+    // The pinned old helper writes this exact intent only after successful
+    // real timer/sandbox/PID1 checks. Retain that history; do not redate it.
+    for (role, g) in [("fire203", &g203), ("fire225", &g225)] {
+        ensure!(
+            intent[role]["manager_completion"][0]["INVOCATION_ID"] == g["guard_invocation_id"]
+                && intent[role]["manager_completion"][0]["_PID"] == "1",
+            "original successful guard fire changed"
+        );
+    }
+    let before203 = unit(c::UNIT)?;
+    let before225 = unit(UNIT225)?;
+    ensure!(
+        before203 == intent["before203"] && before225 == intent["before225"],
+        "producer changed since handoff intent"
+    );
+    let floor =
+        super::continuation203_admission::floor(&bound_json(&s.floor)?, &bound_json(&s.fleet)?)?;
+    let (f203, f225) = budgets(
+        floor,
+        &bound_json(&s.old_guard203)?,
+        &bound_json(&s.old_guard225)?,
+    )?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let (b203, n203) = latest_guard(RECEIPTS203)?;
+    let (b225, n225) = latest_guard(RECEIPTS225)?;
+    new_guard(
+        &n203,
+        203,
+        p["new203_guard_plan"]["sha256"]
+            .as_str()
+            .context("203 plan SHA")?,
+        started,
+        now,
+        f203,
+    )?;
+    new_guard(
+        &n225,
+        225,
+        p["new225_guard_plan"]["sha256"]
+            .as_str()
+            .context("225 plan SHA")?,
+        started,
+        now,
+        f225,
+    )?;
+    let fire203 = guard_completion(203, &n203, started)?;
+    let fire225 = guard_completion(225, &n225, started)?;
+    let retired = retired_old_guards()?;
+    complete_live_census()?;
+    let failed = unit("horizon-ownroot203-handoff-capture-8e3fdf93-v1.service")?;
+    ensure!(
+        failed["ActiveState"] == "failed" && failed["ExecMainStatus"] == "1",
+        "original failed capture evidence unavailable"
+    );
+    let output = Path::new(STATE).join("handoff.json");
+    validate_output_destination(&output)?;
+    ensure!(
+        unit(c::UNIT)? == before203 && unit(UNIT225)? == before225,
+        "producer changed during recovery"
+    );
+    private157::immutable_receipt(
+        &output,
+        &json!({"schema":"jetstreamer-ownroot203-guard-handoff-v1",
+        "policy":private157::binding(&pb),"intent":private157::binding(&ib),"helper_sha256":a[6],
+        "new203_guard_plan":private157::file_binding(&Path::new(DEST).join("guard-203.json"))?,
+        "new225_guard_plan":private157::file_binding(&Path::new(DEST).join("guard-225.json"))?,
+        "new203_guard_sha256":NEW_GUARD_SHA,"unchanged225_guard_sha256":OLD225_GUARD_SHA,
+        "new203_stop_floor_bytes":f203,"new225_stop_floor_bytes":f225,"century_floor_bytes":floor,
+        "older225_remaining_bytes":REMAINING225,"new203_own_root_physical_limit_bytes":c::PEAK,
+        "latest203_guard":private157::binding(&b203),"latest225_guard":private157::binding(&b225),
+        "fresh_fire203":fire203,"fresh_fire225":fire225,"retired_guard_states":retired,"original_failed_capture":failed,
+        "recovered_from_exact_intent":true,"original_stop_command_success":false,"original_stop_exit_code_unavailable":true,
+        "exact_new_protective_fires_proven":true,"only_superseded_guard_units_retired":true,
+        "stop_or_restart_commands_during_recovery":0,"producer_restarted":false,"producer_signaled_by_handoff":false,
+        "producer_hard_limits_changed":false,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false,
+        "recorded_unix_seconds":now}),
+    )?;
+    println!("Exact intent-only guardian recovery completed; no stop/restart commands performed");
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn collected_guard_is_terminal_only_with_no_process_or_cgroup() {
+        let mut v = json!({"LoadState":"not-found","ActiveState":"inactive","SubState":"dead",
+            "MainPID":"0","NRestarts":"0","ControlGroup":""});
+        terminal_guard_shape(&v, true).unwrap();
+        v["LoadState"] = json!("loaded");
+        terminal_guard_shape(&v, true).unwrap();
+        v["MainPID"] = json!("12");
+        assert!(terminal_guard_shape(&v, true).is_err());
+        v["MainPID"] = json!("0");
+        v["ControlGroup"] = json!("/live");
+        assert!(terminal_guard_shape(&v, true).is_err());
+        v["ControlGroup"] = json!("");
+        v["ActiveState"] = json!("active");
+        assert!(terminal_guard_shape(&v, true).is_err());
+    }
+    #[test]
+    fn intent_recovery_cannot_expand_to_other_owners_or_lose_old_proof() {
+        let mut v = json!({"schema":"jetstreamer-ownroot203-retire-guard-intent-v1",
+            "helper_sha256":"af949ba3a038fa9ea25baf1c8f7f1c820b508df3924c3adf506938e07dfdc2d2",
+            "policy":{"path":format!("{DEST}/policy.json"),"sha256":"1c72102ae9e9659a27860158b225c53548560fb0b7261654740e5cca0de65dc9"},
+            "handoff_spec":{"sha256":"0ce49b0bb427edfa253f1bc764fd5e819216996a51ab997614afd72a76b5bbd2"},
+            "stop_only":[OLD_TIMER203,OLD_SERVICE203,OLD_TIMER225,OLD_SERVICE225],"producer_signal_authorized":false});
+        recovery_intent(&v).unwrap();
+        v["stop_only"][0] = json!(c::UNIT);
+        assert!(recovery_intent(&v).is_err());
+    }
     #[test]
     fn releases_only_old_growth_and_keeps_own_peak_and_older225_claim() {
         let a = json!({"unit":c::UNIT,"invocation_id":IID203,"minimum_free_bytes":3284969447424u64,"worker_root":c::ROOT,"maximum_worker_vmas":3500000});

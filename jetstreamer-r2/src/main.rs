@@ -3384,6 +3384,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-ownroot203-rebase") {
         return fleet::capture_ownroot203_rebase();
     }
+    if env::args().nth(1).as_deref() == Some("recover-ownroot203-handoff") {
+        return fleet::recover_ownroot203_handoff();
+    }
     if env::args().nth(1).as_deref() == Some("status-retire-inactive") {
         return inactive_status::run().await;
     }

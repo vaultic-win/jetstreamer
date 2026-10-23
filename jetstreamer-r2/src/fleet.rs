@@ -80,6 +80,9 @@ pub(super) fn prepare_ownroot203_rebase() -> Result<()> {
 pub(super) fn capture_ownroot203_rebase() -> Result<()> {
     ownroot203_rebase::capture()
 }
+pub(super) fn recover_ownroot203_handoff() -> Result<()> {
+    ownroot203_rebase::recover()
+}
 pub(super) fn prepare_continuation144_layout() -> Result<()> {
     continuation144::prepare_layout()
 }
