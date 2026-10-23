@@ -164,7 +164,9 @@ fn terminal_history(
     ensure!(
         finished_command == expected
             && stdout.get("_EXE").is_none_or(|v| v.as_str() == Some(exe))
-            && stdout.get("_CMDLINE").is_none_or(|v| v.as_str() == Some(expected.as_str())),
+            && stdout
+                .get("_CMDLINE")
+                .is_none_or(|v| v.as_str() == Some(expected.as_str())),
         "guard manager/kernel command does not bind its exact plan and executable"
     );
     let expected_exec_start = format!(
