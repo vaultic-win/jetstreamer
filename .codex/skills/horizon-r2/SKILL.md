@@ -206,6 +206,18 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   evidence. If no reviewed Rust inactive-cleanup path is deployed, implement and qualify it promptly;
   report the remaining stale dashboard object explicitly until authenticated cleanup succeeds.
 
+### Host-specific R2 scratch / holding area
+
+When the user explicitly permits host-specific R2 scratch, use a separate key prefix in the
+configured bucket for safe cold offloading, not a FUSE replacement for live replay storage.
+The user must provide the unique directory/prefix name for this host before any scratch upload;
+never invent it from the hostname or reuse another host's prefix. Read
+[references/r2-holding.md](references/r2-holding.md) before parking, restoring, or retiring a local
+copy. Authenticated access is sufficient; no public URL or anonymous verification is required.
+This permission does not authorize overwriting or deleting R2 objects, changing bucket access,
+or weakening canonical archive/sidecar and local-retirement gates. A missing scratch name must
+not stall otherwise admissible ordinary campaign work.
+
 ### Campaign fleet reconciliation
 
 - Maintain one authoritative fleet ledger for the complete assigned campaign, not merely a list of
@@ -288,12 +300,21 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   least 1,800 seconds after the preceding routine sample.
   Use that reference's measured-budget and time-to-sidecar policies to qualify capacity estimates
   and choose among admissible candidates; numerical epoch order alone is not a throughput policy.
-- Continuously reassess whether the campaign is maximizing safe, useful host capacity at every
-  existing 30-minute observation, user-requested status check, and authenticated lane-completion or
-  failure event. Recompute admission from current live claims rather than stale reservations,
-  promptly fill admissible capacity or start the bounded qualification needed to unlock it, and
-  record the concrete limiter for any idle capacity. Optimize verified R2 sidecars per day, not
-  utilization percentages; preserve all resource/integrity gates and add no extra routine polls.
+- Every host's control loop must explicitly answer **"Can I fit another disjoint lane now?"** at
+  each existing 30-minute observation, user-requested status check, and authenticated completion,
+  failure, or admission/guard-handoff event. Use the same fresh evidence, not a second polling loop.
+  Record the next candidate, live/proven lane counts, current resource arithmetic, eligibility,
+  exact limiting gate, and executable next action in the fleet's existing next-action/evidence
+  entries or a hash-bound capacity-decision receipt. Recompute from current invocation-bound claims;
+  do not carry terminal owners' growth reservations forward without justification.
+  If a qualified candidate fits, admit it in the same cycle and continue filling the proven operating
+  point. If the missing bound is resource qualification, start the smallest freshly admissible bounded
+  experiment instead of merely reporting idle capacity. Scaling beyond the proven point remains one
+  experimental lane at a time until a later clean coordinated sample. A cycle must not end with only
+  "waiting for capacity": name the concrete blocker and how it will be resolved. Apply this on every
+  participating host within its own assigned range; never infer another host's capacity from local
+  observations. Optimize verified R2 sidecars per day, preserve every safety/integrity gate, and add
+  no extra autonomous routine polls.
 - Define the filesystem safety floor for a campaign century from resulting `.jet` sizes, not from
   snapshots, replay scratch, or a fixed multi-terabyte constant. For the current century use epochs
   200 through 300 inclusive. Select each epoch at most once and include only canonical complete
