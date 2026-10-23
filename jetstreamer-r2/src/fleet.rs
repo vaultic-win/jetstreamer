@@ -48,6 +48,7 @@ mod shrink_root203;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
+mod warmup223_input_capture;
 pub(crate) mod watch160;
 pub(crate) mod watch198;
 
@@ -56,6 +57,9 @@ pub(super) async fn admit_original141() -> Result<()> {
 }
 pub(super) fn estimate_readback203() -> Result<()> {
     readback203_estimate::run()
+}
+pub(super) fn capture_warmup223_input() -> Result<()> {
+    warmup223_input_capture::run()
 }
 pub(super) fn capture_original141() -> Result<()> {
     original141::capture()

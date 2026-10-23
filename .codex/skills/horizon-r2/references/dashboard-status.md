@@ -32,6 +32,12 @@ Absence means no published live estimate; it never means the epoch is storage-co
   its exact native receipt binding instead of rewriting it into a legacy shape. Never backdate a
   new phase to an observation taken before it started. Use a supported authenticated handoff-event
   publisher, or the next scheduled observation, while delivery continues independently.
+- Estimate readback from its own measured progress, separately from upload throughput. Bind the
+  progress journal to the exact delivery invocation and the coordinated sample cutoff; include
+  time since the last marker so a stall can increase the estimate. Retain a measured allowance
+  for final source revalidation and sidecar commit. Check whether reads already run concurrently
+  before proposing more connections, and keep bounded transport probes distinct from full-object
+  verification evidence.
 
 ## Remove confirmed inactive status objects
 

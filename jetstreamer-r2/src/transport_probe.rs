@@ -20,12 +20,28 @@ fn validate_prefix(bytes: &[u8], expected: &[u8]) -> Result<()> {
     );
     Ok(())
 }
+fn profile(command: &str) -> Result<(u64, &'static str, &'static str)> {
+    match command {
+        "probe-transport-217" => Ok((
+            217,
+            "horizon-217-transport-probe-",
+            "jetstreamer-private-epoch217-transport-probe-v2",
+        )),
+        "probe-transport-203" => Ok((
+            203,
+            "horizon-203-transport-probe-",
+            "jetstreamer-private-epoch203-transport-probe-v1",
+        )),
+        _ => anyhow::bail!("unsupported transport probe profile"),
+    }
+}
 pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 6 && args[2] == "--output" && args[4] == "--self-sha256",
-        "usage: jetstreamer-r2 probe-transport-217 --output PRIVATE/probe.json --self-sha256 HEX"
+        "usage: jetstreamer-r2 probe-transport-203|probe-transport-217 --output PRIVATE/probe.json --self-sha256 HEX"
     );
+    let (epoch, output_prefix, schema) = profile(&args[1])?;
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "probe requires root private receipt identity"
@@ -54,7 +70,7 @@ pub(super) async fn run() -> Result<()> {
             && parent
                 .file_name()
                 .and_then(|s| s.to_str())
-                .is_some_and(|s| s.starts_with("horizon-217-transport-probe-"))
+                .is_some_and(|s| s.starts_with(output_prefix))
             && output.file_name().is_some_and(|s| s == "probe.json")
             && pm.is_dir()
             && pm.uid() == 0
@@ -62,13 +78,14 @@ pub(super) async fn run() -> Result<()> {
         "foreign private probe output"
     );
     ensure!(!output.try_exists()?, "probe output occupied");
-    let path = Path::new("/home/ubuntu/horizon/epoch-217.jet");
-    let before = regular_identity(path)?;
+    let path = PathBuf::from(format!("/home/ubuntu/horizon/epoch-{epoch}.jet"));
+    let key = format!("epoch-{epoch}.jet");
+    let before = regular_identity(&path)?;
     let mut expected = vec![0u8; LENGTH];
     let mut local = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW)
-        .open(path)?;
+        .open(&path)?;
     local.seek(SeekFrom::Start(OFFSET))?;
     local.read_exact(&mut expected)?;
     let config = r2_config_from_env()?;
@@ -86,7 +103,7 @@ pub(super) async fn run() -> Result<()> {
     let head = client
         .head_object()
         .bucket(&config.bucket)
-        .key("epoch-217.jet")
+        .key(&key)
         .send()
         .await
         .map_err(|_| anyhow!("probe HEAD failed"))?;
@@ -95,6 +112,13 @@ pub(super) async fn run() -> Result<()> {
         "remote length differs from local archive"
     );
     let etag = head.e_tag().context("missing immutable ETag")?;
+    if epoch == 203 {
+        ensure!(
+            before.length == 103_802_397_352
+                && etag.trim_matches('"') == "6f543a2b1f7c1d60647a9f5f8b541150-1547",
+            "exact203 staged object identity differs"
+        );
+    }
     let range = format!("bytes={}-{}", OFFSET, OFFSET + LENGTH as u64 - 1);
     let expected_range = format!(
         "bytes {}-{}/{}",
@@ -104,7 +128,7 @@ pub(super) async fn run() -> Result<()> {
     );
     let sdk_started = Instant::now();
     let sdk_attempt: Result<Value> = match tokio::time::timeout(Duration::from_secs(20), async {
-        let response = client.get_object().bucket(&config.bucket).key("epoch-217.jet")
+        let response = client.get_object().bucket(&config.bucket).key(&key)
             .range(&range).if_match(etag).send().await.map_err(|_|anyhow!("SDK window request failed"))?;
         ensure!(response.content_length() == Some(LENGTH as i64) && response.content_range() == Some(expected_range.as_str()), "SDK window response bounds differ");
         let bytes = response.body.collect().await.map_err(|e|anyhow!(format!("{e:?}").replace(&config.access_key,"[redacted]").replace(&config.secret_key,"[redacted]")))?.into_bytes();
@@ -123,7 +147,7 @@ pub(super) async fn run() -> Result<()> {
     let signed = client
         .get_object()
         .bucket(&config.bucket)
-        .key("epoch-217.jet")
+        .key(&key)
         .range(&range)
         .if_match(etag)
         .presigned(aws_sdk_s3::presigning::PresigningConfig::expires_in(
@@ -154,10 +178,10 @@ pub(super) async fn run() -> Result<()> {
         results.push(result);
     }
     ensure!(
-        regular_identity(path)? == before,
+        regular_identity(&path)? == before,
         "local source changed during probe"
     );
-    let report = serde_json::json!({"schema":"jetstreamer-private-epoch217-transport-probe-v2","epoch":217,"archive_length":before.length,"range_start":OFFSET,"range_bytes":LENGTH,"sdk":sdk,"results":results,"publication_authorized":false,"whole_object_verified":false,"archive_mutations":false,"sidecar_mutations":false,"r2_mutations":false,"service_mutations":false});
+    let report = serde_json::json!({"schema":schema,"epoch":epoch,"archive_length":before.length,"range_start":OFFSET,"range_bytes":LENGTH,"sdk":sdk,"results":results,"publication_authorized":false,"whole_object_verified":false,"archive_mutations":false,"sidecar_mutations":false,"r2_mutations":false,"service_mutations":false});
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
     serde_json::to_writer_pretty(temporary.as_file_mut(), &report)?;
     temporary.write_all(b"\n")?;
@@ -170,6 +194,17 @@ pub(super) async fn run() -> Result<()> {
 mod tests {
     use super::*;
     use std::net::IpAddr;
+    #[test]
+    fn probes_are_closed_profiles_with_disjoint_private_outputs() {
+        let old = profile("probe-transport-217").unwrap();
+        let staged = profile("probe-transport-203").unwrap();
+        assert_eq!(old.0, 217);
+        assert_eq!(staged.0, 203);
+        assert_ne!(old.1, staged.1);
+        for command in ["probe-transport-301", "probe-transport-204", "203", ""] {
+            assert!(profile(command).is_err());
+        }
+    }
     #[test]
     fn address_family_is_explicit_and_missing_family_fails_closed() {
         let a = [

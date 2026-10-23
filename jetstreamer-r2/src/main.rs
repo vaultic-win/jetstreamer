@@ -3358,7 +3358,10 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("prepare-private-prefix157") {
         return fleet::prepare_private_prefix157();
     }
-    if env::args().nth(1).as_deref() == Some("probe-transport-217") {
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some("probe-transport-217" | "probe-transport-203")
+    ) {
         return transport_probe::run().await;
     }
     if matches!(
@@ -3393,6 +3396,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("estimate-readback203") {
         return fleet::estimate_readback203();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-warmup223-input") {
+        return fleet::capture_warmup223_input();
     }
     if env::args().nth(1).as_deref() == Some("extend-continuation203-runtime") {
         return fleet::extend_continuation203_runtime();
