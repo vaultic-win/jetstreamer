@@ -388,7 +388,7 @@ fn native_v12_fresh_process_raw_output_equivalence() {
         duplicate_error,
         format!(
             "entry fee collection failed for transaction 0: {:?}",
-            TransactionError::DuplicateSignature,
+            Err::<(), _>(TransactionError::DuplicateSignature),
         )
     );
     let plan = Plan {
