@@ -44,12 +44,12 @@ mod fleet_tail_recovery;
 mod public160;
 #[path = "routine_public160_recovery.rs"]
 mod public160_recovery;
-#[path = "routine_repair183_fleet_recovery.rs"]
-mod repair183_fleet_recovery;
 #[path = "routine_public160_timing.rs"]
 mod public160_timing;
 #[path = "routine_public198.rs"]
 mod public198;
+#[path = "routine_repair183_fleet_recovery.rs"]
+mod repair183_fleet_recovery;
 
 #[path = "routine_private144.rs"]
 mod private144;
@@ -873,7 +873,9 @@ fn validate_observation(p: &Plan, model: &Value, observer: &Value, now: u64) -> 
     let modeled = model["ranges"].as_array().context("model census missing")?;
     ensure!(
         observed.len()
-            == modeled.len() + usize::from(repair183::bootstrap_model(p, model)) + usize::from(repair185::bootstrap_model(p, model))
+            == modeled.len()
+                + usize::from(repair183::bootstrap_model(p, model))
+                + usize::from(repair185::bootstrap_model(p, model))
                 + p.scope_101_200
                     .as_ref()
                     .map_or(0, |s| if s.private144_observer {
@@ -1446,14 +1448,23 @@ fn verify_estimates(
             "invalid estimate integers"
         );
     }
-    let modeled_epochs: BTreeSet<_> = model["ranges"].as_array().context("estimate model ranges")?
-        .iter().flat_map(|r| r["epochs"].as_array().into_iter().flatten())
-        .filter_map(Value::as_u64).collect();
+    let modeled_epochs: BTreeSet<_> = model["ranges"]
+        .as_array()
+        .context("estimate model ranges")?
+        .iter()
+        .flat_map(|r| r["epochs"].as_array().into_iter().flatten())
+        .filter_map(Value::as_u64)
+        .collect();
     let expected: BTreeSet<_> = p.expected_epochs.iter().copied().collect();
-    ensure!(seen == modeled_epochs
-        && (seen == expected || (repair183::bootstrap_model(p, model)
-            && expected.difference(&seen).copied().collect::<BTreeSet<_>>() == BTreeSet::from([183,184]))
-            || (repair185::bootstrap_model(p, model) && expected.difference(&seen).copied().collect::<BTreeSet<_>>() == BTreeSet::from([185]))),
+    ensure!(
+        seen == modeled_epochs
+            && (seen == expected
+                || (repair183::bootstrap_model(p, model)
+                    && expected.difference(&seen).copied().collect::<BTreeSet<_>>()
+                        == BTreeSet::from([183, 184]))
+                || (repair185::bootstrap_model(p, model)
+                    && expected.difference(&seen).copied().collect::<BTreeSet<_>>()
+                        == BTreeSet::from([185]))),
         "estimate census incomplete"
     );
     Ok(entries.clone())
@@ -1881,8 +1892,15 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
-        if args.get(6).is_some_and(|a| a == "--recover-repair183-fleet" || a == "--check-repair183-fleet-recovery") {
-            return repair183_fleet_recovery::run(&plan, &bound, &args[5], args[6] == "--check-repair183-fleet-recovery");
+        if args.get(6).is_some_and(|a| {
+            a == "--recover-repair183-fleet" || a == "--check-repair183-fleet-recovery"
+        }) {
+            return repair183_fleet_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-repair183-fleet-recovery",
+            );
         }
         if args.get(6).is_some_and(|a| {
             matches!(
@@ -2455,22 +2473,33 @@ mod tests {
     #[test]
     fn bootstrap_estimates_may_omit_only_the_exact_unestimated_pair() {
         let (mut p, _, _, _, _, _, _, _) = fixture();
-        let handoff = Bound { path: "/sealed/handoff.json".into(), sha256: "d".repeat(64) };
+        let handoff = Bound {
+            path: "/sealed/handoff.json".into(),
+            sha256: "d".repeat(64),
+        };
         p.repair183_handoff = Some(handoff.clone());
-        p.expected_epochs = vec![152,153,155,156,183,184,191,192,193,194];
+        p.expected_epochs = vec![152, 153, 155, 156, 183, 184, 191, 192, 193, 194];
         let ranges = json!([
             {"range":"152-153","epochs":[152,153],"archive_directory":"/a","expected_controller_invocation_id":"a","expected_producer_invocation_id":"b"},
             {"range":"155-156","epochs":[155,156],"archive_directory":"/b","expected_controller_invocation_id":"a","expected_producer_invocation_id":"b"},
             {"range":"191-194","epochs":[191,192,193,194],"archive_directory":"/c","expected_controller_invocation_id":"a","expected_producer_invocation_id":"b"}]);
         let model = json!({"ranges":ranges,"expected_observer_ranges":["152-153","155-156","191-194","183-184"],
             "evidence":[handoff],"unestimated_bootstrap_epochs":[183,184]});
-        let observer = Bound { path: "/sample".into(), sha256: "e".repeat(64) };
+        let observer = Bound {
+            path: "/sample".into(),
+            sha256: "e".repeat(64),
+        };
         let entries: Vec<_> = model["ranges"].as_array().unwrap().iter().flat_map(|r|
             r["epochs"].as_array().unwrap().iter().map(|n| json!({"epoch":n,"archive_directory":r["archive_directory"],
                 "expected_controller_invocation_id":"a","expected_producer_invocation_id":"b","elapsed_execution_millis":1,"estimated_remaining_millis":2}))).collect();
         let estimates = json!({"schema":"jetstreamer-horizon-r2-status-estimates-v5","sampled_at_utc":p.sample_target_utc,
             "observer_sha256":observer.sha256,"estimates":entries});
-        assert_eq!(verify_estimates(&p, &model, &observer, &estimates).unwrap().len(), 8);
+        assert_eq!(
+            verify_estimates(&p, &model, &observer, &estimates)
+                .unwrap()
+                .len(),
+            8
+        );
         let mut missing = estimates.clone();
         missing["estimates"].as_array_mut().unwrap().pop();
         assert!(verify_estimates(&p, &model, &observer, &missing).is_err());

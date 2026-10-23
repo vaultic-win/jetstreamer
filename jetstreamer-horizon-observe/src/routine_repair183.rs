@@ -253,7 +253,9 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
     Ok(Some(h))
 }
 pub(super) fn validate_live(p: &Plan) -> Result<()> {
-    if let Some(h) = proof(p)? { live_guard(&h)?; }
+    if let Some(h) = proof(p)? {
+        live_guard(&h)?;
+    }
     Ok(())
 }
 pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> {
@@ -271,8 +273,10 @@ pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> 
 fn apply(model: &Value, h: &Handoff) -> Result<Value> {
     scope(h)?;
     let mut v = model.clone();
-    if v["unestimated_bootstrap_epochs"] == json!([183,184]) {
-        v.as_object_mut().context("repair183 model object")?.remove("unestimated_bootstrap_epochs");
+    if v["unestimated_bootstrap_epochs"] == json!([183, 184]) {
+        v.as_object_mut()
+            .context("repair183 model object")?
+            .remove("unestimated_bootstrap_epochs");
     }
     if let Some(census) = v.get_mut("expected_observer_ranges") {
         let census = census.as_array_mut().context("repair183 observer census")?;
@@ -348,12 +352,15 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
         if continued_bootstrap {
             let prior = bound_json(&p.previous_observer, false)?;
             let checked = observation(model, &h, &prior)?;
-            ensure!(checked["unestimated_bootstrap_epochs"] == json!([183,184]),
-                "repair183 bootstrap predecessor changed");
+            ensure!(
+                checked["unestimated_bootstrap_epochs"] == json!([183, 184]),
+                "repair183 bootstrap predecessor changed"
+            );
         }
         ensure!(
-            continued_bootstrap || (h.observer_before_launch.path == p.previous_observer.path
-                && h.observer_before_launch.sha256 == p.previous_observer.sha256),
+            continued_bootstrap
+                || (h.observer_before_launch.path == p.previous_observer.path
+                    && h.observer_before_launch.sha256 == p.previous_observer.sha256),
             "repair183 initial predecessor differs"
         );
     }
@@ -372,10 +379,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     let tracked = fleet["tracked_units"]
         .as_array_mut()
         .context("repair183 fleet tracked units")?;
-    for unit in [
-        CONTROLLER.to_owned(),
-        PRODUCER.to_owned(),
-    ] {
+    for unit in [CONTROLLER.to_owned(), PRODUCER.to_owned()] {
         let value = json!(unit);
         if !tracked.contains(&value) {
             tracked.push(value);
@@ -439,22 +443,37 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
         }
     }
     if o["useful_work"]["last"].is_null() {
-        ensure!(o["useful_work"]["first"].is_null()
-            && o["useful_work"]["matching_markers"] == 0
-            && o["useful_work"]["counter_resets"] == 0
-            && o["useful_work"]["sufficient_for_rates"] == false
-            && o["useful_work"]["slots_per_second"].is_null()
-            && v["ranges"].as_array().unwrap().iter().find(|r| r["range"] == "183-184").unwrap()["terminal_slot"] == FIRST_END,
-            "repair183 absent progress is not initial bootstrap");
+        ensure!(
+            o["useful_work"]["first"].is_null()
+                && o["useful_work"]["matching_markers"] == 0
+                && o["useful_work"]["counter_resets"] == 0
+                && o["useful_work"]["sufficient_for_rates"] == false
+                && o["useful_work"]["slots_per_second"].is_null()
+                && v["ranges"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|r| r["range"] == "183-184")
+                    .unwrap()["terminal_slot"]
+                    == FIRST_END,
+            "repair183 absent progress is not initial bootstrap"
+        );
         for point in ["before", "after"] {
             let worker = &o[format!("worker_{point}")];
-            ensure!(worker["matching_workers"] == 1
-                && worker["executable_beneath_bound_scratch"] == true
-                && worker["vmas"].as_u64().is_some_and(|n| n > 0 && n <= 800000),
-                "repair183 bootstrap worker is not protected");
+            ensure!(
+                worker["matching_workers"] == 1
+                    && worker["executable_beneath_bound_scratch"] == true
+                    && worker["vmas"]
+                        .as_u64()
+                        .is_some_and(|n| n > 0 && n <= 800000),
+                "repair183 bootstrap worker is not protected"
+            );
         }
-        v["ranges"].as_array_mut().unwrap().retain(|r| r["range"] != "183-184");
-        v["unestimated_bootstrap_epochs"] = json!([183,184]);
+        v["ranges"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|r| r["range"] != "183-184");
+        v["unestimated_bootstrap_epochs"] = json!([183, 184]);
         return Ok(v);
     }
     let terminal = o["useful_work"]["last"]["terminal_slot"]
@@ -479,11 +498,18 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
 }
 
 pub(super) fn bootstrap_model(p: &Plan, model: &Value) -> bool {
-    p.repair183_handoff.as_ref().is_some_and(|b|
-        model["unestimated_bootstrap_epochs"] == json!([183,184])
-        && model["ranges"].as_array().is_some_and(|rs| rs.len() == 3 && !rs.iter().any(|r| r["range"] == "183-184"))
-        && model["expected_observer_ranges"].as_array().is_some_and(|rs| rs.len() == 4 && rs.contains(&json!("183-184")))
-        && model["evidence"].as_array().is_some_and(|es| es.contains(&serde_json::to_value(b).unwrap())))
+    p.repair183_handoff.as_ref().is_some_and(|b| {
+        model["unestimated_bootstrap_epochs"] == json!([183, 184])
+            && model["ranges"]
+                .as_array()
+                .is_some_and(|rs| rs.len() == 3 && !rs.iter().any(|r| r["range"] == "183-184"))
+            && model["expected_observer_ranges"]
+                .as_array()
+                .is_some_and(|rs| rs.len() == 4 && rs.contains(&json!("183-184")))
+            && model["evidence"]
+                .as_array()
+                .is_some_and(|es| es.contains(&serde_json::to_value(b).unwrap()))
+    })
 }
 
 #[cfg(test)]
@@ -497,7 +523,10 @@ mod tests {
             .strip_suffix("-e183-184-lane-a-1.service")
             .unwrap();
         assert!(id.len() <= 32);
-        assert!(id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-'));
+        assert!(
+            id.bytes()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+        );
     }
     fn h() -> Handoff {
         serde_json::from_value(json!({"schema":"jetstreamer-horizon-repair183-live-monitor-handoff-v1","controller_invocation_id":"a".repeat(32),"producer_invocation_id":"b".repeat(32),"archive_directory":format!("{ROOT}/destination-x/work/root-cohort-183-184/run-1/archives"),"scratch_path":format!("{ROOT}/destination-x/work/root-cohort-183-184/run-1/scratch"),"observer_before_launch":{"path":"/sample","sha256":"c".repeat(64)},"admission":{"path":"/admit","sha256":"d".repeat(64)},"guard_first_fire":{"path":"/guard","sha256":"e".repeat(64)},"capability":{"path":"/usr/local/lib/jetstreamer/horizon-epochs183-184-package-capability-20261020-v1/capability.json","sha256":"b98120a9a2697fd4bb004df8ebae67594222185db5e4f3cfe2474ce42333ca45"},"new_resource_samples":0,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false})).unwrap()
@@ -518,7 +547,10 @@ mod tests {
         assert_eq!(apply(&new, &h()).unwrap(), new);
         let mut other_bootstrap = new;
         other_bootstrap["unestimated_bootstrap_epochs"] = json!([185]);
-        assert_eq!(apply(&other_bootstrap, &h()).unwrap()["unestimated_bootstrap_epochs"], json!([185]));
+        assert_eq!(
+            apply(&other_bootstrap, &h()).unwrap()["unestimated_bootstrap_epochs"],
+            json!([185])
+        );
     }
     #[test]
     fn wrong_scope_authority_owner_and_allowance_fail_closed() {
@@ -577,17 +609,24 @@ mod tests {
     fn initial_bootstrap_keeps_full_census_but_never_invents_a_rate_or_terminal() {
         let h = h();
         let point = |unit: &str, id: &str| json!({"unit":unit,"invocation_id":id,"restarts":0,"active_state":"active"});
-        let worker = json!({"matching_workers":1,"executable_beneath_bound_scratch":true,"vmas":366000});
+        let worker =
+            json!({"matching_workers":1,"executable_beneath_bound_scratch":true,"vmas":366000});
         let o = json!({"replays":[{"range":"183-184","scratch_path":h.scratch_path,"invocation_binding_stable":true,
             "controller_before":point(CONTROLLER,&h.controller_invocation_id),"controller_after":point(CONTROLLER,&h.controller_invocation_id),
             "producer_before":point(PRODUCER,&h.producer_invocation_id),"producer_after":point(PRODUCER,&h.producer_invocation_id),
             "worker_before":worker,"worker_after":worker,"useful_work":{"first":null,"last":null,"matching_markers":0,"counter_resets":0,"sufficient_for_rates":false,"slots_per_second":null}}]});
         let mut m = model();
-        m["expected_observer_ranges"] = json!(["152-153","155-156","191-194"]);
+        m["expected_observer_ranges"] = json!(["152-153", "155-156", "191-194"]);
         let filtered = observation(&m, &h, &o).unwrap();
         assert_eq!(filtered["ranges"], m["ranges"]);
-        assert_eq!(filtered["expected_observer_ranges"].as_array().unwrap().len(), 4);
-        assert_eq!(filtered["unestimated_bootstrap_epochs"], json!([183,184]));
+        assert_eq!(
+            filtered["expected_observer_ranges"]
+                .as_array()
+                .unwrap()
+                .len(),
+            4
+        );
+        assert_eq!(filtered["unestimated_bootstrap_epochs"], json!([183, 184]));
         for (path, value) in [
             ("/replays/0/useful_work/matching_markers", json!(1)),
             ("/replays/0/useful_work/counter_resets", json!(1)),

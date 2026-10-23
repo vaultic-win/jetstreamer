@@ -24,11 +24,17 @@ fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
 }
 fn corrected_fleet(original: &Value) -> Result<Value> {
     let mut corrected = original.clone();
-    let units = corrected["tracked_units"].as_array_mut().context("repair183 tracked units")?;
-    for name in ["jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.service",
-        "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.timer"] {
-        ensure!(units.iter().filter(|u| u.as_str() == Some(name)).count() == 1,
-            "repair183 guard census correction is not exact");
+    let units = corrected["tracked_units"]
+        .as_array_mut()
+        .context("repair183 tracked units")?;
+    for name in [
+        "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.service",
+        "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.timer",
+    ] {
+        ensure!(
+            units.iter().filter(|u| u.as_str() == Some(name)).count() == 1,
+            "repair183 guard census correction is not exact"
+        );
         units.retain(|u| u.as_str() != Some(name));
     }
     Ok(corrected)
@@ -191,8 +197,14 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     provisional_value["output"] = json!(provisional_path);
     let mut staging: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     staging.cycle_directory = root.clone();
-    let package = delivery198::seal_values(&staging, "guard-census-correction",
-        &[("fleet-plan.json", corrected), ("provisional-plan.json", provisional_value)])?;
+    let package = delivery198::seal_values(
+        &staging,
+        "guard-census-correction",
+        &[
+            ("fleet-plan.json", corrected),
+            ("provisional-plan.json", provisional_value),
+        ],
+    )?;
     let fleet_plan = file(package.join("fleet-plan.json"), true)?;
     let provisional_plan = file(package.join("provisional-plan.json"), true)?;
     child(
@@ -285,53 +297,83 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
 }
 
 pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
-    if c.get("repair183_fleet_recovery").is_none() { return Ok(false); }
+    if c.get("repair183_fleet_recovery").is_none() {
+        return Ok(false);
+    }
     let mut checked: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     consume(&mut checked, c)?;
     let corrected: Bound = serde_json::from_value(c["fleet_plan"].clone())?;
-    ensure!(corrected.path == Path::new(ROOT).join("repair183-fleet-recovery-v2/guard-census-correction/sealed/fleet-plan.json"),
-        "foreign repair183 corrected plan");
-    let original = Bound { path: Path::new(ROOT).join("sealed/fleet-plan.json"),
-        sha256: "c7987fae86f18ea208806afecd298b8d05a9142b9e3655b4e29c28775b8f87e3".into() };
-    ensure!(bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
-        "repair183 correction changed more than the two non-replay guard observations");
+    ensure!(
+        corrected.path
+            == Path::new(ROOT)
+                .join("repair183-fleet-recovery-v2/guard-census-correction/sealed/fleet-plan.json"),
+        "foreign repair183 corrected plan"
+    );
+    let original = Bound {
+        path: Path::new(ROOT).join("sealed/fleet-plan.json"),
+        sha256: "c7987fae86f18ea208806afecd298b8d05a9142b9e3655b4e29c28775b8f87e3".into(),
+    };
+    ensure!(
+        bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
+        "repair183 correction changed more than the two non-replay guard observations"
+    );
     Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
- use super::*;
- #[test]
- fn correction_removes_only_volatile_guard_observations_not_replay_claims() {
-   let guard="jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1";
-   let original=json!({"tracked_units":["controller.service",format!("{guard}.service"),"producer.service",format!("{guard}.timer")],
+    use super::*;
+    #[test]
+    fn correction_removes_only_volatile_guard_observations_not_replay_claims() {
+        let guard = "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1";
+        let original = json!({"tracked_units":["controller.service",format!("{guard}.service"),"producer.service",format!("{guard}.timer")],
        "gates":{"183":{"state":"failed-needs-repair"}},"sentinel":u64::MAX});
-   let mut expected=original.clone();
-   expected["tracked_units"]=json!(["controller.service","producer.service"]);
-   assert_eq!(corrected_fleet(&original).unwrap(), expected);
-   assert!(corrected_fleet(&expected).is_err());
-   let mut duplicate=original.clone();
-   duplicate["tracked_units"].as_array_mut().unwrap().push(json!(format!("{guard}.service")));
-   assert!(corrected_fleet(&duplicate).is_err());
- }
- #[test]
- fn foreign_plan_or_nonmatching_failure_cannot_resume() {
-   let (mut p,_,_,_,_,_,_,_) = crate::tests::fixture101();
-   p.sample_target_utc = "2026-10-23T02:29:58Z".into();
-   p.cycle_directory = ROOT.into();
-   p.repair183_handoff = Some(Bound{path:"/handoff".into(),sha256:"a".repeat(64)});
-   p.public198_delivery=Some(serde_json::from_value(json!({"promotion":{"path":"/promotion","sha256":"a".repeat(64)},
-       "origin":{"path":"/origin","sha256":"a".repeat(64)},"claims":[],"progressive_upload":true})).unwrap());
-   let b=Bound{path:"/plan".into(),sha256:PLAN_SHA.into()};
-   let i=json!({"plan":b,"invocation_id":OLD_IID,"self_sha256":"689a621e600d93ce560e0b159e7e5a333a0601b56a347ef90538f6720deb563a"});
-   let f=json!({"schema":"jetstreamer-horizon-routine-child-result-v1","success":false,"exit_code":1,"signal":null,
+        let mut expected = original.clone();
+        expected["tracked_units"] = json!(["controller.service", "producer.service"]);
+        assert_eq!(corrected_fleet(&original).unwrap(), expected);
+        assert!(corrected_fleet(&expected).is_err());
+        let mut duplicate = original.clone();
+        duplicate["tracked_units"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(format!("{guard}.service")));
+        assert!(corrected_fleet(&duplicate).is_err());
+    }
+    #[test]
+    fn foreign_plan_or_nonmatching_failure_cannot_resume() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        p.sample_target_utc = "2026-10-23T02:29:58Z".into();
+        p.cycle_directory = ROOT.into();
+        p.repair183_handoff = Some(Bound {
+            path: "/handoff".into(),
+            sha256: "a".repeat(64),
+        });
+        p.public198_delivery = Some(
+            serde_json::from_value(
+                json!({"promotion":{"path":"/promotion","sha256":"a".repeat(64)},
+       "origin":{"path":"/origin","sha256":"a".repeat(64)},"claims":[],"progressive_upload":true}),
+            )
+            .unwrap(),
+        );
+        let b = Bound {
+            path: "/plan".into(),
+            sha256: PLAN_SHA.into(),
+        };
+        let i = json!({"plan":b,"invocation_id":OLD_IID,"self_sha256":"689a621e600d93ce560e0b159e7e5a333a0601b56a347ef90538f6720deb563a"});
+        let f = json!({"schema":"jetstreamer-horizon-routine-child-result-v1","success":false,"exit_code":1,"signal":null,
        "tool":p.tools.r2,"stderr":{"text":"Error: invalid fleet unit name\n"}});
-   exact(&p,&b,&i,&f).unwrap();
-   for (key,value) in [("success",json!(true)),("exit_code",json!(0)),("signal",json!(9)),("stderr",json!({"text":"another failure"}))] {
-       let mut bad=f.clone(); bad[key]=value;
-       assert!(exact(&p,&b,&i,&bad).is_err());
-   }
-   p.repair183_handoff=None;
-   assert!(exact(&p,&b,&i,&f).is_err());
- }
+        exact(&p, &b, &i, &f).unwrap();
+        for (key, value) in [
+            ("success", json!(true)),
+            ("exit_code", json!(0)),
+            ("signal", json!(9)),
+            ("stderr", json!({"text":"another failure"})),
+        ] {
+            let mut bad = f.clone();
+            bad[key] = value;
+            assert!(exact(&p, &b, &i, &bad).is_err());
+        }
+        p.repair183_handoff = None;
+        assert!(exact(&p, &b, &i, &f).is_err());
+    }
 }
