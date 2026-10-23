@@ -99,6 +99,10 @@ name = "jetstreamer-epoch141-census-poh-diagnostic"
 path = "src/epoch141_census_poh_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch141-source-equivalence"
+path = "src/epoch141_source_equivalence_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch141-boundary-collect"
 path = "src/epoch141_boundary_collect_bin.rs"
 

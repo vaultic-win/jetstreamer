@@ -17,7 +17,7 @@ const MAX_SIGNATURES: usize = 65_536;
 const MAX_TRANSACTION_BYTES: usize = 1232;
 
 /// One decoded entry's claimed hash and independently derived signature mixin.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DiagnosticEntry {
     /// Claimed hash work; not yet executed or verified by this decoder.
     pub num_hashes: u64,
