@@ -75,6 +75,15 @@ pub(super) fn estimate_readback203() -> Result<()> {
 pub(super) fn capture_warmup223_input() -> Result<()> {
     warmup223_input_capture::run()
 }
+pub(super) fn capture_warmup223_terminal() -> Result<()> {
+    warmup223::capture_terminal()
+}
+pub(super) fn warmup223_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    warmup223::terminal_identity(proof)
+}
+pub(super) fn warmup223_terminal_not_replaced(proof: &Value) -> Result<()> {
+    warmup223::terminal_not_replaced(proof)
+}
 pub(super) async fn publish_full227_status() -> Result<()> {
     full227_status::run().await
 }
@@ -2227,7 +2236,9 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == "jetstreamer-private-warmup223-launch-v1" {
+            if event["schema"] == warmup223::TERMINAL_SCHEMA {
+                warmup223::terminal_predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == "jetstreamer-private-warmup223-launch-v1" {
                 warmup223::event_predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"]
                 == "jetstreamer-private-epoch223-native-v1620-ram-snapshot-intent-v1"
@@ -2442,6 +2453,7 @@ pub(super) async fn run() -> Result<()> {
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
+    warmup223::terminal_census(&plan, &before)?;
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
     singleton227_terminal::terminal_census(&plan, &before)?;

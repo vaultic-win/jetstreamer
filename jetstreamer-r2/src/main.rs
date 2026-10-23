@@ -3495,6 +3495,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-native223-input") {
         return fleet::capture_native223_input();
     }
+    if env::args().nth(1).as_deref() == Some("capture-warmup223-terminal") {
+        return fleet::capture_warmup223_terminal();
+    }
     if env::args().nth(1).as_deref() == Some("admit-native207-input") {
         return fleet::admit_native207_input();
     }

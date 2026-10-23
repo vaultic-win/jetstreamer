@@ -11,6 +11,7 @@ mod native227;
 mod natural144;
 mod preserved144;
 mod publication144;
+mod warmup223;
 pub(super) fn prepare_publication144_preservation() -> Result<()> {
     publication144::prepare()
 }
@@ -366,6 +367,10 @@ fn fresh_census(
     if native207 {
         native207::validate(&current, terminal_fleet, owners)?;
     }
+    let warmup223 = plan.epoch == 223 && warmup223::recognized(terminal_fleet, owners);
+    if warmup223 {
+        warmup223::validate(&current, terminal_fleet, owners)?;
+    }
     let native227 = plan.epoch == 227 && native227::recognized(terminal_fleet, owners);
     if native227 {
         native227::validate(&current, terminal_fleet, owners)?;
@@ -389,6 +394,7 @@ fn fresh_census(
             && !natural144
             && !native223
             && !native207
+            && !warmup223
             && !native227
             && reserve.is_none()
         {
