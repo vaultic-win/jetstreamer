@@ -155,6 +155,10 @@ pub(super) fn terminal_proof(proof: &Value) -> Result<(&'static Profile, String,
     }
     Ok((owner, iid.into(), success, clock))
 }
+pub(in crate::fleet) fn terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    let (owner, iid, _, _) = terminal_proof(proof)?;
+    Ok((owner.unit.into(), iid))
+}
 pub(in crate::fleet) fn terminal_predecessor(
     previous: &Value,
     p: &Plan,

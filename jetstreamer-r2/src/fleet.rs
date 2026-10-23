@@ -165,6 +165,9 @@ pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
 pub(super) fn capture_native223_input() -> Result<()> {
     cold223_scan::capture_native20_input()
 }
+pub(super) fn native223_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    cold223_scan::terminal_status_identity(proof)
+}
 pub(super) fn admit_publication203() -> Result<()> {
     publication203::admit()
 }
