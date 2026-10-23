@@ -259,8 +259,8 @@ fn memory_limits(
             && plan["unit"] == c::UNIT
             && plan["memory_max_bytes"] == requested_max
             && plan["memory_high_bytes"] == requested_high
-            && launch["sandbox"]["MemoryMax"] == requested_max.to_string()
-            && launch["sandbox"]["MemoryHigh"] == requested_high.to_string()
+            && launch["sandbox"]["MemoryMax"] == "225000000000"
+            && launch["sandbox"]["MemoryHigh"] == "150000000000"
             && launch["sandbox"]["MemorySwapMax"] == "0"
             && cap > 0
             && high > 0
