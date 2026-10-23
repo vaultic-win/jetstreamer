@@ -24,6 +24,8 @@ const BUCKET: &str = "solana-archive-with-accounts-data";
 
 #[path = "routine_next.rs"]
 mod next_preparation;
+#[path = "routine_publication144_recover.rs"]
+mod publication144_recover;
 
 #[path = "routine_terminal.rs"]
 mod terminal_handoff;
@@ -1761,6 +1763,8 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--recover-publication144-history"
+                            | "--check-publication144-history-recovery"
                             | "--recover-fleet-tail"
                             | "--check-fleet-tail-recovery"
                             | "--check-assembly144-scans-recovery"
@@ -1804,6 +1808,19 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| {
+            matches!(
+                a.as_str(),
+                "--recover-publication144-history" | "--check-publication144-history-recovery"
+            )
+        }) {
+            return publication144_recover::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-publication144-history-recovery",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             matches!(
                 a.as_str(),

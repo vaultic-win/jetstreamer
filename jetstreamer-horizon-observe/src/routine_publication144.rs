@@ -4,7 +4,22 @@ use super::*;
 mod status;
 #[path = "routine_publication144_upload.rs"]
 mod upload;
-pub(super) use status::{publish, validate_completed};
+pub(super) use status::{publish, publish_using, validate_completed};
+pub(super) const HISTORY_READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261023-v4/jetstreamer-r2";
+pub(super) const HISTORY_READER_SHA: &str =
+    "0ac98fef0a7397ba2f5cb879ff829dfc1a4a33a2b3d7c0cf1789764e04cd2e70";
+pub(super) fn upgrade_reader(p: &mut Plan) {
+    if p.publication144.is_some()
+        && p.tools.r2.path == Path::new(COMPOSITE_READER)
+        && p.tools.r2.sha256 == COMPOSITE_READER_SHA
+    {
+        p.tools.r2 = Bound {
+            path: HISTORY_READER.into(),
+            sha256: HISTORY_READER_SHA.into(),
+        };
+    }
+}
 const UNIT: &str = "horizon-publish-144-v4-20261022-v1.service";
 const LAUNCH: &str = "/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1/launch.json";
 const TOOL: &str = "/usr/local/lib/jetstreamer/horizon-epoch144-publisher-candidate-20261022-v6/jetstreamer-epoch144-publish";
@@ -24,8 +39,10 @@ pub(super) fn composite_reader(p: &Plan) -> bool {
         && native141::all_retry_enabled(p)
         && native141::acquisition_enabled(p)
         && p.assembly144_scans.is_some()
-        && p.tools.r2.path == Path::new(COMPOSITE_READER)
-        && p.tools.r2.sha256 == COMPOSITE_READER_SHA
+        && ((p.tools.r2.path == Path::new(COMPOSITE_READER)
+            && p.tools.r2.sha256 == COMPOSITE_READER_SHA)
+            || (p.tools.r2.path == Path::new(HISTORY_READER)
+                && p.tools.r2.sha256 == HISTORY_READER_SHA))
 }
 const ACTIVE: &str = "Track exact144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
 const SUCCESS: &str = "Exact144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
@@ -201,8 +218,8 @@ pub(super) fn enable(p: &mut Plan, spec: &Bound) -> Result<()> {
     });
     p.tools.r2 = if p.census141_poh.is_some() {
         Bound {
-            path: COMPOSITE_READER.into(),
-            sha256: COMPOSITE_READER_SHA.into(),
+            path: HISTORY_READER.into(),
+            sha256: HISTORY_READER_SHA.into(),
         }
     } else {
         Bound {

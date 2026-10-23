@@ -179,6 +179,7 @@ pub(super) fn observe(
             assembly144_admission::timeout_properties()?;
         }
     }
+    let published_history = publication144_history::validate(plan, census)?;
     ensure!(
         rows.len() == 1
             && plan.first_epoch == 101
@@ -187,12 +188,15 @@ pub(super) fn observe(
             && plan.gates.get(&144).is_some_and(|g| matches!(
                 g.state.as_str(),
                 "blocked-qualification" | "failed-needs-repair"
-            ))
-            && plan.pipeline_claims.iter().all(|c| private_pipeline_shape(
-                c,
-                rows[0]["producer_unit"] == assembly144::UNIT
-                    && overlaps.iter().any(|d| assembly144::namespace(d))
-            ))
+            ) || (published_history
+                && g.state == "post-replay-pipeline"))
+            && plan.pipeline_claims.iter().all(|c| (published_history
+                && publication144_history::namespace(c))
+                || private_pipeline_shape(
+                    c,
+                    rows[0]["producer_unit"] == assembly144::UNIT
+                        && overlaps.iter().any(|d| assembly144::namespace(d))
+                ))
             && !observer["replays"]
                 .as_array()
                 .context("ordinary replay census")?
@@ -203,7 +207,11 @@ pub(super) fn observe(
     // These are independent, captured scans of the successful assembly, not
     // ordinary delivery or a second replay. Reopen their immutable provenance;
     // the main census independently checks live invocation and sandbox later.
-    for claim in plan.pipeline_claims.iter().filter(|c| c.epoch == 144) {
+    for claim in plan
+        .pipeline_claims
+        .iter()
+        .filter(|c| c.epoch == 144 && !publication144_history::namespace(c))
+    {
         private144_scan::validate(claim)?;
     }
     if rows[0]["producer_unit"] == assembly144::UNIT {
@@ -285,6 +293,33 @@ pub(super) fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root exact real144 publisher/private-history handoff regression; no resource scan, archive hash, write or remote access"]
+    fn actual_publication_handoff_keeps_terminal_private_history_not_a_live_claim() {
+        let b=BoundFile{path:"/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261023T002800Z-publication144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/public198-stage/sealed/fleet-plan.json".into(),sha256:"76c237192426062c4b8a30661bed7e2ab773dd960ff6b0686576a1df9dade123".into()};
+        let p: Plan = serde_json::from_value(bound_json(&b).unwrap()).unwrap();
+        let o = bound_json(&p.observer).unwrap();
+        let names = p
+            .tracked_units
+            .iter()
+            .cloned()
+            .chain(p.pipeline_claims.iter().map(|c| c.unit.clone()))
+            .collect();
+        let current = census(&names, 101, 200).unwrap();
+        let result = observe(&p, &o, &current, "2026-10-23T00:28:00Z")
+            .unwrap()
+            .unwrap();
+        assert_eq!(result["live"], false);
+        assert_eq!(result["ordinary_replay_claim"], false);
+        assert_eq!(result["current_sidecar_eta_valid"], false);
+        let mut bad = p;
+        bad.pipeline_claims
+            .iter_mut()
+            .find(|c| publication144_history::namespace(c))
+            .unwrap()
+            .invocation_id = "f".repeat(32);
+        assert!(observe(&bad, &o, &current, "2026-10-23T00:28:00Z").is_err());
+    }
     #[test]
     fn assembly_observation_coexists_only_with_exact_private_scan_shapes() {
         let mut c: PipelineClaim=serde_json::from_value(json!({"epoch":144,
