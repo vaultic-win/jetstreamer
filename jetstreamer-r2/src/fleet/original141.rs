@@ -24,6 +24,35 @@ const CHECKPOINTS_SHA: &str = "28ff603d15cd7ff653af314887b102697403489ab31cea837
 const PLAN: &str = "/usr/local/lib/jetstreamer/horizon-original141-root-plan-20261023-v1/plan.json";
 const ADMISSION: &str =
     "/var/lib/jetstreamer/horizon-original141-admission-20261023-v1/admission.json";
+fn admission_path(path: &Path) -> bool {
+    if path == Path::new(ADMISSION) {
+        return true;
+    }
+    if path.parent() != Path::new(ADMISSION).parent() {
+        return false;
+    }
+    let Some(stamp) = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.strip_prefix("admission-"))
+        .and_then(|s| s.strip_suffix(".json"))
+    else {
+        return false;
+    };
+    if stamp.len() != 16 || !stamp.is_ascii() || &stamp[8..9] != "T" || &stamp[15..16] != "Z" {
+        return false;
+    }
+    utc_seconds(&format!(
+        "{}-{}-{}T{}:{}:{}Z",
+        &stamp[..4],
+        &stamp[4..6],
+        &stamp[6..8],
+        &stamp[9..11],
+        &stamp[11..13],
+        &stamp[13..15]
+    ))
+    .is_ok()
+}
 const NODE_SHA: &str = "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0";
 const WORKER_SHA: &str = "abe395d482174e490833928c7343a33d135d8572096faf873ce3103c35fe520d";
 const INDEX_SHA: &str = "fe38bd4ce018996349c10029720dd7f738340fb0ad30ce6b8577b9651bf87df3";
@@ -109,7 +138,9 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
                 .is_some_and(|n| n >= FLOOR)
             && r["plan"]["path"] == PLAN
             && canonical_digest(&r["plan"]["sha256"])
-            && r["admission"]["path"] == ADMISSION
+            && r["admission"]["path"]
+                .as_str()
+                .is_some_and(|p| admission_path(Path::new(p)))
             && canonical_digest(&r["admission"]["sha256"])
             && r["first_guard"]["path"].as_str()
                 == Some(format!("{ROOT}/receipts/first-guard.json").as_str())
