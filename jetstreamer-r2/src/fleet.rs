@@ -167,6 +167,12 @@ pub(super) fn admit_native207_input() -> Result<()> {
 pub(super) fn capture_native207_input() -> Result<()> {
     native207_capture::run()
 }
+pub(super) fn validate_warmup223_status_claim(value: &Value) -> Result<()> {
+    warmup223::status_claim(value)
+}
+pub(super) fn warmup223_status_jet_path() -> PathBuf {
+    warmup223::status_jet_path()
+}
 /// The native status publisher shares the exact fleet registration gates;
 /// a metadata countdown cannot register or qualify a new native attempt.
 pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
