@@ -23,6 +23,27 @@ than attempt the entire epoch prefix. An in-flight entry's logged signature is
 not necessarily the transaction that failed inside the batch; use the new fatal
 load trace to identify the actual transaction and account state.
 
+The opt-in `epoch223-fee-load-warmup-diagnostic` worker build admits only the
+cold snapshot at 96,335,538 and entries 96,335,539 through 96,335,554. This
+16-slot envelope covers the observed batch with room for parent batching while
+staying below recording. It rejects the tail bootstrap and all later input
+before bank mutation. The existing full-prefix qualification feature keeps its
+original envelope; transaction execution and the fatal fee/load result are
+unchanged. Build this candidate explicitly, since the shared Cargo release
+filename can otherwise refer to a different feature set:
+
+```sh
+cd historical-runtime/v1_6_25
+cargo build --release -p jetstreamer-historical-worker-v1-6-25 \
+  --features epoch223-fee-load-warmup-diagnostic
+```
+
+This build is not launch authority. Bind the resulting exact binary in a fresh
+native input qualification, isolated bounded supervisor, full-fleet admission
+and invocation guard before a chain run. A scope-limit rejection instead of
+the fee/load trace is diagnostic evidence, not successful replay or permission
+to widen the window silently.
+
 The healthy225 worker and all sealed deployments remain unchanged. Before any
 new223 chain experiment, build/seal the candidate with its exact historical
 toolchain, requalify the native snapshot/input capability, and freshly admit a

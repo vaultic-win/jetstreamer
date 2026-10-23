@@ -73,6 +73,7 @@ const DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE: u64 = 96_767_527;
 const EPOCH223_COLD_SNAPSHOT_SLOT: u64 = 96_335_538;
 const EPOCH223_TAIL_SNAPSHOT_SLOT: u64 = 96_767_522;
 const EPOCH223_END_EXCLUSIVE: u64 = 96_768_000;
+const EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE: u64 = EPOCH223_COLD_SNAPSHOT_SLOT + 17;
 #[cfg(all(
     feature = "epoch223-v1-6-25-qualification",
     any(
@@ -937,6 +938,10 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
+    {
+        return Err("epoch223 fee/load diagnostic requires the exact cold snapshot".into());
+    }
     if cfg!(feature = "epoch223-v1-6-25-qualification")
         && ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot)
     {
@@ -1009,6 +1014,10 @@ fn epoch223_snapshot_test_anchor(value: Option<&str>) -> Result<u64, String> {
     if ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot) {
         return Err("unsupported epoch223 test anchor".into());
     }
+    if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
+    {
+        return Err("fee/load diagnostic test anchor must be the cold snapshot".into());
+    }
     Ok(slot)
 }
 
@@ -1040,7 +1049,9 @@ fn effective_min_supported_entry_slot() -> u64 {
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "epoch223-v1-6-25-qualification") {
+    if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+        EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
         EPOCH223_END_EXCLUSIVE
     } else if cfg!(feature = "epoch225-v1-6-25-qualification") {
         EPOCH225_QUALIFICATION_END_EXCLUSIVE
@@ -1583,10 +1594,14 @@ mod tests {
     #[test]
     fn epoch223_test_anchor_is_explicit_and_strict() {
         assert_eq!(epoch223_snapshot_test_anchor(None).unwrap(), 96_335_538);
-        assert_eq!(
-            epoch223_snapshot_test_anchor(Some("96767522")).unwrap(),
-            96_767_522
-        );
+        if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+            assert!(epoch223_snapshot_test_anchor(Some("96767522")).is_err());
+        } else {
+            assert_eq!(
+                epoch223_snapshot_test_anchor(Some("96767522")).unwrap(),
+                96_767_522
+            );
+        }
         for value in &["", "96767521", "96767523", "97199617", "abc"] {
             assert!(epoch223_snapshot_test_anchor(Some(value)).is_err());
         }
@@ -2001,7 +2016,12 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+            assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT).is_ok());
+            assert!(validate_candidate_snapshot_slot(EPOCH223_TAIL_SNAPSHOT_SLOT).is_err());
+            assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT - 1).is_err());
+            assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT + 1).is_err());
+        } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
             for slot in &[EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT] {
                 assert!(validate_candidate_snapshot_slot(*slot).is_ok());
                 assert!(validate_candidate_snapshot_slot(*slot - 1).is_err());
@@ -2048,7 +2068,9 @@ mod tests {
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "epoch223-v1-6-25-qualification") {
+            if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+                EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
                 EPOCH223_END_EXCLUSIVE
             } else if cfg!(feature = "epoch225-v1-6-25-qualification") {
                 EPOCH225_QUALIFICATION_END_EXCLUSIVE
@@ -2064,6 +2086,44 @@ mod tests {
             } else {
                 MAX_SUPPORTED_SLOT_EXCLUSIVE
             }
+        );
+    }
+
+    #[cfg(feature = "epoch223-fee-load-warmup-diagnostic")]
+    #[test]
+    fn warmup_diagnostic_cannot_reach_recording_or_mutate_bank_after_its_bound() {
+        assert_eq!(effective_min_supported_entry_slot(), 96_335_539);
+        assert_eq!(effective_max_supported_entry_slot_exclusive(), 96_335_555);
+        assert!(validate_candidate_entry_slot(96_335_554).is_ok());
+        assert!(validate_candidate_entry_slot(96_335_555).is_err());
+        assert!(validate_candidate_entry_slot(96_336_000).is_err());
+        let (mut state, _) = test_state(1, Some(2));
+        state.enforce_candidate_range = true;
+        let before = (
+            state.bank.slot(),
+            state.bank.hash(),
+            state.bank.transaction_count(),
+            state.write_cursor,
+        );
+        let request = EntryRequest {
+            slot: 96_335_555,
+            entry_index: 0,
+            num_hashes: 0,
+            hash: state.last_entry_hash.as_ref().to_vec(),
+            transactions: Vec::new(),
+        };
+        assert!(state
+            .process_entry(request)
+            .unwrap_err()
+            .contains("outside"));
+        assert_eq!(
+            (
+                state.bank.slot(),
+                state.bank.hash(),
+                state.bank.transaction_count(),
+                state.write_cursor
+            ),
+            before
         );
     }
 
