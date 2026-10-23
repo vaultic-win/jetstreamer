@@ -32,3 +32,12 @@ Keep all output private and sidecar-free. Independent prefix reread and exact
 native checkpoint comparison remain separate requirements. The949-slot suffix,
 checkpoint restart, V4 assembly, full/current-plugin verification and reviewed
 publication route still need qualification before this can produce a ready pair.
+
+The fleet has a separate closed capped205 launch contract. It binds the exact
+5c01bf93 runner/input capability, original parent, capped worker, fixed private
+attempt, natural root coverage, separately sealed resource plan and fresh full
+admission. Its reserve/VMA guard must use the reviewed own-tree guard with a
+300GB physical scratch ceiling and no benchmark stop exemptions. A capability
+invocation cannot masquerade as the actual prefix command. Registration still
+grants no independent prefix, native restart, full epoch, sidecar or publication
+qualification; fresh admission and a proven actual guard remain required.

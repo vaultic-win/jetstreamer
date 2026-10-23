@@ -554,6 +554,8 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let p = d.path().join("input");
         fs::write(&p, b"canonical").unwrap();
+        // The integrity fixture must not depend on the caller's umask (e.g.002).
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
         let b = BoundFile {
             path: p.clone(),
             sha256: hex_lower(&Sha256::digest(b"canonical")),

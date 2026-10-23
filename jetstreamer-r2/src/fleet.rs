@@ -25,6 +25,7 @@ mod native203;
 mod original141;
 mod ownroot203_rebase;
 mod prefix144;
+mod prefix205;
 mod prefix223;
 mod private144;
 mod private144_scan;
@@ -265,6 +266,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
         let evidence: BoundFile = serde_json::from_value(launch["capability"].clone())?;
         prefix223::capability(&bound_json(&evidence)?)?;
         prefix223::terminal203_release(&launch)?;
+    }
+    if prefix205::namespace(claim) {
+        prefix205::bindings(claim, &launch)?;
     }
     Ok(launch)
 }
@@ -653,6 +657,7 @@ fn validate_same_sample_admission(
             "f4f5c0758c1c02b7d9a3b2b1595af7bbc033997f671cd43f2d4a92d38c346c69"
         }
         205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
+        205 if prefix205::namespace(claim) => prefix205::GUARD_SHA,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
         203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
@@ -767,7 +772,7 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
-    if tail223::namespace(claim) || prefix223::namespace(claim) {
+    if tail223::namespace(claim) || prefix223::namespace(claim) || prefix205::namespace(claim) {
         claim.scratch_path.join("scratch")
     } else {
         claim.scratch_path.clone()
@@ -823,6 +828,8 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if tail223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| tail223::guard_matches(claim, &receipt, plan))
+    } else if prefix205::namespace(claim) {
+        bound_json(&claim.launch_receipt).is_ok_and(|r| prefix205::guard_matches(claim, &r, plan))
     } else if prefix223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
@@ -952,6 +959,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
     let tail_223 = receipt["schema"] == tail223::SCHEMA;
     let prefix_223 = receipt["schema"] == prefix223::SCHEMA;
+    let prefix_205 = receipt["schema"] == prefix205::SCHEMA;
+    ensure!(
+        !prefix205::namespace(claim) || prefix_205,
+        "capped205 namespace requires its own schema"
+    );
     ensure!(
         !prefix223::namespace(claim) || prefix_223,
         "prefix223 namespace requires its own private schema"
@@ -998,6 +1010,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || bounded_205
             || tail_223
             || prefix_223
+            || prefix_205
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -1011,7 +1024,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if prefix_223 {
+    let scope_valid = if prefix_205 {
+        prefix205::launch_matches(claim, receipt)
+    } else if prefix_223 {
         prefix223::launch_matches(claim, receipt)
     } else if tail_223 {
         tail223::launch_matches(claim, receipt)
@@ -2315,6 +2330,13 @@ pub(super) async fn run() -> Result<()> {
                     "bounded205 diagnostic live command changed"
                 );
             }
+            if prefix205::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    prefix205::same_command(&current["ExecStart"], &launch),
+                    "capped205 live command changed"
+                );
+            }
             if shrink_budget225::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -2332,7 +2354,7 @@ pub(super) async fn run() -> Result<()> {
             );
             let phase = if original141::namespace(claim) {
                 "private-original-entry-root-qualification"
-            } else if prefix223::namespace(claim) {
+            } else if prefix223::namespace(claim) || prefix205::namespace(claim) {
                 "private-known-root-prefix"
             } else if tail223::namespace(claim) {
                 "private-tail-comparison"
