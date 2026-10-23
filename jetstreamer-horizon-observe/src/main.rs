@@ -1836,6 +1836,7 @@ fn run(config: Config) -> Result<()> {
 
     let available_before = filesystem_available_bytes(&config.filesystem_path)?;
     let (memory_total_kib, memory_available_before_kib) = host_memory()?;
+    let host_resident_before = rss::host_resident();
     let host_pressure_before = config
         .host_global_pressure
         .then(|| host_pressure::capture(Path::new("/proc")));
@@ -1920,6 +1921,7 @@ fn run(config: Config) -> Result<()> {
     }
     let available_after = filesystem_available_bytes(&config.filesystem_path)?;
     let (_, memory_available_after_kib) = host_memory()?;
+    let host_resident_after = rss::host_resident();
     let host_pressure = host_pressure_before.map(|before| {
         host_pressure::report(
             before,
@@ -1960,6 +1962,7 @@ fn run(config: Config) -> Result<()> {
             "conservative_available_kib": memory_available_before_kib.min(memory_available_after_kib),
         },
         "host_global_pressure": host_pressure,
+        "host_resident_memory": {"before":host_resident_before,"after":host_resident_after},
         "vm_max_map_count": vm_max_map_count()?,
         "replays": observations,
         "diagnostic_replays": diagnostic_observations,
