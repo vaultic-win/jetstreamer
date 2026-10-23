@@ -204,7 +204,11 @@ mod tests {
             path::Path,
             process::{Command, Stdio},
         };
-        let path = Path::new("/usr/local/lib/jetstreamer/horizon-epoch141-freeze-worker-20261023-v1/jetstreamer-historical-worker-v1-4-25");
+        let path = Path::new(if cfg!(feature = "epoch141-vote-prefix-diagnostic") {
+            "/usr/local/lib/jetstreamer/horizon-epoch141-vote-prefix-worker-20261023-v1/jetstreamer-historical-worker-v1-4-25"
+        } else {
+            "/usr/local/lib/jetstreamer/horizon-epoch141-freeze-worker-20261023-v1/jetstreamer-historical-worker-v1-4-25"
+        });
         let expected = std::env::var("FREEZE_WORKER_SHA256").expect("explicit release worker hash");
         let before = fs::symlink_metadata(path).unwrap();
         assert!(

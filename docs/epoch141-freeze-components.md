@@ -117,3 +117,22 @@ diagnostic tests passed under exactRust1.46.0 with one sealed-release probe
 ignored pending a separately sealed follow-up binary. This feature is not
 launch authority: distinct input/package/profile, guard, admission and fleet
 handoff remain required.
+
+The follow-up release worker is
+`8f61690a486c5c0322857b25980ec681ec58cfd870b3425cba4bb892e2f4eb9b`,
+sealed in`horizon-epoch141-vote-prefix-worker-20261023-v1`; its cohesive parent
+is`horizon-epoch141-vote-prefix-parent-20261023-v1`. A separately built and
+sealed test harness selected that exact worker path and digest and passed
+actual HELLO/PING/SHUTDOWN without loading a Bank. The original60912004profile
+also passed its four targeted tests after the optional follow-up was added.
+
+Its separately closed R2 profile uses the unit
+`horizon-qualify-141-original-entry-vote-prefix-20261023-v1.service` and root
+`/home/sol/.jetstreamer-private/epoch141-original-entry-vote-prefix-20261023-v1`.
+It retains the256GiB whole-root stop,1800second runtime bound, CPU2,
+MemoryHigh128GiB/Max192GiB, zero swap, and3500000worker-VMA stop. The plan,
+admission and launch explicitly bind worker terminal60912005, while the parent
+retains advertised end61328765. Every runtime/publication authority stays false.
+The routine handoff replaces only the authenticated terminal60912004observer
+owner, retains144and all historical fleet claims, and includes the separately
+sealed predecessor result in subsequent repair evidence.

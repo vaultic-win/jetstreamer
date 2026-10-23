@@ -20,11 +20,22 @@ const FREEZE_ROOT: &str =
 const FREEZE_READER: &str =
     "/usr/local/lib/jetstreamer/horizon-original141-freeze-reader-20261023-v1/jetstreamer-r2";
 const FREEZE_READER_SHA: &str = "d96fb78b85ee92e00560515ecafc48bc5f4b6f8ef148eed71221dced3af65517";
+const VOTE_UNIT: &str = "horizon-qualify-141-original-entry-vote-prefix-20261023-v1.service";
+const VOTE_ROOT: &str =
+    "/home/sol/.jetstreamer-private/epoch141-original-entry-vote-prefix-20261023-v1";
+const VOTE_READER: &str =
+    "/usr/local/lib/jetstreamer/horizon-original141-vote-prefix-reader-20261023-v1/jetstreamer-r2";
+const VOTE_READER_SHA: &str = "11e14c8d8e6799ace6891d30d55cba6a42663f5de1a83e3a27437c900984a739";
+fn predecessor_result() -> Bound {
+    Bound { path:"/usr/local/lib/jetstreamer/horizon-epoch141-freeze-components-result-20261023-v1/result.json".into(),sha256:"f158bd27bf7c071684f4e2c1d7a49b1ed8c432c2c530f03fd59d4792b47e233d".into() }
+}
 fn trace_disabled(trace: &bool) -> bool {
     !trace
 }
 fn identity(s: &Profile) -> (&'static str, &'static str) {
-    if s.freeze_components {
+    if s.vote_prefix {
+        (VOTE_UNIT, VOTE_ROOT)
+    } else if s.freeze_components {
         (FREEZE_UNIT, FREEZE_ROOT)
     } else if s.trace {
         (TRACE_UNIT, TRACE_ROOT)
@@ -33,7 +44,9 @@ fn identity(s: &Profile) -> (&'static str, &'static str) {
     }
 }
 fn reader_binding(s: &Profile) -> (&'static str, &'static str) {
-    if s.freeze_components {
+    if s.vote_prefix {
+        (VOTE_READER, VOTE_READER_SHA)
+    } else if s.freeze_components {
         (FREEZE_READER, FREEZE_READER_SHA)
     } else if s.trace {
         (TRACE_READER, TRACE_READER_SHA)
@@ -44,6 +57,8 @@ fn reader_binding(s: &Profile) -> (&'static str, &'static str) {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
+    #[serde(default, skip_serializing_if = "trace_disabled")]
+    vote_prefix: bool,
     #[serde(default, skip_serializing_if = "trace_disabled")]
     freeze_components: bool,
     #[serde(default, skip_serializing_if = "trace_disabled")]
@@ -58,6 +73,8 @@ pub(super) struct Profile {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
+    #[serde(default)]
+    vote_prefix: bool,
     #[serde(default)]
     freeze_components: bool,
     #[serde(default)]
@@ -80,6 +97,9 @@ pub(super) fn freeze_enabled(p: &Plan) -> bool {
     p.original141_root
         .as_ref()
         .is_some_and(|s| s.freeze_components)
+}
+pub(super) fn vote_enabled(p: &Plan) -> bool {
+    p.original141_root.as_ref().is_some_and(|s| s.vote_prefix)
 }
 pub(super) fn invocation(p: &Plan) -> Option<&str> {
     p.original141_root
@@ -160,7 +180,8 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
         ensure!(
             s.trace
                 && r["worker_freeze_component_diagnostic"] == true
-                && r["worker_entry_terminal_slot"] == 60912004,
+                && r["worker_entry_terminal_slot"]
+                    == if s.vote_prefix { 60912005 } else { 60912004 },
             "freeze141 requires its separately bounded worker"
         );
     }
@@ -186,7 +207,9 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
             && iid(&s.invocation_id)
             && r["schema"]
                 == if s.trace {
-                    if s.freeze_components {
+                    if s.vote_prefix {
+                        "jetstreamer-private-epoch141-original-entry-vote-prefix-launch-v2"
+                    } else if s.freeze_components {
                         "jetstreamer-private-epoch141-original-entry-freeze-components-launch-v2"
                     } else {
                         "jetstreamer-private-epoch141-original-entry-trace-launch-v2"
@@ -345,6 +368,26 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
     Ok(())
 }
 fn read(s: &Profile) -> Result<(Value, Value)> {
+    if s.vote_prefix {
+        ensure!(
+            s.freeze_components && s.trace && !s.coordinated_adoption,
+            "vote prefix requires separately bounded same-sample handoff"
+        );
+        let prior = bound_json(&predecessor_result(), true)?;
+        ensure!(
+            prior["schema"] == "jetstreamer-epoch141-freeze-components-result-v2"
+                && prior["invocation_id"] == "412f43b5db1046a2822efe3aeff95162"
+                && prior["terminal"]["main_pid"] == 0
+                && prior["terminal"]["restarts"] == 0
+                && prior["terminal"]["exit_status"] == 1
+                && prior["boundary"]["slot"] == 60912004
+                && prior["boundary"]["matches_later_vote_expected_hash"] == true
+                && prior["boundary"]["finalized_reward_digest_matches"] == true
+                && prior["full_epoch_verified"] == false
+                && prior["publication_authorized"] == false,
+            "vote prefix lacks retained bounded predecessor result"
+        );
+    }
     let r = bound_json(&s.launch, false)?;
     let e = bound_json(&s.event_fleet, false)?;
     let p = bound_json(&s.event_plan, true)?;
@@ -410,10 +453,20 @@ fn replace_terminal_trace(
 ) -> Result<()> {
     let old = p.original141_root.as_ref().context("old trace profile")?;
     ensure!(
-        old.trace && !old.freeze_components && next.freeze_components && next.trace,
-        "only terminal trace to bounded freeze observer replacement is supported"
+        old.trace
+            && next.freeze_components
+            && next.trace
+            && ((!old.freeze_components && !old.vote_prefix && !next.vote_prefix)
+                || (old.freeze_components && !old.vote_prefix && next.vote_prefix)),
+        "only terminal trace-to-freeze or freeze-to-vote observer replacement is supported"
     );
     let (old_unit, _) = identity(old);
+    ensure!(
+        !next.vote_prefix
+            || (old.invocation_id == "412f43b5db1046a2822efe3aeff95162"
+                && !next.coordinated_adoption),
+        "vote prefix must replace the exact result-bound freeze invocation"
+    );
     let terminal: Vec<_> = fleet["diagnostics"]
         .as_array()
         .context("terminal diagnostic census")?
@@ -483,12 +536,20 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     let evidence = f["gates"]["141"]["evidence"]
         .as_array_mut()
         .context("repair evidence")?;
-    for b in [serde_json::to_value(&s.launch)?, g] {
+    let mut additions = vec![serde_json::to_value(&s.launch)?, g];
+    if s.vote_prefix {
+        additions.push(serde_json::to_value(predecessor_result())?);
+    }
+    for b in additions {
         if !evidence.contains(&b) {
             evidence.push(b);
         }
     }
-    f["gates"]["141"]["next_action"] = if s.freeze_components {
+    f["gates"]["141"]["next_action"] = if s.vote_prefix {
+        json!(
+            "Capture worker-enforced60912005 terminal and frozen Bank evidence; determine whether the formerly failing60912005entry388transaction378 vote executes successfully with the separately built corrected-builtin worker. Retain prior60912004 canonical vote-expected Bank/reward match and both earlier failed roots. Parent progress is prefetch, not execution proof. Keep incident open through complete-span qualification and a verified ready pair."
+        )
+    } else if s.freeze_components {
         json!(
             "Capture the bounded worker's frozen Bank components at60911999 and60912004 and its native terminal result. Compare parent/account-delta/signature-count/blockhash/hardfork inputs and epoch-transition rewards/clock/collector. A worker stop at60912004 is diagnostic evidence, not the parent's61328765 checkpoint or full141 recovery. Preserve both earlier failed roots and keep incident open through a verified ready pair."
         )
@@ -632,6 +693,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
     );
     let launch = bound_json(&spec.launch, false)?;
     let s = Profile {
+        vote_prefix: spec.vote_prefix,
         freeze_components: spec.freeze_components,
         coordinated_adoption: spec.coordinated_adoption,
         trace: spec.trace,
@@ -705,6 +767,50 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn vote_replacement_requires_terminal_freeze_and_keeps_retained_144() {
+        let (mut p, _, mut config) = fixture();
+        let old = p.original141_root.as_mut().unwrap();
+        old.trace = true;
+        old.freeze_components = true;
+        old.invocation_id = "412f43b5db1046a2822efe3aeff95162".into();
+        old.launch.path = Path::new(FREEZE_ROOT).join("receipts/launch.json");
+        config["diagnostic_replays"][1] = config_row(old);
+        let old_id = old.invocation_id.clone();
+        let scope = p.scope_101_200.as_mut().unwrap();
+        scope.diagnostic_ranges[1].controller_unit = FREEZE_UNIT.into();
+        scope.diagnostic_ranges[1].producer_unit = FREEZE_UNIT.into();
+        scope.diagnostic_ranges[1].expected_controller_invocation_id = old_id.clone();
+        scope.diagnostic_ranges[1].expected_producer_invocation_id = old_id.clone();
+        let first = config["diagnostic_replays"][0].clone();
+        let mut next = profile();
+        next.trace = true;
+        next.freeze_components = true;
+        next.vote_prefix = true;
+        next.invocation_id = "c".repeat(32);
+        next.launch.path = Path::new(VOTE_ROOT).join("receipts/launch.json");
+        let ledger = json!({"diagnostics":[{"live":false,"unit":{"Id":FREEZE_UNIT,"InvocationID":old_id,"MainPID":"0","NRestarts":"0","ActiveState":"failed","SubState":"failed","Result":"exit-code","ExecMainStatus":"1"}}]});
+        for (pointer, value) in [
+            ("/diagnostics/0/live", json!(true)),
+            ("/diagnostics/0/unit/NRestarts", json!("1")),
+            ("/diagnostics/0/unit/Id", json!(TRACE_UNIT)),
+            ("/diagnostics/0/unit/ExecMainStatus", json!("0")),
+        ] {
+            let mut bad = ledger.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                replace_terminal_trace(&mut p, &mut config, &next, &bad).is_err(),
+                "{pointer}"
+            );
+        }
+        replace_terminal_trace(&mut p, &mut config, &next, &ledger).unwrap();
+        assert_eq!(config["diagnostic_replays"][0], first);
+        assert_eq!(config["diagnostic_replays"][1]["producer_unit"], VOTE_UNIT);
+        p.original141_root = Some(next);
+        assert!(retained144_census(&p, p.scope_101_200.as_ref().unwrap()));
+        assert!(vote_enabled(&p));
+        assert!(crate::generation_101(&p).starts_with("vote141-"));
+    }
     #[test]
     fn freeze_observer_replacement_requires_the_exact_terminal_trace_and_preserves_144() {
         let (mut p, _, mut config) = fixture();
@@ -787,6 +893,7 @@ mod tests {
             sha256: "a".repeat(64),
         };
         Profile {
+            vote_prefix: false,
             freeze_components: false,
             coordinated_adoption: false,
             trace: false,
