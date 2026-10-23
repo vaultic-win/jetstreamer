@@ -638,12 +638,12 @@ fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
     let args: Vec<_> = env::args().collect();
     ensure!(
-        (args.len() == 6 || (args.len() == 7 && args[6] == "--root-capability-only"))
+        (args.len() == 6 || (args.len() == 7 && matches!(args[6].as_str(),"--root-capability-only"|"--validate-plan-only")))
             && args[2] == "--plan-sha256"
             && args[4] == "--self-sha256",
         "usage: guard PLAN --plan-sha256 HEX --self-sha256 HEX [--root-capability-only]"
     );
-    let capability_only = args.len() == 7;
+    let capability_only = args.get(6).is_some_and(|a|a=="--root-capability-only");
     ensure!(digest(&args[3]) && digest(&args[5]), "invalid digest");
     let executable = fs::read("/proc/self/exe")?;
     ensure!(
@@ -654,6 +654,10 @@ fn run() -> Result<()> {
     ensure!(sha(&bytes) == args[3], "guard plan digest mismatch");
     let plan: Plan = serde_json::from_slice(&bytes)?;
     validate_plan(&plan)?;
+    if args.get(6).is_some_and(|a|a=="--validate-plan-only") {
+        println!("{}",json!({"schema":"jetstreamer-horizon-standalone-static-plan-validation-v1","plan_sha256":args[3],"self_sha256":args[5],"validated":true,"unit":plan.unit,"resource_samples_taken":0,"replay_launch_authorized":false,"protective_guard_proven":false,"producer_signaled":false,"remote_mutations":false,"r2_mutations":false}));
+        return Ok(());
+    }
     ensure!(
         !capability_only
             || (plan.maximum_root_physical_bytes.is_some()

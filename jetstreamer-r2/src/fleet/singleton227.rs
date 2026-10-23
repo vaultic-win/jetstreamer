@@ -24,7 +24,7 @@ pub(super) const FINGERPRINT: &str =
 pub(super) const GUARD_SHA: &str =
     "134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be";
 pub(super) const SINGLETON_GUARD_SHA: &str =
-    "80f302b12cce182a4aa2a37ec2067ed6c7d593c1caf867fb57622ceb4604d3f1";
+    "77bcac7ea38c5f275df04338dbb717a99b756b3d7a602c3eb87bc3e0b8797b5b";
 pub(super) const NATIVE_GUARD_SHA: &str =
     "e53a03e5a97ace54439db60ee3776117af68beebb892d03f34cfa8cceef118d9";
 pub(super) fn native_scope(phase: &str, unit: &str) -> bool {
