@@ -64,3 +64,14 @@ native restore, assembly, sidecar or publication is authorized. A deliberately
 triggered negative qualification while the producer is live must prove no
 reader launch and that the watcher stops; afterward rearm only with a separately
 sealed fresh plan, preserving the failed probe journal.
+
+The distinct v2 dispatcher also accepts the observer's exact zero-worker
+diagnostic for this203producer during its post-worker segment reread, but only
+after independently reproving current clean natural terminal state and the
+exact manager success event. It does not turn that unavailable worker sample
+into replay progress, a valid ETA or terminal proof. Complete fleet bindings,
+fresh global resources, the fully observed unchanged225owner, archive/result/
+manifest identities and all independent reader gates remain mandatory. A
+permission error, changed owner, another missing worker or stale sample is still
+fatal. Keep the v1 deployment immutable; install v2 with separately sealed fresh
+observer/fleet copies and requalify the negative live-owner sandbox before arming.

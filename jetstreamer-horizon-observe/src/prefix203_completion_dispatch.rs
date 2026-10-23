@@ -27,7 +27,7 @@ const READER_BINARY: &str = "/var/lib/jetstreamer/horizon-native203-restore-prep
 const READER_SHA: &str = "660199772c8a3f8752a84fb3bbb1f3aa80adf67cfc3b8b113f2b004852ad879b";
 const WORKER: &str = "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc";
 const STATE: &str = "/var/lib/jetstreamer/horizon-prefix203-completion-v1";
-const BINARY: &str = "/var/lib/jetstreamer/horizon-prefix203-completion-dispatch-v1/jetstreamer-prefix203-completion-dispatch";
+const BINARY: &str = "/var/lib/jetstreamer/horizon-prefix203-completion-dispatch-v2/jetstreamer-prefix203-completion-dispatch";
 const FLOOR: u64 = 248_289_182_611;
 const GIB: u64 = 1 << 30;
 const REQUIRED_MEMORY: u64 = (448 + 128 + 8 + 4) * GIB;
@@ -249,7 +249,20 @@ fn utc(s: &str) -> Result<u64> {
     );
     Ok(n as u64)
 }
-fn evidence(o: &Value, f: &Value, hash: &str, now: u64) -> Result<()> {
+// Constructed only after independent current terminal and manager-success checks.
+struct CleanProducerTerminal;
+fn clean_producer_terminal() -> Result<CleanProducerTerminal> {
+    terminal(&show(PRODUCER)?)?;
+    manager_success()?;
+    Ok(CleanProducerTerminal)
+}
+fn evidence(
+    o: &Value,
+    f: &Value,
+    hash: &str,
+    now: u64,
+    terminal_proof: Option<&CleanProducerTerminal>,
+) -> Result<()> {
     let sample = o["recorded_at_utc"]
         .as_str()
         .context("sample time missing")?;
@@ -289,6 +302,29 @@ fn evidence(o: &Value, f: &Value, hash: &str, now: u64) -> Result<()> {
         let matching: Vec<_> = diagnostics.iter().filter(|d| d["range"] == range).collect();
         ensure!(matching.len() == 1, "missing/duplicate baseline diagnostic");
         let d = matching[0];
+        // A natural terminal-prefix producer performs a durable segment reread
+        // after reaping its worker. The observer correctly refuses to invent a
+        // worker sample then. This exact absence is admissible only once the
+        // real producer is independently proven clean terminal at dispatch time;
+        // all fleet bindings,225sampling and fresh global resource gates remain.
+        let exact_post_worker = unit == PRODUCER
+            && terminal_proof.is_some()
+            && d["status"] == "unavailable"
+            && d["producer_unit"] == PRODUCER
+            && d["expected_producer_invocation_id"] == PRODUCER_IID
+            && d["observation"].is_null()
+            && d["error"]
+                == format!(
+                    "expected exactly one historical-worker beneath {ROOT}/scratch, found 0"
+                )
+            && d["ordinary_replay_claim"] == false
+            && d["current_sidecar_eta_valid"] == false
+            && d["replay_launch_authorized"] == false
+            && d["publication_authorized"] == false
+            && d["r2_mutations"] == false;
+        if exact_post_worker {
+            continue;
+        }
         ensure!(
             d["status"] == "observed"
                 && d["producer_unit"] == unit
@@ -601,7 +637,8 @@ fn execute(plan: &Plan, plan_path: &Path, plan_hash: &str, self_hash: &str) -> R
     let o: Value = serde_json::from_slice(&bound(&plan.observer, 16 << 20)?)?;
     let f: Value = serde_json::from_slice(&bound(&plan.fleet, 16 << 20)?)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    evidence(&o, &f, &plan.observer.sha256, now)?;
+    let terminal_proof = clean_producer_terminal()?;
+    evidence(&o, &f, &plan.observer.sha256, now, Some(&terminal_proof))?;
     current_other(&f)?;
     let memory = available_memory()?;
     let free = free_bytes()?;
@@ -789,8 +826,8 @@ mod tests {
         let (o, f) = baseline();
         let hash = "a".repeat(64);
         let now = utc("2026-10-23T00:08:00Z").unwrap();
-        evidence(&o, &f, &hash, now).unwrap();
-        assert!(evidence(&o, &f, &hash, now + 1801).is_err());
+        evidence(&o, &f, &hash, now, None).unwrap();
+        assert!(evidence(&o, &f, &hash, now + 1801, None).is_err());
         for (ptr, value) in [
             ("/host_memory/conservative_available_kib", json!(0)),
             (
@@ -806,7 +843,7 @@ mod tests {
         ] {
             let mut bad = o.clone();
             *bad.pointer_mut(ptr).unwrap() = value;
-            assert!(evidence(&bad, &f, &hash, now).is_err(), "{ptr}");
+            assert!(evidence(&bad, &f, &hash, now, None).is_err(), "{ptr}");
         }
         for (ptr, value) in [
             ("/observer_sha256", json!("b".repeat(64))),
@@ -816,11 +853,52 @@ mod tests {
         ] {
             let mut bad = f.clone();
             *bad.pointer_mut(ptr).unwrap() = value;
-            assert!(evidence(&o, &bad, &hash, now).is_err(), "{ptr}");
+            assert!(evidence(&o, &bad, &hash, now, None).is_err(), "{ptr}");
         }
         let mut bad = f;
         bad["active"].as_array_mut().unwrap().pop();
-        assert!(evidence(&o, &bad, &hash, now).is_err());
+        assert!(evidence(&o, &bad, &hash, now, None).is_err());
+    }
+    #[test]
+    fn exact_post_worker_absence_requires_current_clean_terminal_proof() {
+        let (mut o, f) = baseline();
+        let d = &mut o["diagnostic_replays"][0];
+        d["status"] = json!("unavailable");
+        d["observation"] = Value::Null;
+        d["error"] = json!(format!(
+            "expected exactly one historical-worker beneath {ROOT}/scratch, found 0"
+        ));
+        for key in [
+            "ordinary_replay_claim",
+            "current_sidecar_eta_valid",
+            "replay_launch_authorized",
+            "publication_authorized",
+            "r2_mutations",
+        ] {
+            d[key] = json!(false);
+        }
+        let hash = "a".repeat(64);
+        let now = utc("2026-10-23T00:08:00Z").unwrap();
+        assert!(evidence(&o, &f, &hash, now, None).is_err());
+        let proof = CleanProducerTerminal;
+        evidence(&o, &f, &hash, now, Some(&proof)).unwrap();
+        for (key, value) in [
+            ("error", json!("worker observation permission denied")),
+            ("expected_producer_invocation_id", json!("foreign")),
+            ("publication_authorized", json!(true)),
+            ("observation", json!({})),
+        ] {
+            let mut bad = o.clone();
+            bad["diagnostic_replays"][0][key] = value;
+            assert!(
+                evidence(&bad, &f, &hash, now, Some(&proof)).is_err(),
+                "accepted {key}"
+            );
+        }
+        let mut bad = o.clone();
+        bad["diagnostic_replays"][1] = o["diagnostic_replays"][0].clone();
+        assert!(evidence(&bad, &f, &hash, now, Some(&proof)).is_err());
+        assert!(evidence(&o, &f, &hash, now + 1801, Some(&proof)).is_err());
     }
     #[test]
     fn file_input_bounds_and_identity_reject_links_and_writable_peers() {
