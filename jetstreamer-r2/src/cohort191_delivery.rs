@@ -325,6 +325,9 @@ fn manager_terminal(cutoff: u64) -> Result<Value> {
 }
 const CONTROLLER_TERMINAL: &str =
     "/var/lib/jetstreamer/horizon-cohort191-controller-terminal-20261023-v1/terminal.json";
+fn no_manager_job(v: &Value) -> bool {
+    matches!(v.as_str(), Some("" | "0"))
+}
 fn terminal_controller_shape(v: &Value, history: &Value) -> Result<()> {
     ensure!(
         v["Id"] == CONTROLLER
@@ -337,7 +340,7 @@ fn terminal_controller_shape(v: &Value, history: &Value) -> Result<()> {
             && v["Result"] == "success"
             && v["ExecMainStatus"] == "0"
             && matches!(v["ExecMainCode"].as_str(), Some("1" | "exited"))
-            && v["Job"] == "0"
+            && no_manager_job(&v["Job"])
             && v["ControlGroup"] == ""
             && v["SuccessExitStatus"] == ""
             && prefix(&v["ExecStart"])
@@ -353,7 +356,7 @@ fn cleared_controller_shape(v: &Value, history: &Value) -> Result<()> {
             && v["SubState"] == "dead"
             && v["MainPID"] == "0"
             && v["NRestarts"] == "0"
-            && v["Job"] == "0"
+            && no_manager_job(&v["Job"])
             && v["ControlGroup"] == ""
             && v["Result"] == "success"
             && v["ExecMainStatus"] == "0",
@@ -541,7 +544,7 @@ fn controller_lifecycle(
         );
         let actual = controller_properties()?;
         ensure!(
-            actual["Job"] == "0" && fleet::unit(CONTROLLER)? == *current,
+            no_manager_job(&actual["Job"]) && fleet::unit(CONTROLLER)? == *current,
             "191 live controller has a queued job/replacement"
         );
         return Ok(json!({"kind":"live-original-controller","unit":actual}));
