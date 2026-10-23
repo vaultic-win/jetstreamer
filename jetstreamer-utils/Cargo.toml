@@ -44,6 +44,10 @@ epoch186-shrink-root-prefix-resource = []
 name = "jetstreamer_utils"
 
 [[bin]]
+name = "jetstreamer-epoch227-input-capability"
+path = "src/epoch227_input_capability_bin.rs"
+
+[[bin]]
 name = "clickhouse-server"
 path = "src/clickhouse_server_bin.rs"
 

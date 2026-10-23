@@ -59,3 +59,55 @@ from output, margin and century floor. Fresh complete fleet admission, actual
 guard protection, native input proof, exact-package capability and real replay
 qualification remain required. Do not treat the old uncapped peak, an early
 CLI rejection, a sealed package or these source regressions as those proofs.
+
+## Admission and guard handoff
+
+`epoch227-singleton-service.service` is a dormant review template for
+`horizon-singleton-227-capped-710f6523-v1.service`. Prepare its fresh owner-private
+run root and `output/` child before loading it. Reject an existing epoch227
+archive, active owner or retained attempt rather than restarting over it. The
+parent copies and binds its worker as `historical-worker` inside the private
+generation, as required by the existing standalone guard.
+
+The separately sealed Rust `jetstreamer-epoch227-input-capability` accepts an
+absent receipt path beneath root-private
+`/var/lib/jetstreamer/horizon-227-input-capability-*` and `--self-sha256 HEX`.
+It rehashes the fixed original node, capped worker, retained snapshot, genesis,
+preflight and capped deployment seal, validates singleton/root scope and writes
+one durable no-clobber receipt. It starts no worker, restores no snapshot,
+creates no archive, polls no fleet and contacts no R2.
+
+Fresh admission must bind that capability and the successful native cold-input
+proof, one accepted complete fleet/resource observation, authenticated R2
+inventory, recomputed century floor, every live claim's remaining growth,
+protective guard identities and all auxiliary jobs. Account for native223 while
+active; afterward bind its terminal result and retained scratch. Recheck protected
+identities and actual resources before and after admission. Reserve1.5 times the
+maximum observed aggregate lane RSS for this century, using the user's150GB seed
+only while actual evidence has not superseded it. The service's150GB high/225GB
+maximum are cgroup ceilings, not observed RSS. Check CPU, VMA and I/O separately;
+do not borrow another host's lane count or another century's resource model.
+
+The pending disk envelope is471,798,691,840 bytes:300GB decimal scratch,128GiB
+output and32GiB margin. Initial free space must exceed that envelope plus the
+current century floor and every other protected remaining growth claim. The
+guard floor excludes this lane's own envelope but preserves that same protected
+remainder. Its plan uses schema
+`jetstreamer-horizon-standalone-guard-plan-v1`, the exact service invocation ID,
+`filesystem:"/"`, the entire run root as `worker_root`,
+`maximum_worker_vmas:3500000`,
+`maximum_root_physical_bytes:471798691840`, and a root-private receipt directory.
+The own-root cap includes private output; scratch alone still has a300GB planning
+allowance. Seal the invocation-specific plan only after the service identity
+exists. Deploy the reviewed own-tree guard and its persistent safety timer;
+prove its first actual no-trip receipt has the exact invocation and one bound
+worker before unattended admission. A zero-worker startup sample is insufficient.
+Guard failures, budget errors or changing identities prevent that admission.
+This safety cadence must not add a second replay observation loop.
+
+Existing epoch204/205 admission commands have closed prefix contracts and cannot
+admit this singleton by substituting its inputs. The campaign owner must add the
+exact227 admission/launch contract to the Rust fleet tools, binding current
+observation, native proof, capability, guard and service sandbox. Keep the service
+dormant until integration and first-fire proof pass; then register epoch227 in
+the single30-minute status-publication and downstream handoff cycle.
