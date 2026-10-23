@@ -1,8 +1,9 @@
 # Native191 verification dispatcher candidate
 
-Source-only companion to the exact191 custody/pipeline profile. Nothing has
-been compiled, tested, sealed or launched from this candidate. Rustfmt and
-whitespace checks are the only completed checks.
+This records the initial source-only companion to the exact191 custody/pipeline
+profile. Current successful compilation, tests, release hashes and the remaining
+first-post191 transition gap are recorded in [the integration qualification](cohort191-delivery-source-integration.md#qualified-source-baseline2026-10-23).
+No operational verifier, uploader or production delivery service was launched.
 
 `jetstreamer-r2 dispatch-verification-191 PLAN --plan-sha256 SHA --self-sha256 SHA
 [--check-only]` dispatches one epoch/stage from191–194 after the real committed
