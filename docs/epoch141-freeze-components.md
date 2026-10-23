@@ -97,3 +97,23 @@ large vote/SlotHashes message can be represented as null. Preserve complete
 native MESSAGE strings before extracting evidence, and keep consensus counters
 as exact Rust integers or original strings. The full earlier trace was
 recaptured separately; its original sealed journal remains unchanged.
+
+Static inspection of the exact old and new worker binaries found the builtin
+label`solana_bpf_loader_upgradeable_program` only in the new worker. The old
+worker came from the retained20261011deployment; it must not be assumed to
+implement the current source's corrected additional-builtin table. The source
+correction is commit`53947c6d`, and its explicit upstream-table regression is
+already present. String presence is a provenance lead, not complete proof of
+the old table or the causal difference in execution.
+
+A distinct opt-in follow-up feature`epoch141-vote-prefix-diagnostic` depends
+on the frozen-component diagnostic, retains bootstrap60911751, and stops
+after freezing60912005. It therefore includes the formerly failing vote at
+60912005entry388transaction378, but creates no later Bank. It records the
+pre-boundary60911999, transition60912004, and terminal60912005 components;
+each record names its worker terminal and whether this follow-up feature is
+enabled. Existing sealed60912004deployments are unchanged. Four targeted
+diagnostic tests passed under exactRust1.46.0 with one sealed-release probe
+ignored pending a separately sealed follow-up binary. This feature is not
+launch authority: distinct input/package/profile, guard, admission and fleet
+handoff remain required.

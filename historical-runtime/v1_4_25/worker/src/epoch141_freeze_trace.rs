@@ -6,7 +6,10 @@ use std::collections::BTreeMap;
 
 const BOOTSTRAP: u64 = 60_911_751;
 const PRE_BOUNDARY: u64 = 60_911_999;
-const TERMINAL: u64 = 60_912_004;
+#[cfg(not(feature = "epoch141-vote-prefix-diagnostic"))]
+pub(crate) const TERMINAL: u64 = 60_912_004;
+#[cfg(feature = "epoch141-vote-prefix-diagnostic")]
+pub(crate) const TERMINAL: u64 = 60_912_005;
 
 pub(crate) fn bootstrap(slot: u64) -> Result<(), String> {
     if slot != BOOTSTRAP {
@@ -20,7 +23,7 @@ pub(crate) fn bootstrap(slot: u64) -> Result<(), String> {
 
 pub(crate) fn transition(from: u64, to: u64) -> Result<(), String> {
     if from > TERMINAL || (to > TERMINAL && from != TERMINAL) {
-        return Err("freeze-component diagnostic cannot skip or execute past60912004".to_string());
+        return Err(format!("freeze-component diagnostic cannot skip or execute past{}", TERMINAL));
     }
     Ok(())
 }
@@ -81,6 +84,8 @@ fn frozen(bank: &Bank) -> Result<Value, String> {
     let reward_bytes = bincode::serialize(&ordered).map_err(|e| e.to_string())?;
     Ok(json!({
         "schema":"jetstreamer-private-epoch141-frozen-bank-components-v2",
+        "worker_entry_terminal_slot":TERMINAL,
+        "vote_prefix_diagnostic":cfg!(feature="epoch141-vote-prefix-diagnostic"),
         "slot":bank.slot(),"epoch":bank.epoch(),"parent_slot":bank.parent_slot(),"parent_epoch":parent.epoch(),
         "bank_hash":bank.hash().to_string(),"parent_hash":parent_hash.to_string(),
         "accounts_delta_hash":info.hash.to_string(),"accounts_delta_stats":info.stats,
@@ -97,7 +102,7 @@ fn frozen(bank: &Bank) -> Result<Value, String> {
 }
 
 pub(crate) fn record(bank: &Bank) -> Result<(), String> {
-    if bank.slot() == PRE_BOUNDARY || bank.slot() == TERMINAL {
+    if bank.slot() == PRE_BOUNDARY || bank.slot() == 60_912_004 || bank.slot() == TERMINAL {
         eprintln!("epoch141 frozen-bank components: {}", frozen(bank)?);
     }
     Ok(())
