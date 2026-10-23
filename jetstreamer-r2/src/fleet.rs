@@ -19,6 +19,7 @@ mod continuation203;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
+mod full227_status;
 mod native141;
 mod native144;
 mod native203;
@@ -73,6 +74,14 @@ pub(super) fn estimate_readback203() -> Result<()> {
 }
 pub(super) fn capture_warmup223_input() -> Result<()> {
     warmup223_input_capture::run()
+}
+pub(super) async fn publish_full227_status() -> Result<()> {
+    full227_status::run().await
+}
+pub(super) fn full227_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    full227_status::inactive_owner(receipt)
 }
 pub(super) fn admit_warmup223(capture: bool) -> Result<()> {
     warmup223::run(capture)
@@ -2925,6 +2934,7 @@ pub(super) async fn run() -> Result<()> {
             let private_qualification_binding =
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
+                        || full227_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                 });
