@@ -56,7 +56,7 @@ mod bounded_resource_runner {
     impl StorageHooks for WarmupStorage {
         fn capability_only(&self) -> bool {
             env::args()
-                .last()
+                .next_back()
                 .is_some_and(|s| s == "--storage-capability")
         }
         fn capability_result(
