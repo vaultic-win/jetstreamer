@@ -23,6 +23,84 @@ pub(super) const FINGERPRINT: &str =
     "sha256:99fa3de5ed1da720b76e33196d4ef4da9dda57202f12af90eaab60f84f9ecd31";
 pub(super) const GUARD_SHA: &str =
     "134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be";
+pub(super) const NATIVE_GUARD_SHA: &str =
+    "f1e24452d93cf014a7a54ee443e9a1c8266ea94881b57f65203384a72abe4647";
+pub(super) fn native_scope(phase: &str, unit: &str) -> bool {
+    phase == "private-cold-snapshot-verification"
+        && unit == super::singleton227_admission::NATIVE_UNIT
+}
+pub(super) fn native_claim(claim: &PipelineClaim) -> Result<()> {
+    ensure!(
+        claim.epoch == 227 && native_scope(&claim.phase, &claim.unit) && claim.evidence.len() == 1,
+        "227 native live claim scope differs"
+    );
+    ensure!(
+        claim
+            .expected_exec_start
+            .split_once(" ; ignore_errors=")
+            .map(|(s, _)| s)
+            == Some(super::singleton227_capture::native_command().as_str()),
+        "227 native claim command differs"
+    );
+    let r = bound_json(&claim.evidence[0])?;
+    ensure!(
+        r["schema"] == "jetstreamer-private-epoch227-native-input-running-v1"
+            && r["epoch"] == 227
+            && r["unit"] == claim.unit
+            && r["invocation_id"] == claim.invocation_id
+            && r["expected_exec_start"] == claim.expected_exec_start
+            && r["private_run_root"] == super::singleton227_admission::NATIVE_ROOT
+            && r["test_sha256"]
+                == "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"
+            && r["snapshot_sha256"] == SNAPSHOT_SHA
+            && r["maximum_memory_bytes"] == 128u64 << 30
+            && r["maximum_scratch_bytes"] == SCRATCH
+            && r["ordinary_replay_claim"] == false
+            && r["replay_entries"] == 0
+            && r["native_input_qualified"] == false
+            && r["resource_samples_taken"] == 0
+            && r["public_sidecar_countdown_authorized"] == false
+            && r["publication_authorized"] == false
+            && r["r2_mutations"] == false,
+        "227 native running proof differs"
+    );
+    let g = bound_json(&serde_json::from_value(r["guard"].clone())?)?;
+    ensure!(
+        g["guard_sha256"] == NATIVE_GUARD_SHA
+            && g["producer_invocation_id"] == claim.invocation_id
+            && g["native_main"]["main_pid"] == r["main_pid"]
+            && g["native_main"]["sha256"] == r["test_sha256"]
+            && g["workers"].as_array().is_some_and(|v| v.len() == 1)
+            && g["workers"][0][0] == r["main_pid"]
+            && g["workers"][0][1]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n < 3500000),
+        "227 native owner/VMA proof differs"
+    );
+    Ok(())
+}
+pub(super) fn native_live(claim: &PipelineClaim, current: &Value) -> Result<()> {
+    native_claim(claim)?;
+    let r = bound_json(&claim.evidence[0])?;
+    ensure!(
+        current["InvocationID"] == claim.invocation_id
+            && current["NRestarts"] == "0"
+            && current["ActiveState"] == "active"
+            && current["SubState"] == "running"
+            && current["MainPID"]
+                .as_str()
+                .and_then(|p| p.parse::<u64>().ok())
+                == r["main_pid"].as_u64()
+            && pipeline_status::same_exec_start(
+                &claim.expected_exec_start,
+                current["ExecStart"]
+                    .as_str()
+                    .context("227 native live command")?
+            ),
+        "227 native live identity changed"
+    );
+    Ok(())
+}
 pub(super) const PEAK: u64 = 471_798_691_840;
 pub(super) const SCRATCH: u64 = 300_000_000_000;
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
@@ -127,7 +205,7 @@ pub(super) fn native_valid(v: &Value) -> Result<()> {
         v["schema"] == "jetstreamer-private-epoch227-native-input-qualified-v1"
             && v["epoch"] == 227
             && v["test_sha256"]
-                == "229191c382de07872b8e44697f1fe2e92866fbcda06a93baac32e2c0784d3ba9"
+                == "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"
             && v["snapshot_sha256"] == SNAPSHOT_SHA
             && v["bootstrap_slot"] == 98063464u64
             && v["accounts_hash"] == "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR"

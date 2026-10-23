@@ -2,9 +2,9 @@
 use super::*;
 use super::{singleton227 as c, singleton227_admission as admission};
 const GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-ownroot203-capability-8623b37c-v1/jetstreamer-horizon-standalone-guard";
-const TEST: &str =
-    "/var/lib/jetstreamer/horizon-227-capped-candidate-710f6523-v1/native-input-test";
-const TEST_SHA: &str = "229191c382de07872b8e44697f1fe2e92866fbcda06a93baac32e2c0784d3ba9";
+const NATIVE_GUARD_BIN: &str = "/var/lib/jetstreamer/horizon-native227-main-guard-f1e24452-v1/jetstreamer-horizon-standalone-guard";
+const TEST: &str = "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test";
+const TEST_SHA: &str = "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
@@ -14,6 +14,8 @@ struct Spec {
     guard: BoundFile,
     guard_plan: BoundFile,
     output: PathBuf,
+    #[serde(default)]
+    native_running: bool,
 }
 fn properties(unit: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     let out = ProcessCommand::new("/usr/bin/systemctl")
@@ -98,11 +100,16 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
         p.get("ReadWritePaths").map(String::as_str) == guard_plan["receipt_directory"].as_str(),
         "227 protective write scope differs"
     );
+    let (guard_bin, guard_sha) = if mode == "native-cold" {
+        (NATIVE_GUARD_BIN, c::NATIVE_GUARD_SHA)
+    } else {
+        (GUARD_BIN, c::GUARD_SHA)
+    };
     let command = format!(
-        "{{ path={GUARD_BIN} ; argv[]={GUARD_BIN} {} --plan-sha256 {} --self-sha256 {}",
+        "{{ path={guard_bin} ; argv[]={guard_bin} {} --plan-sha256 {} --self-sha256 {}",
         plan.path.display(),
         plan.sha256,
-        c::GUARD_SHA
+        guard_sha
     );
     ensure!(
         p["ExecStart"]
@@ -132,7 +139,7 @@ fn manager(mode: &str, guard: &Value, plan: &BoundFile) -> Result<Value> {
     );
     Ok(json!({"properties":p,"timer":timer,"manager_completion":success[0],"journal_sha256":sha}))
 }
-fn native_command() -> String {
+pub(super) fn native_command() -> String {
     format!(
         "{{ path={TEST} ; argv[]={TEST} runtime::tests::native_epoch227_cold_input_matches_canonical_accounts_commitment --exact --ignored --test-threads=1 --nocapture"
     )
@@ -255,7 +262,8 @@ pub(super) fn run() -> Result<()> {
     let s: Spec = serde_json::from_value(bound_json(&b)?)?;
     ensure!(
         s.schema == "jetstreamer-private-epoch227-singleton-capture-spec-v1"
-            && matches!(s.mode.as_str(), "native-cold" | "replay"),
+            && matches!(s.mode.as_str(), "native-cold" | "replay")
+            && (!s.native_running || s.mode == "native-cold"),
         "227 capture scope differs"
     );
     ensure!(
@@ -265,9 +273,9 @@ pub(super) fn run() -> Result<()> {
                 .and_then(Path::file_name)
                 .and_then(|n| n.to_str())
                 .is_some_and(|n| n.starts_with("horizon-227-capture-"))
-            && s.output
-                .file_name()
-                .is_some_and(|n| n == "launch.json" || n == "native.json"),
+            && s.output.file_name().is_some_and(|n| n == "launch.json"
+                || n == "native.json"
+                || (s.native_running && n == "intent.json")),
         "227 capture destination differs"
     );
     if s.output.try_exists()? {
@@ -299,7 +307,12 @@ pub(super) fn run() -> Result<()> {
             && guarded >= admitted
             && guarded - admitted <= 900
             && guarded <= now
-            && now - admitted <= if s.mode == "native-cold" { 3600 } else { 900 },
+            && now - admitted
+                <= if s.mode == "native-cold" && !s.native_running {
+                    3600
+                } else {
+                    900
+                },
         "227 missing/stale launch admission"
     );
     let (unit, root, peak) = if s.mode == "native-cold" {
@@ -325,7 +338,12 @@ pub(super) fn run() -> Result<()> {
             && p["maximum_worker_vmas"] == 3500000
             && p.get("bounded_canary").is_none_or(Value::is_null)
             && p.get("bounded_measurement").is_none_or(Value::is_null)
-            && g["guard_sha256"] == c::GUARD_SHA
+            && g["guard_sha256"]
+                == if s.mode == "native-cold" {
+                    c::NATIVE_GUARD_SHA
+                } else {
+                    c::GUARD_SHA
+                }
             && g["plan_sha256"] == s.guard_plan.sha256
             && g["producer"]["invocation_id"] == iid
             && g["producer"]["cgroup"] == format!("/system.slice/{unit}")
@@ -374,6 +392,20 @@ pub(super) fn run() -> Result<()> {
         unit,
         "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,NoNewPrivileges,ReadWritePaths,Environment,ExecMainPID,ExecMainStatus,Result,ActiveState,SubState,NRestarts,ExecStart",
     )?;
+    if s.mode == "native-cold" {
+        ensure!(
+            p["native_main"]["executable"] == TEST
+                && p["native_main"]["sha256"] == TEST_SHA
+                && p["native_main"]["main_pid"] == g["producer"]["pid"]
+                && g["native_main"] == p["native_main"],
+            "227 native MainPID executable binding differs"
+        );
+    } else {
+        ensure!(
+            p.get("native_main").is_none_or(Value::is_null),
+            "227 replay cannot borrow native process semantics"
+        );
+    }
     require(
         &sandbox,
         &[
@@ -401,11 +433,29 @@ pub(super) fn run() -> Result<()> {
                 ("MemoryMax", "137438953472"),
                 ("TasksMax", "512"),
                 ("RuntimeMaxUSec", "45min"),
-                ("ActiveState", "inactive"),
-                ("SubState", "dead"),
-                ("ExecMainStatus", "0"),
             ],
         )?;
+        if s.native_running {
+            require(
+                &sandbox,
+                &[("ActiveState", "active"), ("SubState", "running")],
+            )?;
+            ensure!(
+                u["InvocationID"] == iid
+                    && u["MainPID"].as_str().and_then(|p| p.parse::<u64>().ok())
+                        == g["producer"]["pid"].as_u64(),
+                "227 native running identity changed"
+            );
+        } else {
+            require(
+                &sandbox,
+                &[
+                    ("ActiveState", "inactive"),
+                    ("SubState", "dead"),
+                    ("ExecMainStatus", "0"),
+                ],
+            )?;
+        }
         ensure!(
             sandbox["ExecStart"]
                 .split_once(" ; ignore_errors=")
@@ -415,14 +465,27 @@ pub(super) fn run() -> Result<()> {
                     == g["producer"]["pid"]
                         .as_u64()
                         .context("227 native guarded PID")?
-                && g["workers"].as_array().is_some_and(Vec::is_empty),
+                && g["workers"].as_array().is_some_and(|w| w.len() == 1)
+                && g["workers"][0][0] == g["producer"]["pid"]
+                && g["workers"][0][1]
+                    .as_u64()
+                    .is_some_and(|n| n > 0 && n < 3500000),
             "227 native command/PID differs"
         );
-        let (rows, journal_sha) = journal(unit)?;
-        let native = marker(&rows, iid)?;
-        json!({"schema":"jetstreamer-private-epoch227-native-input-qualified-v1","epoch":227,"test_sha256":TEST_SHA,
+        if s.native_running {
+            json!({"schema":"jetstreamer-private-epoch227-native-input-running-v1","epoch":227,"unit":unit,"private_run_root":root,
+                "invocation_id":iid,"main_pid":g["producer"]["pid"],"test_sha256":TEST_SHA,"snapshot_sha256":c::SNAPSHOT_SHA,
+                "expected_exec_start":u["ExecStart"],"maximum_memory_bytes":128u64<<30,"maximum_scratch_bytes":c::SCRATCH,
+                "observer":a["observer"],"fleet":a["fleet"],"resource_samples_taken":0,"ordinary_replay_claim":false,
+                "verification_status":{"phase":"native-input-verification","active":true,"epoch":227,"entry_replay":false,"native_input_qualified":false},
+                "replay_entries":0,"native_input_qualified":false,"public_sidecar_countdown_authorized":false})
+        } else {
+            let (rows, journal_sha) = journal(unit)?;
+            let native = marker(&rows, iid)?;
+            json!({"schema":"jetstreamer-private-epoch227-native-input-qualified-v1","epoch":227,"test_sha256":TEST_SHA,
             "snapshot_sha256":c::SNAPSHOT_SHA,"bootstrap_slot":98063464u64,"accounts_hash":"4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR",
             "native_marker":native,"journal_sha256":journal_sha,"child_success":true,"child_exit_code":0,"producer_terminal_and_zero_restarts":true,"replay_entries":0,"bootstrap_writes":0})
+        }
     } else {
         require(
             &sandbox,
@@ -475,9 +538,9 @@ pub(super) fn run() -> Result<()> {
     result["guard_manager"] = manager;
     let after = census(&names, 201, 300)?;
     ensure!(before == after, "227 owner census changed during capture");
-    if s.mode == "native-cold" {
+    if s.mode == "native-cold" && !s.native_running {
         c::native_valid(&result)?;
-    } else {
+    } else if s.mode == "replay" {
         let claim = DiagnosticClaim {
             epoch: 227,
             unit: unit.into(),

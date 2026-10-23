@@ -10,6 +10,7 @@ repository.workspace = true
 documentation.workspace = true
 
 [features]
+epoch227-native-main-guard = []
 epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]
 # Pins the separate bounded epoch225 upstream-comparison worker, not an era.

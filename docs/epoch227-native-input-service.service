@@ -31,4 +31,4 @@ Environment=RUST_MIN_STACK=67108864
 Environment=SOLANA_RAYON_THREADS=8
 Environment=JETSTREAMER_HISTORICAL_POH_THREADS=2
 Environment=JETSTREAMER_EPOCH227_V1620_TEST_SCRATCH=/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch
-ExecStart=/var/lib/jetstreamer/horizon-227-capped-candidate-710f6523-v1/native-input-test runtime::tests::native_epoch227_cold_input_matches_canonical_accounts_commitment --exact --ignored --test-threads=1 --nocapture
+ExecStart=/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test runtime::tests::native_epoch227_cold_input_matches_canonical_accounts_commitment --exact --ignored --test-threads=1 --nocapture

@@ -143,11 +143,16 @@ The native zero-entry service has its own review template,
 `horizon-native-input-227-capped-710f6523-v1.service`. It uses disk scratch,
 112/128GiB high/hard memory caps, eight CPUs and a45-minute execution ceiling.
 Its guard uses the entire native attempt root, a300GB physical cap and the
-admission's exact protected floor. The reviewed standalone guard intentionally
-recognizes no entry worker in this native test; native capture requires zero
-entry workers and an actual successful terminal test, not a replay-worker claim.
-The test's hard memory/time ceilings and the bound kernel VMA admission remain
-independent. Native capture binds the successful test journal to the exact guard
+admission's exact protected floor. Use the separately compiled
+`epoch227-native-main-guard` profile, never the ordinary replay guard. Its
+`native_main` binding names the exact optimized native test executable,
+SHA-256 and live MainPID. It requires that PID to be the only cgroup process,
+checks its actual mapped executable inode and digest through `/proc/PID/exe`,
+and counts its VMAs. Escaped/replaced executables, unreadable maps and additional
+processes stop the exact bound invocation. The ordinary historical-worker route
+and healthy sealed guard deployments remain unchanged. Native capture requires
+one explicit native owner below the VMA ceiling and an actual successful terminal
+test. It binds the successful test journal to the exact guard
 invocation/PID, preserves raw consensus integers, checks the canonical bootstrap
 commitment and requires zero replay entries and bootstrap writes.
 
@@ -160,3 +165,23 @@ Capture requires the exact guard invocation's PID1 successful completion and
 an active waiting safety timer. Native qualification never authorizes a replay
 or an R2 status object. Register a public in-flight status only after the entry
 lane actually starts and has a valid coordinated observer/ETA binding.
+
+The native harness must be the optimized historical rustc1.51 build at
+`/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test`,
+SHA-256 `1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3`.
+The earlier debug harness remains preserved and is not qualified for this launch.
+The new native guard is sealed at
+`/var/lib/jetstreamer/horizon-native227-main-guard-f1e24452-v1`, SHA-256
+`f1e24452d93cf014a7a54ee443e9a1c8266ea94881b57f65203384a72abe4647`.
+Entry replay retains its independently reviewed old guard/hash.
+
+Set `native_running:true` in a native capture spec to create a protected live
+`intent.json` before the test finishes. It requires the actual MainPID/VMA guard
+fire and live sandbox, emits no qualification claim, and includes a generic
+`verification_status` object describing the active native input check. Use
+`native_scope`, `native_claim` and `native_live` hooks when registering this
+intent as a private cold-snapshot pipeline in the campaign ledger. The same
+capture command without that flag later requires the actual successful terminal
+test and writes `native.json`. Neither intent nor qualification is an entry
+replay or a sidecar countdown. The campaign owner must bind any dashboard
+verification-status publication to its reviewed publisher and ETA model.
