@@ -107,3 +107,56 @@ canonical matching UTC/Unix clocks, sealed inputs and current guard/admission
 evidence. Its dashboard phase is `verification`; every qualification/publication
 gate remains closed. The89523820MD5/auth incident remains separate from this
 bootstrap-only check.
+
+### Dormant admission and registry contract
+
+The separate guard build enables `epoch207-native-main-guard`, which implies
+`epoch227-native-main-guard` so the normal all-features CI build stays valid.
+It retains the existing observer and complete 227 tuple. A 207 plan must bind
+all four exact values together:
+
+| Binding | Exact value |
+| --- | --- |
+| Unit | `archive-207-v1616-native-input-actual-v1.service` |
+| Run root | `/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-v1` |
+| Executable | `/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test` |
+| SHA-256 | `3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948` |
+
+Mixed tuples, unknown units, PID 1, alternative disk/VMA caps and bounded-canary
+or measurement exceptions are rejected. The guard additionally binds the actual
+systemd invocation and MainPID, unique cgroup owner, mapped executable inode and
+hash. Build and seal a separate guard package; never replace the sealed 227 guard.
+
+The dormant service template is [epoch207-native-input-service.service](epoch207-native-input-service.service).
+Before launch, the campaign owner must supply the latest accepted complete-fleet
+observer and ledger paths/digests, century floor, remaining-growth claims and
+memory reservations including every native auxiliary. The 300 GB scratch bound
+is a maximum planning claim, separate from already occupied input files. The
+native job's 128 GiB hard memory cap and 112 GiB high watermark are explicit
+claims; they do not imply capacity on a stale observation. Require an empty
+owner-private scratch root, sealed input/harness/service digests and no prior
+live owner of the exact unit or run root. Actual invocation/MainPID bindings
+can only be finalized after the owner's coordinated launch; seal and prove
+the guard's first actual sandboxed no-trip fire immediately thereafter.
+
+Register the native origin through the existing approved-native pipeline status
+publisher. It must bind the actual invocation, unit, origin path/digest and
+canonical matching `recorded_unix_seconds` / `sampled_at_utc` clocks, with
+`resource_samples_taken: 0`, `entry_replay: false`, `publication_authorized: false`,
+`remote_mutations: false` and `r2_mutations: false`. Preserve current admission
+and guard evidence in the claim. The absent zero-output archive is
+`origin.parent/epoch-207.jet`; verify absence rather than creating an empty file.
+Use the initial launch event to bind the origin and carry the claim into the
+central fleet ledger. Publish wire phase `verification` and an inclusive
+definite sidecar ETA through the owner's existing 30-minute observation cycle.
+The private pipeline claim phase is `private-cold-snapshot-verification`.
+The status model sets `origin_launch` to the immutable origin, `peer_units` to
+an empty list and `expected_jet_size_bytes` to zero; its unit, invocation and
+expected `ExecStart` must match the actual launch exactly. Elapsed time comes
+from the unique PID1 producer start, not the later intent capture. The current
+registry helper approves only 223 and 227: the owner must dispatch and approve
+a separate 207 validator binding the exact harness, bootstrap, guard, schema
+and bootstrap-only scope before admitting this origin. Do not borrow another
+epoch's validator or infer approval from the generic reader accepting JSON.
+Neither the service template, origin registration, guard success nor status
+publication opens a replay, root-metadata or archive-publication gate.

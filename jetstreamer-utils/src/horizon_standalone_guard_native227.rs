@@ -9,22 +9,32 @@ pub(super) struct Binding {
     pub main_pid: u32,
 }
 pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
+    let profile227 = cfg!(feature = "epoch227-native-main-guard")
+        && p.unit == "horizon-native-input-227-capped-710f6523-v1.service"
+        && p.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1")
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test",
+            )
+        && n.sha256 == "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3";
+    let profile207 = cfg!(feature = "epoch207-native-main-guard")
+        && p.unit == "archive-207-v1616-native-input-actual-v1.service"
+        && p.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-v1")
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test",
+            )
+        && n.sha256 == "3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948";
     ensure!(
-        cfg!(feature = "epoch227-native-main-guard")
-            && p.unit == "horizon-native-input-227-capped-710f6523-v1.service"
-            && p.worker_root
-                == Path::new("/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1")
-            && n.executable
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test"
-                )
-            && n.sha256 == "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"
+        (profile227 || profile207)
             && n.main_pid > 1
             && p.maximum_root_physical_bytes == Some(300_000_000_000)
             && p.maximum_worker_vmas == 3500000
             && p.bounded_canary.is_none()
             && p.bounded_measurement.is_none(),
-        "native227 guard profile differs"
+        "native input guard profile differs"
     );
     Ok(())
 }
@@ -122,6 +132,55 @@ fn observe_at(
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+    #[test]
+    fn epoch207_requires_its_complete_registered_tuple_and_preserves227() {
+        let mut p: Plan = serde_json::from_value(json!({
+            "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"archive-207-v1616-native-input-actual-v1.service",
+            "invocation_id":"a".repeat(32),"filesystem":"/","minimum_free_bytes":1,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-v1",
+            "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":300_000_000_000u64,
+            "receipt_directory":"/receipts"
+        }))
+        .unwrap();
+        let mut n = Binding {
+            executable:
+                "/var/lib/jetstreamer/horizon-207-native-input-optimized-3a2a-v1/native-input-test"
+                    .into(),
+            sha256: "3a2a21e2987ee7c66785bfc64f1caaf4dfc000871ef692278ed83b3f63c65948".into(),
+            main_pid: 123,
+        };
+        assert_eq!(
+            validate(&p, &n).is_ok(),
+            cfg!(feature = "epoch207-native-main-guard")
+        );
+        p.unit = "horizon-native-input-227-capped-710f6523-v1.service".into();
+        assert!(
+            validate(&p, &n).is_err(),
+            "a registered unit cannot borrow the 207 root/executable"
+        );
+        p.worker_root = "/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1".into();
+        assert!(
+            validate(&p, &n).is_err(),
+            "a registered root cannot borrow the 207 executable"
+        );
+        n.executable =
+            "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test".into();
+        assert!(
+            validate(&p, &n).is_err(),
+            "a registered executable cannot borrow the 207 digest"
+        );
+        n.sha256 = "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3".into();
+        assert_eq!(
+            validate(&p, &n).is_ok(),
+            cfg!(feature = "epoch227-native-main-guard")
+        );
+        n.main_pid = 1;
+        assert!(validate(&p, &n).is_err());
+        n.main_pid = 123;
+        p.unit = "unknown-native.service".into();
+        assert!(validate(&p, &n).is_err());
+    }
     #[test]
     fn native_plan_cannot_borrow_an_ordinary_worker_or_another_unit() {
         let mut p:Plan=serde_json::from_value(json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":"horizon-native-input-227-capped-710f6523-v1.service","invocation_id":"a".repeat(32),"filesystem":"/","minimum_free_bytes":1,
