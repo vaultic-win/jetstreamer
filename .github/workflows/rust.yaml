@@ -62,6 +62,10 @@ jobs:
             scope: "-p jetstreamer-horizon-observe"
             flags: "--features epoch223-v1620-native-input"
             examples: false
+          - name: observer-epoch223-v1620-native-input-release
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-v1620-native-input-release"
+            examples: false
           - name: node-epoch213-continuation
             scope: "-p jetstreamer-node"
             flags: "--features epoch213-checkpoint-continuation-diagnostic"

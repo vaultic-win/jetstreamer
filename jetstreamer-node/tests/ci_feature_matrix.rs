@@ -126,6 +126,8 @@ fn observer_feature_families_are_complete_and_epoch223_remains_isolated() {
         "epoch223-tail-snapshot-tests",
         "epoch223-cold-snapshot-tests",
         "epoch223-warmup-snapshot-tests",
+        "epoch223-v1620-native-input",
+        "epoch223-v1620-native-input-release",
     ] {
         let isolated: Vec<_> = observer
             .iter()

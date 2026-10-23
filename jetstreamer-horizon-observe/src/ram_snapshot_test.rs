@@ -119,7 +119,9 @@ const SNAPSHOT_SIZE: u64 = if COLD223 {
     8_046_142_592
 };
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const TEST_SHA: &str = if V1620 {
+const TEST_SHA: &str = if cfg!(feature = "epoch223-v1620-native-input-release") {
+    "526448fac7ff1db52450947cdbb0acab46cacf96d356ff36325b7b87c0596486"
+} else if V1620 {
     "01e69e4a5a1ec30d5ad9055c60aa5f1dc98e7fddc93001cd2db389937e78079a"
 } else if cfg!(feature = "epoch223-warmup-snapshot-tests") {
     "647665f8abc11570f40d0fac45c4e17dbe7c1c86a0a91da5700fe03fc3f4ab67"
@@ -219,6 +221,26 @@ fn receipt_schema(kind: &str) -> String {
             "v1616"
         }
     )
+}
+fn metadata_utc(seconds: u64) -> Result<String> {
+    let seconds = libc::time_t::try_from(seconds)?;
+    let mut parts = std::mem::MaybeUninit::<libc::tm>::uninit();
+    ensure!(
+        !unsafe { libc::gmtime_r(&seconds, parts.as_mut_ptr()) }.is_null(),
+        "native UTC clock conversion"
+    );
+    let parts = unsafe { parts.assume_init() };
+    let mut out = [0u8; 32];
+    let written = unsafe {
+        libc::strftime(
+            out.as_mut_ptr().cast(),
+            out.len(),
+            c"%Y-%m-%dT%H:%M:%SZ".as_ptr(),
+            &parts,
+        )
+    };
+    ensure!(written == 20, "native canonical UTC clock length");
+    Ok(std::str::from_utf8(&out[..written])?.into())
 }
 fn is_sha(s: &str) -> bool {
     s.len() == 64
@@ -994,11 +1016,12 @@ fn execute(p: &Plan, plan_hash: &str, self_hash: &str) -> Result<()> {
     verify_released_225()?;
     let resources_before = resource_snapshot(p)?;
     if V1620 {
+        let recorded = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let intent = json!({"schema":receipt_schema("intent"),"invocation_id":inv,"plan_sha256":plan_hash,"self_sha256":self_hash,
             "test_sha256":TEST_SHA,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,
             "maximum_memory_bytes":MEMORY_MAX,"tmpfs_bytes":TMPFS_SIZE,"resources_before":resources_before,
             "observer":{"path":p.observer.path,"sha256":p.observer.sha256},"fleet":{"path":p.fleet.path,"sha256":p.fleet.sha256},
-            "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"resource_samples_taken":0,
+            "recorded_unix_seconds":recorded,"sampled_at_utc":metadata_utc(recorded)?,"resource_samples_taken":0,
             "entry_replay":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
         write_new(&p.receipt_directory, "intent.json", &intent)?;
     } else {

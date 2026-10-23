@@ -1,6 +1,8 @@
 //! Exact native input qualification of the bounded223worker, never entry replay.
 use super::*;
-const PACKAGE: &str = if V1620 {
+const PACKAGE: &str = if cfg!(feature = "epoch223-v1620-native-input-release") {
+    "/var/lib/jetstreamer/horizon-223-v1620-native-release-test-v1"
+} else if V1620 {
     "/var/lib/jetstreamer/horizon-223-v1620-native-test-v1"
 } else {
     "/var/lib/jetstreamer/horizon-223-warmup-e3d48954-v1"
@@ -156,6 +158,12 @@ pub(super) fn validate_observer(o: &Value, now: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_event_clock_is_canonical_and_never_wraps_unsigned_seconds() {
+        assert_eq!(metadata_utc(1_792_774_959).unwrap(), "2026-10-23T17:02:39Z");
+        assert_eq!(metadata_utc(0).unwrap(), "1970-01-01T00:00:00Z");
+        assert!(metadata_utc(u64::MAX).is_err());
+    }
     #[test]
     fn selected_native_harness_requires_its_exact_list_and_receipt_era() {
         let count = if V1620 {
