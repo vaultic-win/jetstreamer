@@ -1060,6 +1060,20 @@ mod tests {
     fn complete_native_plans_pass_the_same_validator_used_before_runtime_observation() {
         for (unit, root, exe, sha, enabled) in [
             (
+                "archive-210-v1616-native-input-small-v2.service",
+                "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2",
+                "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
+                "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
+                cfg!(feature = "epoch210-native-small"),
+            ),
+            (
+                "horizon-native-input-227-v1625-small-v2.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2",
+                "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
+                "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef",
+                cfg!(feature = "epoch227-v1625-native-small"),
+            ),
+            (
                 "horizon-native-input-227-v1625-7a831420-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1",
                 "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
@@ -1102,12 +1116,22 @@ mod tests {
                 cfg!(feature = "epoch227-native-main-guard"),
             ),
         ] {
+            let root_bytes = if unit.ends_with("-small-v2.service") {
+                96_000_000_000u64
+            } else {
+                300_000_000_000u64
+            };
             let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":unit,"invocation_id":"a".repeat(32),
                 "filesystem":"/","minimum_free_bytes":1,"worker_root":root,"maximum_worker_vmas":3500000,
-                "maximum_root_physical_bytes":300_000_000_000u64,"receipt_directory":"/sealed/receipts",
+                "maximum_root_physical_bytes":root_bytes,"receipt_directory":"/sealed/receipts",
                 "native_main":{"executable":exe,"sha256":sha,"main_pid":42}});
             let plan: Plan = serde_json::from_value(value.clone()).unwrap();
             assert_eq!(validate_plan(&plan).is_ok(), enabled, "{unit}");
+            if root_bytes == 96_000_000_000 {
+                let mut wrong = value.clone();
+                wrong["maximum_root_physical_bytes"] = json!(300_000_000_000u64);
+                assert!(validate_plan(&serde_json::from_value(wrong).unwrap()).is_err());
+            }
             for (pointer, replacement) in [
                 ("/schema", json!("unknown")),
                 ("/unit", json!("horizon-qualify-unknown.service")),

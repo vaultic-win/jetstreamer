@@ -63,6 +63,9 @@ const STATUS_DELETION_RECEIPT_SCHEMA: &str =
 
 mod cohort160_finalization;
 mod cohort160_handoff;
+mod cohort191_delivery;
+mod cohort191_dispatch;
+mod cohort191_queue_run;
 mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
@@ -75,6 +78,8 @@ mod native223_status;
 mod pipeline_status;
 mod qualification_status;
 mod readback_progress;
+mod repair141;
+mod repair141_model;
 mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
@@ -136,7 +141,7 @@ struct PublicConfig {
     base_url: Url,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 struct FileIdentity {
     device: u64,
     inode: u64,
@@ -1721,11 +1726,38 @@ async fn publish_epoch_status_inner(
     status: &EpochStatus,
     initial144_handoff: bool,
 ) -> Result<(String, Option<String>)> {
+    publish_epoch_status_checked(s3, r2, status, initial144_handoff, None).await
+}
+async fn publish_epoch_status_bound_previous(
+    s3: &Client,
+    r2: &R2Config,
+    status: &EpochStatus,
+    previous: Option<&str>,
+) -> Result<(String, Option<String>)> {
+    publish_epoch_status_checked(s3, r2, status, false, Some(previous)).await
+}
+async fn publish_epoch_status_checked(
+    s3: &Client,
+    r2: &R2Config,
+    status: &EpochStatus,
+    initial144_handoff: bool,
+    expected_previous: Option<Option<&str>>,
+) -> Result<(String, Option<String>)> {
     let epoch = status.epoch;
     validate_epoch_status(status, epoch)?;
     let status_bytes = epoch_status_bytes(status)?;
     let key = format!("epoch-{epoch}.epoch-status.json");
     let previous = get_mutable_object(s3, &r2.bucket, &key).await?;
+    if let Some(expected) = expected_previous {
+        ensure!(
+            repair141_model::same_owned_version(
+                expected,
+                previous.as_ref().map(|o| o.etag.as_str())
+            ),
+            "status owner/version changed after authenticated handoff preflight"
+        );
+    }
+
     let action = if let Some(previous) = &previous {
         let previous_status: EpochStatus =
             serde_json::from_slice(&previous.bytes).context("existing status JSON is invalid")?;
@@ -3350,12 +3382,22 @@ async fn main() -> Result<()> {
                 | "holding-restore"
                 | "holding-admit-restore"
                 | "holding-restore-genesis-probe"
+                | "holding-diagnose185-references"
+                | "holding-reconcile185-staged"
+                | "holding-inspect185"
+                | "holding-check-retire185"
+                | "holding-retire185"
                 | "holding-inspect136"
+                | "holding-disable136-retry"
+                | "holding-check-retire136"
+                | "holding-retire136"
         )
     ) {
         return holding::run().await;
     }
     match env::args().nth(1).as_deref() {
+        Some("prepare-epoch136-capped-layout") => return fleet::prepare_epoch136_capped(),
+        Some("capture-epoch136-capped-launch") => return fleet::capture_epoch136_capped(),
         Some("prepare-original141-capped-layout") => return fleet::prepare_original141_capped(),
         Some("capture-original141-capped-launch") => return fleet::capture_original141_capped(),
         Some("prepare-original141-vote-prefix-layout") => {
@@ -3374,6 +3416,9 @@ async fn main() -> Result<()> {
         Some("probe-continuation203-inputs") => return fleet::probe_continuation203_inputs(),
         Some("capture-continuation203-launch") => return fleet::capture_continuation203_launch(),
         _ => {}
+    }
+    if env::args().nth(1).as_deref() == Some("admit-epoch136-capped") {
+        return fleet::admit_epoch136_capped().await;
     }
     if env::args().nth(1).as_deref() == Some("admit-original141") {
         return fleet::admit_original141().await;
@@ -3456,8 +3501,41 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("repair-task-capture-141") {
+        return repair141::task_capture();
+    }
+    if env::args().nth(1).as_deref() == Some("repair-owner-141") {
+        return repair141::owner_run();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-repair141") {
+        return repair141::publish().await;
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("capture-terminal191") {
+        return cohort191_delivery::capture_terminal_transition();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-controller-terminal-191") {
+        return cohort191_delivery::capture_controller_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("check-delivery-191") {
+        return cohort191_delivery::check();
+    }
+    if env::args().nth(1).as_deref() == Some("sync-verified191") {
+        return cohort191_queue_run::sync_verified();
+    }
+    if env::args().nth(1).as_deref() == Some("delivery-queue-191") {
+        return cohort191_queue_run::run();
+    }
+    if env::args().nth(1).as_deref() == Some("dispatch-verification-191") {
+        return cohort191_dispatch::run();
+    }
+    if env::args().nth(1).as_deref() == Some("observe-delivery-191") {
+        return cohort191_delivery::run();
+    }
+    if env::args().nth(1).as_deref() == Some("capped141-terminal-capture") {
+        return inactive_status::capture_capped141_terminal();
     }
     if env::args().nth(1).as_deref() == Some("status-publish-full227") {
         return fleet::publish_full227_status().await;

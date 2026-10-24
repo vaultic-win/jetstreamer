@@ -19,6 +19,7 @@ mod continuation203;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
+mod epoch136;
 mod full209_status;
 mod full227_failure;
 mod full227_status;
@@ -43,6 +44,7 @@ mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
 mod native227_v1625;
+mod native227_terminal_observation;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
 mod native227_v1625_event;
@@ -109,6 +111,15 @@ pub(crate) mod watch198;
 
 pub(super) async fn admit_original141() -> Result<()> {
     original141::admit().await
+}
+pub(super) async fn admit_epoch136_capped() -> Result<()> {
+    epoch136::admit().await
+}
+pub(super) fn capture_epoch136_capped() -> Result<()> {
+    epoch136::capture()
+}
+pub(super) fn prepare_epoch136_capped() -> Result<()> {
+    epoch136::prepare()
 }
 pub(super) fn estimate_readback203() -> Result<()> {
     readback203_estimate::run()
@@ -302,6 +313,10 @@ pub(super) fn capture_native210_terminal() -> Result<()> {
 }
 pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
     Ok((native210::UNIT.into(), native210_terminal::validate(proof)?))
+}
+/// A derived accounting view only; raw observer/fleet bindings stay immutable.
+pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<Value> {
+    native227_terminal_observation::view(f,o)
 }
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
@@ -656,6 +671,15 @@ pub(super) fn pipeline_unit_range(
     if watch198::namespace(phase, unit) {
         return Ok(198..=198);
     }
+    if super::repair141::scope(phase, unit) {
+        return Ok(141..=141);
+    }
+    if super::cohort191_delivery::queue_scope(phase, unit) {
+        return Ok(191..=194);
+    }
+    if let Some(epoch) = super::cohort191_delivery::queue_sync_epoch(phase, unit) {
+        return Ok(epoch..=epoch);
+    }
     if phase == "producer-finalization" {
         return super::cohort_finalization::scope(unit);
     }
@@ -840,6 +864,21 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
                     .is_some_and(|pid| pid > 0),
             "pipeline live identity or exact command changed"
         );
+        if super::repair141::scope(&claim.phase, &claim.unit) {
+            let evidence = claim
+                .evidence
+                .iter()
+                .map(bound_json)
+                .collect::<Result<Vec<_>>>()?;
+            super::repair141::validate_fleet_claim(
+                claim.epoch,
+                &claim.phase,
+                &claim.unit,
+                &claim.invocation_id,
+                &claim.expected_exec_start,
+                &evidence,
+            )?;
+        }
         if private144_scan::scope(&claim.phase, &claim.unit) {
             private144_scan::validate_live(claim, current)?;
         }
@@ -983,6 +1022,7 @@ fn validate_same_sample_admission(
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
+        136 if epoch136::namespace(claim) => epoch136::GUARD_SHA,
         141 if original141_capped::namespace(claim) => original141_capped::GUARD_SHA,
         141 if original141_vote_prefix::namespace(claim) => original141_vote_prefix::GUARD_SHA,
         141 if original141_freeze::namespace(claim) => original141_freeze::GUARD_SHA,
@@ -1081,7 +1121,8 @@ fn validate_same_sample_admission(
             && guard
                 .get("worker_observation_error")
                 .is_some_and(Value::is_null)
-            && if original141_trace::namespace(claim)
+            && if epoch136::namespace(claim)
+                || original141_trace::namespace(claim)
                 || original141_freeze::namespace(claim)
                 || original141_vote_prefix::namespace(claim)
                 || original141_capped::namespace(claim)
@@ -1142,7 +1183,8 @@ fn validate_same_sample_admission(
 }
 
 fn diagnostic_guard_worker_root(claim: &DiagnosticClaim) -> PathBuf {
-    if original141_trace::namespace(claim)
+    if epoch136::namespace(claim)
+        || original141_trace::namespace(claim)
         || original141_freeze::namespace(claim)
         || original141_vote_prefix::namespace(claim)
         || original141_capped::namespace(claim)
@@ -1195,6 +1237,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if epoch136::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| epoch136::guard_matches(claim, &r, plan));
+    }
     if original141_capped::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| original141_capped::guard_matches(claim, &r, plan));
@@ -1316,6 +1362,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if epoch136::namespace(claim) || receipt["schema"] == epoch136::SCHEMA {
+        return epoch136::launch(receipt, claim);
+    }
     if original141_capped::namespace(claim) || receipt["schema"] == original141_capped::SCHEMA {
         return original141_capped::launch(receipt, claim);
     }
@@ -2068,6 +2117,8 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
+            || ((first_epoch..=last_epoch).contains(&210) && native210::unit_name(name))
+            || ((first_epoch..=last_epoch).contains(&227) && native227_v1625::unit_name(name))
         {
             ensure!(
                 names.contains(name),
@@ -2595,6 +2646,14 @@ pub(super) async fn run() -> Result<()> {
     }
     let mut diagnostic_units = BTreeSet::new();
     for claim in &plan.diagnostics {
+        if epoch136::namespace(claim) {
+            ensure!(
+                plan.gates
+                    .get(&136)
+                    .is_some_and(|g| g.state == "failed-needs-repair"),
+                "private136 experiment cannot close or relabel original repair"
+            );
+        }
         if native141::namespace(claim)
             || census141_poh::namespace(claim)
             || original141::namespace(claim)
@@ -2895,15 +2954,60 @@ pub(super) async fn run() -> Result<()> {
     let mut live_pipeline_stages = BTreeSet::new();
     for claim in &plan.pipeline_claims {
         let current = &before[&claim.unit];
-        let is_active = pipeline_live(claim, current)?;
-        let finalization = if is_active && claim.phase == "producer-finalization" {
-            super::cohort_finalization::observe(current, sample_seconds)?
-        } else if is_active && claim.phase == "controller-import-handoff" {
-            super::cohort_finalization::observe_handoff(current, sample_seconds)?
+        let (is_active, finalization) = if (191..=194).contains(&claim.epoch) {
+            // A same-cutoff native custody check can race a genuine importer
+            // or verifier handoff. Preserve the failure in this durable fleet
+            // without suppressing seven ordinary lanes/private141/successors.
+            let result = (|| -> Result<(bool, Value)> {
+                let live = pipeline_live(claim, current)?;
+                if !live {
+                    return Ok((false, Value::Null));
+                }
+                let mut proofs = Vec::new();
+                for b in &claim.evidence {
+                    let value = bound_json(b)?;
+                    if let Some(proof) = super::cohort191_delivery::fleet_proof(
+                        claim.epoch,
+                        &claim.phase,
+                        &claim.unit,
+                        &claim.invocation_id,
+                        &value,
+                        &before,
+                        sample_seconds,
+                    )? {
+                        proofs.push(proof);
+                    }
+                }
+                ensure!(
+                    proofs.len() == 1,
+                    "191 delivery claim needs exactly one native custody event"
+                );
+                Ok((true, proofs.remove(0)))
+            })();
+            match result {
+                Ok(v) => v,
+                Err(e) => (
+                    false,
+                    json!({"schema":"jetstreamer-cohort191-status-incident-v2",
+                    "epoch":claim.epoch,"sampled_at_utc":sample,"error":format!("{e:#}"),
+                    "actual_owner_may_still_be_active":true,"inactivity_not_proven":true,
+                    "status_deletion_authorized":false,"ordinary_lanes_continue":true,
+                    "publication_authorized":false,"r2_mutations":false}),
+                ),
+            }
         } else {
-            Value::Null
+            let live = pipeline_live(claim, current)?;
+            let proof = if live && claim.phase == "producer-finalization" {
+                super::cohort_finalization::observe(current, sample_seconds)?
+            } else if live && claim.phase == "controller-import-handoff" {
+                super::cohort_finalization::observe_handoff(current, sample_seconds)?
+            } else {
+                Value::Null
+            };
+            (live, proof)
         };
-        let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
+        let private_scan = super::repair141::scope(&claim.phase, &claim.unit)
+            || private144_scan::scope(&claim.phase, &claim.unit)
             || native209::scope(&claim.phase, &claim.unit)
             || native210::scope(&claim.phase, &claim.unit)
             || native227_v1625::scope(&claim.phase, &claim.unit)
@@ -2927,7 +3031,8 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
-                        || ((tail223_scan::scope(&claim.phase, &claim.unit)
+                        || ((super::repair141::scope(&claim.phase, &claim.unit)
+                            || tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)
                             || native210::scope(&claim.phase, &claim.unit)
                             || native227_v1625::scope(&claim.phase, &claim.unit)
@@ -3013,6 +3118,9 @@ pub(super) async fn run() -> Result<()> {
             }
             if original141_capped::namespace(claim) {
                 original141_capped::validate_live(claim, current)?;
+            }
+            if epoch136::namespace(claim) {
+                epoch136::validate_live(claim, current)?;
             }
             if census141_poh::namespace(claim) {
                 census141_poh::validate_live(claim, current)?;
@@ -3131,7 +3239,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if original141_capped::namespace(claim) {
+            let phase = if epoch136::namespace(claim) {
+                "private-corrected-worker-root-repair"
+            } else if original141_capped::namespace(claim) {
                 "private-original-entry-capped-root-qualification"
             } else if original141_vote_prefix::namespace(claim) {
                 "private-original-entry-vote-prefix"
@@ -3228,17 +3338,19 @@ pub(super) async fn run() -> Result<()> {
                     .as_u64()
                     .is_some_and(|last| epoch <= last)
         }) {
-            if !(epoch == 141
-                && plan.diagnostics.iter().any(|c| {
-                    native141::namespace(c)
-                        || census141_poh::namespace(c)
-                        || original141::namespace(c)
-                        || original141_trace::namespace(c)
-                        || original141_freeze::namespace(c)
-                        || original141_vote_prefix::namespace(c)
-                        || original141_capped::namespace(c)
-                }))
-            {
+            let retains_open_repair = (epoch == 136
+                && plan.diagnostics.iter().any(epoch136::namespace))
+                || (epoch == 141
+                    && plan.diagnostics.iter().any(|c| {
+                        native141::namespace(c)
+                            || census141_poh::namespace(c)
+                            || original141::namespace(c)
+                            || original141_trace::namespace(c)
+                            || original141_freeze::namespace(c)
+                            || original141_vote_prefix::namespace(c)
+                            || original141_capped::namespace(c)
+                    }));
+            if !retains_open_repair {
                 state = private_qualification_inventory_state(gate.state.as_str());
             }
             if epoch == 226
@@ -3311,6 +3423,7 @@ pub(super) async fn run() -> Result<()> {
             let private_qualification_binding =
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
+                        || super::repair141::matches(receipt, epoch, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)

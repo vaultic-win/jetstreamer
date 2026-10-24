@@ -61,6 +61,10 @@ mod original141;
 mod private144;
 #[path = "routine_provisional141_predecessor.rs"]
 mod provisional141;
+#[path = "routine_qualification141_status.rs"]
+mod qualification141_status;
+#[path = "routine_repair141_status.rs"]
+mod repair141_status;
 #[path = "routine_original141_terminal.rs"]
 mod terminal141;
 
@@ -80,6 +84,8 @@ mod assembly144_scans;
 mod assembly144_scans_recover;
 #[path = "routine_cohort191.rs"]
 mod cohort191;
+#[path = "routine_cohort191_delivery.rs"]
+mod cohort191_delivery;
 #[path = "routine_completed144.rs"]
 mod completed144;
 #[path = "routine_continuation144.rs"]
@@ -100,6 +106,8 @@ mod publication144;
 mod repair183;
 #[path = "routine_repair185.rs"]
 mod repair185;
+#[path = "routine_terminal185.rs"]
+mod terminal185;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -180,6 +188,12 @@ struct Plan {
     native141_audit: Option<native141::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     original141_root: Option<original141::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    qualification141_status: Option<qualification141_status::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cohort191_delivery: Option<cohort191_delivery::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal185: Option<terminal185::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_scans: Option<assembly144_scans::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -293,6 +307,23 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if terminal185::enabled(p) {
+        return if p.cohort191_delivery.is_some() {
+            "guard-stopped185-and-terminal191-repair141-v1"
+        } else {
+            "guard-stopped185-repair141-v1"
+        };
+    }
+    if repair141_status::enabled(p) {
+        return if p.cohort191_delivery.is_some() {
+            "repair141-and-cohort191-four-owner-v1"
+        } else {
+            "repair141-active-owner-v1"
+        };
+    }
+    if p.cohort191_delivery.is_some() {
+        return "cohort191-terminal-four-owner-delivery-v1";
+    }
     if p.controller_rebind.is_some() && original141::capped_enabled(p) {
         return "controller-rebind-capped141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -738,8 +769,11 @@ fn validate_templates(
         .as_str()
         .context("old observer time missing")?;
     let scheduled = scheduled_target(p)?;
-    let qualified_interval =
-        original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?);
+    let qualified_interval = cohort191_delivery::interval(p, old_time)?.unwrap_or(
+        terminal185::interval(p, old_time)?.unwrap_or(
+            original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?),
+        ),
+    );
     ensure!(
         utc_seconds(scheduled)?.checked_sub(utc_seconds(old_time)?) == Some(qualified_interval),
         "routine target must follow its qualified predecessor interval"
@@ -822,6 +856,12 @@ fn validate_templates(
         );
         epochs.remove(&160);
     }
+    if p.cohort191_delivery.is_some() {
+        cohort191_delivery::validate(p)?;
+        for epoch in 191..=194 {
+            epochs.remove(&epoch);
+        }
+    }
     if p.runtime_handoff157.is_some() {
         runtime157::validate(p)?;
         epochs.remove(&157);
@@ -834,11 +874,16 @@ fn validate_templates(
     assembly144::validate(p)?;
     native141::validate(p)?;
     original141::validate(p)?;
+    qualification141_status::validate(p)?;
     census141_poh::validate(p)?;
     assembly144_scans::validate(p)?;
     publication144::validate(p)?;
     repair183::extend_epochs(p, &mut epochs)?;
     repair185::extend_epochs(p, &mut epochs)?;
+    if terminal185::enabled(p) {
+        terminal185::validate(p)?;
+        epochs.remove(&185);
+    }
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1342,6 +1387,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     delivery198::derive_fleet(p, &mut fleet)?;
     delivery160::derive_fleet(p, &mut fleet)?;
     public198::derive_fleet(p, &mut fleet)?;
+    cohort191_delivery::derive_fleet(p, &mut fleet)?;
     runtime157::derive_fleet(p, &mut fleet)?;
     prefix157::derive_fleet(p, &mut fleet)?;
     prefix144::derive_fleet(p, &mut fleet)?;
@@ -1354,8 +1400,10 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     publication144::derive_fleet(p, &mut fleet)?;
     repair183::derive_fleet(p, &mut fleet)?;
     repair185::derive_fleet(p, &mut fleet)?;
+    terminal185::derive_fleet(p, &mut fleet)?;
     original141::derive_fleet(p, &mut fleet)?;
     terminal141::derive_fleet(p, &mut fleet)?;
+    repair141_status::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1575,6 +1623,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     )?;
     let model = repair183::effective_model(p, &model)?;
     let model = repair185::effective_model(p, &model)?;
+    let model = cohort191_delivery::effective_model(p, &model)?;
     latest_fleet_unchanged(p, &previous)?;
     validate_observer_config(p, &model, &bound_json(&p.observer_config, true)?)?;
     for t in [&p.tools.sealer, &p.tools.estimator, &p.tools.r2] {
@@ -1604,6 +1653,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     repair185::derive_fleet(p, &mut fleet.clone())?;
     original141::derive_fleet(p, &mut fleet.clone())?;
     terminal141::derive_fleet(p, &mut fleet.clone())?;
+    repair141_status::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1694,6 +1744,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         "replay_launch_authorized":false,"archive_mutations":false}),
     )?;
     let result = (|| -> Result<Value> {
+        cohort191_delivery::prepare(p, &observer)?;
         let (model, fleet) = derive(p, &model, &fleet, &observer)?;
         let model_source = write_new(&p.cycle_directory.join("model-source.json"), &model)?;
         let fleet_source = write_new(&p.cycle_directory.join("fleet-source.json"), &fleet)?;
@@ -1839,6 +1890,8 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         };
         let publication144_status = publication144::publish(p, &pipeline, &observer)?;
         let delivery160_status = delivery160::publish(p, &pipeline, &observer)?;
+        let qualification141_status = qualification141_status::publish(p, &pipeline, &observer)?;
+        let cohort191_status = cohort191_delivery::publish(p, &pipeline, &observer)?;
         let parent = p.fleet_output.parent().context("fleet parent missing")?;
         if !parent.exists() {
             private_dir(parent.parent().context("fleet ancestor missing")?)?;
@@ -1849,7 +1902,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
         private_dir(parent)?;
         latest_fleet_unchanged(p, &previous)?;
         child(
-            &p.tools.r2,
+            cohort191_delivery::fleet_reader(p),
             &[
                 "fleet-reconcile".into(),
                 fleet_bound.path.display().to_string(),
@@ -1877,7 +1930,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
             "sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model_bound,"estimates":estimate_bound,"invocation_id":invocation,
             "fleet_plan":fleet_bound,"fleet":{"path":p.fleet_output,"sha256":sha(&bytes)},"status_publications":receipts,
             "inventory":ledger["inventory"],"capacity_decision":capacity,"unestimated_bootstrap_epochs":model.get("unestimated_bootstrap_epochs"),"epoch198_delivery":pipeline,"epoch144_delivery":publication144_status,"epoch160_delivery":delivery160_status,"replay_launch_authorized":false,"archive_mutations":false,
-            "sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
+            "qualification141_status":qualification141_status,"cohort191_delivery":cohort191_status,"sidecar_mutations":false,"deletions":false,"new_resource_samples":0}),
         )
     })();
     match result {
@@ -1912,6 +1965,10 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-delivery191"
+                            | "--prepare-next-repair141"
+                            | "--prepare-next-terminal185"
+                            | "--capture-terminal185"
                             | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-native141-all-retry"
                             | "--prepare-next-census141-poh"
@@ -1970,7 +2027,7 @@ fn main() {
                     )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
-            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-package-recovery|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
+            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-package-recovery|--prepare-next-delivery198 SPEC --handoff-sha256 HEX|--prepare-next-delivery191 SPEC --handoff-sha256 HEX]"
         );
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -2121,6 +2178,20 @@ fn main() {
         {
             return delivery198_recover::run(&plan, &bound, &args[5]);
         }
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--capture-terminal185")
+        {
+            return terminal185::capture(
+                &plan,
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                &fs::read_link("/proc/self/exe")?,
+                &args[5],
+            );
+        }
         if args.get(6).is_some_and(|arg| preparation_mode(arg)) {
             let spec = if args.len() == 10 {
                 Some(Bound {
@@ -2152,6 +2223,7 @@ mod tests {
         ));
         assert!(super::preparation_mode("--prepare-next"));
         assert!(super::preparation_mode("--prepare-next-original141"));
+        assert!(super::preparation_mode("--prepare-next-delivery191"));
         assert!(super::preparation_mode("--prepare-package-recovery"));
         for mode in [
             "--check-only",
@@ -2614,7 +2686,7 @@ mod tests {
         assert!(verify_estimates(&p, &model, &observer, &estimates).is_err());
     }
 
-    fn fixture() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
+    pub(super) fn fixture() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
         let b = |name: &str| json!({"path":format!("/sealed/{name}"),"sha256":"a".repeat(64)});
         let p:Plan=serde_json::from_value(json!({"schema":PLAN_SCHEMA,"sample_target_utc":"2026-10-20T10:34:42Z",
             "endpoint_sha256":"a".repeat(64),"bucket":BUCKET,"observer":"/private/next-observer.json",

@@ -18,6 +18,8 @@ epoch207-native-main-guard = ["epoch227-native-main-guard"]
 epoch209-native-main-guard = ["epoch227-native-main-guard"]
 epoch228-native-main-guard = ["epoch227-native-main-guard"]
 epoch227-v1625-native-main-guard = ["epoch227-native-main-guard"]
+epoch210-native-small = ["epoch227-native-main-guard"]
+epoch227-v1625-native-small = ["epoch227-native-main-guard"]
 epoch227-singleton-guard = []
 epoch209-singleton-guard = []
 epoch223-native20-prefix-guard = []
@@ -103,6 +105,10 @@ path = "src/focused_capability_probe_bin.rs"
 [[bin]]
 name = "jetstreamer-focused-package-attest"
 path = "src/focused_package_attest_bin.rs"
+
+[[bin]]
+name = "jetstreamer-native-snapshot-census"
+path = "src/native_snapshot_census_bin.rs"
 
 [[bin]]
 name = "jetstreamer-epoch223-tail-attest"
@@ -354,6 +360,7 @@ base64.workspace = true
 crc.workspace = true
 anyhow.workspace = true
 tar.workspace = true
+zstd.workspace = true
 bzip2 = "=0.4.4"
 rocksdb = { version = "0.23", default-features = false, features = ["lz4"], optional = true }
 

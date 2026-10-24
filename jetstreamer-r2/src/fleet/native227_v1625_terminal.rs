@@ -93,10 +93,9 @@ pub(super) fn validate(proof: &Value) -> Result<String> {
         "227 terminal origin is not the approved attempt"
     );
     let spec_binding: BoundFile = serde_json::from_value(proof["capture_spec"].clone())?;
-    let spec: Spec = serde_json::from_value(c::immutable_json(&spec_binding)?)?;
+    let spec = read_spec(c::immutable_json(&spec_binding)?)?;
     ensure!(
-        spec.schema == "jetstreamer-native227_v1625-terminal-capture-spec-v1"
-            && spec.running_origin == origin_binding
+        spec.running_origin == origin_binding
             && private157::binding(&spec.journal) == proof["journal"]
             && private157::binding(&spec.observer) == proof["observer"]
             && private157::binding(&spec.fleet) == proof["fleet"],
@@ -250,12 +249,20 @@ struct Spec {
     fleet: BoundFile,
     output: PathBuf,
 }
+// Both actual capture and later proof validation must parse the same wire schema.
+fn read_spec(v: Value) -> Result<Spec> {
+    let s: Spec = serde_json::from_value(v)?;
+    ensure!(
+        s.schema == "jetstreamer-native227-v1625-terminal-capture-spec-v1",
+        "227 terminal capture spec schema differs"
+    );
+    Ok(s)
+}
 pub(super) fn capture() -> Result<()> {
     let (b, self_sha) = publication203::parsed_args("capture-native227-v1625-terminal")?;
-    let s: Spec = serde_json::from_value(bound_json(&b)?)?;
+    let s = read_spec(bound_json(&b)?)?;
     ensure!(
-        s.schema == "jetstreamer-native227-v1625-terminal-capture-spec-v1"
-            && s.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
+        s.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
             && s.output
                 .parent()
                 .and_then(Path::file_name)
@@ -335,6 +342,25 @@ pub(super) fn capture() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_capture_and_later_proof_share_one_checked_wire_schema() {
+        let binding = json!({"path":"/evidence.json","sha256":"a".repeat(64)});
+        let fixture = json!({"schema":"jetstreamer-native227-v1625-terminal-capture-spec-v1",
+            "running_origin":binding,"journal":binding,"observer":binding,"fleet":binding,"output":"/proof.json"});
+        read_spec(fixture.clone()).unwrap();
+        for value in [
+            json!("jetstreamer-native227_v1625-terminal-capture-spec-v1"),
+            json!("other"),
+            Value::Null,
+        ] {
+            let mut bad = fixture.clone();
+            bad["schema"] = value;
+            assert!(read_spec(bad).is_err());
+        }
+        let mut bad = fixture;
+        bad.as_object_mut().unwrap().remove("schema");
+        assert!(read_spec(bad).is_err());
+    }
     #[test]
     fn cleared_owner_is_not_a_replacement_restart_or_collected_unit() {
         let iid = "a".repeat(32);

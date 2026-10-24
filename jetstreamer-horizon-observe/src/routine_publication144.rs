@@ -4,7 +4,39 @@ use super::*;
 mod status;
 #[path = "routine_publication144_upload.rs"]
 mod upload;
-pub(super) use status::{publish, publish_using, validate_completed};
+pub(super) use status::publish_using;
+pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> {
+    if uploading(p) {
+        validate(p)?;
+        let provisional: Bound = serde_json::from_value(pipeline["provisional_fleet"].clone())?;
+        if let Some(completed) = public198::ready_delivery(p, &provisional, observer, 144)? {
+            return Ok(completed);
+        }
+    }
+    status::publish(p, pipeline, observer)
+}
+pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
+    let d = &c["epoch144_delivery"];
+    if d["delivery_completed"] == true {
+        ensure!(
+            uploading(p),
+            "144 completed delivery lacks historical upload profile"
+        );
+        validate(p)?;
+        let provisional: Bound = serde_json::from_value(d["provisional_fleet"].clone())?;
+        ensure!(
+            provisional.path == p.cycle_directory.join("public198-provisional-fleet.json"),
+            "144 ready fleet path differs"
+        );
+        let observer: Bound = serde_json::from_value(c["observer"].clone())?;
+        ensure!(
+            public198::ready_delivery(p, &provisional, &observer, 144)?.as_ref() == Some(d),
+            "144 completed delivery metadata differs from authenticated history"
+        );
+        return Ok(());
+    }
+    status::validate_completed(p, c)
+}
 pub(super) const HISTORY_READER: &str =
     "/usr/local/lib/jetstreamer/horizon-publication144-fleet-reader-20261023-v4/jetstreamer-r2";
 pub(super) const HISTORY_READER_SHA: &str =

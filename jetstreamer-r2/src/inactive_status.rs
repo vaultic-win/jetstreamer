@@ -3,6 +3,7 @@ use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
+mod capped141;
 mod metadata_cycle;
 mod missing157;
 mod native207;
@@ -15,9 +16,23 @@ mod native228;
 mod natural144;
 mod preserved144;
 mod publication144;
+mod terminal185;
 mod warmup223;
+pub(super) fn validate_capped141_repair_terminal(e: &Value) -> Result<()> {
+    capped141::time(e)?;
+    let unit = "horizon-qualify-141-original-entry-capped-root-20261023-v1.service";
+    let current = BTreeMap::from([(unit.to_string(), fleet::unit(unit)?)]);
+    capped141::validate_current(
+        &current,
+        e,
+        &[(unit.into(), "e639f007d482464f8a251455659d2ede".into())],
+    )
+}
 pub(super) fn prepare_publication144_preservation() -> Result<()> {
     publication144::prepare()
+}
+pub(super) fn capture_capped141_terminal() -> Result<()> {
+    capped141::capture()
 }
 
 pub(super) fn private144_terminal_manager_proof(current: &Value) -> Result<()> {
@@ -196,6 +211,25 @@ fn validate_fleet(fleet: &Value, plan: &Plan, now: u64) -> Result<()> {
         !active.iter().any(|entry| entry["epoch"] == plan.epoch),
         "epoch has active downstream or replay work"
     );
+    if let Some(diagnostics) = fleet.get("diagnostics") {
+        ensure!(
+            !diagnostics
+                .as_array()
+                .context("fleet diagnostic census invalid")?
+                .iter()
+                .any(|entry| {
+                    entry["live"] == true
+                        && (entry["epoch"] == plan.epoch
+                            || entry["scope_first_epoch"]
+                                .as_u64()
+                                .zip(entry["scope_last_epoch"].as_u64())
+                                .is_some_and(|(first, last)| {
+                                    first <= plan.epoch && plan.epoch <= last
+                                }))
+                }),
+            "epoch has active private replacement or diagnostic work"
+        );
+    }
     let epochs = fleet["epochs"].as_array().context("fleet epochs missing")?;
     let entry: Vec<_> = epochs
         .iter()
@@ -369,6 +403,16 @@ fn fresh_census(
     if natural144 {
         natural144::validate_current(&current, terminal_fleet, owners)?;
     }
+    let capped141 = capped141::recognized(terminal_fleet);
+    if capped141 {
+        ensure!(plan.epoch == 141, "foreign capped141 cleanup epoch");
+        capped141::validate_current(&current, terminal_fleet, owners)?;
+    }
+    let terminal185 = terminal185::recognized(terminal_fleet);
+    if terminal185 {
+        terminal185::time(plan, terminal_fleet)?;
+        terminal185::validate_current(&current, terminal_fleet, owners)?;
+    }
     let native223 = plan.epoch == 223 && native223::recognized(terminal_fleet, owners);
     if native223 {
         native223::validate(&current, terminal_fleet, owners)?;
@@ -418,6 +462,8 @@ fn fresh_census(
         } else if !preserved
             && !missing157
             && !natural144
+            && !capped141
+            && !terminal185
             && !native223
             && !native207
             && !native209
@@ -598,7 +644,12 @@ pub(super) async fn run() -> Result<()> {
     no_local_delivery(&plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
-    let history_time = if natural144::recognized(&history) {
+    let history_time = if terminal185::recognized(&history) {
+        terminal185::time(&plan, &history)?
+    } else if capped141::recognized(&history) {
+        ensure!(plan.epoch == 141, "foreign capped141 terminal evidence");
+        capped141::time(&history)?
+    } else if natural144::recognized(&history) {
         ensure!(
             plan.epoch == 144
                 && plan.terminal_fleet.path
@@ -888,6 +939,14 @@ mod tests {
         ] {
             let mut bad = fleet.clone();
             bad["active"] = json!([{"epoch":224,"phase":phase}]);
+            assert!(validate_fleet(&bad, &plan, 1792469200).is_err());
+        }
+        for claim in [
+            json!({"epoch":224,"live":true}),
+            json!({"epoch":223,"scope_first_epoch":223,"scope_last_epoch":225,"live":true}),
+        ] {
+            let mut bad = fleet.clone();
+            bad["diagnostics"] = json!([claim]);
             assert!(validate_fleet(&bad, &plan, 1792469200).is_err());
         }
         for state in [

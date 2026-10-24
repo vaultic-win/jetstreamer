@@ -44,6 +44,10 @@ name = "jetstreamer-terminal205-cache-retire"
 path = "src/terminal205_cache_retire_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch223-tail-exact-evidence"
+path = "src/epoch223_tail_exact_evidence.rs"
+
+[[bin]]
 name = "jetstreamer-epoch223-bootstrap-estimate"
 path = "src/epoch223_bootstrap_estimate.rs"
 

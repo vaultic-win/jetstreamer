@@ -1,5 +1,6 @@
 //! Routine, identity-bound post-replay metadata. No archive or sidecar mutation.
 use super::*;
+use serde_json::json;
 use std::{collections::BTreeMap, process::Command};
 mod event144;
 mod native_input;
@@ -93,6 +94,8 @@ impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
+            | ("epoch141-active-repair", "verification")
+            | ("cohort191-delivery", "verification" | "upload" | "readback")
             | ("private-cold-snapshot-verification", "verification")
             | ("private-warmup-reproduction", "verification")
             | ("local-publication", "verification" | "publication")
@@ -116,6 +119,26 @@ impl Binding {
                 "producer finalization/native input must retain the original invocation clock"
             );
         }
+        if self.claim_phase == "epoch141-active-repair" {
+            ensure!(
+                epoch == 141
+                    && super::repair141::scope(&self.claim_phase, &self.unit)
+                    && self.origin_unit == self.unit
+                    && self.origin_invocation_id == self.invocation_id,
+                "141 repair must retain its real active task clock"
+            );
+        }
+        if self.claim_phase == "cohort191-delivery" {
+            ensure!(
+                super::cohort191_delivery::queue_scope(&self.claim_phase, &self.unit)
+                    && super::cohort191_delivery::origin(
+                        epoch,
+                        &self.origin_unit,
+                        &self.origin_invocation_id
+                    ),
+                "191 queue status cannot reset the original producer clock or borrow another manager"
+            );
+        }
         if self.claim_phase == "controller-import-handoff" {
             ensure!(
                 super::cohort198_handoff::binding_matches(
@@ -124,6 +147,11 @@ impl Binding {
                     &self.origin_unit,
                     &self.origin_invocation_id
                 ) || super::cohort160_handoff::binding_matches(
+                    &self.unit,
+                    &self.invocation_id,
+                    &self.origin_unit,
+                    &self.origin_invocation_id
+                ) || super::cohort191_delivery::binding(
                     &self.unit,
                     &self.invocation_id,
                     &self.origin_unit,
@@ -210,7 +238,12 @@ fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
                         && plan.binding.origin_unit == super::cohort198_finalization::UNIT
                         && plan.binding.origin_invocation_id
                             == "e5612ef00a5b4fcab04df2c13a6b35b0")
-                    || exact144_binding(plan))
+                    || exact144_binding(plan)
+                    || super::cohort191_delivery::origin(
+                        plan.epoch,
+                        &plan.binding.origin_unit,
+                        &plan.binding.origin_invocation_id
+                    ))
                 && plan.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
             "foreign-owned pipeline receipt directory is not an exact160/198/144 profile"
@@ -387,6 +420,8 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                         || (unit == super::cohort160_handoff::CONTROLLER
                             && invocation == super::cohort160_handoff::IID
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (unit == super::repair141::UNIT
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (matches!(
                             unit,
                             "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service"
@@ -407,7 +442,7 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
     ensure!(micros > 0, "manager start time is zero");
     Ok(micros / 1000)
 }
-fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
+pub(super) fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
     ensure!(
         unit_name(unit) && hex_id(invocation, 32),
         "invalid manager start identity"
@@ -512,6 +547,7 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
                 e["phase"].as_str(),
                 Some(
                     "full-verification"
+                        | "cohort191-delivery"
                         | "plugin-verification"
                         | "local-publication"
                         | "upload-readback"
@@ -561,6 +597,7 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             unit_name(peer)
                 && [
                     "full-verification",
+                    "cohort191-delivery",
                     "plugin-verification",
                     "local-publication",
                     "upload-readback",
@@ -603,7 +640,47 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
         plan.binding.live_matches(&current[&plan.binding.unit]),
         "pipeline invocation or exact command is not live"
     );
-    if plan.binding.claim_phase == "producer-finalization" {
+    if (191..=194).contains(&plan.epoch) {
+        ensure!(
+            super::cohort191_delivery::origin(
+                plan.epoch,
+                &plan.binding.origin_unit,
+                &plan.binding.origin_invocation_id
+            ),
+            "191 changed original clock"
+        );
+        let mut proofs = Vec::new();
+        for b in &plan.estimate_evidence {
+            let v = bound_json(b)?;
+            if let Some(proof) = super::cohort191_delivery::fleet_proof(
+                plan.epoch,
+                &plan.binding.claim_phase,
+                &plan.binding.unit,
+                &plan.binding.invocation_id,
+                &v,
+                &current,
+                fleet::utc_seconds(fleet["sampled_at_utc"].as_str().context("191 sample")?)?,
+            )? {
+                ensure!(
+                    proof["estimated_remaining_millis"][plan.epoch.to_string()]
+                        == plan.estimated_remaining_millis,
+                    "191 publication ETA differs from native forecast"
+                );
+                ensure!(
+                    proof["observer"]
+                        == json!({"path":plan.observer.path,"sha256":plan.observer.sha256})
+                        && proof["origins"][plan.epoch.to_string()]
+                            == json!({"path":plan.origin_launch.path,"sha256":plan.origin_launch.sha256}),
+                    "191 publication observer/origin differs from native custody"
+                );
+                proofs.push(proof);
+            }
+        }
+        ensure!(
+            proofs.len() == 1,
+            "191 publication requires one exact native custody event"
+        );
+    } else if plan.binding.claim_phase == "producer-finalization" {
         super::cohort_finalization::observe(
             &current[&plan.binding.unit],
             fleet::utc_seconds(
@@ -613,7 +690,8 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             )?,
         )?;
     }
-    if plan.binding.claim_phase == "controller-import-handoff" {
+    if !(191..=194).contains(&plan.epoch) && plan.binding.claim_phase == "controller-import-handoff"
+    {
         super::cohort_finalization::observe_handoff(
             &current[&plan.binding.unit],
             fleet::utc_seconds(
@@ -833,6 +911,22 @@ pub(super) fn native_input_matches_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn exact141_repair_uses_only_its_actual_pid1_started_clock() {
+        let unit = super::super::repair141::UNIT;
+        let invocation = "ad39f007d482464f8a251455659d2ede";
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started exact141 actual repair queue.","__REALTIME_TIMESTAMP":"1792787565383406"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1792787565383
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("wrong");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
     #[test]
     fn native20_warmup_simple_service_uses_its_exact_pid1_started_clock() {
         let unit = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";

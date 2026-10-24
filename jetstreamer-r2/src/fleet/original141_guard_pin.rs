@@ -13,12 +13,20 @@ fn object_path(unit: &str) -> String {
     path
 }
 pub(in super::super) fn empty_environment_files(name: &str) -> Result<String> {
-    let out = ProcessCommand::new("busctl").args([
-        "--system", "get-property", "org.freedesktop.systemd1", &object_path(name),
-        "org.freedesktop.systemd1.Service", "EnvironmentFiles",
-    ]).output()?;
-    ensure!(out.status.success() && out.stdout == b"a(sb) 0\n",
-        "typed EnvironmentFiles is unavailable or nonempty");
+    let out = ProcessCommand::new("busctl")
+        .args([
+            "--system",
+            "get-property",
+            "org.freedesktop.systemd1",
+            &object_path(name),
+            "org.freedesktop.systemd1.Service",
+            "EnvironmentFiles",
+        ])
+        .output()?;
+    ensure!(
+        out.status.success() && out.stdout == b"a(sb) 0\n",
+        "typed EnvironmentFiles is unavailable or nonempty"
+    );
     Ok(String::new())
 }
 fn raw_clock(object: &str, interface: &str, property: &str) -> Result<u64> {
@@ -67,7 +75,8 @@ fn properties(name: &str, keys: &str) -> Result<BTreeMap<String, String>> {
             "duplicate guard property"
         );
     }
-    if keys.split(',').any(|k| k == "EnvironmentFiles") && !result.contains_key("EnvironmentFiles") {
+    if keys.split(',').any(|k| k == "EnvironmentFiles") && !result.contains_key("EnvironmentFiles")
+    {
         result.insert("EnvironmentFiles".into(), empty_environment_files(name)?);
     }
     Ok(result)

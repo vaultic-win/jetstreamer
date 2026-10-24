@@ -101,12 +101,13 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
             "210 resource pressure:{counter}"
         );
     }
-    let mut rows = o["replays"]
+    let accounting = native227_terminal_observation::view(f, o)?;
+    let mut rows = accounting["replays"]
         .as_array()
         .context("210 ordinary sample census")?
         .iter()
         .collect::<Vec<_>>();
-    for diagnostic in o["diagnostic_replays"]
+    for diagnostic in accounting["diagnostic_replays"]
         .as_array()
         .context("210 diagnostic census")?
     {
@@ -188,6 +189,7 @@ pub(super) fn run() -> Result<()> {
     validate_output_destination(&s.output)?;
     let cold = c::immutable_json(&s.cold_plan)?;
     c::no_authority(&cold)?;
+    c::small_envelope(&cold)?;
     ensure!(
         cold["native_main"]["sha256"] == c::TEST_SHA
             && cold["snapshot"]["sha256"] == c::SNAPSHOT_SHA
@@ -226,11 +228,13 @@ pub(super) fn run() -> Result<()> {
     let o = bound_json(&s.observer)?;
     let f = bound_json(&s.fleet)?;
     let p = bound_json(&s.resource_plan)?;
+    let accounting_o = native227_terminal_observation::view(&f, &o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("210 sample clock")?)?;
     let floor = singleton227_admission::century_floor_for(&f, 210)?;
     let free_before = singleton227_admission::disk_free()?;
-    let (growth, measurements) = prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (growth, measurements) =
+        prefix223_live_peer::disk(&f, &accounting_o, &s.protected_guards, t, now)?;
     let (computed, existing_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let protected = p["guard_minimum_free_bytes"]
@@ -273,7 +277,7 @@ pub(super) fn run() -> Result<()> {
             .is_some_and(|u| !diagnostic_stage_running(u)),
         "210 native owner already live"
     );
-    let caps = singleton227_admission::limits(&f)?;
+    let caps = prefix223_live_peer::limits(&f)?;
     let memory = actual_memory()?;
     let free = free_before.min(singleton227_admission::disk_free()?);
     ensure!(
@@ -290,13 +294,19 @@ pub(super) fn run() -> Result<()> {
     prefix223_live_peer::current(&f, &after)?;
     singleton227_admission::owners(&f, &after)?;
     ensure!(
-        before == after && caps == singleton227_admission::limits(&f)?,
+        before == after && caps == prefix223_live_peer::limits(&f)?,
         "210 owners/caps changed during admission"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     sample(&s, &o, &f, now, required)?;
+    let after_accounting_o = native227_terminal_observation::view(&f, &o)?;
+    ensure!(
+        accounting_o["terminal_observation_accounting"]
+            == after_accounting_o["terminal_observation_accounting"],
+        "210 terminal observation accounting changed during admission"
+    );
     let (after_growth, after_measurements) =
-        prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+        prefix223_live_peer::disk(&f, &after_accounting_o, &s.protected_guards, t, now)?;
     let (after_auxiliary, after_auxiliary_measurements) = prefix223_live_peer::memory(&f)?;
     ensure!(
         after_growth <= growth
@@ -316,6 +326,7 @@ pub(super) fn run() -> Result<()> {
         "fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"all_immutable_inputs_rehashed":true,"snapshot_restored":false,
         "producer_started":false,"resource_samples_taken":0,"recorded_unix_seconds":now,"maximum_launch_delay_seconds":900,
         "spec_sha256":binding.sha256,"self_sha256":self_sha});
+    r["terminal_observation_accounting"] = accounting_o["terminal_observation_accounting"].clone();
     for flag in [
         "entry_replay",
         "replay_launch_authorized",

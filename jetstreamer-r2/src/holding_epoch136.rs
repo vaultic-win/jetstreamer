@@ -1,5 +1,24 @@
-//! Read-only inspection of the exact retained failed136 prefix. No retirement.
+//! Exact failed136 inspection, stopped-controller masking and separately gated
+//! authenticated-custody local retirement. No canonical publication or job resume.
 use super::*;
+#[path = "holding_epoch136_control.rs"]
+mod control;
+#[path = "holding_epoch136_retire.rs"]
+mod retire;
+
+pub(super) async fn retire_local(
+    client: &Client,
+    m: &Mapping,
+    value: Value,
+    spec: &Bound,
+    check: bool,
+) -> Result<()> {
+    retire::run(client, m, &serde_json::from_value(value)?, spec, check).await
+}
+
+pub(super) fn disable_retry(m: &Mapping, value: Value, spec: &Bound) -> Result<()> {
+    control::disable(m, &serde_json::from_value(value)?, spec)
+}
 
 const SOURCE: &str = "/home/sol/.jetstreamer-private/epochs122-147-20260922-v1/lane-i/private/destination-c5792de2a8e0654934ff68ab4eeb99d2a05ffdde82ad8e388a4228ec95fe8bc2/work/root-cohort-136-139/run-821104-1791986784685460478/archives/epoch-136.jet";
 const LANE: &str = "/home/sol/.jetstreamer-private/epochs122-147-20260922-v1/lane-i";
@@ -81,7 +100,8 @@ fn terminal_shape(name: &str, v: &Value) -> Result<()> {
             && v["SubState"] == "dead"
             && v["MainPID"] == "0"
             && v["NRestarts"] == "0"
-            && matches!(v["LoadState"].as_str(), Some("loaded" | "not-found"))
+            && (matches!(v["LoadState"].as_str(), Some("loaded" | "not-found"))
+                || (name == CONTROLLER && v["LoadState"] == "masked"))
             && ["Triggers", "TriggeredBy", "OnFailure", "OnSuccess"]
                 .iter()
                 .all(|k| v[*k] == ""),
@@ -192,6 +212,11 @@ mod tests {
         let v = json!({"Id":CONTROLLER,"LoadState":"loaded","ActiveState":"inactive","SubState":"dead",
             "MainPID":"0","NRestarts":"0","Triggers":"","TriggeredBy":"","OnFailure":"","OnSuccess":""});
         terminal_shape(CONTROLLER, &v).unwrap();
+        let mut masked = v.clone();
+        masked["LoadState"] = json!("masked");
+        terminal_shape(CONTROLLER, &masked).unwrap();
+        masked["Id"] = json!(PRODUCER);
+        assert!(terminal_shape(PRODUCER, &masked).is_err());
         for (key, value) in [
             ("MainPID", "12"),
             ("NRestarts", "1"),
