@@ -36,9 +36,14 @@ const TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/debug";
 const UBUNTU_DEBUG_DEPS: &str = "/home/ubuntu/workspace/jetstreamer/target/debug/deps";
 const UBUNTU_DEBUG_DEPS_PROFILE: &str = "jetstreamer-horizon-ubuntu-debug-deps-cache-check-plan-v1";
 const RELEASE_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/target/release";
+mod ubuntu_disposable;
 const SELECTED225_TARGET: &str = "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch225-shrink-budget-target-v1/debug";
 fn cache_target(schema: &str) -> Result<&'static Path> {
     match schema {
+        ubuntu_disposable::RELEASE_PROFILE => Ok(Path::new(ubuntu_disposable::RELEASE_DEPS)),
+        ubuntu_disposable::INCREMENTAL_PROFILE => {
+            Ok(Path::new(ubuntu_disposable::DEBUG_INCREMENTAL))
+        }
         SOL_PROFILE => Ok(Path::new(SOL_TARGET)),
         SOL_RELEASE_DEPS_PROFILE => Ok(Path::new(SOL_RELEASE_DEPS)),
         SOL_PRIVATE_DEBUG_DEPS_PROFILE => Ok(Path::new(SOL_PRIVATE_DEBUG_DEPS)),
@@ -106,6 +111,8 @@ fn validate_plan(p: &Plan) -> Result<()> {
             || matches!(
                 p.schema.as_str(),
                 SOL_PROFILE
+                    | ubuntu_disposable::RELEASE_PROFILE
+                    | ubuntu_disposable::INCREMENTAL_PROFILE
                     | SOL_RELEASE_DEPS_PROFILE
                     | SOL_PRIVATE_DEBUG_DEPS_PROFILE
                     | UBUNTU_DEBUG_DEPS_PROFILE
@@ -346,6 +353,9 @@ fn relative_cache_literal(target: &Path) -> &'static [u8] {
     }
 }
 fn relative_cache_reference(bytes: &[u8], target: &Path) -> bool {
+    if let Some(scope) = ubuntu_disposable::reference_scope_for_target(target) {
+        return ubuntu_disposable::cache_reference(bytes, scope);
+    }
     if target == Path::new(SOL_PRIVATE_DEBUG_DEPS) {
         // An executable elsewhere in this exact debug profile can load deps
         // later. Other repositories and the active release profile are distinct.
@@ -499,6 +509,12 @@ pub fn run() -> Result<()> {
     };
     let p: Plan = serde_json::from_value(bound_json(&pb)?)?;
     validate_plan(&p)?;
+    if matches!(
+        p.schema.as_str(),
+        ubuntu_disposable::RELEASE_PROFILE | ubuntu_disposable::INCREMENTAL_PROFILE
+    ) {
+        return ubuntu_disposable::run(&p, &pb, &a[5]);
+    }
     let sol_deps = p.schema == SOL_RELEASE_DEPS_PROFILE;
     let sol_private_deps = p.schema == SOL_PRIVATE_DEBUG_DEPS_PROFILE;
     let ubuntu_deps = p.schema == UBUNTU_DEBUG_DEPS_PROFILE;
