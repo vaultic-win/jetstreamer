@@ -355,6 +355,10 @@ fn validate_prior(v: &Value, p: &Plan, t: &Path, self_sha: &str) -> Result<Manif
             && v["checks"]["process_scan"]["references"] == json!([])
             && v["checks"]["staged_unit_references"] == json!([])
             && v["r2_mutations"] == false
+            && v["remote_mutations"] == false
+            && v["archive_deletion_authorized"] == false
+            && v["replay_scratch_deletion_authorized"] == false
+            && v["replay_launch_authorized"] == false
             && v["retirement_authorized"] == false,
         "cache prior positive ledger profile/source/authority differs"
     );
@@ -465,6 +469,14 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
     let after = manifest(t)?;
     subset(&after, &original)?;
     ensure!(empty(&after), "cache members remain after unlink");
+    let final_lock = fs::symlink_metadata(parent.join(".cargo-lock"))?;
+    ensure!(
+        final_lock.is_file()
+            && final_lock.nlink() == 1
+            && final_lock.dev() == lock_metadata.dev()
+            && final_lock.ino() == lock_metadata.ino(),
+        "parent Cargo lock changed during retirement"
+    );
     File::open(t)?.sync_all()?;
     persist(
         &completion,
@@ -503,7 +515,9 @@ mod tests {
             let t = target(profile).unwrap();
             let good = json!({"schema":LEDGER_SCHEMA,"cache_profile":profile,"source_commit":p.source_commit,"cargo_lock_sha256":p.cargo_lock_sha256,
                 "self_sha256":"d".repeat(64),"target":t,"checks":{"builder_census_complete":true,"active_builders":[],"process_scan":{"references":[]},"staged_unit_references":[]},
-                "retirement_authorized":false,"r2_mutations":false,"manifest":{"nodes":{},"unique_inode_physical_bytes":0,"pathname_allocated_bytes":0}});
+                "retirement_authorized":false,"r2_mutations":false,"remote_mutations":false,"archive_deletion_authorized":false,
+                "replay_scratch_deletion_authorized":false,"replay_launch_authorized":false,
+                "manifest":{"nodes":{},"unique_inode_physical_bytes":0,"pathname_allocated_bytes":0}});
             validate_prior(&good, &p, t, &"d".repeat(64)).unwrap();
             for (pointer, value) in [
                 ("/cache_profile", json!("other-profile")),
