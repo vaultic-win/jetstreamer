@@ -17,6 +17,9 @@ pub(super) fn completed_guard_binding(
     let selected = guard_receipt::select(name, directory, minimum, now, 1800)?;
     Ok(json!({"binding":private157::binding(&selected.binding),"history":selected.history}))
 }
+pub(super) fn validate_completed_guard_history(history: &Value, guard: &Value) -> Result<()> {
+    guard_receipt::validate_history(history, guard)
+}
 pub(super) fn capture_terminal() -> Result<()> {
     let a: Vec<_> = env::args().collect();
     ensure!(a.len() == 7, "warmup terminal capture arguments");

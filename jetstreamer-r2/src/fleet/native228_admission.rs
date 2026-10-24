@@ -304,7 +304,7 @@ fn launchable_peers(terminal223: Option<&BoundFile>) -> Result<()> {
     );
     Ok(())
 }
-fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
+pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let (extra, mut evidence) = super::native228_full209::memory(f)?;
     let (base, rest) = super::native228_peer209::memory(&without_full209(f)?)?;
     evidence.extend(rest);
@@ -314,7 +314,7 @@ fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         evidence,
     ))
 }
-fn protected_growth(
+pub(super) fn protected_growth(
     f: &Value,
     o: &Value,
     guards: &BTreeMap<String, BoundFile>,

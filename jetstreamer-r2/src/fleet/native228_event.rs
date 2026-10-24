@@ -43,6 +43,13 @@ fn origin_binding(
     );
     Ok(())
 }
+// Called only after the exact immutable admitted/captured native claim validates.
+fn gate_state(epoch: u64, old: &str, new: &str) -> bool {
+    old == new
+        || (epoch == 228
+            && matches!(old, "not-yet-staged" | "staged-admissible")
+            && new == "blocked-qualification")
+}
 pub(super) fn event_predecessor(
     previous: &Value,
     p: &Plan,
@@ -135,7 +142,7 @@ pub(super) fn event_predecessor(
             .get(epoch)
             .context("228 event omitted a prior gate")?;
         ensure!(
-            new.state == gate.state
+            gate_state(*epoch, &gate.state, &new.state)
                 && serde_json::to_value(&new.reserve_stop)?
                     == serde_json::to_value(&gate.reserve_stop)?
                 && gate.evidence.iter().all(|e| new.evidence.contains(e))
@@ -144,6 +151,10 @@ pub(super) fn event_predecessor(
             "228 event changed an unrelated or completion gate"
         );
         if *epoch == 228 {
+            ensure!(
+                new.evidence.iter().any(|e| claim.evidence.contains(e)),
+                "228 blocked gate lacks its genuine captured origin"
+            );
             ensure!(
                 new.evidence
                     .iter()
@@ -181,6 +192,26 @@ pub(super) fn event_census(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn admitted_native_gate_only_enters_blocked_qualification_for_228() {
+        for old in ["not-yet-staged", "staged-admissible"] {
+            assert!(gate_state(228, old, "blocked-qualification"));
+            assert!(!gate_state(227, old, "blocked-qualification"));
+            assert!(!gate_state(229, old, "blocked-qualification"));
+            for authority in ["ready", "complete", "post-replay-pipeline", "live-replay"] {
+                assert!(!gate_state(228, old, authority));
+            }
+        }
+        for old in [
+            "ready",
+            "complete",
+            "failed-needs-repair",
+            "post-replay-pipeline",
+        ] {
+            assert!(!gate_state(228, old, "blocked-qualification"));
+            assert!(gate_state(228, old, old));
+        }
+    }
     #[test]
     fn native_event_cannot_replace_its_resource_observer_or_prior_fleet() {
         let observer = json!({"path":"/observer.json","sha256":"a".repeat(64)});

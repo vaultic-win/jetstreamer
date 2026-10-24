@@ -25,6 +25,8 @@ Absence means no published live estimate; it never means the epoch is storage-co
 - Refresh at the existing coordinated 30-minute cadence and handle authenticated failure,
   completion and phase-handoff events promptly. Do not create another routine polling loop or
   restart healthy producers to improve the display.
+  After accepting the coordinated fleet, refresh its existing live reports before lengthy
+  admission or repair work; publish newly admitted owners through their separate initial event.
 - Bind every estimate to the actual invocation, sample time, current progress and phase. Recompute
   remaining replay from measured rates and the real publication gate, including queued members of
   a legacy cohort. Include archive close/import, independent full/current-plugin checks, upload,
