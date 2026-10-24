@@ -441,7 +441,7 @@ mod tests {
         let evidence = json!({"unit":canary227::UNIT,"memory_floor_policy":policy,
             "memory_floor_top_up_bytes":top_up,"remaining_hard_memory_growth_bytes":123});
         assert_eq!(
-            hard_growth(&f, total, top_up + 123, &[evidence.clone()]).unwrap(),
+            hard_growth(&f, total, top_up + 123, std::slice::from_ref(&evidence)).unwrap(),
             (123, top_up)
         );
         assert_eq!(hard_growth(&f, total, 123, &[]).unwrap(), (123, 0));
@@ -454,7 +454,7 @@ mod tests {
             )
             .is_err()
         );
-        assert!(hard_growth(&f, total, top_up - 1, &[evidence.clone()]).is_err());
+        assert!(hard_growth(&f, total, top_up - 1, std::slice::from_ref(&evidence)).is_err());
         let mut foreign = evidence.clone();
         foreign["unit"] = json!("unqualified.service");
         assert!(hard_growth(&f, total, top_up + 123, &[foreign]).is_err());
