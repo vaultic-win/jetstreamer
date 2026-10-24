@@ -11,8 +11,7 @@ use std::{
 };
 const UNIT: &str = "horizon-cohort191-delivery-queue-20261023-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1";
-const PROGRAM: &str =
-    "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-delivery-tools-20261024-v1/jetstreamer-r2";
 const RECEIPTS: &str = "/home/sol/.jetstreamer-private/r2-receipts";
 // Confirmed fixed deployment contract; never accept an admission-supplied envfile.
 const ENVFILE: &str = "/etc/jetstreamer/horizon-r2.env";

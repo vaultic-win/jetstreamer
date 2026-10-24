@@ -3530,6 +3530,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-controller-terminal-191") {
         return cohort191_delivery::capture_controller_terminal();
     }
+    if env::args().nth(1).as_deref() == Some("observe-public191") {
+        return cohort191_delivery::observe_public();
+    }
     if env::args().nth(1).as_deref() == Some("check-delivery-191") {
         return cohort191_delivery::check();
     }

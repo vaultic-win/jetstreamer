@@ -220,6 +220,41 @@ fn captured_program(v: &Value) -> Result<()> {
     );
     member(Path::new(ORIGINAL_CAPTURE_PROGRAM), ORIGINAL_CAPTURE_SHA)
 }
+// Historical producer records only. This never establishes current importer,
+// public custody, verification or a downstream claim; those remain independent.
+pub(super) fn historical_records(proof: &Bound, cutoff: u64) -> Result<Value> {
+    let v = bound(proof, false)?;
+    shape(&v)?;
+    captured_program(&v)?;
+    let pb: Bound = serde_json::from_value(v["capture_plan"].clone())?;
+    let p = bound(&pb, true)?;
+    ensure!(
+        p["schema"] == "jetstreamer-cohort191-import-pending-capture-plan-v1"
+            && p["program"]["path"] == ORIGINAL_CAPTURE_PROGRAM
+            && p["program"]["sha256"] == ORIGINAL_CAPTURE_SHA
+            && p["output"].as_str() == proof.path.to_str()
+            && p["source_batch"] == v["source_batch"]
+            && p["origins"] == v["origins"]
+            && v["recorded_unix_seconds"]
+                .as_u64()
+                .is_some_and(|n| n <= cutoff)
+            && manager_terminal(cutoff)? == v["producer_terminal"],
+        "191 historical records lack native provenance"
+    );
+    let mut rows = vec![v["native_events"]["root"].clone()];
+    rows.extend(
+        v["native_events"]["closes"]
+            .as_array()
+            .context("191 historical closes")?
+            .iter()
+            .cloned(),
+    );
+    ensure!(
+        roots(&rows, cutoff)? == v["native_events"],
+        "191 historical native fields differ"
+    );
+    Ok(v)
+}
 pub(super) fn retained_events(proof: &Bound, p: &Capture, cutoff: u64) -> Result<Value> {
     let v = bound(proof, false)?;
     shape(&v)?;
@@ -229,6 +264,7 @@ pub(super) fn retained_events(proof: &Bound, p: &Capture, cutoff: u64) -> Result
             .as_u64()
             .is_some_and(|t| t <= cutoff)
             && p.public_batch.is_none()
+            && p.native_terminal_proof.is_none()
             && p.source_batch
                 .as_ref()
                 .is_some_and(|b| serde_json::to_value(b).is_ok_and(|x| x == v["source_batch"]))
@@ -366,6 +402,7 @@ fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
         queue: None,
         source_revalidation_policy: None,
         native_pending_proof: Some(p.bootstrap.clone()),
+        native_terminal_proof: None,
         output: p.output.clone(),
     };
     let cp_path = p.output.with_extension("capture-plan.json");
@@ -509,6 +546,9 @@ mod tests {
             retained_events(&proof, &p, cutoff).unwrap(),
             v["native_events"]
         );
+        p.native_terminal_proof = Some(proof.clone());
+        assert!(retained_events(&proof, &p, cutoff).is_err());
+        p.native_terminal_proof = None;
         p.public_batch = Some(proof.clone());
         assert!(retained_events(&proof, &p, cutoff).is_err());
         p.public_batch = None;

@@ -315,6 +315,13 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if memory152::enabled(p)
+        && p.cohort191_delivery
+            .as_ref()
+            .is_some_and(|s| !s.import_pending)
+    {
+        return "memory152-rebind-terminal191-repair141-v1";
+    }
     if memory152::enabled(p) {
         return "memory152-rebind-guard-stopped185-import-pending191-repair141-v2";
     }

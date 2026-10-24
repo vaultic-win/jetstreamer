@@ -4,8 +4,7 @@ use super::*;
 pub(super) const PHASE: &str = "cohort191-delivery";
 pub(super) const UNIT: &str = "horizon-cohort191-delivery-queue-20261023-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1";
-const PROGRAM: &str =
-    "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-delivery-tools-20261024-v1/jetstreamer-r2";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Binding {
@@ -178,7 +177,7 @@ fn rows<'a>(v: &'a Value, name: &str) -> Result<&'a Vec<Value>> {
         .as_array()
         .with_context(|| format!("191 queue {name}"))
 }
-fn read_head() -> Result<(Bound, Value)> {
+pub(super) fn read_head() -> Result<(Bound, Value)> {
     let path = Path::new(ROOT).join("state.json");
     let bytes = read_stable_bounded(&path, 4 << 20, "191 queue current head")?;
     let b = Bound {
@@ -212,7 +211,7 @@ fn eligible_snapshot(rows: &[(Bound, Value)], cutoff: u64) -> Result<Option<&(Bo
     }
     Ok(latest)
 }
-fn selected_state(anchor: &Bound, cutoff: u64) -> Result<(Bound, Value, Bound, Value)> {
+pub(super) fn selected_state(anchor: &Bound, cutoff: u64) -> Result<(Bound, Value, Bound, Value)> {
     let (head_bound, head) = read_head()?;
     let history = Path::new(ROOT).join("history");
     if !history.try_exists()? {

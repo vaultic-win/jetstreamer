@@ -15,6 +15,8 @@ pub(super) struct Profile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     terminal_collector: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    public_context: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     adoption_predecessor: Option<Bound>,
 }
 #[derive(Deserialize)]
@@ -142,6 +144,16 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
         "foreign191 publisher, event namespace or duplicate ordinary claim"
     );
     tool_ok(&s.publisher)?;
+    if let Some(context) = &s.public_context {
+        let c = bound_json(context, true)?;
+        ensure!(
+            !s.import_pending
+                && c["schema"] == "jetstreamer-cohort191-public-context-v1"
+                && c["publisher"] == serde_json::to_value(&s.publisher)?
+                && c["terminal"] == serde_json::to_value(&s.terminal_event)?,
+            "191 public context differs from exact collector/publisher"
+        );
+    }
     let v = bound_json(&s.terminal_event, false)?;
     ensure!(
         s.terminal_collector.is_none()
@@ -162,11 +174,14 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     let collector = s.terminal_collector.as_ref().unwrap_or(&s.publisher);
     if s.terminal_collector.is_some() {
         ensure!(
-            collector.path
-                == Path::new(
+            matches!(
+                collector.path.to_str(),
+                Some(
                     "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2"
-                ),
-            "191 terminal collector is not the original sealed native reader"
+                        | "/usr/local/lib/jetstreamer/horizon-cohort191-collected-delivery-tools-20261024-v1/jetstreamer-r2"
+                )
+            ),
+            "191 terminal collector is not a scoped sealed native reader"
         );
         tool_ok(collector)?;
     }
@@ -181,10 +196,20 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     let c = bound_json(&capture, true)?;
     if v["schema"] == "jetstreamer-cohort191-terminal-transition-v1" {
         ensure!(
-            c["schema"] == "jetstreamer-cohort191-terminal-collection-plan-v1"
+            c["schema"]
+                == (if collector.path
+                    == Path::new(
+                        "/usr/local/lib/jetstreamer/horizon-cohort191-collected-delivery-tools-20261024-v1/jetstreamer-r2"
+                    ) {
+                    "jetstreamer-cohort191-terminal-cache-collection-plan-v1"
+                } else {
+                    "jetstreamer-cohort191-terminal-collection-plan-v1"
+                })
                 && c["program"] == serde_json::to_value(collector)?
                 && c["source_batch"] == v["source_batch"]
                 && c["public_batch"] == v["public_batch"]
+                && (c["schema"] != "jetstreamer-cohort191-terminal-cache-collection-plan-v1"
+                    || c["origins"] == v["origins"])
                 && c["output"].as_str() == s.terminal_event.path.to_str()
                 && c.get("observer").is_none(),
             "191 terminal-only collector plan/program/import differs"
@@ -393,13 +418,7 @@ pub(super) fn enable(
         // Preserve every surviving observer range rather than removing twice.
         let old = next.cohort191_delivery.as_ref().unwrap();
         let old_proof = bound_json(&old.terminal_event, false)?;
-        ensure!(
-            old_proof["schema"] == "jetstreamer-cohort191-import-pending-transition-v1"
-                && old_proof["source_batch"] == proof["source_batch"]
-                && !next.expected_epochs.iter().any(|e| (191..=194).contains(e))
-                && !range_set(config, "replays")?.contains("191-194"),
-            "191 public transition differs from accepted original pending cohort"
-        );
+        pending_to_public_scope(&old_proof, &proof, &next.expected_epochs, config)?;
         (config.clone(), next.expected_epochs.clone())
     } else {
         let (_, edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
@@ -414,6 +433,22 @@ pub(super) fn enable(
     validate(next)?;
     *config = edited;
     next.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
+    Ok(())
+}
+fn pending_to_public_scope(old: &Value, new: &Value, epochs: &[u64], config: &Value) -> Result<()> {
+    ensure!(
+        old["schema"] == "jetstreamer-cohort191-import-pending-transition-v1"
+            && new["schema"] == "jetstreamer-cohort191-terminal-transition-v1"
+            && old["source_batch"] == new["source_batch"]
+            && old["origins"] == new["origins"]
+            && old["origins"].as_object().is_some_and(|o| o
+                .keys()
+                .map(String::as_str)
+                .eq(["191", "192", "193", "194"]))
+            && !epochs.iter().any(|e| (191..=194).contains(e))
+            && !range_set(config, "replays")?.contains("191-194"),
+        "191 public transition differs from accepted original pending cohort"
+    );
     Ok(())
 }
 pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
@@ -486,6 +521,31 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
     let result = (|| -> Result<Bound> {
         if s.import_pending {
             cohort191_import::capture(p, observer)?;
+        } else if let Some(context) = &s.public_context {
+            let output = event_path(p).context("191 current public event path")?;
+            let package = delivery198::seal_values(
+                p,
+                "public191-capture",
+                &[(
+                    "plan.json",
+                    json!({
+                "schema":"jetstreamer-cohort191-public-observation-plan-v1","context":context,"observer":observer,"output":output}),
+                )],
+            )?;
+            let plan = file(package.join("plan.json"), true)?;
+            child(
+                &s.publisher,
+                &[
+                    "observe-public191".into(),
+                    plan.path.display().to_string(),
+                    "--plan-sha256".into(),
+                    plan.sha256,
+                    "--self-sha256".into(),
+                    s.publisher.sha256.clone(),
+                ],
+                false,
+                &p.cycle_directory.join("child-public191-capture.json"),
+            )?;
         }
         let b = file(event_path(p).context("191 current event path")?, false)?;
         let v = bound_json(&b, false)?;
@@ -833,6 +893,36 @@ mod tests {
         adoption_clocks(10000, 13600, 13600).unwrap();
     }
     #[test]
+    fn pending_to_public_preserves_original_source_origins_and_surviving_observer() {
+        let origins = (191..=194)
+            .map(|e| {
+                (
+                    e.to_string(),
+                    json!({"path":format!("/origin/{e}"),"sha256":"a".repeat(64)}),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let old = json!({"schema":"jetstreamer-cohort191-import-pending-transition-v1","source_batch":"source","origins":origins});
+        let mut new = old.clone();
+        new["schema"] = json!("jetstreamer-cohort191-terminal-transition-v1");
+        let epochs = [152, 153, 155, 156, 183, 184];
+        let config =
+            json!({"replays":[{"range":"152-153"},{"range":"155-156"},{"range":"183-184"}]});
+        pending_to_public_scope(&old, &new, &epochs, &config).unwrap();
+        for field in ["schema", "source_batch", "origins"] {
+            let mut bad = new.clone();
+            bad[field] = json!("foreign");
+            assert!(pending_to_public_scope(&old, &bad, &epochs, &config).is_err());
+        }
+        let mut bad = config.clone();
+        bad["replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"range":"191-194"}));
+        assert!(pending_to_public_scope(&old, &new, &epochs, &bad).is_err());
+        assert!(pending_to_public_scope(&old, &new, &[152, 191], &config).is_err());
+    }
+    #[test]
     fn adoption_interval_cannot_be_borrowed_by_foreign_or_later_predecessor() {
         let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
         let profile = || Profile {
@@ -849,6 +939,7 @@ mod tests {
             adoption_predecessor: None,
             import_pending: false,
             terminal_collector: None,
+            public_context: None,
         };
         p.cohort191_delivery = Some(profile());
         assert!(interval(&p, "2026-10-24T01:16:00Z").unwrap().is_none());
