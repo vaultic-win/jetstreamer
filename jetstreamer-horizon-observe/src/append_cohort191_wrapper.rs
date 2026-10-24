@@ -559,6 +559,11 @@ mod tests {
     fn append_reentry_and_publication_frontier_recovery() {
         let (_d, p, o) = fixture();
         assert_eq!(o, 0);
+        let target = p.target_directory.join(WRAPPER);
+        fs::copy(&p.wrapper_source, &target).unwrap();
+        assert!(execute(&p, "a", o, false).is_err());
+        assert!(!p.state_directory.join("intent.json").exists());
+        fs::remove_file(&target).unwrap();
         execute(&p, "a", o, false).unwrap();
         let old = p.original_members.clone();
         execute(&p, "a", o, false).unwrap();
