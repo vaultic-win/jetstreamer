@@ -120,7 +120,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
         );
         rows.push(&diagnostic["observation"]);
     }
-    prefix223_native20_admission::roster(f)?;
+    prefix223_live_peer::roster(f)?;
     let mut seen = BTreeSet::new();
     for active in f["active"].as_array().context("210 active census")? {
         let owner = singleton227_admission::active_owner(active)?;
@@ -230,8 +230,7 @@ pub(super) fn run() -> Result<()> {
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("210 sample clock")?)?;
     let floor = singleton227_admission::century_floor_for(&f, 210)?;
     let free_before = singleton227_admission::disk_free()?;
-    let (growth, measurements) =
-        prefix223_native20_peer228::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (growth, measurements) = prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
     let (computed, existing_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let protected = p["guard_minimum_free_bytes"]
@@ -246,7 +245,7 @@ pub(super) fn run() -> Result<()> {
         .context("210 free overflow")?;
     candidate(&p, protected, required)?;
     let (_, memory_required) = sample(&s, &o, &f, now, required)?;
-    let (auxiliary_growth, auxiliary_measurements) = prefix223_native20_peer228::memory(&f)?;
+    let (auxiliary_growth, auxiliary_measurements) = prefix223_live_peer::memory(&f)?;
     let memory_required = memory_required
         .checked_add(auxiliary_growth)
         .context("210 memory claim overflow")?;
@@ -266,6 +265,7 @@ pub(super) fn run() -> Result<()> {
     names.insert(c::UNIT.into());
     let before = census(&names, 201, 300)?;
     native210_peer_history::current(&f, &before)?;
+    prefix223_live_peer::current(&f, &before)?;
     singleton227_admission::owners(&f, &before)?;
     ensure!(
         before
@@ -287,6 +287,7 @@ pub(super) fn run() -> Result<()> {
     );
     let after = census(&names, 201, 300)?;
     native210_peer_history::current(&f, &after)?;
+    prefix223_live_peer::current(&f, &after)?;
     singleton227_admission::owners(&f, &after)?;
     ensure!(
         before == after && caps == singleton227_admission::limits(&f)?,
@@ -295,8 +296,8 @@ pub(super) fn run() -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     sample(&s, &o, &f, now, required)?;
     let (after_growth, after_measurements) =
-        prefix223_native20_peer228::disk(&f, &o, &s.protected_guards, t, now)?;
-    let (after_auxiliary, after_auxiliary_measurements) = prefix223_native20_peer228::memory(&f)?;
+        prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (after_auxiliary, after_auxiliary_measurements) = prefix223_live_peer::memory(&f)?;
     ensure!(
         after_growth <= growth
             && after_auxiliary <= auxiliary_growth
@@ -414,6 +415,26 @@ mod tests {
             .push(json!({"producer_after":{"unit":singleton227::UNIT}}));
         assert!(sample(&s, &stale, &f, 1792778410, 1).is_err());
         assert!(sample(&s, &o, &old, 1792778410, 1).is_err());
+    }
+    #[test]
+    fn observed_live223_peer_is_counted_and_an_unobserved_post_sample_peer_is_rejected() {
+        let (s, mut o, mut f) = complete_sample();
+        let history = native210_peer_history::fixture(false);
+        for field in ["diagnostics", "unit_census", "epochs"] {
+            f[field] = history[field].clone();
+        }
+        f["active"].as_array_mut().unwrap().remove(3);
+        o["replays"].as_array_mut().unwrap().remove(3);
+        let peer = prefix223_live_peer::fixture_row();
+        let unit = singleton227_admission::active_owner(&peer).unwrap();
+        let observed = json!({"unit":unit["Id"],"invocation_id":unit["InvocationID"],"restarts":0,"rss":{"census_stable":true}});
+        o["diagnostic_replays"] = json!([{"producer_unit":unit["Id"],"status":"observed","error":null,
+            "observation":{"invocation_binding_stable":true,"producer_before":observed,"producer_after":observed}}]);
+        f["active"].as_array_mut().unwrap().push(peer);
+        sample(&s, &o, &f, 1792778410, 1).unwrap();
+        assert_eq!(f["active"].as_array().unwrap().len(), 5);
+        o["diagnostic_replays"] = json!([]);
+        assert!(sample(&s, &o, &f, 1792778410, 1).is_err());
     }
     #[test]
     fn all_five_actual_peers_are_retained_and_every_observation_is_required() {

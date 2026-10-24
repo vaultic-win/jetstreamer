@@ -393,6 +393,7 @@ pub(super) fn run() -> Result<()> {
     names.insert(c::UNIT.into());
     let before = census(&names, 201, 300)?;
     native210_peer_history::current(&f, &before)?;
+    prefix223_live_peer::current(&f, &before)?;
     let mut protected = before.clone();
     protected.remove(c::UNIT);
     singleton227_admission::owners(&f, &protected)?;
@@ -481,6 +482,7 @@ pub(super) fn run() -> Result<()> {
     r["guard_manager"] = manager;
     let after = census(&names, 201, 300)?;
     native210_peer_history::current(&f, &after)?;
+    prefix223_live_peer::current(&f, &after)?;
     ensure!(before == after, "210 capture owner census changed");
     private157::immutable_receipt(&s.output, &r)?;
     Ok(())
