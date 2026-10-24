@@ -39,3 +39,18 @@ last guard's two stable physical scans and a bounded post-stop scratch observati
 agree. No cleanup or restart follows from source qualification alone: the parent
 operator reviews the exact plan, coordinates cleanup, then obtains fresh complete
 admission and launches the unchanged smallv2 runtime only after prelaunch proof.
+
+Retry2 exposed a second metadata-only preflight requirement: identical unit bytes
+are insufficient when `/etc/systemd/system/...service` is writable. Prelaunch
+must require a canonical root-owned regular file with one link and no write bits,
+as well as the exact135a4b4d digest. The installed unit is now0444. The terminal
+raw journal destination is `horizon-native227-v1625-terminal-raw-small-v2`, matching
+the terminal verifier's closed namespace. Capture and subsequent terminal-proof
+validation now share one checked hyphenated capture-spec schema parser.
+
+A sealed systemd collector is connected through producer OnSuccess/OnFailure;
+no dependency starts or restarts the producer. On terminal transition it preserves
+the original unit journal, including PID1 completion, then makes it0444. Its
+no-existing-journal condition protects the original evidence. The journal alone
+never qualifies the native input; the independent exact-IID/PID marker, test,
+manager, accepted-fleet, observer and unchanged-census gates remain mandatory.

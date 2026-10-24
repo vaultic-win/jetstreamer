@@ -278,6 +278,23 @@ fn directory(path: &Path, uid: u32, empty: bool) -> Result<Value> {
         json!({"path":path,"device":m.dev(),"inode":m.ino(),"uid":uid,"mode":"0700","empty":is_empty}),
     )
 }
+fn installed_unit(path: &Path, uid: u32, expected: &str) -> Result<()> {
+    let m = fs::symlink_metadata(path)?;
+    ensure!(
+        m.is_file()
+            && m.uid() == uid
+            && m.nlink() == 1
+            && m.mode() & 0o222 == 0
+            && path.is_absolute()
+            && path.canonicalize()? == path,
+        "native227 installed unit is not an immutable canonical owned regular file"
+    );
+    ensure!(
+        file_sha256(path)? == expected,
+        "native227 installed unit differs"
+    );
+    Ok(())
+}
 pub(super) fn prelaunch() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
     ensure!(
@@ -309,7 +326,7 @@ pub(super) fn prelaunch() -> Result<()> {
     for path in [
         Path::new(ORIGIN).parent().unwrap(),
         Path::new(TERMINAL).parent().unwrap(),
-        Path::new("/var/lib/jetstreamer/horizon-native227-v1625-terminal-journal-small-v2"),
+        Path::new("/var/lib/jetstreamer/horizon-native227-v1625-terminal-raw-small-v2"),
     ] {
         dirs.push(directory(path, 0, true)?);
     }
@@ -324,12 +341,11 @@ pub(super) fn prelaunch() -> Result<()> {
         1000,
         !destinations_only,
     )?);
-    ensure!(
-        file_sha256(Path::new(
-            "/etc/systemd/system/horizon-native-input-227-v1625-small-v2.service"
-        ))? == "135a4b4dee78f6779cf06e87cc83e37418f8dd1150f8a5530d9cb2fdda357b53",
-        "native227 installed unit differs"
-    );
+    installed_unit(
+        Path::new("/etc/systemd/system/horizon-native-input-227-v1625-small-v2.service"),
+        0,
+        "135a4b4dee78f6779cf06e87cc83e37418f8dd1150f8a5530d9cb2fdda357b53",
+    )?;
     let expected = UnitExpectation {
         unit: UNIT.into(),
         invocation_id: IID.into(),
@@ -347,6 +363,7 @@ pub(super) fn prelaunch() -> Result<()> {
     let proof = json!({"schema":"jetstreamer-native227-small-prelaunch-destinations-v1","recorded_unix_millis":now_millis()?,"unit":UNIT,
         "directories":dirs,"unit_terminal":before,"destinations_only":destinations_only,"empty_scratch_required":!destinations_only,
         "installed_unit_sha256":"135a4b4dee78f6779cf06e87cc83e37418f8dd1150f8a5530d9cb2fdda357b53",
+        "installed_unit_readonly":true,
         "fresh_complete_fleet_admission_still_required":true,"native_input_qualified":false,"replay_launch_authorized":false,
         "native_execution_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
     write_noclobber(output, &proof)?;
@@ -368,6 +385,25 @@ mod tests {
             "completion_receipt":"/home/ubuntu/.jetstreamer-private/native227-small-retirement-9fe28fc9-v1/complete.json",
             "authority":{"local_failed_diagnostic_retirement_authorized":true,"preserve_run_root":true,
                 "archive_publication_authorized":false,"remote_mutations":false,"r2_mutations":false}})).unwrap()
+    }
+    #[test]
+    fn identical_unit_bytes_are_insufficient_when_installed_mode_is_writable() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("native.service");
+        fs::write(&p, b"unit").unwrap();
+        let uid = unsafe { libc::geteuid() };
+        let sha = file_sha256(&p).unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(installed_unit(&p, uid, &sha).is_err());
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o444)).unwrap();
+        installed_unit(&p, uid, &sha).unwrap();
+        assert!(installed_unit(&p, uid, &"a".repeat(64)).is_err());
+        let link = d.path().join("alias");
+        std::os::unix::fs::symlink(&p, &link).unwrap();
+        assert!(installed_unit(&link, uid, &sha).is_err());
+        fs::remove_file(link).unwrap();
+        fs::hard_link(&p, d.path().join("second")).unwrap();
+        assert!(installed_unit(&p, uid, &sha).is_err());
     }
     #[test]
     fn cleared_guard_requires_only_the_original_three_completed_fires() {
