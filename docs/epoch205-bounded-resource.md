@@ -2,7 +2,7 @@
 
 The opt-in `epoch205-bounded-resource` feature builds
 `jetstreamer-epoch205-bounded-resource` using the existing reviewed bounded
-runner. It pins parent `025757b9…`, v1.6.16 store8 worker `3f5e8efe…`, the
+runner. It pins parent `025757b9…`, v1.6.16 store 8 worker `3f5e8efe…`, the
 generation-bound 88,559,361 bootstrap and the exact 88,991,050 checkpoint.
 The private target is 88,584,000, well before that checkpoint and the canonical
 epoch end. Reaching it is resource evidence only: it is neither complete-prefix

@@ -1,4 +1,4 @@
-//! Closed observation contract for one capped205 canonical-root prefix experiment.
+//! Closed observation contract for one capped 205 canonical-root prefix experiment.
 //! Registration never supplies the missing suffix, restart or publication gate.
 use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch205-capped-root-prefix-launch-v1";
@@ -78,7 +78,7 @@ pub(super) fn launch_matches(c: &DiagnosticClaim, r: &Value) -> bool {
         && expected(r).is_some_and(|e| command(&r["expected_exec_start"]) == Some(e.as_str()))
 }
 pub(super) fn bindings(c: &DiagnosticClaim, r: &Value) -> Result<()> {
-    ensure!(launch_matches(c, r), "capped205 prefix scope differs");
+    ensure!(launch_matches(c, r), "capped 205 prefix scope differs");
     let cb: BoundFile = serde_json::from_value(r["capability"].clone())?;
     ensure!(
         cb.path

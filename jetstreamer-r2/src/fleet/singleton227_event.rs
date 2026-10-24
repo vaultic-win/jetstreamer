@@ -1,4 +1,4 @@
-//! One guarded native227 owner may join an accepted sample without a new poll.
+//! One guarded native 227 owner may join an accepted sample without a new poll.
 use super::*;
 use super::{singleton227 as c, singleton227_admission as admission};
 pub(super) fn event_predecessor(

@@ -30,7 +30,7 @@ Recover privately, with no canonical sidecar or publication authority:
    canonical import and R2 upload/readback/sidecar remain separate unqualified
    work. A private root pass does not admit the full epoch.
 
-Keep failed157 in the durable open repair backlog. Its old production countdown
+Keep failed 157 in the durable open repair backlog. Its old production countdown
 must be retired only through fresh complete-fleet ownership checks and the
 reviewed conditional status-only cleanup; preserved data and qualification work
 are not disposable. Restore a production ETA only after an actual qualified live

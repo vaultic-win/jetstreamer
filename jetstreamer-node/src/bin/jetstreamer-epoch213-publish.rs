@@ -337,7 +337,7 @@ fn validate_archive(file: &File) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("archive open: {e}"))?;
     ensure!(
         reader.header().slot_start == 92016000 && reader.header().slot_count == 432000,
-        "not complete epoch213 coverage"
+        "not complete epoch 213 coverage"
     );
     let provenance = reader
         .provenance()

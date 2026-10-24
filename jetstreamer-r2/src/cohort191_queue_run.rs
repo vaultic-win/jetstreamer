@@ -1,4 +1,4 @@
-//! Persistent191–194 owner. Admissions are supplied after actual resource
+//! Persistent 191–194 owner. Admissions are supplied after actual resource
 //! observations; a queued slot never contains an invented child or future hash.
 use super::*;
 use crate::cohort191_delivery::{self as custody, Bound};
@@ -53,7 +53,7 @@ fn bound_path(p: &Path, maximum: u64, uid: u32) -> Result<Bound> {
             && m.uid() == uid
             && m.nlink() == 1
             && m.mode() & 0o022 == 0,
-        "unsafe191 queue receipt/admission"
+        "unsafe 191 queue receipt/admission"
     );
     let bytes = read_stable_bounded(p, maximum, "191 queue bound")?;
     Ok(Bound {
@@ -78,7 +78,7 @@ fn executable(b: &Bound) -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && m.mode() & 0o111 != 0,
-        "unsealed191 queue executable"
+        "unsealed 191 queue executable"
     );
     let mut f = OpenOptions::new()
         .read(true)
@@ -718,7 +718,7 @@ pub(super) fn sync_verified() -> Result<()> {
     sync_inputs(&s, &qp, iid, row)?;
     custody::bound(&sb, true)?;
     executable(&program)?;
-    // The shared checker revalidates existing actors and84GiB combined spare
+    // The shared checker revalidates existing actors and 84 GiB combined spare
     // envelope against these actual same-cutoff receipts. It samples no replay.
     let resources = resource_admission(&s, &admitted)?;
     let u = manager(&sync_unit(epoch))?;

@@ -556,7 +556,7 @@ fn validate_private_225_terminal(value: &Value) -> Result<()> {
             && value["publication_authorized"] == false
             && value["remote_mutations"] == false
             && value["r2_mutations"] == false,
-        "epoch225 verifier needs exact natural-completion terminal evidence, not a stopped benchmark"
+        "epoch 225 verifier needs exact natural-completion terminal evidence, not a stopped benchmark"
     );
     Ok(())
 }
@@ -904,7 +904,7 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
             return Ok(watch160::child_start(&claim.phase, current)?.is_some());
         }
         if watch198::namespace(&claim.phase, &claim.unit) {
-            ensure!(claim.epoch == 198, "legacy watcher profile is198 only");
+            ensure!(claim.epoch == 198, "legacy watcher profile is 198 only");
             return Ok(watch198::child_start(&claim.phase, current)?.is_some());
         }
     }
@@ -1068,7 +1068,7 @@ fn validate_same_sample_admission(
             "cc3536dfcc268c913feccf1603a25e3cdbdf2807289c9061e04884027d1b1560"
         }
         203 if shrink_budget_203_namespace(claim) => {
-            // Separately sealed guard with the exact epoch203 target-stop
+            // Separately sealed guard with the exact epoch 203 target-stop
             // profile; this does not replace a guard on an existing replay.
             "d039ddf0b161bc554614a862bd12987bd6a3474549a22d066ebefa5584e5dd98"
         }
@@ -1321,8 +1321,8 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
         plan.get("bounded_canary").is_none_or(Value::is_null)
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
             // Lower bound only: fresh admission must additionally protect the
-            // remaining 203 debt. This does not adopt the proposed 512GiB
-            // replacement for the still-live 576GiB 216-219 growth claim.
+            // remaining 203 debt. This does not adopt the proposed 512 GiB
+            // replacement for the still-live 576 GiB 216-219 growth claim.
             && plan["minimum_free_bytes"]
                 .as_u64()
                 .is_some_and(|v| v >= 231_874_716_783 + ((576 + 640 + 64) << 30))
@@ -1434,35 +1434,35 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let singleton_209 = receipt["schema"] == singleton209::SCHEMA;
     ensure!(
         !singleton209::namespace(claim) || singleton_209,
-        "capped209 namespace requires its own full singleton schema"
+        "capped 209 namespace requires its own full singleton schema"
     );
     ensure!(
         !singleton227::namespace(claim) || singleton_227,
-        "capped227 namespace requires its own full singleton schema"
+        "capped 227 namespace requires its own full singleton schema"
     );
     ensure!(
         !prefix204::namespace(claim) || prefix_204,
-        "capped204 namespace requires its own schema"
+        "capped 204 namespace requires its own schema"
     );
     ensure!(
         !prefix205::namespace(claim) || prefix_205,
-        "capped205 namespace requires its own schema"
+        "capped 205 namespace requires its own schema"
     );
     ensure!(
         !prefix223::namespace(claim) || prefix_223,
-        "prefix223 namespace requires its own private schema"
+        "prefix 223 namespace requires its own private schema"
     );
     ensure!(
         !prefix223_native20::namespace(claim) || prefix_223_native20,
-        "native20 prefix223 namespace requires its own private schema"
+        "native 20 prefix 223 namespace requires its own private schema"
     );
     ensure!(
         !tail223::namespace(claim) || tail_223,
-        "tail223 namespace requires its own private schema"
+        "tail 223 namespace requires its own private schema"
     );
     ensure!(
         !bounded205::namespace(claim) || bounded_205,
-        "bounded205 namespace requires its own launch schema"
+        "bounded 205 namespace requires its own launch schema"
     );
     let shrink_budget_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-shrink-budget-resource-launch-v1";
@@ -2644,7 +2644,7 @@ pub(super) async fn run() -> Result<()> {
                 plan.gates
                     .get(&136)
                     .is_some_and(|g| g.state == "failed-needs-repair"),
-                "private136 experiment cannot close or relabel original repair"
+                "private 136 experiment cannot close or relabel original repair"
             );
         }
         if native141::namespace(claim)
@@ -2657,7 +2657,7 @@ pub(super) async fn run() -> Result<()> {
         {
             ensure!(
                 plan.gates[&141].state == "failed-needs-repair",
-                "private native141 acquisition cannot close or relabel the failed repair"
+                "private native 141 acquisition cannot close or relabel the failed repair"
             );
         }
         ensure!(
@@ -2775,7 +2775,7 @@ pub(super) async fn run() -> Result<()> {
         let previous = bound_json(
             plan.previous_fleet
                 .as_ref()
-                .context("native209 prior fleet missing")?,
+                .context("native 209 prior fleet missing")?,
         )?;
         let claims = plan
             .pipeline_claims
@@ -2784,7 +2784,7 @@ pub(super) async fn run() -> Result<()> {
             .collect::<Vec<_>>();
         ensure!(
             claims.len() == 1,
-            "native209 event requires one bound new owner"
+            "native 209 event requires one bound new owner"
         );
         native209_event::event_census(&previous, &before, claims[0])?;
     }
@@ -2794,7 +2794,7 @@ pub(super) async fn run() -> Result<()> {
         let previous = bound_json(
             plan.previous_fleet
                 .as_ref()
-                .context("native210 prior fleet missing")?,
+                .context("native 210 prior fleet missing")?,
         )?;
         let claims = plan
             .pipeline_claims
@@ -2803,7 +2803,7 @@ pub(super) async fn run() -> Result<()> {
             .collect::<Vec<_>>();
         ensure!(
             claims.len() == 1,
-            "native210 event requires one bound new owner"
+            "native 210 event requires one bound new owner"
         );
         native210_event::event_census(&previous, &before, claims[0])?;
     }
@@ -2834,7 +2834,7 @@ pub(super) async fn run() -> Result<()> {
         let previous = bound_json(
             plan.previous_fleet
                 .as_ref()
-                .context("native228 prior fleet missing")?,
+                .context("native 228 prior fleet missing")?,
         )?;
         let claims = plan
             .pipeline_claims
@@ -2843,7 +2843,7 @@ pub(super) async fn run() -> Result<()> {
             .collect::<Vec<_>>();
         ensure!(
             claims.len() == 1,
-            "native228 event requires one bound new owner"
+            "native 228 event requires one bound new owner"
         );
         native228_event::event_census(&previous, &before, claims[0])?;
     }
@@ -2853,7 +2853,7 @@ pub(super) async fn run() -> Result<()> {
         let previous = bound_json(
             plan.previous_fleet
                 .as_ref()
-                .context("native207 prior fleet missing")?,
+                .context("native 207 prior fleet missing")?,
         )?;
         let claims = plan
             .pipeline_claims
@@ -2862,7 +2862,7 @@ pub(super) async fn run() -> Result<()> {
             .collect::<Vec<_>>();
         ensure!(
             claims.len() == 1,
-            "native207 event requires one bound new owner"
+            "native 207 event requires one bound new owner"
         );
         native207_event::event_census(&previous, &before, claims[0])?;
     }
@@ -2872,7 +2872,7 @@ pub(super) async fn run() -> Result<()> {
         let previous = bound_json(
             plan.previous_fleet
                 .as_ref()
-                .context("native227 prior fleet missing")?,
+                .context("native 227 prior fleet missing")?,
         )?;
         let claims = plan
             .pipeline_claims
@@ -2883,7 +2883,7 @@ pub(super) async fn run() -> Result<()> {
             .collect::<Vec<_>>();
         ensure!(
             claims.len() == 1,
-            "native227 event requires exactly one bound new owner"
+            "native 227 event requires exactly one bound new owner"
         );
         singleton227_event::event_census(&previous, &before, claims[0])?;
     }
@@ -3160,20 +3160,20 @@ pub(super) async fn run() -> Result<()> {
                         &current["ExecStart"],
                         &launch["expected_exec_start"]
                     ),
-                    "tail223 diagnostic live command changed"
+                    "tail 223 diagnostic live command changed"
                 );
             }
             if prefix223::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     prefix223::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
-                    "prefix223 diagnostic live command changed"
+                    "prefix 223 diagnostic live command changed"
                 );
             }
             if prefix223_native20::namespace(claim) {
                 ensure!(
                     prefix223_native20::same_command(&current["ExecStart"]),
-                    "native20 full-prefix live command changed"
+                    "native 20 full-prefix live command changed"
                 );
                 let props = singleton227_capture::properties(
                     &claim.unit,
@@ -3185,35 +3185,35 @@ pub(super) async fn run() -> Result<()> {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     bounded205::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
-                    "bounded205 diagnostic live command changed"
+                    "bounded 205 diagnostic live command changed"
                 );
             }
             if prefix205::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     prefix205::same_command(&current["ExecStart"], &launch),
-                    "capped205 live command changed"
+                    "capped 205 live command changed"
                 );
             }
             if prefix204::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     prefix204::same_command(&current["ExecStart"], &launch),
-                    "capped204 live command changed"
+                    "capped 204 live command changed"
                 );
             }
             if singleton227::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     singleton227::same_command(&current["ExecStart"], &launch),
-                    "capped227 live command changed"
+                    "capped 227 live command changed"
                 );
             }
             if singleton209::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
                     singleton209::same_command(&current["ExecStart"]),
-                    "capped209 live command changed"
+                    "capped 209 live command changed"
                 );
                 singleton209::bindings(claim, &launch)?;
             }

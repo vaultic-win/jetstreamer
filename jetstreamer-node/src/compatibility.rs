@@ -422,7 +422,7 @@ pub enum BootstrapStateLoader {
 /// Meaning of the hash embedded in a snapshot archive filename.
 ///
 /// This is an execution-runtime property, not a compression-format property:
-/// historical runtimes can store their legacy accounts hash in either a bzip2
+/// historical runtimes can store their legacy accounts hash in either a bzip 2
 /// or zstd archive name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotHashKind {

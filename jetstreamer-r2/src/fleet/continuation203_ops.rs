@@ -1,4 +1,4 @@
-//! Exact203 preparation/read capability/live capture; never a replay launcher.
+//! Exact 203 preparation/read capability/live capture; never a replay launcher.
 use super::continuation203 as c;
 use super::*;
 use std::os::unix::{
@@ -560,7 +560,7 @@ mod tests {
             path: p.clone(),
             sha256: hex_lower(&Sha256::digest(b"canonical")),
         };
-        // Fixture UID is the actual test owner; production capability separately enforces1000.
+        // Fixture UID is the actual test owner; production capability separately enforces 1000.
         if [0, 1000].contains(&unsafe { libc::geteuid() }) {
             measure(&b, Some(9)).unwrap();
         }

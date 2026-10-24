@@ -20,11 +20,11 @@ epoch144-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-sna
 # Read-only clock inspection of the original failed cohort's exact bootstrap.
 epoch140-original-bootstrap-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
 epoch141-boundary-consumer-diagnostic = ["serde_json"]
-# Closed cold-bootstrap diagnostic. Stops in the worker after freezing60912004;
+# Closed cold-bootstrap diagnostic. Stops in the worker after freezing 60912004;
 # it cannot finish an ordinary epoch or promote a runtime route.
 epoch141-freeze-component-diagnostic = ["serde_json"]
-# Separate bounded follow-up: execute the formerly failing60912005 vote and
-# freeze60912005, while retaining the same cold bootstrap and private authority.
+# Separate bounded follow-up: execute the formerly failing 60912005 vote and
+# freeze 60912005, while retaining the same cold bootstrap and private authority.
 epoch141-vote-prefix-diagnostic = ["epoch141-freeze-component-diagnostic"]
 
 [[bin]]

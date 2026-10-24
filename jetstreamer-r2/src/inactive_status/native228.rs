@@ -1,4 +1,4 @@
-//! Status-only cleanup after independently proved native228 terminal success.
+//! Status-only cleanup after independently proved native 228 terminal success.
 use super::*;
 const UNIT: &str = "horizon-native-input-228-capped-1bfa8d51-v1.service";
 pub(super) fn recognized(f: &Value, owners: &[(String, String)]) -> bool {
@@ -9,7 +9,7 @@ pub(super) fn validate(
     f: &Value,
     owners: &[(String, String)],
 ) -> Result<()> {
-    ensure!(recognized(f, owners), "not native228 terminal status");
+    ensure!(recognized(f, owners), "not native 228 terminal status");
     let proof = bound_json(&serde_json::from_value(f["metadata_event"].clone())?)?;
     let expected = fleet::native228_terminal_status_identity(&proof)?;
     ensure!(

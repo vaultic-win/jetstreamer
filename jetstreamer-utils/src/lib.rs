@@ -19,7 +19,7 @@ pub mod horizon_legacy_poh;
 /// Lossless diagnostic source-transaction equivalence and original-entry PoH binding.
 pub mod horizon_legacy_source;
 
-/// Immutable, bounded original-entry bundle input for private epoch141 qualification.
+/// Immutable, bounded original-entry bundle input for private epoch 141 qualification.
 pub mod horizon_legacy_bundle;
 
 /// Raw diagnostic acquisition independent of strict legacy recovery qualification.
@@ -35,7 +35,7 @@ pub mod horizon_legacy_v1_5_6;
 /// Bounded diagnostic collection of a complete flat RocksDB tar file set.
 pub mod horizon_ledger_tar;
 
-/// Digest-bound diagnostic collection of a retained bzip2 RocksDB tar.
+/// Digest-bound diagnostic collection of a retained bzip 2 RocksDB tar.
 pub mod horizon_ledger_bzip;
 
 /// Optional, diagnostic complete-census native RocksDB resolution, not source completeness.

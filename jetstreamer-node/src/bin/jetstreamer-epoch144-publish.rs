@@ -1,4 +1,4 @@
-//! Exact144 V4 artifact import. Preserves the root-owned original, requires both
+//! Exact 144 V4 artifact import. Preserves the root-owned original, requires both
 //! private scans, copies/hashes independently, and commits checksum last through
 //! the existing absence-only transaction after a permanent UID/GID drop.
 #[path = "epoch144_publish/capacity.rs"]
@@ -51,7 +51,7 @@ const MARGIN: u64 = 1 << 30;
 const UID: u32 = 1001;
 const GID: u32 = 1003;
 // The writer lock opens every ancestor O_RDONLY|O_DIRECTORY, not O_PATH.
-// Only fresh, non-sensitive work roots get this mode; receipts stay0700.
+// Only fresh, non-sensitive work roots get this mode; receipts stay 0700.
 const WORK_MODE: u32 = 0o755;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -195,7 +195,7 @@ fn validate_archive(f: &File) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("archive header:{e}"))?;
     ensure!(
         reader.header().slot_start == 62208000 && reader.header().slot_count == 432000,
-        "not complete144"
+        "not complete 144"
     );
     let p = reader
         .provenance()

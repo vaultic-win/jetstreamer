@@ -5,7 +5,7 @@ not qualify the full cold-epoch peak, promote a runtime, import an archive, or
 authorize a canonical checksum sidecar or R2 publication.
 
 The target-stop/capture mechanics are shared with a distinct compile-time
-[epoch203 profile](epoch203-bounded-resource-runner.md). Neither binary accepts
+[epoch 203 profile](epoch203-bounded-resource-runner.md). Neither binary accepts
 the other profile's plan, unit, private root, snapshot or target. Already-sealed
 runner and guard deployments are unchanged.
 

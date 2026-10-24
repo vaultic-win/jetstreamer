@@ -1,6 +1,6 @@
 //! Conservative next-candidate budget from accepted bytes. Never admission.
 //! Keep the five original growth claims and subtract only already consumed
-//! physical bytes from the live private141 whole-root stop.
+//! physical bytes from the live private 141 whole-root stop.
 use super::*;
 
 const GIB: u64 = 1 << 30;
@@ -8,7 +8,7 @@ const PRIVATE_PEAK: u64 = 512 * GIB;
 const RANGES: [&str; 5] = ["152-153", "155-156", "191-194", "183-184", "185-185"];
 
 fn arithmetic(base: u64, consumed: u64, free: u64) -> Result<Value> {
-    ensure!(consumed <= PRIVATE_PEAK, "live141 stop already exceeded");
+    ensure!(consumed <= PRIVATE_PEAK, "live 141 stop already exceeded");
     let remaining = PRIVATE_PEAK - consumed;
     let protected = base.checked_add(remaining).context("protection overflow")?;
     let required = protected
@@ -30,16 +30,16 @@ fn arithmetic(base: u64, consumed: u64, free: u64) -> Result<Value> {
 fn checked(p: &Plan, o: &Value) -> Result<Value> {
     ensure!(
         original141::capped_enabled(p),
-        "capped141 profile not active"
+        "capped 141 profile not active"
     );
-    let invocation = original141::invocation(p).context("private141 identity")?;
+    let invocation = original141::invocation(p).context("private 141 identity")?;
     let launch = bound_json(
-        original141::launch_binding(p).context("private141 launch")?,
+        original141::launch_binding(p).context("private 141 launch")?,
         false,
     )?;
     ensure!(
         launch["invocation_id"] == invocation,
-        "private141 launch identity differs"
+        "private 141 launch identity differs"
     );
     let admission: Bound = serde_json::from_value(launch["admission"].clone())?;
     let base = bound_json(&admission, false)?;
@@ -50,7 +50,7 @@ fn checked(p: &Plan, o: &Value) -> Result<Value> {
             && base["candidate_incremental_peak_bytes"] == PRIVATE_PEAK
             && base["existing_growth_claims_protected"] == true
             && base["century_floor_protected"] == true,
-        "private141 admission has foreign growth basis"
+        "private 141 admission has foreign growth basis"
     );
     let rows = o["replays"]
         .as_array()
@@ -126,7 +126,7 @@ fn checked(p: &Plan, o: &Value) -> Result<Value> {
             && private["producer_after"]["invocation_id"] == invocation
             && private["producer_after"]["restarts"] == 0
             && private["range"] == "141",
-        "private141 growth owner changed"
+        "private 141 growth owner changed"
     );
     let consumed = private["scratch_pass_1"]["physical_bytes"]
         .as_u64()
@@ -185,7 +185,7 @@ pub(super) fn report(p: &Plan, o: &Value) -> Value {
     result["new_resource_samples"] = json!(0);
     result["full_cold_epoch_peak_qualified"] = json!(false);
     result["next_action"] = json!(
-        "Recheck current growth maxima, actual guards, latest century floor and live resource envelope during fresh admission. If disk does not fit, qualify verified cold offload or a separately bounded resource experiment; never subtract live141 remaining growth or lower the memory-selected concurrency target."
+        "Recheck current growth maxima, actual guards, latest century floor and live resource envelope during fresh admission. If disk does not fit, qualify verified cold offload or a separately bounded resource experiment; never subtract live 141 remaining growth or lower the memory-selected concurrency target."
     );
     result
 }

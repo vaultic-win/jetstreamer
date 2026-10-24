@@ -1,4 +1,4 @@
-//! Isolated epoch225 profile for the shared, bounded RAM-only test supervisor.
+//! Isolated epoch 225 profile for the shared, bounded RAM-only test supervisor.
 use super::*;
 
 fn allowed_203_invocation(id: &str) -> bool {
@@ -12,7 +12,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-private-v1625-ram-snapshot-test-plan-v1"
             && matches!(p.mode.as_str(), "capability" | "snapshot-tests"),
-        "wrong225 schema/mode"
+        "wrong 225 schema/mode"
     );
     ensure!(
         p.unit.starts_with("horizon-v1625-snapshot-test-")
@@ -20,19 +20,19 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
             && p.unit
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
-        "foreign225 unit"
+        "foreign 225 unit"
     );
     ensure!(
         p.test_binary.sha256 == TEST_SHA
             && p.snapshot.sha256 == SNAPSHOT_SHA
             && p.genesis.sha256 == GENESIS_SHA,
-        "foreign225 fixture or test"
+        "foreign 225 fixture or test"
     );
     ensure!(
         p.snapshot.path.file_name().and_then(|s| s.to_str())
             == Some("snapshot-97199617-HE57JmgvEeZjBKN8cfTLrmyCbUnptJ9PWjUdTzgxSSdi.tar.zst")
             && p.genesis.path.file_name().and_then(|s| s.to_str()) == Some("genesis.tar.bz2"),
-        "foreign225 fixture name"
+        "foreign 225 fixture name"
     );
     ensure!(
         p.receipt_directory.parent()
@@ -42,7 +42,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.starts_with("ram-snapshot-test-225-"))
             && (60..=1800).contains(&p.maximum_runtime_seconds),
-        "foreign225 receipts/time bound"
+        "foreign 225 receipts/time bound"
     );
     validate_reserves(TMPFS_SIZE, MEMORY_MAX, FLOOR, STOP_MEMORY)
 }
@@ -180,7 +180,7 @@ pub(super) fn validate_fleet(f: &Value, observer: &Value, observer_hash: &str) -
             && f["last_epoch"] == 300
             && f["producer_mutations"] == false
             && f["remote_mutations"] == false,
-        "unbound225 fleet"
+        "unbound 225 fleet"
     );
     let ready = f["inventory"]["entries"]
         .as_array()

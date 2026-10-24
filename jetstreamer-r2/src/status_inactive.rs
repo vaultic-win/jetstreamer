@@ -300,7 +300,7 @@ fn parse_unit_properties(bytes: &[u8]) -> Result<Value> {
 }
 
 // Match whole numeric epoch tokens/ranges in unit namespaces, not dates or
-// arbitrary decimal substrings. Example: epochs182-200, e183-184, epoch183.
+// arbitrary decimal substrings. Example: epochs182-200, e183-184, epoch 183.
 fn names_epoch(text: &str, epoch: u64) -> bool {
     for (index, _) in text.match_indices(|c: char| c.is_ascii_digit()) {
         if index > 0 && text.as_bytes()[index - 1].is_ascii_digit() {

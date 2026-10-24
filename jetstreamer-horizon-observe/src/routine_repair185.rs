@@ -1,4 +1,4 @@
-//! Exact admitted repair185-185 observer/model adoption; never replay authority.
+//! Exact admitted repair for epoch 185: observer/model adoption; never replay authority.
 use super::*;
 const CONTROLLER: &str = "jetstreamer-epoch185-full-20261023-controller-v1-r2.service";
 const PRODUCER: &str = "jetstreamer-root-sweep-e185-full-20261023-v1-r2-e185-185-lane-a-1.service";
@@ -43,7 +43,7 @@ fn scope(h: &Handoff) -> Result<()> {
             && !h.publication_authorized
             && !h.remote_mutations
             && !h.r2_mutations,
-        "repair185 handoff grants authority or has invalid identities"
+        "repair 185 handoff grants authority or has invalid identities"
     );
     let scratch = &h.scratch_path;
     ensure!(
@@ -68,9 +68,9 @@ fn scope(h: &Handoff) -> Result<()> {
             && h.archive_directory
                 == scratch
                     .parent()
-                    .context("repair185 run parent")?
+                    .context("repair 185 run parent")?
                     .join("archives"),
-        "repair185 private archive/scratch scope differs"
+        "repair 185 private archive/scratch scope differs"
     );
     ensure!(
         h.capability.path
@@ -79,7 +79,7 @@ fn scope(h: &Handoff) -> Result<()> {
             )
             && h.capability.sha256
                 == "cf0eaedd746ed8c884e04521861364534728e94e13cd9b95e69129d7543fc0eb",
-        "repair185 capability binding differs"
+        "repair 185 capability binding differs"
     );
     Ok(())
 }
@@ -112,7 +112,7 @@ fn guard(h: &Handoff, v: &Value) -> Result<()> {
             && s["producer"]["worker_vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n <= 800000),
-        "repair185 guard first-fire proof differs"
+        "repair 185 guard first-fire proof differs"
     );
     for key in [
         "replay_launch_authorized",
@@ -120,7 +120,7 @@ fn guard(h: &Handoff, v: &Value) -> Result<()> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(v[key] == false, "repair185 guard proof grants authority");
+        ensure!(v[key] == false, "repair 185 guard proof grants authority");
     }
     Ok(())
 }
@@ -134,7 +134,7 @@ fn live_guard(h: &Handoff) -> Result<()> {
         let out=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=ActiveState,SubState,Result,NRestarts,ExecMainStatus,ExecStart,Triggers"]).output()?;
         ensure!(
             out.status.success() && out.stdout.len() < 32768,
-            "repair185 guard manager read failed"
+            "repair 185 guard manager read failed"
         );
         let text = std::str::from_utf8(&out.stdout)?;
         let values: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
@@ -142,23 +142,25 @@ fn live_guard(h: &Handoff) -> Result<()> {
             ensure!(
                 values.get("ActiveState") == Some(&"active")
                     && values.get("Triggers") == Some(&GUARD),
-                "repair185 guard timer is not active for its exact service"
+                "repair 185 guard timer is not active for its exact service"
             );
         } else {
             ensure!(
                 values.get("Result") == Some(&"success")
                     && values.get("NRestarts") == Some(&"0")
                     && values.get("ExecMainStatus") == Some(&"0"),
-                "repair185 guard is not healthy"
+                "repair 185 guard is not healthy"
             );
-            let command = values.get("ExecStart").context("repair185 guard command")?;
+            let command = values
+                .get("ExecStart")
+                .context("repair 185 guard command")?;
             ensure!(
                 command
                     .split_whitespace()
                     .filter(|w| *w == GUARD_SCRIPT)
                     .count()
                     == 1,
-                "repair185 guard executable differs"
+                "repair 185 guard executable differs"
             );
             for token in [
                 format!("--controller-unit={CONTROLLER}"),
@@ -176,7 +178,7 @@ fn live_guard(h: &Handoff) -> Result<()> {
             ] {
                 ensure!(
                     command.split_whitespace().filter(|w| *w == token).count() == 1,
-                    "repair185 guard command binding differs"
+                    "repair 185 guard command binding differs"
                 );
             }
         }
@@ -189,19 +191,19 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
     };
     ensure!(
         is_101(p)? && p.publication144.is_some() && p.repair183_handoff.is_some(),
-        "foreign repair185 profile"
+        "foreign repair 185 profile"
     );
     ensure!(
         b.path.starts_with("/usr/local/lib/jetstreamer")
             && b.path.file_name().and_then(|s| s.to_str()) == Some("handoff.json"),
-        "repair185 handoff namespace"
+        "repair 185 handoff namespace"
     );
     let h: Handoff = serde_json::from_value(bound_json(b, true)?)?;
     scope(&h)?;
     let cap = bound_json(&h.capability, true)?;
     ensure!(
         cap["epoch"] == 185 && cap["replay_launch_authorized"] == false,
-        "repair185 original capability differs"
+        "repair 185 original capability differs"
     );
     let admission = bound_json(&h.admission, false)?;
     ensure!(
@@ -222,7 +224,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
             && admission["evidence"]["minimum_vm_max_map_count"]
                 .as_u64()
                 .is_some_and(|n| n >= 4194304),
-        "repair185 full admission proof differs"
+        "repair 185 full admission proof differs"
     );
     let manifest: Bound = serde_json::from_value(
         json!({"path":admission["manifest"],"sha256":admission["manifest_sha256"]}),
@@ -234,7 +236,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
             && m["snapshot"]["size"] == 7250303600u64
             && m["snapshot"]["crc32c_base64"] == "kaWIJg=="
             && m["snapshot"]["md5_base64"] == "jP6QpLlFKYPq4AC25GQUJQ==",
-        "repair185 admitted snapshot differs"
+        "repair 185 admitted snapshot differs"
     );
     let before = bound_json(&h.observer_before_launch, false)?;
     ensure!(
@@ -251,7 +253,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
                         .is_some_and(|n| n > 0 && n <= 800000)
                     && r["cross_sample"]["producer_cgroup_counter_delta"]["memory_events.oom"]
                         == 0)),
-        "repair185 admission lacks the settled clean four-lane operating point"
+        "repair 185 admission lacks the settled clean four-lane operating point"
     );
     ensure!(
         before["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -260,7 +262,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
                 .is_some_and(|rows| rows.iter().any(|r| r["path"]
                     == h.observer_before_launch.path.to_str().unwrap_or("")
                     && r["sha256"] == h.observer_before_launch.sha256)),
-        "repair185 admission does not bind the exact prelaunch observer"
+        "repair 185 admission does not bind the exact prelaunch observer"
     );
     guard(&h, &bound_json(&h.guard_first_fire, true)?)?;
     let mut h = h;
@@ -303,12 +305,14 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
             .remove("unestimated_bootstrap_epochs");
     }
     if let Some(census) = v.get_mut("expected_observer_ranges") {
-        let census = census.as_array_mut().context("repair185 observer census")?;
+        let census = census
+            .as_array_mut()
+            .context("repair 185 observer census")?;
         if !census.contains(&json!("185-185")) {
             census.push(json!("185-185"));
         }
     }
-    let ranges = v["ranges"].as_array_mut().context("repair185 ranges")?;
+    let ranges = v["ranges"].as_array_mut().context("repair 185 ranges")?;
     let indices: Vec<_> = ranges
         .iter()
         .enumerate()
@@ -327,7 +331,7 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
                     .map(|r| r["range"].as_str().unwrap_or(""))
                     .collect::<BTreeSet<_>>()
                     == BTreeSet::from(["152-153", "155-156", "191-194", "183-184"]),
-            "repair185 baseline census differs"
+            "repair 185 baseline census differs"
         );
         ranges.push(json!({"range":"185-185","epochs":[185],"archive_directory":h.archive_directory,
             "expected_controller_invocation_id":h.controller_invocation_id,"expected_producer_invocation_id":h.producer_invocation_id,
@@ -335,7 +339,7 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
             "epoch_downstream_allowance_seconds":{"185":43200},
             "formula":{"185":"remaining observed epoch185 slots / observed rate +12h independent import/full/plugin/upload/readback allowance"}}));
     } else {
-        ensure!(indices.len() == 1, "overlapping repair185 claims");
+        ensure!(indices.len() == 1, "overlapping repair 185 claims");
         let r = &ranges[indices[0]];
         ensure!(
             r["range"] == "185-185"
@@ -344,19 +348,19 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
                 && r["expected_controller_invocation_id"] == h.controller_invocation_id
                 && r["expected_producer_invocation_id"] == h.producer_invocation_id
                 && r.get("elapsed_execution_millis").is_none(),
-            "repair185 existing model owner/clock differs"
+            "repair 185 existing model owner/clock differs"
         );
-        let terminal = r["terminal_slot"].as_u64().context("repair185 terminal")?;
+        let terminal = r["terminal_slot"].as_u64().context("repair 185 terminal")?;
         ensure!(
             terminal == FIRST_END,
-            "repair185 terminal is outside exact cohort"
+            "repair 185 terminal is outside exact cohort"
         );
         {
             let (e, allowance) = ("185", 43200);
             ensure!(
                 r["epoch_additional_replay_slots"][e] == FINAL_END - terminal
                     && r["epoch_downstream_allowance_seconds"][e] == allowance,
-                "repair185 gated work/allowance changed"
+                "repair 185 gated work/allowance changed"
             );
         }
     }
@@ -373,7 +377,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     };
     let already = model["ranges"]
         .as_array()
-        .context("repair185 ranges")?
+        .context("repair 185 ranges")?
         .iter()
         .any(|r| r["range"] == "185-185");
     if !already {
@@ -383,19 +387,21 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
             let checked = observation(model, &h, &prior)?;
             ensure!(
                 checked["unestimated_bootstrap_epochs"] == json!([185]),
-                "repair185 bootstrap predecessor changed"
+                "repair 185 bootstrap predecessor changed"
             );
         }
         ensure!(
             continued_bootstrap
                 || (h.observer_before_launch.path == p.previous_observer.path
                     && h.observer_before_launch.sha256 == p.previous_observer.sha256),
-            "repair185 initial predecessor differs"
+            "repair 185 initial predecessor differs"
         );
     }
     let mut v = apply(model, &h)?;
     let b = serde_json::to_value(p.repair185_handoff.as_ref().unwrap())?;
-    let evidence = v["evidence"].as_array_mut().context("repair185 evidence")?;
+    let evidence = v["evidence"]
+        .as_array_mut()
+        .context("repair 185 evidence")?;
     if !evidence.contains(&b) {
         evidence.push(b);
     }
@@ -407,7 +413,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     }
     let tracked = fleet["tracked_units"]
         .as_array_mut()
-        .context("repair185 fleet tracked units")?;
+        .context("repair 185 fleet tracked units")?;
     for unit in [CONTROLLER.to_owned(), PRODUCER.to_owned()] {
         let value = json!(unit);
         if !tracked.contains(&value) {
@@ -421,16 +427,16 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
         replacement_gate(gate)?;
         ensure!(
             gate["state"] == "failed-needs-repair",
-            "repair185 original open repair gate changed"
+            "repair 185 original open repair gate changed"
         );
         let evidence = gate["evidence"]
             .as_array_mut()
-            .context("repair185 gate evidence")?;
+            .context("repair 185 gate evidence")?;
         if !evidence.contains(&e) {
             evidence.push(e);
         }
         gate["next_action"] = json!(
-            "Track the freshly admitted, independently publishable185 singleton under exact guarded controller/producer identities. Its terminal is80351999 with no queued-cohort offset and12h downstream allowance. Keep the original reserve-stop/source repair open through canonical/full/plugin checks and authenticated ready pair; launch alone is not recovery."
+            "Track the freshly admitted, independently publishable 185 singleton under exact guarded controller/producer identities. Its terminal is 80351999 with no queued-cohort offset and 12h downstream allowance. Keep the original reserve-stop/source repair open through canonical/full/plugin checks and authenticated ready pair; launch alone is not recovery."
         );
     }
     Ok(())
@@ -455,7 +461,7 @@ pub(super) fn for_observation(p: &Plan, model: &Value, observed: &Value) -> Resu
                 old["useful_work"]["last"].is_null()
                     && old["useful_work"]["first"].is_null()
                     && old["useful_work"]["matching_markers"] == 0,
-                "repair185 cannot revert established replay to bootstrap"
+                "repair 185 cannot revert established replay to bootstrap"
             );
         }
     }
@@ -465,21 +471,21 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
     let mut v = apply(model, h)?;
     let rows: Vec<_> = observed["replays"]
         .as_array()
-        .context("repair185 observation census")?
+        .context("repair 185 observation census")?
         .iter()
         .filter(|r| r["range"] == "185-185")
         .collect();
-    ensure!(rows.len() == 1, "repair185 missing/duplicate observation");
+    ensure!(rows.len() == 1, "repair 185 missing/duplicate observation");
     let o = rows[0];
     ensure!(
         o["controller_before"]["unit"] == CONTROLLER
             && o["producer_before"]["unit"] == PRODUCER
             && o["scratch_path"] == h.scratch_path.to_str().unwrap_or(""),
-        "repair185 observed paths/units differ"
+        "repair 185 observed paths/units differ"
     );
     ensure!(
         o["invocation_binding_stable"] == true,
-        "repair185 unstable observation"
+        "repair 185 unstable observation"
     );
     for (kind, id) in [
         ("controller", &h.controller_invocation_id),
@@ -489,7 +495,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
             let s = &o[format!("{kind}_{point}")];
             ensure!(
                 s["invocation_id"] == *id && s["restarts"] == 0 && s["active_state"] == "active",
-                "repair185 observed owner changed"
+                "repair 185 observed owner changed"
             );
         }
     }
@@ -507,7 +513,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
                     .find(|r| r["range"] == "185-185")
                     .unwrap()["terminal_slot"]
                     == FIRST_END,
-            "repair185 absent progress is not initial bootstrap"
+            "repair 185 absent progress is not initial bootstrap"
         );
         for point in ["before", "after"] {
             let worker = &o[format!("worker_{point}")];
@@ -517,7 +523,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
                     && worker["vmas"]
                         .as_u64()
                         .is_some_and(|n| n > 0 && n <= 800000),
-                "repair185 bootstrap worker is not protected"
+                "repair 185 bootstrap worker is not protected"
             );
         }
         v["ranges"]
@@ -529,13 +535,13 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
     }
     let terminal = o["useful_work"]["last"]["terminal_slot"]
         .as_u64()
-        .context("repair185 observed terminal")?;
+        .context("repair 185 observed terminal")?;
     let ranges = v["ranges"].as_array_mut().unwrap();
     let r = ranges.iter_mut().find(|r| r["range"] == "185-185").unwrap();
     let previous = r["terminal_slot"].as_u64().unwrap();
     ensure!(
         terminal == FIRST_END && terminal >= previous,
-        "repair185 backward/unknown terminal"
+        "repair 185 backward/unknown terminal"
     );
     r["terminal_slot"] = json!(terminal);
     {
@@ -570,7 +576,7 @@ pub(super) fn replacement_gate(gate: &mut Value) -> Result<()> {
     let source: Bound = serde_json::from_value(history["source_fleet_plan"].clone())?;
     ensure!(
         bound_json(&source, true)?["gates"]["185"]["reserve_stop"] == history["original_stop"],
-        "repair185 historical stop differs from original immutable gate"
+        "repair 185 historical stop differs from original immutable gate"
     );
     replacement_gate_with(gate, &history, &binding)
 }
@@ -596,31 +602,31 @@ fn replacement_gate_with(gate: &mut Value, history: &Value, binding: &Bound) -> 
                 == "jetstreamer-root-sweep-e185-s1-20261020-v1-r2-e185-185-lane-a-1.service"
             && stop["producer_invocation_id"] == "557be07ab87d47fbac93afe1876a4281"
             && gate["state"] == "failed-needs-repair",
-        "repair185 cannot retire a foreign stop or close the repair"
+        "repair 185 cannot retire a foreign stop or close the repair"
     );
     let evidence = gate["evidence"]
         .as_array()
-        .context("repair185 stop evidence")?;
+        .context("repair 185 stop evidence")?;
     ensure!(
         ["intent", "completion"]
             .iter()
             .all(|key| evidence.contains(&stop[*key])),
-        "repair185 must retain both original stop receipts"
+        "repair 185 must retain both original stop receipts"
     );
     let value = serde_json::to_value(binding)?;
     if gate["reserve_stop"].is_null() {
         ensure!(
             evidence.contains(&value),
-            "repair185 replacement lost its stop history"
+            "repair 185 replacement lost its stop history"
         );
         return Ok(());
     }
     ensure!(
         gate["reserve_stop"] == *stop,
-        "repair185 replacement cannot remove another stop"
+        "repair 185 replacement cannot remove another stop"
     );
     gate.as_object_mut()
-        .context("repair185 gate object")?
+        .context("repair 185 gate object")?
         .remove("reserve_stop");
     let evidence = gate["evidence"].as_array_mut().unwrap();
     if !evidence.contains(&value) {

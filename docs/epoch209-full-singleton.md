@@ -1,10 +1,10 @@
 # Full epoch 209 independent singleton handoff
 
-This is the closed full209 route, separate from the already successful native
+This is the closed full 209 route, separate from the already successful native
 bootstrap. The ordinary compatibility registry remains unchanged. The node must
 verify canonical root 90719638, continue through all 361 following slots, and
 produce exactly 432000 output slots, 90288000 through 90719999. No successor
-epoch's replay or snapshot is required to finalize or upload209.
+epoch's replay or snapshot is required to finalize or upload 209.
 
 ## Bound deployment
 
@@ -34,9 +34,9 @@ no-clobber receipt is produced. No proposed value substitutes for an execution.
    `/var/lib/jetstreamer/horizon-209-singleton-capability-v1/capability.json`.
    It rehashes node, worker, preflight, cached snapshot and genesis without
    restore, resources, replay or network access. Retain the capability digest.
-2. Prepare only a fresh mode0700 owner1000 run root
+2. Prepare only a fresh mode 0700 owner 1000 run root
    `/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1`
-   containing an empty mode0700 `output/`. Admission rejects old attempt data.
+   containing an empty mode 0700 `output/`. Admission rejects old attempt data.
 3. `admit-singleton209` accepts schema
    `jetstreamer-private-epoch209-singleton-admission-spec-v1`, `mode:"replay"`,
    bound files `observer, fleet, capability, native_input, resource_plan`, a map
@@ -52,12 +52,12 @@ no-clobber receipt is produced. No proposed value substitutes for an execution.
    `maximum_scratch_bytes:300000000000`, `memory_max_bytes:225000000000`,
    `memory_high_bytes:150000000000`, `maximum_runtime_seconds:259200`, and the
    recomputed `guard_minimum_free_bytes, required_initial_free_bytes`.
-   The latter equals protected floor plus471798691840. The protected floor is
+   The latter equals protected floor plus 471798691840. The protected floor is
    at least the current twice-average-century `.jet` floor plus every other
    owner's remaining guarded growth, and at least the largest actual
    `minimum_free_bytes` baseline among all bound protected guards. A new
    candidate must never be planned to trip a healthy existing guard at peak.
-   Preserve full227 whole-root credit and
+   Preserve full 227 whole-root credit and
    remaining hard-memory growth,204/205/225 and all auxiliaries. All six fields
    `runtime_promotion_authorized, full_epoch_qualified,
    canonical_sidecar_authorized, publication_authorized, remote_mutations,
@@ -71,29 +71,29 @@ and fields `observer, fleet, capability, native_input, terminal223` (nullable),
 directory must be `/var/lib/jetstreamer/horizon-209-singleton-admission-specs-*`.
 It selects each of the four protected guards from exact completed PID1 history,
 without firing a guard, and runs the reviewed protected-growth calculation
-twice using only saved observations/guards and bounded204/205 output-file
+twice using only saved observations/guards and bounded 204/205 output-file
 metadata. It performs no scratch scan, host resource observation, admission or
 launch. The resulting `resource-plan.json`, `admission-spec.json` and
-`preparation.json` are no-clobber root0400 receipts. The preparation report binds
+`preparation.json` are no-clobber root 0400 receipts. The preparation report binds
 both measurements and guard histories and states whether the resulting bound
 fits the saved free-space observation. Actual admission must still bracket
 current owner identities, caps, free disk and memory and reject stale evidence
 or increased remaining growth; preparation does not reserve or admit a lane.
-For saved334, full227's2TB guard baseline alone requires at least
-2471798691840bytes of initial free space. Saved availability2420007051264bytes
-is51791640576bytes short. Keep this blocked budget explicit until safe reclaim
+For saved 334, full 227's 2 TB guard baseline alone requires at least
+2471798691840 bytes of initial free space. Saved availability 2420007051264 bytes
+is 51791640576 bytes short. Keep this blocked budget explicit until safe reclaim
 or later authoritative evidence establishes headroom; never lower an existing
 guard or substitute imaginary output/reclaim credit.
 
 The historical terminal-from333 fleet contains four owners. It is not current
-launch authority after another owner starts. In particular, a live223v2 repair
+launch authority after another owner starts. In particular, a live 223v2 repair
 is rejected until its exact registered envelope/guard/memory model is supported
 or its independently validated terminal proof is bound through optional
 `terminal223` in the admission spec. That binding must validate the existing
 `jetstreamer-private-warmup223-native20-terminal-v2` validator, exact actual
 IID `58ab3d9221a6452685b8eab3ceabdb49`, original v2 runner/plan/origin,
 preserved journal and controlled result gates. Its observer and predecessor
-fleet must equal this admission's accepted pair, so the saved334 live sample
+fleet must equal this admission's accepted pair, so the saved 334 live sample
 can carry forward only after that actual owner terminates. A proof supplied
 for another observation, origin, invocation or warmup profile is rejected.
 
@@ -104,12 +104,12 @@ free space and memory remain bracketed before/after, every other owner remains
 protected, and the existing terminal-owner/no-later-invocation checks run
 before/after admission and launch capture. Capture and status binding retain
 the exact terminal proof and accounting evidence. This path never starts or
-terminates223 and does not qualify its prefix or close its repair.
+terminates 223 and does not qualify its prefix or close its repair.
 
-Do not omit223, pretend it is the older native-only profile, subtract its
-reservation while live, or launch against the old333 receipt. Freshness remains1800seconds;
-the225GB reservation must also fit the century's1.5x observed RSS ceiling and
-the90percent host-memory target after protected hard-memory growth.
+Do not omit 223, pretend it is the older native-only profile, subtract its
+reservation while live, or launch against the old 333 receipt. Freshness remains 1800 seconds;
+the 225 GB reservation must also fit the century's 1.5x observed RSS ceiling and
+the 90 percent host-memory target after protected hard-memory growth.
 
 ## Actual producer, first guard and capture
 
@@ -130,7 +130,7 @@ first fire, one real worker and exact PID1 successful completion.
 The guard service/timer names are
 `horizon-singleton209-protective-v1.service/.timer`. Capture requires root
 oneshot, no restart, strict system/read-only home, private network,
-`NoNewPrivileges=yes`,1GiB memory,256tasks,100percent CPU and only the exact
+`NoNewPrivileges=yes`,1 GiB memory, 256 tasks, 100 percent CPU and only the exact
 receipt directory writable; its timer must be active/waiting. Keep the guard's
 protective cadence separate from routine resource/status observations.
 
@@ -138,7 +138,7 @@ protective cadence separate from routine resource/status observations.
 `jetstreamer-private-epoch209-singleton-capture-spec-v1` and bound files
 `admission, guard, guard_plan`, plus `output` below a fresh
 `/var/lib/jetstreamer/horizon-209-singleton-capture-*/launch.json`.
-It requires capture within900seconds of admission, exact effective service
+It requires capture within 900 seconds of admission, exact effective service
 sandbox/environment, native proof, unchanged complete owner census and actual
 guard identity. The resulting launch authorizes neither qualification nor R2.
 Register its actual diagnostic claim before routine fleet/status reconciliation.
@@ -153,7 +153,7 @@ Bind `mode` (`launch-event` or `observation`), `observer, fleet, launch`, privat
 The downstream map includes all seven positive allowances:
 `archive_close, boundary, full_verification, plugin_verification, upload,
 readback, sidecar_commit`. Preserve the original producer clock. Launch-event
-publication then the single coordinated1800second observation cycle covers all
+publication then the single coordinated 1800 second observation cycle covers all
 active work. Use only legal wire phases; this adapter reports `verification`
 during initialization and `replay` during actual transaction execution.
 
@@ -169,7 +169,7 @@ The independent tools used by the delivery helper are:
 /var/lib/jetstreamer/horizon-full209-verification-tools-v1/horizon_pipeline 209:209 ROOT/output --threads 8 --verify-only
 ```
 
-`ROOT` in these command templates is the fixed full209 run root above. Admit
+`ROOT` in these command templates is the fixed full 209 run root above. Admit
 each stage's real resource envelope and actual owner separately. The reviewed
 Rust `deliver-singleton209-output` helper takes the same exact immutable
 `SPEC --spec-sha256 HEX --self-sha256 HEX` convention. Its strict spec schema is
@@ -203,8 +203,8 @@ requires its own real MainPID/IID and command before/after execution. It starts
 no service, observes no fleet/replay resources, and grants no local retirement.
 
 The full stage runs independent full PoH and ordered coverage scans and records
-`full.json`. It requires the verifier to report epoch209, first90288000 and
-432000slots. The plugin stage requires that exact full receipt, runs the current
+`full.json`. It requires the verifier to report epoch 209, first 90288000 and
+432000 slots. The plugin stage requires that exact full receipt, runs the current
 read-only plugin and records `plugin.json`. Both rehash the same canonical pair
 before/after, use the pinned independent binaries, fsync actual successful logs
 and write immutable no-clobber receipts. Later stages revalidate tool hashes,
@@ -214,7 +214,7 @@ logs; use a fresh private attempt directory for a failed stage and reuse already
 successful bound upstream receipts instead of restarting replay or prior scans.
 
 The existing `status-publish-pipeline` accepts this genuine launched origin's
-`evidence.units`; retain the full209 origin unit/IID/start clock when handing
+`evidence.units`; retain the full 209 origin unit/IID/start clock when handing
 off to actual `full-verification`, `plugin-verification`, `upload-readback`
 owners. Use bounded units such as `horizon-full-verify-209-singleton-v1.service`,
 `horizon-plugin-verify-209-singleton-v1.service`,
@@ -235,7 +235,7 @@ SHA-256 readback, source revalidation and matching sidecar publication remain ma
 Only after that commit may the exact owned status JSON be conditionally removed.
 No anonymous URL or public-access check is required.
 
-Both208/209 and209/210 independent boundary receipts are still required for
-local retirement. A missing successor does not delay209's independently
+Both 208/209 and 209/210 independent boundary receipts are still required for
+local retirement. A missing successor does not delay 209's independently
 verified upload or remote sidecar, but must retain its local pair. Never replace
 or weaken these gates to reduce an ETA.

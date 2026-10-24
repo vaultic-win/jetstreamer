@@ -1,4 +1,4 @@
-//! Exact failed136 partial retirement after authenticated cold custody. This is
+//! Exact failed 136 partial retirement after authenticated cold custody. This is
 //! not canonical archive retirement or a portable runtime checkpoint.
 use super::*;
 
@@ -32,7 +32,7 @@ fn scope(p: &Retire, m: &Mapping, e: &Value, c: &Value) -> Result<FileIdentity> 
             && p.inspection.path == Path::new(INSPECTION)
             && p.inspection.sha256 == INSPECTION_SHA
             && p.controller_mask.path == Path::new(MASK_ROOT).join("completion.json"),
-        "foreign136 partial retirement scope"
+        "foreign 136 partial retirement scope"
     );
     let (_, etag, sha, length) = custody(c, m)?;
     ensure!(
@@ -229,7 +229,7 @@ fn basis(p: &Retire) -> Result<Value> {
                     && old["MainPID"] == unit["MainPID"]
                     && old["NRestarts"] == unit["NRestarts"]
                     && unit["NRestarts"] == "0",
-                "live campaign owner changed since136 retirement basis"
+                "live campaign owner changed since 136 retirement basis"
             );
         }
     }
@@ -350,11 +350,11 @@ fn local_state(
         (None, None) => {
             ensure!(
                 unlink_intent,
-                "unexplained136 local absence before unlink intent"
+                "unexplained 136 local absence before unlink intent"
             );
             Ok(LocalState::Absent)
         }
-        (Some(_), Some(_)) => bail!("conflicting136 source and quarantine both exist"),
+        (Some(_), Some(_)) => bail!("conflicting 136 source and quarantine both exist"),
     }
 }
 
@@ -426,7 +426,7 @@ fn read_record(path: &Path) -> Result<Option<Value>> {
                     && md.nlink() == 1
                     && path.canonicalize()? == path
                     && md.len() <= 1 << 20,
-                "unsafe136 transition record"
+                "unsafe 136 transition record"
             );
             let id = regular_identity(path)?;
             let bytes = fs::read(path)?;

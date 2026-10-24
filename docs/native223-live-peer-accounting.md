@@ -1,7 +1,7 @@
 # Typed live epoch 223 peer accounting
 
 `fleet::prefix223_live_peer` is shared by candidate admission profiles. It
-recognizes only the actual native20 full-prefix attempt:
+recognizes only the actual native 20 full-prefix attempt:
 
 - Unit `horizon-qualify-223-v1620-root-prefix-resource-full-v1.service`.
 - Invocation `e70aaf097e7c4583b216aba454145910`.
@@ -22,7 +22,7 @@ helpers authenticate the real registered diagnostic and immutable launch through
 the existing prefix bindings, sandbox and first-guard provenance. Their internal
 accounting view isolates only this already-accounted owner before calling the
 existing reviewed peer arithmetic, then adds its reservation back. The accepted
-fleet, all diagnostics, failed227 history, claims and unit census are preserved.
+fleet, all diagnostics, failed 227 history, claims and unit census are preserved.
 Unknown, duplicate, restarted, substituted or differently scoped 223 owners fail.
 
 Disk growth is the whole-root envelope minus the smaller of the same-invocation
@@ -41,8 +41,8 @@ free memory/disk. It creates no new coordinated observer sample or host mutation
 Epoch 210 now uses these functions in its own admission and running capture.
 It retains its original 300000000000-byte root cap, 128 GiB memory cap and exact
 native harness/guard/cold-plan bindings. Its complete sample still requires a
-real coordinated observation of 223. Observation339 predates that launch and
-cannot be turned into such a sample; use the normal340 cycle or a later accepted
+real coordinated observation of 223. Observation 339 predates that launch and
+cannot be turned into such a sample; use the normal 340 cycle or a later accepted
 fresh complete cycle. This accounting does not qualify either epoch's runtime,
 checkpoint, full archive, sidecar or publication.
 

@@ -45,7 +45,7 @@ pub(super) fn validate(
 ) -> Result<()> {
     ensure!(
         recognized(f, owners),
-        "not a bounded native20 warmup status"
+        "not a bounded native 20 warmup status"
     );
     let proof = bound_json(&serde_json::from_value(f["metadata_event"].clone())?)?;
     let expected = fleet::warmup223_terminal_status_identity(&proof)?;

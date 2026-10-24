@@ -1,5 +1,5 @@
-//! Closed136 copy of the reviewed controller-adoption growth validator.
-//! Keeps136's admission type independent of existing live141 deployments.
+//! Closed 136 copy of the reviewed controller-adoption growth validator.
+//! Keeps 136's admission type independent of existing live 141 deployments.
 use super::*;
 const REBIND: &str =
     "/usr/local/lib/jetstreamer/horizon-controller-rebind-proof-20261023-v1/unit-bindings.json";
@@ -111,7 +111,7 @@ fn minimum(prior_max: u64, observed: u64, jet: u64) -> Result<(u64, u64)> {
         .checked_mul(2)
         .and_then(|v| jet.checked_mul(2).and_then(|j| v.checked_add(j)))
         .context("growth extension overflow")?;
-    ensure!(n <= 512u64 << 30, "extended growth no longer fits512GiB");
+    ensure!(n <= 512u64 << 30, "extended growth no longer fits 512 GiB");
     Ok((max, n))
 }
 pub(super) fn extend(s: &Spec) -> Result<Value> {

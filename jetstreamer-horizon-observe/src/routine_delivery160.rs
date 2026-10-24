@@ -1,4 +1,4 @@
-//! Exact160 terminal handoff. Metadata only; no replay or archive authority.
+//! Exact 160 terminal handoff. Metadata only; no replay or archive authority.
 use super::*;
 
 pub(super) const UNIT: &str =
@@ -147,7 +147,7 @@ fn proof(p: &Plan) -> Result<Value> {
     //and its current archive; an ended handoff must not freeze healthy ranges.
     ensure!(
         s.handoff.path == Path::new(HANDOFF),
-        "foreign160 controller handoff path"
+        "foreign 160 controller handoff path"
     );
     let h = bound_json(&s.handoff, false)?;
     ensure!(
@@ -184,7 +184,7 @@ fn apply_model(model: &Value, proof: &Bound) -> Result<Value> {
     let rows = out["ranges"].as_array_mut().context("160 model ranges")?;
     ensure!(
         rows.iter().filter(|r| r["range"] == "160").count() <= 1,
-        "duplicate160 range"
+        "duplicate 160 range"
     );
     for r in rows.iter() {
         if r["range"] == "160" {
@@ -262,7 +262,7 @@ pub(super) fn enable(
             && p.sample_target_utc == "2026-10-22T15:28:00Z"
             && p.previous_observer.sha256
                 == "50ac2a4f84f258c709b8cff4d333488e6a2cf483f85edc4dc2901dba2fb53c21",
-        "160 handoff is not exact accepted1458 successor"
+        "160 handoff is not exact accepted 1458 successor"
     );
     range(
         model["ranges"]
@@ -375,7 +375,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     );
     gate["state"] = json!("post-replay-pipeline");
     gate["next_action"] = json!(
-        "Track160 controller-owned staged/importing handoff with original producer clock. On terminal controller/canonical import, promptly authenticate existing160 verifier/upload children and repair status; do not present the old owner projection as fresh, restart replay, or infer remote readiness. Preserve independent gates."
+        "Track 160 controller-owned staged/importing handoff with original producer clock. On terminal controller/canonical import, promptly authenticate existing 160 verifier/upload children and repair status; do not present the old owner projection as fresh, restart replay, or infer remote readiness. Preserve independent gates."
     );
     for b in [&s.proof, &s.handoff, &s.origin_publication] {
         let b = serde_json::to_value(b)?;
@@ -427,7 +427,7 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
         .count();
     if matching == 0 {
         return Ok(
-            json!({"provisional_fleet":fleet,"publication_skipped":true,"reason":"Original160 controller handoff ended; exact downstream child qualification/status repair is open. Other healthy replay publications continue; old160 projection is not current."}),
+            json!({"provisional_fleet":fleet,"publication_skipped":true,"reason":"Original 160 controller handoff ended; exact downstream child qualification/status repair is open. Other healthy replay publications continue; old 160 projection is not current."}),
         );
     }
     ensure!(
@@ -453,7 +453,7 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
     let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":160,"phase":"publication",
         "binding":{"unit":OWNER,"invocation_id":CONTROLLER,"expected_exec_start":v["controller_handoff"]["controller"]["ExecStart"],"claim_phase":"controller-import-handoff","origin_unit":UNIT,"origin_invocation_id":IID,"model_path":target,"model_sha256":"","fleet_path":fleet.path,"fleet_sha256":fleet.sha256},
         "observer":observer,"fleet":fleet,"origin_launch":s.origin_publication,"estimate_evidence":[s.proof,s.handoff],
-        "estimate_basis":"Exact160 clean producer terminal, committed lane archive and independently reauthenticated controller-owned staged/importing handoff; retained43200second downstream budget anchored to real archive close, including source rehash/import, independent full/plugin checks, uploader/readback/source revalidation/sidecar; original producer elapsed clock retained.",
+        "estimate_basis":"Exact 160 clean producer terminal, committed lane archive and independently reauthenticated controller-owned staged/importing handoff; retained 43200 second downstream budget anchored to real archive close, including source rehash/import, independent full/plugin checks, uploader/readback/source revalidation/sidecar; original producer elapsed clock retained.",
         "estimated_remaining_millis":eta,"jet_path":ARCHIVE,"expected_jet_size_bytes":LENGTH,"peer_units":[],"receipt_directory":STATUS,"receipt_directory_uid":1001});
     let sealed =
         delivery198::seal_values(p, "delivery160-status", &[("pipeline-plan.json", value)])?;
@@ -530,7 +530,10 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         return public160::validate_completed(p, c);
     }
     if p.epoch160_delivery.is_none() {
-        ensure!(c["epoch160_delivery"].is_null(), "unexpected160 completion");
+        ensure!(
+            c["epoch160_delivery"].is_null(),
+            "unexpected 160 completion"
+        );
         return Ok(());
     }
     let d = &c["epoch160_delivery"];
@@ -549,7 +552,7 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
                     .context("160 skipped active census")?
                     .iter()
                     .any(|r| r["epoch"] == 160),
-            "live160 cannot be skipped"
+            "live 160 cannot be skipped"
         );
         return Ok(());
     }
@@ -560,7 +563,7 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         m.path
             == p.cycle_directory
                 .join("delivery160-status/sealed/pipeline-plan.json"),
-        "foreign160 model"
+        "foreign 160 model"
     );
     validate_publication(p, &o, &m, &bound_json(&r, false)?)
 }

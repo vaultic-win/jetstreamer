@@ -71,7 +71,7 @@ pub(super) fn validate_roots(
             || terminal_bank != ROOT_BANK
             || profile(a).is_none_or(|(_, _, _, required)| revision != required))
     {
-        return Err("epoch223 prefix must bind both independent canonical checkpoint identities and its exact namespaced worker/runtime revision".into());
+        return Err("epoch 223 prefix must bind both independent canonical checkpoint identities and its exact namespaced worker/runtime revision".into());
     }
     Ok(())
 }

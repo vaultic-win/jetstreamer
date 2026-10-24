@@ -1,4 +1,4 @@
-//! Rehash the closed cached singleton209 package without a Bank or resource poll.
+//! Rehash the closed cached singleton 209 package without a Bank or resource poll.
 use super::{singleton209 as c, *};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -1,4 +1,4 @@
-//! Exact post-suffix203/older225 guard-policy preparation, never replay admission.
+//! Exact guard-policy preparation after the epoch 203 suffix, preserving the older epoch 225 policy; never replay admission.
 //! Preserve old protection until separately captured replacement timer proofs.
 use super::continuation203 as c;
 use super::*;
@@ -98,7 +98,7 @@ fn terminal_evidence(ready: &Value, result: &Value, terminal205: &Value) -> Resu
             && result["producer_canonical_root_prefix_present"] == true
             && result["producer_segment_manifest_sha256"]
                 == "983ecabfc9c36e261a66641b8a039e5e1834198b0c9a07552db38457e67e5722",
-        "old203 growth release needs exact natural terminal proof, not a live prefix"
+        "old 203 growth release needs exact natural terminal proof, not a live prefix"
     );
     ensure!(
         terminal205["schema"] == "jetstreamer-private-epoch205-bounded-resource-v1"
@@ -158,7 +158,7 @@ fn budgets(floor: u64, old203: &Value, old225: &Value) -> Result<(u64, u64)> {
             .checked_add(OLD_GROWTH)
             .and_then(|n| n.checked_add(BUFFER))
             == Some(1_347_800_810_387),
-        "old225 reservation arithmetic differs"
+        "old 225 reservation arithmetic differs"
     );
     let floor225 = floor.checked_add(BUFFER).context("225 rebase overflow")?;
     let floor203 = floor225
@@ -291,7 +291,7 @@ pub(super) fn prepare() -> Result<()> {
         .context("rebase free bytes")?;
     ensure!(
         stop203.checked_add(c::PEAK).is_some_and(|n| available >= n),
-        "rebase cannot fit intact256GiB own-tree envelope"
+        "rebase cannot fit intact 256 GiB own-tree envelope"
     );
     let plan203 = Path::new(STATE).join("guard-203.json");
     let plan225 = Path::new(STATE).join("guard-225.json");
@@ -557,7 +557,7 @@ fn recurrence_shape(monotonic: &str, calendar: &str) -> Result<()> {
                 .iter()
                 .any(|l| l.starts_with("{ OnActiveUSec=2s ; next_elapse="))
             && calendar.trim().is_empty(),
-        "replacement guardian must recur every60s, not merely fire once"
+        "replacement guardian must recur every 60s, not merely fire once"
     );
     Ok(())
 }
@@ -783,7 +783,7 @@ pub(super) fn capture() -> Result<()> {
             .as_u64()
             .zip(g203["recorded_unix_seconds"].as_u64())
             .is_some_and(|(a, b)| a <= b),
-        "replacement225 must be proved before203"
+        "replacement 225 must be proved before 203"
     );
     for timer in [OLD_TIMER203, OLD_TIMER225] {
         ensure!(
@@ -806,14 +806,14 @@ pub(super) fn capture() -> Result<()> {
     guard_command(
         &unit(OLD_SERVICE203)?,
         "/var/lib/jetstreamer/horizon-205-bounded-preparation-candidate-v1/jetstreamer-horizon-standalone-guard",
-        s.old_guard203.path.to_str().context("old203 guard path")?,
+        s.old_guard203.path.to_str().context("old 203 guard path")?,
         &s.old_guard203.sha256,
         c::GUARD_SHA,
     )?;
     guard_command(
         &unit(OLD_SERVICE225)?,
         "/var/lib/jetstreamer/horizon-225-natural-root-guard-v1/jetstreamer-horizon-standalone-guard",
-        s.old_guard225.path.to_str().context("old225 guard path")?,
+        s.old_guard225.path.to_str().context("old 225 guard path")?,
         &s.old_guard225.sha256,
         OLD225_GUARD_SHA,
     )?;

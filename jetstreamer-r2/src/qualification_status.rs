@@ -181,7 +181,7 @@ fn plan_epochs(p: &Plan) -> Result<Vec<u64>> {
             epochs == [141]
                 && p.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
-            "foreign141 status scope"
+            "foreign 141 status scope"
         );
         let policy = policy141(
             p.epoch141_delivery_policy
@@ -367,7 +367,7 @@ fn remaining(row: &Value, p: &Profile, allowance: u64) -> Result<u64> {
 fn deadline141(row: &Value, p: &Profile, elapsed_millis: u64) -> Result<Value> {
     ensure!(
         p.first == 141 && p.last == 141,
-        "foreign141 deadline profile"
+        "foreign 141 deadline profile"
     );
     let slot = row["useful_work"]["last"]["slot"]
         .as_u64()

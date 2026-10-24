@@ -77,7 +77,7 @@ fn public_census(fleet: &Value, proof: &Value) -> Result<()> {
                 && active.iter().any(|a| a == row)
                 && proof["owners"]
                     .as_array()
-                    .context("public160 owners")?
+                    .context("public 160 owners")?
                     .iter()
                     .any(|o| row["phase"] == o["phase"]
                         && row["unit"]["Id"] == o["unit"]["Id"]
@@ -86,7 +86,7 @@ fn public_census(fleet: &Value, proof: &Value) -> Result<()> {
                         && row["unit"]["ActiveState"] == "active"
                         && row["unit"]["SubState"] == "running"
                         && row["unit"]["ExecStart"] == o["unit"]["ExecStart"]),
-            "unbudgeted or changed public160 owner"
+            "unbudgeted or changed public 160 owner"
         );
     }
     // No active child is acceptable only with the independently reconciled
@@ -109,7 +109,7 @@ fn public_delivery(b: &Bound, fleet: &Value) -> Result<Value> {
                 "/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json"
             )
             && b.sha256 == "c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008",
-        "foreign160 public proof"
+        "foreign 160 public proof"
     );
     let proof = read(b, false)?;
     ensure!(
@@ -172,15 +172,15 @@ fn census(fleet: &Value, handoff: bool) -> Result<()> {
     Ok(())
 }
 fn post_replay_protection(claims: u64, floor: u64, guards: u64) -> Result<(u64, u64)> {
-    // Preserve the *entire* previous four-owner envelope, including768GiB
-    // formerly reserved for160. It is now explicit delivery debt, not a claim
+    // Preserve the *entire* previous four-owner envelope, including 768 GiB
+    // formerly reserved for 160. It is now explicit delivery debt, not a claim
     // that its dead producer or old reserve guard remains live. No budget or
     // live guard is lowered. The five other epoch debts remain protected too.
     let delivery = DELIVERY160_GIB * GIB;
     let (protected, debt) = arithmetic(
         claims
             .checked_add(delivery)
-            .context("delivery160 overflow")?,
+            .context("delivery 160 overflow")?,
         floor,
         guards,
     )?;
@@ -309,7 +309,7 @@ fn guard(
 fn arithmetic(claims: u64, floor: u64, guards: u64) -> Result<(u64, u64)> {
     // Each of four growth claims already protects one 2*max-jet allowance.
     // Reserve another five for the other claimed epochs, plus the safety floor
-    // and 64GiB for metadata/import staging/measurement uncertainty. No credit
+    // and 64 GiB for metadata/import staging/measurement uncertainty. No credit
     // for shrinkage, already-written bytes, or pending retirement is taken.
     let debt = floor.checked_mul(5).context("delivery debt overflow")?;
     let measured = claims
@@ -336,7 +336,7 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
                     "/var/lib/jetstreamer/horizon-epoch160-delivery-observations-20261022-v1/handoff.json"
                 )
                 && b.sha256 == "e14b5044e4ba2b4e49d478d5bd5a07d3aec5935abf3ae3e181349cf083eca6de",
-            "foreign160 handoff proof"
+            "foreign 160 handoff proof"
         );
         let proof = read(b, false)?;
         let current = &fleet["pipelines"]
@@ -360,7 +360,7 @@ pub(super) fn qualify(p: &Plan, o: &Value, fleet: &Value, floor: u64) -> Result<
                     == proof["evidence"]["producer_terminal_manager"],
             "160 delivery lineage changed"
         );
-        // Five simultaneous full-size copies plus8GiB stay below the retained
+        // Five simultaneous full-size copies plus 8 GiB stay below the retained
         //768GiB debt. Actual downstream storage is bounded by that larger debt;
         // it is not credited as free space or removed when a worker disappears.
         ensure!(

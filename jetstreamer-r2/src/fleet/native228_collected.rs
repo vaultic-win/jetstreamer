@@ -1,4 +1,4 @@
-//! Exact collected native228 terminal recovery. Absence alone never qualifies.
+//! Exact collected native 228 terminal recovery. Absence alone never qualifies.
 use super::native228 as c;
 use super::*;
 const IID: &str = "1b207be826cc45979d5a92a44de4bd14";

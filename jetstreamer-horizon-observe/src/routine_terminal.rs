@@ -1,4 +1,4 @@
-//! Exact epoch157 v1.5.6 -> v1.5.8 ETA handoff. No replay/runtime authority.
+//! Exact epoch 157 v1.5.6 -> v1.5.8 ETA handoff. No replay/runtime authority.
 use super::*;
 
 const MANIFEST: &str = "/usr/local/lib/jetstreamer/deploy-epochs155-157-runtime-boundaries-md5-20261012-v1/preflight-157-v4.json";
@@ -19,10 +19,10 @@ fn validate(p: &Plan, model: &Value, manifest: &Value) -> Result<()> {
     let binding = p
         .epoch157_terminal_handoff
         .as_ref()
-        .context("missing157 binding")?;
+        .context("missing 157 binding")?;
     ensure!(
         is_101(p)? && binding.path == Path::new(MANIFEST) && binding.sha256 == MANIFEST_SHA,
-        "unsupported157 manifest/profile"
+        "unsupported 157 manifest/profile"
     );
     ensure!(
         manifest["manifest"]["schema"] == "jetstreamer-gcs-snapshot-preflight-v4"
@@ -86,7 +86,7 @@ fn apply(p: &Plan, model: &Value, observer: &Value) -> Result<Value> {
         .context("157 terminal missing")?;
     ensure!(
         terminal == OLD || terminal == NEW,
-        "unqualified157 terminal"
+        "unqualified 157 terminal"
     );
     ensure!(
         work["sufficient_for_rates"] == true,

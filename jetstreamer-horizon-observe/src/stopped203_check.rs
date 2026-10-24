@@ -47,7 +47,7 @@ fn validate_plan(p: &Plan) -> Result<()> {
             && p.incident.path == Path::new(INCIDENT)
             && p.incident.sha256 == INCIDENT_SHA
             && p.build_receipt.sha256 == BUILD_SHA,
-        "not the exact stopped203 evidence"
+        "not the exact stopped 203 evidence"
     );
     let parent = p.output.parent().context("missing output parent")?;
     ensure!(

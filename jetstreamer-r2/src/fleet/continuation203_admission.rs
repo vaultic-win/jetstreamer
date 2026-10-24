@@ -1,4 +1,4 @@
-//! Exact private203 complete-path admission issuer. Never launches a service.
+//! Exact private 203 complete-path admission issuer. Never launches a service.
 use super::continuation203 as c;
 use super::*;
 use std::ffi::CString;
@@ -96,7 +96,7 @@ pub(super) fn floor(v: &Value, fleet: &Value) -> Result<u64> {
         v["schema"] == "horizon-century-floor-recomputation-v1"
             && v["century_first_epoch"] == 200
             && v["century_last_epoch"] == 300,
-        "wrong203 century floor"
+        "wrong 203 century floor"
     );
     let rows = v["census"].as_array().context("203 floor census")?;
     let inventory = fleet["inventory"]["entries"]
@@ -221,7 +221,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, p: &Value, now: u64) -> Result<()> {
             && r["useful_work"]["slots_per_second"]
                 .as_f64()
                 .is_some_and(|n| n.is_finite() && n > 0.0),
-        "203 protected225 is not stable/advancing/below VMA ceiling"
+        "203 protected 225 is not stable/advancing/below VMA ceiling"
     );
     for k in [
         "memory_events.oom",
@@ -231,7 +231,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, p: &Value, now: u64) -> Result<()> {
     ] {
         ensure!(
             r["cross_sample"]["producer_cgroup_counter_delta"][k] == 0,
-            "203 blocked by protected225 memory event:{k}"
+            "203 blocked by protected 225 memory event:{k}"
         );
     }
     let psi = &o["host_global_pressure"]["cross_sample"];
@@ -318,7 +318,7 @@ fn guard(g: &Value, now: u64) -> Result<()> {
             && workers[0][1]
                 .as_u64()
                 .is_some_and(|v| v > 0 && v < 3_500_000),
-        "203 protected225 guard lacks a real bounded worker"
+        "203 protected 225 guard lacks a real bounded worker"
     );
     Ok(())
 }
@@ -333,7 +333,7 @@ fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     }
     let stopped = current
         .get(UNIT205)
-        .context("203 missing terminal205 census")?;
+        .context("203 missing terminal 205 census")?;
     ensure!(
         stopped["MainPID"] == "0"
             && stopped["NRestarts"] == "0"

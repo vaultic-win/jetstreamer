@@ -92,7 +92,7 @@ mod bounded_resource_runner {
             let output = command(p).arg("--epoch223-prefix-preflight").output()?;
             ensure!(
                 output.status.success(),
-                "parent planning rejected native20 prefix: {}",
+                "parent planning rejected native 20 prefix: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
             let report = planning_report(std::str::from_utf8(&output.stdout)?, &p.worker)?;
@@ -133,7 +133,7 @@ mod bounded_resource_runner {
                 && r["worker_spawned"] == false
                 && r["archive_created"] == false
                 && r["publication_authorized"] == false,
-            "wrong native20 planning envelope"
+            "wrong native 20 planning envelope"
         );
         Ok(r)
     }

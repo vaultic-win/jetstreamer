@@ -1,4 +1,4 @@
-//! Exact recovery of the0809 observer after original141 failed before adoption.
+//! Exact recovery of the 0809 observer after original 141 failed before adoption.
 //! Keep the raw diagnostic in durable evidence; exclude only its authenticated
 //! terminal owner from the legacy ETA view. No launch or archive authority.
 use super::*;
@@ -48,16 +48,16 @@ fn terminal(v: &Value) -> Result<()> {
         ("ActiveState", "failed"),
         ("SubState", "failed"),
     ] {
-        ensure!(v[key] == value, "original141 terminal owner differs:{key}");
+        ensure!(v[key] == value, "original 141 terminal owner differs:{key}");
     }
     ensure!(
         v.get("Restart").is_none_or(|r| r == "no"),
-        "terminal141 restart policy differs"
+        "terminal 141 restart policy differs"
     );
     Ok(())
 }
 fn checked(p: &Plan) -> Result<Value> {
-    ensure!(matches(p), "foreign terminal141 recovery");
+    ensure!(matches(p), "foreign terminal 141 recovery");
     let s = bound_json(&binding(), true)?;
     ensure!(
         s["schema"] == "jetstreamer-original141-terminal-recovery-spec-v2"
@@ -65,7 +65,7 @@ fn checked(p: &Plan) -> Result<Value> {
             && s["invocation_id"] == IID
             && s["observer_config"] == serde_json::to_value(&p.observer_config)?
             && s["observer"]["path"].as_str() == p.observer.to_str(),
-        "terminal141 recovery scope changed"
+        "terminal 141 recovery scope changed"
     );
     for k in [
         "replay_launch_authorized",
@@ -73,7 +73,7 @@ fn checked(p: &Plan) -> Result<Value> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(s[k] == false, "terminal141 recovery grants authority");
+        ensure!(s[k] == false, "terminal 141 recovery grants authority");
     }
     let b: Bound = serde_json::from_value(s["root_plan"].clone())?;
     let plan = bound_json(&b, true)?;
@@ -82,13 +82,13 @@ fn checked(p: &Plan) -> Result<Value> {
             && plan["unit"] == UNIT
             && plan["node_sha256"]
                 == "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0",
-        "terminal141 parent changed"
+        "terminal 141 parent changed"
     );
     let recorded: Bound = serde_json::from_value(s["terminal_unit_file"].clone())?;
     let bytes = read_checked(&recorded.path, LIMIT, 0, true)?;
     ensure!(
         sha(&bytes) == recorded.sha256,
-        "terminal141 retained terminal changed"
+        "terminal 141 retained terminal changed"
     );
     let fields: serde_json::Map<_, _> = std::str::from_utf8(&bytes)?
         .lines()
@@ -102,7 +102,7 @@ fn checked(p: &Plan) -> Result<Value> {
     let out=Command::new("/usr/bin/systemctl").args(["show",UNIT,"--no-pager","--property=Id,InvocationID,MainPID,NRestarts,Restart,Result,ExecMainStatus,ActiveState,SubState,ExecStart"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 16384,
-        "terminal141 current unit unreadable"
+        "terminal 141 current unit unreadable"
     );
     let fields: serde_json::Map<_, _> = std::str::from_utf8(&out.stdout)?
         .lines()
@@ -113,25 +113,25 @@ fn checked(p: &Plan) -> Result<Value> {
     terminal(&current)?;
     ensure!(
         current["Restart"] == "no",
-        "terminal141 current restart policy missing"
+        "terminal 141 current restart policy missing"
     );
     ensure!(
         prefix(&current["ExecStart"]) == prefix(&plan["expected_exec_start"])
             && prefix(&old["ExecStart"]) == prefix(&current["ExecStart"]),
-        "terminal141 command changed"
+        "terminal 141 command changed"
     );
     let journal: Bound = serde_json::from_value(s["journal"].clone())?;
     let bytes = read_checked(&journal.path, LIMIT, 0, true)?;
     ensure!(
         sha(&bytes) == journal.sha256,
-        "terminal141 retained journal changed"
+        "terminal 141 retained journal changed"
     );
     let mut found = false;
     for line in std::str::from_utf8(&bytes)?.lines() {
         let v: Value = serde_json::from_str(line)?;
         ensure!(
             v["_SYSTEMD_INVOCATION_ID"] == IID && v["_SYSTEMD_UNIT"] == UNIT,
-            "foreign terminal141 journal"
+            "foreign terminal 141 journal"
         );
         found |= v["MESSAGE"].as_str().is_some_and(|m| {
             m.contains("historical execution mismatch at slot 60912005 entry 388 transaction 378")
@@ -139,31 +139,31 @@ fn checked(p: &Plan) -> Result<Value> {
                 && m.contains("Custom(2)")
         });
     }
-    ensure!(found, "terminal141 execution failure not evidenced");
+    ensure!(found, "terminal 141 execution failure not evidenced");
     Ok(s)
 }
 fn strip(v: &Value, observation: bool) -> Result<Value> {
     let mut out = v.clone();
     let rows = out["diagnostic_replays"]
         .as_array_mut()
-        .context("terminal141 diagnostic census")?;
+        .context("terminal 141 diagnostic census")?;
     ensure!(
         rows.len() == 2 && rows.iter().filter(|r| r["range"] == "141").count() == 1,
-        "terminal141 census changed"
+        "terminal 141 census changed"
     );
     let r = rows.iter().find(|r| r["range"] == "141").unwrap();
     ensure!(
         r["producer_unit"] == UNIT
             && r["expected_producer_invocation_id"] == IID
             && r["scratch_path"] == SCRATCH,
-        "terminal141 diagnostic owner changed"
+        "terminal 141 diagnostic owner changed"
     );
     if observation {
         ensure!(
             r["status"] == "unavailable"
                 && r["observation"].is_null()
                 && r["error"] == "systemd control group is not absolute: prefix not found",
-            "terminal141 observation is not the exact failed sample"
+            "terminal 141 observation is not the exact failed sample"
         );
         for key in [
             "replay_launch_authorized",
@@ -172,20 +172,20 @@ fn strip(v: &Value, observation: bool) -> Result<Value> {
             "publication_authorized",
             "r2_mutations",
         ] {
-            ensure!(r[key] == false, "terminal141 diagnostic grants authority");
+            ensure!(r[key] == false, "terminal 141 diagnostic grants authority");
         }
     } else {
         ensure!(
             r["controller_unit"] == UNIT
                 && r["expected_controller_invocation_id"] == IID
                 && r["worker_executable_basename"] == "historical-worker",
-            "terminal141 diagnostic config changed"
+            "terminal 141 diagnostic config changed"
         );
     }
     rows.retain(|r| r["range"] != "141");
     ensure!(
         rows.len() == 1 && rows[0]["range"] == "144",
-        "terminal141 dropped other diagnostic"
+        "terminal 141 dropped other diagnostic"
     );
     Ok(out)
 }
@@ -202,7 +202,7 @@ pub(super) fn observation(p: &Plan, v: &Value) -> Result<Value> {
     }
     let s = checked(p)?;
     let actual = bound_json(&serde_json::from_value(s["observer"].clone())?, false)?;
-    ensure!(actual == *v, "terminal141 observer changed");
+    ensure!(actual == *v, "terminal 141 observer changed");
     strip(v, true)
 }
 pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
@@ -212,7 +212,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     checked(p)?;
     ensure!(
         f["gates"]["141"]["state"] == "failed-needs-repair",
-        "terminal141 cannot close repair"
+        "terminal 141 cannot close repair"
     );
     let units = f["tracked_units"].as_array_mut().context("tracked units")?;
     if !units.contains(&json!(UNIT)) {
@@ -226,7 +226,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         e.push(b);
     }
     f["gates"]["141"]["next_action"] = json!(
-        "Private original-entry qualification reached Bank execution then failed at60912005 entry388 transaction378: expected success, got InstructionError Custom(2). Preserve sealed terminal/journal/source evidence, extract the failing transaction and account/program facts, repair canonical execution before retry, and freshly admit the compatible disjoint186 fallback while this repair proceeds. Never publish141 or close its repair from this partial diagnostic."
+        "Private original-entry qualification reached Bank execution then failed at 60912005 entry 388 transaction 378: expected success, got InstructionError Custom(2). Preserve sealed terminal/journal/source evidence, extract the failing transaction and account/program facts, repair canonical execution before retry, and freshly admit the compatible disjoint 186 fallback while this repair proceeds. Never publish 141 or close its repair from this partial diagnostic."
     );
     Ok(())
 }

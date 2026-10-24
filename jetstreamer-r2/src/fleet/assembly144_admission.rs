@@ -1,4 +1,4 @@
-//! Fresh, read-only-storage admission for exact144 assembly-only recovery.
+//! Fresh, read-only-storage admission for exact 144 assembly-only recovery.
 //! Never launches a service or mutates any R2 object.
 use super::*;
 const ASSEMBLER: &str = assembly144::TOOL;
@@ -69,7 +69,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, now: u64) -> Result<()> {
             .all(|r| r["epoch"] != 144
                 || (r["producer"]["Id"] == continuation144::UNIT
                     && r["ordinary_replay_claim"] == false)),
-        "another144claim overlaps assembly-only recovery"
+        "another 144claim overlaps assembly-only recovery"
     );
     ensure!(
         s.output.parent() == Some(Path::new(ROOT))
@@ -102,7 +102,7 @@ fn source_manifests(p: &Value, s: &Value) -> Result<()> {
             && s["bootstrap"]["write_count"] == 0
             && s["runtime"]["runtime_profile"] == "solana-v1.4.25"
             && p["runtime"]["runtime_profile"] == s["runtime"]["runtime_profile"],
-        "wrong complete144 sources"
+        "wrong complete 144 sources"
     );
     for key in [
         "slot",
@@ -125,7 +125,7 @@ pub(super) fn timeout_properties() -> Result<Value> {
     let out=ProcessCommand::new("systemctl").args(["show",continuation144::UNIT,"--property=Id,InvocationID,MainPID,NRestarts,Restart,Result,ActiveState,SubState,RuntimeMaxUSec,ExecMainStatus,ExecStart"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 16384,
-        "original144 timeout observation failed"
+        "original 144 timeout observation failed"
     );
     let fields: serde_json::Map<_, _> = std::str::from_utf8(&out.stdout)?
         .lines()
@@ -148,7 +148,7 @@ pub(super) fn check_timeout(v: &Value) -> Result<()> {
             && v["SubState"] == "failed"
             && v["RuntimeMaxUSec"] == "2h"
             && matches!(v["ExecMainStatus"].as_str(), Some("9" | "15" | "1")),
-        "original144 not exact terminal timeout; no assembly-only admission"
+        "original 144 not exact terminal timeout; no assembly-only admission"
     );
     Ok(())
 }
@@ -175,7 +175,7 @@ pub(super) fn protected_owners(f: &Value, current: &BTreeMap<String, Value>) -> 
     let old = filtered["unit_census"][continuation144::UNIT].clone();
     ensure!(
         old["InvocationID"] == ORIGINAL_IID,
-        "original144 predecessor identity absent/changed"
+        "original 144 predecessor identity absent/changed"
     );
     filtered["active"]
         .as_array_mut()

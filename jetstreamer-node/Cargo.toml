@@ -10,25 +10,25 @@ keywords.workspace = true
 
 [features]
 default = []
-# Exact private207cohort through its own final slot; never ordinary support.
+# Exact private 207cohort through its own final slot; never ordinary support.
 epoch207-singleton-qualification = []
-# Exact private singleton209–212 profiles with their own canonical final root.
+# Exact private singleton 209–212 profiles with their own canonical final root.
 epochs209-212-singleton-qualification = []
-# Complete original-entry source binding for one private141root qualification.
+# Complete original-entry source binding for one private 141 root qualification.
 epoch141-original-entry-qualification = ["dep:jetstreamer-utils"]
-# Fixed60911751 native restore comparison; never sends replay entries.
+# Fixed 60911751 native restore comparison; never sends replay entries.
 epoch140-native-restore-diagnostic = ["dep:chrono"]
 epoch144-native-restore-diagnostic = ["dep:chrono"]
 epoch203-native-restore-diagnostic = ["dep:chrono"]
 epoch205-native-restore-diagnostic = ["dep:chrono"]
-# Private epoch213 prefix/checkpoint continuation. Never creates a canonical
+# Private epoch 213 prefix/checkpoint continuation. Never creates a canonical
 # checksum or enables ordinary archive reuse/publication.
 epoch213-checkpoint-continuation-diagnostic = []
-# Exact private epoch144 prefix/native-checkpoint continuation, never publication.
+# Exact private epoch 144 prefix/native-checkpoint continuation, never publication.
 epoch144-checkpoint-continuation-diagnostic = []
-# Exact retained203 prefix/native checkpoint plus419slots; private V4 only.
+# Exact retained 203 prefix/native checkpoint plus 419 slots; private V4 only.
 epoch203-checkpoint-continuation-diagnostic = []
-# Private epoch223 cold/tail comparison, never the ordinary runtime route.
+# Private epoch 223 cold/tail comparison, never the ordinary runtime route.
 epoch223-v1-6-25-qualification = []
 # Independently checkpointed v1.6.20 cold prefix, ending before the known tail
 # incompatibility. Separate private namespace; no full epoch or tail execution.
@@ -43,9 +43,9 @@ epoch224-v1-6-25-diagnostic = []
 # Private complete-span epoch-224 qualification after the bounded comparison.
 # The node requires the focused qualification CLI and never publishes a sidecar.
 epoch224-v1-6-25-qualification = []
-# Private epoch225 bounded upstream comparison, never an ordinary era promotion.
+# Private epoch 225 bounded upstream comparison, never an ordinary era promotion.
 epoch225-v1-6-25-diagnostic = []
-# Complete private epoch225 plus its first later-root verification suffix.
+# Complete private epoch 225 plus its first later-root verification suffix.
 epoch225-v1-6-25-qualification = []
 
 [[bin]]

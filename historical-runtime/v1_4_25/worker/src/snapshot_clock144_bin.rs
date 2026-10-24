@@ -1,4 +1,4 @@
-//! Exact62639490 read-only serialized observation. No native restoration or replay.
+//! Exact 62639490 read-only serialized observation. No native restoration or replay.
 #![allow(dead_code)]
 #[cfg(test)]
 mod leader_schedule;

@@ -1,4 +1,4 @@
-//! Append-only custody and separately scoped backed partial136 retirement. No
+//! Append-only custody and separately scoped backed partial 136 retirement. No
 //! canonical sidecar, runtime checkpoint or job-resume authority.
 use super::*;
 use serde_json::json;

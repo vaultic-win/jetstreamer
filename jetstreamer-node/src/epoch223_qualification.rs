@@ -1,4 +1,4 @@
-//! Private epoch223 era comparisons. Never an ordinary runtime promotion.
+//! Private epoch 223 era comparisons. Never an ordinary runtime promotion.
 use crate::{BankHashExpectation, QualificationPlan, compatibility, snapshot_path_expectation};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -397,7 +397,7 @@ pub(crate) fn tail_expectations(
 }
 
 pub(crate) fn validate_filesystem(ledger: &Path) -> Result<(), String> {
-    // Reuse only the generic canonical-directory checks, never epoch225 policy.
+    // Reuse only the generic canonical-directory checks, never epoch 225 policy.
     crate::epoch225_qualification::validate_filesystem(ledger)?;
     let root = ledger
         .parent()

@@ -1,4 +1,4 @@
-//! Exact160 post-replay evidence, never independent verification/publication.
+//! Exact 160 post-replay evidence, never independent verification/publication.
 use super::*;
 use std::process::Command;
 pub(super) const UNIT: &str =
@@ -188,7 +188,7 @@ pub(super) fn run() -> Result<()> {
                 && m.nlink() == 1
                 && m.mode() & 0o222 == 0
                 && p.canonicalize()? == p,
-            "unsealed160observer input"
+            "unsealed 160observer input"
         );
         ensure!(
             hex_lower(&Sha256::digest(read_stable_bounded(
@@ -220,7 +220,7 @@ pub(super) fn run() -> Result<()> {
             && p.expires_unix_seconds
                 .checked_sub(p.not_before_unix_seconds)
                 .is_some_and(|n| n > 0 && n <= 1800),
-        "foreign160observation plan"
+        "foreign 160observation plan"
     );
     resource_audit::private_directory(Path::new(OUTPUT_ROOT))?;
     ensure!(!p.output.try_exists()?, "160 proof already exists");

@@ -1,4 +1,4 @@
-//! Exact failed185 inspection, collected-controller closure and separately gated
+//! Exact failed 185 inspection, collected-controller closure and separately gated
 //! authenticated-custody local retirement. No canonical publication or job resume.
 use super::*;
 #[path = "holding_epoch185_growth.rs"]
@@ -80,7 +80,7 @@ fn scope(p: &Inspect, m: &Mapping, i: &Value, c: &Value, q: &Value) -> Result<()
             && p.deployment.sha256 == DEPLOYMENT_SHA
             && p.qualification.path == Path::new(QUALIFICATION)
             && p.qualification.sha256 == QUALIFICATION_SHA,
-        "foreign185 stop or transport binding"
+        "foreign 185 stop or transport binding"
     );
     ensure!(
         i["schema"] == "jetstreamer-adaptive-replay-reserve-stop-intent-v1"

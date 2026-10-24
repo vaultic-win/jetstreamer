@@ -161,7 +161,7 @@ fn cache_tree(target: &Path, expected_uid: u32) -> Result<Value> {
         let name = path
             .file_name()
             .and_then(|s| s.to_str())
-            .context("nonUTF8 cache member")?;
+            .context("non-UTF8 cache member")?;
         ensure!(
             !name.ends_with(".jet")
                 && !name.ends_with(".sha256")
@@ -310,7 +310,7 @@ fn staged_references_inner(
                 let name = path
                     .file_name()
                     .and_then(|s| s.to_str())
-                    .context("nonUTF8 dangling unit")?;
+                    .context("non-UTF8 dangling unit")?;
                 ensure!(
                     name.ends_with(".service")
                         && !name.starts_with('-')

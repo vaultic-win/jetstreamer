@@ -154,7 +154,7 @@ fn derive_manifest(m: &Value) -> Result<Value> {
                 && c["last_epoch"].as_u64().is_some_and(|n| n >= 228)
         })
         .collect::<Vec<_>>();
-    ensure!(candidates.len() == 1, "source228 cohort missing/duplicate");
+    ensure!(candidates.len() == 1, "source 228 cohort missing/duplicate");
     let c = candidates[0];
     ensure!(
         c["runtime"] == "solana-v1.6.20"

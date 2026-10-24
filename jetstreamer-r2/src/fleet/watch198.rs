@@ -1,4 +1,4 @@
-//! Legacy watcher units are epoch198 owners only while their real child is busy.
+//! Legacy watcher units are epoch 198 owners only while their real child is busy.
 use super::*;
 pub(crate) const FULL: &str = "jetstreamer-horizon-audit-epochs182-200-v5.service";
 pub(crate) const PLUGIN: &str =
@@ -100,7 +100,7 @@ pub(super) fn legacy160_member(path: &str, digest: &str) -> Result<()> {
     ensure!(
         path == "/usr/local/lib/jetstreamer/horizon-plugin-merged-main-20260930-v1/horizon_pipeline"
             && digest == "9f4abe27011b04d0c33cb3e24d0d9bc14dbce9f46528f22c4bde367af97a7070",
-        "foreign legacy160 member"
+        "foreign legacy 160 member"
     );
     pinned_member(path, digest, true)
 }
@@ -156,7 +156,7 @@ fn pinned_member(path: &str, digest: &str, legacy160: bool) -> Result<()> {
 pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
     let name = current["Id"].as_str().context("198 watcher unit")?;
     let (iid, pid, script, script_sha, worker) =
-        profile(phase, name).context("foreign198 watcher")?;
+        profile(phase, name).context("foreign 198 watcher")?;
     ensure!(
         current["InvocationID"] == iid
             && current["MainPID"] == pid
@@ -179,7 +179,7 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
                 "831151d939a51690fedff391a792055e06efadd7ebb83fd46732feddbd07d394"
             }
             "upload-readback" => "7b21414c1c105cefb18f5bf3ca8bb96759c14c529ea42232a70835bdc864b990",
-            _ => anyhow::bail!("foreign198 stage"),
+            _ => anyhow::bail!("foreign 198 stage"),
         },
     )?;
     scan_children(phase, current, worker, child_matches)

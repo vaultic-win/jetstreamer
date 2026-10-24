@@ -1,4 +1,4 @@
-//! Fresh full209 admission using the complete existing observation and native proof.
+//! Fresh full 209 admission using the complete existing observation and native proof.
 use super::{singleton209 as c, *};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,7 +20,7 @@ fn supported_peer(active: &Value) -> Result<()> {
     ensure!(
         active["epoch"] != 223
             || owner["Id"] == "archive-223-v1620-native-input-release-actual-v1.service",
-        "209 full admission does not account for this live223 repair envelope; bind its exact resource model or terminal proof first"
+        "209 full admission does not account for this live 223 repair envelope; bind its exact resource model or terminal proof first"
     );
     Ok(())
 }
@@ -104,7 +104,7 @@ fn sample(
         o["lane_rss_history"]["200"]["reservation_ceiling_bytes"]
             .as_u64()
             .is_some_and(|n| c::MEMORY <= n),
-        "209 full memory reservation exceeds1.5x observed century RSS"
+        "209 full memory reservation exceeds 1.5x observed century RSS"
     );
     let psi = &o["host_global_pressure"]["cross_sample"];
     ensure!(

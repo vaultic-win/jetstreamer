@@ -1,4 +1,4 @@
-//! Classifies one separately admitted, exact noncanonical185 park transport.
+//! Classifies one separately admitted, exact noncanonical 185 park transport.
 //! This policy grants no upload, replay, overwrite, deletion or retirement authority.
 use super::*;
 
@@ -249,7 +249,7 @@ fn live_manager(name: &str) -> Result<Value> {
             .context("185 holding owner metadata shape")?;
         ensure!(
             m.insert(k.into(), json!(v)).is_none(),
-            "duplicate185 holding owner field"
+            "duplicate 185 holding owner field"
         );
     }
     let mut v = Value::Object(m);

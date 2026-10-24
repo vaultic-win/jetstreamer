@@ -117,5 +117,5 @@ pub(crate) fn profile(epoch: u64) -> Result<Profile, String> {
         .iter()
         .find(|p| p.epoch == epoch)
         .copied()
-        .ok_or_else(|| "private singleton profile must be209,210,211or212".into())
+        .ok_or_else(|| "private singleton profile must be 209,210,211or212".into())
 }

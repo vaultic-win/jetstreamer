@@ -341,7 +341,7 @@ mod bounded_resource_runner {
                 .tempdir()
                 .unwrap();
             let mut child = ChildGroup(fixture_command(t.path()).spawn().unwrap(), false);
-            // Establish the same already-self-stopped state as failed13a5.
+            // Establish the same already-self-stopped state as failed 13a5.
             prepare_target_capture(child.0.id(), TargetStopProtocol::CooperativeResumeOnly)
                 .unwrap();
             resume_target(child.0.id(), TargetStopProtocol::ResumeAndInterrupt).unwrap();

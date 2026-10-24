@@ -35,7 +35,7 @@ fn native223_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
             && unit == "archive-223-v1620-native-input-release-actual-v1.service"
             && row["phase"] == "private-cold-snapshot-verification"
             && row["ordinary_replay_claim"] == false,
-        "227 auxiliary is not the centrally registered optimized native223 profile"
+        "227 auxiliary is not the centrally registered optimized native 223 profile"
     );
     let plan = bound_json(&BoundFile {
         path: f["plan"]
@@ -55,13 +55,13 @@ fn native223_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
         .collect::<Vec<_>>();
     ensure!(
         matching.len() == 1,
-        "227 native223 registered claim missing/duplicate"
+        "227 native 223 registered claim missing/duplicate"
     );
     let claim: PipelineClaim = serde_json::from_value(matching[0].clone())?;
     ensure!(
         claim.invocation_id == owner["InvocationID"]
             && claim.evidence == serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,
-        "227 native223 live claim differs from accepted fleet"
+        "227 native 223 live claim differs from accepted fleet"
     );
     cold223_scan::validate(&claim)?;
     Ok(claim)
@@ -73,7 +73,7 @@ fn native207_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
             && owner["Id"] == native207::UNIT
             && row["phase"] == "private-cold-snapshot-verification"
             && row["ordinary_replay_claim"] == false,
-        "227 unknown native207 auxiliary"
+        "227 unknown native 207 auxiliary"
     );
     let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
         path: f["plan"].as_str().context("227207 fleet plan")?.into(),
@@ -321,7 +321,7 @@ pub(super) fn protected_growth(
             let claim = native207_claim(f, row)?;
             let binding = guards
                 .get(unit)
-                .context("227 native207 needs current protective guard")?;
+                .context("227 native 207 needs current protective guard")?;
             let g = bound_json(binding)?;
             let origin = bound_json(&claim.evidence[0])?;
             let plan: BoundFile = serde_json::from_value(origin["guard_plan"].clone())?;
@@ -348,7 +348,7 @@ pub(super) fn protected_growth(
             ensure!(
                 intent["maximum_memory_bytes"] == 128u64 << 30
                     && intent["tmpfs_bytes"] == 512u64 << 30,
-                "227 native223 storage/memory profile changed"
+                "227 native 223 storage/memory profile changed"
             );
             // Private tmpfs has no root-filesystem growth claim. Its remaining
             // hard-memory growth is separately measured and reserved below.
@@ -709,7 +709,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
                     } else {
                         rss
                     },
-        "227 exceeds90percent memory target"
+        "227 exceeds 90 percent memory target"
     );
     let psi = &o["host_global_pressure"]["cross_sample"];
     ensure!(

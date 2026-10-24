@@ -749,7 +749,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
             || (plan.epoch == 224
                 && plan.node_sha256
                     == "bcb76f90515465ee3b19486a18da907d15d4a3fbe310d66e0c3912a5daa4e257"),
-        "bounded measurement layout requires the exact epoch224 parent"
+        "bounded measurement layout requires the exact epoch 224 parent"
     );
     ensure!(
         (203..=212).contains(&plan.epoch) || matches!(plan.epoch, 224 | 225),

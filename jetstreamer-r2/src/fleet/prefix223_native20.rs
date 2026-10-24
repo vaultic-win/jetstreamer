@@ -1,4 +1,4 @@
-//! Exact private native20 known-root prefix. Never complete epoch/publication authority.
+//! Exact private native 20 known-root prefix. Never complete epoch/publication authority.
 use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch223-native20-prefix-launch-v1";
 pub(super) const UNIT: &str = "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service";
@@ -69,7 +69,7 @@ pub(super) fn no_publication(v: &Value) -> Result<()> {
     ] {
         ensure!(
             v[key] == false,
-            "native20 prefix grants forbidden authority:{key}"
+            "native 20 prefix grants forbidden authority:{key}"
         );
     }
     Ok(())
@@ -88,7 +88,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
             && v["publication_authorized"] == false
             && v["r2_mutations"] == false
             && v["prerequisites"]["warmup_terminal"] == json!({"path":WARMUP,"sha256":WARMUP_SHA}),
-        "native20 full-prefix capability differs"
+        "native 20 full-prefix capability differs"
     );
     let p = &v["parent_planning_report"];
     ensure!(
@@ -112,7 +112,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
             && p["canonical_prefix_qualified"] == false
             && p["runtime_promotion_authorized"] == false
             && p["publication_authorized"] == false,
-        "native20 planning barrier/span differs"
+        "native 20 planning barrier/span differs"
     );
     Ok(())
 }
@@ -193,30 +193,30 @@ pub(super) fn guard_matches(c: &DiagnosticClaim, v: &Value, p: &Value) -> bool {
         && p["receipt_directory"] == GUARD_RECEIPTS
 }
 pub(super) fn bindings(c: &DiagnosticClaim, v: &Value) -> Result<()> {
-    ensure!(launch_matches(c, v), "native20 full prefix launch differs");
+    ensure!(launch_matches(c, v), "native 20 full prefix launch differs");
     prerequisites()?;
     let rows = v["evidence"]["units"]
         .as_array()
-        .context("native20 prefix captured unit evidence")?;
+        .context("native 20 prefix captured unit evidence")?;
     ensure!(
         rows.len() == 1
             && rows[0]["unit"] == UNIT
             && rows[0]["invocation_id"] == c.invocation_id
             && rows[0]["restarts"] == 0
             && rows[0]["main_pid"].as_u64().is_some_and(|n| n > 1),
-        "native20 prefix claim is not its captured invocation"
+        "native 20 prefix claim is not its captured invocation"
     );
     ensure!(
         v["capability"] == json!({"path":CAPABILITY,"sha256":CAPABILITY_SHA})
             && v["warmup_terminal"] == json!({"path":WARMUP,"sha256":WARMUP_SHA})
             && v["resource_plan"] == json!({"path":PLAN,"sha256":PLAN_SHA}),
-        "native20 prefix prerequisites substituted"
+        "native 20 prefix prerequisites substituted"
     );
     let a = native209::immutable_json(&serde_json::from_value(v["admission"].clone())?)?;
     super::prefix223_native20_admission::validate_saved(&a)?;
     let started = v["recorded_unix_seconds"]
         .as_u64()
-        .context("native20 prefix launch clock")?;
+        .context("native 20 prefix launch clock")?;
     ensure!(
         a["recorded_unix_seconds"]
             .as_u64()

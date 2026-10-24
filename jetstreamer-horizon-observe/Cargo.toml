@@ -10,12 +10,12 @@ documentation.workspace = true
 keywords.workspace = true
 
 [features]
-# Diagnostic CPU allocation released by the exact reserve-stopped epoch225.
+# Diagnostic CPU allocation released by the exact reserve-stopped epoch 225.
 # Cannot run while that producer or another fleet claim is live.
 ram-snapshot-eight-core-stopped225 = []
 # Isolated selected-profile v1.6.25 snapshot tests; no entry replay or publication.
 epoch225-shrink-snapshot-tests = []
-# Exact private epoch223 tail snapshot tests; separate inputs and fleet contract.
+# Exact private epoch 223 tail snapshot tests; separate inputs and fleet contract.
 epoch223-tail-snapshot-tests = []
 # Separate exact cold snapshot; cannot borrow the tail's input/anchor contract.
 epoch223-cold-snapshot-tests = []

@@ -9,7 +9,7 @@ use {
 // 	Hash  **int
 // 	Index **int
 // 	Total **int
-// 	Data  []uint8
+// 	Data  []uint 8
 // 	Next  **List__Link
 // }
 /// Representation of a `Kind::DataFrame` node from the firehose.

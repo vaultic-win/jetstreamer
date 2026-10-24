@@ -2,7 +2,7 @@
 
 The Rust `jetstreamer-horizon-dev-cache-check` tool accepts the distinct
 `jetstreamer-horizon-sol-dev-cache-check-plan-v1` profile. Its only target is
-`/home/sol/workspace/jetstreamer/target/debug`, owned by UID1001. It cannot select
+`/home/sol/workspace/jetstreamer/target/debug`, owned by UID 1001. It cannot select
 release tools, historical runtime targets, replay scratch, snapshots or archives.
 Existing other-host profiles keep their original paths and owner checks.
 
@@ -34,7 +34,7 @@ from the retained revision and lockfile.
 
 The distinct `jetstreamer-horizon-sol-release-deps-cache-check-plan-v1` profile
 selects only `/home/sol/workspace/jetstreamer/target/release/deps`. It keeps the
-UID1001 ownership, preserved clean revision/lockfile, builder exclusion,
+UID 1001 ownership, preserved clean revision/lockfile, builder exclusion,
 complete process/staged-unit reference scans, positive prior census, no-clobber
 intent and fsynced completion gates. It does not broaden the debug profile or
 authorize deleting the complete release directory, top-level executable tools,

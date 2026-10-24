@@ -356,7 +356,7 @@ mod tests {
     }
     #[test]
     fn terminal_parser_keeps_consensus_integer_and_requires_original_child_and_order() {
-        // Synthetic parser fixture; these are not actual227 native Bank measurements.
+        // Synthetic parser fixture; these are not actual 227 native Bank measurements.
         let iid = "a".repeat(32);
         let child = |msg: &str, t: &str| json!({"_PID":"42","_SYSTEMD_UNIT":c::UNIT,"_SYSTEMD_INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":t,"MESSAGE":msg});
         let rows = vec![

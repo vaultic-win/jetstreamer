@@ -1,4 +1,4 @@
-//! First post191 terminal proof. No future observer, task launch or R2 access.
+//! First post 191 terminal proof. No future observer, task launch or R2 access.
 use super::*;
 const PROGRAM: &str =
     "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2";

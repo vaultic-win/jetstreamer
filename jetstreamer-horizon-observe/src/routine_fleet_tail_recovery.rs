@@ -282,7 +282,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
             && ledger["inventory"]["anomalies"] == 0,
         "recovered fleet differs"
     );
-    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No authenticated current198 verifier child; stage transition/status cleanup requires prompt reconciliation"});
+    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No authenticated current 198 verifier child; stage transition/status cleanup requires prompt reconciliation"});
     let d160 = json!({"provisional_fleet":provisional,"publication_skipped":true,"ready_pair_verified_cleanup":true});
     let c = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":pb,"self_sha256":self_sha,"sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model,"estimates":estimates,"invocation_id":iid,"fleet_plan":fleet_plan,"fleet":fleet,"status_publications":statuses,"inventory":ledger["inventory"],"epoch198_delivery":pipeline,"epoch160_delivery":d160,"epoch144_delivery":{"enabled":false},"final_fleet_recovery":recovery,"new_resource_samples":0,"replay_status_republications":0,"archive_mutations":false,"sidecar_mutations":false,"replay_launch_authorized":false,"deletions":false});
     next_preparation::completion_bindings(p, pb, &c)?;

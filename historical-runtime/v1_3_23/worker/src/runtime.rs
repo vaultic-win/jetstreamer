@@ -45,7 +45,7 @@ const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 63_936_000;
 // because validators supplied it through `--hard-fork` when restarting. Add
 // it exactly once before replay; later snapshots must persist both markers.
 // Omitting it produces the pre-extension hash EZzqCD... at the restart slot,
-// while the canonical vote stream commits to Fi4p8z....
+// while the canonical vote stream commits to Fi 4p8z....
 const FIRST_MAINNET_HARD_FORK_SLOT: u64 = 13_334_463;
 const SECOND_MAINNET_HARD_FORK_SLOT: u64 = 53_180_900;
 const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";

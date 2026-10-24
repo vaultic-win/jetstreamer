@@ -1,4 +1,4 @@
-# Complete epoch141 boundary collection
+# Complete epoch 141 boundary collection
 
 `jetstreamer-epoch141-boundary-collect` is the independent consumer of the exact
 owner-bound full-census PoH diagnostic. It does not run while that diagnostic is
@@ -54,21 +54,21 @@ replacement, duplicate adoption, partial counts, altered source/output digests,
 or any acquired authority. The helper rehashes the complete diagnostic and
 collected boundary bytes. Its successor namespace includes `census141-boundaries`
 and its repair next action advances to version-specific consumer/root
-qualification; epoch141 remains failed-needs-repair, never remote-ready.
+qualification; epoch 141 remains failed-needs-repair, never remote-ready.
 
 For a candidate readable bundle, seal the non-sensitive boundary JSON as a
-root-owned0444 member beneath a non-writable0555 deployment directory, leaving
+root-owned 0444 member beneath a non-writable 0555 deployment directory, leaving
 the original private tree and provenance receipt private. The deployment sealer
 must independently copy/rehash the exact collected bytes with no replacement.
 Readability and sealing do not authorize using the hashes in a production Bank.
-The existing epoch208 consumer is v1.6.16-specific: do not transplant its runtime
+The existing epoch 208 consumer is v1.6.16-specific: do not transplant its runtime
 shape assumptions into the v1.4.25 repair without checking this source's entry,
 tick, parent-jump and canonical-root behavior independently.
 
 ## Pinned v1.4.25 Bank semantics regression
 
 The test-only worker module `recovered_boundary_bank_fixture` uses the first
-collected group's five distinct hashes (slot60911776, finalized parent60911771).
+collected group's five distinct hashes (slot 60911776, finalized parent 60911771).
 It normalizes that five-slot jump to a small synthetic Bank with the pinned
 v1.4.25 implementation and 64 ticks per slot. It compares boundary-filled ticks,
 different non-boundary tick hashes with identical boundary hashes, and the
@@ -80,7 +80,7 @@ Run from `historical-runtime/v1_4_25` with the pinned toolchain, `--offline
 `pinned_bank_gap_boundaries_preserve_queue_root_and_slot_hashes`. Keep build jobs
 and debug output bounded under the host's existing build policy.
 
-This is a version-specific unit regression, not an epoch141 runtime consumer,
+This is a version-specific unit regression, not an epoch 141 runtime consumer,
 snapshot/root qualification, source-chain proof, or complete-census ingestion.
 It wires no new runtime input, changes no production worker behavior, and grants
 no replay, route-promotion, publication, or R2 authority. An actual source adapter

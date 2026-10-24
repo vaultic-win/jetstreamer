@@ -2,7 +2,7 @@
 use super::*;
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 const IID: &str = "0def5bbebbbc4d6aa8b7f6fe33d08365";
-const ACTION: &str = "Private144 retained prefix independently passed through62639490; original producer and verifier are terminal and stale status was conditionally removed. Preserve validated109GBprefix. Qualify final509slots and exact native restart/assembly,complete epoch/full-plugin and R2 gates; no production ETA or cold prefix restart.";
+const ACTION: &str = "Private 144 retained prefix independently passed through 62639490; original producer and verifier are terminal and stale status was conditionally removed. Preserve validated109GBprefix. Qualify final 509 slots and exact native restart/assembly,complete epoch/full-plugin and R2 gates; no production ETA or cold prefix restart.";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
@@ -100,7 +100,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && p.runtime_handoff157.is_some()
             && !p.expected_epochs.contains(&144)
             && prefix144::writer(p),
-        "foreign completed144 profile"
+        "foreign completed 144 profile"
     );
     ensure!(
         read(profile)?.2["recorded_unix_seconds"]
@@ -123,44 +123,44 @@ fn fold_history(
             || transitions
                 .iter()
                 .any(|(_, guard)| f["admission_transition_guard"] == *guard),
-        "completed144 cannot create/consume a live admission"
+        "completed 144 cannot create/consume a live admission"
     );
     let rows = f["diagnostics"]
         .as_array_mut()
-        .context("completed144 diagnostic history")?;
+        .context("completed 144 diagnostic history")?;
     let found: Vec<_> = rows
         .iter()
         .filter(|d| d["epoch"] == 144 && !transitions.iter().any(|(claim, _)| *d == claim))
         .collect();
     ensure!(
         found.is_empty() || (found.len() == 1 && found[0] == claim),
-        "completed144 would replace another claim"
+        "completed 144 would replace another claim"
     );
     if found.is_empty() {
         rows.push(claim.clone());
     }
     let units = f["tracked_units"]
         .as_array_mut()
-        .context("completed144 tracked units")?;
+        .context("completed 144 tracked units")?;
     if !units.contains(&json!(UNIT)) {
         units.push(json!(UNIT));
     }
     let gate = &mut f["gates"]["144"];
     let action = gate["next_action"]
         .as_str()
-        .context("completed144 action")?;
+        .context("completed 144 action")?;
     ensure!(
         matches!(
             gate["state"].as_str(),
             Some("blocked-qualification" | "failed-needs-repair")
         ) && (action == ACTION || sha(action.as_bytes()) == prior_action_sha),
-        "completed144 newer gate/action must not be overwritten"
+        "completed 144 newer gate/action must not be overwritten"
     );
     gate["state"] = json!("blocked-qualification");
     gate["next_action"] = json!(ACTION);
     let evidence = gate["evidence"]
         .as_array_mut()
-        .context("completed144 gate evidence")?;
+        .context("completed 144 gate evidence")?;
     for b in [proof, validation] {
         let value = serde_json::to_value(b)?;
         if !evidence.contains(&value) {

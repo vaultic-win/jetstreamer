@@ -71,14 +71,14 @@ pub(super) fn scope(scopes: &[LegacySlotScope]) -> Result<()> {
             && scopes
                 .first()
                 .is_some_and(|s| s.slot == 60911776 && s.parent_slot == 60911771)
-            // The interval ends61328765, but the independently finalized gap
-            //census's last post-gap target is61328744. They are not aliases.
+            // The interval ends 61328765, but the independently finalized gap
+            //census's last post-gap target is 61328744. They are not aliases.
             && scopes.last().is_some_and(|s| s.slot == 61328744)
             && scopes.windows(2).all(|w| w[0].slot < w[1].slot)
             && scopes
                 .iter()
                 .all(|s| s.slot > s.parent_slot && (60911751..=61328765).contains(&s.slot)),
-        "all-target acquisition needs complete ordered fixed141 census"
+        "all-target acquisition needs complete ordered fixed 141 census"
     );
     Ok(())
 }

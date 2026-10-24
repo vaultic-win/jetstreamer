@@ -126,7 +126,7 @@ fn safe_unit(s: &str, suffix: &str) -> bool {
 fn unit(name: &str) -> Result<Value> {
     ensure!(
         safe_unit(name, ".service") || safe_unit(name, ".timer"),
-        "foreign185 guard unit name"
+        "foreign 185 guard unit name"
     );
     let out = std::process::Command::new("/usr/bin/systemctl")
         .args([
@@ -146,7 +146,7 @@ fn unit(name: &str) -> Result<Value> {
         let (k, v) = l.split_once('=').context("185 guard manager framing")?;
         ensure!(
             m.insert(k.into(), json!(v)).is_none(),
-            "duplicate185 guard property"
+            "duplicate 185 guard property"
         );
     }
     Ok(Value::Object(m))
@@ -195,7 +195,7 @@ fn decode_exec(v: &Value) -> Result<Vec<String>> {
     let args: Vec<String> = serde_json::from_value(row[1].clone())?;
     ensure!(
         args.first().is_some_and(|s| s == "/usr/bin/python3"),
-        "185 guard argv0 differs"
+        "185 guard argv 0 differs"
     );
     Ok(args)
 }
@@ -241,7 +241,7 @@ pub(super) fn normalize(g: &Guard, args: &[String]) -> Result<Value> {
         let (k, v) = arg
             .split_once('=')
             .context("185 guard needs exact --name=value argv")?;
-        ensure!(flags.insert(k, v).is_none(), "duplicate185 guard flag");
+        ensure!(flags.insert(k, v).is_none(), "duplicate 185 guard flag");
     }
     let names = [
         "--controller-unit",
@@ -394,7 +394,7 @@ pub(super) fn capture(m: &Mapping, p: &Capture, spec: &Bound) -> Result<()> {
     for g in &p.guards {
         ensure!(
             timers.insert(g.timer_unit.clone()) && services.insert(g.service_unit.clone()),
-            "duplicate185 guard capture"
+            "duplicate 185 guard capture"
         );
         profiles.push(snapshot(g)?);
     }

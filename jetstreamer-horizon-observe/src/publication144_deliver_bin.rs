@@ -1,4 +1,4 @@
-//! One exact144 delivery, serialized with the unchanged global uploader. This
+//! One exact 144 delivery, serialized with the unchanged global uploader. This
 //! is not another progressive coordinator and never retires local archives.
 #[allow(dead_code)]
 #[path = "../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
@@ -111,7 +111,7 @@ fn shape(p: &Plan, v: &Value, t: &Value) -> Result<()> {
             && p.output_directory.file_name().is_some_and(|n| n
                 .to_string_lossy()
                 .starts_with("horizon-epoch144-delivery-")),
-        "foreign144 delivery scope or authority"
+        "foreign 144 delivery scope or authority"
     );
     ensure!(
         v["schema"] == "jetstreamer-exact144-v4-publication-plan-v2"
@@ -314,14 +314,14 @@ impl MutationLock {
                 && m.nlink() == 1
                 && m.mode() & 0o777 == 0o600
                 && expected.is_none_or(|(d, i)| m.dev() == d && m.ino() == i),
-            "shared144 mutation lock identity differs"
+            "shared 144 mutation lock identity differs"
         );
         let locked = unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0;
         if !locked {
             let error = std::io::Error::last_os_error();
             ensure!(
                 error.kind() == std::io::ErrorKind::WouldBlock,
-                "shared144 lock acquisition failed:{error}"
+                "shared 144 lock acquisition failed:{error}"
             );
         }
         ensure!(
@@ -443,7 +443,7 @@ fn child(
             c.pre_exec(child_identity);
         }
     }
-    // Metadata publications are root-owned0600, even beneath the UID1001
+    // Metadata publications are root-owned 0600, even beneath the UID 1001
     //directory. Only the fixed completion-only status command keeps root;
     //the payload upload always permanently drops IDs and capabilities.
     let spawned_millis = now()?;

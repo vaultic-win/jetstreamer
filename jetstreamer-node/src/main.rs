@@ -5856,7 +5856,7 @@ fn root_checkpoint_cohort_runtime(
         && (singletons209_212_profile::profile(start_epoch).is_ok()
             || singletons209_212_profile::profile(end_epoch).is_ok())
     {
-        return Err("private209–212cohorts admit exactly one registered epoch".into());
+        return Err("private 209–212cohorts admit exactly one registered epoch".into());
     }
     if start_epoch == 0 || start_epoch > end_epoch {
         return Err("a root-checkpoint cohort requires one or more nonzero epochs".to_string());
@@ -6826,7 +6826,7 @@ const COMPATIBLE_V1_5_6_GENERATION_PROFILES: &[&str] =
 // validation remains mandatory.
 const COMPATIBLE_V1_6_15_GENERATION_PROFILES: &[&str] =
     &["jetstreamer-node/0.7.0/old-faithful-to-horizon-v2@ed00144fbf303723304090655b84230af61e7a12"];
-// This exact clean parent produced the sealed epoch-214/215 root cohort before
+// This exact clean parent produced the sealed epoch- 214/215 root cohort before
 // importer-only recovery support changed the node build revision. Admission is
 // scoped to v1.6.17 and still requires the exact configured worker executable,
 // runtime revision/toolchain, bootstrap/checkpoint chain, complete semantic and
@@ -6842,7 +6842,7 @@ const COMPATIBLE_V1_6_17_GENERATION_PROFILES: &[&str] =
 const COMPATIBLE_EPOCH67_FIRST_SEGMENT_GENERATION_PROFILES: &[&str] = &[
     "jetstreamer-node/0.7.0/old-faithful-to-horizon-v2@24306fa59e09c17cc8e460e1ffa3c86095187035-dirty-4e6b39e6745313048e230bca",
 ];
-// These exact producers completed the source-lineage-qualified epoch-67/68
+// These exact producers completed the source-lineage-qualified epoch- 67/68
 // root cohort through both terminal checkpoints. Their subsequent node changes
 // only prepare and safely rebind the private mixed-runtime archive for
 // transactional publication; they do not alter replay, handoff, or archive
@@ -11815,7 +11815,7 @@ async fn run_geyser_replay(
     // qualification child obtains this from its sealed environment.
     handoff_export_directory: Option<&Path>,
     retain_runtime_state: bool,
-    // Only exact independently validated private epoch144/213 runners construct these proofs.
+    // Only exact independently validated private epoch 144/213 runners construct these proofs.
     checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
     epoch223_tail_mode: epoch223_qualification::TailMode,
 ) -> Result<ReplayRunOutcome, String> {
@@ -27624,7 +27624,7 @@ mod scheduler_tests {
 
     #[test]
     fn readers_share_round_after_writer() {
-        // A writes X; B,C read X. Expect round0=[A], round1=[B,C].
+        // A writes X; B, C read X. Expect round 0=[A], round 1=[B, C].
         let entries = vec![entry(&[1], &[]), entry(&[], &[1]), entry(&[], &[1])];
         let rounds = assign_rounds(&entries);
         check_invariants(&entries, &rounds);

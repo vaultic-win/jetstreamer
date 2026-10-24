@@ -207,24 +207,24 @@ impl<'de> serde::Deserialize<'de> for Buffer {
 }
 
 /// Maximum Old Faithful CAR section size permitted while parsing (32 MiB).
-pub const MAX_ALLOWED_SECTION_SIZE: usize = 32 << 20; // 32MiB
+pub const MAX_ALLOWED_SECTION_SIZE: usize = 32 << 20; // 32 MiB
 
 /// Maximum size of a reassembled Old Faithful frame (128 MiB).
 ///
 /// The largest epoch-start reward frame found across epochs 0 through 954 is
 /// 63,448,722 compressed bytes, so this retains more than 2x headroom.
-pub const MAX_ALLOWED_REASSEMBLED_FRAME_SIZE: usize = 128 << 20; // 128MiB
+pub const MAX_ALLOWED_REASSEMBLED_FRAME_SIZE: usize = 128 << 20; // 128 MiB
 
 /// Maximum decompressed size of an Old Faithful frame (128 MiB).
 ///
 /// That same CID-verified reward frame expands to 87,557,613 bytes.
-pub const MAX_ALLOWED_DECOMPRESSED_FRAME_SIZE: usize = 128 << 20; // 128MiB
+pub const MAX_ALLOWED_DECOMPRESSED_FRAME_SIZE: usize = 128 << 20; // 128 MiB
 
 /// Maximum compressed or decompressed transaction-metadata frame (1 MiB).
 /// Transaction metadata is handled once per transaction and is much smaller
 /// than a slot-wide rewards frame; sampled historical metadata remains below
 /// three KiB.
-pub const MAX_TRANSACTION_METADATA_FRAME_SIZE: usize = 1 << 20; // 1MiB
+pub const MAX_TRANSACTION_METADATA_FRAME_SIZE: usize = 1 << 20; // 1 MiB
 
 const _: () = {
     assert!(MAX_ALLOWED_REASSEMBLED_FRAME_SIZE >= 63_448_722);

@@ -44,15 +44,15 @@ Both entry points retain complete exact-key censuses, metadata rereads, all
 contiguous shreds, bounded padding/entry decoding, trusted external clock/anchors,
 aggregate hash limits and unique boundaries. A failure returns no partial trusted
 set. Every successful result still denies source completeness and publication.
-The existing epoch141 fixed-input acquisition tools are not v1.5.6 operational
+The existing epoch 141 fixed-input acquisition tools are not v1.5.6 operational
 profiles and must not be relabeled to consume this source.
 
 ## Remaining operational gates
 
 Determine the compatible full execution/root span first, then census every parent
 jump over that span. The retained planning root 69,119,821 is 178 slots short of
-the end of epoch159; it cannot establish full-epoch completion. Preserve the live
-epoch160 singleton and do not launch an overlapping cohort to reach a later root.
+the end of epoch 159; it cannot establish full-epoch completion. Preserve the live
+epoch 160 singleton and do not launch an overlapping cohort to reach a later root.
 
 Acquire or stream the exact generation only after fresh complete resource
 admission. Independently establish full tar/LSM/MANIFEST/WAL/column-family/live-SST

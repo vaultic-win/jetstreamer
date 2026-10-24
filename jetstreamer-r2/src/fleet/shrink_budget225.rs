@@ -1,4 +1,4 @@
-//! Registration only of the separately pinned epoch225 shrink-cap measurement.
+//! Registration only of the separately pinned epoch 225 shrink-cap measurement.
 use super::*;
 
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {

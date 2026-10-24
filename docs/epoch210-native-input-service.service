@@ -2,7 +2,7 @@
 # No systemd-run/collection dependency; no boot enablement. Actual admission,
 # registered origin and first invocation-bound guard are separate launch gates.
 [Unit]
-Description=Horizon epoch210 v1.6.16 native cold input verification
+Description=Horizon epoch 210 v1.6.16 native cold input verification
 
 [Service]
 Type=exec

@@ -1,4 +1,4 @@
-//! Continue from the real, successful0813 ledger after only its duplicate
+//! Continue from the real, successful 0813 ledger after only its duplicate
 //! final read exceeded freshness. Never mark the failed read successful.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261023T081357Z-controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
@@ -32,7 +32,7 @@ fn checked_receipt(p: &Plan, v: &Value) -> Result<()> {
             && v["producer_mutations"] == false
             && v["remote_mutations"] == false
             && v["publication_authorized"] == false,
-        "foreign provisional141 predecessor"
+        "foreign provisional 141 predecessor"
     );
     let t = utc_seconds(v["sampled_at_utc"].as_str().unwrap())?;
     ensure!(

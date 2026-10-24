@@ -1,4 +1,4 @@
-//! Exact same-sample private144 fleet handoff, never a launcher or resource poll.
+//! Exact same-sample private 144 fleet handoff, never a launcher or resource poll.
 use super::*;
 use continuation144::{SCHEMA, SCRATCH, UNIT};
 use private157::{binding, file_binding};
@@ -33,7 +33,7 @@ fn scope(s: &Spec) -> Result<()> {
                 .is_some_and(
                     |s| s.starts_with("fleet-") && s.ends_with("-continuation144-admitted.json")
                 ),
-        "foreign private144 event scope"
+        "foreign private 144 event scope"
     );
     Ok(())
 }
@@ -114,7 +114,7 @@ fn first_fire_for(
                     && w[0][0].as_u64().is_some_and(|n| n > 0)
                     && w[0][1].as_u64().is_some_and(|n| n > 0 && n <= 3500000)
             }),
-        "private144 requires actual clean exact-worker sandboxed first fire"
+        "private 144 requires actual clean exact-worker sandboxed first fire"
     );
     Ok(())
 }
@@ -136,7 +136,7 @@ pub(super) fn run() -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && hex_lower(&Sha256::digest(fs::read(&exe)?)) == args[6],
-        "unsealed private144 fleet preparer"
+        "unsealed private 144 fleet preparer"
     );
     let s: Spec = serde_json::from_value(bound_json(&BoundFile {
         path: args[2].clone().into(),
@@ -153,7 +153,7 @@ pub(super) fn run() -> Result<()> {
         unit: UNIT.into(),
         invocation_id: r["invocation_id"]
             .as_str()
-            .context("private144 invocation")?
+            .context("private 144 invocation")?
             .into(),
         scratch_path: SCRATCH.into(),
         launch_receipt: lb,
@@ -173,7 +173,7 @@ pub(super) fn run() -> Result<()> {
             && r["observer"] == binding(&s.observer)
             && previous["admission_transition_guard"].is_null()
             && plan["admission_transition_guard"].is_null(),
-        "private144 event predecessor differs"
+        "private 144 event predecessor differs"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let sample = utc_seconds(
@@ -183,7 +183,7 @@ pub(super) fn run() -> Result<()> {
     )?;
     ensure!(
         sample <= now && now - sample <= 1800,
-        "private144 event sample stale"
+        "private 144 event sample stale"
     );
     if args[7] == "--routine-spec" {
         let event: BoundFile = serde_json::from_value(file_binding(&s.output)?)?;
@@ -196,7 +196,7 @@ pub(super) fn run() -> Result<()> {
                 && ev["previous_fleet"] == binding(&s.previous_fleet)
                 && ev["observer_sha256"] == s.observer.sha256
                 && ev["admission_transition_guard"] == binding(&s.guard_sample),
-            "private144 event not accepted"
+            "private 144 event not accepted"
         );
         persist(
             &Path::new(ROOT).join("routine-spec.json"),
@@ -212,7 +212,7 @@ pub(super) fn run() -> Result<()> {
     let limits=ProcessCommand::new("systemctl").args(["show",GUARD_UNIT,"--property=ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities"]).output()?;
     ensure!(
         limits.status.success(),
-        "private144 guard sandbox unreadable"
+        "private 144 guard sandbox unreadable"
     );
     let text = std::str::from_utf8(&limits.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
@@ -226,7 +226,7 @@ pub(super) fn run() -> Result<()> {
     ] {
         ensure!(
             fields.get(k) == Some(&v),
-            "private144 guard sandbox differs:{k}"
+            "private 144 guard sandbox differs:{k}"
         );
     }
     owners(&previous)?;
@@ -239,7 +239,7 @@ pub(super) fn run() -> Result<()> {
         .context("diagnostic history")?;
     ensure!(
         !ds.iter().any(|v| v["unit"] == UNIT),
-        "duplicated private144 continuation history"
+        "duplicated private 144 continuation history"
     );
     ds.push(json!({"epoch":144,"unit":UNIT,"invocation_id":c.invocation_id,"scratch_path":SCRATCH,"launch_receipt":binding(&c.launch_receipt)}));
     let names = plan["tracked_units"]

@@ -16,17 +16,17 @@ poh-force-soft = ["sha2-fast/force-soft"]
 diagnostic-singleton = []
 # Isolated read-only snapshot bank metadata example; never ordinary replay.
 snapshot-hard-fork-metadata = ["solana-runtime/snapshot-hard-fork-metadata"]
-# Private epoch223 prefix using the original runtime and capped storage shrink
+# Private epoch 223 prefix using the original runtime and capped storage shrink
 # debt. No native transaction, fee, hash or account-loading semantics change.
 epoch223-prefix-qualification = []
 # Independently sealed sixteen-slot cold comparison, never a long replay.
 epoch223-prefix-warmup-diagnostic = ["epoch223-prefix-qualification"]
-# Independently admitted epoch227 singleton; same storage-only debt cap, with
-# exact cold snapshot and full epoch bounds. Never substitutes for epoch223.
+# Independently admitted epoch 227 singleton; same storage-only debt cap, with
+# exact cold snapshot and full epoch bounds. Never substitutes for epoch 223.
 epoch227-capped-qualification = []
 # Separately sealed sixteen-slot cold comparison, never a full epoch.
 epoch227-capped-warmup-diagnostic = ["epoch227-capped-qualification"]
-# Exact epoch228 input plus its279-slot canonical checkpoint tail in229.
+# Exact epoch 228 input plus its279-slot canonical checkpoint tail in 229.
 epoch228-capped-qualification = []
 
 [[example]]

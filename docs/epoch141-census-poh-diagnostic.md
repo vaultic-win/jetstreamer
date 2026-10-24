@@ -1,4 +1,4 @@
-# Complete epoch141 private PoH diagnostic
+# Complete epoch 141 private PoH diagnostic
 
 `jetstreamer-epoch141-census-poh-diagnostic` consumes only the exact corrected
 all-target native acquisition, after clean terminal success, native close and

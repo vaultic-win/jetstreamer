@@ -629,7 +629,7 @@ pub fn load_archive(archive_path: &Path, state_dir: &TempDir) -> Result<LoadedSn
     })
 }
 
-/// Load an already-extracted genesis or unpack the normal js2 genesis archive
+/// Load an already-extracted genesis or unpack the normal js 2 genesis archive
 /// into worker-private storage.  The shared ledger path is never modified.
 pub fn load_genesis(ledger_path: &Path, state_dir: &TempDir) -> Result<GenesisConfig, String> {
     let direct_directory = if ledger_path.is_file()

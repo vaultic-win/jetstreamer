@@ -1,10 +1,10 @@
-# Dormant RAM-backed epoch203 resource experiment
+# Dormant RAM-backed epoch 203 resource experiment
 
 This is preparation, not a deployed supervisor or launch authorization.
 The two real 86,831,488 snapshot integration tests passed on October 21.
 Entry replay, IPC, resource behavior and all canonical/plugin gates remain
 independent. Existing disk-backed comparison admission remains closed while
-the healthy epoch203 root-prefix producer has unbounded future scratch growth.
+the healthy epoch 203 root-prefix producer has unbounded future scratch growth.
 
 For a targeted reproducible-cache check, the separately sealed Rust
 `jetstreamer-horizon-dev-cache-check` accepts
@@ -16,7 +16,7 @@ preserved clean source/lock and Git-ignore classification, measures physical
 bytes without following cache links, rejects archives/snapshots/sidecars or
 foreign mounts, and performs bounded staged-unit and complete process-reference
 checks. It writes only root-private, no-clobber `check.json` under an existing
-mode0700 `/var/lib/jetstreamer/horizon-dev-cache-check-ATTEMPT` directory.
+mode 0700 `/var/lib/jetstreamer/horizon-dev-cache-check-ATTEMPT` directory.
 It never removes a file or runs Cargo. A positive check is not retirement or
 replay-admission authority: preserve its evidence, apply the ordinary cache
 policy and fresh final checks, and use only the pinned native Cargo dev-profile
@@ -27,7 +27,7 @@ continue allocating.
 
 A dangling system-service alias is not silently ignored. Require a stable
 alias target outside the cache plus two matching manager observations proving
-`not-found/inactive/dead`, PID0, no triggers and no cached executable hooks;
+`not-found/inactive/dead`, PID 0, no triggers and no cached executable hooks;
 retain those exact observations in the check receipt. A permission error,
 loaded unit, cached command, changing alias or alias into the dev cache still
 fails closed. This addresses genuinely uninstalled OS-service aliases without
@@ -58,7 +58,7 @@ The provisional envelope has these separate budgets:
 | Host stop reserve | 544 |
 | Protected host reserve after a worst-case extra diagnostic cap | 224 |
 
-The retained same-input store8 baseline used 172,458,995,712 physical scratch
+The retained same-input store 8 baseline used 172,458,995,712 physical scratch
 bytes and 85,901,561,856 cgroup peak bytes on disk. The envelope is a bounded
 experiment budget, not proof that replay fits: on RAM the file pages and
 anonymous memory consume the **same** cgroup limit. It may reject or stop a
@@ -93,7 +93,7 @@ Expected geometry input:
 
 Supply the sealed path and independently calculated digest as
 `/absolute/geometry.json --plan-sha256 HEX`. A passing geometry report does
-not bind a fleet, refreshed century census, stopped225 CPU allocation,
+not bind a fleet, refreshed century census, stopped 225 CPU allocation,
 snapshot, worker, measured free memory, VMA limit or actual sandbox. It is
 not fresh admission and has no runtime authority. Do not deploy this checker
 as an admission service or reinterpret the old disk runner's free-space gate.
@@ -103,7 +103,7 @@ as an admission service or reinterpret the old disk runner's free-space gate.
 1. A distinct sealed Rust supervisor, exact sandbox capability probe and
    invocation-bound guard must authenticate the actual tmpfs mount, CPU and
    memory caps, no swap, UID/capability drop, input identities, and the complete
-   three-producer fleet plus stopped225 evidence. Keep at most four entry
+   three-producer fleet plus stopped 225 evidence. Keep at most four entry
    replays. Use a fresh coordinated observation, not a new polling loop.
 2. Bind the exact parent, generation-pinned 87,695,515 bootstrap, genesis,
    epoch hashes, 16-thread setting, bounded target 87,720,000 and underlying
@@ -127,7 +127,7 @@ as an admission service or reinterpret the old disk runner's free-space gate.
 5. Require all normal root, independent full archive, current-plugin, suffix,
    assembly and publication gates after performance evidence. A bounded
    comparison cannot promote a route, qualify a full cold-epoch peak, publish
-   an archive or close the epoch203/225 repair incidents.
+   an archive or close the epoch 203/225 repair incidents.
 
 The geometry is intentionally separated from implementation and admission.
 Leave existing replays, guards, metadata owners and sealed binaries unchanged.
@@ -153,7 +153,7 @@ and its owned node in the exact cgroup/process group, passes the resource/VMA
 checks, and reauthenticates the supervisor. Startup grace (zero workers) and
 post-target drainage cannot emit this proof. It binds invocation, supervisor,
 node and worker PIDs, worker file identity/digest, RAM root identity, sample
-values and time. Creation is no-clobber with mode0400 and file/directory fsync;
+values and time. Creation is no-clobber with mode 0400 and file/directory fsync;
 a write failure follows the ordinary guard stop-intent path. Later checks do
 not renew or replace the first proof. This remains metadata on persistent
 tmpfs: it is not a durable root-storage receipt, launch/admission evidence,
@@ -169,14 +169,14 @@ launcher. Invoke it only through an independently sealed plan/binary with
 `invocation_id`, `run_root`, `worker_sha256`, `supervisor_binary`,
 `supervisor_plan`, `setpriv`, `first_worker`, and `output` (plus `schema`).
 Each file binding is `{ "path": "/absolute/path", "sha256": "..." }`.
-Precreate the exact root-owned mode0700 output directory
+Precreate the exact root-owned mode 0700 output directory
 `/var/lib/jetstreamer/horizon-203-ram-launch-ATTEMPT`; output is `launch.json`.
 The first-worker binding must name the exact RAM root's
 `receipts/ram-guard-first-worker.json`, not a copied test receipt.
 
 The collector independently checks the real running oneshot invocation and
 exact setpriv/supervisor/plan command, sealed executable hashes, persistent
-mount generation/geometry, fresh (at most120seconds old) positive guard proof,
+mount generation/geometry, fresh (at most 120 seconds old) positive guard proof,
 source and copied worker hashes/identities, live node/worker ownership and
 process groups, start ticks, cgroups and privilege drops. It rechecks the owner,
 processes, mount and proof before atomic no-clobber publication with file and
@@ -197,7 +197,7 @@ and the root-owned immutable plan, and authenticates the actual unit/cgroup,
 mount unit, mount ID, filesystem type/capacity, root inode device, child
 directories, TMPDIR and exact before/after identities. Its only write is
 `receipts/storage-capability.json` beneath the exact private RAM root, with
-no-clobber creation, mode0400 and file/directory fsync. Seal that metadata onto
+no-clobber creation, mode 0400 and file/directory fsync. Seal that metadata onto
 durable storage before treating it as retained evidence: fsync on tmpfs does
 not make it survive reboot. It never launches replay, polls host memory or
 the fleet, signals a process, mounts/unmounts, removes files or accesses R2.
@@ -220,7 +220,7 @@ The strict plan has these fields, with no others:
 The mount must be a separately managed active `tmpfs` mount with
 `StopWhenUnneeded=no`, empty `BindsTo=`/`PartOf=`, 768-GiB capacity,
 `rw,nosuid,nodev` and executable files, root mode0700/UID1000/GID1000, and
-empty mode0700 `scratch`, `output`, `ledger`, `tmp` and `receipts` children
+empty mode 0700 `scratch`, `output`, `ledger`, `tmp` and `receipts` children
 on the same device. Do not substitute a bind-mounted subtree or a service's
 `TemporaryFileSystem=` namespace. Probe plans bind its actual current
 invocation, host device and propagation peer group. Mount IDs are namespace-local:
@@ -232,9 +232,9 @@ For the future exact probe service require `Type=oneshot`, `Restart=no`,
 `ProtectSystem=strict`, `ProtectHome=read-only`, `ProtectControlGroups=yes`,
 `PrivateDevices=yes`, `RestrictSUIDSGID=yes`, `UMask=0077`, `PrivateNetwork=no`,
 empty `TemporaryFileSystem=`, and only the exact RAM root in `ReadWritePaths=`.
-The actual cgroup must have memory.high304GiB, memory.max320GiB, swap0,
-groupOOM1, pids512 and an exact 16-core CPU quota. The probe makes no claim
-that this CPU budget is available: stopped225 allocation and fresh fleet
+The actual cgroup must have memory.high304 GiB, memory.max320 GiB, swap 0,
+group OOM 1, pids 512 and an exact 16-core CPU quota. The probe makes no claim
+that this CPU budget is available: stopped 225 allocation and fresh fleet
 admission remain separate gates before **any replay**.
 
 `User=1000` alone retains ubuntu's NSS supplementary groups (including sudo
@@ -245,15 +245,15 @@ wrapper as `User=root`, `Group=root`, with only
 Invoke the immutable reviewed wrapper with
 `--reuid=1000 --regid=1000 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs`
 and the sealed probe/plan/digests. The probe itself must observe all four
-real/effective/saved/filesystem UID and GID values1000, no foreign supplementary
-groups, all five process capability sets zero and effective NoNewPrivs1.
+real/effective/saved/filesystem UID and GID values 1000, no foreign supplementary
+groups, all five process capability sets zero and effective NoNewPrivs 1.
 A real host read-only `/usr/bin/setpriv ... /usr/bin/cat /proc/self/status`
 check confirmed that this drop mechanism works; that check was **not** an
 actual sandbox or storage capability pass. No mount or replay is authorized
 by it. Require a separately sealed actual probe invocation before deployment.
 
 The first sealed real probe attempt (`horizon-203-ram-storage-probe-v1`,
-invocation `c8a6527a5a604b8b86a686e2f1c9a1f0`) failed in setpriv with exit127:
+invocation `c8a6527a5a604b8b86a686e2f1c9a1f0`) failed in setpriv with exit 127:
 `setresuid failed: Operation not permitted`. A bounding set alone did not
 provide the required effective drop capabilities in this sandbox. Preserve that
 failed unit/journal and package. The revised sandbox explicitly binds the same
@@ -273,7 +273,7 @@ separately records the host ID, binds device and propagation master, and require
 the service's actual mount ID/peer to remain stable before/after. This is an
 explicit corrected identity model, not permission to accept arbitrary mounts.
 
-The third sealed actual probe passed with exit0 (invocation
+The third sealed actual probe passed with exit 0 (invocation
 `01fe443690454ef6a61354b892db4787`). Its root-owned retained capability is
 `/var/lib/jetstreamer/horizon-203-ram-storage-success-v3/storage-capability.json`,
 SHA256 `bb7bc335b8a2161f9966bd0c7f23c45b33501224e13e33b107deac8bf9a36ffb`.
@@ -308,8 +308,8 @@ all mutable paths to it, bind fresh fleet/CPU/memory/input evidence and implemen
 the host/tmpfs/cgroup/VMA guard and retained-artifact lifecycle before launch.
 
 The current coordinated observer rejects overlapping diagnostic ranges, as well
-as ordinary replay claims. A same-input epoch203 canary beside the healthy
-epoch203 root-prefix job therefore also needs an explicit reviewed diagnostic
+as ordinary replay claims. A same-input epoch 203 canary beside the healthy
+epoch 203 root-prefix job therefore also needs an explicit reviewed diagnostic
 census model and fleet integration; do not omit either job from the observer,
 rename it to another epoch, weaken the overlap check globally or treat an old
 fleet as evidence of the expanded producer set. The fourth-entry-replay ceiling
@@ -328,13 +328,13 @@ complete admission path remain independently required.
 
 `start` authenticates the invocation's own cgroup and private RAM device/inode,
 the immutable parent path, 768-GiB tmpfs geometry, actual320/304-GiB memory
-limits, swap0/groupOOM, pids512 and CPU16, startup864-GiB available memory and
+limits, swap0/groupOOM, pids 512 and CPU 16, startup864-GiB available memory and
 host VMA limit. A no-clobber private start receipt prevents reopening the same
 run to renew the at-most60-second initial zero-worker grace. This grace is not
 a successful worker/maps capability proof. Before unattended replay require
 an actual positive worker observation under the sealed supervisor.
 
-`check` performs at most one owned-canary safety sample per15seconds, on calls
+`check` performs at most one owned-canary safety sample per 15 seconds, on calls
 from that supervisor; it creates no loop and never samples another replay.
 It preserves the544-GiB host reserve, century tmpfs floor,320-GiB total charged
 memory, zero max/OOM events,224-GiB aggregate RAM-file ceiling and16-GiB private
@@ -350,9 +350,9 @@ with a500,000-VMA ceiling. Foreign/multiple workers, a pre-target disappearing
 worker, unreadable state, replacement RAM root, changed limits, memory pressure
 at the hard bound and oversized/unexpected output fail closed.
 
-A zero-worker post-target drain requires the exact existing epoch203 target
-stop receipt, same invocation and child,87720000target, bounded overshoot,
-no external signal and no more than180seconds age. The matching retained
+A zero-worker post-target drain requires the exact existing epoch 203 target
+stop receipt, same invocation and child, 87720000target, bounded overshoot,
+no external signal and no more than 180 seconds age. The matching retained
 capture must have the exact canonical JSON hash, private path, bounded scratch
 and accounts-state/cgroup contents. The guard pins that receipt digest and its
 own monotonic deadline so a rewritten timestamp or clock change cannot renew
@@ -386,14 +386,14 @@ it requires its own exact sealed supervisor capability proof before launch.
 ## Dormant supervisor implementation
 
 `epoch203-ram-resource-supervisor` now builds
-`jetstreamer-epoch203-ram-resource` with baseline worker3f5e8efe. The separate
-`epoch203-ram-shrink-candidate` feature pins worker4aeca563 and distinct
-shrink unit/root namespaces. Both pin parent025757b9, the same87695515
-snapshot,16threads,87720000measurement target,88127580underlying root,
+`jetstreamer-epoch203-ram-resource` with baseline worker 3f5e8efe. The separate
+`epoch203-ram-shrink-candidate` feature pins worker 4aeca563 and distinct
+shrink unit/root namespaces. Both pin parent 025757b9, the same 87695515
+snapshot, 16 threads, 87720000measurement target, 88127580underlying root,
 192-GiB target scratch,16-GiB output and six-hour maximum. Baseline and
 candidate must run sequentially in equivalent fresh RAM environments. The
 retained baseline output was inspected read-only: its partial archive is
-5,893,849,884bytes, below the proposed16-GiB output ceiling. That diagnostic
+5,893,849,884 bytes, below the proposed16-GiB output ceiling. That diagnostic
 file size is not a canonical century sample or proof of a full-epoch peak.
 
 The CLI keeps the shared runner syntax:
@@ -415,7 +415,7 @@ nine claims, unchanged six canonical floor samples, the actual real snapshot
 success and exact stopped225/released16-core chain. It additionally performs
 before/after live systemd discovery: any unbound/fifth entry owner, competing
 snapshot/auxiliary diagnostic or active delivery stage rejects admission.
-The three primary identities and stopped225unit are freshly checked. This
+The three primary identities and stopped 225unit are freshly checked. This
 is admission inspection, not an additional routine resource poll.
 
 Preparation and pre-fork authenticate the actual RAM sandbox. The child gets
@@ -445,7 +445,7 @@ actual RAM sandbox before the large reads, repeats preparation checks, copies
 only verified genesis into the private ledger, builds the exact child command/
 cleared environment, and authenticates the pre-spawn storage phase. It then
 returns through a distinct capability dispatch **before any replay/measurement
-call** and writes only `receipts/supervisor-storage-capability.json` mode0400,
+call** and writes only `receipts/supervisor-storage-capability.json` mode 0400,
 no-clobber with file/directory fsync. A subprocess-dispatch regression rejects
 any path into replay admission, spawn or safety guard during this operation.
 Existing DiskStorage profiles reject this extra CLI argument.
@@ -461,9 +461,9 @@ Seal the resulting metadata onto durable storage; its original RAM copy does
 not survive reboot. Fullbenchmark mode remains fail-closed on all qualification
 evidence and repeats fresh admission immediately before its actual fork.
 
-The actual baseline no-entry invocation passed on October21 at05:18:41UTC:
+The actual baseline no-entry invocation passed on October 21 at 05:18:41 UTC:
 `horizon-203-ram-resource-baseline-capability-v1.service`, invocation
-`4b6aac090fb1421aa2e9a4161561b6f8`, exit0. Its independently sealed retained
+`4b6aac090fb1421aa2e9a4161561b6f8`, exit 0. Its independently sealed retained
 metadata is `/var/lib/jetstreamer/horizon-203-ram-supervisor-capability-success-v1/supervisor-storage-capability.json`,
 SHA256 `6e8778e2a536ae612f59cbc7ac1259f90286030fc5b3b195d17605292a341f26`.
 This verifies the actual RAM sandbox, input hashes, genesis preparation and
@@ -476,7 +476,7 @@ RAM mount and original metadata remain preserved; no replay was started.
 The v2 observer now accepts one optional `epoch203_ram_auxiliary` config object
 with `replay` (the existing invocation-bound replay config), `supervisor_profile`,
 `worker_sha256`, `target_slot` and `terminal_root_slot`. It admits only the
-bounded87720000/88127580private epoch203 baseline or shrink comparison, with
+bounded87720000/88127580private epoch 203 baseline or shrink comparison, with
 the exact pinned worker, matching supervisor/root namespace and isolated scratch.
 It requires the primary203root-prefix diagnostic to remain explicitly configured.
 Ordinary replay and existing diagnostic overlap rejection is unchanged; this

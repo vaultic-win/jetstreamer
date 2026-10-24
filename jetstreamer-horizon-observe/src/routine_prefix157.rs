@@ -37,7 +37,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && p.runtime_handoff157.is_some()
             && !p.expected_epochs.contains(&157)
             && writer(p),
-        "foreign prefix157 profile"
+        "foreign prefix 157 profile"
     );
     let r = bound_json(&profile.launch, true)?;
     ensure!(
@@ -54,7 +54,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && r["replay_entries_authorized"] == false
             && r["publication_authorized"] == false
             && r["r2_mutations"] == false,
-        "prefix157 launch proof differs"
+        "prefix 157 launch proof differs"
     );
     let event = bound_json(&profile.admission_fleet, false)?;
     ensure!(
@@ -64,7 +64,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && event["admission_transition_guard"] == serde_json::to_value(&profile.launch)?
             && event["diagnostics"]
                 .as_array()
-                .context("prefix157 event diagnostics")?
+                .context("prefix 157 event diagnostics")?
                 .iter()
                 .filter(|d| d["epoch"] == 157
                     && d["unit"]["Id"] == UNIT
@@ -72,7 +72,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                     && d["launch_invocation_id"] == r["invocation_id"])
                 .count()
                 == 1,
-        "prefix157 admission not an exact full fleet"
+        "prefix 157 admission not an exact full fleet"
     );
     Ok(())
 }
@@ -98,11 +98,11 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
 fn fold(fleet: &mut Value, expected: &Value) -> Result<()> {
     let rows = fleet["diagnostics"]
         .as_array_mut()
-        .context("prefix157 diagnostic template")?;
+        .context("prefix 157 diagnostic template")?;
     let found: Vec<_> = rows.iter().filter(|r| r["epoch"] == 157).collect();
     ensure!(
         found.len() == 1 && found[0] == expected,
-        "prefix157 template changed or duplicated"
+        "prefix 157 template changed or duplicated"
     );
     // The accepted event is history. A subsequent ordinary cycle must not
     // repeatedly authorize a second same-sample admission.
@@ -112,7 +112,7 @@ fn fold(fleet: &mut Value, expected: &Value) -> Result<()> {
 pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
     ensure!(
         is_101(next)? && next.prefix157_audit.is_none() && next.runtime_handoff157.is_some(),
-        "prefix157 migration requires unmigrated paused157 profile"
+        "prefix 157 migration requires unmigrated paused 157 profile"
     );
     let spec: Spec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(
@@ -120,11 +120,11 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
             && !spec.replay_launch_authorized
             && !spec.publication_authorized
             && !spec.r2_mutations,
-        "prefix157 spec grants authority"
+        "prefix 157 spec grants authority"
     );
     ensure!(
         spec.event_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101)),
-        "prefix157 event outside fleet namespace"
+        "prefix 157 event outside fleet namespace"
     );
     let e = bound_json(&spec.event_fleet, false)?;
     let ep = bound_json(&spec.event_plan, true)?;
@@ -138,7 +138,7 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
             && ep["observer"] == serde_json::to_value(&next.previous_observer)?
             && ep["previous_fleet"] == serde_json::to_value(&next.previous_fleet)?
             && ep["admission_transition_guard"] == serde_json::to_value(&spec.launch)?,
-        "prefix157 event did not consume actual accepted fleet/observer"
+        "prefix 157 event did not consume actual accepted fleet/observer"
     );
     next.previous_fleet = spec.event_fleet.clone();
     next.fleet_template = spec.event_plan;
@@ -168,7 +168,7 @@ pub(super) fn namespaces(p: &mut Plan, op: &mut PathBuf, cp: &mut PathBuf) -> Re
     p.cycle_unit = cycle_unit(p)?;
     p.scope_101_200
         .as_mut()
-        .context("prefix157 scope")?
+        .context("prefix 157 scope")?
         .additional_tracked_units = vec![p.cycle_unit.clone()];
     Ok(())
 }

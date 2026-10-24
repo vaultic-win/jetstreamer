@@ -1,10 +1,10 @@
-# Exact native228 collected-terminal recovery
+# Exact native 228 collected-terminal recovery
 
 This adapter preserves the real not-found state of the transient native-input
 unit. It does not recreate a unit, rerun a Bank, start a process, or access R2.
 The generic loaded-terminal validator continues to reject not-found defaults.
 
-Only original IID `1b207be826cc45979d5a92a44de4bd14`, PID297588, captured origin
+Only original IID `1b207be826cc45979d5a92a44de4bd14`, PID 297588, captured origin
 SHA256 `f53486f4fca27ae950f0af4412d262e5f1946769f2cdbe97ae62c8fc1193a349`
 and sealed canonical journal SHA256
 `5894b7b9c0e612f8e10d984fe22a8d4087b3cca522d076f2d7ecd3b690325710`
@@ -13,12 +13,12 @@ are eligible. Existing terminal verification still independently checks the real
 PID/IID, PID1 success, immutable input bindings and2700-second execution bound.
 
 Capture additionally requires a fresh accepted observer/fleet containing exactly
-this registered228 pipeline claim, no other staged/live228 owner and the existing
+this registered 228 pipeline claim, no other staged/live228 owner and the existing
 blocked-qualification gate. It brackets the complete producer census, preserves
-all other owners (including full209), checks the original cgroup is absent, reads
+all other owners (including full 209), checks the original cgroup is absent, reads
 the complete discovered service/job tables, and validates fresh original-unit
 PID1/child history from before the original start. Missing starts, later starts,
-foreign IIDs/PIDs, queued228 work, loaded replacement units, any retained cgroup,
+foreign IIDs/PIDs, queued 228 work, loaded replacement units, any retained cgroup,
 or a changing census fail closed. No additional replay/resource sample is made.
 
 The terminal proof stores a hash-bound-to-inputs collected_terminal witness with
@@ -32,7 +32,7 @@ object was never published.
 
 The existing capture-native228-terminal command/spec schema is retained. Root
 must supply a NEW immutable spec bound to its latest accepted observer/fleet and
-a new absent proof output; the old004f... spec cannot discard full209 or later
+a new absent proof output; the old 004f... spec cannot discard full 209 or later
 accepted history. The adapter chooses the narrowly pinned collected path only
 when the actual unit is not-found. Loaded units retain the ordinary strict path.
 

@@ -1,16 +1,16 @@
-# Epoch198 delivery observation
+# Epoch 198 delivery observation
 
 The separately pinned `cohort198_finalization` profile recognizes only the
-existing dev-samjohnson epoch198 reader-fix singleton. It does not borrow the
-other host's216–219 allowlist, change its producer or grant any replay,
+existing dev-samjohnson epoch 198 reader-fix singleton. It does not borrow the
+other host's 216–219 allowlist, change its producer or grant any replay,
 verification, publication, deletion or R2 archive mutation authority.
 
 `producer-finalization`/`finalization` can be claimed only while the exact
 original producer is active/running with its pinned invocation, PID, command,
 zero restarts, immutable node digest and immutable preflight report. Four unique
 original-user journal events must precede the coordinated observation and be
-strictly ordered: trusted root checkpoint85,967,282 with its manifest accounts
-hash, complete terminal checkpoint85,967,999, snapshot-verification completion,
+strictly ordered: trusted root checkpoint 85,967,282 with its manifest accounts
+hash, complete terminal checkpoint 85,967,999, snapshot-verification completion,
 and complete432,000-slot singleton archive close. Numeric fields are parsed as
 checked u64 integers. These events are observational evidence, never independent
 full/plugin verification or a ready-pair receipt.
@@ -51,7 +51,7 @@ retry blindly or invent terminal evidence.
 The immutable root-owned plan schema is
 `jetstreamer-epoch198-delivery-observation-plan-v1`. It has `output`, positive
 integer `not_before_unix_seconds` and `expires_unix_seconds` bounding at most
-1,800seconds, exact `expected_unit`, `expected_invocation_id` and
+1,800 seconds, exact `expected_unit`, `expected_invocation_id` and
 `expected_exec_start_sha256`, plus mandatory false `replay_launch_authorized`,
 `publication_authorized` and `r2_mutations` fields. Output must be a direct
 `proof-*.json` member of the precreated root-private directory
@@ -71,7 +71,7 @@ window, writing a proof or consuming cadence. Its success explicitly does not
 establish finalization. Keep this as a dormant preparation until the event;
 preflight never authorizes running a finalization claim while replay continues.
 
-For this exact epoch198 origin only, a pipeline status plan may explicitly set
+For this exact epoch 198 origin only, a pipeline status plan may explicitly set
 `receipt_directory_uid: 1001` with
 `receipt_directory: /home/sol/.jetstreamer-private/r2-status-receipts`.
 That preserves the existing shared publication history used by the fleet and
@@ -86,7 +86,7 @@ override.
 
 `observe-handoff-198` is a separate read-only command using
 `jetstreamer-epoch198-controller-handoff-observation-plan-v1` and the same strict
-plan fields,1800second bound, private output namespace, running-binary self-hash
+plan fields, 1800 second bound, private output namespace, running-binary self-hash
 and no-clobber fsync protocol. It emits
 `jetstreamer-epoch198-controller-handoff-observation-v1` with phase
 `controller-import-handoff`; it cannot be invoked with a producer-finalization
@@ -95,15 +95,15 @@ parent/manifest/controller script and sealed controller-recovery receipt. It
 reads no terminal events and claims no actual handoff.
 
 Actual observation accepts only controller02c5ac25/PID2939002 and the complete
-deployed argv digest, script62592209 and state configuration0929b892. The original
+deployed argv digest, script 62592209 and state configuration 0929b892. The original
 e5612ef0producer must remain loaded with authoritative clean terminal success,
-exit0, zero restarts and no process. A collected/missing unit is not clean
+exit 0, zero restarts and no process. A collected/missing unit is not clean
 terminal proof for this profile. The state must retain exactly lane-a/198/attempt1
 and the original producer PID/start identity, phase `producer` or `staged`, no
 failure/source recovery, null import owner and no importer. The four unique
 canonical original-producer events remain mandatory.
 
-The exact closed source archive must now be the singly linked regular UID1001
+The exact closed source archive must now be the singly linked regular UID 1001
 `lane-a/output/epoch-198.jet`, match the actual archive-close byte count, and
 retain its file identity/mtime/ctime through capture. Controller, producer and
 root-private state must also remain unchanged. A move, active importer, new
@@ -114,11 +114,11 @@ producer events, source archive identity, complete state, immutable digests and
 sealed recovery binding; its original start clock is never reset to controller
 restart time.
 
-The fleet and pipeline binding validators have a separate exact198 handoff
-allowlist;216–219 remain unchanged. All source and synthetic tests still need
+The fleet and pipeline binding validators have a separate exact 198 handoff
+allowlist; 216–219 remain unchanged. All source and synthetic tests still need
 immutable sealing, actual-host preflight, and coordinated model/observer/fleet/
 status integration before any live phase adoption. In particular, the earlier
-routine198 helper that accepts only active producer-finalization proofs must
+routine 198 helper that accepts only active producer-finalization proofs must
 not consume this new proof until its distinct schema, owner and archive-path
 transition are separately qualified. The actual serialized importer remains a
 different dynamically authenticated `local-publication` phase, never a guessed
@@ -143,8 +143,8 @@ pipeline publication and final fleet use the pending controller with status phas
 `publication`, not a live producer or replay countdown. The existing close-based
 43,200-second downstream deadline is neither restarted nor extended at handoff.
 
-When epoch157's verification-pause profile is also present, retain its qualified
-superset reader/publisher; do not downgrade to a writer that cannot retain157 in
+When epoch 157's verification-pause profile is also present, retain its qualified
+superset reader/publisher; do not downgrade to a writer that cannot retain 157 in
 the full fleet. Source/tests alone do not activate either stage: fresh actual
 proof, sealed helper and plans, check-only qualification and normal timer
 handoff remain required. An active importer is a separate authenticated route.

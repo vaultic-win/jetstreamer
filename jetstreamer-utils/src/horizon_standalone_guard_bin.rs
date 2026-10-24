@@ -614,7 +614,7 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
-    // Only the separately admitted203 native comparator may use this namespace.
+    // Only the separately admitted 203 native comparator may use this namespace.
     // Do not extend this to arbitrary native units or bounded-stop exemptions.
     plan.unit == "horizon-native-203-0158-v1.service"
         && plan.worker_root

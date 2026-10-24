@@ -7,7 +7,7 @@ terminal capture. Preparation artifacts alone remain insufficient for launch.
 This is dormant preparation for the independent singleton described in
 [epochs209–212](epochs209-212-singleton-qualification.md). It does not qualify a
 Bank, launch replay, promote a runtime, or authorize publication. Keep epoch
-207's root-MD5 blocker open. Existing healthy full209 work remains unchanged.
+207's root-MD5 blocker open. Existing healthy full 209 work remains unchanged.
 
 | Binding | Exact value |
 | --- | --- |
@@ -27,7 +27,7 @@ Bank, launch replay, promote a runtime, or authorize publication. Keep epoch
 
 ## Actual preparation evidence
 
-The sealed singleton metadata preparer produced the exact epoch210 report in
+The sealed singleton metadata preparer produced the exact epoch 210 report in
 `/var/lib/jetstreamer/horizon-singleton-210-nativeprep-v1/`. The sealed node's
 actual `--singleton-preflight` CLI then passed offline with networking disabled.
 The checked-in fixture is the captured stdout, not a synthesized success:
@@ -55,7 +55,7 @@ exact single-link immutable snapshot and genesis, rehashes their bodies, restore
 the bootstrap, freezes its canonical accounts commitment, and requires zero
 bootstrap writes and unchanged cursor, transaction count, capitalization,
 last blockhash and tick height. It emits an epoch210-specific marker. Existing
-ordinary worker runtime semantics and the epoch209 harness are unchanged.
+ordinary worker runtime semantics and the epoch 209 harness are unchanged.
 
 ## Dormant deployment
 
@@ -74,7 +74,7 @@ intended for `/etc/systemd/system/` under that exact unit name. Preparation does
 not install, enable or start it. Do not substitute an ephemeral `systemd-run`
 unit: terminal capture needs the original PID1 invocation properties and journal
 after exit. Do not use `RemainAfterExit`, which changes the expected terminal
-shape. Precreate its empty owner0700 run root and scratch for the admission
+shape. Precreate its empty owner 0700 run root and scratch for the admission
 checks; do not start the unit before admission succeeds.
 
 The unit requests 112 GiB high/128 GiB hard memory, no swap, eight CPUs, 512 tasks,
@@ -90,7 +90,7 @@ PREPARER SPEC --spec-sha256 SPEC_SHA --self-sha256 PREPARER_SHA
 Its immutable root-owned spec uses schema
 `jetstreamer-private-epoch210-native-preparation-spec-v1`, bound-file objects
 `harness`, `guard`, `singleton_preflight` (each `path` and `sha256`), and a fresh
-precreated root0700 `output_directory` named
+precreated root 0700 `output_directory` named
 `/var/lib/jetstreamer/horizon-native210-preparation-UNIQUE`.
 The guard must be separately sealed under
 `/var/lib/jetstreamer/horizon-210-native-main-guard-v1/`.
@@ -104,22 +104,22 @@ replay, runtime-promotion and publication authority remains false.
 
 1. Add an epoch210-specific admission, running capture, terminal capture,
    central fleet origin and status path. Bind these exact new artifacts and
-   plan; never copy epoch209 proof or assume closed epoch228 commands authorize
+   plan; never copy epoch 209 proof or assume closed epoch 228 commands authorize
    210. Until those profiles exist this preparation is not launchable.
 2. Reuse one accepted coordinated sample, with current owner/free/cgroup race
    checks, to census every actual replay and auxiliary, including healthy
-   full209, full227, 204/205/225 and any native228 or other new owner. Reserve
+   full 209, full 227, 204/205/225 and any native 228 or other new owner. Reserve
    their remaining whole-root growth and hard memory growth. Preserve the
    largest bound guard minimum-free baseline, current century floor and all
    remaining reservations. No capacity claim follows from this document.
 3. Keep the installed persistent file inactive until admission succeeds. Bind original PID1
    invocation/MainPID and prove the guard's first actual sandboxed no-trip
    fire. Register the exact origin promptly through an authenticated lifecycle
-   event that permits the epoch210 blocked-qualification transition. Publish
+   event that permits the epoch 210 blocked-qualification transition. Publish
    `verification` status with the original start time through that lifecycle.
    Keep the single 1800-second observation cadence; no separate poll loop.
 4. Preserve the original journal and PID1 properties. A typed terminal proof
-   must check exact epoch210 marker, one successful native test, canonical
+   must check exact epoch 210 marker, one successful native test, canonical
    bootstrap commitment, zero entries/writes and PID1 success. Capture that
    evidence before any unit collection; retire only the owned status through
    the authenticated inactive-status protocol.
@@ -127,10 +127,10 @@ replay, runtime-promotion and publication authority remains false.
 The source integration points are `jetstreamer-r2/src/main.rs`, the exact
 profiles under `src/fleet/native209*` and `native228*`,
 `src/pipeline_status/native_input.rs`, and `src/inactive_status/`.
-For current full209 accounting inspect `native228_full209::{split,memory}` and
+For current full 209 accounting inspect `native228_full209::{split,memory}` and
 `native228_peer209::{disk,memory}`. The composing `native228_admission` helpers
-are private and its admission is closed to epoch228; reuse requires a reviewed
-epoch210 profile or scoped factoring, not passing epoch210 through a 228 command.
+are private and its admission is closed to epoch 228; reuse requires a reviewed
+epoch 210 profile or scoped factoring, not passing epoch 210 through a 228 command.
 
 ## Full singleton and delivery gates
 

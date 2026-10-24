@@ -27,7 +27,7 @@ fn calibration() -> Result<(Bound, u64)> {
             && v["estimate"]["publication_to_sidecar_millis"] == 4979863
             && v["publication_authorized"] == false
             && v["r2_mutations"] == false,
-        "publication144 calibration changed"
+        "publication 144 calibration changed"
     );
     Ok((b, 4979863))
 }
@@ -120,12 +120,12 @@ pub(crate) fn publish_using(
         .collect();
     if found.is_empty() {
         return Ok(
-            json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No active exact144 local publisher; reconcile terminal/upload stage promptly, no replay ETA invented"}),
+            json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No active exact 144 local publisher; reconcile terminal/upload stage promptly, no replay ETA invented"}),
         );
     }
     ensure!(
         found.len() == 1 && found[0]["unit"]["Id"] == UNIT,
-        "unexpected or overlapping144publisher"
+        "unexpected or overlapping 144publisher"
     );
     let u = &found[0]["unit"];
     let launch = bound_json(&profile.launch, true)?;
@@ -148,7 +148,7 @@ pub(crate) fn publish_using(
     let model = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":144,"phase":"publication",
         "binding":{"unit":UNIT,"invocation_id":u["InvocationID"],"expected_exec_start":u["ExecStart"],"claim_phase":"local-publication","origin_unit":UNIT,"origin_invocation_id":u["InvocationID"],"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},
         "observer":observer,"fleet":provisional,"origin_launch":profile.launch,"estimate_evidence":[calibration,profile.launch],
-        "estimate_basis":"Exact198 hash/upload/readback calibration scaled by complete144/198 bytes, three independent import pass allowances plus separate R2 hash/upload/readback/source-revalidation/sidecar and10min dispatch. Deadline anchored once to the exact144 canonical-artifact publisher manager start, no countdown reset.",
+        "estimate_basis":"Exact 198 hash/upload/readback calibration scaled by complete 144/198 bytes, three independent import pass allowances plus separate R2 hash/upload/readback/source-revalidation/sidecar and 10min dispatch. Deadline anchored once to the exact 144 canonical-artifact publisher manager start, no countdown reset.",
         "estimated_remaining_millis":eta,"jet_path":SOURCE,"expected_jet_size_bytes":LENGTH,"peer_units":[],
         "receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
     let package =
@@ -224,7 +224,7 @@ fn validate_publication(sample: &str, model: &Bound, v: &Value, r: &Value) -> Re
             && r["pipeline_binding"]["model_path"].as_str() == model.path.to_str()
             && r["pipeline_binding"]["model_sha256"] == model.sha256
             && r["authenticated_readback"] == true,
-        "publication144 status receipt differs from exact model"
+        "publication 144 status receipt differs from exact model"
     );
     Ok(())
 }
@@ -243,7 +243,7 @@ pub(crate) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     if d["publication_skipped"] == true {
         ensure!(
             d["publication"].is_null() && d["reason"].as_str().is_some_and(|s| !s.is_empty()),
-            "skipped144status invented publication"
+            "skipped 144status invented publication"
         );
         return Ok(());
     }

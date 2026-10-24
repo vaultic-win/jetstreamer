@@ -166,10 +166,10 @@ fn sample(
         .context("228 diagnostic census")?
     {
         if diagnostic["producer_unit"] == native209::UNIT && terminal209.is_some() {
-            let proof = terminal209.context("228 terminal209 proof")?;
+            let proof = terminal209.context("228 terminal 209 proof")?;
             let iid = proof["invocation_id"]
                 .as_str()
-                .context("228 terminal209 IID")?;
+                .context("228 terminal 209 IID")?;
             native209_terminal::terminal_shape(&f["unit_census"][native209::UNIT], iid)?;
             ensure!(
                 !f["active"]
@@ -187,7 +187,7 @@ fn sample(
                                 == iid
                             && diagnostic["observation"]["scratch_path"]
                                 == format!("{}/scratch", native209::ROOT))),
-                "228 obsolete native209 sample has no exact terminal owner"
+                "228 obsolete native 209 sample has no exact terminal owner"
             );
             continue;
         }
@@ -270,7 +270,7 @@ fn without_full209(f: &Value) -> Result<Value> {
     let mut reduced = f.clone();
     reduced["active"]
         .as_array_mut()
-        .context("228 derived209 memory census")?
+        .context("228 derived 209 memory census")?
         .retain(|r| {
             singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] != singleton209::UNIT)
         });
@@ -289,10 +289,10 @@ fn terminal209_current(current: &BTreeMap<String, Value>, proof: Option<&Value>)
         native209_terminal::terminal_shape(
             current
                 .get(native209::UNIT)
-                .context("228 terminal209 current owner omitted")?,
+                .context("228 terminal 209 current owner omitted")?,
             p["invocation_id"]
                 .as_str()
-                .context("228 terminal209 original IID")?,
+                .context("228 terminal 209 original IID")?,
         )?;
     }
     Ok(())
@@ -300,7 +300,7 @@ fn terminal209_current(current: &BTreeMap<String, Value>, proof: Option<&Value>)
 fn launchable_peers(terminal223: Option<&BoundFile>) -> Result<()> {
     ensure!(
         terminal223.is_none(),
-        "228 launch requires a fleet already reconciled past terminal223; capture/event carry-forward is not qualified"
+        "228 launch requires a fleet already reconciled past terminal 223; capture/event carry-forward is not qualified"
     );
     Ok(())
 }
@@ -310,7 +310,7 @@ pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     evidence.extend(rest);
     Ok((
         base.checked_add(extra)
-            .context("228 full209 memory overflow")?,
+            .context("228 full 209 memory overflow")?,
         evidence,
     ))
 }
@@ -327,7 +327,7 @@ pub(super) fn protected_growth(
     evidence.extend(rest);
     Ok((
         base.checked_add(extra)
-            .context("228 full209 disk overflow")?,
+            .context("228 full 209 disk overflow")?,
         evidence,
     ))
 }

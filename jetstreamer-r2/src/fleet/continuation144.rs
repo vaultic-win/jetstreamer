@@ -1,4 +1,4 @@
-//! Exact private144 suffix/assembly owner. Never ordinary replay or publication.
+//! Exact private 144 suffix/assembly owner. Never ordinary replay or publication.
 use super::*;
 use std::os::unix::{
     fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
@@ -63,7 +63,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             && canonical_digest(&r["continuation_plan"]["sha256"])
             && command_part(&r["expected_exec_start"])
                 == Some(command(r["continuation_plan"]["sha256"].as_str().unwrap_or("")).as_str()),
-        "private144 continuation launch scope differs"
+        "private 144 continuation launch scope differs"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -78,7 +78,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     ] {
         ensure!(
             r[flag] == false,
-            "private144 continuation launch grants forbidden authority:{flag}"
+            "private 144 continuation launch grants forbidden authority:{flag}"
         );
     }
     Ok(())
@@ -112,7 +112,7 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
                 .is_some_and(|n| n >= PROTECTED)
             && r["required_guard_minimum_free_bytes"] == a["required_guard_minimum_free_bytes"]
             && a["experimental_peak_guard_includes_other_fleet_allocations"] == true,
-        "private144 requires its exact full-path plan/admission"
+        "private 144 requires its exact full-path plan/admission"
     );
     for (name, digest) in [
         (
@@ -146,14 +146,14 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
     ] {
         ensure!(
             p[name]["sha256"] == digest,
-            "private144 input differs:{name}"
+            "private 144 input differs:{name}"
         );
     }
     ensure!(
         a["protection_release"] == p["protection_release"]
             && a["resource_policy"]["sha256"]
                 == "4656cb2058d49f222d3e4bd0522d6c8fc7f7710b4bf23d940d5bbb0dc3d46c0a",
-        "private144 protection/resource evidence differs"
+        "private 144 protection/resource evidence differs"
     );
     for flag in [
         "ordinary_replay_authorized",
@@ -164,7 +164,7 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
     ] {
         ensure!(
             a[flag] == false,
-            "private144 admission grants forbidden authority"
+            "private 144 admission grants forbidden authority"
         );
     }
     let admitted = a["recorded_unix_seconds"]
@@ -173,7 +173,7 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
     let launched = r["recorded_unix_seconds"].as_u64().context("launch time")?;
     ensure!(
         admitted <= launched && launched - admitted <= 900,
-        "private144 launched from stale/future admission"
+        "private 144 launched from stale/future admission"
     );
     Ok(())
 }
@@ -187,7 +187,7 @@ pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> 
             && current["ActiveState"] == "active"
             && current["SubState"] == "running"
             && command_part(&current["ExecStart"]) == command_part(&r["expected_exec_start"]),
-        "private144 continuation live owner differs"
+        "private 144 continuation live owner differs"
     );
     live_limits()?;
     terminal_ancestors()
@@ -201,7 +201,7 @@ fn terminal_ancestors() -> Result<()> {
             && native["SubState"] == "exited"
             && native["Result"] == "success"
             && native["ExecMainStatus"] == "0",
-        "private144 native checkpoint probe not clean terminal history"
+        "private 144 native checkpoint probe not clean terminal history"
     );
     crate::inactive_status::private144_terminal_manager_proof(&unit(
         "horizon-qualify-epoch144-loader-focus-20261016-v1.service",
@@ -214,7 +214,7 @@ fn terminal_ancestors() -> Result<()> {
             && audit["SubState"] == "exited"
             && audit["Result"] == "success"
             && audit["ExecMainStatus"] == "0",
-        "private144 prefix audit not clean terminal history"
+        "private 144 prefix audit not clean terminal history"
     );
     Ok(())
 }
@@ -224,12 +224,12 @@ fn live_limits() -> Result<()> {
 fn live_limits_for(name: &str) -> Result<()> {
     ensure!(
         name == UNIT || name == "horizon-continuation144-limits-fixture-20261022-v1.service",
-        "foreign private144 limits fixture"
+        "foreign private 144 limits fixture"
     );
     let out=ProcessCommand::new("systemctl").args(["show",name,"--no-pager","--property=Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,PrivateMounts,NoNewPrivileges,ReadWritePaths,User,Group,UMask,CapabilityBoundingSet,AmbientCapabilities,Environment"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 16384,
-        "private144 limits unreadable"
+        "private 144 limits unreadable"
     );
     let mut limits = BTreeMap::new();
     for line in std::str::from_utf8(&out.stdout)?.lines() {
@@ -261,7 +261,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
         ("CapabilityBoundingSet", ""),
         ("AmbientCapabilities", ""),
     ] {
-        ensure!(l.get(k) == Some(&v), "private144 sandbox differs:{k}");
+        ensure!(l.get(k) == Some(&v), "private 144 sandbox differs:{k}");
     }
     let rw: BTreeSet<_> = l
         .get("ReadWritePaths")
@@ -273,7 +273,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
             ROOT,
             "/home/sol/.jetstreamer-private/checkpoint-continuation-144.lock"
         ]),
-        "private144 writable scope differs"
+        "private 144 writable scope differs"
     );
     let env: BTreeSet<_> = l
         .get("Environment")
@@ -290,7 +290,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
             "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1",
             "JETSTREAMER_HISTORICAL_WORKER_V1_4_25=/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-historical-worker-v1-4-25"
         ]),
-        "private144 environment differs from measured native and exact worker"
+        "private 144 environment differs from measured native and exact worker"
     );
     Ok(())
 }
@@ -299,7 +299,7 @@ const STATE: &str = "/var/lib/jetstreamer/horizon-continuation144-launch-2026102
 pub(super) fn sealed_self(expected: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
-        "continuation144 preparation requires root"
+        "continuation 144 preparation requires root"
     );
     let path = fs::read_link("/proc/self/exe")?;
     let m = fs::symlink_metadata(path)?;
@@ -309,7 +309,7 @@ pub(super) fn sealed_self(expected: &str) -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == expected,
-        "unsealed continuation144 preparer"
+        "unsealed continuation 144 preparer"
     );
     Ok(())
 }
@@ -342,14 +342,14 @@ pub(super) fn prepare_layout() -> Result<()> {
     let owner = unit(UNIT)?;
     ensure!(
         owner["MainPID"] == "0" && owner["ActiveState"] == "inactive" && owner["NRestarts"] == "0",
-        "private144 layout owner already live or failed"
+        "private 144 layout owner already live or failed"
     );
     validate_output_destination(&Path::new(STATE).join("layout.json"))?;
     let base = Path::new(ROOT).parent().unwrap();
     let m = fs::symlink_metadata(base)?;
     ensure!(
         base.canonicalize()? == base && m.is_dir() && m.uid() == 1001 && m.mode() & 0o077 == 0,
-        "unsafe private144 parent"
+        "unsafe private 144 parent"
     );
     let group = unsafe { libc::getgrnam(c"horizon".as_ptr()) };
     ensure!(!group.is_null(), "horizon group missing");
@@ -362,7 +362,7 @@ pub(super) fn prepare_layout() -> Result<()> {
                 .open(ROOT)?;
             ensure!(
                 unsafe { libc::fchown(dir.as_raw_fd(), 1001, gid) } == 0,
-                "private144 root chown failed"
+                "private 144 root chown failed"
             );
             dir.sync_all()?;
             File::open(base)?.sync_all()?;
@@ -378,7 +378,7 @@ pub(super) fn prepare_layout() -> Result<()> {
             && m.gid() == gid
             && m.mode() & 0o077 == 0
             && fs::read_dir(ROOT)?.next().is_none(),
-        "private144 root occupied or unsafe; preserve existing work"
+        "private 144 root occupied or unsafe; preserve existing work"
     );
     let lease = base.join("checkpoint-continuation-144.lock");
     let file = match std::fs::OpenOptions::new()
@@ -393,7 +393,7 @@ pub(super) fn prepare_layout() -> Result<()> {
             file.set_permissions(fs::Permissions::from_mode(0o600))?;
             ensure!(
                 unsafe { libc::fchown(file.as_raw_fd(), 1001, gid) } == 0,
-                "private144 lease chown failed"
+                "private 144 lease chown failed"
             );
             file.sync_all()?;
             File::open(base)?.sync_all()?;
@@ -416,11 +416,11 @@ pub(super) fn prepare_layout() -> Result<()> {
             && lm.gid() == gid
             && lm.mode() & 0o777 == 0o600
             && unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "private144 lease occupied or unsafe"
+        "private 144 lease occupied or unsafe"
     );
     ensure!(
         unit(UNIT)? == owner,
-        "private144 owner changed during layout preparation"
+        "private 144 owner changed during layout preparation"
     );
     private157::immutable_receipt(
         &Path::new(STATE).join("layout.json"),
@@ -456,13 +456,13 @@ pub(super) fn capture_launch() -> Result<()> {
     let sm = fs::symlink_metadata(&sb.path)?;
     ensure!(
         sm.is_file() && sm.uid() == 0 && sm.nlink() == 1 && sm.mode() & 0o222 == 0,
-        "unsealed private144 capture spec"
+        "unsealed private 144 capture spec"
     );
     let s: CaptureSpec = serde_json::from_value(bound_json(&sb)?)?;
     ensure!(
         s.schema == "jetstreamer-private144-launch-capture-spec-v2"
             && s.continuation_plan.path == Path::new(PLAN),
-        "foreign private144 capture"
+        "foreign private 144 capture"
     );
     let a = bound_json(&s.admission)?;
     let o = bound_json(&s.observer)?;
@@ -474,7 +474,7 @@ pub(super) fn capture_launch() -> Result<()> {
             && f["observer_sha256"] == s.observer.sha256
             && f["first_epoch"] == 101
             && f["last_epoch"] == 200,
-        "private144 capture predecessor differs"
+        "private 144 capture predecessor differs"
     );
     let before = unit(UNIT)?;
     let iid = before["InvocationID"]
@@ -523,11 +523,11 @@ pub(super) fn capture_launch() -> Result<()> {
                 .as_str()
                 .and_then(|p| p.parse::<u32>().ok())
                 .is_some_and(|p| p > 0),
-        "private144 producer not bound live"
+        "private 144 producer not bound live"
     );
     ensure!(
         unit(UNIT)? == before,
-        "private144 owner changed during capture"
+        "private 144 owner changed during capture"
     );
     private157::immutable_receipt(&Path::new(STATE).join("launch.json"), &r)?;
     let guard_source = Path::new(STATE).join("guard-plan.json");

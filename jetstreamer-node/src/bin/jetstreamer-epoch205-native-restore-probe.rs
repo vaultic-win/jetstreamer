@@ -1,8 +1,8 @@
-//! Private fixed epoch205 restore-only comparator; no replay or publication.
+//! Private fixed epoch 205 restore-only comparator; no replay or publication.
 mod profile {
     pub(super) const EPOCH: u64 = 205;
-    // Preserve205's prior closed expectation until its own real prefix/reader
-    // inputs are qualified; never infer its producer identity from203 evidence.
+    // Preserve 205's prior closed expectation until its own real prefix/reader
+    // inputs are qualified; never infer its producer identity from 203 evidence.
     pub(super) const GENERATION_PROFILE: &str = "jetstreamer-node/historical-replay-v1";
     pub(super) const SLOT: u64 = 88_991_050;
     pub(super) const START: u64 = 88_560_000;

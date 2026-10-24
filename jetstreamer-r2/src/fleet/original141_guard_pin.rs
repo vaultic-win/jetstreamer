@@ -47,7 +47,7 @@ fn raw_clock(object: &str, interface: &str, property: &str) -> Result<u64> {
     let value = std::str::from_utf8(&out.stdout)?
         .trim()
         .strip_prefix("t ")
-        .context("systemd clock is not uint64")?
+        .context("systemd clock is not uint 64")?
         .parse::<u64>()?;
     ensure!(value > 0, "systemd clock has not fired");
     Ok(value)
@@ -227,7 +227,7 @@ pub(super) fn pin(
         "Id,ActiveState,SubState,Unit,LastTriggerUSecMonotonic",
     )?;
     // Timer timestamps are human durations in systemctl output. Preserve the
-    // real uint64 D-Bus value rather than interpreting display formatting.
+    // real uint 64 D-Bus value rather than interpreting display formatting.
     timer.insert(
         "LastTriggerUSecMonotonic".into(),
         raw_clock(

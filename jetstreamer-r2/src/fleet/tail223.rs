@@ -109,7 +109,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
             && v["terminal_slot"] == 96_767_999u64
             && v["slot_count"] == 477
             && v["tail_comparison_only"] == true,
-        "tail223 capability differs from the exact private package"
+        "tail 223 capability differs from the exact private package"
     );
     for key in [
         "complete_epoch_span_covered",
@@ -126,11 +126,11 @@ pub(super) fn capability(v: &Value) -> Result<()> {
     ] {
         ensure!(
             v[key] == false,
-            "tail223 capability grants foreign authority"
+            "tail 223 capability grants foreign authority"
         );
     }
-    let probes = v["probes"].as_array().context("tail223 probes")?;
-    ensure!(probes.len() == 4, "tail223 probe census");
+    let probes = v["probes"].as_array().context("tail 223 probes")?;
+    ensure!(probes.len() == 4, "tail 223 probe census");
     for (i, p) in probes.iter().enumerate() {
         ensure!(
             p["mode"] == json!(i)
@@ -141,7 +141,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
                         _ => 2,
                     }
                 && canonical_digest(&p["log_sha256"]),
-            "tail223 capability probe binding"
+            "tail 223 capability probe binding"
         );
     }
     planning_preflight(&probes[3]["planning_preflight"])?;
@@ -165,7 +165,7 @@ fn planning_preflight(v: &Value) -> Result<()> {
             && v["pre_worker_barrier_reached"] == true
             && v["worker_profile_validated"] == true
             && v["worker_executable"] == format!("{PACKAGE}/jetstreamer-historical-worker-v1-6-25"),
-        "tail223 post-bootstrap planning differs"
+        "tail 223 post-bootstrap planning differs"
     );
     for key in [
         "canonical_terminal_required",
@@ -186,7 +186,7 @@ fn planning_preflight(v: &Value) -> Result<()> {
     ] {
         ensure!(
             v[key] == false,
-            "tail223 planning grants foreign authority: {key}"
+            "tail 223 planning grants foreign authority: {key}"
         );
     }
     Ok(())

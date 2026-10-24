@@ -1,5 +1,5 @@
 //! Diagnostic binding of every exact SlotMeta/data-shred lookup to every target.
-//! Key layout: Solana893cc764 `ledger/src/blockstore_db.rs`, SHA-256
+//! Key layout: Solana 893cc764 `ledger/src/blockstore_db.rs`, SHA-256
 //! 7391732d9c41d09cdf4f1c9997c9ee37ccace9040aa5845249918084bcc0b046.
 //! These functions do not authenticate a native result, backup, clock or anchor.
 //! They never grant source completeness, runtime or publication authority.

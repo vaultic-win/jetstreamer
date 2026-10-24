@@ -1,4 +1,4 @@
-//! Public198 verification ownership and honest promotion of the partial20:18 cycle.
+//! Public 198 verification ownership and honest promotion of the partial 20:18 cycle.
 use super::*;
 pub(super) const READER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch198-public-watch-reader-20261021-v2/jetstreamer-r2";
@@ -263,7 +263,7 @@ pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
         is_101(p)?
             && p.sample_target_utc == "2026-10-21T21:28:00Z"
             && spec.sha256 == "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346",
-        "foreign native198 manager refresh"
+        "foreign native 198 manager refresh"
     );
     authenticate_named_service("horizon-native198-manager-refresh-20261021-v1.service")?;
     let mut copy: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
@@ -271,7 +271,7 @@ pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
     let profile = copy
         .public198_delivery
         .as_ref()
-        .context("native198 refresh profile")?;
+        .context("native 198 refresh profile")?;
     let root = Path::new("/var/lib/jetstreamer/horizon-epoch198-manager-refresh-20261021-v1");
     absent(root)?;
     fs::create_dir(root)?;
@@ -284,7 +284,7 @@ pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
         let output = Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,ExecStart,Type,Result,ControlGroup"]).output()?;
         ensure!(
             output.status.success() && output.stdout.len() < 16384,
-            "cannot refresh native198 manager properties"
+            "cannot refresh native 198 manager properties"
         );
         let mut fresh = serde_json::Map::new();
         for line in std::str::from_utf8(&output.stdout)?.lines() {
@@ -309,7 +309,7 @@ pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
         ] {
             ensure!(
                 fresh[key] == value["unit"][key],
-                "native198 {key} changed, not command metadata refresh"
+                "native 198 {key} changed, not command metadata refresh"
             );
         }
         let old_command = value["unit"]["ExecStart"]
@@ -318,7 +318,7 @@ pub(super) fn refresh_managers(p: &Plan, spec: &Bound) -> Result<()> {
         let new_command = fresh["ExecStart"].as_str().context("new refresh command")?;
         ensure!(
             manager_command_matches(old_command, new_command),
-            "native198 executable arguments or ignore-errors changed"
+            "native 198 executable arguments or ignore-errors changed"
         );
         value["unit"] = fresh.clone();
         value["claim"]["expected_exec_start"] = fresh["ExecStart"].clone();
@@ -346,14 +346,14 @@ struct NativeSpec {
 fn claims(profile: &Profile) -> Result<Vec<Value>> {
     ensure!(
         !profile.progressive_upload || profile.native_verification.len() == 2,
-        "progressive198 requires both native verification histories"
+        "progressive 198 requires both native verification histories"
     );
     if profile.native_verification.is_empty() {
         return Ok(profile.claims.clone());
     }
     ensure!(
         profile.native_verification.len() == 2,
-        "native198 must bind both stages"
+        "native 198 must bind both stages"
     );
     let mut claims = Vec::new();
     let mut phases = BTreeSet::new();
@@ -363,7 +363,7 @@ fn claims(profile: &Profile) -> Result<Vec<Value>> {
         let (suffix, expected_phase) = match claim["phase"].as_str() {
             Some("full-verification") => ("full", "full-verification"),
             Some("plugin-verification") => ("plugin", "plugin-verification"),
-            _ => anyhow::bail!("foreign native198 phase"),
+            _ => anyhow::bail!("foreign native 198 phase"),
         };
         let unit = format!("horizon-{suffix}-verify-198-native-20261021-v1.service");
         ensure!(
@@ -384,7 +384,7 @@ fn claims(profile: &Profile) -> Result<Vec<Value>> {
                 && receipt["publication_authorized"] == false
                 && receipt["r2_mutations"] == false
                 && phases.insert(expected_phase),
-            "invalid native198 launch proof"
+            "invalid native 198 launch proof"
         );
         let plan: Bound = serde_json::from_value(receipt["plan"].clone())?;
         let value = bound_json(&plan, true)?;
@@ -400,14 +400,14 @@ fn claims(profile: &Profile) -> Result<Vec<Value>> {
                 && value["archive_directory"] == "/home/sol/horizon"
                 && value["expected_archive_sha256"]
                     == "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb",
-            "native198 plan differs"
+            "native 198 plan differs"
         );
         ensure!(
             receipt["unit"]["ExecStart"]
                 .as_str()
                 .is_some_and(|s| s.starts_with(&command))
                 && receipt["admission_observer"] == value["admission_observer"],
-            "native198 executable or admission differs"
+            "native 198 executable or admission differs"
         );
         tool_ok(&Bound {
             path: NATIVE_RUNNER.into(),
@@ -416,7 +416,7 @@ fn claims(profile: &Profile) -> Result<Vec<Value>> {
         let mut claim = claim.clone();
         claim["evidence"]
             .as_array_mut()
-            .context("native198 evidence")?
+            .context("native 198 evidence")?
             .push(serde_json::to_value(b)?);
         claims.push(claim);
     }
@@ -434,7 +434,7 @@ fn upload_claim() -> Result<Value> {
             && value["new_wrapper_sha256"]
                 == "a0b1fba9a9e456532da9a73e121fd0b4eb7c3e7bc0c8923393b6b3d611419150"
             && value["publication_gate_weakened"] == false,
-        "progressive198 transition proof differs"
+        "progressive 198 transition proof differs"
     );
     Ok(
         json!({"epoch":198,"phase":"upload-readback","unit":UPLOAD_UNIT,
@@ -446,9 +446,12 @@ fn upload_claim() -> Result<Value> {
 pub(super) fn enable_upload(p: &mut Plan) -> Result<()> {
     ensure!(
         is_101(p)? && native(p) && refreshed(p) && !upload(p),
-        "foreign progressive198 migration"
+        "foreign progressive 198 migration"
     );
-    let profile = p.public198_delivery.as_mut().context("public198 profile")?;
+    let profile = p
+        .public198_delivery
+        .as_mut()
+        .context("public 198 profile")?;
     profile.progressive_upload = true;
     claims(profile)?;
     p.tools.r2 = Bound {
@@ -458,7 +461,7 @@ pub(super) fn enable_upload(p: &mut Plan) -> Result<()> {
     Ok(())
 }
 
-/// One exact phase-handoff publication from the genuine22:28 sample. It neither
+/// One exact phase-handoff publication from the genuine 22:28 sample. It neither
 /// resamples resources nor changes the canonical fleet/completion predecessor.
 pub(super) fn upload_event(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
     ensure!(
@@ -468,19 +471,19 @@ pub(super) fn upload_event(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
             && !upload(p)
             && p.sample_target_utc == "2026-10-21T22:28:00Z"
             && pb.sha256 == "edfb8a1d48ea2b407f507dbb683051c393259d2410e8d40cb9c0f41cb5737e9d",
-        "foreign progressive198 status event"
+        "foreign progressive 198 status event"
     );
     let endpoint = env::var("HORIZON_S3_ENDPOINT").context("storage endpoint missing")?;
     ensure!(
         sha(endpoint.as_bytes()) == p.endpoint_sha256 && p.bucket == BUCKET,
-        "progressive198 event endpoint differs"
+        "progressive 198 event endpoint differs"
     );
     let invocation =
         authenticate_named_service("horizon-progressive198-status-handoff-20261021-v1.service")?;
     let cb = file(p.cycle_directory.join("completion.json"), false)?;
     ensure!(
         cb.sha256 == "e9da9593602ade6ff16e72cb9122bcdafc5424d8ceb3886a2b3c02a0f098a805",
-        "progressive198 accepted completion differs"
+        "progressive 198 accepted completion differs"
     );
     let completion = bound_json(&cb, false)?;
     next_preparation::completion_bindings(p, pb, &completion)?;
@@ -493,7 +496,7 @@ pub(super) fn upload_event(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
             && sample["recorded_at_utc"] == p.sample_target_utc
             && seconds <= now
             && now - seconds <= 1800,
-        "progressive198 resource sample expired"
+        "progressive 198 resource sample expired"
     );
     let source: Bound = serde_json::from_value(completion["fleet_plan"].clone())?;
     let mut fleet = bound_json(&source, true)?;
@@ -524,7 +527,7 @@ pub(super) fn upload_event(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
     let result = publish(&event, &fleet, &observer)?;
     ensure!(
         result["publication_skipped"] != true && !result["publication"].is_null(),
-        "progressive198 status event did not publish; preserve partial evidence"
+        "progressive 198 status event did not publish; preserve partial evidence"
     );
     write_new(
         &event.cycle_directory.join("completion.json"),
@@ -543,15 +546,15 @@ pub(super) fn enable_native(p: &mut Plan, spec: &Bound) -> Result<()> {
         value.schema == "horizon-native198-verification-handoff-v1"
             && !value.publication_authorized
             && !value.r2_mutations,
-        "foreign native198 handoff"
+        "foreign native 198 handoff"
     );
     let profile = p
         .public198_delivery
         .as_mut()
-        .context("native198 requires prior public handoff")?;
+        .context("native 198 requires prior public handoff")?;
     ensure!(
         profile.native_verification.is_empty(),
-        "native198 already migrated"
+        "native 198 already migrated"
     );
     profile.native_verification = value.launches;
     claims(profile)?;
@@ -578,7 +581,7 @@ fn event_scope(
                 "89b55302366b2e027dd98a83a690f061f66e4ba0f3b065aa7bfc6e894ff12346"
                     | "f3a42392d656d183353461f4216d912f49e5a0613bbdf01e825e9c650f5a92f6"
             ),
-        "foreign native198 status event"
+        "foreign native 198 status event"
     );
     Ok(())
 }
@@ -590,7 +593,7 @@ fn event_phase_clock(launched: u64, sampled: u64) -> Result<()> {
     Ok(())
 }
 pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -> Result<()> {
-    ensure!(is_101(p)?, "foreign native198 campaign");
+    ensure!(is_101(p)?, "foreign native 198 campaign");
     event_scope(
         &p.sample_target_utc,
         &pb.sha256,
@@ -613,7 +616,7 @@ pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -
     let cb = file(p.cycle_directory.join("completion.json"), false)?;
     ensure!(
         cb.sha256 == "8e26cd0f9975f2978a57baff0b1641e96f4c58eae3af45c4b3e43daaf6969fb4",
-        "accepted21:28 completion differs"
+        "accepted 21:28 completion differs"
     );
     let completion = bound_json(&cb, false)?;
     next_preparation::completion_bindings(p, pb, &completion)?;
@@ -663,7 +666,7 @@ pub(super) fn native_event(p: &Plan, pb: &Bound, spec: &Bound, self_sha: &str) -
     let result = publish(&event, &fleet, &observer)?;
     ensure!(
         result["publication_skipped"] != true && !result["publication"].is_null(),
-        "native198 status event did not publish; preserve partial evidence"
+        "native 198 status event did not publish; preserve partial evidence"
     );
     write_new(
         &event.cycle_directory.join("completion.json"),
@@ -720,7 +723,7 @@ pub(super) fn promoted(p: &Plan, c: &Value) -> Result<bool> {
             && c["fleet_plan"]["path"]
                 == json!(Path::new(ROOT).join("delivery198-stage/sealed/fleet-plan.json"))
             && c["epoch198_delivery"].is_null(),
-        "foreign partial198 promotion"
+        "foreign partial 198 promotion"
     );
     let value = bound_json(&bound, false)?;
     ensure!(
@@ -729,7 +732,7 @@ pub(super) fn promoted(p: &Plan, c: &Value) -> Result<bool> {
                 == "a875e052381e1fdf0aee6e1e847649a0c99b808f77a27e20937e895a303f3e03"
             && value["new_resource_samples"] == 0
             && value["archive_mutations"] == false,
-        "invalid198 promotion proof"
+        "invalid 198 promotion proof"
     );
     Ok(true)
 }
@@ -815,14 +818,14 @@ fn fold(fleet: &mut Value, profile: &Profile) -> Result<()> {
     for claim in &claims {
         let units = fleet["tracked_units"]
             .as_array_mut()
-            .context("native198 tracked units")?;
+            .context("native 198 tracked units")?;
         if !units.contains(&claim["unit"]) {
             units.push(claim["unit"].clone());
         }
     }
     fleet["gates"]["198"]["state"] = json!("post-replay-pipeline");
     fleet["gates"]["198"]["next_action"] = json!(
-        "Imported198 is public locally; authenticate real198 full/plugin watcher children, publish verification ETA when active, preserve original43200second downstream deadline and receipt-gated R2 publication. Inactive stages must not retain a live countdown."
+        "Imported 198 is public locally; authenticate real 198 full/plugin watcher children, publish verification ETA when active, preserve original 43200 second downstream deadline and receipt-gated R2 publication. Inactive stages must not retain a live countdown."
     );
     let evidence = fleet["gates"]["198"]["evidence"]
         .as_array_mut()
@@ -848,7 +851,7 @@ pub(super) fn promote(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
     ensure!(
         p.cycle_directory == Path::new(ROOT)
             && pb.sha256 == "5820b69150677bd27c3a2dc18d8d101332c556b3e3078bd37281d409ee7e4014",
-        "foreign198 promotion"
+        "foreign 198 promotion"
     );
     let invocation =
         authenticate_named_service("horizon-public198-promote-partial2018-20261021-v3.service")?;
@@ -1060,7 +1063,7 @@ pub(super) fn publish_sealed(
         });
     let Some(owner) = owner else {
         return Ok(
-            json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No authenticated current198 verifier child; stage transition/status cleanup requires prompt reconciliation"}),
+            json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No authenticated current 198 verifier child; stage transition/status cleanup requires prompt reconciliation"}),
         );
     };
     let unit = &owner["unit"];
@@ -1079,7 +1082,7 @@ pub(super) fn publish_sealed(
     } else {
         "verification"
     };
-    let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":198,"phase":phase,"binding":{"unit":unit["Id"],"invocation_id":unit["InvocationID"],"expected_exec_start":unit["ExecStart"],"claim_phase":owner["phase"],"origin_unit":ORIGIN,"origin_invocation_id":IID,"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},"observer":observer,"fleet":provisional,"origin_launch":profile.origin,"estimate_evidence":[profile.promotion],"estimate_basis":"Actual198 verifier or exact progressive upload/readback child, original producer clock, original archive close plus43200seconds through sidecar; no allowance reset","estimated_remaining_millis":remaining,"jet_path":"/home/sol/horizon/epoch-198.jet","expected_jet_size_bytes":99381250591u64,"peer_units":[],"receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
+    let value = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":198,"phase":phase,"binding":{"unit":unit["Id"],"invocation_id":unit["InvocationID"],"expected_exec_start":unit["ExecStart"],"claim_phase":owner["phase"],"origin_unit":ORIGIN,"origin_invocation_id":IID,"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},"observer":observer,"fleet":provisional,"origin_launch":profile.origin,"estimate_evidence":[profile.promotion],"estimate_basis":"Actual 198 verifier or exact progressive upload/readback child, original producer clock, original archive close plus 43200 seconds through sidecar; no allowance reset","estimated_remaining_millis":remaining,"jet_path":"/home/sol/horizon/epoch-198.jet","expected_jet_size_bytes":99381250591u64,"peer_units":[],"receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
     let package =
         delivery198::seal_values(p, "public198-status", &[("pipeline-plan.json", value)])?;
     let plan = file(package.join("pipeline-plan.json"), true)?;

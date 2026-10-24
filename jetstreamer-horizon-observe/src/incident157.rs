@@ -1,4 +1,4 @@
-//! Exact read-only capture of the collected157 missing-terminal incident.
+//! Exact read-only capture of the collected 157 missing-terminal incident.
 //! No service changes, replay, resource sample, deletion, or network access.
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -55,7 +55,7 @@ fn stable(path: &Path, private: bool) -> Result<Vec<u8>> {
             m.ctime_nsec(),
         )
     };
-    ensure!(id(&a) == id(&c) && id(&a) == id(&d), "157input changed");
+    ensure!(id(&a) == id(&c) && id(&a) == id(&d), "157 input changed");
     Ok(b)
 }
 fn unit(name: &str) -> Result<Value> {
@@ -131,7 +131,7 @@ fn validate(
             && hashes
                 .contains("snapshot-68255828-AVreSVPd46H4WiihQ2pFUcRExPRQwL1MxhzQHVGky8bH.tar.bz2")
             && !hashes.contains("snapshot-68255999-"),
-        "157checkpoint input differs"
+        "157 checkpoint input differs"
     );
     Ok(())
 }
@@ -146,7 +146,7 @@ fn run() -> Result<()> {
         "157collector self hash differs"
     );
     let output = Path::new(&args[1]);
-    let parent = output.parent().context("157output parent")?;
+    let parent = output.parent().context("157 output parent")?;
     let m = fs::symlink_metadata(parent)?;
     ensure!(
         output.is_absolute()
@@ -155,7 +155,7 @@ fn run() -> Result<()> {
             && m.uid() == 0
             && m.mode() & 0o077 == 0
             && !output.try_exists()?,
-        "unsafe or occupied157destination"
+        "unsafe or occupied 157destination"
     );
     let state = stable(Path::new(STATE), true)?;
     let hashes = stable(Path::new(HASHES), false)?;

@@ -1,4 +1,4 @@
-//! Finish only the failed20:18 metadata transaction; never resample or replay.
+//! Finish only the failed 20:18 metadata transaction; never resample or replay.
 use super::*;
 const UNIT: &str = "horizon-routine-recover-delivery198-2018-20261021-v1.service";
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
@@ -17,7 +17,7 @@ fn scope(p: &Plan, pb: &Bound) -> Result<()> {
                 == Path::new(
                     "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T201800Z-delivery198-completed144-v1"
                 ),
-        "foreign198 failed-cycle recovery"
+        "foreign 198 failed-cycle recovery"
     );
     Ok(())
 }

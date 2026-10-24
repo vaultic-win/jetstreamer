@@ -157,7 +157,7 @@ fn validate_service(text: &str, p: &Plan, inv: &str, pid: u32) -> Result<()> {
         // A fixed setpriv exec wrapper clears NSS supplementary groups and
         // the bounding set before this process starts. systemd User=1000
         // alone would retain ubuntu's sudo/lxd groups. This process itself
-        // must independently prove UID/GID1000 and all five capability sets0.
+        // must independently prove UID/GID1000 and all five capability sets 0.
         ("User", "root"),
         ("Group", "root"),
         ("SupplementaryGroups", ""),

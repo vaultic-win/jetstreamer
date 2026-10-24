@@ -99,7 +99,7 @@ a large job restore fits; ordinary restoration still needs its complete-growth
 admission and artifact-specific retirement/restoration gates remain separate.
 
 `holding-inspect136` is a read-only source inspection for the exact retained
-99,718,944,924-byte failed epoch136 partial. Its plan schema is
+99,718,944,924-byte failed epoch 136 partial. Its plan schema is
 `jetstreamer-horizon-holding-inspect136-plan-v2`, with only `mapping`, `terminal`
 and `qualification` bindings. Source path, original device/inode, size, owner,
 mode and failure lineage are compiled into the tool. It requires the original
@@ -112,11 +112,11 @@ credentials or R2 requests, copies no source bytes and cannot remove the prefix.
 The receipt deliberately retains `local_retirement_authorized: false` and
 requires separate staged-reference and retirement review. Feed only this
 separately sealed eligibility proof to the ordinary no-clobber holding park
-operation; neither inspection nor backup repairs epoch136 or qualifies it for
+operation; neither inspection nor backup repairs epoch 136 or qualifies it for
 canonical publication or job resume.
 
 `holding-disable136-retry` retires only the configuration of the already-stopped
-original136–147 controller. Its plan schema is
+original 136–147 controller. Its plan schema is
 `jetstreamer-horizon-holding-disable136-retry-plan-v2`, with `mapping`, `terminal`,
 `qualification` and `archived_unit` bindings. It requires the exact original
 failure lineage, no live/restarted owner or relaunch/handoff trigger, and the
@@ -133,7 +133,7 @@ exchange, and records the exchanged original inode before removing that temporar
 configuration. It rejects differing bytes, conflicting retained/partial copies or
 an unexplained mask. A durable completion records that the original bytes were
 retained but the original inode was not. It neither signals a
-producer nor removes replay data, changes active service limits or repairs136.
+producer nor removes replay data, changes active service limits or repairs 136.
 
 Run this only in its separate root sandbox with write access to that exact
 receipt/configuration-retention directory, the holding state lock, and
@@ -157,16 +157,16 @@ There are no source, destination or epoch selectors.
 The check revalidates full authenticated holding custody, prefix ownership,
 manifest and blob identity, the original stopped-owner/failure lineage, and the
 durably masked controller. It requires a fresh complete fleet/capacity completion,
-rejects changed owners or any live replacement/downstream claim for136, and scans
+rejects changed owners or any live replacement/downstream claim for 136, and scans
 the whole original lane and quarantine for process or staged-service references
-without exclusions. Adjacent sidecars and remote canonical epoch136 archive or
+without exclusions. Adjacent sidecars and remote canonical epoch 136 archive or
 sidecar objects must remain absent. It hashes the local partial without moving or
 removing it and writes only a private capability receipt.
 
 Retirement repeats those gates, writes a durable intent, and moves the exact
 partial without replacement into the compiled root-private `retirements/`
 quarantine on the same home filesystem. The quarantine directory must already
-exist, be root-owned mode0700, and share a single writable sandbox ancestor with
+exist, be root-owned mode 0700, and share a single writable sandbox ancestor with
 the source: separate writable bind mounts cause `EXDEV` even on one filesystem.
 Use only `/home/sol/.jetstreamer-private` as that shared writable ancestor, with
 the sealed executable constraining all actual paths; never make `/` writable.
@@ -176,5 +176,5 @@ It binds the raw moved-proof digest into a durable unlink intent, repeats curren
 ownership/reference/remote checks, unlinks only the quarantine and fsyncs its parent.
 A completion preserves all evidence. Retries recover each durable frontier;
 unexplained absence, changed bytes, conflicting markers, or a reappearing source
-after completion fail closed. Neither command writes R2, repairs136, qualifies
+after completion fail closed. Neither command writes R2, repairs 136, qualifies
 canonical publication, exports a runtime checkpoint, or authorizes job resume.

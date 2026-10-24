@@ -1,11 +1,11 @@
-# Exact historical native25 input for epoch223
+# Exact historical native 25 input for epoch 223
 
 `jetstreamer-epoch223-tail-exact-evidence` captures metadata from the already
-successful isolated477-slot tail at96767523..96767999. It does not restore a
+successful isolated477-slot tail at 96767523..96767999. It does not restore a
 Bank, replay entries, observe current producers, scan an archive, contact R2,
-promote a runtime, qualify a handoff or close the223 repair.
+promote a runtime, qualify a handoff or close the 223 repair.
 
-The closed evidence set binds the root-owned sealed native25 launch, producer
+The closed evidence set binds the root-owned sealed native 25 launch, producer
 NDJSON, exact segment manifest, independent full tail reread, hard-fork snapshot
 metadata and preserved rounded terminal summary. The tool rehashes every input
 and its own sealed executable, accepts only a root-owned immutable plan, and
@@ -22,21 +22,21 @@ The plan contains only:
 }
 ```
 
-Create the output parent root-owned0700, seal the plan0444 and executable0555,
+Create the output parent root-owned 0700, seal the plan 0444 and executable 0555,
 then execute as root with three positional arguments: the absolute sealed plan,
 its SHA256, and the executable SHA256. Compilation does not create evidence;
 root owns the actual capture and later operational use.
 
 The receipt checks a unique initialized marker, bootstrap checkpoint, terminal
 checkpoint and PID1 clean-success event for invocation
-`20dc145d1e8c41fdbc682046b6fe4289`, producer PID3452507 and exact tail unit. It
+`20dc145d1e8c41fdbc682046b6fe4289`, producer PID 3452507 and exact tail unit. It
 requires ordered line numbers and realtime clocks, the initialized slot/hash,
-ticks_per_slot64 and initialized cursor107266983592. All checkpoint numbers are
-parsed directly as u64, never float or JavaScript numbers. Bootstrap writes0,
+ticks_per_slot64 and initialized cursor 107266983592. All checkpoint numbers are
+parsed directly as u64, never float or JavaScript numbers. Bootstrap writes 0,
 slot-complete status, the full consensus tuple and both cursors must match the
 sealed segment. The independent reread binds the477-slot span, archive digest,
-worker, native25 revision and normalized manifest digest. Fork metadata binds
-the exact96767522 snapshot and all four required fork markers with count1;
+worker, native 25 revision and normalized manifest digest. Fork metadata binds
+the exact 96767522 snapshot and all four required fork markers with count 1;
 metadata alone remains no Bank-restore or replay qualification.
 
 The preserved terminal summary has two rounded values. Retain that file and its
@@ -48,17 +48,17 @@ journal and segment:
 | Bootstrap capitalization | 504095069290845100 | 504095069290845150 |
 | Terminal capitalization | 504095067970690000 | 504095067970689961 |
 
-The emitted raw cursor range is107266983592..107268320809, end exclusive.
-These cursors belong to this independently restored native25 validator. Do not
-equate them to a native20 prefix cursor or treat the bootstrap cursor as a
+The emitted raw cursor range is 107266983592..107268320809, end exclusive.
+These cursors belong to this independently restored native 25 validator. Do not
+equate them to a native 20 prefix cursor or treat the bootstrap cursor as a
 global event count. Future assembly must prove each segment's contiguous
 emitted range, apply an explicit checked mapping, and preserve all events with
 overflow and coverage checks. Consensus handoff equality excludes local raw
-cursor equality and still requires the independently verified native20 prefix.
+cursor equality and still requires the independently verified native 20 prefix.
 
 Every publication, prefix, handoff, assembly, normalization and repair-closure
 authority remains false. The exact historical receipt is comparison input;
 the normal full-prefix reread, consensus handoff, checked assembly, full/plugin
 and boundary verification, authenticated upload/readback and sidecar gates
-remain open. A second ignored native25 Bank test is a dormant contingency only;
+remain open. A second ignored native 25 Bank test is a dormant contingency only;
 do not run it merely to reformat evidence already preserved here.

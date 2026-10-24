@@ -1,16 +1,16 @@
 # Bounded routine metadata cycle
 
-## Overdue160 readback forecast
+## Overdue 160 readback forecast
 
-The initial160 upload-only forecast used measured198 hash/upload/readback
+The initial 160 upload-only forecast used measured 198 hash/upload/readback
 durations scaled by archive size. Once that deadline expires, never reset the
 same allowance, clamp the countdown to zero or call an archive-only object ready.
 The qualified revision binds the exact original uploader invocation and child,
-the actual17:59:31readback event, four stable child-owned TCP socket inodes and
+the actual 17:59:31 readback event, four stable child-owned TCP socket inodes and
 receive counters from the same normal metadata cycle. It estimates outstanding
 bytes at the observed since-readback average after deducting1MiB/socket and a
-10percent transport margin, plus the independently calibrated local whole-file
-rehash and10minute sidecar allowance. Omitted closed sockets bias this estimate
+10 percent transport margin, plus the independently calibrated local whole-file
+rehash and 10 minute sidecar allowance. Omitted closed sockets bias this estimate
 later. These counters are approximate transport evidence, never authenticated
 readback progress, digest verification or completion evidence. Preserve both the
 superseded forecast and its revision. Child changes, retries, ambiguous events,
@@ -18,14 +18,14 @@ unexpected endpoints, descriptor races, unavailable counters and stale transport
 observations fail closed instead of fabricating a replacement countdown. No
 extra resource observer, HTTP request, archive scan or periodic loop is added.
 
-## Exact native141 acquisition history
+## Exact native 141 acquisition history
 
 The guarded full-census native attempt `1ca7610a…` stopped with
 `target SlotMeta is not connected`. Its initial guard is evidence of an actual
 admitted private acquisition, not full native-session success or epoch recovery.
-The native141 reader pins this exact unit, guard, plan, admission and executable;
+The native 141 reader pins this exact unit, guard, plan, admission and executable;
 live rows also require the exact command and sandbox. Terminal attempts remain
-diagnostic history, leave epoch141 `failed-needs-repair`, and have no ordinary
+diagnostic history, leave epoch 141 `failed-needs-repair`, and have no ordinary
 replay claim, dashboard ETA or publication authority. Unknown native full-census
 owners fail closed instead of disappearing from the campaign census.
 
@@ -37,7 +37,7 @@ clobbering prepared baseline plans. It takes no resource sample, starts no job,
 and does not retry the failed native acquisition. Seal and sandbox-preflight the
 successor before arming its normal cadence. Later successors use `--prepare-next`.
 
-### Separately qualified native141 rejection-evidence attempt
+### Separately qualified native 141 rejection-evidence attempt
 
 `--prepare-next-native141-rejection SPEC --handoff-sha256 HEX` adopts the fixed
 `horizon-epoch141-native-full-census-rejection-20261022-v1.service` attempt only
@@ -57,13 +57,13 @@ epoch recovery. A rejected target remains failed-needs-repair even when its raw
 metadata is retained after successful native close and source rehash. See
 [metadata rejection evidence](epoch141-native-metadata-rejection.md).
 
-### First-target native141 raw acquisition
+### First-target native 141 raw acquisition
 
 `--prepare-next-native141-acquisition SPEC --handoff-sha256 HEX` adopts only the
 distinct, genuinely admitted first-target acquisition after its initial guard
 exists. The strict spec schema is `jetstreamer-native141-acquisition-monitor-handoff-v1`,
 with `first_guard: {path,sha256}` and false replay/publication/remote/R2 authority
-flags. Both original failed native histories and both captured144 scans remain
+flags. Both original failed native histories and both captured 144 scans remain
 required. Ordinary observer/model/status claims and execution clocks are unchanged.
 
 The reader pins the new candidate, exact unit, source/census, v2 immutable plan
@@ -71,7 +71,7 @@ and admission manifest, inherited protected reserve and unchanged hard sandbox.
 Only this first-target profile uses its reviewed 1 GiB admission allowance and
 256 MiB native-output guard; neither full-census profile changes. Native success
 is raw diagnostic acquisition, not complete18,283-target recovery or PoH/root
-qualification. Epoch141 remains failed-needs-repair with no public ETA.
+qualification. Epoch 141 remains failed-needs-repair with no public ETA.
 
 The distinct `native141-acquisition-assembly144-scans-…` namespace avoids pending
 baseline artifacts. Stop and authenticate both old observer/metadata timers before
@@ -79,30 +79,30 @@ launching an owner they cannot census, then seal/preflight/arm the adopted pair.
 Never let an old baseline fire during this handoff. Later `--prepare-next` retains
 the new profile without restarting any producer or taking an extra resource sample.
 
-### All-target native141 raw acquisition
+### All-target native 141 raw acquisition
 
 `--prepare-next-native141-all-acquisition SPEC --handoff-sha256 HEX` is a distinct
 handoff for the fixed `acquisition-all-20261022-v1` diagnostic. Its strict schema
 is `jetstreamer-native141-all-acquisition-monitor-handoff-v1`, with the real
 `first_guard: {path,sha256}` and all four replay/publication/remote/R2 authority
-flags false. It requires the accepted timed160 profile and preserves the
-original failed native, rejection and first-target acquisitions plus144scans.
-Both guard and admission must retain the full32GiB output reservation. A
+flags false. It requires the accepted timed 160 profile and preserves the
+original failed native, rejection and first-target acquisitions plus 144 scans.
+Both guard and admission must retain the full 32 GiB output reservation. A
 first-target receipt or a plan is never all-target launch evidence.
 
 The successor uses a separate `native141-all-acquisition-public160-timed-…`
 namespace and the exact sealed all-target-aware reader. The helper preserves
 ordinary replay claims, ETA clocks and prior diagnostics, adds the authenticated
-private owner and keeps141 `failed-needs-repair`. Complete attempt coverage is
+private owner and keeps 141 `failed-needs-repair`. Complete attempt coverage is
 not complete raw acquisition, PoH recovery, canonical root qualification or
 publication. Stop/authenticate superseded pending timers before launching this
 owner; seal and sandbox-preflight the adopted successor before arming it. Reader
 source support, unit tests and an offline successor do not authorize a launch.
 
 `--prepare-next-native141-all-retry SPEC --handoff-sha256 HEX` adopts only the
-correctedv2attempt under strict schema
+correctedv 2attempt under strict schema
 `jetstreamer-native141-all-retry-monitor-handoff-v1`. It requires an accepted
-original all-target profile, the exact retained failedv1guard and actual
+original all-target profile, the exact retained failedv 1 guard and actual
 zero-restart failed parent invocation. The new real initial guard binds distinct
 v2binary, plan, admission and output paths. The successor uses the separate
 `native141-all-retry-public160-timed-…` namespace and newly sealed retry-aware
@@ -112,7 +112,7 @@ Never start the retry while a pending baseline observer/metadata generation
 cannot census it; wait for its accepted completion or perform the authenticated
 timer handoff before launch, then seal/preflight/arm the adopted successor.
 
-## Private epoch144 assembly-only fallback
+## Private epoch 144 assembly-only fallback
 
 The separately qualified assembly-only owner is never ordinary replay or an ETA
 claim. Its launch capture binds the exact assembler, plan, native prefix/suffix,
@@ -191,7 +191,7 @@ The sealed spec uses schema
 requires the sealed scan plan and frozen successful outcome, the actual original
 timeout and clean terminal assembler, the exact runner/command and live
 zero-restart scanner, and its reviewed sandbox. It rechecks both owners before
-writing a no-clobber private launch receipt. Precreate the root-owned mode0700
+writing a no-clobber private launch receipt. Precreate the root-owned mode 0700
 parent `/var/lib/jetstreamer/horizon-assembly144-scan-launches-20261022-v1`;
 each stage gets a distinct `STAGE/launch.json`. Capture is ownership evidence,
 not independent scan success, admission, a fleet transition, import or publication
@@ -209,7 +209,7 @@ namespace permits qualification before stopping an older pending timer pair.
 Later successors use ordinary `--prepare-next`. Capture and adoption do not
 establish scan success or canonical V4 import/publication authority.
 
-The exact October22 10:28 transition has a separately bounded metadata recovery:
+The exact October 22 10:28 transition has a separately bounded metadata recovery:
 `--check-assembly144-scans-recovery` and `--recover-assembly144-scans` authenticate
 both failed owners and the fixed scanner-aware plan. They reuse the original v2
 sample, byte-identical estimator model, estimate and nine successful authenticated
@@ -224,7 +224,7 @@ observer/private-pipeline coexistence check, the separately named `-tail` check
 and recovery modes bind its exact intent and failed child hashes. They retain
 the already-sealed model/fleet, reopen the original nine status receipts, and
 perform read-only provisional/canonical reconciliation through the corrected
-immutable reader. Both ledgers must show epoch198 ready with no status object;
+immutable reader. Both ledgers must show epoch 198 ready with no status object;
 there is no status republication or deletion. The genuine completion binds the
 new reader for successor preparation; original failure evidence stays intact.
 
@@ -245,10 +245,10 @@ overwriting prepared v1 plans. Seal and sandbox-preflight the successor before
 arming its normal cadence; no extra resource observation is authorized. Later
 successors use ordinary `--prepare-next` and retain the v2 reader.
 
-## Exact epoch193 to epoch194 ETA handoff
+## Exact epoch 193 to epoch 194 ETA handoff
 
-The retained dev-samjohnson 191–194 cohort shares an import gate at epoch194.
-Its observed terminal advances from 83807999 to 84239999 when epoch194 begins.
+The retained dev-samjohnson 191–194 cohort shares an import gate at epoch 194.
+Its observed terminal advances from 83807999 to 84239999 when epoch 194 begins.
 The routine helper binds the exact immutable manifest, original controller and
 producer, archive directory and complete four-epoch model. It transfers the
 432000 queued slots into the observed terminal for every epoch, preserving total
@@ -265,16 +265,16 @@ absent before a deliberate metadata-only recovery. Do not retry a partially
 published cycle through this path or change a healthy producer. Derive the next
 30-minute cycle only from genuine recovered completion.
 
-## Exact October21 controller/package recovery
+## Exact October 21 controller/package recovery
 
-The dev-samjohnson controllers were externally restarted at14:13:53 while their
-six producers retained the original invocations. The14:38 observer and metadata
-cycle failed closed; no14:38 sample or status refresh exists. Guard rebinding
+The dev-samjohnson controllers were externally restarted at 14:13:53 while their
+six producers retained the original invocations. The 14:38 observer and metadata
+cycle failed closed; no 14:38 sample or status refresh exists. Guard rebinding
 retains every original floor, VMA limit and producer, with six independently
 verified sandboxed first fires. No replay was restarted.
 
 `--prepare-package-recovery` is a separately pinned one-time recovery from the
-genuine accepted14:08 cycle to15:08. It accepts only the exact immutable recovery
+genuine accepted 14:08 cycle to 15:08. It accepts only the exact immutable recovery
 and first-fire receipts. It records the real3600-second predecessor gap rather
 than fabricating a missed sample, and replaces only the six old controller IDs
 with those in the sealed incident. Every producer ID, original elapsed clock,
@@ -283,30 +283,30 @@ The same transition isolates the already-private144 observer as described below.
 It performs no service/resource/R2 observations, stops, launches or mutations.
 
 The resulting cycle has an explicit `package_controller_recovery` binding.
-Only its exact15:08 target and14:08 predecessor permit the3600-second gap; all
-ordinary cycles still require1800seconds. The live observer independently
+Only its exact 15:08 target and 14:08 predecessor permit the3600-second gap; all
+ordinary cycles still require 1800 seconds. The live observer independently
 requires stable exact new owners and the original producers, and the estimator
 derives original producer elapsed time from systemd, never controller start.
-The successor drops the one-time recovery only after genuine15:08 completion
+The successor drops the one-time recovery only after genuine 15:08 completion
 and a bound model carrying all six adopted controller IDs. Preflight/sealing,
 full fleet reconciliation and ordinary publication gates remain mandatory.
 An additional failure or missed deadline requires its own qualified recovery;
 this profile is not a general retry or interval override.
 
-The exact198 delivery helper additionally binds a changed controller origin to
+The exact 198 delivery helper additionally binds a changed controller origin to
 that immutable recovery receipt. It accepts `02c5ac25…` only when the genuine
 completed predecessor model carries the exact recovery path/hash and is sampled
-at or after15:08, and its authenticated replay status and observer bind that
+at or after 15:08, and its authenticated replay status and observer bind that
 same new controller plus the unchanged original producer. The profile retains
-the recovery binding after198 leaves the rate-bearing model. Old immutable
+the recovery binding after 198 leaves the rate-bearing model. Old immutable
 profiles without that binding still require `d64e3dcc…`; arbitrary owners or
 pre-adoption clocks are rejected. This source support does not claim a15:08
-completion,198terminal event or controller/import handoff, and does not alter
+completion, 198 terminal event or controller/import handoff, and does not alter
 the already-armed15:08 recovery cycle.
 
-## Exact private144 observer isolation
+## Exact private 144 observer isolation
 
-For the retained dev-samjohnson private144 diagnostic only,
+For the retained dev-samjohnson private 144 diagnostic only,
 `--prepare-next-private144` moves the exact original observation configuration
 from `replays` to `diagnostic_replays`, and sets the explicit
 `scope_101_200.private144_observer` mode. This consumes genuine predecessor
@@ -316,15 +316,15 @@ formula, runtime handoff, repair gate and fleet diagnostic. It neither stops
 the job nor deletes its status. The new mode requires a separately qualified
 observer that implements the diagnostic envelope; the old append-log-only
 observer must not be used for this configuration.
-The helper also pins the separately qualified private144 fleet/status writer:
-its fleet output keeps the actual live144 diagnostic in the active list when
+The helper also pins the separately qualified private 144 fleet/status writer:
+its fleet output keeps the actual live 144 diagnostic in the active list when
 resource evidence is unavailable, with the complete before/after unit census.
 Terminal or missing ownership is retained as unresolved diagnostic history,
-not cleanup evidence. The exact198 delivery profile retains this writer when
-private144 isolation is enabled; it must not revert to an older reader.
+not cleanup evidence. The exact 198 delivery profile retains this writer when
+private 144 isolation is enabled; it must not revert to an older reader.
 
-The derived ETA model removes only144 from its ordinary observer census;
-there is still no144 production ETA. A missing worker or terminal diagnostic
+The derived ETA model removes only 144 from its ordinary observer census;
+there is still no 144 production ETA. A missing worker or terminal diagnostic
 is recorded as explicitly unavailable, never inferred complete, inactive or
 safe to delete. An observed diagnostic still requires its exact stable owner.
 The independent full fleet census retains the actual diagnostic identity and
@@ -355,11 +355,11 @@ handoff, user-requested observation, new admission or newer fleet requires a
 reviewed replacement plan; it never invents an ETA or relabels a phase.
 
 One narrowly pinned narrative correction is permitted: when the exact retained
-epoch225 reserve-stop incident (`fc51f75a…`) is supplied as added gate evidence,
+epoch 225 reserve-stop incident (`fc51f75a…`) is supplied as added gate evidence,
 the exact old next-action digest (`31b7234d…`) in `failed-needs-repair` is replaced
 with the evidence-backed instruction that the parent already reclaimed material
 scratch and no deletion tool is needed. The incident must deny deletion, replay
-and publication, and bind the original producer plus8192B scaffolding. Only that
+and publication, and bind the original producer plus 8192 B scaffolding. Only that
 text changes; state, evidence, tracked units, diagnostics, admission and integrity
 gates remain untouched. A newer action or state is never overwritten. Immutable
 prior fleets remain history. Check-only validates the same correction evidence
@@ -388,14 +388,14 @@ schedule, and derive a new predecessor chain. The helper additionally fences
 against a newer full campaign ledger, but that fence is not permission to race
 two operators or to leave an obsolete resource timer armed.
 
-For the exact existing dev-samjohnson epoch157 deployment, an optional
+For the exact existing dev-samjohnson epoch 157 deployment, an optional
 `epoch157_terminal_handoff` manifest binding allows the already-sealed parent to
-advance from its v1.5.6 terminal68,140,176 to its v1.5.8 terminal68,255,999.
+advance from its v1.5.6 terminal 68,140,176 to its v1.5.8 terminal 68,255,999.
 This is an ETA-model transition only, not runtime qualification, replay launch,
 restart or publication authority. The exact immutable preflight report path and
 SHA-256 are allowlisted; no other epoch, runtime or deployment is accepted.
 The original predecessor model and estimate bindings remain intact. The derived
-model moves the115,823 queued slots into the successor terminal, leaving zero
+model moves the 115,823 queued slots into the successor terminal, leaving zero
 additional slots, the same invocation identities, authoritative producer-start
 clock and43,200-second downstream allowance. No remaining replay is discarded.
 Only a clean global-slot rate window and one stable worker across the physical
@@ -416,43 +416,43 @@ ordinary `--prepare-next` mode. Use the new qualified executable for both the
 handoff-enabled cycle and its successor preparation; older strict readers reject
 the new optional field instead of silently ignoring it.
 
-## Exact epoch198 delivery transition
+## Exact epoch 198 delivery transition
 
-The October21 observed completion has four skipped terminal slots. Its last
-real Bank is85967995, while the canonical archive still covers through85967999.
+The October 21 observed completion has four skipped terminal slots. Its last
+real Bank is 85967995, while the canonical archive still covers through 85967999.
 The skipped-tail reader requires the exact invocation-bound decoded boundary
-record (block85968000, parent85967995, coverage85967999), ordered between the
+record (block 85968000, parent 85967995, coverage 85967999), ordered between the
 trusted root and final Bank checkpoint. It preserves four primary phase events
 and records the decoded tail separately; neither a guessed terminal Bank nor a
 shortened archive is accepted. A naturally collected producer additionally
-requires PID1's exact successful-deactivation message and invocation, ordered
+requires PID 1's exact successful-deactivation message and invocation, ordered
 after archive close, plus the unchanged pending controller/state/archive.
 `not-found` alone is never clean completion proof. These are observational
 handoff gates only, not independent archive/plugin or R2 verification.
 
-The optional `epoch198_delivery` profile is distinct from the epoch157 runtime
+The optional `epoch198_delivery` profile is distinct from the epoch 157 runtime
 terminal adjustment. `--prepare-next-delivery198 SPEC --handoff-sha256 HEX`
 consumes a genuine completed cycle and every old status receipt first, then
-accepts only the exact host198 read-only finalization proof produced by the
+accepts only the exact host 198 read-only finalization proof produced by the
 separately pinned `observe-delivery-198` writer. The immutable spec schema is
 `jetstreamer-epoch198-routine-handoff-spec-v1`, with `proof: {path,sha256}` and
 mandatory false `replay_launch_authorized`, `archive_publication_authorized`
 and `r2_archive_mutations`. Unknown fields fail closed.
 
-Initial proof must precede the next scheduled sample by at most1,800seconds,
+Initial proof must precede the next scheduled sample by at most 1,800 seconds,
 name the exact original active zero-restart producer and match the immutable
 parent/manifest and ordered root/terminal/verification/archive-close events.
-The helper preserves the original authenticated198 replay receipt and observer
-as elapsed-clock origin. It removes only198 from the next rate-bearing model
+The helper preserves the original authenticated 198 replay receipt and observer
+as elapsed-clock origin. It removes only 198 from the next rate-bearing model
 and observer census, keeps genuine predecessor hashes unchanged and binds the
 separately qualified shared-history phase-capable R2 publisher. All other
-claims, u64 fields, repair gates, private144 diagnostic and pending157 handoff
+claims, u64 fields, repair gates, private 144 diagnostic and pending 157 handoff
 remain intact. No producer or timer is changed by preparation.
 
 During that single coordinated sample, the executor first refreshes the ten
 remaining replay statuses. It then seals and produces a private provisional
 full-range fleet receipt inside the cycle directory, authenticating the actual
-live198 finalization claim. A separately sealed pipeline plan binds this fleet,
+live 198 finalization claim. A separately sealed pipeline plan binds this fleet,
 the original producer clock, exact complete archive length and true archive-close
 time plus the already-qualified43,200second downstream budget. The executor runs
 pipeline check-only before conditional status publication and authenticated
@@ -468,11 +468,11 @@ changed owner/phase, missing complete archive, conflicting pipeline or failed
 readback fails closed and retains child results; there is no zero clamp, invented
 replay rate, archive mutation or automatic retry. The actual controller/import
 handoff remains separately qualified; terminal producer ownership is not active
-finalization and the other host's216–219 identities are never accepted for198.
+finalization and the other host's 216–219 identities are never accepted for 198.
 
 Seal and qualify this new executable and helper before adoption. Existing armed
 cycles remain pinned. This source support and synthetic regression fixtures do
-not claim an actual198 terminal event, authorize a handoff without its genuine
+not claim an actual 198 terminal event, authorize a handoff without its genuine
 proof, or replace normal archive/plugin/upload/sidecar gates.
 
 Delivery-enabled preparation uses separate `*-delivery198-v1` observer/plan,

@@ -101,7 +101,7 @@ struct Config {
     #[serde(default)]
     native_input_diagnostics: Vec<native_input_diagnostic::NativeConfig>,
     // A separate, tightly scoped private benchmark is not a publication claim.
-    // Its predecessor namespace must not collide with the primary epoch203.
+    // Its predecessor namespace must not collide with the primary epoch 203.
     #[serde(default)]
     epoch203_ram_auxiliary: Option<RamAuxiliaryConfig>,
     // Telemetry only, sampled inside this same cadence. Never changes admission.
@@ -372,7 +372,7 @@ fn validate_ram_auxiliary(config: &Config) -> Result<()> {
     };
     let replay = &auxiliary.replay;
     // Preserve the ordinary/diagnostic validator unchanged. Only this explicit
-    // role may share epoch203, never a controller, invocation or mutable tree.
+    // role may share epoch 203, never a controller, invocation or mutable tree.
     validate_replay_configs(&[], std::slice::from_ref(replay))?;
     ensure!(
         replay.range == "203-203"

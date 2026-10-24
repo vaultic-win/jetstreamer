@@ -70,7 +70,7 @@ fn estimate(records: &Value, sample_micros: u64) -> Result<Value> {
                     .context("203 readback elapsed")?;
                 ensure!(
                     bytes > 0 && bytes <= TOTAL && elapsed > 0,
-                    "invalid203readback counters"
+                    "invalid 203 readback counters"
                 );
                 if let Some((old_bytes, old_elapsed, _)) = last {
                     ensure!(

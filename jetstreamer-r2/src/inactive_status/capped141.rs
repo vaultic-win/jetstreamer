@@ -1,4 +1,4 @@
-//! Native terminal proof for the exact stopping-root141 invocation.
+//! Native terminal proof for the exact stopping-root invocation for epoch 141.
 //! This proves process termination only, never a checkpoint or a full epoch.
 use super::*;
 const UNIT: &str = "horizon-qualify-141-original-entry-capped-root-20261023-v1.service";
@@ -11,7 +11,7 @@ pub(super) fn recognized(e: &Value) -> bool {
 fn launch(b: &Bound) -> Result<Value> {
     ensure!(
         b.path == Path::new(ROOT).join("receipts/launch.json") && b.sha256 == LAUNCH_SHA,
-        "capped141 terminal launch binding changed"
+        "capped 141 terminal launch binding changed"
     );
     let l = bound_json(b)?;
     ensure!(
@@ -22,7 +22,7 @@ fn launch(b: &Bound) -> Result<Value> {
                 == "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0"
             && l["worker_sha256"]
                 == "fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759",
-        "capped141 terminal proof is not the exact stopping-root launch"
+        "capped 141 terminal proof is not the exact stopping-root launch"
     );
     Ok(l)
 }
@@ -49,7 +49,7 @@ fn terminal_shape(c: &Value) -> Result<()> {
             && c["NRestarts"] == "0"
             && matches!(c["InvocationID"].as_str(), Some("" | IID))
             && (clean || failed),
-        "capped141 owner is live, replaced, restarting or not positively terminal"
+        "capped 141 owner is live, replaced, restarting or not positively terminal"
     );
     Ok(())
 }
@@ -95,7 +95,7 @@ fn journal_time(records: &[Value], current: &Value) -> Result<u64> {
         .collect();
     ensure!(
         rows.last().is_some_and(|r| r["INVOCATION_ID"] == IID),
-        "capped141 latest manager owner differs"
+        "capped 141 latest manager owner differs"
     );
     let start = rows
         .iter()
@@ -107,33 +107,33 @@ fn journal_time(records: &[Value], current: &Value) -> Result<u64> {
                 .as_str()
                 .is_some_and(|s| s.starts_with("Starting ") || s.starts_with("Started "))
         })
-        .context("capped141 manager start missing")?;
+        .context("capped 141 manager start missing")?;
     let result = if collected(current) {
         None
     } else {
         Some(
             current["Result"]
                 .as_str()
-                .context("capped141 terminal result")?,
+                .context("capped 141 terminal result")?,
         )
     };
     let end = rows
         .iter()
         .rposition(|r| r["INVOCATION_ID"] == IID && manager_end(r, result))
-        .context("capped141 manager terminal event missing")?;
+        .context("capped 141 manager terminal event missing")?;
     ensure!(
         start < end && rows[start]["INVOCATION_ID"] == IID,
-        "capped141 restarted or ambiguous manager lifecycle"
+        "capped 141 restarted or ambiguous manager lifecycle"
     );
     let a = rows[start]["__REALTIME_TIMESTAMP"]
         .as_str()
-        .context("capped141 start time")?
+        .context("capped 141 start time")?
         .parse::<u64>()?;
     let b = rows[end]["__REALTIME_TIMESTAMP"]
         .as_str()
-        .context("capped141 stop time")?
+        .context("capped 141 stop time")?
         .parse::<u64>()?;
-    ensure!(b > a, "capped141 terminal time precedes start");
+    ensure!(b > a, "capped 141 terminal time precedes start");
     Ok(b / 1_000_000)
 }
 fn manager_proof() -> Result<Vec<Value>> {
@@ -153,7 +153,7 @@ fn manager_proof() -> Result<Vec<Value>> {
         .output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 16 * 1024 * 1024,
-        "capped141 manager journal unreadable"
+        "capped 141 manager journal unreadable"
     );
     Ok(serde_json::Deserializer::from_slice(&out.stdout)
         .into_iter::<Value>()
@@ -165,7 +165,7 @@ fn no_restart() -> Result<()> {
         .output()?;
     ensure!(
         out.status.success() && out.stdout == b"no\n",
-        "capped141 owner can restart"
+        "capped 141 owner can restart"
     );
     Ok(())
 }
@@ -187,7 +187,7 @@ fn scope(e: &Value, owners: &[(String, String)]) -> Result<()> {
             && e["capture_self_sha256"]
                 .as_str()
                 .is_some_and(|s| is_lower_hex(s, 64)),
-        "foreign capped141 terminal evidence or lost suffix/repair obligation"
+        "foreign capped 141 terminal evidence or lost suffix/repair obligation"
     );
     for flag in [
         "full_epoch_verified",
@@ -201,7 +201,7 @@ fn scope(e: &Value, owners: &[(String, String)]) -> Result<()> {
     ] {
         ensure!(
             e[flag] == false,
-            "capped141 process termination grants {flag}"
+            "capped 141 process termination grants {flag}"
         );
     }
     Ok(())
@@ -214,7 +214,7 @@ fn validate(e: &Value, owners: &[(String, String)]) -> Result<u64> {
         capture["schema"] == "jetstreamer-capped141-terminal-capture-plan-v2"
             && capture["launch"] == e["launch"]
             && capture["output"] == e["evidence_path"],
-        "capped141 retained evidence does not bind its capture plan"
+        "capped 141 retained evidence does not bind its capture plan"
     );
     let l = launch(&serde_json::from_value(e["launch"].clone())?)?;
     let command = |v: &Value| -> Option<String> {
@@ -225,13 +225,13 @@ fn validate(e: &Value, owners: &[(String, String)]) -> Result<u64> {
             || (command(&e["unit_census"][UNIT]["ExecStart"]).is_some()
                 && command(&e["unit_census"][UNIT]["ExecStart"])
                     == command(&l["expected_exec_start"])),
-        "capped141 terminal command differs from authenticated launch"
+        "capped 141 terminal command differs from authenticated launch"
     );
     let rows: Vec<Value> = serde_json::from_value(e["manager_journal"].clone())?;
     let time = journal_time(&rows, &e["unit_census"][UNIT])?;
     ensure!(
         e["terminal_unix_seconds"] == time,
-        "capped141 terminal timestamp differs from manager proof"
+        "capped 141 terminal timestamp differs from manager proof"
     );
     Ok(time)
 }
@@ -239,11 +239,11 @@ pub(super) fn time(e: &Value) -> Result<u64> {
     let terminal = validate(e, &[(UNIT.into(), IID.into())])?;
     let recorded = e["recorded_unix_seconds"]
         .as_u64()
-        .context("capped141 capture time missing")?;
+        .context("capped 141 capture time missing")?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         terminal <= recorded && recorded <= now,
-        "capped141 capture time precedes terminal or is future-dated"
+        "capped 141 capture time precedes terminal or is future-dated"
     );
     // Capture can follow a status PUT which started while the producer was
     // alive but finished just after its manager terminal event. Keep both real
@@ -258,7 +258,7 @@ pub(super) fn validate_current(
     let retained_time = validate(e, owners)?;
     let c = current
         .get(UNIT)
-        .context("capped141 owner absent from full census")?;
+        .context("capped 141 owner absent from full census")?;
     if !collected(c) {
         terminal_shape(c)?;
         no_restart()?;
@@ -276,12 +276,12 @@ pub(super) fn validate_current(
     ] {
         ensure!(
             c[field] == e["unit_census"][UNIT][field],
-            "capped141 terminal owner changed:{field}"
+            "capped 141 terminal owner changed:{field}"
         );
     }
     ensure!(
         journal_time(&manager_proof()?, c)? == retained_time,
-        "capped141 manager lifecycle changed after capture"
+        "capped 141 manager lifecycle changed after capture"
     );
     Ok(())
 }
@@ -295,7 +295,7 @@ pub(super) fn capture() -> Result<()> {
         unsafe { libc::geteuid() } == 0
             && is_lower_hex(&args[6], 64)
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == args[6],
-        "capped141 capture requires root and exact executable"
+        "capped 141 capture requires root and exact executable"
     );
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -313,7 +313,7 @@ pub(super) fn capture() -> Result<()> {
         p.schema == "jetstreamer-capped141-terminal-capture-plan-v2"
             && p.output.is_absolute()
             && p.output.starts_with(Path::new(ROOT).join("receipts")),
-        "foreign capped141 terminal capture"
+        "foreign capped 141 terminal capture"
     );
     launch(&p.launch)?;
     let parent = p.output.parent().context("terminal output parent")?;

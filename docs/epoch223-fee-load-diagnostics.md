@@ -1,6 +1,6 @@
-# Epoch223 native account-load failure
+# Epoch 223 native account-load failure
 
-The retained cold-prefix invocation5c5a9e56… failed during warmup on the native
+The retained cold-prefix invocation 5c5a9e56… failed during warmup on the native
 v1.6.25 result `InvalidWritableAccount`. Its wrapper reports that result through
 `fee_collection_results`; the label does not establish a fee-payer defect. In
 the pinned native `accounts.rs`, this error can identify a writable upgradeable
@@ -44,8 +44,8 @@ and invocation guard before a chain run. A scope-limit rejection instead of
 the fee/load trace is diagnostic evidence, not successful replay or permission
 to widen the window silently.
 
-The healthy225 worker and all sealed deployments remain unchanged. Before any
-new223 chain experiment, build/seal the candidate with its exact historical
+The healthy 225 worker and all sealed deployments remain unchanged. Before any
+new 223 chain experiment, build/seal the candidate with its exact historical
 toolchain, requalify the native snapshot/input capability, and freshly admit a
 bounded invocation with an exact guard. Preserve the old failed invocation and
 artifacts. Use the captured transaction and canonical source metadata to resolve
@@ -93,8 +93,8 @@ runtime promotion or completed-epoch claim follows from this diagnostic.
 ## Separately built v1.6.20 prefix candidate
 
 The parent feature `epoch223-v1-6-20-prefix-qualification` selects the original
-v1.6.20 descriptor and worker override. It accepts only focused epoch223,
-bootstrap96,335,538 through the known96,767,522 root, and an isolated
+v1.6.20 descriptor and worker override. It accepts only focused epoch 223,
+bootstrap 96,335,538 through the known 96,767,522 root, and an isolated
 `qualification-223-v1620-prefix-*` root. It rejects full-epoch/tail requests,
 v1.6.25 namespaces, cohorts, inherited leases, maintenance/recovery entrypoints
 and unrelated diagnostic feature combinations. Its planning-only
@@ -105,7 +105,7 @@ The historical v1.6.20 worker's separate `epoch223-prefix-qualification`
 feature closes input to that exact bootstrap and prefix. It caps shrink debt at
 the pinned validator background-service bound; native account loading, fees,
 transactions and Bank hash algorithms are unchanged. The narrower
-`epoch223-prefix-warmup-diagnostic` build admits only the first16slots, rejecting
+`epoch223-prefix-warmup-diagnostic` build admits only the first 16 slots, rejecting
 later input before transaction decoding or Bank mutation. Default historical
 worker builds retain their original range and shrink behavior, and every
 already sealed deployment remains unchanged.
@@ -123,8 +123,8 @@ only in a separately admitted, sealed128-GiB sandbox with an owner-only fresh
 `/tmp`: the test requires a real tmpfs there, creates a fresh owner-only test
 directory, and retains its lifetime through native load/freeze. That supervisor
 keeps the 128-GiB hard limit, 112-GiB high limit, private 512-GiB tmpfs with one
-million inodes, exact UID1000 child, complete protected-owner census and
-15-second memory/tmpfs guards. Its separate native20 harness, unit and receipt
+million inodes, exact UID 1000 child, complete protected-owner census and
+15-second memory/tmpfs guards. Its separate native 20 harness, unit and receipt
 namespaces cannot borrow the v1.6.25 snapshot profile. Merely compiling this ignored test is
 not native input qualification. The exact test executable, source/input hashes,
 terminal journal and result still need durable evidence before an entry replay.
@@ -140,27 +140,27 @@ replace fresh coordinated admission and invocation-bound VMA protection.
 
 The first16-entry v1.6.20 diagnostic also requires the hash-bound cooperative
 parent stop. Only the exact sealed narrow worker enables this stop; the full
-prefix worker does not. The parent splits its transport batch after96,335,554,
+prefix worker does not. The parent splits its transport batch after 96,335,554,
 without adding that slot to the canonical checkpoint set. After SourceExact
 outcomes, account writes and the complete-slot response have passed, it requests
 orderly shutdown, emits the private completion marker and stops itself. The
 supervisor freezes the full process group, captures resources, then resumes and
 drains it. Periodic warmup progress alone cannot trigger a successful capture.
-The worker still rejects slot17 before decoding or mutation; neither the stop
+The worker still rejects slot 17 before decoding or mutation; neither the stop
 nor the diagnostic resource receipt qualifies the known root or publication.
 
 The separate `epoch223-v1620-root-prefix-resource` utility profile prepares the
-full native20 prefix using the exact long worker and both canonical roots. Its
+full native 20 prefix using the exact long worker and both canonical roots. Its
 300-GB scratch planning allowance is separate from output, host reserve and
-other owners' growth; it does not inherit the older25 worker's shrink-debt
+other owners' growth; it does not inherit the older 25 worker's shrink-debt
 reservation. A planning-only `--storage-capability` requires the actual parent
-pre-worker barrier. The independent prefix rereader binds the native20 private
+pre-worker barrier. The independent prefix rereader binds the native 20 private
 namespace to that full worker and revision and rejects the first16-slot worker
-and native25 substitutions. Neither profile can claim restart, suffix,
+and native 25 substitutions. Neither profile can claim restart, suffix,
 assembly, full-epoch verification or publication. Keep the full prefix dormant
 until the bounded warmup and fresh full-fleet admission/guards pass.
 
-## Native20 bounded warmup registration and dashboard lifecycle
+## Native 20 bounded warmup registration and dashboard lifecycle
 
 The sealed `horizon-223-v1620-warmup-envelope480-v1` package pins the
 cooperative parent and first16-entry worker. It reserves a 300-GB scratch
@@ -168,17 +168,17 @@ increment, starts only above 2.3-TB free disk and 608-GiB MemAvailable, and stop
 its own group below the protected 2-TB/480-GiB floors. The actual systemd owner
 requires 128-GiB maximum/112-GiB high memory, zero swap, no restart and the exact
 private scratch/output root. This envelope admits the three unchanged
-204/205/225 owners, with either the exact registered live native207 or its
-independently authenticated successful terminal207 proof and a complete census
-showing only those three remaining owners. The optional native207 path retains
-the same reserves. Full227 or any other live owner
+204/205/225 owners, with either the exact registered live native 207 or its
+independently authenticated successful terminal 207 proof and a complete census
+showing only those three remaining owners. The optional native 207 path retains
+the same reserves. Full 227 or any other live owner
 requires a fresh complete claim calculation; this package is not approval to
 reuse an old census.
 
 `admit-warmup223` and `capture-warmup223` accept the separate
 `jetstreamer-private-warmup223-native20-admission-spec-v1` with exact `observer`
 and `fleet` bindings. The admission checks the accepted sample, full owner
-census, existing guards, native20 input proof and planning capability. Capture
+census, existing guards, native 20 input proof and planning capability. Capture
 requires its genuinely running invocation and fresh invocation-bound VMA/disk
 guard before it writes `launch.json`. The event retains `entry_replay:true`,
 the existing private-warmup fleet phase and all unqualified archive gates.
@@ -186,7 +186,7 @@ the existing private-warmup fleet phase and all unqualified archive gates.
 Immediately reconcile that captured launch into the existing accepted resource
 sample, then publish one generic pipeline status model through
 `status-publish-pipeline`. Its wire phase is `verification`, its claim phase is
-`private-warmup-reproduction`, its origin is the immutable native20 launch, and
+`private-warmup-reproduction`, its origin is the immutable native 20 launch, and
 its elapsed clock is the actual PID1 invocation start. Measure the exact
 `output/epoch-223.jet`: absent means zero bytes; an actual empty or partially
 written regular file is measured as such. Do not fabricate a zero-entry native
@@ -194,13 +194,13 @@ test receipt. Include evidence and a positive current best estimate through
 prefix, suffix/restart, assembly, full/plugin verification, upload and readback
 to the canonical sidecar.
 
-Guard admission and native20 capture select the latest completed oneshot from
+Guard admission and native 20 capture select the latest completed oneshot from
 its PID1 manager history. A guard's current `InvocationID` may name a newly
 started invocation whose `sample-IID.json` is not written yet, or may already
 be cleared. Require the exact start, printed receipt, successful deactivation
 and completed job events for the selected invocation, with matching unit,
 boot identity, receipt bytes, ordered clocks and the existing freshness bound.
-Bind PID1's full finished-job command to the immutable executable hash and
+Bind PID 1's full finished-job command to the immutable executable hash and
 current exact `ExecStart`; any available kernel `_EXE`/`_CMDLINE` must agree.
 Those optional kernel fields can disappear when a short guard exits before
 journald reads `/proc`. Keep the default `systemd-run` command description for
@@ -222,7 +222,7 @@ owner instead. The warmup result is not an uploaded epoch: canonical completion
 still requires all independent archive gates, and completion cleanup follows
 sidecar commit.
 
-### Native20 terminal-event adapter
+### Native 20 terminal-event adapter
 
 `capture-warmup223-terminal` consumes a sealed
 `jetstreamer-warmup223-native20-terminal-spec-v1` with `running_origin`,
@@ -243,7 +243,7 @@ operator/manager/journal history. Every full-prefix, native-restart, suffix,
 assembly, full/plugin, runtime-promotion, sidecar and R2 gate remains false.
 
 The metadata event keeps the accepted observer sample and all existing owner
-claims. Only epoch223's next action/evidence may advance; its repair gate stays
+claims. Only epoch 223's next action/evidence may advance; its repair gate stays
 `failed-needs-repair`. The inactive adapter authenticates that event and the
 original status owner even if systemd cleared its IID, rejects live/restarted/
 replacement owners, and rechecks latest PID1 history for a later invocation.
@@ -251,7 +251,7 @@ Ordinary conditional status deletion, authenticated absence, repair-backlog and
 no-active-handoff checks remain mandatory. Terminal metadata never counts as
 archive or sidecar completion.
 
-### Resume and drain after the cooperative native20 target
+### Resume and drain after the cooperative native 20 target
 
 The preserved attempt `13a5f755a196442e991c6930b410c04f` reached the exact
 96,335,554 complete-slot target. Its resource runner then sent SIGINT to a
@@ -260,9 +260,9 @@ parent's normal second-interrupt handler force-exited130. That attempt remains
 failed; its target marker and captured resources do not qualify a clean warmup.
 Keep its proof and terminal history unchanged.
 
-The corrected runner selects `cooperative-resume-only` only for the native20
-runtime, sealed cooperative parent99f643ff, first16 worker52d6c86a and exact
-96,335,539–96,335,554 interval with parent terminal96,767,522. It first observes
+The corrected runner selects `cooperative-resume-only` only for the native 20
+runtime, sealed cooperative parent 99f643ff, first 16 worker 52d6c86a and exact
+96,335,539–96,335,554 interval with parent terminal 96,767,522. It first observes
 the parent's own stopped state within a five-second bound, then freezes the
 whole owned group and durably captures the resource/stop intent. Waiting for
 the self-stop prevents racing a still-pending parent SIGSTOP against resume.
@@ -273,8 +273,8 @@ and unchanged receipt fields. Cooperative receipts and planning capability
 identify their selected protocol explicitly.
 
 The controlled success gate remains unchanged: target observed, no external
-signal, no capture/guard/drainage error and an actual child return code0or1.
-Exit130 remains fatal. Bank-free process tests reproduce the old130 failure,
+signal, no capture/guard/drainage error and an actual child return code 0or1.
+Exit 130 remains fatal. Bank-free process tests reproduce the old 130 failure,
 exercise freeze/capture/resume/natural drainage through the real measure loop,
 and check that all archive/publication authority stays false.
 
@@ -284,7 +284,7 @@ the new runner digest through the fleet, status and terminal-reader registry;
 do not overwrite or reuse the failed attempt. Precreate all five owner-private
 directories: root, `scratch`, `output`, `receipts`, `ledger`. Repeat the exact
 planning capability and obtain fresh complete-fleet admission including the
-already-running full227; the old three-owner/native207 envelope is not launch
+already-running full 227; the old three-owner/native207 envelope is not launch
 approval. Only a successful new bounded native warmup can support the separate
 full-prefix admission. Prefix, suffix/restart, assembly, full/plugin, upload,
 readback and canonical sidecar gates remain independent.
@@ -295,7 +295,7 @@ the bounded warmup comparison and eventual canonical-prefix completion remain
 outstanding until their respective invocations succeed. A16-slot result is not
 a measured full-prefix peak or an epoch archive.
 
-## Cooperative native20 v2 retry preparation
+## Cooperative native 20 v2 retry preparation
 
 The v2 runner is separately sealed at
 `/var/lib/jetstreamer/horizon-223-v1620-warmup-cooperative-8457f800-v2`:
@@ -310,13 +310,13 @@ or started by preparation.
 The no-worker planning capability passed in the v5 capability namespace and is
 sealed at `/var/lib/jetstreamer/horizon-warmup223-native20-capability-v5/capability.json`,
 SHA256 `955bb371ec8543fab27811f5cb0ed3c72f26134706daaeab041105666999f164`.
-It explicitly binds `cooperative-resume-only`, parent99f643ff and first16
-worker52d6c86a. No native replay or resource admission follows from that result.
+It explicitly binds `cooperative-resume-only`, parent 99f643ff and first 16
+worker 52d6c86a. No native replay or resource admission follows from that result.
 
 `admit-warmup223`/`capture-warmup223` route the separate
 `jetstreamer-private-warmup223-native20-admission-spec-v2` to the v2 admission
 state. The accepted census must contain exactly the three unchanged old owners
-and registered full227 invocation `a10f37b57711425a81633c62c66438d5`.
+and registered full 227 invocation `a10f37b57711425a81633c62c66438d5`.
 Admission validates its original launch, current command/caps and a freshly
 completed protective guard, then reserves its full remaining hard-memory
 headroom and its entire471,798,691,840-byte disk envelope without scratch credit.
@@ -333,8 +333,8 @@ V2 uses `horizon-warmup223-native20-admission-v2`,
 The guard plan requires the actual new IID and must be sealed after start; keep
 the default full-command systemd-run description. Status lookup selects the
 jet root by exact approved unit, and PID1 Started-clock support is constrained
-to the two native20 owners. V2 terminal capture uses
+to the two native 20 owners. V2 terminal capture uses
 `jetstreamer-warmup223-native20-terminal-spec-v2` and preserves the previous
-failed13a5 terminal proof alongside its own exact journal/output. V1 launch,
+failed 13a5 terminal proof alongside its own exact journal/output. V1 launch,
 status and terminal support remain available independently; neither generation
 can borrow the other's runner, plan, root or result identity.

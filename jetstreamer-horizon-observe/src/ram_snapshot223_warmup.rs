@@ -1,4 +1,4 @@
-//! Exact native input qualification of the bounded223worker, never entry replay.
+//! Exact native input qualification of the bounded 223 worker, never entry replay.
 use super::*;
 const PACKAGE: &str = if cfg!(feature = "epoch223-v1620-native-input-release") {
     "/var/lib/jetstreamer/horizon-223-v1620-native-release-test-v1"
@@ -358,7 +358,7 @@ fn fleet_shape(f: &Value, o: &Value, hash: &str) -> Result<()> {
             && f["inventory"]["anomalies"] == 0,
         "warmup fleet binding differs"
     );
-    // Allow the independently delivered203 pair to join the existing sample,
+    // Allow the independently delivered 203 pair to join the existing sample,
     // while retaining the older, stricter floor and every old guard unchanged.
     let ready = f["inventory"]["entries"]
         .as_array()

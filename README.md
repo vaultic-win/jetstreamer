@@ -792,7 +792,7 @@ suffix worker, and produces only private V4 assembly. It neither promotes the
 ordinary runtime route nor authorizes canonical sidecars or R2 publication.
 
 The separate [epoch-205 native restore profile](docs/horizon-epoch205-native-restore.md)
-pins its verified terminal snapshot and unchanged store8 worker. It is dormant
+pins its verified terminal snapshot and unchanged store 8 worker. It is dormant
 until the exact complete prefix, independent reader and fresh protected admission
 exist; it does not qualify the remaining 949 slots or enable ordinary replay.
 

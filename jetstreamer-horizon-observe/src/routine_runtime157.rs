@@ -22,7 +22,7 @@ pub(super) fn validate(p: &Plan) -> Result<Value> {
             && p.epoch157_terminal_handoff.is_none()
             && !p.expected_epochs.contains(&157)
             && writer(p),
-        "foreign157pause profile"
+        "foreign 157pause profile"
     );
     let proof = bound_json(b, true)?;
     ensure!(
@@ -95,7 +95,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
             && r["epochs"] == json!([157])
             && r["epoch_additional_replay_slots"] == json!({"157":115823})
             && r["epoch_downstream_allowance_seconds"] == json!({"157":43200}),
-        "original157queue changed"
+        "original 157queue changed"
     );
     let mut out = exclude(model)?;
     let evidence = out["evidence"]
@@ -127,7 +127,7 @@ pub(super) fn enable(
             && p.sample_target_utc == "2026-10-21T15:38:00Z"
             && model["sample_target_utc"] == OLD
             && p.epoch157_terminal_handoff.is_some(),
-        "157pause requires genuine15:08completion"
+        "157pause requires genuine 15:08completion"
     );
     for path in [
         &p.observer,

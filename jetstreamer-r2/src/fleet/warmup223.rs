@@ -133,7 +133,7 @@ pub(super) fn status_jet_path(unit: &str) -> Result<PathBuf> {
     match unit {
         native20::UNIT => Ok(native20::status_jet_path()),
         native20_v2::UNIT => Ok(native20_v2::status_jet_path()),
-        _ => anyhow::bail!("unregistered native20 status unit"),
+        _ => anyhow::bail!("unregistered native 20 status unit"),
     }
 }
 fn command() -> String {
@@ -198,7 +198,7 @@ fn sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
             .filter(|r| r["epoch"] == 223 && r["state"] == "missing")
             .count()
             == 1,
-        "warmup must not duplicate a staged or completed remote223"
+        "warmup must not duplicate a staged or completed remote 223"
     );
     for (name, iid) in OWNERS {
         if name == OWNERS[0].0 && delivery_complete(f) {
@@ -237,7 +237,7 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
         if name == OWNERS[0].0 && delivery_complete(f) {
             ensure!(
                 u["MainPID"] == "0" && u["ActiveState"] == "inactive",
-                "completed203 uploader is still active"
+                "completed 203 uploader is still active"
             );
             continue;
         }
@@ -277,7 +277,7 @@ fn inputs(f: &Value) -> Result<()> {
                 && receipt["remote_sha256_readback"] == true
                 && receipt["archive_sha256"]
                     == "7efb3b28b2761cd646d20fa282d87c508249488fd0fb27ce8e033a1aed7d39ad",
-            "completed203 receipt differs"
+            "completed 203 receipt differs"
         );
     }
     let proof = bound_json(&BoundFile {
@@ -793,7 +793,7 @@ pub(super) fn event_predecessor(
     }
     ensure!(
         p.gates[&223].state == "failed-needs-repair",
-        "warmup event cannot close failed223"
+        "warmup event cannot close failed 223"
     );
     Ok(())
 }

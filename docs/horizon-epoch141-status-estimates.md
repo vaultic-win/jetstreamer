@@ -1,4 +1,4 @@
-# Epoch141 operational status
+# Epoch 141 operational status
 
 The separate `jetstreamer-qualification141-status-plan-v2` route in
 `status-publish-qualification` covers only the exact capped original-entry141
@@ -6,7 +6,7 @@ invocation `e639f007d482464f8a251455659d2ede`. It uses the observed `141` row,
 actual `output/private.jet` size and real manager start. Its wire phase is
 `replay`; private qualification and every publication gate remain unchanged.
 
-The invocation stops at root61328765. The epoch ends at61343999, leaving15234
+The invocation stops at root 61328765. The epoch ends at 61343999, leaving 15234
 suffix slots. The estimate therefore adds remaining root execution and a
 **separate future suffix run**, each projected at the observed profile rate,
 plus a sealed policy's explicit stage allowances. It never assumes the live
@@ -17,8 +17,8 @@ must be positive integers: suffix input/restore/qualification, assembly/import,
 full verification, current-plugin verification, required boundary checks and
 upload/readback/source revalidation/sidecar.
 
-The first reviewed planning proposal uses24hours for the unresolved suffix route
-and12hours total downstream, following the existing ordinary cohort planning
+The first reviewed planning proposal uses 24 hours for the unresolved suffix route
+and 12 hours total downstream, following the existing ordinary cohort planning
 allowance. These are revisable planning assumptions, not measured upper bounds
 or a guaranteed completion date. Once the root finishes, authenticate the new
 active repair/delivery owner or remove the inactive status through its gated
@@ -32,12 +32,12 @@ this exact publisher path in its closed allowlist before the next plan uses it.
 The cycle reuses its existing same-sample provisional fleet, seals a141-only
 publisher plan, publishes and authenticates the status, then uses that new reader
 for the final fleet reconciliation. The eleven ordinary estimates and legacy
-reader pin remain unchanged. The141 publication is recorded separately in the
+reader pin remain unchanged. The 141 publication is recorded separately in the
 completion, and successor preparation requires that evidence when enabled.
 No new observation, timer, replay owner, guard or archive mutation is introduced.
 
 The lifecycle hardening patch records a durable
-`jetstreamer-qualification141-status-incident-v2` when the optional141 publisher
+`jetstreamer-qualification141-status-incident-v2` when the optional 141 publisher
 fails operationally. The eleven ordinary statuses, final fleet reconciliation,
 and normal successor cadence continue. The incident binds the exact sample and
 owner and says explicitly that the old ETA is no longer current. It establishes
@@ -70,21 +70,21 @@ Once the live owner terminates, the existing terminal-handoff lifecycle applies.
 
 ## Stopping-root terminal handoff
 
-The distinct capped141 lifecycle package may be sealed at
+The distinct capped 141 lifecycle package may be sealed at
 `/usr/local/lib/jetstreamer/horizon-epoch141-lifecycle-tools-20261023-v2`.
 Never replace the already deployed v1 package. The coordinating parent owns
 deployment, terminal event handling, R2 mutation and the next routine plan.
 
 1. Preserve the prefix, checkpoint, original-entry sources, failed-root bytes,
-   guard evidence and open141 repair. A clean process exit is not checkpoint
-   qualification; even a verified61328765 root still leaves15234 suffix slots.
+   guard evidence and open 141 repair. A clean process exit is not checkpoint
+   qualification; even a verified 61328765 root still leaves 15234 suffix slots.
 2. After a positive terminal event, use the sealed Rust command
    `capped141-terminal-capture PLAN --plan-sha256 HEX --self-sha256 HEX`.
    Its closed plan contains only schema
    `jetstreamer-capped141-terminal-capture-plan-v2`, `launch` (exact original
    launch path/SHA), and an absent `output` beneath the root-owned private
    `receipts` directory. It validates the exact native launch/command, zero
-   restarts, disabled restart policy, PID0 and a matching latest trusted PID1
+   restarts, disabled restart policy, PID 0 and a matching latest trusted PID1
    manager start/terminal lifecycle twice before fsyncing no-clobber evidence.
    A collected transient unit requires the exact authenticated launch and latest
    trusted PID1 terminal lifecycle; disappearance alone cannot pass. Loaded
@@ -92,7 +92,7 @@ deployment, terminal event handling, R2 mutation and the next routine plan.
    restart policy. A missing rate, unavailable observer or timeout of a metadata
    command cannot pass. Captured process failure from an actual manager timeout
    remains distinct from a metadata-probe timeout.
-3. Reconcile the complete assigned101–200 claim census, including queued starts,
+3. Reconcile the complete assigned 101–200 claim census, including queued starts,
    downstream tasks and authenticated other-host handoffs. If a real successor
    exists, bind that owner and model its actual supported phase and remaining
    delivery gates. Preserve its status; never delete on the former root's exit.
@@ -108,9 +108,9 @@ deployment, terminal event handling, R2 mutation and the next routine plan.
    metadata oneshot may normalize only its own census row via its bound cycle
    completion; any other claim change still rejects cleanup.
 5. Make an explicit immutable successor transition. Once cleanup is authenticated,
-   disable the141 status hook until a supported active replacement is adopted.
+   disable the 141 status hook until a supported active replacement is adopted.
    Retain terminal diagnostic history and its open repair, and preserve the
-   single coordinated cadence. Do not silently drop original141 diagnostics
+   single coordinated cadence. Do not silently drop original 141 diagnostics
    or reuse the old `f9c...` terminal-recovery profile for this `e639...` owner.
 6. Retire only the stopped private producer's *future growth reservation* through
    an explicit freshly bound full census/protection transition. Account for all
@@ -147,5 +147,5 @@ For a first one-off status, seal the policy and a publisher plan with current
 `estimate_receipt`, `epoch141_delivery_policy` and a nonempty `estimate_basis`.
 Run the sealed tool with its separately supplied SHA and plan SHA under the same
 restricted metadata sandbox, first with `--check-only`. The accepted observer
-must be no older than1800seconds, and all live ownership checks must still pass.
+must be no older than 1800 seconds, and all live ownership checks must still pass.
 Only the coordinating main agent performs deployment and R2 publication.

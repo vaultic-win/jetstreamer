@@ -1,4 +1,4 @@
-//! Bind the actually admitted full209 job and its first real protective fire.
+//! Bind the actually admitted full 209 job and its first real protective fire.
 use super::{singleton209 as c, *};
 use singleton227_capture::{journal, properties, require};
 const PROTECTIVE: &str = "horizon-singleton209-protective-v1.service";

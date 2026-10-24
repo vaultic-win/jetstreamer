@@ -1,5 +1,5 @@
 //! Private qualification input, never a promoted runtime or publication route.
-//! The separately hash-bound index must come from the complete acquired141census
+//! The separately hash-bound index must come from the complete acquired 141census
 //! and its verified PoH receipts. A bundle does not establish source equivalence:
 //! compare each whole slot with independent source transactions before execution.
 
@@ -152,7 +152,7 @@ fn validate_records(
 }
 
 impl OriginalBundleIndex {
-    /// Validate the exact complete141profile, bounds and contiguous byte coverage.
+    /// Validate the exact complete 141profile, bounds and contiguous byte coverage.
     /// A caller still must authenticate this index's independently supplied SHA.
     pub fn validate(&self) -> Result<(), String> {
         if self.schema != "jetstreamer-epoch141-original-entry-bundle-v1"
@@ -164,7 +164,7 @@ impl OriginalBundleIndex {
             || self.ticks_per_slot != 64
             || self.hashes_per_tick != 12_500
         {
-            return Err("original bundle is not the complete pinned141profile".into());
+            return Err("original bundle is not the complete pinned 141profile".into());
         }
         validate_records(self, 18_283, 84_597)
     }
@@ -255,7 +255,7 @@ impl OriginalEntryBundle {
         })
     }
     /// Authenticate both members, stream-hash all data, and retain the open inode.
-    /// The guard runs at each1MiBchunk; any error returns no usable bundle.
+    /// The guard runs at each 1 MiB chunk; any error returns no usable bundle.
     pub fn open(
         index_path: &Path,
         index_sha256: &str,

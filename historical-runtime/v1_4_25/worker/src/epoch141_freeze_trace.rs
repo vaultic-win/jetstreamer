@@ -1,4 +1,4 @@
-//! Read-only frozen-Bank evidence for one cold141 diagnostic generation.
+//! Read-only frozen-Bank evidence for one cold 141 diagnostic generation.
 use serde_json::{json, Value};
 use solana_runtime::bank::Bank;
 use solana_sdk::hash::{extend_and_hash, hash, hashv, Hash};

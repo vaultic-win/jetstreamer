@@ -53,7 +53,7 @@ fn read(profile: &Profile) -> Result<(Value, Value)> {
     let event = bound_json(&profile.event_fleet, false)?;
     let plan = bound_json(&profile.event_plan, true)?;
     let guard_bound: Bound = serde_json::from_value(event["admission_transition_guard"].clone())?;
-    // Guard receipts are root-private mode0600, not immutable deployment members.
+    // Guard receipts are root-private mode 0600, not immutable deployment members.
     let guard = bound_json(&guard_bound, false)?;
     checked(profile, &launch, &event, &plan, &guard)
 }
@@ -83,7 +83,7 @@ fn checked(
             && launch["maximum_runtime_seconds"] == 1800
             && launch["experimental_envelope_bytes"] == 40u64 << 30
             && launch["protected_existing_floor_bytes"] == 4_740_696_923_590u64,
-        "native144 launch differs"
+        "native 144 launch differs"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -101,7 +101,7 @@ fn checked(
     ] {
         ensure!(
             launch[flag] == false,
-            "native144 launch grants authority:{flag}"
+            "native 144 launch grants authority:{flag}"
         );
     }
     ensure!(
@@ -149,19 +149,19 @@ fn checked(
             && guard["workers"].as_array().is_some_and(|w| w.len() == 1
                 && w[0][0].as_u64().is_some_and(|pid| pid > 0)
                 && w[0][1].as_u64().is_some_and(|v| v > 0 && v <= 3_500_000)),
-        "native144 requires genuine guarded admission event"
+        "native 144 requires genuine guarded admission event"
     );
     let expected = claim(profile);
     ensure!(
         plan["diagnostics"]
             .as_array()
-            .context("native144 plan history")?
+            .context("native 144 plan history")?
             .iter()
             .filter(|d| d["unit"] == UNIT)
             .eq(std::iter::once(&expected))
             && event["diagnostics"]
                 .as_array()
-                .context("native144 event history")?
+                .context("native 144 event history")?
                 .iter()
                 .filter(|d| d["unit"]["Id"] == UNIT
                     && d["launch_invocation_id"] == profile.invocation_id
@@ -169,7 +169,7 @@ fn checked(
                     && d["launch_receipt_sha256"] == profile.launch.sha256)
                 .count()
                 == 1,
-        "native144 admission owner differs"
+        "native 144 admission owner differs"
     );
     Ok((expected, event["admission_transition_guard"].clone()))
 }
@@ -198,7 +198,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                     && (owner(p, &s.diagnostic_ranges[0])
                         || continuation144::owner(p, &s.diagnostic_ranges[0])
                         || assembly144::owner(p, &s.diagnostic_ranges[0]))),
-        "foreign native144 routine profile"
+        "foreign native 144 routine profile"
     );
     read(profile)?;
     Ok(())
@@ -213,15 +213,15 @@ fn fold(f: &mut Value, expected: &Value, guard: &Value) -> Result<()> {
     ensure!(
         f["diagnostics"]
             .as_array()
-            .context("native144 template diagnostics")?
+            .context("native 144 template diagnostics")?
             .iter()
             .filter(|d| d["unit"] == UNIT)
             .eq(std::iter::once(expected)),
-        "native144 cannot replace or duplicate history"
+        "native 144 cannot replace or duplicate history"
     );
     ensure!(
         f["admission_transition_guard"].is_null() || f["admission_transition_guard"] == *guard,
-        "native144 cannot consume another admission guard"
+        "native 144 cannot consume another admission guard"
     );
     f["admission_transition_guard"] = Value::Null;
     Ok(())
@@ -234,19 +234,19 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn observer(p: &Plan, value: &Value, observed: bool) -> Result<()> {
-    let profile = p.native144_restore.as_ref().context("native144 profile")?;
+    let profile = p.native144_restore.as_ref().context("native 144 profile")?;
     ensure!(
         !value["replays"]
             .as_array()
-            .context("native144 ordinary census")?
+            .context("native 144 ordinary census")?
             .iter()
             .any(|r| r["range"] == "144"),
-        "native144 ordinary claim forbidden"
+        "native 144 ordinary claim forbidden"
     );
     let rows = value["diagnostic_replays"]
         .as_array()
-        .context("native144 diagnostic census")?;
-    ensure!(rows.len() == 1, "native144 diagnostic census differs");
+        .context("native 144 diagnostic census")?;
+    ensure!(rows.len() == 1, "native 144 diagnostic census differs");
     observer_row(&rows[0], &profile.invocation_id, observed)
 }
 fn observer_row(row: &Value, iid: &str, observed: bool) -> Result<()> {
@@ -255,7 +255,7 @@ fn observer_row(row: &Value, iid: &str, observed: bool) -> Result<()> {
             && row["producer_unit"] == UNIT
             && row["expected_producer_invocation_id"] == iid
             && row["scratch_path"] == SCRATCH,
-        "native144 observer owner/tree differs"
+        "native 144 observer owner/tree differs"
     );
     if !observed {
         ensure!(
@@ -263,7 +263,7 @@ fn observer_row(row: &Value, iid: &str, observed: bool) -> Result<()> {
                 && row["expected_controller_invocation_id"] == iid
                 && row["worker_executable_basename"] == "historical-worker"
                 && row.get("append_log").is_none_or(Value::is_null),
-            "native144 config borrows legacy owner/log"
+            "native 144 config borrows legacy owner/log"
         );
         return Ok(());
     }
@@ -276,14 +276,14 @@ fn observer_row(row: &Value, iid: &str, observed: bool) -> Result<()> {
     ] {
         ensure!(
             row[flag] == false,
-            "native144 observer grants authority:{flag}"
+            "native 144 observer grants authority:{flag}"
         );
     }
     match row["status"].as_str() {
         Some("unavailable") => ensure!(
             row["observation"].is_null()
                 && row["error"].as_str().is_some_and(|s| !s.trim().is_empty()),
-            "native144 unavailable is not inactivity proof"
+            "native 144 unavailable is not inactivity proof"
         ),
         Some("observed") => {
             let s = &row["observation"];
@@ -292,7 +292,7 @@ fn observer_row(row: &Value, iid: &str, observed: bool) -> Result<()> {
                     && s["range"] == "144"
                     && s["scratch_path"] == SCRATCH
                     && s["invocation_binding_stable"] == true,
-                "native144 observation differs"
+                "native 144 observation differs"
             );
             for kind in ["controller", "producer"] {
                 for point in ["before", "after"] {
@@ -301,12 +301,12 @@ fn observer_row(row: &Value, iid: &str, observed: bool) -> Result<()> {
                         u["invocation_id"] == iid
                             && u["restarts"] == 0
                             && matches!(u["active_state"].as_str(), Some("active" | "activating")),
-                        "native144 observation owner changed"
+                        "native 144 observation owner changed"
                     );
                 }
             }
         }
-        _ => anyhow::bail!("unknown native144 diagnostic outcome"),
+        _ => anyhow::bail!("unknown native 144 diagnostic outcome"),
     }
     Ok(())
 }
@@ -316,7 +316,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
             && next.native144_restore.is_none()
             && next.completed144_prefix.is_some()
             && public198::refreshed(next),
-        "native144 requires unmigrated completed144/native198 history"
+        "native 144 requires unmigrated completed144/native198 history"
     );
     let s: Spec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(
@@ -325,7 +325,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
             && !s.publication_authorized
             && !s.r2_mutations
             && s.event_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101)),
-        "native144 spec scope or authority differs"
+        "native 144 spec scope or authority differs"
     );
     let event = bound_json(&s.event_fleet, false)?;
     let ep = bound_json(&s.event_plan, true)?;
@@ -336,14 +336,14 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
                 == bound_json(&next.previous_observer, false)?["recorded_at_utc"]
             && ep["observer"] == serde_json::to_value(&next.previous_observer)?
             && ep["previous_fleet"] == serde_json::to_value(&next.previous_fleet)?,
-        "native144 event must follow exact completed predecessor"
+        "native 144 event must follow exact completed predecessor"
     );
     let launch = bound_json(&s.launch, true)?;
     let iid = launch["invocation_id"]
         .as_str()
-        .context("native144 invocation")?
+        .context("native 144 invocation")?
         .to_string();
-    let scope = next.scope_101_200.as_mut().context("native144 scope")?;
+    let scope = next.scope_101_200.as_mut().context("native 144 scope")?;
     migrate_observer(scope, config, &iid)?;
     next.previous_fleet = s.event_fleet.clone();
     next.fleet_template = s.event_plan.clone();
@@ -367,7 +367,7 @@ fn migrate_observer(scope: &mut Scope101200, config: &mut Value, iid: &str) -> R
     let old = "horizon-qualify-epoch144-loader-focus-20261016-v1.service";
     ensure!(
         scope.private144_observer && scope.diagnostic_ranges.len() == 1,
-        "native144 original observer scope absent"
+        "native 144 original observer scope absent"
     );
     let owner = &scope.diagnostic_ranges[0];
     ensure!(
@@ -376,11 +376,11 @@ fn migrate_observer(scope: &mut Scope101200, config: &mut Value, iid: &str) -> R
             && owner.producer_unit == old
             && owner.expected_controller_invocation_id == private144::INVOCATION
             && owner.expected_producer_invocation_id == private144::INVOCATION,
-        "native144 cannot replace a newer observer owner"
+        "native 144 cannot replace a newer observer owner"
     );
     let rows = config["diagnostic_replays"]
         .as_array_mut()
-        .context("native144 original diagnostic")?;
+        .context("native 144 original diagnostic")?;
     ensure!(
         rows.len() == 1
             && rows[0]["range"] == "144"
@@ -388,7 +388,7 @@ fn migrate_observer(scope: &mut Scope101200, config: &mut Value, iid: &str) -> R
             && rows[0]["producer_unit"] == old
             && rows[0]["expected_controller_invocation_id"] == private144::INVOCATION
             && rows[0]["expected_producer_invocation_id"] == private144::INVOCATION,
-        "native144 must migrate only original terminal diagnostic observer"
+        "native 144 must migrate only original terminal diagnostic observer"
     );
     rows[0] = json!({"range":"144","controller_unit":UNIT,"producer_unit":UNIT,
         "expected_controller_invocation_id":iid,"expected_producer_invocation_id":iid,

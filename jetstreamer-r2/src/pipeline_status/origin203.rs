@@ -1,4 +1,4 @@
-//! Exact private continuation origin for the independently published203 archive.
+//! Exact private continuation origin for the independently published 203 archive.
 use super::*;
 
 pub(super) fn validate(plan: &Plan, origin: &Value) -> Result<()> {

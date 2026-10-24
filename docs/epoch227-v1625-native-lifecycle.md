@@ -1,6 +1,6 @@
-# Epoch227 v1.6.25 native-input lifecycle
+# Epoch 227 v1.6.25 native-input lifecycle
 
-This route qualifies only restoration/freezing of the retained98063464 snapshot
+This route qualifies only restoration/freezing of the retained 98063464 snapshot
 with the separately sealed FULL-profile v1.6.25 test runner. It never launches
 entries, promotes an era, creates an archive/sidecar, or grants R2 authority.
 The failed v1.6.20 attempt and its data remain intact.
@@ -42,26 +42,26 @@ sandbox, then writes the immutable origin at
 `/var/lib/jetstreamer/horizon-227-v1625-native-capture-actual-v1/intent.json`.
 
 Admission shares the existing closed disk/memory arithmetic, century-floor
-calculation and maximum existing guard baseline. It reserves128GiB maximum
-memory and300GB scratch, with8CPU affinity,45-minute bound and no restart.
-It requires each of the four live producers204,205,209,225(shared226) to retain
+calculation and maximum existing guard baseline. It reserves 128 GiB maximum
+memory and 300 GB scratch, with 8CPU affinity,45-minute bound and no restart.
+It requires each of the four live producers 204,205,209,225(shared 226) to retain
 its exact observed invocation, original guards and remaining growth. It also
-retains the failed original227 diagnostic/IID/launch/gate/current-manager evidence;
-an unexplained omission or stale active original227 is rejected.
+retains the failed original 227 diagnostic/IID/launch/gate/current-manager evidence;
+an unexplained omission or stale active original 227 is rejected.
 The shared `prefix223_live_peer` adapter additionally accepts only the actual
 full-prefix223 invocation `e70aaf097e7c4583b216aba454145910`, with its immutable
 launch, sandbox, same-invocation whole-root allocation and fresh protective guard.
 It reserves the complete remaining disk envelope and exact kernel-rounded hard
 memory growth, including before progress or allocation has begun. No accepted
 owner or failed history is removed; a derived accounting view only feeds the
-unchanged base arithmetic. Native210 and any other unmodeled auxiliary still
+unchanged base arithmetic. Native 210 and any other unmodeled auxiliary still
 block admission. The parent coordinates launch order and fresh complete evidence.
 
 Central fleet registration adds only the new native claim and its exact metadata
-event. Preserve the original failed227 diagnostic and its launch evidence.
-The claim remains private input verification and keeps227's failed repair gate;
+event. Preserve the original failed 227 diagnostic and its launch evidence.
+The claim remains private input verification and keeps 227's failed repair gate;
 neither a running claim nor successful input proof is archive completion.
-The coordinated observer supports both exact227 runtime tuples independently and
+The coordinated observer supports both exact 227 runtime tuples independently and
 rejects cross-runtime, wrong-epoch or diagnostic-runner telemetry.
 
 Publish the real active native phase as dashboard `verification` using the

@@ -166,7 +166,7 @@ mod tests {
     use super::*;
     #[test]
     fn reporting_above_sealed_floor_never_lowers_inherited_reservations() {
-        // Saved337 optimistic growth already makes the old2TB plan impossible.
+        // Saved 337 optimistic growth already makes the old 2 TB plan impossible.
         let (floor, initial, _) =
             requirements(245_383_154_903, 1_841_658_544_128, c::FLOOR, 0, 1).unwrap();
         assert_eq!(floor, 2_087_041_699_031);

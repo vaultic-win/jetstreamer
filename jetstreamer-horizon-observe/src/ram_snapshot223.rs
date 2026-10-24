@@ -1,4 +1,4 @@
-//! Separate closed RAM-only cold/tail gates for the isolated epoch223 candidate.
+//! Separate closed RAM-only cold/tail gates for the isolated epoch 223 candidate.
 use super::*;
 
 const PLAN_SCHEMA: &str = if COLD223 {
@@ -64,23 +64,23 @@ fn safe_name(s: &str, prefix: &str) -> bool {
 pub(super) fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.schema == PLAN_SCHEMA && matches!(p.mode.as_str(), "capability" | "snapshot-tests"),
-        "wrong223 schema/mode"
+        "wrong 223 schema/mode"
     );
     ensure!(
         p.unit
             .strip_suffix(".service")
             .is_some_and(|s| safe_name(s, UNIT_PREFIX)),
-        "foreign223 unit"
+        "foreign 223 unit"
     );
     ensure!(
         p.test_binary.sha256 == TEST_SHA
             && p.snapshot.sha256 == SNAPSHOT_SHA
             && p.genesis.sha256 == GENESIS_SHA,
-        "foreign223 inputs"
+        "foreign 223 inputs"
     );
     ensure!(
         p.snapshot.path == Path::new(SNAPSHOT_PATH) && p.genesis.path == Path::new(GENESIS_PATH),
-        "foreign223 package"
+        "foreign 223 package"
     );
     ensure!(
         p.test_binary.path.file_name().and_then(|s| s.to_str()) == Some("historical-worker")
@@ -88,7 +88,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
                 == Some(Path::new(
                     "/var/lib/jetstreamer/horizon-223-tail-snapshot-harness-release-bd60006d-v1"
                 )),
-        "foreign223 harness"
+        "foreign 223 harness"
     );
     ensure!(
         p.receipt_directory.parent()
@@ -98,7 +98,7 @@ pub(super) fn validate_plan(p: &Plan) -> Result<()> {
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| safe_name(s, RECEIPT_PREFIX))
             && (60..=1800).contains(&p.maximum_runtime_seconds),
-        "foreign223 receipt/time scope"
+        "foreign 223 receipt/time scope"
     );
     validate_reserves(TMPFS_SIZE, MEMORY_MAX, FLOOR, STOP_MEMORY)
 }
@@ -209,7 +209,7 @@ fn fleet_binding(f: &Value, o: &Value, hash: &str) -> Result<()> {
             && f["last_epoch"] == 300
             && f["producer_mutations"] == false
             && f["remote_mutations"] == false,
-        "unbound223 fleet"
+        "unbound 223 fleet"
     );
     let entries = f["inventory"]["entries"]
         .as_array()

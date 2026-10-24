@@ -660,7 +660,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     ensure!(
         args.len() == 5 && args[1] == "--plan-sha256" && args[3] == "--self-sha256",
-        "usage: jetstreamer-epoch{EPOCH}-private-verify PLAN --plan-sha256 HEX --self-sha256 HEX"
+        "usage: jetstreamer-epoch {EPOCH}-private-verify PLAN --plan-sha256 HEX --self-sha256 HEX"
     );
     run(
         Evidence {

@@ -42,7 +42,7 @@ fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
             && f["tool"] == serde_json::to_value(&p.tools.r2)?
             && f["stderr"]["text"]
                 == "Error: private144 fleet scope, gate, tracking or overlapping owner differs\n",
-        "not the exact original144 private/public contract failure"
+        "not the exact original 144 private/public contract failure"
     );
     Ok(())
 }
@@ -93,7 +93,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     let sample = utc_seconds(&p.sample_target_utc)?;
     ensure!(
         sample <= now && now - sample <= 1800,
-        "history recovery needs original fresh resource sample,not a replacement observation"
+        "history recovery needs original fresh resource sample, not a replacement observation"
     );
     let model = file(p.cycle_directory.join("sealed/eta-model.json"), true)?;
     let mv = bound_json(&model, true)?;
@@ -208,7 +208,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
             "downstream readiness changed"
         );
     }
-    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No authenticated current198 verifier child; stage transition/status cleanup requires prompt reconciliation"});
+    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"No authenticated current 198 verifier child; stage transition/status cleanup requires prompt reconciliation"});
     let d144 = publication144::publish_using(p, &pipeline, &observer, &writer)?;
     let d160 = delivery160::publish(p, &pipeline, &observer)?;
     child(

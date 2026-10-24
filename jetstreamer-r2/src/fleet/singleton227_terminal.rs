@@ -1,4 +1,4 @@
-//! Exact native227 terminal event; never promotes the full epoch or starts replay.
+//! Exact native 227 terminal event; never promotes the full epoch or starts replay.
 use super::*;
 use super::{singleton227 as c, singleton227_admission as admission};
 pub(super) const TERMINAL_SCHEMA: &str =

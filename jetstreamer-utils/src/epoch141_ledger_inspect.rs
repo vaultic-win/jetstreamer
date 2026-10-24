@@ -451,7 +451,7 @@ pub(crate) fn run(retain: bool) -> Result<()> {
     let age = now()?
         .checked_sub(u64::try_from(m.mtime())?)
         .context("future admission timestamp")?;
-    ensure!(age <= 300, "admission is older than300seconds");
+    ensure!(age <= 300, "admission is older than 300 seconds");
     let start = Instant::now();
     let free_before = guard(&plan, start)?;
     if values.contains_key("--check-only") {

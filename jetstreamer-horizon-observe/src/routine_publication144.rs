@@ -1,4 +1,4 @@
-//! Metadata-only adoption of one genuinely captured exact144 local publisher.
+//! Metadata-only adoption of one genuinely captured exact 144 local publisher.
 use super::*;
 #[path = "routine_publication144_status.rs"]
 mod status;
@@ -118,7 +118,7 @@ fn checked(b: &Bound, r: &Value) -> Result<Value> {
                 .is_some_and(|s| s.len() == 32
                     && s.bytes()
                         .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
-        "foreign exact144 captured publisher"
+        "foreign exact 144 captured publisher"
     );
     for flag in [
         "ordinary_replay_claim",

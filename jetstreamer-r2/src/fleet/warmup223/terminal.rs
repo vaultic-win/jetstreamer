@@ -1,4 +1,4 @@
-//! Terminal handoff for this bounded native20 warmup, never prefix qualification.
+//! Terminal handoff for this bounded native 20 warmup, never prefix qualification.
 use super::super::*;
 use super::native20 as c;
 pub(super) const SCHEMA: &str = "jetstreamer-private-warmup223-native20-terminal-v1";

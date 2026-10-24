@@ -1,4 +1,4 @@
-//! Canonical160 delivery through authenticated existing watcher children.
+//! Canonical 160 delivery through authenticated existing watcher children.
 use super::*;
 const PROOF: &str =
     "/var/lib/jetstreamer/horizon-epoch160-public-observation-20261022-v1/proof.json";
@@ -32,7 +32,7 @@ fn read(p: &Plan) -> Result<Value> {
         .context("160 public proof absent")?;
     ensure!(
         b.path == Path::new(PROOF) && reader(p),
-        "foreign160 public reader/proof"
+        "foreign 160 public reader/proof"
     );
     let v = bound_json(b, false)?;
     validate_capture(&v, utc_seconds(&p.sample_target_utc)?)?;
@@ -111,7 +111,7 @@ pub(super) fn enable(p: &mut Plan) -> Result<()> {
                         .ends_with("sample-20261022T162800Z.json")))
             && p.epoch160_delivery.is_some()
             && !enabled(p),
-        "160 public handoff must follow accepted1558 cycle"
+        "160 public handoff must follow accepted 1558 cycle"
     );
     let bytes = read_checked(Path::new(PROOF), LIMIT, 0, false)?;
     p.epoch160_delivery.as_mut().unwrap().public_observation = Some(Bound {
@@ -166,7 +166,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         "160 public transition cannot weaken another gate"
     );
     gate["next_action"] = json!(
-        "Canonical160 import is committed. Authenticate actual160 full/plugin/upload children at each coordinated sample; preserve independent digest-matching receipts and sole global uploader. Matching verified R2sidecar is completion, not a local import or idle watcher. Repair missing downstream ownership/status promptly."
+        "Canonical 160 import is committed. Authenticate actual 160 full/plugin/upload children at each coordinated sample; preserve independent digest-matching receipts and sole global uploader. Matching verified R2 sidecar is completion, not a local import or idle watcher. Repair missing downstream ownership/status promptly."
     );
     let b = serde_json::to_value(profile.public_observation.as_ref().unwrap())?;
     let evidence = gate["evidence"]
@@ -235,7 +235,7 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
     });
     let Some(owner) = owner else {
         return Ok(
-            json!({"provisional_fleet":fleet,"publication_skipped":true,"reason":"No authenticated actual160 child; repair downstream/status promptly, never invent a watcher claim"}),
+            json!({"provisional_fleet":fleet,"publication_skipped":true,"reason":"No authenticated actual 160 child; repair downstream/status promptly, never invent a watcher claim"}),
         );
     };
     ensure!(
@@ -386,7 +386,7 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
                     && m["fleet"] == d["provisional_fleet"]
                     && m["observer"] == c["observer"]
                     && d["publication"].is_null(),
-                "foreign160 post-sample handoff rejection"
+                "foreign 160 post-sample handoff rejection"
             );
             let r = bound_json(&b, false)?;
             // The original cycle plan still pins the pre-recovery reader.
@@ -417,7 +417,7 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         m.path
             == p.cycle_directory
                 .join("delivery160-status/sealed/pipeline-plan.json"),
-        "foreign160 public model"
+        "foreign 160 public model"
     );
     validate(p, &o, &m, &bound_json(&r, false)?)
 }

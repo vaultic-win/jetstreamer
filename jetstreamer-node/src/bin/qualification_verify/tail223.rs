@@ -40,7 +40,7 @@ pub(super) fn validate_bootstrap(
     if namespace(a) && (!matches(a) || accounts != ACCOUNTS || bank != BANK || revision != REVISION)
     {
         return Err(
-            "epoch223 tail must bind its exact canonical bootstrap hashes and runtime revision"
+            "epoch 223 tail must bind its exact canonical bootstrap hashes and runtime revision"
                 .into(),
         );
     }

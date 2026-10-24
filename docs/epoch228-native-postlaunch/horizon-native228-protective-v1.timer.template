@@ -1,5 +1,5 @@
 [Unit]
-Description=Horizon native228 protective guard timer
+Description=Horizon native 228 protective guard timer
 
 [Timer]
 OnActiveSec=1s

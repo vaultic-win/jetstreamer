@@ -1,4 +1,4 @@
-//! Fixed-work private measurement of the prepared epoch224 v1.6.25 repair.
+//! Fixed-work private measurement of the prepared epoch 224 v1.6.25 repair.
 //! Neither reaching the target nor passing its resource capture qualifies an epoch.
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;

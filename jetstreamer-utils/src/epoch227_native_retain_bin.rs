@@ -1,4 +1,4 @@
-//! No-clobber preservation of the positively stopped first native227 attempt.
+//! No-clobber preservation of the positively stopped first native 227 attempt.
 use anyhow::{Result, ensure};
 use sha2::{Digest, Sha256};
 use std::{

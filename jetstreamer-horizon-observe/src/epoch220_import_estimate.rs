@@ -47,7 +47,7 @@ fn read(b: &Bound, immutable: bool) -> Result<Value> {
 }
 fn prior_budget(maximum_full_millis: u64) -> Result<u64> {
     // Explicit scheduling assumption: 25% overhead for normal semantic/context
-    // collection, trusted219 anchoring and hashing beyond the measured reader.
+    // collection, trusted 219 anchoring and hashing beyond the measured reader.
     ensure!(maximum_full_millis > 0, "empty duration prior");
     maximum_full_millis
         .checked_mul(5)
@@ -186,7 +186,7 @@ fn run() -> Result<()> {
     }
     evidence::write_receipt(
         &p.output,
-        &json!({"schema":"horizon-epoch220-import-estimates-v1","sampled_at_utc":observer["recorded_at_utc"],"phase":"publication","unit":u,"phase_elapsed_millis":elapsed,"phase_start_proof":start,"private_full_duration_millis":durations,"projected_import_duration_millis":budget,"estimate_basis":"Historical maximum8-thread private full reread duration plus explicit25% normal semantic/context/hash/anchor overhead prior; remaining importer time plus retained per-epoch full/plugin/upload/readback/sidecar allowance. No measured current progress is claimed. Prior expires rather than clamping an overdue live job.","estimates":estimates,"observer_sha256":p.observer.sha256,"fleet_sha256":p.fleet.sha256,"prior_model_sha256":MODEL_SHA,"private_reader_receipt_shas":READ_SHAS,"plan_sha256":args[1],"self_sha256":args[2],"archive_mutations":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":"horizon-epoch220-import-estimates-v1","sampled_at_utc":observer["recorded_at_utc"],"phase":"publication","unit":u,"phase_elapsed_millis":elapsed,"phase_start_proof":start,"private_full_duration_millis":durations,"projected_import_duration_millis":budget,"estimate_basis":"Historical maximum8-thread private full reread duration plus explicit 25% normal semantic/context/hash/anchor overhead prior; remaining importer time plus retained per-epoch full/plugin/upload/readback/sidecar allowance. No measured current progress is claimed. Prior expires rather than clamping an overdue live job.","estimates":estimates,"observer_sha256":p.observer.sha256,"fleet_sha256":p.fleet.sha256,"prior_model_sha256":MODEL_SHA,"private_reader_receipt_shas":READ_SHAS,"plan_sha256":args[1],"self_sha256":args[2],"archive_mutations":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     println!("{}", p.output.display());
     Ok(())

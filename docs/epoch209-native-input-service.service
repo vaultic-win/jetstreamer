@@ -1,6 +1,6 @@
 # Dormant: sealed input/harness, fresh root admission, fleet registration and guard required.
 [Unit]
-Description=Horizon epoch209 v1.6.16 native cold input verification
+Description=Horizon epoch 209 v1.6.16 native cold input verification
 
 [Service]
 Type=exec

@@ -48,7 +48,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
                 .as_u64()
                 .is_some_and(|v| v >= FLOOR + (32u64 << 30))
             && r["trip"] == false,
-        "foreign native141 rejection attempt"
+        "foreign native 141 rejection attempt"
     );
     for key in ["plan_sha256", "admission_sha256"] {
         let s = r[key].as_str().context("missing rejection binding")?;
@@ -91,7 +91,7 @@ fn bindings(p: &Value, a: &Value, m: &Value) -> Result<()> {
             && p["initial_guard_receipt"] == format!("{ROOT}/results/initial-guard.json")
             && p["metadata_receipt"] == format!("{ROOT}/results/intent.json")
             && p["output_receipt"] == format!("{ROOT}/results/candidates.json"),
-        "native141 rejection plan differs"
+        "native 141 rejection plan differs"
     );
     ensure!(
         m["schema"] == "jetstreamer-historical-performance-admission-v1"
@@ -105,7 +105,7 @@ fn bindings(p: &Value, a: &Value, m: &Value) -> Result<()> {
                 .as_u64()
                 .is_some_and(|v| v >= 144u64 << 30)
             && m["files"] == json!([{"path":TOOL,"sha256":TOOL_SHA,"uid":0,"gid":0,"mode":"0555"}]),
-        "native141 rejection manifest differs"
+        "native 141 rejection manifest differs"
     );
     ensure!(
         a["schema"] == "jetstreamer-historical-performance-admission-receipt-v1"
@@ -117,7 +117,7 @@ fn bindings(p: &Value, a: &Value, m: &Value) -> Result<()> {
             && a["evidence"]["filesystem"] == "/home/sol"
             && a["evidence"]["files"] == m["files"]
             && a["evidence"]["minimum_free_bytes"] == m["minimum_free_bytes"],
-        "native141 rejection admission differs"
+        "native 141 rejection admission differs"
     );
     for flag in [
         "services_started",
@@ -176,7 +176,7 @@ fn live(c: &DiagnosticClaim, r: &Value, v: &Value) -> Result<()> {
                 .and_then(|s| s.parse::<u64>().ok())
                 .is_some_and(|p| p > 0)
             && command(&v["ExecStart"]) == Some(expected_command(r).as_str()),
-        "native141 rejection live identity differs"
+        "native 141 rejection live identity differs"
     );
     Ok(())
 }

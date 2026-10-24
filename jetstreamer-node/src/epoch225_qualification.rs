@@ -1,4 +1,4 @@
-//! Complete private epoch225; the epoch226 suffix is verification evidence only.
+//! Complete private epoch 225; the epoch 226 suffix is verification evidence only.
 use std::path::Path;
 
 pub(crate) const BOOTSTRAP_SLOT: u64 = 97_199_617;
@@ -56,10 +56,10 @@ pub(crate) fn validate_launch(
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch225-v1-6-25-qualification requires exact private focused epoch225 from97199617 through98063464; ordinary replay, cohorts, inherited leases, recovery and publication are unavailable".into());
+        return Err("epoch225-v1-6-25-qualification requires exact private focused epoch 225 from 97199617 through 98063464; ordinary replay, cohorts, inherited leases, recovery and publication are unavailable".into());
     }
     let (ledger, output, scratch) =
-        paths.ok_or("complete epoch225 qualification requires explicit private paths")?;
+        paths.ok_or("complete epoch 225 qualification requires explicit private paths")?;
     let root = ledger
         .parent()
         .ok_or("missing private qualification root")?;
@@ -73,7 +73,7 @@ pub(crate) fn validate_launch(
         || output != root.join("output/epoch-225.jet")
         || scratch != root.join("scratch")
     {
-        return Err("complete epoch225 qualification paths require one isolated qualification-225-v1625 private root".into());
+        return Err("complete epoch 225 qualification paths require one isolated qualification-225-v1625 private root".into());
     }
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! One exact native191 verifier admission/launch. Never replays or mutates R2.
+//! One exact native 191 verifier admission/launch. Never replays or mutates R2.
 use super::*;
 use crate::cohort191_delivery::{self as custody, Bound};
 use serde_json::json;
@@ -18,8 +18,8 @@ const OS_BUDGET: (&str, &str) = (
     "/usr/local/lib/jetstreamer/horizon-v1425-portability-os-budget-20261023-v2/budget.json",
     "2e95927a3c49972630c9de458e32359a859b90de7b0fa9b195d6dbb1083ed620",
 );
-// Eight fixed tasks, each with at most two16MiB logs, plus bounded custody files.
-// Reserve64MiB per task and8MiB for dispatcher evidence; retain completed files.
+// Eight fixed tasks, each with at most two 16 MiB logs, plus bounded custody files.
+// Reserve 64 MiB per task and 8 MiB for dispatcher evidence; retain completed files.
 const OS_ALLOWANCE: u64 = 520 << 20;
 const GIB: u64 = 1 << 30;
 const FULL_DIR: &str =
@@ -83,7 +83,7 @@ fn validate(p: &Plan, spec: &Value) -> Result<()> {
                 ))
             && p.output_directory
                 == Path::new(ROOT).join(format!("epoch-{}-{}", p.epoch, p.stage.name())),
-        "foreign191 verifier dispatch"
+        "foreign 191 verifier dispatch"
     );
     ensure!(
         spec["schema"] == "horizon-verify-canonical-pair-dev-samjohnson191-v1"
@@ -195,7 +195,7 @@ fn resources(observer: &Bound, o: &Value, c: &Value, now: u64) -> Result<()> {
         .context("191 memory overflow")?;
     ensure!(
         m["valid"] == true && need <= total,
-        "191 lacks protected growth +64GiB verifier +16GiB compiler +2GiB queue/dispatcher +2GiB uploader envelope"
+        "191 lacks protected growth +64 GiB verifier +16 GiB compiler +2 GiB queue/dispatcher +2 GiB uploader envelope"
     );
     ensure!(
         o["host_memory"]["conservative_available_kib"]
@@ -335,7 +335,7 @@ fn bounded_command(program: &str, args: &[String], maximum: usize) -> Result<Vec
             break s;
         }
         if Instant::now() >= deadline {
-            // This kills only the short client, never PID1's verifier service.
+            // This kills only the short client, never PID 1's verifier service.
             let _ = child.kill();
             let _ = child.wait();
             anyhow::bail!(
@@ -553,7 +553,7 @@ pub(super) fn run() -> Result<()> {
             && budget["reservations"]["fixture_maximum_physical_bytes"] == 10 * GIB,
         "191 retained OS budget changed"
     );
-    // One fixed native191 dispatcher at a time, including fsynced intent and
+    // One fixed native 191 dispatcher at a time, including fsynced intent and
     // actual manager capture. This lock does not purport to mediate other work.
     let lock_path = Path::new(ROOT).join("dispatch.lock");
     let lock = OpenOptions::new()

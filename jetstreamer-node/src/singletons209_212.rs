@@ -51,7 +51,7 @@ pub(crate) fn validate_launch(
         || snapshot.and_then(Path::file_name).and_then(|s| s.to_str())
             != Some(p.bootstrap.filename().as_str())
     {
-        return Err("private209–212singleton requires one exact verified cohort, candidate opt-in and its cached canonical bootstrap; other modes are forbidden".into());
+        return Err("private 209–212singleton requires one exact verified cohort, candidate opt-in and its cached canonical bootstrap; other modes are forbidden".into());
     }
     let root = output.parent().ok_or("singleton output root missing")?;
     if output.file_name().and_then(|s| s.to_str()) != Some("output")

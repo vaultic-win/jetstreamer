@@ -1063,7 +1063,7 @@ fn restore_mainnet_runtime_hooks(bank: &mut Bank, genesis: &GenesisConfig) -> Re
     // Exact Stable callback semantics in this era have no inflation/program
     // activations, but disable CPI before epoch 63 and enable it from epoch 63.
     // `MessageProcessor::is_cross_program_supported` is serde-skipped and its
-    // default is `true`, so a restored epoch-61/62 snapshot must be corrected
+    // default is `true`, so a restored epoch- 61/62 snapshot must be corrected
     // immediately rather than waiting for the next epoch boundary.
     bank.set_cross_program_support(bank.epoch() >= 63);
     bank.set_entered_epoch_callback(Box::new(|bank| {

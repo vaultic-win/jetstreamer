@@ -1,4 +1,4 @@
-//! Independent203 source/producer/RPC bindings; never publication admission.
+//! Independent 203 source/producer/RPC bindings; never publication admission.
 mod profile {
     pub const UNIT: &str = "horizon-qualify-203-checkpoint-continuation-ed66145-v1.service";
     pub const INVOCATION: &str = "ddf3ed2de8b040758ee7a0d696159afd";

@@ -19,7 +19,7 @@ fn id(v: &Value) -> bool {
     })
 }
 pub(super) fn checked(s: &Profile) -> Result<(Value, Value)> {
-    let b = s.upload.as_ref().context("missing144 upload capture")?;
+    let b = s.upload.as_ref().context("missing 144 upload capture")?;
     let l = bound_json(b, true)?;
     let original = bound_json(&s.launch, true)?;
     let pb: Bound = serde_json::from_value(l["plan"].clone())?;
@@ -40,7 +40,7 @@ fn lineage(
     i: &Value,
     k: &Value,
 ) -> Result<Value> {
-    let b = s.upload.as_ref().context("missing144 upload capture")?;
+    let b = s.upload.as_ref().context("missing 144 upload capture")?;
     let root = Path::new(d["output_directory"].as_str().context("delivery root")?);
     ensure!(
         root.parent() == Some(Path::new("/var/lib/jetstreamer"))
@@ -57,7 +57,7 @@ fn lineage(
             && d["r2_create_missing_pair_authorized"] == true
             && d["r2_overwrite_authorized"] == false
             && d["local_retirement_authorized"] == false,
-        "foreign144 upload plan or origin"
+        "foreign 144 upload plan or origin"
     );
     ensure!(
         l["schema"] == "jetstreamer-exact144-delivery-launch-v1"
@@ -70,7 +70,7 @@ fn lineage(
             && l["claim"]["invocation_id"] == l["owner"]["InvocationID"]
             && l["claim"]["origin_unit"] == UNIT
             && l["claim"]["origin_invocation_id"] == original["claim"]["invocation_id"],
-        "foreign or queued144 upload capture"
+        "foreign or queued 144 upload capture"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -264,7 +264,7 @@ fn phase(v: &Value) -> Result<&'static str> {
     match v["phase"].as_str() {
         Some("pre-upload-source-hash" | "upload" | "awaiting-readback") => Ok("upload"),
         Some("readback" | "source-revalidation-sidecar" | "sidecar-commit") => Ok("readback"),
-        _ => anyhow::bail!("unsupported144 child phase;never invent queued progress"),
+        _ => anyhow::bail!("unsupported 144 child phase; never invent queued progress"),
     }
 }
 pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> {
@@ -296,14 +296,14 @@ fn publish_inner(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> 
         .collect();
     if active.is_empty() {
         return Ok(
-            json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Exact144 upload is not active;capture terminal event and reconcile ready/failure status lifecycle promptly","delivery_kind":"upload144"}),
+            json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Exact 144 upload is not active; capture terminal event and reconcile ready/failure status lifecycle promptly","delivery_kind":"upload144"}),
         );
     }
     ensure!(
         active.len() == 1
             && active[0]["phase"] == "upload-readback"
             && state(&active[0]["unit"], &l)?.1 == ACTIVE_UPLOAD,
-        "overlapping144 upload owner"
+        "overlapping 144 upload owner"
     );
     let pb: Bound = serde_json::from_value(l["plan"].clone())?;
     let d = bound_json(&pb, true)?;
@@ -366,7 +366,7 @@ fn publish_inner(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> 
         "binding":{"unit":UPLOAD,"invocation_id":u["InvocationID"],"expected_exec_start":u["ExecStart"],"claim_phase":"upload-readback",
             "origin_unit":UNIT,"origin_invocation_id":l["claim"]["origin_invocation_id"],"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},
         "observer":observer,"fleet":provisional,"origin_launch":s.launch,"estimate_evidence":[progress,s.upload,s.launch],
-        "estimate_basis":"Authenticated exact live144 child progress/forecast;original publisher invocation clock retained;no queued time or replay ETA fabricated",
+        "estimate_basis":"Authenticated exact live 144 child progress/forecast;original publisher invocation clock retained; no queued time or replay ETA fabricated",
         "estimated_remaining_millis":forecast["estimated_remaining_millis"],"jet_path":"/home/sol/horizon/epoch-144.jet","expected_jet_size_bytes":LENGTH,
         "peer_units":[],"receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
     let package =

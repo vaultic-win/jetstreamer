@@ -1,4 +1,4 @@
-//! Custody of the real persistent191 queue; waiting is a manager task, never
+//! Custody of the real persistent 191 queue; waiting is a manager task, never
 //! a fabricated live verifier. This module launches nothing and holds no R2 key.
 use super::*;
 pub(super) const PHASE: &str = "cohort191-delivery";
@@ -455,7 +455,7 @@ fn child(
     let start = owner["start_ticks"].as_u64().context("191 task start")?;
     ensure!(
         u["MainPID"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(pid),
-        "191 task is not PID1's actual main process"
+        "191 task is not PID 1's actual main process"
     );
     process(pid, start, &c.unit, &program)?;
     let start_ms = pipeline_status::manager_start(&c.unit, &c.invocation_id)?;

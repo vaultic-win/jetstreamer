@@ -1,4 +1,4 @@
-//! Compile-time exact60911751 snapshot identity; no caller-selectable cloud object.
+//! Compile-time exact 60911751 snapshot identity; no caller-selectable cloud object.
 pub(super) const EPOCH: u64 = 140;
 pub(super) const FILENAME: &str =
     "snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst";

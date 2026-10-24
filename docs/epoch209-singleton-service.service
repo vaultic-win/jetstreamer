@@ -1,5 +1,5 @@
 # Dormant template for horizon-singleton-209-capped-4aeca563-v1.service.
-# Load/start only after the full209 native/capability/admission gates pass.
+# Load/start only after the full 209 native/capability/admission gates pass.
 [Unit]
 Description=Horizon epoch 209 independent capped singleton
 After=network-online.target

@@ -77,8 +77,8 @@ publish status in the existing coordinated 30-minute cycle using only `replay`,
 
 ## Epoch 209 native input harness
 
-Epoch210 has its own [native preparation and integration plan](epoch210-native-preparation.md).
-Its build, preflight and non-native integrity checks do not borrow epoch209's
+Epoch 210 has its own [native preparation and integration plan](epoch210-native-preparation.md).
+Its build, preflight and non-native integrity checks do not borrow epoch 209's
 native proof or qualify its 424-slot post-root tail.
 
 The test-only v1.6.16 module `worker/src/native209_input.rs` supplies the ignored
@@ -139,14 +139,14 @@ it binds the closed unit/root, harness/snapshot/genesis/guard digests, cold plan
 300 GB candidate scratch, 128 GiB hard memory, protected floor and required
 initial free bytes. Its eight authority flags remain false.
 
-Current full227 work is a distinct authenticated diagnostic owner, never a
-native227 substitute. Admission validates its launch, canonical command and
+Current full 227 work is a distinct authenticated diagnostic owner, never a
+native 227 substitute. Admission validates its launch, canonical command and
 current whole-root protective guard. Its disk reservation is the whole-root
 envelope minus the smaller of coordinated same-invocation whole-root allocation
 and current guarded whole-root allocation. Both observer scope paths must equal
 the exact singleton root. Actual free space brackets these calculations, owners
 and caps are checked twice, and increased remaining growth aborts admission.
-The full227 hard cgroup memory growth is separately reserved; current RSS cannot
+The full 227 hard cgroup memory growth is separately reserved; current RSS cannot
 replace that claim. Existing 204/205/225 and any supported native auxiliaries
 retain their original guard and accounting gates.
 
@@ -171,4 +171,4 @@ Terminal validation rechecks that exact immutable spec and original registered
 owner, child PID, ordered canonical marker/test/PID1 success and bounded run
 clock. Preserve the proof in a fleet terminal event, then conditionally retire
 only its exact owned status using the existing inactive-status protocol.
-Never reuse epoch207's origin/journal hashes or rerun an already successful Bank.
+Never reuse epoch 207's origin/journal hashes or rerun an already successful Bank.

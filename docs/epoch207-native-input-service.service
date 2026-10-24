@@ -1,6 +1,6 @@
 # Dormant. Exact root coordination, native admission, registry and guard required.
 [Unit]
-Description=Horizon epoch207 v1.6.16 native cold input verification
+Description=Horizon epoch 207 v1.6.16 native cold input verification
 
 [Service]
 Type=exec

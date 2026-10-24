@@ -1,4 +1,4 @@
-//! Status-only cleanup for a terminal exact144 delivery. Canonical and staged
+//! Status-only cleanup for a terminal exact 144 delivery. Canonical and staged
 //! archives remain untouched; no ready pair is invented and no retry is started.
 use super::*;
 const PUB: &str = "horizon-publish-144-v4-20261022-v1.service";
@@ -23,7 +23,7 @@ pub(super) fn scope(p: &Plan, i: &Value) -> Result<()> {
             && i["publisher"]["publication"]["epoch"] == 144
             && i["publisher"]["publication"]["archive_sha256"] == DIGEST
             && i["publisher"]["publication"]["archive_bytes"] == LENGTH,
-        "preserved delivery is not the exact committed144 artifact and nonqueued owner"
+        "preserved delivery is not the exact committed 144 artifact and nonqueued owner"
     );
     Ok(())
 }
@@ -47,7 +47,7 @@ fn evidence(p: &Plan, i: &Value) -> Result<()> {
             && d["r2_create_missing_pair_authorized"] == true
             && d["r2_overwrite_authorized"] == false
             && d["local_retirement_authorized"] == false,
-        "foreign preserved144 delivery plan"
+        "foreign preserved 144 delivery plan"
     );
     let origin = Bound {
         path: "/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1/launch.json".into(),
@@ -64,7 +64,7 @@ fn evidence(p: &Plan, i: &Value) -> Result<()> {
             && o["publisher_plan"] == d["publisher_plan"]
             && o["tracker_plan"] == d["tracker_plan"]
             && o["claim"]["invocation_id"] == i["publisher"]["publisher"]["InvocationID"],
-        "preserved144 original publisher differs"
+        "preserved 144 original publisher differs"
     );
     Ok(())
 }
@@ -76,7 +76,7 @@ pub(super) fn owner(p: &Plan, i: &Value, r: &StatusPublicationReceipt) -> Result
     let b = r
         .pipeline_binding
         .as_ref()
-        .context("preserved144 requires exact pipeline status owner")?;
+        .context("preserved 144 requires exact pipeline status owner")?;
     ensure!(
         r.epoch == 144
             && b.origin_unit == PUB
@@ -112,7 +112,7 @@ pub(super) fn terminal_owner(current: &Value, historical: &Value, iid: &str) -> 
                 && v["ExecMainStatus"]
                     .as_str()
                     .is_some_and(|s| s.parse::<u32>().is_ok()),
-            "preserved144 owner is live, replaced, restarting, collected or ambiguous"
+            "preserved 144 owner is live, replaced, restarting, collected or ambiguous"
         );
     }
     ensure!(
@@ -120,7 +120,7 @@ pub(super) fn terminal_owner(current: &Value, historical: &Value, iid: &str) -> 
             .as_str()
             .zip(historical["ExecStart"].as_str())
             .is_some_and(|(a, b)| pipeline_status::same_exec_start(a, b)),
-        "preserved144 terminal command changed"
+        "preserved 144 terminal command changed"
     );
     Ok(())
 }
@@ -136,19 +136,19 @@ pub(super) fn terminal_census(
     for (name, capture) in [(PUB, &i["publisher"]["publisher"]), (UPLOAD, &i["owner"])] {
         let v = current
             .get(name)
-            .context("preserved144 publisher/uploader absent from full census")?;
+            .context("preserved 144 publisher/uploader absent from full census")?;
         // The capture is live at intent creation; require the terminal census
         // independently, retaining its exact captured invocation and command.
         let iid = capture["InvocationID"]
             .as_str()
-            .context("preserved144 capture IID")?;
+            .context("preserved 144 capture IID")?;
         terminal_owner(v, v, iid)?;
         ensure!(
             v["ExecStart"]
                 .as_str()
                 .zip(capture["ExecStart"].as_str())
                 .is_some_and(|(a, b)| pipeline_status::same_exec_start(a, b)),
-            "preserved144 captured command changed"
+            "preserved 144 captured command changed"
         );
         no_pending_owner_trigger(name, false)?;
     }
@@ -187,7 +187,7 @@ pub(super) fn local(p: &Plan, i: &Value) -> Result<()> {
             && m.mode() & 0o7777 == 0o440
             && m.len() == LENGTH
             && archive_matches(&identity(&m), &i["publisher"]["archive_identity"]),
-        "preserved144 canonical identity changed"
+        "preserved 144 canonical identity changed"
     );
     let sidecar = p.public_archive_directory.join("epoch-144.jet.sha256");
     let s = fs::symlink_metadata(&sidecar)?;
@@ -197,10 +197,10 @@ pub(super) fn local(p: &Plan, i: &Value) -> Result<()> {
             && s.gid() == 1003
             && s.nlink() == 1
             && s.mode() & 0o7777 == 0o440
-            && read_stable_bounded(&sidecar, 4096, "preserved144 local sidecar")?
+            && read_stable_bounded(&sidecar, 4096, "preserved 144 local sidecar")?
                 == format!("{DIGEST}  epoch-144.jet\n").as_bytes()
             && identity(&fs::symlink_metadata(path)?) == identity(&m),
-        "preserved144 canonical sidecar or archive changed"
+        "preserved 144 canonical sidecar or archive changed"
     );
     Ok(())
 }
@@ -227,7 +227,7 @@ pub(super) async fn remote(s3: &Client, r2: &R2Config) -> Result<Value> {
                 && e.archive_metadata_sha256
                     .as_deref()
                     .is_none_or(|s| s == DIGEST),
-            "staged144 remote identity conflicts with preserved canonical archive"
+            "staged 144 remote identity conflicts with preserved canonical archive"
         );
     }
     let key = "epoch-144.jet";

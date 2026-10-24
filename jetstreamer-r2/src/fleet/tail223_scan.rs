@@ -1,4 +1,4 @@
-//! Closed observational owner for the private477slot reread, never delivery.
+//! Closed observational owner for the private 477 slot reread, never delivery.
 use super::*;
 pub(super) const UNIT: &str = "archive-223-tail-reread-1743245a-v3.service";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-tail-1743245a-v3";
@@ -27,7 +27,7 @@ fn checked(c: &PipelineClaim, launch: &Value, terminal: &Value) -> Result<()> {
                 .split_once(" ; ignore_errors=")
                 .map(|(s, _)| s)
                 == Some(command().as_str()),
-        "private223 reread launch or exact command differs"
+        "private 223 reread launch or exact command differs"
     );
     ensure!(
         terminal["schema"] == "jetstreamer-private-epoch223-tail-terminal-v1"
@@ -50,7 +50,7 @@ fn checked(c: &PipelineClaim, launch: &Value, terminal: &Value) -> Result<()> {
             && terminal["terminal_slot"] == 96_767_999u64
             && terminal["output_slot_count"] == 477
             && terminal["tail_comparison_only"] == true,
-        "private223 reread requires exact clean parent terminal evidence"
+        "private 223 reread requires exact clean parent terminal evidence"
     );
     for value in [launch, terminal] {
         for flag in [
@@ -68,7 +68,7 @@ fn checked(c: &PipelineClaim, launch: &Value, terminal: &Value) -> Result<()> {
         ] {
             ensure!(
                 value[flag] == false,
-                "private223 reread grants foreign authority:{flag}"
+                "private 223 reread grants foreign authority:{flag}"
             );
         }
     }
@@ -77,7 +77,7 @@ fn checked(c: &PipelineClaim, launch: &Value, terminal: &Value) -> Result<()> {
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     ensure!(
         c.evidence.len() == 1,
-        "private223 reread needs one exact launch receipt"
+        "private 223 reread needs one exact launch receipt"
     );
     let launch = bound_json(&c.evidence[0])?;
     let binding: BoundFile = serde_json::from_value(launch["producer_terminal"].clone())?;
@@ -86,7 +86,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
             == Path::new(
                 "/var/lib/jetstreamer/horizon-223-tail-terminal-1743245a-v3/terminal.json"
             ),
-        "private223 terminal path differs"
+        "private 223 terminal path differs"
     );
     checked(c, &launch, &bound_json(&binding)?)
 }
@@ -94,10 +94,13 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     validate(c)?;
     ensure!(
         current["Type"] == "oneshot",
-        "private223 reread must be oneshot"
+        "private 223 reread must be oneshot"
     );
     let out = ProcessCommand::new("systemctl").args(["show", &c.unit, "--property=User,Group,DynamicUser,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,TimeoutStartUSec"]).output()?;
-    ensure!(out.status.success(), "private223 reread sandbox unreadable");
+    ensure!(
+        out.status.success(),
+        "private 223 reread sandbox unreadable"
+    );
     let text = std::str::from_utf8(&out.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|l| l.split_once('=')).collect();
     for (key, expected) in [
@@ -123,7 +126,7 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     ] {
         ensure!(
             fields.get(key) == Some(&expected),
-            "private223 reread sandbox differs:{key}"
+            "private 223 reread sandbox differs:{key}"
         );
     }
     Ok(())

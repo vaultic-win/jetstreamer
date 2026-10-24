@@ -1,4 +1,4 @@
-//! Status-only cleanup for the exact guarded incomplete185 invocation.
+//! Status-only cleanup for the exact guarded incomplete 185 invocation.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-terminal185-20261024-v1/terminal.json";
 const SHA: &str = "59b4626838f5d8e0fc8964a952b6fb96e2284d93a12f35e8fea80b30d9de73be";
@@ -25,7 +25,7 @@ fn scope(e: &Value, actual: &[(String, String)]) -> Result<()> {
             && actual == owners()
             && e["last_observed_slot"] == 80099168u64
             && e["canonical_terminal_slot"] == 80351999u64,
-        "foreign185 terminal scope or incomplete suffix lost"
+        "foreign 185 terminal scope or incomplete suffix lost"
     );
     for key in [
         "replay_launch_authorized",
@@ -109,7 +109,7 @@ fn terminal(c: &Value, unit: &str, iid: &str) -> Result<()> {
 pub(super) fn time(plan: &Plan, e: &Value) -> Result<u64> {
     ensure!(
         plan.epoch == 185 && binding(&plan.terminal_fleet),
-        "unbound185 native terminal evidence"
+        "unbound 185 native terminal evidence"
     );
     scope(e, &owners())?;
     for (key, file, sha) in [
@@ -149,7 +149,7 @@ pub(super) fn time(plan: &Plan, e: &Value) -> Result<u64> {
     }
     ensure!(
         captured <= SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-        "future185 capture"
+        "future 185 capture"
     );
     Ok(captured)
 }

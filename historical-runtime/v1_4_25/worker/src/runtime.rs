@@ -563,7 +563,7 @@ impl RuntimeState {
         let mut writes = self.freeze_root_and_drain()?;
         #[cfg(feature = "epoch141-freeze-component-diagnostic")]
         if crate::epoch141_freeze_trace::terminal(self.bank.slot()) {
-            return Err(format!("epoch141 freeze-component diagnostic captured terminal{}; bounded stop before any later Bank or entry", crate::epoch141_freeze_trace::TERMINAL));
+            return Err(format!("epoch 141 freeze-component diagnostic captured terminal {}; bounded stop before any later Bank or entry", crate::epoch141_freeze_trace::TERMINAL));
         }
         let child_poh_start = self.bank.last_blockhash();
         let leader = leader_schedule::slot_leader(&self.bank, slot, &mut self.leader_schedules)?;

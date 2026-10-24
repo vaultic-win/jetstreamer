@@ -310,7 +310,7 @@ pub(super) fn validate_live(p: &Plan) -> Result<()> {
             continue;
         }
         if p.cohort191_delivery.is_some() && row["range"] == "191-194" {
-            // Historical rebind proof is retained. Current191 custody is owned
+            // Historical rebind proof is retained. Current 191 custody is owned
             // by its native delivery event, never a fake fifth live replay.
             continue;
         }
@@ -377,7 +377,7 @@ pub(super) fn enable(
             && p.previous_observer.sha256
                 == "ff0e6cb88985b95fee3ee8cea8af460200ac8001e5e1ca48d4dc9b3026a289b3"
             && p.original141_root.is_none(),
-        "controller recovery requires exact accepted0559predecessor and no extra lane"
+        "controller recovery requires exact accepted 0559predecessor and no extra lane"
     );
     p.controller_rebind = Some(binding());
     let v = evidence(p)?.unwrap();

@@ -1,4 +1,4 @@
-//! Exact bounded144 native comparison; never replay, sidecar or publication.
+//! Exact bounded 144 native comparison; never replay, sidecar or publication.
 use super::*;
 mod prepare;
 pub(super) fn prepare() -> Result<()> {
@@ -52,7 +52,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             && canonical_digest(&r["native_plan"]["sha256"])
             && command_part(&r["expected_exec_start"])
                 == Some(command(r["native_plan"]["sha256"].as_str().unwrap_or("")).as_str()),
-        "native144 exact launch scope differs"
+        "native 144 exact launch scope differs"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -68,7 +68,10 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(r[flag] == false, "native144 launch grants authority:{flag}");
+        ensure!(
+            r[flag] == false,
+            "native 144 launch grants authority:{flag}"
+        );
     }
     Ok(())
 }
@@ -92,7 +95,7 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             && admission["replay_launch_authorized"] == false
             && admission["publication_authorized"] == false
             && admission["r2_mutations"] == false,
-        "native144 missing exact acyclic plan/admission"
+        "native 144 missing exact acyclic plan/admission"
     );
     let inputs: BoundFile = serde_json::from_value(plan["inputs"].clone())?;
     let inputs = bound_json(&inputs)?;
@@ -100,7 +103,7 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
         inputs["schema"] == "jetstreamer-epoch144-native-input-policy-v1"
             && inputs["probe_sha256"] == PROBE_SHA
             && inputs["scratch_directory"] == SCRATCH,
-        "native144 inputs changed"
+        "native 144 inputs changed"
     );
     Ok(())
 }
@@ -114,7 +117,7 @@ pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> 
             && current["InvocationID"] == c.invocation_id
             && current["NRestarts"] == "0"
             && command_part(&current["ExecStart"]) == command_part(&r["expected_exec_start"]),
-        "native144 live owner differs"
+        "native 144 live owner differs"
     );
     live_limits(UNIT)?;
     let old = unit("horizon-qualify-epoch144-loader-focus-20261016-v1.service")?;
@@ -127,7 +130,7 @@ pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> 
             && audit["MainPID"] == "0"
             && audit["Result"] == "success"
             && audit["ExecMainStatus"] == "0",
-        "native144 conflicts with original private audit"
+        "native 144 conflicts with original private audit"
     );
     Ok(())
 }
@@ -140,12 +143,12 @@ fn live_limits(name: &str) -> Result<()> {
         "--property=Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,PrivateMounts,NoNewPrivileges,ReadWritePaths,User,Group,UMask,CapabilityBoundingSet,AmbientCapabilities"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 16384,
-        "native144 limits unreadable"
+        "native 144 limits unreadable"
     );
     let mut limits = BTreeMap::new();
     for line in std::str::from_utf8(&out.stdout)?.lines() {
         let (k, v) = line.split_once('=').context("native144 limit line")?;
-        ensure!(limits.insert(k, v).is_none(), "duplicate native144 limit");
+        ensure!(limits.insert(k, v).is_none(), "duplicate native 144 limit");
     }
     validate_limits(&limits)
 }
@@ -176,7 +179,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
         ("CapabilityBoundingSet", ""),
         ("AmbientCapabilities", ""),
     ] {
-        ensure!(l.get(k) == Some(&v), "native144 sandbox differs:{k}");
+        ensure!(l.get(k) == Some(&v), "native 144 sandbox differs:{k}");
     }
     Ok(())
 }

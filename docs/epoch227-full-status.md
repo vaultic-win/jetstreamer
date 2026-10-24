@@ -1,6 +1,6 @@
-# Full227 operational status
+# Full 227 operational status
 
-`fleet/full227_status.rs` reports the actual admitted full227 diagnostic. It
+`fleet/full227_status.rs` reports the actual admitted full 227 diagnostic. It
 never creates a pipeline claim, substitutes a historical worker, grants archive
 qualification, or writes archive/sidecar objects. It reuses `publish_epoch_status`
 and the existing authenticated conditional publication/readback transport.
@@ -53,7 +53,7 @@ status-publish-full227 MODEL --plan-sha256 SHA --self-sha256 SHA [--check-only]
 ```
 
 The initial event is at the actual launch capture clock, requires a registered
-full227 diagnostic and its exact first real protective guard/PID1 completion,
+full 227 diagnostic and its exact first real protective guard/PID1 completion,
 and reads the invocation journal once at that cutoff. The adapter emits
 `verification` while initializing and `replay` once real progress markers prove
 slot execution; a reached replay terminal returns to `verification` for the
@@ -74,9 +74,9 @@ Zero means this bound run has not created its archive yet. After cohort import,
 the canonical destination supplies the size. The immutable estimate records
 the measured path, source and cohort-state digest.
 
-Observed slots between the pinned bootstrap and epoch227 remain `verification`.
+Observed slots between the pinned bootstrap and epoch 227 remain `verification`.
 They retain the full epoch estimate and provisional rate until epoch recording
-begins; a fast pre-epoch warmup does not shorten the estimate for432000slots.
+begins; a fast pre-epoch warmup does not shorten the estimate for 432000 slots.
 ETA includes the complete432000-slot
 epoch, its suffix and every declared downstream stage through verified sidecar
 commit. A sufficient measured rate replaces the provisional rate. If transaction

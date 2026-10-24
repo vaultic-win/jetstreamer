@@ -5,7 +5,7 @@ The fleet reader has a separate, closed contract for
 qualification from bootstrap slot 60911751 through root 61328765. It is not a
 complete epoch 141 archive and must never acquire an ordinary replay claim or
 publication authority. Active qualification still needs the separate operational
-dashboard countdown described in [the141 status model](horizon-epoch141-status-estimates.md);
+dashboard countdown described in [the 141 status model](horizon-epoch141-status-estimates.md);
 a root-only ETA is not a time-to-sidecar projection. The epoch remains `failed-needs-repair` while this
 diagnostic runs and until a verified ready pair eventually closes the repair.
 

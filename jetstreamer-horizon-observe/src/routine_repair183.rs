@@ -1,4 +1,4 @@
-//! Exact admitted repair183-184 observer/model adoption; never replay authority.
+//! Exact admitted repair for epochs 183–184: observer/model adoption; never replay authority.
 use super::*;
 const CONTROLLER: &str =
     "jetstreamer-epochs183-184-readerfix-full-20261023-controller-v2-r2.service";
@@ -46,7 +46,7 @@ fn scope(h: &Handoff) -> Result<()> {
             && !h.publication_authorized
             && !h.remote_mutations
             && !h.r2_mutations,
-        "repair183 handoff grants authority or has invalid identities"
+        "repair 183 handoff grants authority or has invalid identities"
     );
     let scratch = &h.scratch_path;
     ensure!(
@@ -71,9 +71,9 @@ fn scope(h: &Handoff) -> Result<()> {
             && h.archive_directory
                 == scratch
                     .parent()
-                    .context("repair183 run parent")?
+                    .context("repair 183 run parent")?
                     .join("archives"),
-        "repair183 private archive/scratch scope differs"
+        "repair 183 private archive/scratch scope differs"
     );
     ensure!(
         h.capability.path
@@ -82,7 +82,7 @@ fn scope(h: &Handoff) -> Result<()> {
             )
             && h.capability.sha256
                 == "b98120a9a2697fd4bb004df8ebae67594222185db5e4f3cfe2474ce42333ca45",
-        "repair183 capability binding differs"
+        "repair 183 capability binding differs"
     );
     Ok(())
 }
@@ -115,7 +115,7 @@ fn guard(h: &Handoff, v: &Value) -> Result<()> {
             && s["producer"]["worker_vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n <= 800000),
-        "repair183 guard first-fire proof differs"
+        "repair 183 guard first-fire proof differs"
     );
     for key in [
         "replay_launch_authorized",
@@ -123,7 +123,7 @@ fn guard(h: &Handoff, v: &Value) -> Result<()> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(v[key] == false, "repair183 guard proof grants authority");
+        ensure!(v[key] == false, "repair 183 guard proof grants authority");
     }
     Ok(())
 }
@@ -137,7 +137,7 @@ fn live_guard(h: &Handoff) -> Result<()> {
         let out=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=ActiveState,SubState,Result,NRestarts,ExecMainStatus,ExecStart,Triggers"]).output()?;
         ensure!(
             out.status.success() && out.stdout.len() < 32768,
-            "repair183 guard manager read failed"
+            "repair 183 guard manager read failed"
         );
         let text = std::str::from_utf8(&out.stdout)?;
         let values: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
@@ -145,23 +145,25 @@ fn live_guard(h: &Handoff) -> Result<()> {
             ensure!(
                 values.get("ActiveState") == Some(&"active")
                     && values.get("Triggers") == Some(&GUARD),
-                "repair183 guard timer is not active for its exact service"
+                "repair 183 guard timer is not active for its exact service"
             );
         } else {
             ensure!(
                 values.get("Result") == Some(&"success")
                     && values.get("NRestarts") == Some(&"0")
                     && values.get("ExecMainStatus") == Some(&"0"),
-                "repair183 guard is not healthy"
+                "repair 183 guard is not healthy"
             );
-            let command = values.get("ExecStart").context("repair183 guard command")?;
+            let command = values
+                .get("ExecStart")
+                .context("repair 183 guard command")?;
             ensure!(
                 command
                     .split_whitespace()
                     .filter(|w| *w == GUARD_SCRIPT)
                     .count()
                     == 1,
-                "repair183 guard executable differs"
+                "repair 183 guard executable differs"
             );
             for token in [
                 format!("--controller-unit={CONTROLLER}"),
@@ -179,7 +181,7 @@ fn live_guard(h: &Handoff) -> Result<()> {
             ] {
                 ensure!(
                     command.split_whitespace().filter(|w| *w == token).count() == 1,
-                    "repair183 guard command binding differs"
+                    "repair 183 guard command binding differs"
                 );
             }
         }
@@ -192,19 +194,19 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
     };
     ensure!(
         is_101(p)? && p.publication144.is_some(),
-        "foreign repair183 profile"
+        "foreign repair 183 profile"
     );
     ensure!(
         b.path.starts_with("/usr/local/lib/jetstreamer")
             && b.path.file_name().and_then(|s| s.to_str()) == Some("handoff.json"),
-        "repair183 handoff namespace"
+        "repair 183 handoff namespace"
     );
     let h: Handoff = serde_json::from_value(bound_json(b, true)?)?;
     scope(&h)?;
     let cap = bound_json(&h.capability, true)?;
     ensure!(
         cap["epochs"] == json!([183, 184]) && cap["replay_started"] == false,
-        "repair183 original capability differs"
+        "repair 183 original capability differs"
     );
     let admission = bound_json(&h.admission, false)?;
     ensure!(
@@ -225,7 +227,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
             && admission["evidence"]["minimum_vm_max_map_count"]
                 .as_u64()
                 .is_some_and(|n| n >= 4194304),
-        "repair183 full admission proof differs"
+        "repair 183 full admission proof differs"
     );
     let manifest: Bound = serde_json::from_value(
         json!({"path":admission["manifest"],"sha256":admission["manifest_sha256"]}),
@@ -237,7 +239,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
             && m["snapshot"]["size"] == 7042035825u64
             && m["snapshot"]["crc32c_base64"] == "nQBGXw=="
             && m["snapshot"]["md5_base64"] == "9/3TqW83uPXBE5gkYfpmCg==",
-        "repair183 admitted snapshot differs"
+        "repair 183 admitted snapshot differs"
     );
     let before = bound_json(&h.observer_before_launch, false)?;
     ensure!(
@@ -247,7 +249,7 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
                 .is_some_and(|rows| rows.iter().any(|r| r["path"]
                     == h.observer_before_launch.path.to_str().unwrap_or("")
                     && r["sha256"] == h.observer_before_launch.sha256)),
-        "repair183 admission does not bind the exact prelaunch observer"
+        "repair 183 admission does not bind the exact prelaunch observer"
     );
     guard(&h, &bound_json(&h.guard_first_fire, true)?)?;
     let mut h = h;
@@ -273,7 +275,7 @@ pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> 
         ensure!(
             !epochs.iter().any(|e| (183..=184).contains(e))
                 || epochs.contains(&183) && epochs.contains(&184),
-            "partial repair183 prior claim"
+            "partial repair 183 prior claim"
         );
         epochs.extend([183, 184]);
         scope(&h)?;
@@ -285,16 +287,18 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
     let mut v = model.clone();
     if v["unestimated_bootstrap_epochs"] == json!([183, 184]) {
         v.as_object_mut()
-            .context("repair183 model object")?
+            .context("repair 183 model object")?
             .remove("unestimated_bootstrap_epochs");
     }
     if let Some(census) = v.get_mut("expected_observer_ranges") {
-        let census = census.as_array_mut().context("repair183 observer census")?;
+        let census = census
+            .as_array_mut()
+            .context("repair 183 observer census")?;
         if !census.contains(&json!("183-184")) {
             census.push(json!("183-184"));
         }
     }
-    let ranges = v["ranges"].as_array_mut().context("repair183 ranges")?;
+    let ranges = v["ranges"].as_array_mut().context("repair 183 ranges")?;
     let indices: Vec<_> = ranges
         .iter()
         .enumerate()
@@ -313,7 +317,7 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
                     .map(|r| r["range"].as_str().unwrap_or(""))
                     .collect::<BTreeSet<_>>()
                     == BTreeSet::from(["152-153", "155-156", "191-194"]),
-            "repair183 baseline census differs"
+            "repair 183 baseline census differs"
         );
         ranges.push(json!({"range":"183-184","epochs":[183,184],"archive_directory":h.archive_directory,
             "expected_controller_invocation_id":h.controller_invocation_id,"expected_producer_invocation_id":h.producer_invocation_id,
@@ -322,7 +326,7 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
             "formula":{"183":"remaining observed epoch183 slots plus432000 queued epoch184 slots / observed rate +12h downstream; shared cohort import gate is184",
                 "184":"remaining observed epoch183 slots plus432000 queued epoch184 slots / observed rate +24h downstream; shared cohort import gate is184"}}));
     } else {
-        ensure!(indices.len() == 1, "overlapping repair183 claims");
+        ensure!(indices.len() == 1, "overlapping repair 183 claims");
         let r = &ranges[indices[0]];
         ensure!(
             r["range"] == "183-184"
@@ -331,18 +335,18 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
                 && r["expected_controller_invocation_id"] == h.controller_invocation_id
                 && r["expected_producer_invocation_id"] == h.producer_invocation_id
                 && r.get("elapsed_execution_millis").is_none(),
-            "repair183 existing model owner/clock differs"
+            "repair 183 existing model owner/clock differs"
         );
-        let terminal = r["terminal_slot"].as_u64().context("repair183 terminal")?;
+        let terminal = r["terminal_slot"].as_u64().context("repair 183 terminal")?;
         ensure!(
             matches!(terminal, FIRST_END | FINAL_END),
-            "repair183 terminal is outside exact cohort"
+            "repair 183 terminal is outside exact cohort"
         );
         for (e, allowance) in [("183", 43200), ("184", 86400)] {
             ensure!(
                 r["epoch_additional_replay_slots"][e] == FINAL_END - terminal
                     && r["epoch_downstream_allowance_seconds"][e] == allowance,
-                "repair183 gated work/allowance changed"
+                "repair 183 gated work/allowance changed"
             );
         }
     }
@@ -356,7 +360,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     };
     let already = model["ranges"]
         .as_array()
-        .context("repair183 ranges")?
+        .context("repair 183 ranges")?
         .iter()
         .any(|r| r["range"] == "183-184");
     if !already {
@@ -366,19 +370,21 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
             let checked = observation(model, &h, &prior)?;
             ensure!(
                 checked["unestimated_bootstrap_epochs"] == json!([183, 184]),
-                "repair183 bootstrap predecessor changed"
+                "repair 183 bootstrap predecessor changed"
             );
         }
         ensure!(
             continued_bootstrap
                 || (h.observer_before_launch.path == p.previous_observer.path
                     && h.observer_before_launch.sha256 == p.previous_observer.sha256),
-            "repair183 initial predecessor differs"
+            "repair 183 initial predecessor differs"
         );
     }
     let mut v = apply(model, &h)?;
     let b = serde_json::to_value(p.repair183_handoff.as_ref().unwrap())?;
-    let evidence = v["evidence"].as_array_mut().context("repair183 evidence")?;
+    let evidence = v["evidence"]
+        .as_array_mut()
+        .context("repair 183 evidence")?;
     if !evidence.contains(&b) {
         evidence.push(b);
     }
@@ -390,7 +396,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     }
     let tracked = fleet["tracked_units"]
         .as_array_mut()
-        .context("repair183 fleet tracked units")?;
+        .context("repair 183 fleet tracked units")?;
     for unit in [CONTROLLER.to_owned(), PRODUCER.to_owned()] {
         let value = json!(unit);
         if !tracked.contains(&value) {
@@ -402,16 +408,16 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
         let gate = &mut fleet["gates"][epoch];
         ensure!(
             gate["state"] == "failed-needs-repair",
-            "repair183 original open repair gate changed"
+            "repair 183 original open repair gate changed"
         );
         let evidence = gate["evidence"]
             .as_array_mut()
-            .context("repair183 gate evidence")?;
+            .context("repair 183 gate evidence")?;
         if !evidence.contains(&e) {
             evidence.push(e);
         }
         gate["next_action"] = json!(
-            "Track freshly admitted and guard-protected183-184 repair replay under its exact controller/producer identities. Shared import gate is epoch184; preserve queued work and downstream allowances in both ETAs. Keep source incident open through canonical/full/plugin/publication and authenticated ready pairs; launch or unit tests alone are not recovery."
+            "Track freshly admitted and guard-protected183-184 repair replay under its exact controller/producer identities. Shared import gate is epoch 184; preserve queued work and downstream allowances in both ETAs. Keep source incident open through canonical/full/plugin/publication and authenticated ready pairs; launch or unit tests alone are not recovery."
         );
     }
     Ok(())
@@ -426,21 +432,21 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
     let mut v = apply(model, h)?;
     let rows: Vec<_> = observed["replays"]
         .as_array()
-        .context("repair183 observation census")?
+        .context("repair 183 observation census")?
         .iter()
         .filter(|r| r["range"] == "183-184")
         .collect();
-    ensure!(rows.len() == 1, "repair183 missing/duplicate observation");
+    ensure!(rows.len() == 1, "repair 183 missing/duplicate observation");
     let o = rows[0];
     ensure!(
         o["controller_before"]["unit"] == CONTROLLER
             && o["producer_before"]["unit"] == PRODUCER
             && o["scratch_path"] == h.scratch_path.to_str().unwrap_or(""),
-        "repair183 observed paths/units differ"
+        "repair 183 observed paths/units differ"
     );
     ensure!(
         o["invocation_binding_stable"] == true,
-        "repair183 unstable observation"
+        "repair 183 unstable observation"
     );
     for (kind, id) in [
         ("controller", &h.controller_invocation_id),
@@ -450,7 +456,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
             let s = &o[format!("{kind}_{point}")];
             ensure!(
                 s["invocation_id"] == *id && s["restarts"] == 0 && s["active_state"] == "active",
-                "repair183 observed owner changed"
+                "repair 183 observed owner changed"
             );
         }
     }
@@ -468,7 +474,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
                     .find(|r| r["range"] == "183-184")
                     .unwrap()["terminal_slot"]
                     == FIRST_END,
-            "repair183 absent progress is not initial bootstrap"
+            "repair 183 absent progress is not initial bootstrap"
         );
         for point in ["before", "after"] {
             let worker = &o[format!("worker_{point}")];
@@ -478,7 +484,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
                     && worker["vmas"]
                         .as_u64()
                         .is_some_and(|n| n > 0 && n <= 800000),
-                "repair183 bootstrap worker is not protected"
+                "repair 183 bootstrap worker is not protected"
             );
         }
         v["ranges"]
@@ -490,13 +496,13 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
     }
     let terminal = o["useful_work"]["last"]["terminal_slot"]
         .as_u64()
-        .context("repair183 observed terminal")?;
+        .context("repair 183 observed terminal")?;
     let ranges = v["ranges"].as_array_mut().unwrap();
     let r = ranges.iter_mut().find(|r| r["range"] == "183-184").unwrap();
     let previous = r["terminal_slot"].as_u64().unwrap();
     ensure!(
         matches!(terminal, FIRST_END | FINAL_END) && terminal >= previous,
-        "repair183 backward/unknown terminal"
+        "repair 183 backward/unknown terminal"
     );
     r["terminal_slot"] = json!(terminal);
     for (epoch, allowance) in [("183", 43200), ("184", 86400)] {

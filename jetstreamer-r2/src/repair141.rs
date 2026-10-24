@@ -1,4 +1,4 @@
-//! Exact active141 repair queue and status-only publisher. A failed replay is
+//! Exact active 141 repair queue and status-only publisher. A failed replay is
 //! historical evidence; only an actual live native queue owns this projection.
 use super::*;
 use serde_json::json;
@@ -65,7 +65,7 @@ fn read(b: &Bound, sealed: bool) -> Result<Value> {
             && m.mode() & 0o022 == 0
             && (!sealed || m.mode() & 0o222 == 0)
             && is_lower_hex(&b.sha256, 64),
-        "unsafe141 repair evidence"
+        "unsafe 141 repair evidence"
     );
     let bytes = read_stable_bounded(&b.path, 16 << 20, "141 repair evidence")?;
     ensure!(
@@ -93,7 +93,7 @@ fn program(b: &Bound) -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && m.mode() & 0o111 != 0,
-        "unsealed141 native repair program"
+        "unsealed 141 native repair program"
     );
     let bytes = read_stable_bounded(&b.path, 512 << 20, "141 repair native program")?;
     ensure!(
@@ -230,7 +230,7 @@ fn queue_plan(b: &Bound) -> Result<QueuePlan> {
             && p.program.path == Path::new(PROGRAM)
             && p.output_directory == Path::new(ROOT)
             && p.task_slots.iter().map(String::as_str).eq(TASKS),
-        "foreign141 repair queue"
+        "foreign 141 repair queue"
     );
     program(&p.program)?;
     terminal(&p.terminal)?;
@@ -314,7 +314,7 @@ fn state_budget(extra: u64) -> Result<()> {
     }
     ensure!(
         used.checked_add(extra).is_some_and(|n| n <= 64 << 20),
-        "141 queue64MiB OS growth cap reached"
+        "141 queue 64 MiB OS growth cap reached"
     );
     Ok(())
 }
@@ -402,7 +402,7 @@ fn bootstrap(p: &QueuePlan) -> Result<Value> {
     let floor = 228_833_779_142u64 + 268_435_456 + 67_108_864;
     ensure!(
         free >= floor,
-        "141 queue cannot preserve OS baseline plus existing bootstrap and64MiB growth"
+        "141 queue cannot preserve OS baseline plus existing bootstrap and 64 MiB growth"
     );
     state_budget(2 << 20)?;
     Ok(
@@ -548,7 +548,7 @@ pub(super) fn task_capture() -> Result<()> {
     let v = read(&intent, true)?;
     ensure!(
         v["schema"] == "jetstreamer-epoch141-repair-task-capture-plan-v2" && v["epoch"] == 141,
-        "foreign141 repair task capture plan"
+        "foreign 141 repair task capture plan"
     );
     let id = v["task_id"].as_str().context("141 capture task id")?;
     ensure!(TASKS.contains(&id), "141 task is not a concrete queue slot");
@@ -714,7 +714,7 @@ fn owner_evidence(capture: &Value, now: u64) -> Result<(Bound, QueuePlan, Value)
             && capture["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|n| n <= now),
-        "foreign141 repair capture"
+        "foreign 141 repair capture"
     );
     let b: Bound = serde_json::from_value(capture["queue_plan"].clone())?;
     let p = queue_plan(&b)?;
@@ -756,7 +756,7 @@ pub(super) fn validate_fleet_claim(
 ) -> Result<()> {
     ensure!(
         epoch == 141 && scope(phase, unit),
-        "foreign141 repair claim"
+        "foreign 141 repair claim"
     );
     let matching: Vec<_> = evidence
         .iter()

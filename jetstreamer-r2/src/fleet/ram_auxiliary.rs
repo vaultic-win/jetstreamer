@@ -1,4 +1,4 @@
-//! Explicit private epoch203 comparison ownership, never a publication claim.
+//! Explicit private epoch 203 comparison ownership, never a publication claim.
 //! Launch receipts must come from an independently qualified launcher; tests in
 //! this module establish policy only and are not operational attestations.
 use super::*;
@@ -223,7 +223,7 @@ pub(super) fn validate_scope(plan: &Plan, observer: &Value, claim: &Claim) -> Re
         primary.len() == 1
             && primary[0].epoch == 203
             && primary[0].unit == "horizon-qualify-203-root-prefix-resource-v1.service",
-        "RAM auxiliary requires explicit primary203 diagnostic"
+        "RAM auxiliary requires explicit primary 203 diagnostic"
     );
     for diagnostic in &plan.diagnostics {
         ensure!(

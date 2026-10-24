@@ -26,7 +26,7 @@ fn prefix_warmup_valid(v: &Value) -> Result<()> {
             && v["terminal_manager"]["ExecMainStatus"] == "0"
             && v["terminal_manager"]["MainPID"] == "0"
             && v["terminal_manager"]["NRestarts"] == "0",
-        "native20 full-prefix requires actual successful exact warmup"
+        "native 20 full-prefix requires actual successful exact warmup"
     );
     for key in [
         "canonical_prefix_qualified",
@@ -65,7 +65,7 @@ fn prefix_prerequisites() -> Result<()> {
         native["native_input_qualified"] == true
             && native["entry_replay"] == false
             && native["repair_closed"] == false,
-        "native20 cold input remains unqualified"
+        "native 20 cold input remains unqualified"
     );
     Ok(())
 }
@@ -93,7 +93,7 @@ fn prefix_resource_values(free: u64, available: u64, starting: bool) -> Result<(
         .context("prefix memory overflow")?;
     ensure!(
         free >= disk && available >= memory,
-        "native20 prefix protected host resources no longer fit"
+        "native 20 prefix protected host resources no longer fit"
     );
     Ok(())
 }

@@ -28,7 +28,7 @@ plan schema is `jetstreamer-epoch141-first-target-byte-diagnostic-plan-v1`, with
 exact `acquisition` and `finalized_target` path/SHA bindings and a root-private
 output named `diagnostic.json` beneath
 `/var/lib/jetstreamer/horizon-epoch141-first-target-byte-diagnostic-UNIQUE`.
-Only the fixed source receipt SHA785b52de… and finalized-target SHA3103bc31…
+Only the fixed source receipt SHA 785b52de… and finalized-target SHA 3103bc31…
 are admitted. Use `PLAN --plan-sha256 HEX --self-sha256 HEX --check-only` in the
 intended sandbox first; it validates/traverses inputs but writes nothing and
 performs no decode. Actual execution writes a no-clobber intent and explicit
@@ -50,14 +50,14 @@ runtime's clock from trusted retained genesis/runtime evidence. Never infer
 ticks-per-slot or hashes-per-tick from these observed entry counts or select a
 clock merely because its work arithmetic fits. Root marker presence and a
 matching final hash do not repair the original disconnected ancestry bit.
-Keep epoch141 failed-needs-repair until qualified complete recovery reaches
+Keep epoch 141 failed-needs-repair until qualified complete recovery reaches
 the actual verified ready-pair outcome; this diagnostic alone cannot close it.
 
 ## Explicit read-only PoH regression
 
 The separately ignored test `retained_actual_first_target_poh_diagnostic` binds
-the retained typed snapshot-clock receipt SHAf74aacd8… and native-restore
-comparison SHA53f1aa88… for the same60911751 snapshot, the pinned Bank source
+the retained typed snapshot-clock receipt SHAf 74aacd8… and native-restore
+comparison SHA 53f1aa88… for the same 60911751 snapshot, the pinned Bank source
 and unchanged clock inheritance, and the finalized target anchors. It executes
 the existing bounded PoH verifier over the actual raw records without writing
 a receipt or changing a runtime route. This is preliminary diagnostic test

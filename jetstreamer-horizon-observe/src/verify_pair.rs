@@ -102,7 +102,7 @@ fn validate_plan(p: &Plan) -> Result<()> {
     if local(p) {
         ensure!(
             p.admission_observer.is_some(),
-            "epoch198 requires fresh coordinated admission evidence"
+            "epoch 198 requires fresh coordinated admission evidence"
         );
         let state = if local198 {
             PathBuf::from(
@@ -137,7 +137,7 @@ fn validate_plan(p: &Plan) -> Result<()> {
                 )
                 .join(name)
                 && p.verifier.sha256 == digest,
-            "epoch198 requires the qualified exact verifier"
+            "epoch 198 requires the qualified exact verifier"
         );
     }
     ensure!(
@@ -202,7 +202,7 @@ fn admission_value(v: &serde_json::Value, now: u64) -> Result<()> {
             && v["host_memory"]["conservative_available_kib"]
                 .as_u64()
                 .is_some_and(|n| n >= 192 * 1024 * 1024),
-        "fresh observer does not admit the combined two64GiB verifier services plus64GiB reserve or protected disk claims"
+        "fresh observer does not admit the combined two 64 GiB verifier services plus 64 GiB reserve or protected disk claims"
     );
     let replays = v["replays"].as_array().context("admission replay census")?;
     let expected = [
@@ -228,8 +228,8 @@ fn admission_value(v: &serde_json::Value, now: u64) -> Result<()> {
 
 // A191 verifier makes two independent scans with the already qualified large-
 // frame reader. This is a fresh verifier envelope, never replay admission or
-// evidence that any191 archive has passed either check.
-// The1TiB scalar below is only the read-only service floor. It does not
+// evidence that any 191 archive has passed either check.
+// The 1 TiB scalar below is only the read-only service floor. It does not
 // prove live growth reservations fit, reduce a replay guard/century floor, or
 // replace the dispatcher's independently bound capacity and compiler claims.
 fn admission191_value(v: &serde_json::Value, now: u64) -> Result<()> {
@@ -249,7 +249,7 @@ fn admission191_value(v: &serde_json::Value, now: u64) -> Result<()> {
             && v["filesystem"]["conservative_available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= (1024u64 << 30) + (32 << 20)),
-        "191 verifier admission is stale or lacks one64GiB verifier plus64GiB reserve or read-only service disk floor"
+        "191 verifier admission is stale or lacks one 64 GiB verifier plus 64 GiB reserve or read-only service disk floor"
     );
     let replays = v["replays"]
         .as_array()
@@ -694,7 +694,10 @@ fn run() -> Result<()> {
         let f = open_stable(&archive)?;
         let m = f.metadata()?;
         if p.epoch == 198 {
-            ensure!(m.len() == 99_381_250_591, "epoch198 archive length differs");
+            ensure!(
+                m.len() == 99_381_250_591,
+                "epoch 198 archive length differs"
+            );
         }
         recheck(&archive, &f, &m)?;
         println!(

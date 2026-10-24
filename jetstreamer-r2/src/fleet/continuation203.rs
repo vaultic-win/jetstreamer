@@ -1,4 +1,4 @@
-//! Closed observational registration for one exact private203 suffix/assembly.
+//! Closed observational registration for one exact private 203 suffix/assembly.
 //! This does not issue admission, launch a process, or qualify publication.
 use super::*;
 
@@ -227,7 +227,7 @@ pub(super) fn live_limits_for(runtime: &str) -> Result<()> {
     let mut limits = BTreeMap::new();
     for line in std::str::from_utf8(&out.stdout)?.lines() {
         let (k, v) = line.split_once('=').context("203 limit line")?;
-        ensure!(limits.insert(k, v).is_none(), "duplicate203 limit");
+        ensure!(limits.insert(k, v).is_none(), "duplicate 203 limit");
     }
     validate_limits_for(&limits, runtime)
 }
@@ -470,7 +470,7 @@ mod tests {
             assert!(validate_limits(&bad).is_err(), "{key}");
         }
         l.insert("RuntimeMaxUSec", "12h");
-        assert!(validate_limits(&l).is_err()); // No extension evidence means original3h.
+        assert!(validate_limits(&l).is_err()); // No extension evidence means original 3h.
         validate_limits_for(&l, "12h").unwrap();
         for key in l.keys() {
             let mut bad = l.clone();

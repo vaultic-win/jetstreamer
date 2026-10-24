@@ -1,4 +1,4 @@
-//! Finish the exact failed23:28metadata cycle without resampling or rewriting statuses.
+//! Finish the exact failed 23:28 metadata cycle without resampling or rewriting statuses.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T232800Z-native144-upload198-refresh-completed144-v1";
 const PLAN_SHA: &str = "f38c2225b477868d6a5acba3cdea2059d9a6bc8a50b3a4c18a06bc3c7f9b6d8b";
@@ -33,7 +33,7 @@ fn exact(p: &Plan, pb: &Bound, intent: &Value, failed: &Value) -> Result<()> {
             && failed["tool"]["sha256"]
                 == "48699f87596d93f319476d2af0c0b90e14a7ca672ed5a326c7af1a4f25ebae85"
             && failed["stderr"]["text"] == "Error: private144 observer envelope owner differs\n",
-        "not the exact recoverable native144 observer failure"
+        "not the exact recoverable native 144 observer failure"
     );
     Ok(())
 }
@@ -51,7 +51,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         observed.path == p.observer
             && observed.sha256
                 == "2addb94b258266c1941f51d38b457ef6f034388a475238613d80b4c9c442a7f8",
-        "native144 recovery observer differs"
+        "native 144 recovery observer differs"
     );
     let o = bound_json(&observed, false)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -71,7 +71,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     };
     ensure!(
         bound_json(&model, true)? == expected_model && bound_json(&fleet, true)? == expected_fleet,
-        "native144 recovery would change accepted formula or fleet scope"
+        "native 144 recovery would change accepted formula or fleet scope"
     );
     let estimates = file(p.estimate_output.clone(), false)?;
     let ev = bound_json(&estimates, false)?;
@@ -229,7 +229,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     let receipt = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":pb,"self_sha256":self_sha,
         "sampled_at_utc":p.sample_target_utc,"observer":observed,"model":model,"estimates":estimates,"invocation_id":iid,
         "fleet_plan":fleet,"fleet":canonical,"status_publications":statuses,"inventory":ledger["inventory"],
-        "epoch198_delivery":{"provisional_fleet":provisional,"publication_skipped":true,"reason":"Authenticated198 ready pair; status already conditionally deleted"},
+        "epoch198_delivery":{"provisional_fleet":provisional,"publication_skipped":true,"reason":"Authenticated 198 ready pair; status already conditionally deleted"},
         "native144_observer_recovery":recovery,"replay_launch_authorized":false,"archive_mutations":false,
         "sidecar_mutations":false,"deletions":false,"new_resource_samples":0});
     write_new(&root.join("completion.json"), &receipt)?;
@@ -255,7 +255,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
             && c["sampled_at_utc"] == "2026-10-21T23:28:00Z"
             && p.native144_restore.is_some()
             && public198::upload(p),
-        "foreign native144 recovery consumption"
+        "foreign native 144 recovery consumption"
     );
     p.tools.r2 = native144::reader();
     Ok(())

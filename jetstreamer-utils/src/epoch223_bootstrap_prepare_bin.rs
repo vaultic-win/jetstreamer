@@ -1,4 +1,4 @@
-//! Fixed epoch223 source; existing sealed deployments remain unchanged.
+//! Fixed epoch 223 source; existing sealed deployments remain unchanged.
 mod profile {
     pub(super) const EPOCH: u64 = 223;
     pub(super) const PROTECTED_FLEET: bool = false;

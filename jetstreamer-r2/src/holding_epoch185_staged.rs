@@ -1,4 +1,4 @@
-//! Exact185 metadata lifecycle reconciliation. Never selects replay data or excludes staged references.
+//! Exact 185 metadata lifecycle reconciliation. Never selects replay data or excludes staged references.
 use super::*;
 
 const ROOT: &str = "/var/lib/jetstreamer/horizon-terminal185-staged-reconciliation-20261024-v1";
@@ -86,7 +86,7 @@ fn config_path(unit: &str) -> PathBuf {
 fn manager_raw(name: &str) -> Result<Value> {
     ensure!(
         name == OLD_CONTROLLER || JOBS.iter().any(|j| j.unit == name),
-        "foreign185 metadata owner"
+        "foreign 185 metadata owner"
     );
     let out=std::process::Command::new("/usr/bin/systemctl").args(["show",name,"--no-pager","--all",
         "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,Triggers,TriggeredBy,OnFailure,OnSuccess,ExecStop,ExecStopPost,Restart,Type,RemainAfterExit,ExecMainStatus,Result,ControlGroup,FragmentPath,Job,ControlPID"]).output()?;
@@ -268,7 +268,7 @@ fn job_shape(v: &Value, j: Job, collected: bool) -> Result<()> {
     let expected_status = match j.status {
         0 => "0",
         1 => "1",
-        _ => bail!("foreign185 terminal status"),
+        _ => bail!("foreign 185 terminal status"),
     };
     ensure!(
         v["LoadState"] == "loaded"
@@ -301,7 +301,7 @@ fn empty_cgroup(v: &Value) -> Result<()> {
     }
     ensure!(
         group.starts_with("/system.slice/") && !group.contains(".."),
-        "foreign185 metadata cgroup"
+        "foreign 185 metadata cgroup"
     );
     let path = Path::new("/sys/fs/cgroup")
         .join(group.trim_start_matches('/'))
@@ -322,12 +322,12 @@ fn old_gate() -> Result<Value> {
         v["ActiveState"] == "inactive"
             && v["SubState"] == "dead"
             && matches!(v["LoadState"].as_str(), Some("loaded" | "masked")),
-        "obsolete185 controller is live or changed"
+        "obsolete 185 controller is live or changed"
     );
     if v["LoadState"] == "loaded" {
         ensure!(
             v["FragmentPath"] == ORIGINAL && v["Type"] == "exec" && v["RemainAfterExit"] == "no",
-            "obsolete185 loaded definition changed"
+            "obsolete 185 loaded definition changed"
         );
     }
     empty_cgroup(&v)?;
@@ -348,7 +348,7 @@ fn allowed_staged(v: &Value) -> Result<()> {
                 || JOBS
                     .iter()
                     .any(|j| config_path(j.unit).to_str() == Some(name)),
-            "unreviewed185 staged consumer: {name}"
+            "unreviewed 185 staged consumer: {name}"
         );
     }
     Ok(())
@@ -419,7 +419,7 @@ fn immutable_blob(b: &Bound, max: u64) -> Result<Vec<u8>> {
             && md.nlink() == 1
             && md.mode() & 0o222 == 0
             && digest(&b.sha256),
-        "unsafe185 preserved evidence"
+        "unsafe 185 preserved evidence"
     );
     let bytes = read_stable_bounded(&b.path, max, "185 preserved evidence")?;
     ensure!(
@@ -431,7 +431,7 @@ fn immutable_blob(b: &Bound, max: u64) -> Result<Vec<u8>> {
 fn preservation(p: &Reconcile, d: &Value) -> Result<Value> {
     ensure!(
         p.preservation.path == Path::new(BACKUP).join("preservation.json"),
-        "foreign185 preservation manifest"
+        "foreign 185 preservation manifest"
     );
     let v = bound(&p.preservation)?;
     ensure!(
@@ -449,7 +449,7 @@ fn preservation(p: &Reconcile, d: &Value) -> Result<Value> {
     let rows = v["members"].as_array().context("185 preserved members")?;
     ensure!(
         rows.len() == 9,
-        "185 preservation must cover all9reviewed owners"
+        "185 preservation must cover all 9reviewed owners"
     );
     let mut seen = std::collections::BTreeSet::new();
     let mut bytes = 0u64;
@@ -460,7 +460,7 @@ fn preservation(p: &Reconcile, d: &Value) -> Result<Value> {
         } else {
             JOBS.iter()
                 .find(|j| j.unit == name)
-                .context("foreign185 preservation unit")?
+                .context("foreign 185 preservation unit")?
                 .sha
         };
         ensure!(
@@ -487,7 +487,7 @@ fn preservation(p: &Reconcile, d: &Value) -> Result<Value> {
             .checked_add(immutable_blob(&journal, 16 << 20)?.len() as u64)
             .context("185 journal size overflow")?;
     }
-    ensure!(bytes <= 16 << 20, "185 preservation exceeds16MiB");
+    ensure!(bytes <= 16 << 20, "185 preservation exceeds 16 MiB");
     let mut expected: Vec<_> = std::iter::once(ORIGINAL.to_owned())
         .chain(
             JOBS.iter()
@@ -504,7 +504,7 @@ fn preservation(p: &Reconcile, d: &Value) -> Result<Value> {
 fn run_manager(action: &str, name: &str) -> Result<()> {
     ensure!(
         JOBS.iter().any(|j| j.unit == name) && matches!(action, "stop" | "reset-failed"),
-        "foreign185 manager mutation"
+        "foreign 185 manager mutation"
     );
     let out = std::process::Command::new("/usr/bin/systemctl")
         .args(["--job-mode=fail", action, name])
@@ -629,7 +629,7 @@ pub(super) fn fenced_for_growth() -> Result<Value> {
     let before = old_gate()?;
     ensure!(
         before["LoadState"] == "masked" && fs::read_link(ORIGINAL)? == Path::new("/dev/null"),
-        "old185 controller is launchable"
+        "old 185 controller is launchable"
     );
     checked_bytes(Path::new(RETAINED), OLD_SHA, 0)?;
     let completion = state_record(&Path::new(ROOT).join("completion.json"), 0)?
@@ -689,7 +689,7 @@ pub(super) fn fenced_for_growth() -> Result<Value> {
 pub(super) fn reconcile(m: &Mapping, p: &Reconcile, spec: &Bound) -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-horizon-holding185-staged-reconcile-plan-v2",
-        "foreign185 reconciliation schema"
+        "foreign 185 reconciliation schema"
     );
     let common: Inspect = serde_json::from_value(bound(&p.inspection_plan)?)?;
     ensure!(
@@ -798,7 +798,7 @@ pub(super) fn reconcile(m: &Mapping, p: &Reconcile, spec: &Bound) -> Result<()> 
             .context("185 preserved old controller")?;
         ensure!(
             serde_json::to_value(id)? == old_row["original_identity"],
-            "obsolete185 original identity changed since diagnostic"
+            "obsolete 185 original identity changed since diagnostic"
         );
         checked_bytes(Path::new(ORIGINAL), OLD_SHA, 0)?;
         for path in [
@@ -891,7 +891,7 @@ fn checked_bytes(path: &Path, sha: &str, uid: u32) -> Result<Vec<u8>> {
             && md.nlink() == 1
             && md.mode() & 0o022 == 0
             && before.length <= 1 << 20,
-        "unsafe185 obsolete controller configuration"
+        "unsafe 185 obsolete controller configuration"
     );
     let bytes = read_stable_bounded(path, 1 << 20, "185 obsolete controller bytes")?;
     ensure!(
@@ -912,7 +912,7 @@ fn state_record(path: &Path, uid: u32) -> Result<Option<Value>> {
                     && md.nlink() == 1
                     && md.is_file()
                     && path.canonicalize()? == path,
-                "unsafe185 obsolete control state"
+                "unsafe 185 obsolete control state"
             );
             Ok(Some(serde_json::from_slice(&read_stable_bounded(
                 path,
@@ -991,7 +991,7 @@ fn retained_copy(
                     && md.uid() == uid
                     && md.len() <= expected.length
                     && partial.canonicalize()? == partial,
-                "unsafe185 obsolete partial config copy"
+                "unsafe 185 obsolete partial config copy"
             );
             if md.mode() & 0o777 == 0o400 {
                 checked_bytes(&partial, sha, uid)?;
@@ -1088,7 +1088,7 @@ fn retain_and_mask(
         Ok(md) if md.file_type().is_symlink() => {
             ensure!(
                 fs::read_link(original)? == Path::new("/dev/null"),
-                "foreign185 obsolete controller alias"
+                "foreign 185 obsolete controller alias"
             );
             checked_bytes(retained, sha, uid)?;
             ensure!(
@@ -1101,7 +1101,7 @@ fn retain_and_mask(
                 "185 obsolete original path absent or unreadable outside atomic exchange",
             );
         }
-        _ => bail!("unsupported185 obsolete controller path"),
+        _ => bail!("unsupported 185 obsolete controller path"),
     }
     ensure!(
         fs::read_link(original)? == Path::new("/dev/null"),

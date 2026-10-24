@@ -239,7 +239,7 @@ fn restore_admission_requires_the_entire_restore_above_complete_protection() {
     assert!(admission_bytes(BASE_RESERVE - 1, 42, u64::MAX).is_err());
     assert!(admission_bytes(BASE_RESERVE, 0, u64::MAX).is_err());
     assert!(admission_bytes(u64::MAX, 42, u64::MAX).is_err());
-    // The lower five-lane baseline cannot conceal the remaining private141 claim.
+    // The lower five-lane baseline cannot conceal the remaining private 141 claim.
     let protected = BASE_RESERVE + (512u64 << 30);
     assert!(admission_bytes(protected, 20144, BASE_RESERVE + 20144).is_err());
 }

@@ -1,4 +1,4 @@
-//! Exact failed136 inspection, stopped-controller masking and separately gated
+//! Exact failed 136 inspection, stopped-controller masking and separately gated
 //! authenticated-custody local retirement. No canonical publication or job resume.
 use super::*;
 #[path = "holding_epoch136_control.rs"]

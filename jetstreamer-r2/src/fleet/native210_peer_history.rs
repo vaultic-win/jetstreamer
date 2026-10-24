@@ -1,4 +1,4 @@
-//! Keep the original full227 attempt in history after authentic termination.
+//! Keep the original full 227 attempt in history after authentic termination.
 //! Only accepted live owners reserve future growth; this never edits a census.
 use super::*;
 const IID: &str = "a10f37b57711425a81633c62c66438d5";
@@ -14,7 +14,7 @@ fn record(f: &Value) -> Result<&Value> {
         .collect::<Vec<_>>();
     ensure!(
         rows.len() == 1,
-        "210 original full227 history missing or duplicated"
+        "210 original full 227 history missing or duplicated"
     );
     Ok(rows[0])
 }
@@ -32,7 +32,7 @@ pub(super) fn validate(f: &Value) -> Result<()> {
             && u["InvocationID"] == IID
             && u["NRestarts"] == "0"
             && f["unit_census"][singleton227::UNIT] == *u,
-        "210 full227 retained launch or manager identity differs"
+        "210 full 227 retained launch or manager identity differs"
     );
     let active = f["active"]
         .as_array()
@@ -55,18 +55,18 @@ pub(super) fn validate(f: &Value) -> Result<()> {
             && gates[0]["gate_evidence"]
                 .as_array()
                 .is_some_and(|e| e.contains(&json!({"path":LAUNCH,"sha256":LAUNCH_SHA}))),
-        "210 full227 original launch evidence was discarded"
+        "210 full 227 original launch evidence was discarded"
     );
     match d["live"]
         .as_bool()
-        .context("210 full227 retained live flag")?
+        .context("210 full 227 retained live flag")?
     {
         true => ensure!(
             matches.len() == 1
                 && *matches[0] == *u
                 && diagnostic_stage_running(u)
                 && d["terminal_outcome_requires_canary_receipt"] == false,
-            "210 live full227 was removed or replaced"
+            "210 live full 227 was removed or replaced"
         ),
         false => ensure!(
             matches.is_empty()
@@ -88,7 +88,7 @@ pub(super) fn validate(f: &Value) -> Result<()> {
                 && gates[0]["next_action"]
                     .as_str()
                     .is_some_and(|s| !s.trim().is_empty()),
-            "210 inactive full227 lacks its same-IID terminal failure and repair history"
+            "210 inactive full 227 lacks its same-IID terminal failure and repair history"
         ),
     }
     Ok(())
@@ -98,7 +98,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     let original = &record(f)?["unit"];
     let observed = current
         .get(singleton227::UNIT)
-        .context("210 retained full227 current manager missing")?;
+        .context("210 retained full 227 current manager missing")?;
     for key in [
         "Id",
         "LoadState",
@@ -114,19 +114,19 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     ] {
         ensure!(
             original[key] == observed[key],
-            "210 retained full227 manager changed:{key}"
+            "210 retained full 227 manager changed:{key}"
         );
     }
     ensure!(
         pipeline_status::same_exec_start(
             original["ExecStart"]
                 .as_str()
-                .context("210 original full227 command")?,
+                .context("210 original full 227 command")?,
             observed["ExecStart"]
                 .as_str()
-                .context("210 current full227 command")?
+                .context("210 current full 227 command")?
         ),
-        "210 retained full227 command changed"
+        "210 retained full 227 command changed"
     );
     Ok(())
 }

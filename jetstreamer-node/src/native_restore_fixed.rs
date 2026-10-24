@@ -351,7 +351,7 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
     let started = Instant::now();
     ensure!(
         unsafe { libc::geteuid() } == 1000,
-        "isolated fixed replay UID1000 required"
+        "isolated fixed replay UID 1000 required"
     );
     bound_bytes(&fs::read_link("/proc/self/exe")?, self_sha, 256 << 20)?;
     let plan: Plan = serde_json::from_slice(&bound_bytes(path, plan_sha, 1 << 20)?)?;
@@ -504,7 +504,7 @@ pub(super) fn main() {
         execute(Path::new(&a[0]), &a[2], &a[4])
     } else {
         Err(anyhow::anyhow!(
-            "usage: jetstreamer-epoch{EPOCH}-native-restore-probe PLAN --plan-sha256 HEX --self-sha256 HEX"
+            "usage: jetstreamer-epoch {EPOCH}-native-restore-probe PLAN --plan-sha256 HEX --self-sha256 HEX"
         ))
     };
     if let Err(error) = result {
@@ -576,7 +576,7 @@ mod tests {
     #[test]
     fn actual203_prefix_receipts_pin_the_recorded_producer_generation() {
         if EPOCH != 203 {
-            return; // A205 prefix has not yet completed; never borrow203 proof.
+            return; // A205 prefix has not yet completed; never borrow 203 proof.
         }
         let m: HistoricalSegmentManifest = serde_json::from_str(include_str!(
             "../tests/fixtures/epoch203-capped-shrink-root.manifest.json"

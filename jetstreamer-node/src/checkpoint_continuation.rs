@@ -1,4 +1,4 @@
-//! Build-bound, private continuation of the exact independently verified epoch213 prefix.
+//! Build-bound, private continuation of the exact independently verified epoch 213 prefix.
 //! No canonical sidecar, publication, retirement, or remote mutation is performed here.
 
 use {

@@ -1,4 +1,4 @@
-//! Exact160 child ownership in existing watchers, never a coordinator-as-worker claim.
+//! Exact 160 child ownership in existing watchers, never a coordinator-as-worker claim.
 use super::*;
 pub(crate) const FULL: &str = "jetstreamer-horizon-audit-epochs101-181-v4.service";
 pub(crate) const PLUGIN: &str =
@@ -99,7 +99,7 @@ fn matches(phase: &str, exe: &str, args: &[&str], worker: &str) -> bool {
 pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
     let name = current["Id"].as_str().context("160 watcher unit")?;
     let (iid, pid, script, script_sha, worker, worker_sha) =
-        profile(phase, name).context("foreign160 watcher")?;
+        profile(phase, name).context("foreign 160 watcher")?;
     ensure!(
         current["InvocationID"] == iid
             && current["MainPID"] == pid
@@ -136,7 +136,7 @@ fn legacy_pipeline(path: &str, sha: &str) -> Result<()> {
     ensure!(
         path == "/usr/local/lib/jetstreamer/horizon-plugin-merged-main-20260930-v1/horizon_pipeline"
             && sha == "9f4abe27011b04d0c33cb3e24d0d9bc14dbce9f46528f22c4bde367af97a7070",
-        "foreign legacy160 pipeline"
+        "foreign legacy 160 pipeline"
     );
     let p = Path::new(path);
     let m = fs::symlink_metadata(p)?;
@@ -146,7 +146,7 @@ fn legacy_pipeline(path: &str, sha: &str) -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o7777 == 0o755
             && p.canonicalize()? == p,
-        "legacy160 pipeline ownership changed"
+        "legacy 160 pipeline ownership changed"
     );
     // Use the bounded streaming executable hasher, not a JSON-sized buffer.
     watch198::legacy160_member(path, sha)?;
@@ -180,7 +180,7 @@ pub(crate) fn run() -> Result<()> {
                 && m.nlink() == 1
                 && m.mode() & 0o222 == 0
                 && path.canonicalize()? == path,
-            "unsealed160 public observer input"
+            "unsealed 160 public observer input"
         );
         ensure!(
             hex_lower(&Sha256::digest(read_stable_bounded(
@@ -206,7 +206,7 @@ pub(crate) fn run() -> Result<()> {
             && p.expires_unix_seconds
                 .checked_sub(p.not_before_unix_seconds)
                 .is_some_and(|n| n > 0 && n <= 1800),
-        "foreign160 public observation plan"
+        "foreign 160 public observation plan"
     );
     super::super::resource_audit::private_directory(p.output.parent().unwrap())?;
     ensure!(!p.output.try_exists()?, "160 public observation exists");

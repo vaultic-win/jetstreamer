@@ -1,4 +1,4 @@
-//! Fixed60911751 restore-only comparison against mechanically preserved journal.
+//! Fixed 60911751 restore-only comparison against mechanically preserved journal.
 //! This is not a prefix manifest, continuation, archive producer or publication gate.
 #[allow(dead_code)]
 #[path = "../historical.rs"]
@@ -352,7 +352,7 @@ fn restore(plan: &Plan, expected: &SegmentCheckpointSummary) -> Result<Value> {
 fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 1001,
-        "run as isolated host replay UID1001, not root"
+        "run as isolated host replay UID 1001, not root"
     );
     let invocation = env::var("INVOCATION_ID").context("persistent systemd invocation required")?;
     ensure!(

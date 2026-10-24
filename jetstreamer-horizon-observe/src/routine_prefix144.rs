@@ -1,4 +1,4 @@
-//! Fold one exact private144 reread event without changing replay/ETA semantics.
+//! Fold one exact private 144 reread event without changing replay/ETA semantics.
 use super::*;
 pub(super) const WRITER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch144-prefix-fleet-reader-20261021-v3/jetstreamer-r2";
@@ -52,7 +52,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             && p.runtime_handoff157.is_some()
             && !p.expected_epochs.contains(&144)
             && writer(p),
-        "foreign144 prefix profile"
+        "foreign 144 prefix profile"
     );
     let r = bound_json(&profile.launch, true)?;
     ensure!(
@@ -124,7 +124,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
 pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
     ensure!(
         is_101(next)? && next.prefix144_audit.is_none() && next.prefix157_audit.is_some(),
-        "144 prefix requires existing157 history"
+        "144 prefix requires existing 157 history"
     );
     let s: Spec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(

@@ -65,7 +65,7 @@ mod tests {
     }
     impl Fixture {
         // Real five-gap topology, but deliberately SYNTHETIC hashes and clock.
-        // This is not recovery of epoch159's actual historical boundaries.
+        // This is not recovery of epoch 159's actual historical boundaries.
         fn new() -> Self {
             let mut f = Self {
                 scopes: vec![],

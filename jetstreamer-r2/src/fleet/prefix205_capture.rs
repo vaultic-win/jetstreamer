@@ -1,4 +1,4 @@
-//! Capture exact capped205 launch only after its real protective timer succeeds.
+//! Capture exact capped 205 launch only after its real protective timer succeeds.
 use super::*;
 const UNIT: &str = "horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-205-5c01bf93-v1";
@@ -27,7 +27,7 @@ fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
         let (k, v) = line.split_once('=').context("205 property syntax")?;
         ensure!(
             result.insert(k.into(), v.into()).is_none(),
-            "duplicate205 property"
+            "duplicate 205 property"
         );
     }
     Ok(result)
@@ -109,7 +109,7 @@ fn manager(g: &Value, plan: &BoundFile) -> Result<Value> {
         {
             ensure!(
                 found.replace(v).is_none(),
-                "duplicate205 guard manager completion"
+                "duplicate 205 guard manager completion"
             );
         }
     }

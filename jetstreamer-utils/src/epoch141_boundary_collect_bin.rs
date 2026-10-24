@@ -127,7 +127,7 @@ fn manifest(v: &Value) -> Result<()> {
                 .is_some_and(|a| a.len() == TARGETS)
             && v["acquisition"]["path"] == format!("{RAW_ROOT}/all-target-acquisition.json")
             && v["acquisition"]["sha256"] == RAW_SHA,
-        "not the complete exact141PoH diagnostic"
+        "not the complete exact 141PoH diagnostic"
     );
     deny(v)?;
     ensure!(
@@ -344,7 +344,7 @@ fn run() -> Result<()> {
                 == Path::new(ROOT)
                     .join("targets")
                     .join(format!("slot-{}.json", m.slot)),
-            "missing,reordered,duplicate or foreign PoH target"
+            "missing, reordered, duplicate or foreign PoH target"
         );
     }
     terminal()?;

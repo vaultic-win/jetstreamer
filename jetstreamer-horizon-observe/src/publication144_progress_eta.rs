@@ -171,7 +171,9 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
                 "sidecar allowance anchored to exact source-revalidation completion;not remote readiness",
             )
         }
-        _ => anyhow::bail!("unsupported actual child phase;queue requires its own ownership model"),
+        _ => {
+            anyhow::bail!("unsupported actual child phase; queue requires its own ownership model")
+        }
     };
     let total = work
         .checked_add(downstream)

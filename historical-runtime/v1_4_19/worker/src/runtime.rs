@@ -29,7 +29,7 @@ use std::{cmp, collections::HashMap, env, path::Path, sync::Arc};
 use tempfile::TempDir;
 
 const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
-// Epoch-131/134 candidate envelope. The minimum is the exact canonical
+// Epoch- 131/134 candidate envelope. The minimum is the exact canonical
 // epoch-131 predecessor snapshot used by qualification. A focused replay from
 // the canonical slot-58,011,320 snapshot reproduced epoch 134's first observed
 // source-status divergence and the next canonical checkpoint. The parent binds

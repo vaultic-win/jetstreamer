@@ -1,4 +1,4 @@
-//! Status metadata for the real full209 diagnostic; never a pipeline impersonation.
+//! Status metadata for the real full 209 diagnostic; never a pipeline impersonation.
 use super::singleton209 as c;
 use super::*;
 mod jet;
@@ -36,23 +36,23 @@ pub(super) fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
     let launch = bound_json(binding)?;
     let rows = launch["evidence"]["units"]
         .as_array()
-        .context("full209 launch owner census")?;
+        .context("full 209 launch owner census")?;
     ensure!(
         launch["launched"] == true
             && rows.len() == 1
             && rows[0]["unit"] == c::UNIT
             && rows[0]["restarts"] == 0,
-        "full209 exact launch owner absent"
+        "full 209 exact launch owner absent"
     );
     let iid = rows[0]["invocation_id"]
         .as_str()
-        .context("full209 launch IID")?;
+        .context("full 209 launch IID")?;
     ensure!(
         iid.len() == 32
             && iid
                 .bytes()
                 .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()),
-        "full209 launch IID invalid"
+        "full 209 launch IID invalid"
     );
     let d = DiagnosticClaim {
         epoch: 209,
@@ -89,7 +89,7 @@ pub(super) fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
             ]
             .iter()
             .all(|k| guard.get(*k).is_some_and(Value::is_null)),
-        "full209 first actual guard differs"
+        "full 209 first actual guard differs"
     );
     let completion = &launch["guard_manager"]["manager_completion"];
     ensure!(
@@ -98,16 +98,16 @@ pub(super) fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
             && completion["INVOCATION_ID"] == guard["guard_invocation_id"]
             && completion["MESSAGE"]
                 == "horizon-singleton209-protective-v1.service: Deactivated successfully.",
-        "full209 first guard lacks exact PID1 completion"
+        "full 209 first guard lacks exact PID1 completion"
     );
     Ok((d, launch))
 }
 fn registered(d: &DiagnosticClaim, f: &Value) -> Result<()> {
     let p: Plan = serde_json::from_value(bound_json(&BoundFile {
-        path: f["plan"].as_str().context("full209 accepted plan")?.into(),
+        path: f["plan"].as_str().context("full 209 accepted plan")?.into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("full209 accepted plan SHA")?
+            .context("full 209 accepted plan SHA")?
             .into(),
     })?)?;
     let owners = p
@@ -121,7 +121,7 @@ fn registered(d: &DiagnosticClaim, f: &Value) -> Result<()> {
             && owners[0].invocation_id == d.invocation_id
             && owners[0].scratch_path == d.scratch_path
             && owners[0].launch_receipt == d.launch_receipt,
-        "full209 launch is not its accepted diagnostic owner"
+        "full 209 launch is not its accepted diagnostic owner"
     );
     Ok(())
 }
@@ -145,18 +145,18 @@ fn live(d: &DiagnosticClaim, f: &Value) -> Result<Value> {
         owner(&u, &d.invocation_id)
             && owner(old, &d.invocation_id)
             && u["MainPID"] == old["MainPID"],
-        "full209 live identity changed"
+        "full 209 live identity changed"
     );
     Ok(u)
 }
 fn observed<'a>(o: &'a Value, iid: &str) -> Result<&'a Value> {
     let rows = o["diagnostic_replays"]
         .as_array()
-        .context("full209 diagnostic observation census")?
+        .context("full 209 diagnostic observation census")?
         .iter()
         .filter(|r| r["producer_unit"] == c::UNIT)
         .collect::<Vec<_>>();
-    ensure!(rows.len() == 1, "full209 observation missing/duplicate");
+    ensure!(rows.len() == 1, "full 209 observation missing/duplicate");
     let r = rows[0];
     let v = &r["observation"];
     ensure!(
@@ -166,7 +166,7 @@ fn observed<'a>(o: &'a Value, iid: &str) -> Result<&'a Value> {
             && r["expected_producer_invocation_id"] == iid
             && v["invocation_binding_stable"] == true
             && v["useful_work"]["journal_invocation_id"] == iid,
-        "full209 observation differs"
+        "full 209 observation differs"
     );
     for k in [
         "controller_before",
@@ -179,7 +179,7 @@ fn observed<'a>(o: &'a Value, iid: &str) -> Result<&'a Value> {
                 && v[k]["restarts"] == 0
                 && v[k]["active_state"] == "active"
                 && v[k]["sub_state"] == "running",
-            "full209 observation is not stable live work"
+            "full 209 observation is not stable live work"
         );
     }
     Ok(&v["useful_work"])
@@ -193,35 +193,38 @@ fn elapsed(sample: u64, launch: &Value) -> Result<u64> {
             "--value",
         ])
         .output()?;
-    ensure!(out.status.success(), "full209 invocation start unavailable");
+    ensure!(
+        out.status.success(),
+        "full 209 invocation start unavailable"
+    );
     let start_micros = std::str::from_utf8(&out.stdout)?.trim().parse::<u64>()?;
     ensure!(
         launch["sandbox"]["ExecMainStartTimestampMonotonic"]
             .as_str()
             .and_then(|n| n.parse::<u64>().ok())
             == Some(start_micros),
-        "full209 manager start differs from captured launch"
+        "full 209 manager start differs from captured launch"
     );
     let start = start_micros / 1000;
-    ensure!(start > 0, "full209 invocation start absent");
+    ensure!(start > 0, "full 209 invocation start absent");
     let mut clock = std::mem::MaybeUninit::<libc::timespec>::uninit();
     ensure!(
         unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, clock.as_mut_ptr()) } == 0,
-        "full209 monotonic clock unavailable"
+        "full 209 monotonic clock unavailable"
     );
     let clock = unsafe { clock.assume_init() };
     let now = u64::try_from(clock.tv_sec)?
         .checked_mul(1000)
         .and_then(|n| n.checked_add(u64::try_from(clock.tv_nsec).ok()? / 1_000_000))
-        .context("full209 clock overflow")?;
+        .context("full 209 clock overflow")?;
     let age = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_millis()
         .checked_sub(u128::from(sample) * 1000)
-        .context("full209 future sample")?;
+        .context("full 209 future sample")?;
     now.checked_sub(start)
         .and_then(|n| n.checked_sub(u64::try_from(age).ok()?))
-        .context("full209 sample predates invocation")
+        .context("full 209 sample predates invocation")
 }
 fn decimal(message: &str, key: &str) -> Option<u64> {
     let tail = message.split_once(key)?.1;
@@ -241,7 +244,7 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
         .output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 16 << 20,
-        "full209 launch journal unavailable/oversized"
+        "full 209 launch journal unavailable/oversized"
     );
     let rows = out
         .stdout
@@ -251,31 +254,31 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
         .collect::<std::result::Result<Vec<_>, _>>()?;
     ensure!(
         rows.len() < 8192,
-        "full209 launch journal truncated; use the coordinated observation"
+        "full 209 launch journal truncated; use the coordinated observation"
     );
     let mut last = None;
     let mut markers = Vec::new();
     for row in rows {
         ensure!(
             row["_SYSTEMD_INVOCATION_ID"] == iid && row["_SYSTEMD_UNIT"] == c::UNIT,
-            "full209 foreign launch journal"
+            "full 209 foreign launch journal"
         );
         let msg = row["MESSAGE"]
             .as_str()
-            .context("full209 launch journal message")?;
+            .context("full 209 launch journal message")?;
         if let Some(tail) = msg.split_once("progress slot ").map(|p| p.1) {
             let slot = tail
                 .split_once('/')
-                .context("full209 malformed progress")?
+                .context("full 209 malformed progress")?
                 .0
                 .parse::<u64>()?;
-            let terminal = decimal(tail, "/").context("full209 progress terminal")?;
+            let terminal = decimal(tail, "/").context("full 209 progress terminal")?;
             ensure!(
                 terminal == TERMINAL && (FIRST..=TERMINAL).contains(&slot),
-                "full209 foreign progress interval"
+                "full 209 foreign progress interval"
             );
             last = Some(
-                json!({"slot":slot,"terminal_slot":terminal,"transactions":decimal(msg,"txs=").context("full209 transaction counter")?,"account_updates":decimal(msg,"accounts=").context("full209 account counter")?}),
+                json!({"slot":slot,"terminal_slot":terminal,"transactions":decimal(msg,"txs=").context("full 209 transaction counter")?,"account_updates":decimal(msg,"accounts=").context("full 209 account counter")?}),
             );
             markers.push(row);
         }
@@ -287,7 +290,7 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
 fn validate_progress_counters(progress: &Value) -> Result<()> {
     let resets = progress["counter_resets"]
         .as_u64()
-        .context("full209 reset count missing")?;
+        .context("full 209 reset count missing")?;
     if resets == 0 {
         return Ok(());
     }
@@ -298,25 +301,27 @@ fn validate_progress_counters(progress: &Value) -> Result<()> {
     let last = &progress["last"];
     let a = first["slot"]
         .as_u64()
-        .context("full209 first slot missing")?;
-    let b = last["slot"].as_u64().context("full209 last slot missing")?;
+        .context("full 209 first slot missing")?;
+    let b = last["slot"]
+        .as_u64()
+        .context("full 209 last slot missing")?;
     let start = first["realtime_microseconds"]
         .as_u64()
-        .context("full209 first clock missing")?;
+        .context("full 209 first clock missing")?;
     let end = last["realtime_microseconds"]
         .as_u64()
-        .context("full209 last clock missing")?;
+        .context("full 209 last clock missing")?;
     let duration = end
         .checked_sub(start)
         .filter(|n| *n > 0)
-        .context("full209 invalid progress clock")?;
+        .context("full 209 invalid progress clock")?;
     let delta = b
         .checked_sub(a)
-        .context("full209 slot counter moved backwards")?;
+        .context("full 209 slot counter moved backwards")?;
     let rate = delta as f64 / (duration as f64 / 1_000_000.0);
     let reported = progress["slots_per_second"]
         .as_f64()
-        .context("full209 slot rate missing")?;
+        .context("full 209 slot rate missing")?;
     ensure!(
         progress["sufficient_for_rates"] == true
             && progress["matching_markers"]
@@ -331,7 +336,7 @@ fn validate_progress_counters(progress: &Value) -> Result<()> {
             && rate > 0.0
             && reported.is_finite()
             && (reported - rate).abs() <= (rate * 1e-9).max(1e-12),
-        "full209 accounting resets lack an independently monotonic slot window"
+        "full 209 accounting resets lack an independently monotonic slot window"
     );
     Ok(())
 }
@@ -348,13 +353,13 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
             && p.downstream_allowance_millis
                 .values()
                 .all(|n| *n > 0 && *n <= 30 * 86_400_000),
-        "full209 complete inclusive model required"
+        "full 209 complete inclusive model required"
     );
     let downstream = p
         .downstream_allowance_millis
         .values()
         .try_fold(0u64, |a, b| {
-            a.checked_add(*b).context("full209 downstream overflow")
+            a.checked_add(*b).context("full 209 downstream overflow")
         })?;
     validate_progress_counters(progress)?;
     let slot = progress["last"]["slot"].as_u64();
@@ -362,7 +367,7 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
     let observed_slot = slot.unwrap_or(FIRST - 1);
     ensure!(
         (WARMUP_FIRST..=TERMINAL).contains(&observed_slot),
-        "full209 progress outside exact epoch"
+        "full 209 progress outside exact epoch"
     );
     let current = observed_slot.max(FIRST - 1);
     if current == TERMINAL {
@@ -371,8 +376,8 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
     let rate = if replay && progress["sufficient_for_rates"] == true {
         let r = progress["slots_per_second"]
             .as_f64()
-            .context("full209 rate missing")?;
-        ensure!(r.is_finite() && r > 0.0, "full209 invalid measured rate");
+            .context("full 209 rate missing")?;
+        ensure!(r.is_finite() && r > 0.0, "full 209 invalid measured rate");
         r
     } else {
         p.fallback_slots_per_second
@@ -380,7 +385,7 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
     let replay_millis = ((TERMINAL - current) as f64 * 1000.0 / rate).ceil();
     ensure!(
         replay_millis.is_finite() && replay_millis >= 0.0 && replay_millis < u64::MAX as f64,
-        "full209 ETA overflow"
+        "full 209 ETA overflow"
     );
     let initialization = if replay {
         0
@@ -390,12 +395,12 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
         elapsed
             .checked_div(2)
             .and_then(|n| n.checked_add(p.initialization_allowance_millis / 2))
-            .context("full209 overdue initialization overflow")?
+            .context("full 209 overdue initialization overflow")?
     };
     let remaining = (replay_millis as u64)
         .checked_add(downstream)
         .and_then(|n| n.checked_add(initialization))
-        .context("full209 total ETA overflow")?;
+        .context("full 209 total ETA overflow")?;
     Ok((
         if replay { "replay" } else { "verification" }.into(),
         remaining,
@@ -406,7 +411,7 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
         receipt.epoch == 209
             && receipt.pipeline_binding.is_none()
             && matches!(receipt.status.phase.as_str(), "verification" | "replay"),
-        "not a full209 status receipt"
+        "not a full 209 status receipt"
     );
     let evidence = bound_json(&BoundFile {
         path: receipt.observer_receipt.clone(),
@@ -414,7 +419,7 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
     })?;
     ensure!(
         evidence["schema"] == ESTIMATE_SCHEMA && evidence["status"] == json!(receipt.status),
-        "full209 frozen observation differs"
+        "full 209 frozen observation differs"
     );
     let (d, _) = claim(&serde_json::from_value(evidence["launch"].clone())?)?;
     let p: Model = serde_json::from_value(bound_json(&serde_json::from_value(
@@ -426,7 +431,7 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
             && private157::binding(&p.launch) == evidence["launch"]
             && private157::binding(&p.observer) == evidence["observer"]
             && private157::binding(&p.fleet) == evidence["fleet"],
-        "full209 frozen model bindings differ"
+        "full 209 frozen model bindings differ"
     );
     let observer = bound_json(&p.observer)?;
     let f = bound_json(&p.fleet)?;
@@ -435,19 +440,19 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
         owner(&f["unit_census"][c::UNIT], &d.invocation_id)
             && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && f["observer_sha256"] == p.observer.sha256,
-        "full209 frozen observation lacks original owner"
+        "full 209 frozen observation lacks original owner"
     );
     let expected_clock = if p.mode == "launch-event" {
         let launch = bound_json(&p.launch)?;
         publication203::utc(
             launch["recorded_unix_seconds"]
                 .as_u64()
-                .context("full209 frozen launch clock")?,
+                .context("full 209 frozen launch clock")?,
         )?
     } else {
         observer["recorded_at_utc"]
             .as_str()
-            .context("full209 frozen observer clock")?
+            .context("full 209 frozen observer clock")?
             .into()
     };
     let (phase, remaining) = estimate(
@@ -459,12 +464,12 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
         receipt.status.sampled_at_utc == expected_clock
             && receipt.status.phase == phase
             && receipt.status.estimated_remaining_millis == remaining,
-        "full209 frozen status does not reproduce its model"
+        "full 209 frozen status does not reproduce its model"
     );
     ensure!(
         receipt.controller_invocation_id == d.invocation_id
             && receipt.producer_invocation_id == d.invocation_id,
-        "full209 receipt owner differs"
+        "full 209 receipt owner differs"
     );
     Ok((d, evidence))
 }
@@ -517,7 +522,7 @@ pub(super) async fn run() -> Result<()> {
             && own.nlink() == 1
             && own.mode() & 0o222 == 0
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == args[6],
-        "full209 status helper unsealed"
+        "full 209 status helper unsealed"
     );
     let binding = BoundFile {
         path: args[2].clone().into(),
@@ -529,7 +534,7 @@ pub(super) async fn run() -> Result<()> {
             && matches!(p.mode.as_str(), "launch-event" | "observation")
             && !p.estimate_basis.trim().is_empty()
             && !p.estimate_evidence.is_empty(),
-        "full209 estimate scope/evidence absent"
+        "full 209 estimate scope/evidence absent"
     );
     for e in &p.estimate_evidence {
         bound_json(e)?;
@@ -540,7 +545,7 @@ pub(super) async fn run() -> Result<()> {
     registered(&d, &f)?;
     let observer_time = o["recorded_at_utc"]
         .as_str()
-        .context("full209 observer UTC")?;
+        .context("full 209 observer UTC")?;
     let observed_seconds = utc_seconds(observer_time)?;
     ensure!(
         o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -551,12 +556,12 @@ pub(super) async fn run() -> Result<()> {
             && f["observer_receipt"].as_str() == p.observer.path.to_str()
             && f["observer_sha256"] == p.observer.sha256
             && f["sampled_at_utc"] == observer_time,
-        "full209 unaccepted observer/fleet"
+        "full 209 unaccepted observer/fleet"
     );
     let seconds = if p.mode == "launch-event" {
         launch["recorded_unix_seconds"]
             .as_u64()
-            .context("full209 launch event clock")?
+            .context("full 209 launch event clock")?
     } else {
         observed_seconds
     };
@@ -567,7 +572,7 @@ pub(super) async fn run() -> Result<()> {
             && now - seconds <= 1800
             && (p.mode != "launch-event"
                 || (now - seconds <= 300 && seconds - observed_seconds <= 1800)),
-        "full209 stale/future observation event"
+        "full 209 stale/future observation event"
     );
     let first = live(&d, &f)?;
     let evidence = if p.estimate_receipt.try_exists()? {
@@ -582,7 +587,7 @@ pub(super) async fn run() -> Result<()> {
                 && old["launch"] == private157::binding(&p.launch)
                 && old["observer"] == private157::binding(&p.observer)
                 && old["fleet"] == private157::binding(&p.fleet),
-            "full209 retry estimate differs"
+            "full 209 retry estimate differs"
         );
         old
     } else {
@@ -597,7 +602,7 @@ pub(super) async fn run() -> Result<()> {
             Path::new(c::ROOT),
             launch["evidence"]["units"][0]["main_pid"]
                 .as_u64()
-                .context("full209 original PID")?,
+                .context("full 209 original PID")?,
             c::FINGERPRINT,
             1000,
         )?;
@@ -626,7 +631,7 @@ pub(super) async fn run() -> Result<()> {
             && status.phase == expected_phase
             && status.estimated_remaining_millis == expected_remaining
             && matches!(status.phase.as_str(), "verification" | "replay"),
-        "full209 frozen payload differs"
+        "full 209 frozen payload differs"
     );
     if args.len() == 8 {
         println!("{evidence}");
@@ -634,7 +639,7 @@ pub(super) async fn run() -> Result<()> {
     }
     ensure!(
         first == live(&d, &f)?,
-        "full209 owner changed before status publish"
+        "full 209 owner changed before status publish"
     );
     preflight_status_receipt_write(&p.receipt_directory)?;
     let source: BoundFile = serde_json::from_value(private157::file_binding(&p.estimate_receipt)?)?;
@@ -671,14 +676,14 @@ pub(super) async fn run() -> Result<()> {
                 && old.producer_invocation_id == receipt.producer_invocation_id
                 && old.controller_invocation_id == receipt.controller_invocation_id
                 && old.authenticated_readback,
-            "full209 prior status receipt differs"
+            "full 209 prior status receipt differs"
         );
     } else {
         write_status_receipt(&p.receipt_directory, &receipt)?;
     }
     ensure!(
         first == live(&d, &f)?,
-        "full209 owner changed during status publish"
+        "full 209 owner changed during status publish"
     );
     println!("{}", path.display());
     Ok(())

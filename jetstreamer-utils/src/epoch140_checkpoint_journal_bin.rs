@@ -1,4 +1,4 @@
-//! Fixed, bounded capture of original epoch140 checkpoint observations.
+//! Fixed, bounded capture of original epoch 140 checkpoint observations.
 //! This is primary-source preservation, not a recovery manifest or launch gate.
 #[allow(dead_code)]
 mod epoch141_ledger_common;
@@ -156,7 +156,7 @@ fn extract(bytes: &[u8]) -> Result<Vec<Checkpoint>> {
     let lines = std::str::from_utf8(bytes)?.lines().collect::<Vec<_>>();
     ensure!(
         lines.len() == 3,
-        "expected exactly3 primary journal records"
+        "expected exactly 3 primary journal records"
     );
     let mut cursors = BTreeSet::new();
     let mut checkpoints = Vec::new();
@@ -236,7 +236,7 @@ fn extract_bootstrap(bytes: &[u8]) -> Result<Vec<Checkpoint>> {
     let lines = std::str::from_utf8(bytes)?.lines().collect::<Vec<_>>();
     ensure!(
         lines.len() == 2,
-        "expected exactly2 original bootstrap records"
+        "expected exactly 2 original bootstrap records"
     );
     let mut previous_time = 0;
     let mut previous_sequence = 0;

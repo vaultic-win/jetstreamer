@@ -1,4 +1,4 @@
-//! Preserve the production157 claim while no historical worker is rate-bearing.
+//! Preserve the production 157 claim while no historical worker is rate-bearing.
 use super::*;
 const PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch157-verification-pause-evidence-20261021-v1/pause.json";
 const SHA: &str = "7551fdeafd0c5773dfb52a1b0df8b867f09e1dc1b2939569568bf5ede99789c2";
@@ -11,7 +11,7 @@ fn owner(current: &Value, unit: &str, iid: &str) -> Result<bool> {
     if live {
         ensure!(
             current["Id"] == unit && current["InvocationID"] == iid && current["NRestarts"] == "0",
-            "157runtime handoff owner changed"
+            "157 runtime handoff owner changed"
         );
     }
     Ok(live)
@@ -77,7 +77,7 @@ pub(super) fn observe(
             && binding.sha256 == SHA
             && plan.first_epoch == 101
             && plan.last_epoch == 200,
-        "foreign157runtime handoff binding"
+        "foreign 157 runtime handoff binding"
     );
     let proof = bound_json(binding)?;
     ensure!(

@@ -1,4 +1,4 @@
-//! Private fixed-work epoch205 resource probe, never full-prefix qualification.
+//! Private fixed-work epoch 205 resource probe, never full-prefix qualification.
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-205-canary.jet";

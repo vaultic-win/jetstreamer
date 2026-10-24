@@ -71,7 +71,7 @@ const TMPFS_SIZE: u64 = 512 * GIB;
 const FLOOR: u64 = if PROFILE223 {
     248_289_182_611
 } else if PROFILE225 {
-    // Seven verified campaign samples after epoch216's sidecar commit.
+    // Seven verified campaign samples after epoch 216's sidecar commit.
     235_600_351_300
 } else {
     231_874_716_783
@@ -436,7 +436,7 @@ fn ram_geometry() -> Result<u64> {
 fn validate_inode_geometry(files: u64) -> Result<()> {
     ensure!(
         !(PROFILE225 || PROFILE223) || files == 1_048_576,
-        "wrong225 tmpfs inode limit"
+        "wrong 225 tmpfs inode limit"
     );
     Ok(())
 }
@@ -697,7 +697,7 @@ fn validate_observer(v: &Value, now: u64) -> Result<()> {
             .iter()
             .filter(|d| d["range"] == "225-226")
             .collect();
-        ensure!(stopped.len() == 1, "missing stopped225 census entry");
+        ensure!(stopped.len() == 1, "missing stopped 225 census entry");
         let d = stopped[0];
         ensure!(
             d["status"] == "unavailable"
@@ -707,7 +707,7 @@ fn validate_observer(v: &Value, now: u64) -> Result<()> {
                 && d["expected_producer_invocation_id"] == "ac9aee3d47eb41e483a5e008ed43d030"
                 && d["ordinary_replay_claim"] == false
                 && d["replay_launch_authorized"] == false,
-            "sample still has live or foreign225 claim"
+            "sample still has live or foreign 225 claim"
         );
         // Unavailability is never proof of a stop: the fixed guard receipt and
         // actual terminal unit are independently checked before child launch.
@@ -824,7 +824,7 @@ fn validate_released_225(completion: &Value, launch: &Value) -> Result<()> {
             && launch["epoch"] == 225
             && launch["hard_limits"]["cpu_quota_cores"] == 16
             && launch["hard_limits"]["restart_policy"] == "no",
-        "CPU release is not the exact terminal225 guard/launch chain"
+        "CPU release is not the exact terminal 225 guard/launch chain"
     );
     Ok(())
 }
@@ -871,7 +871,7 @@ fn verify_released_225() -> Result<()> {
     ]).output()?;
     ensure!(
         output.status.success() && output.stdout.len() < 16_384,
-        "cannot authenticate released225"
+        "cannot authenticate released 225"
     );
     let text = std::str::from_utf8(&output.stdout)?;
     for (key, expected) in [
@@ -894,7 +894,7 @@ fn verify_released_225() -> Result<()> {
                 .filter(|line| *line == format!("{key}={expected}"))
                 .count()
                 == 1,
-            "released225 unit changed: {key}"
+            "released 225 unit changed: {key}"
         );
     }
     Ok(())

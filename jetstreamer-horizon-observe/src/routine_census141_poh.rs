@@ -1,4 +1,4 @@
-//! Exact private141PoH handoff, no resource observation or archive mutation.
+//! Exact private 141PoH handoff, no resource observation or archive mutation.
 use super::*;
 const UNIT: &str = "horizon-epoch141-census-poh-diagnostic-20261022-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch141-census-poh-diagnostic-20261022-v2";
@@ -41,7 +41,7 @@ fn collection_shape(v: &Value) -> Result<()> {
                 == "/var/lib/jetstreamer/horizon-epoch141-boundary-collection-20261022-v1/boundaries.json"
             && v["output"]["sha256"]
                 == "e371b3546d62e5fdac79a497607b61ea2647c3c5d410157b3ff456709f78be4a",
-        "foreign or incomplete141boundary collection"
+        "foreign or incomplete 141boundary collection"
     );
     for flag in [
         "canonical_ancestry_proven",
@@ -66,7 +66,7 @@ fn collection(b: &Bound) -> Result<()> {
                 "/var/lib/jetstreamer/horizon-epoch141-boundary-collection-20261022-v1/collection.json"
             )
             && b.sha256 == "b7b8c12df60021b3f7fc37288b41601b2179dd670dd4ffb83316a640349f3dfd",
-        "foreign141collection binding"
+        "foreign 141collection binding"
     );
     let v = bound_json(b, false)?;
     collection_shape(&v)?;
@@ -121,7 +121,7 @@ fn claim(b: &Bound, v: &Value) -> Result<Value> {
             && v["memory_admission"]["available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= 130u64 << 30),
-        "foreign private141PoH capture"
+        "foreign private 141PoH capture"
     );
     let command = format!(
         "{{ path={TOOL} ; argv[]={TOOL} {PLAN} --plan-sha256 {PLAN_SHA} --self-sha256 {TOOL_SHA} --run"
@@ -180,7 +180,7 @@ fn evidence(b: &Bound) -> Result<Value> {
             && raw["recovered_target_count"] == 0
             && raw["invocation_id"] == "4721c4110425431cbddedac185e7d6e9"
             && raw["publication_authorized"] == false,
-        "PoH requires closed exact141source"
+        "PoH requires closed exact 141 source"
     );
     Ok(v)
 }
@@ -272,7 +272,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         "PoH cannot close repair"
     );
     g["next_action"] = json!(
-        "Inspect complete private18,283target PoH diagnostic and every retained target failure. Verify84,597boundaries only after full input/output revalidation. Preserve raw acquisition and all earlier attempts. Diagnostic chain success is not canonical ancestry,liveness,runtime boundary,replay,root,plugin or ready-pair authority; keep141repair open."
+        "Inspect complete private 18,283target PoH diagnostic and every retained target failure. Verify 84,597boundaries only after full input/output revalidation. Preserve raw acquisition and all earlier attempts. Diagnostic chain success is not canonical ancestry, liveness, runtime boundary, replay, root, plugin or ready-pair authority; keep 141repair open."
     );
     let e = g["evidence"].as_array_mut().context("PoH evidence")?;
     let b = serde_json::to_value(&s.launch)?;
@@ -285,7 +285,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
             e.push(b);
         }
         g["next_action"] = json!(
-            "Complete private141PoH and independent boundary collection passed for18283groups/84597distinctboundaries,including66314hidden hashes. Preserve all originals and candidate readable bundle. Qualify the exact v1.4.25 source/boundary consumer and private canonical-root path before runtime input use,route promotion,full/plugin/publication or R2delivery. Keep141repair open until verified ready pair; collection is not ancestry/liveness/root or launch authority."
+            "Complete private 141PoH and independent boundary collection passed for18283groups/84597distinctboundaries,including66314hidden hashes. Preserve all originals and candidate readable bundle. Qualify the exact v1.4.25 source/boundary consumer and private canonical-root path before runtime input use, route promotion,full/plugin/publication or R2 delivery. Keep 141repair open until verified ready pair; collection is not ancestry/liveness/root or launch authority."
         );
     }
     Ok(())

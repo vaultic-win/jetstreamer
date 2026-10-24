@@ -15,7 +15,7 @@ const GUARD_UNIT: &str = "horizon-original141-capped-root-guard-20261023-v1.serv
 const GUARD_ROOT: &str = "/var/lib/jetstreamer/horizon-original141-capped-root-guard-20261023-v1";
 const GUARD_BIN: &str = "/usr/local/lib/jetstreamer/horizon-original141-trace-guard-20261023-v1/jetstreamer-horizon-standalone-guard";
 // Whole-root experimental stop, including scratch, indices and private output.
-// Neither a qualified full-cold peak nor the200–300 century planning seed.
+// Neither a qualified full-cold peak nor the 200–300 century planning seed.
 const PEAK: u64 = 512 << 30;
 const MAX_RUNTIME: u64 = 432000;
 const RUNTIME_DISPLAY: &str = "5d";

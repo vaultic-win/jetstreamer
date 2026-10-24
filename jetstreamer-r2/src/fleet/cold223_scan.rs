@@ -78,7 +78,7 @@ fn profile(unit: &str) -> Result<&'static Profile> {
         n if n == WARMUP.unit => Ok(&WARMUP),
         n if n == NATIVE20.unit => Ok(&NATIVE20),
         n if n == NATIVE20_RELEASE.unit => Ok(&NATIVE20_RELEASE),
-        _ => anyhow::bail!("unknown223nativeinput owner"),
+        _ => anyhow::bail!("unknown 223 native input owner"),
     }
 }
 pub(super) fn scope(phase: &str, unit: &str) -> bool {

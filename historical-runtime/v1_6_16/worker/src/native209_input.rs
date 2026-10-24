@@ -35,7 +35,7 @@ fn identity(m: &fs::Metadata) -> (u64, u64, u64, u32, u32, u64, i64, i64, i64, i
 fn checked_input(path: &Path, size: u64, digest: &str, owner: u32) -> Result<(), String> {
     let check = || -> Result<(), Box<dyn std::error::Error>> {
         if !path.is_absolute() || fs::canonicalize(path)? != path {
-            return Err("noncanonical native209 input".into());
+            return Err("noncanonical native 209 input".into());
         }
         let before = fs::symlink_metadata(path)?;
         if !before.is_file()
@@ -44,14 +44,14 @@ fn checked_input(path: &Path, size: u64, digest: &str, owner: u32) -> Result<(),
             || before.nlink() != 1
             || before.len() != size
         {
-            return Err("unsafe native209 input identity".into());
+            return Err("unsafe native 209 input identity".into());
         }
         let mut file = OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
             .open(path)?;
         if identity(&file.metadata()?) != identity(&before) {
-            return Err("native209 input changed before hashing".into());
+            return Err("native 209 input changed before hashing".into());
         }
         let mut hash = Sha256::new();
         let mut buffer = vec![0u8; 1024 * 1024];
@@ -63,7 +63,7 @@ fn checked_input(path: &Path, size: u64, digest: &str, owner: u32) -> Result<(),
             }
             total += count as u64;
             if total > size {
-                return Err("native209 input grew".into());
+                return Err("native 209 input grew".into());
             }
             hash.input(&buffer[..count]);
         }
@@ -72,7 +72,7 @@ fn checked_input(path: &Path, size: u64, digest: &str, owner: u32) -> Result<(),
             || identity(&file.metadata()?) != identity(&before)
             || identity(&fs::symlink_metadata(path)?) != identity(&before)
         {
-            return Err("native209 input hash/identity differs".into());
+            return Err("native 209 input hash/identity differs".into());
         }
         Ok(())
     };

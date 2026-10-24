@@ -1,4 +1,4 @@
-//! Exact private144 suffix/assembly observation; preserves native/prefix history.
+//! Exact private 144 suffix/assembly observation; preserves native/prefix history.
 use super::*;
 const UNIT: &str = "horizon-qualify-144-checkpoint-continuation-20261022-v1.service";
 const SCRATCH: &str =
@@ -67,7 +67,7 @@ fn checked(p: &Profile, r: &Value, e: &Value, plan: &Value, g: &Value) -> Result
             && r["protected_existing_floor_bytes"] == 3_916_063_202_758u64
             && r["private_suffix_authorized"] == true
             && r["private_assembly_authorized"] == true,
-        "continuation144 launch differs from exact private full-path scope"
+        "continuation 144 launch differs from exact private full-path scope"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -82,7 +82,7 @@ fn checked(p: &Profile, r: &Value, e: &Value, plan: &Value, g: &Value) -> Result
     ] {
         ensure!(
             r[flag] == false,
-            "continuation144 launch grants forbidden authority:{flag}"
+            "continuation 144 launch grants forbidden authority:{flag}"
         );
     }
     ensure!(
@@ -104,7 +104,7 @@ fn checked(p: &Profile, r: &Value, e: &Value, plan: &Value, g: &Value) -> Result
             && plan["previous_fleet"] == r["previous_fleet"]
             && plan["observer"] == r["observer"]
             && e["inventory"]["anomalies"] == 0,
-        "continuation144 event predecessor or inventory differs"
+        "continuation 144 event predecessor or inventory differs"
     );
     ensure!(
         g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
@@ -138,19 +138,19 @@ fn checked(p: &Profile, r: &Value, e: &Value, plan: &Value, g: &Value) -> Result
             && g["workers"].as_array().is_some_and(|w| w.len() == 1
                 && w[0][0].as_u64().is_some_and(|n| n > 0)
                 && w[0][1].as_u64().is_some_and(|n| n > 0 && n <= 3500000)),
-        "continuation144 requires actual full-path guard first fire"
+        "continuation 144 requires actual full-path guard first fire"
     );
     let expected = claim(p);
     ensure!(
         plan["diagnostics"]
             .as_array()
-            .context("continuation144 plan diagnostics")?
+            .context("continuation 144 plan diagnostics")?
             .iter()
             .filter(|d| d["unit"] == UNIT)
             .eq(std::iter::once(&expected))
             && e["diagnostics"]
                 .as_array()
-                .context("continuation144 event history")?
+                .context("continuation 144 event history")?
                 .iter()
                 .filter(|d| d["unit"]["Id"] == UNIT
                     && d["launch_invocation_id"] == p.invocation_id
@@ -158,7 +158,7 @@ fn checked(p: &Profile, r: &Value, e: &Value, plan: &Value, g: &Value) -> Result
                     && d["launch_receipt_sha256"] == p.launch.sha256)
                 .count()
                 == 1,
-        "continuation144 event owner differs"
+        "continuation 144 event owner differs"
     );
     Ok((expected, e["admission_transition_guard"].clone()))
 }
@@ -191,7 +191,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                     && original141::retained144_census(p, s)
                     && (owner(p, &s.diagnostic_ranges[0])
                         || assembly144::owner(p, &s.diagnostic_ranges[0]))),
-        "foreign continuation144 routine profile"
+        "foreign continuation 144 routine profile"
     );
     read(profile)?;
     Ok(())
@@ -207,15 +207,15 @@ fn fold(f: &mut Value, c: &Value, g: &Value) -> Result<()> {
     ensure!(
         f["diagnostics"]
             .as_array()
-            .context("continuation144 template history")?
+            .context("continuation 144 template history")?
             .iter()
             .filter(|d| d["unit"] == UNIT)
             .eq(std::iter::once(c)),
-        "continuation144 diagnostic removed,changed or duplicated"
+        "continuation 144 diagnostic removed, changed or duplicated"
     );
     ensure!(
         f["admission_transition_guard"].is_null() || f["admission_transition_guard"] == *g,
-        "continuation144 cannot consume another guard"
+        "continuation 144 cannot consume another guard"
     );
     f["admission_transition_guard"] = Value::Null;
     Ok(())
@@ -234,7 +234,7 @@ fn row(row: &Value, iid: &str, observed: bool) -> Result<()> {
             && row["producer_unit"] == UNIT
             && row["expected_producer_invocation_id"] == iid
             && row["scratch_path"] == SCRATCH,
-        "continuation144 observer owner differs"
+        "continuation 144 observer owner differs"
     );
     if !observed {
         ensure!(
@@ -242,7 +242,7 @@ fn row(row: &Value, iid: &str, observed: bool) -> Result<()> {
                 && row["expected_controller_invocation_id"] == iid
                 && row["worker_executable_basename"] == "historical-worker"
                 && row.get("append_log").is_none_or(Value::is_null),
-            "continuation144 observer config differs"
+            "continuation 144 observer config differs"
         );
         return Ok(());
     }
@@ -255,14 +255,14 @@ fn row(row: &Value, iid: &str, observed: bool) -> Result<()> {
     ] {
         ensure!(
             row[flag] == false,
-            "continuation144 observer grants authority"
+            "continuation 144 observer grants authority"
         );
     }
     match row["status"].as_str() {
         Some("unavailable") => ensure!(
             row["observation"].is_null()
                 && row["error"].as_str().is_some_and(|s| !s.trim().is_empty()),
-            "continuation144 absence is not terminal proof"
+            "continuation 144 absence is not terminal proof"
         ),
         Some("observed") => {
             let o = &row["observation"];
@@ -271,7 +271,7 @@ fn row(row: &Value, iid: &str, observed: bool) -> Result<()> {
                     && o["range"] == "144"
                     && o["scratch_path"] == SCRATCH
                     && o["invocation_binding_stable"] == true,
-                "continuation144 sample unstable"
+                "continuation 144 sample unstable"
             );
             for kind in ["controller", "producer"] {
                 for point in ["before", "after"] {
@@ -280,12 +280,12 @@ fn row(row: &Value, iid: &str, observed: bool) -> Result<()> {
                         u["invocation_id"] == iid
                             && u["restarts"] == 0
                             && matches!(u["active_state"].as_str(), Some("active" | "activating")),
-                        "continuation144 sampled owner changed"
+                        "continuation 144 sampled owner changed"
                     );
                 }
             }
         }
-        _ => anyhow::bail!("unknown continuation144 diagnostic outcome"),
+        _ => anyhow::bail!("unknown continuation 144 diagnostic outcome"),
     }
     Ok(())
 }
@@ -293,19 +293,22 @@ pub(super) fn observer(p: &Plan, v: &Value, observed: bool) -> Result<()> {
     let profile = p
         .continuation144
         .as_ref()
-        .context("continuation144 profile")?;
+        .context("continuation 144 profile")?;
     ensure!(
         !v["replays"]
             .as_array()
             .context("ordinary census")?
             .iter()
             .any(|r| r["range"] == "144"),
-        "continuation144 cannot become an ordinary ETA claim"
+        "continuation 144 cannot become an ordinary ETA claim"
     );
     let rows = v["diagnostic_replays"]
         .as_array()
-        .context("continuation144 diagnostics")?;
-    ensure!(rows.len() == 1, "continuation144 diagnostic census differs");
+        .context("continuation 144 diagnostics")?;
+    ensure!(
+        rows.len() == 1,
+        "continuation 144 diagnostic census differs"
+    );
     row(&rows[0], &profile.invocation_id, observed)
 }
 pub(super) fn enable(next: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> {
@@ -314,7 +317,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, b: &Bound) -> Result<(
             && next.continuation144.is_none()
             && next.native144_restore.is_some()
             && next.completed144_prefix.is_some(),
-        "continuation144 requires intact native/prefix history"
+        "continuation 144 requires intact native/prefix history"
     );
     let s: Spec = serde_json::from_slice(&bound_bytes(b, true)?)?;
     ensure!(
@@ -323,7 +326,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, b: &Bound) -> Result<(
             && !s.publication_authorized
             && !s.r2_mutations
             && s.event_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101)),
-        "foreign continuation144 handoff spec"
+        "foreign continuation 144 handoff spec"
     );
     let launch = bound_json(&s.launch, true)?;
     let event = bound_json(&s.event_fleet, false)?;
@@ -333,7 +336,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, b: &Bound) -> Result<(
             && event["observer_sha256"] == next.previous_observer.sha256
             && ep["previous_fleet"] == serde_json::to_value(&next.previous_fleet)?
             && ep["observer"] == serde_json::to_value(&next.previous_observer)?,
-        "continuation144 handoff changes predecessor"
+        "continuation 144 handoff changes predecessor"
     );
     let profile = Profile {
         launch: s.launch,
@@ -341,7 +344,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, b: &Bound) -> Result<(
         event_plan: s.event_plan,
         invocation_id: launch["invocation_id"]
             .as_str()
-            .context("continuation144 invocation")?
+            .context("continuation 144 invocation")?
             .into(),
     };
     let (c, g) = read(&profile)?;
@@ -363,16 +366,16 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, b: &Bound) -> Result<(
     }
     expected["gates"]["144"]["evidence"]
         .as_array_mut()
-        .context("old144 evidence")?
+        .context("old 144 evidence")?
         .extend([serde_json::to_value(&profile.launch)?, g]);
     ensure!(
         expected == ep,
-        "continuation144 event changed other claims,history,gate or scalar"
+        "continuation 144 event changed other claims, history, gate or scalar"
     );
     let scope = next
         .scope_101_200
         .as_mut()
-        .context("continuation144 scope")?;
+        .context("continuation 144 scope")?;
     migrate(scope, config, &profile.invocation_id)?;
     next.previous_fleet = profile.event_fleet.clone();
     next.fleet_template = profile.event_plan.clone();
@@ -396,11 +399,11 @@ fn migrate(scope: &mut Scope101200, config: &mut Value, iid: &str) -> Result<()>
             && iid
                 .bytes()
                 .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()),
-        "continuation144 cannot replace newer diagnostic"
+        "continuation 144 cannot replace newer diagnostic"
     );
     let rows = config["diagnostic_replays"]
         .as_array_mut()
-        .context("old native144 observer")?;
+        .context("old native 144 observer")?;
     ensure!(
         rows.len() == 1
             && rows[0]["producer_unit"] == native144::UNIT
@@ -409,7 +412,7 @@ fn migrate(scope: &mut Scope101200, config: &mut Value, iid: &str) -> Result<()>
                 == scope.diagnostic_ranges[0].expected_controller_invocation_id
             && rows[0]["expected_producer_invocation_id"]
                 == scope.diagnostic_ranges[0].expected_producer_invocation_id,
-        "continuation144 observer already migrated"
+        "continuation 144 observer already migrated"
     );
     rows[0] = json!({"range":"144","controller_unit":UNIT,"producer_unit":UNIT,"expected_controller_invocation_id":iid,
         "expected_producer_invocation_id":iid,"scratch_path":SCRATCH,"worker_executable_basename":"historical-worker"});

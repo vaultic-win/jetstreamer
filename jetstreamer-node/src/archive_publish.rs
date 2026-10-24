@@ -5758,7 +5758,7 @@ fn renameat2(
     let source_name = os_str_cstring(source_name)?;
     let destination_name = os_str_cstring(destination_name)?;
     // SAFETY: both descriptors are live directories and both paths are
-    // NUL-terminated basenames. renameat2 does not dereference user pointers
+    // NUL-terminated basenames. renameat 2 does not dereference user pointers
     // after the syscall returns.
     let result = unsafe {
         libc::renameat2(

@@ -29,7 +29,7 @@ pub(super) fn enable(p: &mut Plan) -> Result<()> {
             && p.previous_observer
                 .path
                 .ends_with("sample-20261022T172800Z.json"),
-        "160 timing must follow accepted1728"
+        "160 timing must follow accepted 1728"
     );
     budget(&bound_json(&calibration(), false)?)?;
     p.epoch160_delivery.as_mut().unwrap().timed_upload = true;
@@ -46,7 +46,7 @@ fn budget(v: &Value) -> Result<(u64, Value)> {
                 == "81470e448a855612c57c2727e11f08dbb9b52a19bbe6168cea440fe1b17ae1f3"
             && v["publication_authorized"] == false
             && v["r2_mutations"] == false,
-        "foreign160 timing calibration"
+        "foreign 160 timing calibration"
     );
     let mut sum = 600_000u64;
     let mut phases = serde_json::Map::new();

@@ -1,4 +1,4 @@
-//! Observational finalization for the exact already-running epoch198 singleton.
+//! Observational finalization for the exact already-running epoch 198 singleton.
 //! These logs are not independent verification, publication or ready-pair proof.
 use super::*;
 use std::{collections::BTreeMap, process::Command};
@@ -54,7 +54,7 @@ fn validate_observation_plan(p: &ObservationPlan) -> Result<()> {
             && !p.replay_launch_authorized
             && !p.publication_authorized
             && !p.r2_mutations,
-        "unqualified198 observation plan"
+        "unqualified 198 observation plan"
     );
     ensure!(
         p.not_before_unix_seconds > 0
@@ -113,7 +113,7 @@ pub(super) fn run_observation() -> Result<()> {
     );
     ensure!(
         is_lower_hex(&args[4], 64) && is_lower_hex(&args[6], 64),
-        "invalid198 observation digest"
+        "invalid 198 observation digest"
     );
     let executable = fs::read_link("/proc/self/exe")?;
     let mut running = File::open("/proc/self/exe")?;
@@ -147,7 +147,7 @@ pub(super) fn run_observation() -> Result<()> {
             && meta.is_file()
             && meta.nlink() == 1
             && meta.mode() & 0o222 == 0,
-        "unsafe198 observation plan"
+        "unsafe 198 observation plan"
     );
     let bytes = read_stable_bounded(path, 1 << 20, "198 observation plan")?;
     ensure!(
@@ -263,7 +263,7 @@ pub(super) fn immutable_inputs() -> Result<()> {
                 && meta.nlink() == 1
                 && meta.mode() & 0o222 == 0
                 && Path::new(path).canonicalize()? == Path::new(path),
-            "unsafe198 immutable input"
+            "unsafe 198 immutable input"
         );
         let bytes = read_stable_bounded(Path::new(path), limit, "198 finalization input")?;
         ensure!(
@@ -372,7 +372,7 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
                 && r["_SYSTEMD_UNIT"] == UNIT
                 && r["_PID"] == PID
                 && r["_UID"] == "1001",
-            "unbound198 finalization event"
+            "unbound 198 finalization event"
         );
         let timestamp = r["__REALTIME_TIMESTAMP"]
             .as_str()

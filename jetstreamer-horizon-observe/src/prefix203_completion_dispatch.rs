@@ -306,7 +306,7 @@ fn evidence(
         // after reaping its worker. The observer correctly refuses to invent a
         // worker sample then. This exact absence is admissible only once the
         // real producer is independently proven clean terminal at dispatch time;
-        // all fleet bindings,225sampling and fresh global resource gates remain.
+        // all fleet bindings, 225sampling and fresh global resource gates remain.
         let exact_post_worker = unit == PRODUCER
             && terminal_proof.is_some()
             && d["status"] == "unavailable"
@@ -425,7 +425,7 @@ fn current_other(f: &Value) -> Result<()> {
             && field(&s, "NRestarts")? == "0"
             && field(&s, "ActiveState")? == "active"
             && field(&s, "SubState")? == "running",
-        "older225owner changed"
+        "older 225 owner changed"
     );
     let old = f["active"]
         .as_array()
@@ -435,13 +435,13 @@ fn current_other(f: &Value) -> Result<()> {
         .unwrap();
     let expected = old["producer"]["ExecStart"]
         .as_str()
-        .context("baseline225command absent")?;
+        .context("baseline 225command absent")?;
     ensure!(
         expected.split_once(" ; ignore_errors=").map(|x| x.0)
             == field(&s, "ExecStart")?
                 .split_once(" ; ignore_errors=")
                 .map(|x| x.0),
-        "older225command changed"
+        "older 225command changed"
     );
     Ok(())
 }

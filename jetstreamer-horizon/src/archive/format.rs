@@ -106,7 +106,7 @@ pub const MAX_BUCKET_INDEX_ENTRIES: u64 = 1_000_000;
 /// bytes. Recorded in the header so a reader can detect that it was built
 /// with a different prime table (which would mis-decode every primed ID).
 pub static PRIME_TABLE_ID: Lazy<u64> = Lazy::new(|| {
-    // SAFETY of layout: POPULAR_PUBKEYS is contiguous [[u8;32]; N].
+    // SAFETY of layout: POPULAR_PUBKEYS is contiguous [[u8; 32]; N].
     let bytes = unsafe {
         core::slice::from_raw_parts(
             POPULAR_PUBKEYS.as_ptr() as *const u8,

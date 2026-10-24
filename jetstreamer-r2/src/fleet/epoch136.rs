@@ -1,4 +1,4 @@
-//! Closed corrected-worker136 root experiment. Never full-epoch or delivery authority.
+//! Closed root experiment with the corrected worker for epoch 136. Never full-epoch or delivery authority.
 use super::*;
 mod ops;
 
@@ -99,12 +99,12 @@ fn scope(v: &Value) -> Result<()> {
                 == "bounded-qualification-stop-not-adopted-full-epoch-peak"
             && v["repair_must_remain_open"] == true
             && v["capped_shrink_candidate"] == true,
-        "foreign136 runtime, input, root, failure, suffix or bounded-stop contract"
+        "foreign 136 runtime, input, root, failure, suffix or bounded-stop contract"
     );
     for key in DENIED {
         ensure!(
             v[*key] == false,
-            "private136 grants forbidden authority:{key}"
+            "private 136 grants forbidden authority:{key}"
         );
     }
     Ok(())
@@ -159,7 +159,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             && r["required_guard_minimum_free_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= BASE_PROTECTED),
-        "private136 launch identity or command differs"
+        "private 136 launch identity or command differs"
     );
     Ok(())
 }
@@ -190,7 +190,7 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
                 .as_u64()
                 .zip(a["required_guard_minimum_free_bytes"].as_u64())
                 .is_some_and(|(free, floor)| floor.checked_add(PEAK).is_some_and(|n| free >= n)),
-        "private136 plan/admission or growth binding differs"
+        "private 136 plan/admission or growth binding differs"
     );
     let at = a["recorded_unix_seconds"]
         .as_u64()
@@ -204,7 +204,7 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
             && r["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|t| start <= t),
-        "private136 admission stale or later than actual start"
+        "private 136 admission stale or later than actual start"
     );
     Ok(())
 }
@@ -262,7 +262,7 @@ fn first_guard(c: &DiagnosticClaim, r: &Value, g: &Value, p: &Value) -> Result<(
                 .as_u64()
                 .zip(r["recorded_unix_seconds"].as_u64())
                 .is_some_and(|(guard, launch)| guard <= launch && launch - guard <= 900),
-        "private136 lacks real one-worker no-trip invocation-bound root guard"
+        "private 136 lacks real one-worker no-trip invocation-bound root guard"
     );
     Ok(())
 }
@@ -285,12 +285,12 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     let gb: BoundFile = serde_json::from_value(r["first_guard"].clone())?;
     ensure!(
         gb.path == Path::new(ROOT).join("receipts/first-guard.json"),
-        "foreign136 first guard path"
+        "foreign 136 first guard path"
     );
     let g = bound_json(&gb)?;
     let gp: BoundFile =
         serde_json::from_value(json!({"path":g["plan"],"sha256":g["plan_sha256"]}))?;
-    ensure!(gp.path == Path::new(GUARD_PLAN), "foreign136 guard plan");
+    ensure!(gp.path == Path::new(GUARD_PLAN), "foreign 136 guard plan");
     first_guard(c, r, &g, &bound_json(&gp)?)
 }
 fn live_shape(c: &DiagnosticClaim, v: &Value) -> Result<()> {
@@ -308,7 +308,7 @@ fn live_shape(c: &DiagnosticClaim, v: &Value) -> Result<()> {
                 .and_then(|s| s.parse::<u32>().ok())
                 .is_some_and(|n| n > 1)
             && command(&v["ExecStart"]) == Some(expected_command().as_str()),
-        "private136 live owner or command differs"
+        "private 136 live owner or command differs"
     );
     Ok(())
 }
@@ -337,7 +337,7 @@ fn limits(p: &BTreeMap<String, String>) -> Result<()> {
     ] {
         ensure!(
             p.get(key).map(String::as_str) == Some(value),
-            "private136 sandbox differs:{key}"
+            "private 136 sandbox differs:{key}"
         );
     }
     ensure!(
@@ -346,7 +346,7 @@ fn limits(p: &BTreeMap<String, String>) -> Result<()> {
                 "{ROOT}/destination {ROOT}/output {ROOT}/scratch {ROOT}/.jetstreamer-private"
             ))
             && p.get("Environment") == Some(&environment()),
-        "private136 writable paths/environment differ"
+        "private 136 writable paths/environment differ"
     );
     Ok(())
 }

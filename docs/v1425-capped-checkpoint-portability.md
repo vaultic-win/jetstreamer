@@ -8,7 +8,7 @@ remote mutation was performed for this audit.
 The exact current candidate is worker SHA-256
 `fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759`,
 compiled from the corrected v1.4.25 source with `capped-shrink-candidate` using
-Rust1.46.0. The healthy141 root qualification and the prepared136 route remain
+Rust 1.46.0. The healthy 141 root qualification and the prepared 136 route remain
 separate and retain their existing admission and runtime authority.
 
 ## Actual export and restore path
@@ -82,8 +82,8 @@ Use a separately finalized V2 prefix and a new V2 suffix. Existing machinery is
 `HistoricalReplay::from_restored_checkpoint`, and
 `archive::merge_checkpoint_restart_segments` with explicit V4 provenance. The
 merger binds source digests, decoded events, raw-write ranges and the PoH handoff;
-it grants no canonical root or publication authority. Existing exact144/203/213
-continuation tools demonstrate the shape, not authority for141/136. The141
+it grants no canonical root or publication authority. Existing exact 144/203/213
+continuation tools demonstrate the shape, not authority for 141/136. The 141
 original-entry profile additionally fixes bootstrap60911751/terminal61328765
 and rejects partial source resume. A new private bounded profile must preserve
 those checks and independently bind its next-slot source cursor; do not weaken
@@ -91,14 +91,14 @@ the running profile or reuse another epoch's `RestartProof`.
 
 ## Smallest safe implementation and next bounded experiment
 
-First implement a test-only native1.2.0 serialization round trip. It requires no
+First implement a test-only native 1.2.0 serialization round trip. It requires no
 new production protocol or runtime route, and can use
 `RuntimeState::from_test_bank` plus the existing rooted-bank fixtures. Reserve a
 separate historical build target with the parent before compilation. Proposed
-build bounds are the already-used Rust1.46.0 offline/locked jobs2, CPU200%,
-MemoryHigh12GiB/Max16GiB, no swap, Tasks512, private network and read-only source.
-Use only disposable temporary state, with a distinct10GiB whole-fixture stop and
-30-minute execution deadline; these are experiment limits, not a native141 peak.
+build bounds are the already-used Rust 1.46.0 offline/locked jobs 2, CPU 200%,
+MemoryHigh 12 GiB / Max 16 GiB, no swap, Tasks 512, private network and read-only source.
+Use only disposable temporary state, with a distinct 10 GiB whole-fixture stop and
+30-minute execution deadline; these are experiment limits, not a native 141 peak.
 
 1. Create an isolated deterministic Bank with the corrected builtin table,
    execute fixed successful and failing transactions through a complete slot,
@@ -136,42 +136,42 @@ changing members must fail closed. Test default and capped builds separately.
 The next stage is a private **two-output-segment** equivalence run: close and
 independently read the prefix at the same completed-slot checkpoint, bind its
 full digest/manifest and original source index/data generations, restore in a
-fresh process, start a new output at the first next non-skipped slot and entry0,
+fresh process, start a new output at the first next non-skipped slot and entry 0,
 and prove no source transaction is duplicated/skipped. Bind original and
 replacement invocation IDs and worker/parent/source hashes. Compare the merged
 decoded output with uninterrupted execution; byte equality alone is inappropriate
 when headers carry independent creation times or different segment provenance.
-Then require a real bounded native141/136 input sample and later trusted root,
+Then require a real bounded native 141/136 input sample and later trusted root,
 full/plugin/boundary gates, authenticated holding round trip and interrupted
 transition recovery. No stage authorizes stopping a healthy producer early.
 
 Native serialization and output continuation remain **unqualified**. No capacity
-gain from parking a live141/136 replay is demonstrated by this audit.
+gain from parking a live 141/136 replay is demonstrated by this audit.
 
-## Existing141 deadline evidence
+## Existing 141 deadline evidence
 
 No new poll was taken. The coordinated observer at
 `/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T182600Z.json`
 has SHA-256
 `dde879bd02d342a9879eb21b82766880257c2442a39fa692f56d1f1f7eb67ff8`.
-Its last slot60926156 and rate1.0021996518807004slots/s leave402609slots to
-root61328765. The matching `qualification141-estimate.json` under the
+Its last slot 60926156 and rate1.0021996518807004slots/s leave 402609 slots to
+root 61328765. The matching `qualification141-estimate.json` under the
 `20261023T182600Z-controller-rebind-capped141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1`
-routine-cycle directory binds that observer and records elapsed13936388ms,
-remaining546525910ms and129600000ms downstream allowance.
+routine-cycle directory binds that observer and records elapsed 13936388 ms,
+remaining 546525910 ms and 129600000 ms downstream allowance.
 Its SHA-256 is
 `b1734ae57f99d311005eb265168b206ce82da2b3c14593ec66f20cb63c3b884e`.
 
-The5day runtime cap is432000000ms. At that sample, its remaining execution
-window was418063612ms (4days20hours7minutes43.612seconds). Root replay at the
-observed rate projects401725345ms (4days15hours35minutes25.345seconds), leaving
-only16338267ms (4hours32minutes18.267seconds), before any extra terminal work.
-The minimum sustained remaining rate is0.963032870slots/s: about3.91% below
+The 5 day runtime cap is 432000000 ms. At that sample, its remaining execution
+window was 418063612 ms (4days20hours7minutes43.612 seconds). Root replay at the
+observed rate projects 401725345 ms (4days15hours35minutes25.345 seconds), leaving
+only 16338267 ms (4hours32minutes18.267 seconds), before any extra terminal work.
+The minimum sustained remaining rate is0.963032870slots/s: about 3.91% below
 the observed rate. The projection currently fits, but has a tight deadline
 margin and is not a guaranteed bound. Do not silently extend that cap.
 
-The dashboard's larger estimate also includes15234suffix slots at the same
-assumed rate and36hours of explicit unmeasured planning allowances:24hours for
-suffix source/restoration/qualification and12hours for delivery. That suffix is
+The dashboard's larger estimate also includes 15234 suffix slots at the same
+assumed rate and 36 hours of explicit unmeasured planning allowances:24 hours for
+suffix source/restoration/qualification and 12 hours for delivery. That suffix is
 outside the running root invocation. Its ETA cannot establish that the current
 invocation can execute the suffix, nor imply a qualified native resume path.

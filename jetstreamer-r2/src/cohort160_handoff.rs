@@ -1,4 +1,4 @@
-//! Exact pending/importing160 controller. Observations grant no publication authority.
+//! Exact pending/importing controller for epoch 160. Observations grant no publication authority.
 use super::*;
 use std::process::Command;
 pub(super) const CONTROLLER: &str =
@@ -161,7 +161,7 @@ pub(super) fn observe(current: &Value, sample: u64) -> Result<Value> {
     let meta = fs::symlink_metadata(STATE)?;
     ensure!(
         meta.is_file() && meta.uid() == 0 && meta.nlink() == 1 && meta.mode() & 0o077 == 0,
-        "unsafe160 state"
+        "unsafe 160 state"
     );
     let sb = read_stable_bounded(Path::new(STATE), 1 << 20, "160 controller state")?;
     let s: Value = serde_json::from_slice(&sb)?;

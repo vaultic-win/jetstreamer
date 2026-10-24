@@ -1,30 +1,30 @@
-# Epoch228 cached preparation and remaining gate
+# Epoch 228 cached preparation and remaining gate
 
-The retained v4 manifest provides an exact root bootstrap at98495291, generation
+The retained v4 manifest provides an exact root bootstrap at 98495291, generation
 1633013483898142, accounts hash
 `GfiRSgpC1qvH3uxVd9VAtYZ6qKM8fcdkyoyAkhF7izLq`. Its existing compressed cache is
 10510540911 bytes, SHA-256
 `da26bd1b4b3b93be74c9dae28d1d982f821474333aa06e87f32dfa83342915f3`.
 No acquisition or authentication refresh is required for this offline work.
 
-There is no root checkpoint inside epoch228 (98496000–98927999) in that retained
-authority. The first later root is98928278, generation1633247230841050, accounts
-hash `6Ec1ZPL4kEMFLU2qAsRfrbmYnEhm8pL77Xt1PoBhyGra`. It requires279 slots of
-epoch229 after epoch228 ends. The ordinary singleton validator requires a root
-inside its final requested epoch; declaring228–228 with this checkpoint fails
+There is no root checkpoint inside epoch 228 (98496000–98927999) in that retained
+authority. The first later root is 98928278, generation 1633247230841050, accounts
+hash `6Ec1ZPL4kEMFLU2qAsRfrbmYnEhm8pL77Xt1PoBhyGra`. It requires 279 slots of
+epoch 229 after epoch 228 ends. The ordinary singleton validator requires a root
+inside its final requested epoch; declaring 228–228 with this checkpoint fails
 that unchanged gate. Do not move the root backward, substitute an hourly anchor,
 drop the gate, or call the focused output a canonical epoch archive.
 
 The existing `--qualification-end-slot=98928278` mechanism can describe that
 bounded verification tail, but produces a432279-slot focused artifact. A reviewed
 extractor/assembly and full/plugin qualification route is still needed to obtain
-the canonical432000-slot epoch228 output while preserving the279-slot proof.
+the canonical432000-slot epoch 228 output while preserving the279-slot proof.
 
-The sealed capped227 worker is also inapplicable: it accepts only snapshot
-98063464 and entries98063465–98495999. Epoch228's bootstrap is98495291 and its
-first output slot98496000 is already outside that worker's exclusive upper
-bound. A new closed228 storage-cap profile must cover its exact bootstrap,
-708 pre-output slots from227, full228 and279 verification slots in229. It must
+The sealed capped 227 worker is also inapplicable: it accepts only snapshot
+98063464 and entries 98063465–98495999. Epoch 228's bootstrap is 98495291 and its
+first output slot 98496000 is already outside that worker's exclusive upper
+bound. A new closed 228 storage-cap profile must cover its exact bootstrap,
+708 pre-output slots from 227, full 228 and 279 verification slots in 229. It must
 retain the original v1.6.20 consensus path and cap only storage shrink debt.
 Cold native input qualification, bounded resource admission, actual guard,
 fleet/status registration, canonical/full/plugin checks and delivery gates
@@ -47,21 +47,21 @@ the native sealer, then execute:
 jetstreamer-cached-singleton-prepare PLAN --plan-sha256 SHA --self-sha256 SHA
 ```
 
-Its minimal metadata manifest covers228–229 with intended publication prefix228.
+Its minimal metadata manifest covers 228–229 with intended publication prefix 228.
 That is preparation for existing whole-cohort/recovery validation, not a claim
-that a fresh cohort runs only279 slots of229: the existing whole-cohort route
-continues through99359999. Manifest publication-prefix metadata alone also does
-not enforce fresh-replay remote publication scope. Keep229 local/private with
+that a fresh cohort runs only 279 slots of 229: the existing whole-cohort route
+continues through 99359999. Manifest publication-prefix metadata alone also does
+not enforce fresh-replay remote publication scope. Keep 229 local/private with
 explicit delivery scope and a qualified publication path, or implement the
-short focused-tail route before using it as an independent singleton. Epoch301
+short focused-tail route before using it as an independent singleton. Epoch 301
 is not included and remains private.
 
 Outputs are `manifest.json`, `epoch-hashes.json`, and `capability.json`. Their
 receipt explicitly records those limitations and denies runtime, replay and
 publication authority. Idempotent retries retain identical immutable files and
 refuse changed evidence. The exact next efficient step is the separately pinned
-capped228 profile plus qualified focused-tail extraction, rather than relabeling
-the capped227 binary or weakening the ordinary singleton checkpoint gate.
+capped 228 profile plus qualified focused-tail extraction, rather than relabeling
+the capped 227 binary or weakening the ordinary singleton checkpoint gate.
 
 The actual offline preparation is durable at
 `/var/lib/jetstreamer/horizon-cached-singleton-228-preparation-v1/`:
@@ -77,7 +77,7 @@ SHA-256 `749349cb469c706fcaa14a6b76b1fabaa605b2e34e367a703b6211f18b045caa`.
 Its sealed plan is
 `/var/lib/jetstreamer/horizon-cached-singleton-228-plan-v1/plan.json`, SHA-256
 `0658487e7cc5fc881c48c9aa638c3f2d15ea0ff1545a1baa20697b37551adade`.
-The10.5GB bootstrap was rehashed in place without creating another copy.
+The 10.5 GB bootstrap was rehashed in place without creating another copy.
 Keep this receipt tree private. Any future unprivileged worker input must be
 separately deployed through the native sealer into a read-only input bundle;
 do not relax the private evidence directory to make it readable.

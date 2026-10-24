@@ -1,4 +1,4 @@
-//! One guarded native207 owner may join an accepted sample without a new poll.
+//! One guarded native 207 owner may join an accepted sample without a new poll.
 use super::native207 as c;
 use super::*;
 fn origin_binding(

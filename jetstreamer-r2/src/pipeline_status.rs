@@ -104,7 +104,7 @@ impl Binding {
             | ("upload-readback", "upload" | "readback") => (),
             ("upload-readback", "queued-upload") => ensure!(
                 epoch == 144 && self.unit == UPLOAD144 && self.origin_unit == PUB144,
-                "queued upload requires the exact144 delivery owner"
+                "queued upload requires the exact 144 delivery owner"
             ),
             _ => bail!("pipeline and status phases disagree"),
         };
@@ -246,7 +246,7 @@ fn receipt_directory_owner(plan: &Plan) -> Result<u32> {
                     ))
                 && plan.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
-            "foreign-owned pipeline receipt directory is not an exact160/198/144 profile"
+            "foreign-owned pipeline receipt directory is not an exact 160/198/144 profile"
         );
     }
     Ok(requested)
@@ -316,7 +316,7 @@ fn validate_receipt_directory(plan: &Plan) -> Result<()> {
         "pipeline status receipt directory owner/privacy differs"
     );
     // The common writer already supports a root writer under DAC_OVERRIDE in
-    // a private UID1001 directory, without chmod or CAP_FOWNER. Keep one
+    // a private UID 1001 directory, without chmod or CAP_FOWNER. Keep one
     // shared receipt history for fleet classification and completion cleanup.
     Ok(())
 }

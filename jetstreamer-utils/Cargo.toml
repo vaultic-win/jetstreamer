@@ -23,11 +23,11 @@ epoch209-singleton-guard = []
 epoch223-native20-prefix-guard = []
 epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]
-# Pins the separate bounded epoch225 upstream-comparison worker, not an era.
+# Pins the separate bounded epoch 225 upstream-comparison worker, not an era.
 epoch225-v1-6-25-diagnostic = []
-# Separate capped-shrink epoch225 prefix measurement; no route promotion.
+# Separate capped-shrink epoch 225 prefix measurement; no route promotion.
 epoch225-shrink-budget-resource = []
-# Private same-input epoch203 resource comparison; no runtime promotion.
+# Private same-input epoch 203 resource comparison; no runtime promotion.
 epoch203-single-thread-resource = []
 # Exact private comparison of the v1.6.16 upstream shrink-budget cap.
 epoch203-shrink-budget-resource = []
@@ -35,7 +35,7 @@ epoch203-shrink-budget-resource = []
 epoch203-root-prefix-resource = []
 # Same canonical root and safety envelope, separately pinned capped-shrink worker.
 epoch203-shrink-root-prefix-resource = ["epoch203-root-prefix-resource"]
-# Closed private cold epoch223 prefix ending at the independently known root.
+# Closed private cold epoch 223 prefix ending at the independently known root.
 epoch223-root-prefix-resource = []
 # Separate native v1.6.20 prefix; not a full epoch or publication route.
 epoch223-v1620-root-prefix-resource = []
@@ -43,11 +43,11 @@ epoch223-v1620-root-prefix-resource = []
 epoch223-warmup-resource = []
 # Separate exact v1.6.20 first16-entry qualification; no root promotion.
 epoch223-v1620-warmup-resource = []
-# Private fixed-span epoch224 measurement against its pinned v1.6.25 package.
+# Private fixed-span epoch 224 measurement against its pinned v1.6.25 package.
 epoch224-bounded-resource = []
-# Dormant exact epoch205 checkpoint-prefix measurement; no ordinary replay.
+# Dormant exact epoch 205 checkpoint-prefix measurement; no ordinary replay.
 epoch205-bounded-resource = []
-# Private capped-shrink prefix ending at epoch205's independently known checkpoint.
+# Private capped-shrink prefix ending at epoch 205's independently known checkpoint.
 epoch205-shrink-root-prefix-resource = []
 # Private capped-shrink204 prefix; publication and638-slot suffix remain closed.
 epoch204-shrink-root-prefix-resource = []

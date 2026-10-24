@@ -127,10 +127,10 @@ fn fold(f: &mut Value, claim: Value, b: &Bound) -> Result<()> {
     let gate = &mut f["gates"]["141"];
     ensure!(
         gate["state"] == "failed-needs-repair",
-        "acquisition must not close141repair"
+        "acquisition must not close 141repair"
     );
     gate["next_action"] = json!(
-        "Track exact private first-target native141 acquisition and preserve both failed attempts plus post-close metadata rejection. Retain raw parent/target meta/root/dead/orphan and every original shred outcome; false connectivity remains unchanged. One queried target is not full18283target recovery, canonical ancestry, authenticated clock or PoH. Inspect genuine post-close receipt before further qualification; no ordinary ETA or publication authority."
+        "Track exact private first-target native 141 acquisition and preserve both failed attempts plus post-close metadata rejection. Retain raw parent/target meta/root/dead/orphan and every original shred outcome; false connectivity remains unchanged. One queried target is not full 18283target recovery, canonical ancestry, authenticated clock or PoH. Inspect genuine post-close receipt before further qualification; no ordinary ETA or publication authority."
     );
     let entries = gate["evidence"]
         .as_array_mut()

@@ -1,4 +1,4 @@
-//! Exact retained cohort's epoch193 -> epoch194 ETA handoff, not replay authority.
+//! Exact retained cohort's epoch 193 -> epoch 194 ETA handoff, not replay authority.
 use super::*;
 const OLD: u64 = 83_807_999;
 const NEW: u64 = 84_239_999;

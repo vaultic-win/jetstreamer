@@ -208,7 +208,7 @@ fn admission(observer: &Value, plan: &Plan, time: u64) -> Result<()> {
     } else {
         ensure!(
             plan.fleet.is_none(),
-            "legacy223 does not accept a protected fleet extension"
+            "legacy 223 does not accept a protected fleet extension"
         );
     }
     let timestamp = utc_seconds(
@@ -335,7 +335,7 @@ fn validate_fleet_binding(p: &Plan, observer: &Value) -> Result<()> {
     if !PROTECTED_FLEET {
         ensure!(
             p.fleet.is_none(),
-            "legacy223 does not accept a protected fleet extension"
+            "legacy 223 does not accept a protected fleet extension"
         );
         return Ok(());
     }
@@ -440,7 +440,7 @@ fn run() -> Result<()> {
             "storage",
             "cp",
             OBJECT.uri,
-            destination.to_str().context("nonUTF8 path")?,
+            destination.to_str().context("non-UTF8 path")?,
         ])
         .spawn()?,
     ));

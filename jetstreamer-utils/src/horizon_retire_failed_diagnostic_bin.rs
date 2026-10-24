@@ -1,9 +1,9 @@
 //! Plan-bound retirement of reproducible state from one failed Horizon diagnostic.
 //!
 //! The legacy profile accepts only its two known disposable subtrees. An explicit
-//! restore-only epoch213 profile accepts only its isolated scratch directory and
+//! restore-only epoch 213 profile accepts only its isolated scratch directory and
 //! requires a zero-entry stopped probe with retained inputs and no archive.
-//! A closed epoch223 v3 profile retires only its failed restore scratch, retaining
+//! A closed epoch 223 v3 profile retires only its failed restore scratch, retaining
 //! and rehashing the immutable inputs and original failure evidence.
 //! All profiles prove terminal identity, revalidate sealed outcome evidence, and
 //! scan command/maps/cwd/root/exe/fd references before deletion.
@@ -374,7 +374,7 @@ fn disposable_targets(plan: &Plan) -> Result<BTreeSet<PathBuf>> {
                     .guard
                     .unit
                     .starts_with("horizon-native-restore-probe-213-guard-"),
-            "restore-only retirement must bind an isolated epoch213 native probe"
+            "restore-only retirement must bind an isolated epoch 213 native probe"
         );
         Ok(BTreeSet::from([plan.run_root.join("scratch")]))
     } else {
