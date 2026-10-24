@@ -718,7 +718,12 @@ mod tests {
             match change {
                 0 => t.output_slot_start += 1,
                 1 => t.output_slot_start -= 1,
-                2 => p.emitted_raw_write_versions = 10001..10000,
+                2 => {
+                    p.emitted_raw_write_versions = std::ops::Range {
+                        start: 10001,
+                        end: 10000,
+                    }
+                }
                 3 => {
                     p.bootstrap.next_write_version = 0;
                     p.terminal.next_write_version = u64::MAX - 1;
