@@ -470,6 +470,14 @@ mod tests {
                 10,
                 "--intent-receipt=/var/lib/jetstreamer-adaptive-reserve-test/../../escape",
             ),
+            (
+                10,
+                "--intent-receipt=/var/lib/jetstreamer-adaptive-reserve-test/./intent.json",
+            ),
+            (
+                10,
+                "--intent-receipt=/var/lib/jetstreamer-adaptive-reserve-test//intent.json",
+            ),
             (11, "--completion-receipt=/tmp/completion.json"),
         ] {
             let mut bad = args.clone();
