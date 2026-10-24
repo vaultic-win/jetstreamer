@@ -116,6 +116,8 @@ mod publication144;
 mod repair183;
 #[path = "routine_repair185.rs"]
 mod repair185;
+#[path = "routine_repair_gate_notes.rs"]
+mod repair_gate_notes;
 #[path = "routine_terminal185.rs"]
 mod terminal185;
 
@@ -1435,6 +1437,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     original141::derive_fleet(p, &mut fleet)?;
     terminal141::derive_fleet(p, &mut fleet)?;
     repair141_status::derive_fleet(p, &mut fleet)?;
+    repair_gate_notes::apply(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1685,6 +1688,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     original141::derive_fleet(p, &mut fleet.clone())?;
     terminal141::derive_fleet(p, &mut fleet.clone())?;
     repair141_status::derive_fleet(p, &mut fleet.clone())?;
+    repair_gate_notes::validate(p)?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
