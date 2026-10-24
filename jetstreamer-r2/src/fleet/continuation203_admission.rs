@@ -309,7 +309,7 @@ fn guard(g: &Value, now: u64) -> Result<()> {
                 .as_u64()
                 .zip(g["minimum_free_bytes"].as_u64())
                 .is_some_and(|(n, min)| n >= min),
-        "203 needs fresh no-trip225 guard and must preserve its protected reserve"
+        "203 needs fresh no-trip 225 guard and must preserve its protected reserve"
     );
     let workers = g["workers"].as_array().context("203 older guard workers")?;
     ensure!(
@@ -734,7 +734,7 @@ mod tests {
         assert!(guard(&changed, 1000).is_err());
     }
     #[test]
-    #[ignore = "root read-only actual sealed 203 primary inputs/accepted296; no resource or remote observations, writes or launch"]
+    #[ignore = "root read-only actual sealed 203 primary inputs/accepted 296; no resource or remote observations, writes or launch"]
     fn actual_sealed203_inputs_and_accepted296_match() {
         let read =
             |path: &str| -> Value { serde_json::from_slice(&fs::read(path).unwrap()).unwrap() };

@@ -294,7 +294,7 @@ pub(super) fn observe(
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact real144 publisher/private-history handoff regression; no resource scan, archive hash, write or remote access"]
+    #[ignore = "root exact real 144 publisher/private-history handoff regression; no resource scan, archive hash, write or remote access"]
     fn actual_publication_handoff_keeps_terminal_private_history_not_a_live_claim() {
         let b=BoundFile{path:"/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261023T002800Z-publication144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/public198-stage/sealed/fleet-plan.json".into(),sha256:"76c237192426062c4b8a30661bed7e2ab773dd960ff6b0686576a1df9dade123".into()};
         let p: Plan = serde_json::from_value(bound_json(&b).unwrap()).unwrap();

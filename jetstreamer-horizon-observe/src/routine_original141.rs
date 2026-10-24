@@ -643,7 +643,7 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
         )
     } else if s.vote_prefix {
         json!(
-            "Capture worker-enforced60912005 terminal and frozen Bank evidence; determine whether the formerly failing60912005entry388transaction378 vote executes successfully with the separately built corrected-builtin worker. Retain prior60912004 canonical vote-expected Bank/reward match and both earlier failed roots. Parent progress is prefetch, not execution proof. Keep incident open through complete-span qualification and a verified ready pair."
+            "Capture worker-enforced 60912005 terminal and frozen Bank evidence; determine whether the formerly failing 60912005 entry 388 transaction 378 vote executes successfully with the separately built corrected-builtin worker. Retain prior 60912004 canonical vote-expected Bank/reward match and both earlier failed roots. Parent progress is prefetch, not execution proof. Keep incident open through complete-span qualification and a verified ready pair."
         )
     } else if s.freeze_components {
         json!(

@@ -370,7 +370,7 @@ pub(super) fn enable(p: &mut Plan, c: &mut Value, b: &Bound) -> Result<()> {
             && cohort191_import::enabled(p)
             && terminal185::enabled(p)
             && repair141_status::enabled(p),
-        "152 recovery requires exact accepted03:16three-owner profile"
+        "152 recovery requires exact accepted 03:16 three-owner profile"
     );
     absent(Path::new(
         "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261024T034600Z.json",

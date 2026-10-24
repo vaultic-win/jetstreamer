@@ -548,7 +548,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
         let (epoch, allowance) = ("185", 43200);
         r["epoch_additional_replay_slots"][epoch] = json!(FINAL_END - terminal);
         r["formula"][epoch] = json!(format!(
-            "remaining observed slots plus{} queued gated slots / observed rate +{allowance}s downstream; independent epoch185 import gate",
+            "remaining observed slots plus {} queued gated slots / observed rate +{allowance}s downstream; independent epoch 185 import gate",
             FINAL_END - terminal
         ));
     }

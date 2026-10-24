@@ -297,7 +297,7 @@ pub(super) fn enable(
     config["not_before_utc"] = json!(NEXT);
     config["output"] = json!(next.observer);
     // Preserve every predecessor hash, producer clock and pending 157 handoff.
-    // Isolate the already-private144 claim before its expected terminal event.
+    // Isolate the already-private 144 claim before its expected terminal event.
     private144::enable(next, config, old_model)?;
     interval(next)?;
     Ok(())
@@ -348,7 +348,7 @@ mod tests {
         assert!(epoch198_origin(&json!({"evidence":[{"path":PROOF,"sha256":"f".repeat(64)}],"sample_target_utc":NEXT})).is_err());
     }
     #[test]
-    #[ignore = "requires root and exact immutable package-recovery evidence; no198 event or adoption claimed"]
+    #[ignore = "requires root and exact immutable package-recovery evidence; no 198 event or adoption claimed"]
     fn exact198controller_binding_keeps_original_producer_and_legacy_origin() {
         let binding = Bound {
             path: PROOF.into(),

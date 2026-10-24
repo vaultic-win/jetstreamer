@@ -560,7 +560,7 @@ mod tests {
         next["metadata_event"] = event.clone();
         next["gates"]["227"]["state"] = json!("failed-needs-repair");
         next["gates"]["227"]["next_action"] =
-            json!("Repair slot98091122; keep publication gates open");
+            json!("Repair slot 98091122; keep publication gates open");
         next["gates"]["227"]["evidence"] =
             json!([event, private157::binding(&fixed(REPAIR, REPAIR_SHA))]);
         let p: Plan = serde_json::from_value(next.clone()).unwrap();

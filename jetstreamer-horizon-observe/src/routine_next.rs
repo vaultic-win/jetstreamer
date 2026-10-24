@@ -874,7 +874,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires root and exact accepted14:08/failed14:38/rebound guard host evidence; no sampling or writes"]
+    #[ignore = "requires root and exact accepted 14:08/failed 14:38/rebound guard host evidence; no sampling or writes"]
     fn host_package_recovery_preserves_genuine_history_and_producer_clocks() {
         let pb = Bound {
             path: "/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T140800Z-v2/cycle-plan.json".into(),

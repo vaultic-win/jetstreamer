@@ -467,7 +467,7 @@ mod tests {
         assert!(supported_peer(&json!({"epoch":223,"controller":{"Id":"repair"}})).is_err());
     }
     #[test]
-    #[ignore = "root-only accepted333 metadata reader proof; no resource poll, admission, Bank, process or network"]
+    #[ignore = "root-only accepted 333 metadata reader proof; no resource poll, admission, Bank, process or network"]
     fn root_terminal_native209_sample_preserves_four_live_owners_without_a_new_poll() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let fleet=BoundFile {path:"/var/lib/jetstreamer/horizon-campaign-fleet/native209-terminal-from333-v1/fleet-ledger.json".into(),

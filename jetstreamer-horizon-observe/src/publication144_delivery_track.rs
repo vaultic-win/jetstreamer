@@ -333,7 +333,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, is_terminal: bool) -> Re
                     fields(UNIT)? == before,
                     "delivery changed during capture recovery"
                 );
-                println!("exact existing144 ownership capture verified; no write or remote access");
+                println!("exact existing 144 ownership capture verified; no write or remote access");
                 return Ok(());
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}

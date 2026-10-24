@@ -131,7 +131,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact retained failed all-targetv1 parent only; no new native open, resource sample, R2 request or launch"]
+    #[ignore = "root exact retained failed all-target v1 parent only; no new native open, resource sample, R2 request or launch"]
     fn actual_failed_parent_has_unchanged_guard_and_terminal_identity() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let b = Bound {

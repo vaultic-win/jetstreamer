@@ -2358,6 +2358,7 @@ mod tests {
     }
 
     fn incident203_fixture() -> (Bound, Value, Value) {
+        // Preserve historical text byte for byte: its digest identifies the stale action.
         let old = "Continue exact guarded natural-root prefix qualification; no independent full prefix or full epoch is qualified yet. Independent native validator now supports literal prefix203filename and no-clobber fsynced private --receipt;6tests passed,source pushed and reader sealed. On natural parent success and exact431581slot segment, freshly admit independent complete reread. No prefix sidecar/public countdown; native restart,419slot suffix,assembly,current plugin and publication remain separate.";
         assert_eq!(sha(old.as_bytes()), STALE_203_ACTION_SHA);
         let evidence = Bound {
@@ -2448,6 +2449,7 @@ mod tests {
     #[test]
     fn exact225scratch_task_correction_preserves_all_gates_and_open_repair() {
         use super::*;
+        // Preserve historical text byte for byte: its digest identifies the stale action.
         let old = "Reserve guard stopped exact ac9aee3d47eb41e483a5e008ed43d030 at filesystem2019662348288 below protected2019796866159 on2026-10-21T02:31:42Z; terminalexit1 at02:32:04. EOF followed guardSIGINT and is not new canonical divergence. Lastslot97274295; partial20.2GiB archive and retainedinputs preserved. Keeprepair open. Bind guardstopchain and source-review cursor-free bootstrap restart; qualify exact natural225 scratch retirement profile before cleanup. No existing generic/epoch213/singleton profile authorizes this layout. No automatic restart, newdiskadmission,canonicalsidecar,promotionorpublication; natural-parent0/fullspan never reached.";
         assert_eq!(sha(old.as_bytes()), STALE_225_ACTION_SHA);
         let evidence = Bound {

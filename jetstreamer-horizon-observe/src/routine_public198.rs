@@ -1197,7 +1197,7 @@ fn validate_completed_status(
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root-only accepted01:16 fleet and existing144/198 receipts; no network, new resource observation or mutation"]
+    #[ignore = "root-only accepted 01:16 fleet and existing 144/198 receipts; no network, new resource observation or mutation"]
     fn exact_ready144_and198_fold_from_accepted_inventory_and_existing_cleanup_receipts() {
         let plan = file("/var/lib/jetstreamer/horizon-routine-plan-101-200-20261024T011600Z-guard-stopped185-repair141-v1/cycle-plan.json".into(), true).unwrap();
         let p: Plan = serde_json::from_value(bound_json(&plan, true).unwrap()).unwrap();
@@ -1336,7 +1336,7 @@ mod tests {
         validate_completed_status(sample, &plan, &old, &old_receipt, false).unwrap();
     }
     #[test]
-    #[ignore = "root exact accepted22:58 upload completion phase regression; no sampling/writes/remote access"]
+    #[ignore = "root exact accepted 22:58 upload completion phase regression; no sampling/writes/remote access"]
     fn root_accepted2258_upload_completion_is_a_valid_successor() {
         let b=Bound {path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T225800Z-upload198-refresh-completed144-v1/cycle-plan.json".into(),sha256:"75f6667672e9a2817f1f7f31921594417a96c7ec7d3fc721682ec070ea8d2803".into()};
         let p: Plan = serde_json::from_slice(&bound_bytes(&b, true).unwrap()).unwrap();
@@ -1376,7 +1376,7 @@ mod tests {
         assert!(!upload_writer(&p));
     }
     #[test]
-    #[ignore = "root exact accepted22:28 host profile migration, no resource sample or remote access"]
+    #[ignore = "root exact accepted 22:28 host profile migration, no resource sample or remote access"]
     fn root_progressive_profile_preserves_native_histories_and_other_gates() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let b=Bound {path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T222800Z-native198-refresh-completed144-v1/cycle-plan.json".into(),sha256:"edfb8a1d48ea2b407f507dbb683051c393259d2410e8d40cb9c0f41cb5737e9d".into()};
