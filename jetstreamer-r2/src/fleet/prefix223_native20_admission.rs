@@ -542,7 +542,8 @@ mod tests {
             (c::PROTECTIVE, c::GUARD_RECEIPTS)
         );
         assert!(guard_selector("another223.service").is_err());
-        let f = json!({"active":[super::super::prefix223_live_peer::fixture_row()]});
+        let row = super::super::prefix223_live_peer::fixture_row();
+        let f = json!({"active":[row],"unit_census":{(c::UNIT):row["producer"]}});
         assert!(
             roster(&f).is_err(),
             "prefix self-overlap must still be refused"

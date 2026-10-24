@@ -549,7 +549,11 @@ mod tests {
     fn full210_is_retained_as_one_typed_peer_and_never_hidden_as_a_native_or_foreign_owner() {
         let row = json!({"epoch":210,"phase":"diagnostic-qualification","ordinary_replay_claim":false,
             "unit":{"Id":singleton210::UNIT,"InvocationID":"a".repeat(32),"NRestarts":"0"}});
-        let f = json!({"active":[row]});
+        let f = json!({"active":[row],"unit_census":{(singleton210::UNIT):row["unit"]}});
+        assert!(
+            roster(&json!({"active":[row]})).is_err(),
+            "the shared peer adapter still requires the complete raw census"
+        );
         let original = f.clone();
         assert_eq!(
             roster(&f).unwrap(),
