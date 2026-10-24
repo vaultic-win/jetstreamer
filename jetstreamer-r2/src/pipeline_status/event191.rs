@@ -193,21 +193,25 @@ mod tests {
             .unwrap();
         let mut newer = readback.clone();
         newer.sampled_at_utc = "2026-10-24T09:46:00Z".into();
-        assert!(same_previous_or_exact_retry(
-            &epoch_status_bytes(&newer).unwrap(),
-            "newer-etag",
-            &prior,
-            &readback
-        )
-        .is_err());
+        assert!(
+            same_previous_or_exact_retry(
+                &epoch_status_bytes(&newer).unwrap(),
+                "newer-etag",
+                &prior,
+                &readback
+            )
+            .is_err()
+        );
         let mut changed_eta = readback.clone();
         changed_eta.estimated_remaining_millis += 1;
-        assert!(same_previous_or_exact_retry(
-            &epoch_status_bytes(&changed_eta).unwrap(),
-            "changed-etag",
-            &prior,
-            &readback
-        )
-        .is_err());
+        assert!(
+            same_previous_or_exact_retry(
+                &epoch_status_bytes(&changed_eta).unwrap(),
+                "changed-etag",
+                &prior,
+                &readback
+            )
+            .is_err()
+        );
     }
 }
