@@ -20,6 +20,8 @@ epoch228-native-main-guard = ["epoch227-native-main-guard"]
 epoch227-v1625-native-main-guard = ["epoch227-native-main-guard"]
 epoch210-native-small = ["epoch227-native-main-guard"]
 epoch227-v1625-native-small = ["epoch227-native-main-guard"]
+# Closed complete-slot227 canary handshake; no runtime/publication promotion.
+epoch227-v1625-canary-guard = []
 epoch227-singleton-guard = []
 epoch209-singleton-guard = []
 epoch223-native20-prefix-guard = []

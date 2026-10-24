@@ -107,7 +107,14 @@ fn canary_scope(unit: &str) -> Result<(&'static str, u64)> {
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
         "invalid bounded-canary unit"
     );
-    if unit.starts_with("horizon-qualify-225-bounded-resource-") {
+    if cfg!(feature = "epoch227-v1625-canary-guard")
+        && unit.starts_with("horizon-qualify-227-v1625-bounded-resource-")
+    {
+        Ok((
+            "jetstreamer-private-epoch227-v1625-comparison-stop-v1",
+            98_091_122,
+        ))
+    } else if unit.starts_with("horizon-qualify-225-bounded-resource-") {
         Ok((
             "jetstreamer-private-epoch225-canary-target-stop-v1",
             97_202_500,
@@ -1025,6 +1032,28 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn canary227_handshake_is_selected_only_in_its_separate_guard_generation() {
+        let selected =
+            canary_scope("horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.service");
+        if cfg!(feature = "epoch227-v1625-canary-guard") {
+            assert_eq!(
+                selected.unwrap(),
+                (
+                    "jetstreamer-private-epoch227-v1625-comparison-stop-v1",
+                    98_091_122
+                )
+            );
+        } else {
+            assert!(selected.is_err());
+        }
+        assert!(
+            canary_scope("horizon-qualify-227-v1620-bounded-resource-d01adb19-v1.service").is_err()
+        );
+        assert!(
+            canary_scope("horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.timer").is_err()
+        );
+    }
     #[test]
     fn root_capability_never_falls_through_to_the_producer_stop_path() {
         use std::cell::Cell;
