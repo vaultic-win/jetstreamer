@@ -61,7 +61,6 @@ fn collected_terminal(
 
 /// Collected display counters confer no execution identity. Require the complete
 /// independent original journal proof, including the actual stdout executable.
-
 fn collected_journal(
     v: &Value,
     p: &ProbeIdentity,
