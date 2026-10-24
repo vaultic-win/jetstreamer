@@ -12,6 +12,8 @@ const FLOOR: u64 = 3_503_746_342_342;
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
     pub proof: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recovery_predecessor: Option<Bound>,
 }
 pub(super) fn enabled(p: &Plan) -> bool {
     p.terminal185.is_some()
@@ -188,6 +190,47 @@ fn proof_value(v: &Value, cutoff: u64) -> Result<()> {
         stopped(&manager(name)?, name, iid)?;
     }
     no_live185()
+}
+// Only the authenticated first transition may bridge a missed observation.
+// Its exact predecessor binding persists, so later successors regain the grid.
+pub(super) fn interval(p: &Plan, old_time: &str) -> Result<Option<u64>> {
+    let Some(profile) = &p.terminal185 else {
+        return Ok(None);
+    };
+    let Some(previous) = &profile.recovery_predecessor else {
+        return Ok(None);
+    };
+    if previous.path != p.previous_observer.path || previous.sha256 != p.previous_observer.sha256 {
+        return Ok(None);
+    }
+    let old = utc_seconds(old_time)?;
+    let target = utc_seconds(scheduled_target(p)?)?;
+    let gap = target
+        .checked_sub(old)
+        .context("185 recovery precedes predecessor")?;
+    ensure!(
+        (1800..=3600).contains(&gap),
+        "185 recovery interval outside bounded window"
+    );
+    let proof = bound_json(&profile.proof, false)?;
+    let captured = proof["captured_unix_seconds"]
+        .as_u64()
+        .context("185 capture clock missing")?;
+    recovery_clocks(old, target, captured)?;
+    Ok(Some(gap))
+}
+fn recovery_clocks(old: u64, target: u64, captured: u64) -> Result<()> {
+    ensure!(
+        target
+            .checked_sub(old)
+            .is_some_and(|gap| (1800..=3600).contains(&gap)),
+        "185 recovery interval outside bounded window"
+    );
+    ensure!(
+        captured > old && captured <= target,
+        "185 capture does not follow predecessor and precede target"
+    );
+    Ok(())
 }
 pub(super) fn validate(p: &Plan) -> Result<()> {
     let Some(profile) = &p.terminal185 else {
@@ -370,6 +413,7 @@ pub(super) fn enable(p: &mut Plan, c: &mut Value, spec: &Bound) -> Result<()> {
         )?;
     }
     p.terminal185 = Some(serde_json::from_value(v["profile"].clone())?);
+    p.terminal185.as_mut().unwrap().recovery_predecessor = Some(p.previous_observer.clone());
     validate(p)?;
     config(p, c)?;
     p.expected_epochs.retain(|e| *e != 185);
@@ -401,6 +445,18 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recovery_interval_requires_bounded_gap_and_between_sample_capture() {
+        for gap in [1800, 2400, 3000, 3600] {
+            recovery_clocks(10000, 10000 + gap, 11000).unwrap();
+        }
+        for target in [9999, 10000, 11799, 13601] {
+            assert!(recovery_clocks(10000, target, 11000).is_err());
+        }
+        for captured in [9999, 10000, 12401] {
+            assert!(recovery_clocks(10000, 12400, captured).is_err());
+        }
+    }
     #[test]
     fn explicit_recovery_target_respects_ordinary_floor_and_bounded_window() {
         for target in [
@@ -447,6 +503,12 @@ mod tests {
         expected_config["not_before_utc"] = json!(p.sample_target_utc);
         expected_config["output"] = json!(p.observer);
         assert_eq!(c, expected_config);
+        assert!(interval(&p, "2026-10-24T00:26:00Z").unwrap().is_none());
+        p.terminal185.as_mut().unwrap().recovery_predecessor = Some(Bound {
+            path: "/different-predecessor".into(),
+            sha256: "a".repeat(64),
+        });
+        assert!(interval(&p, "2026-10-24T00:26:00Z").unwrap().is_none());
         let unchanged = serde_json::to_value(&p).unwrap();
         let unchanged_config = c.clone();
         assert!(retime(&mut p, &mut c, "2026-10-24T01:05:59Z").is_err());
