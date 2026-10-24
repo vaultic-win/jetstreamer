@@ -7,6 +7,8 @@ use std::os::unix::fs::PermissionsExt;
 mod epoch136;
 #[path = "holding_foundation213.rs"]
 mod foundation213;
+#[path = "holding_resumable213.rs"]
+mod resumable213;
 
 const HOST: &str = "dev-samjohnson";
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";

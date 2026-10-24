@@ -82,6 +82,7 @@ pub(super) fn command(s: &str) -> bool {
         "holding-foundation213-park"
             | "holding-foundation213-admit-restore"
             | "holding-foundation213-restore"
+            | "holding-foundation213-restore-resumable"
             | "holding-foundation213-retire"
             | "holding-foundation213-maintain"
             | "holding-foundation213-maintenance-finalize"
@@ -570,13 +571,30 @@ fn preserve_segment(c: &Value, a: Artifact) -> Result<Option<PathBuf>> {
     Ok(Some(path))
 }
 async fn restore(client: &Client, p: &RestoreSpec, spec: &Bound) -> Result<()> {
+    restore_with_mode(client, p, spec, false).await
+}
+async fn restore_with_mode(
+    client: &Client,
+    p: &RestoreSpec,
+    spec: &Bound,
+    resumable: bool,
+) -> Result<()> {
     ensure!(
-        p.schema == "jetstreamer-foundation-holding-restore-plan-v1",
+        p.schema
+            == if resumable {
+                "jetstreamer-foundation213-resumable-restore-plan-v1"
+            } else {
+                "jetstreamer-foundation-holding-restore-plan-v1"
+            },
         "foreign Foundation restore plan"
     );
     mapping_binding(&p.mapping)?;
     let c = receipt_bound(&p.custody)?;
     let a = custody(&c)?;
+    ensure!(
+        !resumable || a == Artifact::Prefix213,
+        "resumable path is closed to the exact Foundation213 prefix"
+    );
     let admitted = receipt_bound(&p.admission)?;
     admission(&admitted, &p.custody, a)?;
     let expected_owner = owner()?;
@@ -609,19 +627,24 @@ async fn restore(client: &Client, p: &RestoreSpec, spec: &Bound) -> Result<()> {
         .as_u64()
         .context("Foundation restore floor")?;
     let directory = Path::new(STATE).join("restores");
-    let destination = restore_blob(
-        client,
-        BlobRestore {
-            key: &artifact_key,
-            etag,
-            sha: a.sha(),
-            length: a.length(),
-            directory: &directory,
-            minimum: write_floor(minimum)?,
-        },
-        || admission(&admitted, &p.custody, a),
-    )
-    .await?;
+    let target = BlobRestore {
+        key: &artifact_key,
+        etag,
+        sha: a.sha(),
+        length: a.length(),
+        directory: &directory,
+        minimum: write_floor(minimum)?,
+    };
+    let (destination, resume_proof) = if resumable {
+        let (path, proof) =
+            resumable213::restore(client, target, || admission(&admitted, &p.custody, a)).await?;
+        (path, Some(proof))
+    } else {
+        (
+            restore_blob(client, target, || admission(&admitted, &p.custody, a)).await?,
+            None,
+        )
+    };
     metadata_space(minimum, available(Path::new(STATE))?)?;
     let segment = preserve_segment(&c, a)?;
     let proof = hash_and_etag(
@@ -639,12 +662,17 @@ async fn restore(client: &Client, p: &RestoreSpec, spec: &Bound) -> Result<()> {
     remote_matches(&current, &artifact_key, a.length(), a.sha(), Some(etag))?;
     native_checksum(&current, &proof, a.length())?;
     admission(&admitted, &p.custody, a)?;
-    let receipt = json!({"schema":"jetstreamer-foundation-holding-restore-v1","host":review::HOST,"prefix":review::PREFIX,
+    let mut receipt = json!({"schema":if resumable {"jetstreamer-foundation-holding-resumable-restore-v1"} else {"jetstreamer-foundation-holding-restore-v1"},"host":review::HOST,"prefix":review::PREFIX,
         "mapping":p.mapping,"artifact":a,"custody":p.custody,"admission":p.admission,"spec":spec,"sha256":a.sha(),"length":a.length(),
         "object_key":artifact_key,"object_etag":etag,"destination":destination,"raw_segment_destination":segment,"original_file_metadata":c["manifest"],
-        "restoration_complete":true,"remote_sha256_readback":true,"owner_checked":true,"staging_only":true,"local_source_mutated":false,
+        "restoration_complete":true,"remote_sha256_readback":resume_proof.as_ref().is_none_or(|p|p.local_prefix_bytes==0),"owner_checked":true,"staging_only":true,"local_source_mutated":false,
         "local_retirement_authorized":false,"canonical_publication_authorized":false,"runtime_checkpoint_qualified":false,
         "job_resume_authorized":false,"replay_launch_authorized":false});
+    if let Some(proof) = resume_proof {
+        receipt["resumable_transport"] = serde_json::to_value(proof)?;
+        receipt["independent_local_sha256_verified"] = json!(true);
+        receipt["conditional_remote_identity_revalidated"] = json!(true);
+    }
     no_authority(&receipt)?;
     let path = Path::new(STATE)
         .join("receipts")
@@ -701,6 +729,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
         "holding-foundation213-park" => park(&client, &serde_json::from_value(v)?, spec).await,
         "holding-foundation213-restore" => {
             restore(&client, &serde_json::from_value(v)?, spec).await
+        }
+        "holding-foundation213-restore-resumable" => {
+            restore_with_mode(&client, &serde_json::from_value(v)?, spec, true).await
         }
         "holding-foundation213-retire" => retirement::run(&client, v, spec).await,
         "holding-foundation213-maintain" => maintenance::run(&client, v, spec).await,
