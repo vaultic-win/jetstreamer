@@ -54,6 +54,21 @@ pub(super) fn command_matches(expected: &str, current: &str) -> bool {
     exec_identity(current) == Some(expected)
 }
 
+fn worker_start_ticks(worker: &Value) -> Result<u64> {
+    // guard_core::start_time reads procfs field 22 and serializes its decimal
+    // string directly. Keep this exact field-specific wire contract separate
+    // from the strict JSON integer reader used by all byte/time counters.
+    let decimal = string(worker, "start_time")?;
+    let ticks: u64 = decimal
+        .parse()
+        .context("guard worker start time is not unsigned decimal ticks")?;
+    ensure!(
+        ticks > 0 && decimal == ticks.to_string(),
+        "guard worker start time must be a canonical positive decimal string"
+    );
+    Ok(ticks)
+}
+
 pub(super) fn guard(
     p: &Value,
     l: &Value,
@@ -116,9 +131,9 @@ pub(super) fn guard(
             number(worker, "vmas")? > 0
                 && number(worker, "vmas")? <= number(p, "maximum_worker_vmas")?
                 && number(worker, "pid")? > 1
-                && number(worker, "start_time")? > 0
+                && worker_start_ticks(worker)? > 0
                 && number(worker, "rss_bytes")? > 0,
-            "capped worker VMA bound exceeded"
+            "capped worker PID, start time, RSS or VMA evidence is invalid"
         );
     }
     for key in [

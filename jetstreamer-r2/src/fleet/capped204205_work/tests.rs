@@ -130,7 +130,7 @@ fn a_workerless_valid_guard_is_active_work_not_inactivity() {
         g["phase"]["stage"] = json!(stage);
         evidence::guard(&p, &l, &g, &c, 2000).unwrap();
     }
-    g["processes"]["workers"] = json!([{"vmas":100,"pid":44,"start_time":50,"rss_bytes":1000}]);
+    g["processes"]["workers"] = json!([{"vmas":100,"pid":44,"start_time":"50","rss_bytes":1000}]);
     assert!(evidence::guard(&p, &l, &g, &c, 2000).is_err());
     g["phase"]["stage"] = json!("native_restore");
     evidence::guard(&p, &l, &g, &c, 2000).unwrap();
@@ -169,6 +169,57 @@ fn worker_presence_is_required_for_suffix_execution_status() {
     assert_eq!(stage_from_guard(&g).unwrap(), Stage::SuffixExecution);
     g["phase"]["stage"] = json!("unknown_future_stage");
     assert!(stage_from_guard(&g).is_err());
+}
+
+#[test]
+fn actual_guard_worker_decimal_string_shape_is_accepted_and_noncanonical_forms_are_rejected() {
+    let p = plan();
+    let l = launch();
+    let mut g = guard(&p, &l);
+    g["phase"]["stage"] = json!("native_restore");
+    g["processes"]["total_process_rss_bytes"] = json!(1_000_000_000u64);
+    // Synthetic values in the exact shared guard's field types and copied
+    // executable shape. This is not evidence of a real continuation launch.
+    g["processes"]["workers"] = json!([{"pid":44,"rss_bytes":500_000_000u64,
+        "vmas":1024,"start_time":"67133715","executable_binding_kind":"historical-private-copy",
+        "executable_path":"/private/run/scratch/jetstreamer-historical-parent-Ab12cd/bound-worker/historical-worker",
+        "executable_owner_uid":1000,"sealed_source":{"path":"/sealed/worker","sha256":WORKER_SHA}}]);
+    let census = BTreeMap::from([
+        (
+            string(&p, "producer_unit").unwrap().into(),
+            owner(string(&p, "producer_unit").unwrap(), &"c".repeat(32), 42),
+        ),
+        (
+            string(&p, "guard_unit").unwrap().into(),
+            owner(string(&p, "guard_unit").unwrap(), &"d".repeat(32), 43),
+        ),
+    ]);
+    evidence::guard(&p, &l, &g, &census, 2000).unwrap();
+    assert_eq!(stage_from_guard(&g).unwrap(), Stage::SuffixExecution);
+    for invalid in [
+        json!(67133715),
+        json!(-1),
+        Value::Null,
+        json!(""),
+        json!("0"),
+        json!("-1"),
+        json!("+1"),
+        json!("01"),
+        json!(" 1"),
+        json!("1 "),
+        json!("1.0"),
+        json!("1e3"),
+        json!("١"),
+        json!("18446744073709551616"),
+    ] {
+        let mut bad = g.clone();
+        bad["processes"]["workers"][0]["start_time"] = invalid.clone();
+        assert!(
+            evidence::guard(&p, &l, &bad, &census, 2000).is_err(),
+            "accepted {invalid}"
+        );
+    }
+    assert!(number(&json!({"bytes":"67133715"}), "bytes").is_err());
 }
 
 #[test]

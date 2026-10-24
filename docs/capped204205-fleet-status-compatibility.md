@@ -34,6 +34,20 @@ digest and process identity before a live launch. The status adapter does not
 weaken or bypass this guard and does not assert that the frozen candidate can
 already launch safely.
 
+The separate source-only copied-worker successor
+`cb1fb523088538637a024a1d857862a9696970d1` extracts the actual small binder
+into `worker_executable.rs` and corrects source/copy/mapped-inode authentication.
+Its Cargo qualification, concrete artifacts and real disposable capability are
+still required. This R2 adapter grants none of that authority.
+
+The successor to preserved lifecycle commit `0c9e709d` also corrects the
+guard worker `start_time` contract: the actual guard serializes procfs start
+ticks as a decimal JSON string. A field-specific reader requires a canonical
+positive `u64` decimal string and rejects integers, null, zero, signs, whitespace,
+leading zeroes, fractions, exponents, non-ASCII digits and overflow. The generic
+JSON integer reader remains strict. An actual-shaped synthetic guard payload
+and negative variants are covered by source tests; Cargo remains pending.
+
 Public status phases are limited here to `replay`, `verification`, `upload` and
 `readback`. ETA policy includes prefix reread, native restore and suffix replay,
 suffix validation, assembly, independent full verification, current-plugin
