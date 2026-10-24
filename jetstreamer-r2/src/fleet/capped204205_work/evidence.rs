@@ -2,6 +2,13 @@
 use super::*;
 
 pub(super) fn bytes(b: &BoundFile, immutable: bool) -> Result<Vec<u8>> {
+    bytes_limit(b, immutable, 16 << 20)
+}
+pub(super) fn executable(b: &BoundFile) -> Result<()> {
+    bytes_limit(b, true, 256 << 20)?;
+    Ok(())
+}
+fn bytes_limit(b: &BoundFile, immutable: bool, maximum: u64) -> Result<Vec<u8>> {
     ensure!(
         b.path.is_absolute()
             && b.path.canonicalize()? == b.path
@@ -16,7 +23,7 @@ pub(super) fn bytes(b: &BoundFile, immutable: bool) -> Result<Vec<u8>> {
             && m.mode() & (if immutable { 0o222 } else { 0o022 }) == 0,
         "capped evidence is writable by another owner or not sealed"
     );
-    let raw = read_stable_bounded(&b.path, 16 << 20, "capped work evidence")?;
+    let raw = read_stable_bounded(&b.path, maximum, "capped work evidence")?;
     ensure!(
         hex_lower(&Sha256::digest(&raw)) == b.sha256,
         "capped evidence digest changed"
@@ -98,12 +105,19 @@ pub(super) fn guard(
             && number(processes, "total_process_rss_bytes")?
                 <= number(p, "maximum_process_rss_bytes")?
             && workers.len() <= 1
-            && (stage_from_guard(g)? == Stage::NativeRestore || workers.is_empty()),
+            && (matches!(
+                stage_from_guard(g)?,
+                Stage::NativeRestore | Stage::SuffixExecution
+            ) || workers.is_empty()),
         "capped guard process ownership or whole-lane bound changed"
     );
     for worker in workers {
         ensure!(
-            number(worker, "vmas")? <= number(p, "maximum_worker_vmas")?,
+            number(worker, "vmas")? > 0
+                && number(worker, "vmas")? <= number(p, "maximum_worker_vmas")?
+                && number(worker, "pid")? > 1
+                && number(worker, "start_time")? > 0
+                && number(worker, "rss_bytes")? > 0,
             "capped worker VMA bound exceeded"
         );
     }
@@ -132,6 +146,12 @@ pub(super) fn actor(epoch: u64, c: &Claim, l: &Value, a: &Actor) -> Result<()> {
     ensure!(!a.evidence.is_empty(), "downstream launch evidence absent");
     let v = bound(&a.evidence[0], true)?;
     actor_value(epoch, c, l, a, &v)?;
+    let raw = bytes(&serde_json::from_value(v["manager_journal"].clone())?, true)?;
+    ensure!(
+        capture::manager_history(&raw, &a.unit, &a.invocation_id, false)? == a.started_unix_millis
+            && number(&v, "main_pid")? > 1,
+        "downstream launch lacks actual manager start and PID"
+    );
     for b in &a.evidence {
         bound(b, true)?;
     }
@@ -174,7 +194,8 @@ pub(super) fn generated_bytes(p: &Value, f: &Value) -> Result<u64> {
         root.join(format!("output/epoch-{epoch}-suffix.jet")),
         root.join(format!("output/epoch-{epoch}-checkpoint-restart-v4.jet")),
     ]);
-    let mut largest = number(p, "prefix_bytes")?;
+    let output = root.join(format!("output/epoch-{epoch}-checkpoint-restart-v4.jet"));
+    let mut current_output_bytes = 0;
     let mut seen = BTreeSet::new();
     let prefix = string(&p["prefix_archive"], "path")?;
     for row in f["generated_archives"]
@@ -197,13 +218,15 @@ pub(super) fn generated_bytes(p: &Value, f: &Value) -> Result<u64> {
                 "frozen retained prefix size/owner differs"
             );
         }
-        largest = largest.max(n);
+        if path == output {
+            current_output_bytes = n;
+        }
     }
     ensure!(
         seen.contains(Path::new(prefix)),
         "retained original prefix byte proof missing"
     );
-    Ok(largest)
+    Ok(current_output_bytes)
 }
 
 pub(super) fn inactive(
@@ -242,6 +265,12 @@ pub(super) fn inactive_value(
                 .is_some_and(Vec::is_empty),
         "capped inactivity needs actual complete manager/cgroup/reference evidence"
     );
+    if let Some(handoffs) = f.get("authenticated_other_host_handoffs") {
+        ensure!(
+            handoffs.as_array().is_some_and(Vec::is_empty),
+            "authenticated other-host handoff prevents local inactive cleanup"
+        );
+    }
     let jobs = proof["pending_job_units"]
         .as_array()
         .context("pending job census missing")?;
@@ -288,6 +317,11 @@ pub(super) fn terminal_proof(p: &Value, l: &Value, v: &Value) -> Result<()> {
         string(l, "invocation_id")?,
         success,
     )?;
+    capture::manager_terminal(
+        &records,
+        string(p, "producer_unit")?,
+        string(l, "invocation_id")?,
+    )?;
     if success {
         let result = bound(
             &serde_json::from_value(v["continuation_result"].clone())?,
@@ -298,12 +332,44 @@ pub(super) fn terminal_proof(p: &Value, l: &Value, v: &Value) -> Result<()> {
                 && result["epoch"] == p["epoch"]
                 && result["plan_sha256"] == l["producer_plan"]["sha256"]
                 && result["producer_invocation_id"] == l["invocation_id"]
+                && result["guard_invocation_id"] == l["guard_invocation_id"]
+                && result["admission_sha256"] == l["admission"]["sha256"]
+                && result["source_capture"] == p["source_capture"]
+                && result["prefix_archive"] == p["prefix_archive"]
+                && result["private_output"].as_str()
+                    == Some(
+                        Path::new(string(p, "run_root")?)
+                            .join(format!(
+                                "output/epoch-{}-checkpoint-restart-v4.jet",
+                                number(p, "epoch")?
+                            ))
+                            .to_str()
+                            .context("private output path encoding")?
+                    )
                 && result["slots_merged"] == 432000
                 && result["source_archives"] == 2
                 && result["provenance_version"] == 4
                 && result["authority"]["canonical_sidecar_authorized"] == false
                 && result["authority"]["publication_authorized"] == false,
             "private completion is not the exact actual V4 result"
+        );
+        for key in [
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "retirement_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            ensure!(
+                result["authority"][key] == false,
+                "private result grants unrelated authority: {key}"
+            );
+        }
+        ensure!(
+            result["independent_final_archive_verification_passed"] == false
+                && result["current_plugin_verification_passed"] == false
+                && result["independent_adjacent_boundary_receipts_still_required"] == true,
+            "private V4 result cannot claim final archive or publication gates"
         );
     }
     denied(v)
@@ -362,6 +428,10 @@ pub(super) fn prepare() -> Result<()> {
     next["metadata_event"] = json!({"path":event_path,"sha256":capture::file_sha(&event_path)?});
     capture::write_sealed(&spec.output_directory.join("fleet-plan.json"), &next)?;
     capture::write_sealed(
+        &spec.output_directory.join("claim.json"),
+        &serde_json::to_value(&spec.claim)?,
+    )?;
+    capture::write_sealed(
         &spec.output_directory.join("status-estimate.json"),
         &json!({
         "schema":"jetstreamer-capped204205-status-estimate-v1","row":result.row,"status":result.status,
@@ -387,6 +457,10 @@ pub(super) fn derive_plan(
         "capped derivative lost the accepted raw predecessor"
     );
     let mut next = old.clone();
+    ensure!(
+        frame["previous_fleet"] == private157::binding(&s.previous_fleet),
+        "captured frame and metadata transition have different accepted predecessors"
+    );
     let mut tracked: BTreeSet<String> = serde_json::from_value(old["tracked_units"].clone())?;
     tracked.extend(
         prior["unit_census"]
@@ -572,8 +646,40 @@ pub(super) async fn publish() -> Result<()> {
         census(&names, 201, 300)? == before,
         "capped owner changed before metadata publication"
     );
+    let publisher_sha = hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?));
+    ensure!(
+        i.policy["publisher_sha256"] == publisher_sha,
+        "sidecar ETA model is not bound to the actual reviewed publisher executable"
+    );
+    let estimate_path = Path::new(string(&i.policy, "estimate_receipt")?);
+    ensure!(
+        estimate_path.is_absolute()
+            && estimate_path.extension().is_some_and(|s| s == "json")
+            && !estimate_path.starts_with(Path::new(string(&i.plan, "run_root")?)),
+        "estimate receipt must be a private metadata JSON path outside the producer root"
+    );
     if args.len() == 6 {
         return Ok(());
+    }
+    let estimate = json!({"schema":"jetstreamer-capped204205-publish-estimate-v1",
+        "claim":c,"observer":observer_binding,"row":result.row,"status":status,
+        "publisher_sha256":publisher_sha,"replay_launch_authorized":false,
+        "publication_authorized":false,"r2_mutations":false});
+    match fs::symlink_metadata(estimate_path) {
+        Ok(_) => ensure!(
+            bound(
+                &BoundFile {
+                    path: estimate_path.into(),
+                    sha256: capture::file_sha(estimate_path)?
+                },
+                true
+            )? == estimate,
+            "existing estimate receipt differs; preserve it and reconcile the current owner/model"
+        ),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            capture::write_sealed(estimate_path, &estimate)?
+        }
+        Err(e) => return Err(e.into()),
     }
     let r2 = r2_config_from_env()?;
     let s3 = s3_client(&r2);

@@ -208,6 +208,8 @@ fn validate_fleet(fleet: &Value, plan: &Plan, now: u64) -> Result<()> {
     let active = fleet["active"]
         .as_array()
         .context("fleet active census missing")?;
+    ensure!(fleet::capped204205_cleanup_allowed(fleet, plan.epoch),
+        "capped continuation is unresolved or lacks positive current inactivity proof");
     ensure!(
         !active.iter().any(|entry| entry["epoch"] == plan.epoch),
         "epoch has active downstream or replay work"
@@ -450,6 +452,7 @@ fn fresh_census(
         native227::validate(&current, terminal_fleet, owners)?;
     }
     let reserve = reserve_owner_evidence(terminal_fleet, owners)?;
+    let capped204205 = fleet::capped204205_cleanup_current(fleet, plan.epoch, &current, owners)?;
     if let Some(stop) = &reserve {
         stop.validate(
             &current,
@@ -477,6 +480,7 @@ fn fresh_census(
             && !native228
             && !warmup223
             && !native227
+            && !capped204205
             && reserve.is_none()
         {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;

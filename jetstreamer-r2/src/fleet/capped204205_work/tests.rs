@@ -67,9 +67,14 @@ fn all_stages_use_only_legal_dashboard_phases_and_include_sidecar_work() {
     }
     assert_eq!(
         remaining(&policy(), Stage::WaitingForGuard, 0).unwrap(),
-        1200
+        1300
     );
-    assert_eq!(remaining(&policy(), Stage::NativeRestore, 25).unwrap(), 975);
+    assert_eq!(
+        remaining(&policy(), Stage::NativeRestore, 25).unwrap(),
+        1075
+    );
+    assert_eq!(Stage::NativeRestore.public_phase(), "verification");
+    assert_eq!(Stage::SuffixExecution.public_phase(), "replay");
     assert_eq!(remaining(&policy(), Stage::Readback, 10).unwrap(), 190);
     assert_eq!(remaining(&policy(), Stage::SidecarCommit, 0).unwrap(), 100);
 }
@@ -125,10 +130,11 @@ fn a_workerless_valid_guard_is_active_work_not_inactivity() {
         g["phase"]["stage"] = json!(stage);
         evidence::guard(&p, &l, &g, &c, 2000).unwrap();
     }
-    g["processes"]["workers"] = json!([{"vmas":100}]);
+    g["processes"]["workers"] = json!([{"vmas":100,"pid":44,"start_time":50,"rss_bytes":1000}]);
     assert!(evidence::guard(&p, &l, &g, &c, 2000).is_err());
     g["phase"]["stage"] = json!("native_restore");
     evidence::guard(&p, &l, &g, &c, 2000).unwrap();
+    assert_eq!(stage_from_guard(&g).unwrap(), Stage::SuffixExecution);
     assert!(evidence::guard(&p, &l, &g, &c, 61001).is_err());
     g["processes"]["main_pid"] = json!(44);
     assert!(evidence::guard(&p, &l, &g, &c, 2000).is_err());
@@ -150,6 +156,64 @@ fn missing_unavailable_or_replaced_units_cannot_be_called_idle() {
         assert!(!idle(&v));
         v[key] = old;
     }
+}
+
+#[test]
+fn worker_presence_is_required_for_suffix_execution_status() {
+    let p = plan();
+    let l = launch();
+    let mut g = guard(&p, &l);
+    g["phase"]["stage"] = json!("native_restore");
+    assert_eq!(stage_from_guard(&g).unwrap(), Stage::NativeRestore);
+    g["processes"]["workers"] = json!([{"pid":44}]);
+    assert_eq!(stage_from_guard(&g).unwrap(), Stage::SuffixExecution);
+    g["phase"]["stage"] = json!("unknown_future_stage");
+    assert!(stage_from_guard(&g).is_err());
+}
+
+#[test]
+fn unresolved_continuation_prevents_inactive_cleanup_even_with_no_running_pid() {
+    for row in [
+        json!({"epoch":204,"live":false,"ownership_unresolved":true}),
+        json!({"epoch":204,"live":true,"positive_inactivity_confirmed":true}),
+        json!({"epoch":204,"live":false,"positive_inactivity_confirmed":false}),
+    ] {
+        assert!(!cleanup_allowed(&json!({"capped204205_work":[row]}), 204));
+    }
+    assert!(cleanup_allowed(
+        &json!({"capped204205_work":[{"epoch":204,
+        "live":false,"positive_inactivity_confirmed":true}]}),
+        204
+    ));
+    assert!(!cleanup_allowed(&json!({"capped204205_work":null}), 204));
+    let p = plan();
+    let c = BTreeMap::from([(
+        string(&p, "producer_unit").unwrap().into(),
+        json!({"ActiveState":"activating","MainPID":"0"}),
+    )]);
+    let row = lifecycle::unresolved(&claim(204), &p, &c, "synthetic changed owner");
+    assert_eq!(row["live"], true);
+    assert_eq!(row["positive_inactivity_confirmed"], false);
+    assert_eq!(row["current_sidecar_eta_valid"], false);
+}
+
+#[test]
+fn terminal_history_needs_an_actual_terminal_event_after_the_exact_start() {
+    let name = "horizon-qualify-204-capped-continuation-fixture.service";
+    let iid = "c".repeat(32);
+    let start = json!({"_PID":"1","_UID":"0","UNIT":name,"INVOCATION_ID":iid,
+        "__REALTIME_TIMESTAMP":"1000000","__CURSOR":"start","MESSAGE":"Started owner",
+        "MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf"});
+    let mut raw = serde_json::to_vec(&start).unwrap();
+    assert!(capture::manager_terminal(&raw, name, &iid).is_err());
+    let terminal = json!({"_PID":"1","_UID":"0","UNIT":name,"INVOCATION_ID":iid,
+        "__REALTIME_TIMESTAMP":"2000000","__CURSOR":"end",
+        "MESSAGE":format!("{name}: Failed with result 'exit-code'."),
+        "MESSAGE_ID":"be02cf6855d2428ba40df7e9d022f03d"});
+    raw.push(b'\n');
+    raw.extend(serde_json::to_vec(&terminal).unwrap());
+    capture::manager_terminal(&raw, name, &iid).unwrap();
+    assert!(capture::manager_history(&raw, name, &iid, true).is_err());
 }
 #[test]
 fn positive_inactivity_requires_the_complete_roster_queue_cgroups_and_references() {
@@ -181,12 +245,15 @@ fn positive_inactivity_requires_the_complete_roster_queue_cgroups_and_references
     }
 }
 #[test]
-fn generated_size_uses_the_largest_real_archive_and_does_not_double_count_assembly() {
+fn generated_size_uses_only_the_current_final_output_and_zero_before_it_exists() {
     let p = json!({"epoch":204,"run_root":"/private/run","prefix_archive":{"path":"/private/original/prefix.jet"},"prefix_bytes":100});
     let row = |path: &str, n: u64, uid: u64| json!({"path":path,"bytes":n,"uid":uid,"links":1,"inode":42,"archive_body_read":false});
     let mut f = json!({"generated_archives":[row("/private/original/prefix.jet",100,0),
         row("/private/run/output/epoch-204-suffix.jet",20,1000),row("/private/run/output/epoch-204-checkpoint-restart-v4.jet",110,1000)]});
     assert_eq!(evidence::generated_bytes(&p, &f).unwrap(), 110);
+    let mut absent = f.clone();
+    absent["generated_archives"].as_array_mut().unwrap().pop();
+    assert_eq!(evidence::generated_bytes(&p, &absent).unwrap(), 0);
     f["generated_archives"][0]["bytes"] = json!(101);
     assert!(evidence::generated_bytes(&p, &f).is_err());
     f["generated_archives"][0]["bytes"] = json!(100);
@@ -210,7 +277,7 @@ fn raw_manager_success_cannot_be_replaced_by_a_stop_or_another_invocation() {
     let end = row(
         "2000000",
         "end",
-        "Deactivated successfully",
+        &format!("{unit}: Deactivated successfully."),
         "7ad2d189f7e94e70a38c781354912448",
     );
     let encode = |rows: Vec<Value>| {
@@ -269,8 +336,8 @@ fn derive_plan_preserves_every_unrelated_owner_and_failure_history() {
         "capped204205_work":[{"epoch":204,"launch":{"path":"/old","sha256":"b".repeat(64)}}]});
     let prior = json!({"schema":SCHEMA,"first_epoch":201,"last_epoch":300,"plan":s.original_plan.path,
         "plan_sha256":s.original_plan.sha256,"unit_census":{"older-collected.service":{}}});
-    let frame =
-        json!({"unit_census_after":{"new.service":{}},"sampled_at_utc":"2026-10-24T13:00:00Z"});
+    let frame = json!({"unit_census_after":{"new.service":{}},"sampled_at_utc":"2026-10-24T13:00:00Z",
+        "previous_fleet":{"path":"/fixture/fleet.json","sha256":"a".repeat(64)}});
     let (next, event) = evidence::derive_plan(&s, &old, &prior, &frame).unwrap();
     assert_eq!(next["diagnostics"], old["diagnostics"]);
     assert_eq!(next["pipeline_claims"], old["pipeline_claims"]);

@@ -14,11 +14,16 @@ struct Spec {
     previous_fleet: BoundFile,
     launch: Option<BoundFile>,
     downstream_actors: Vec<Actor>,
+    authenticated_other_host_handoffs: Vec<BoundFile>,
     output_directory: PathBuf,
 }
 
 pub(super) fn file_sha(path: &Path) -> Result<String> {
-    Ok(hex_lower(&Sha256::digest(fs::read(path)?)))
+    Ok(hex_lower(&Sha256::digest(read_stable_bounded(
+        path,
+        16 << 20,
+        "captured metadata digest",
+    )?)))
 }
 fn binding(path: &Path) -> Result<BoundFile> {
     Ok(BoundFile {
@@ -117,6 +122,10 @@ pub(super) fn manager_history(raw: &[u8], unit: &str, iid: &str, success: bool) 
             starts.push(time);
         }
         if v["INVOCATION_ID"] == iid && v["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448" {
+            ensure!(
+                v["MESSAGE"] == format!("{unit}: Deactivated successfully."),
+                "manager success marker has a different message"
+            );
             ends.push(time);
         }
         rows.push((time, v));
@@ -153,6 +162,34 @@ pub(super) fn manager_history(raw: &[u8], unit: &str, iid: &str, success: bool) 
         ensure!(time >= starts[0], "journal order changed");
     }
     Ok(starts[0] / 1000)
+}
+
+pub(super) fn manager_terminal(raw: &[u8], unit: &str, iid: &str) -> Result<()> {
+    let start = manager_history(raw, unit, iid, false)?
+        .checked_mul(1000)
+        .context("manager terminal clock overflow")?;
+    let mut terminal = false;
+    for line in std::str::from_utf8(raw)?.lines() {
+        let row: Value = serde_json::from_str(line)?;
+        let at = string(&row, "__REALTIME_TIMESTAMP")?.parse::<u64>()?;
+        if at < start || row["INVOCATION_ID"] != iid {
+            continue;
+        }
+        let message = string(&row, "MESSAGE")?;
+        terminal |= (row["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            && message == format!("{unit}: Deactivated successfully."))
+            || (row["MESSAGE_ID"] == "be02cf6855d2428ba40df7e9d022f03d"
+                && message.starts_with(&format!("{unit}: Failed with result '"))
+                && message.ends_with("'."))
+            || (row["MESSAGE_ID"] == "9d1aaa27d60140bd96365438aad20286"
+                && row["JOB_TYPE"] == "stop"
+                && row["JOB_RESULT"] == "done");
+    }
+    ensure!(
+        terminal,
+        "exact PID 1 terminal event missing; disappearance alone is not inactivity"
+    );
+    Ok(())
 }
 pub(super) fn epoch_scope(epoch: u64, name: &str) -> bool {
     namespace(epoch, name)
@@ -223,7 +260,7 @@ fn archive(path: &Path) -> Result<Option<Value>> {
         json!({"path":path,"bytes":m.len(),"device":m.dev(),"inode":m.ino(),"uid":m.uid(),"links":m.nlink(),"archive_body_read":false}),
     ))
 }
-fn group(unit: &str) -> Result<Value> {
+pub(super) fn group(unit: &str) -> Result<Value> {
     let path = Path::new("/sys/fs/cgroup/system.slice").join(unit);
     let m = match fs::symlink_metadata(&path) {
         Ok(m) => m,
@@ -290,11 +327,25 @@ fn launch(s: &Spec, p: &Value, a: &Value, before: &BTreeMap<String, Value>) -> R
     let (old, old_iid, restart, end) = profile(epoch)?;
     let manager: BoundFile = serde_json::from_value(p["metadata"]["manager_journal"].clone())?;
     let origin = manager_history(&evidence::bytes(&manager, true)?, old, old_iid, true)?;
+    let first_copy = s.output_directory.join("first-guard.json");
+    write_raw(&first_copy, &raw)?;
+    let name = string(p, "producer_unit")?;
+    let launch_journal = journal(name)?;
+    manager_history(
+        &launch_journal,
+        name,
+        string(current, "InvocationID")?,
+        false,
+    )?;
+    let launch_manager = s.output_directory.join("launch-manager.jsonl");
+    write_raw(&launch_manager, &launch_journal)?;
     let value = json!({"schema":"jetstreamer-capped204205-continuation-launch-v1","epoch":epoch,"unit":p["producer_unit"],
         "invocation_id":current["InvocationID"],"guard_unit":p["guard_unit"],"guard_invocation_id":first["guard_invocation_id"],
         "producer_plan":private157::binding(&s.producer_plan),"admission":private157::binding(&s.admission),
         "node_sha256":p["node_sha256"],"guard_sha256":p["guard_sha256"],"recorded_unix_millis":first["recorded_unix_millis"],
         "epoch_started_unix_millis":origin,"expected_exec_start":current["ExecStart"],"restart_slot":restart,"terminal_slot":end,
+        "main_pid":string(current,"MainPID")?.parse::<u64>()?,"unit_census":before,
+        "first_guard":private157::binding(&binding(&first_copy)?),"manager_journal":private157::binding(&binding(&launch_manager)?),
         "first_fire_source":{"path":first_path,"sha256":hex_lower(&Sha256::digest(raw))},
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
     let path = s.output_directory.join("launch.json");
@@ -327,7 +378,11 @@ pub(super) fn run() -> Result<()> {
         "wrong capped metadata capture spec"
     );
     let p = evidence::bound(&s.producer_plan, true)?;
+    lifecycle::plan_scope(&p)?;
     let a = evidence::bound(&s.admission, true)?;
+    for handoff in &s.authenticated_other_host_handoffs {
+        evidence::bound(handoff, true)?;
+    }
     let epoch = number(&p, "epoch")?;
     profile(epoch)?;
     let observer = evidence::bound(&s.observer, false)?;
@@ -336,7 +391,7 @@ pub(super) fn run() -> Result<()> {
         s.observer_executable.sha256 == OBSERVER_SHA,
         "observer executable is not the deployed corrected generation"
     );
-    evidence::bytes(&s.observer_executable, true)?;
+    evidence::executable(&s.observer_executable)?;
     ensure!(
         prior["schema"] == SCHEMA
             && prior["first_epoch"] == 201
@@ -354,8 +409,10 @@ pub(super) fn run() -> Result<()> {
         .collect();
     names.insert(string(&p, "producer_unit")?.into());
     names.insert(string(&p, "guard_unit")?.into());
+    names.insert(profile(epoch)?.0.into());
     names.extend(s.downstream_actors.iter().map(|a| a.unit.clone()));
     let before = census(&names, 201, 300)?;
+    capped204205_admission::original_idle(&before[profile(epoch)?.0], epoch)?;
     let launched = launch(&s, &p, &a, &before)?;
     let l = evidence::bound(&launched, true)?;
     let mut actors = s.downstream_actors;
@@ -380,11 +437,16 @@ pub(super) fn run() -> Result<()> {
             let path = s
                 .output_directory
                 .join(format!("downstream-{}.json", actor.invocation_id));
+            let manager_path = s
+                .output_directory
+                .join(format!("downstream-{}-manager.jsonl", actor.invocation_id));
+            write_raw(&manager_path, &raw)?;
             write_sealed(
                 &path,
                 &json!({"schema":"jetstreamer-capped204205-downstream-launch-v1","epoch":epoch,
                 "origin_launch":private157::binding(&launched),"origin_invocation_id":l["invocation_id"],
                 "unit":actor.unit,"invocation_id":actor.invocation_id,"expected_exec_start":actor.expected_exec_start,
+                "main_pid":string(current,"MainPID")?.parse::<u64>()?,"manager_journal":private157::binding(&binding(&manager_path)?),
                 "started_unix_millis":start,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
             )?;
             actor.evidence.push(binding(&path)?);
@@ -418,21 +480,23 @@ pub(super) fn run() -> Result<()> {
         .all(|n| idle(&before[n]));
     let mut inactivity = Value::Null;
     let (stamp, ms) = current_stamp()?;
-    if all_idle {
+    let mut terminal_binding = Value::Null;
+    if idle(producer) {
         let owner_name = string(&p, "producer_unit")?;
         let raw = journal(owner_name)?;
         let iid = string(&l, "invocation_id")?;
         let result = root.join("receipts/continuation.json");
-        let success = producer["Result"] == "success"
-            && producer["ExecMainStatus"] == "0"
-            && result.is_file();
+        let success = result.is_file()
+            && manager_history(&raw, owner_name, iid, true).is_ok()
+            && (producer["LoadState"] == "not-found"
+                || (producer["Result"] == "success" && producer["ExecMainStatus"] == "0"));
         manager_history(&raw, owner_name, iid, success)?;
+        manager_terminal(&raw, owner_name, iid)?;
         let journal_path = s.output_directory.join("terminal-manager.jsonl");
         write_raw(&journal_path, &raw)?;
         let result_binding = if success {
             let path = s.output_directory.join("continuation-result.json");
-            let original =
-                read_stable_bounded(&result, 4 << 20, "actual private continuation result")?;
+            let original = source_bytes(&result, 1000)?;
             write_raw(&path, &original)?;
             private157::binding(&binding(&path)?)
         } else {
@@ -446,6 +510,21 @@ pub(super) fn run() -> Result<()> {
             "outcome":if success{"natural_success"}else{"failed_or_stopped"},"continuation_result":result_binding,
             "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
         )?;
+        terminal_binding = private157::binding(&binding(&terminal_path)?);
+    }
+    if all_idle && s.authenticated_other_host_handoffs.is_empty() {
+        let iid = string(&l, "invocation_id")?;
+        let mut downstream_terminals = serde_json::Map::new();
+        for actor in &actors {
+            let raw = journal(&actor.unit)?;
+            manager_terminal(&raw, &actor.unit, &actor.invocation_id)?;
+            let manager_path = s
+                .output_directory
+                .join(format!("downstream-{}-terminal.jsonl", actor.invocation_id));
+            write_raw(&manager_path, &raw)?;
+            downstream_terminals.insert(actor.unit.clone(), json!({"invocation_id":actor.invocation_id,
+                "current_unit":before[&actor.unit],"manager_journal":private157::binding(&binding(&manager_path)?)}));
+        }
         let mut groups = serde_json::Map::new();
         for name in names.iter().filter(|n| epoch_scope(epoch, n)) {
             inactive_status::no_pending_owner_trigger(
@@ -479,7 +558,7 @@ pub(super) fn run() -> Result<()> {
             &proof_path,
             &json!({"schema":"jetstreamer-capped204205-positive-inactivity-v1","epoch":epoch,
             "producer_invocation_id":iid,"sampled_at_utc":stamp,"unit_census":before,"pending_job_units":pending,
-            "cgroups":groups,"process_reference_census":references,"terminal_snapshot":private157::binding(&binding(&terminal_path)?),
+            "cgroups":groups,"process_reference_census":references,"terminal_snapshot":terminal_binding,"downstream_terminals":downstream_terminals,
             "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
         )?;
         inactivity = private157::binding(&binding(&proof_path)?);
@@ -493,7 +572,10 @@ pub(super) fn run() -> Result<()> {
         "observer":private157::binding(&s.observer),"observer_executable_sha256":OBSERVER_SHA,"producer_plan_sha256":s.producer_plan.sha256,
         "observer_executable":private157::binding(&s.observer_executable),"observer_source_revision":"3e9326815cf46d03ac9423d5bcf4c637774b7260",
         "launch":private157::binding(&launched),"unit_census_before":before,"unit_census_after":after,
+        "previous_fleet":private157::binding(&s.previous_fleet),
         "guard_snapshot":guard_binding,"downstream_actors":actors,"generated_archives":artifacts,"inactivity_snapshot":inactivity,
+        "terminal_snapshot":terminal_binding,
+        "authenticated_other_host_handoffs":s.authenticated_other_host_handoffs,
         "resource_samples_taken":0,"archive_body_reads":0,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
     write_sealed(&s.output_directory.join("frame.json"), &frame)?;
     Ok(())

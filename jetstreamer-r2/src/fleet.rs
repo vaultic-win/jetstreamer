@@ -371,6 +371,14 @@ pub(super) fn capped204205_binding_scope(epoch: u64, unit: &str, phase: &str) ->
 pub(super) fn capped204205_origin_scope(epoch: u64, unit: &str) -> Result<()> {
     capped204205_work::origin_scope(epoch, unit)
 }
+pub(super) fn capped204205_cleanup_allowed(f: &Value, epoch: u64) -> bool {
+    capped204205_work::cleanup_allowed(f, epoch)
+}
+pub(super) fn capped204205_cleanup_current(
+    f: &Value, epoch: u64, current: &BTreeMap<String, Value>, owners: &[(String, String)],
+) -> Result<bool> {
+    capped204205_work::cleanup_current(f, epoch, current, owners)
+}
 pub(super) fn admit_canary227_v1625_output_metadata() -> Result<()> {
     canary227_admission::run_output_metadata()
 }
@@ -2150,7 +2158,7 @@ pub(super) fn census(
         .args([
             "list-units",
             "--type=service",
-            "--state=running,activating",
+            "--state=running,activating,deactivating",
             "--output=json",
             "--no-pager",
         ])
@@ -2197,6 +2205,8 @@ pub(super) fn census(
             // auxiliary claim contract is integrated, fail closed rather than
             // silently omit one from the complete campaign census.
             || ram_entry_owner(name)
+            || [204, 205].into_iter().any(|epoch| (first_epoch..=last_epoch).contains(&epoch)
+                && name.starts_with(&format!("horizon-guard-{epoch}-capped-continuation-")))
             || assigned_diagnostic
             || assigned_pipeline
             || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name) || original141_freeze::unit_name(name) || original141_vote_prefix::unit_name(name) || original141_capped::unit_name(name)))
@@ -3439,7 +3449,7 @@ pub(super) async fn run() -> Result<()> {
     for row in &capped_work {
         if row["live"] == true {
             let epoch = row["epoch"].as_u64().context("capped row epoch missing")?;
-            ensure!(
+            ensure!(row["ownership_unresolved"] == true || (
                 !live_diagnostic_epochs.contains(&epoch)
                     && !pipelines
                         .iter()
@@ -3447,7 +3457,7 @@ pub(super) async fn run() -> Result<()> {
                     && !replays.iter().any(|r| r["range"]
                         .as_str()
                         .and_then(|s| parse_observer_claim_range(s).ok())
-                        .is_some_and(|r| r.contains(&epoch))),
+                        .is_some_and(|r| r.contains(&epoch)))),
                 "capped work overlaps another live epoch owner"
             );
             active.push(row.clone());

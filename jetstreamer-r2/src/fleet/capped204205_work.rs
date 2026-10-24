@@ -3,6 +3,7 @@
 use super::*;
 mod capture;
 mod evidence;
+mod lifecycle;
 #[cfg(test)]
 mod tests;
 
@@ -17,6 +18,7 @@ enum Stage {
     WaitingForGuard,
     PrefixValidation,
     NativeRestore,
+    SuffixExecution,
     SuffixValidation,
     Assembly,
     FullVerification,
@@ -27,10 +29,11 @@ enum Stage {
     Readback,
     SidecarCommit,
 }
-const STAGES: [Stage; 12] = [
+const STAGES: [Stage; 13] = [
     Stage::WaitingForGuard,
     Stage::PrefixValidation,
     Stage::NativeRestore,
+    Stage::SuffixExecution,
     Stage::SuffixValidation,
     Stage::Assembly,
     Stage::FullVerification,
@@ -47,6 +50,7 @@ impl Stage {
             Self::WaitingForGuard => "waiting_for_guard",
             Self::PrefixValidation => "prefix_validation",
             Self::NativeRestore => "native_restore",
+            Self::SuffixExecution => "suffix_execution",
             Self::SuffixValidation => "suffix_validation",
             Self::Assembly => "assembly",
             Self::FullVerification => "full_verification",
@@ -60,7 +64,7 @@ impl Stage {
     }
     fn public_phase(self) -> &'static str {
         match self {
-            Self::NativeRestore => "replay",
+            Self::SuffixExecution => "replay",
             Self::Upload | Self::SidecarCommit => "upload",
             Self::Readback => "readback",
             _ => "verification",
@@ -154,9 +158,14 @@ fn live(v: &Value) -> bool {
 fn idle(v: &Value) -> bool {
     v["MainPID"] == "0"
         && v["NRestarts"] == "0"
-        && matches!(v["ActiveState"].as_str(), Some("inactive" | "failed"))
-        && matches!(v["SubState"].as_str(), Some("dead" | "failed" | "exited"))
         && matches!(v["LoadState"].as_str(), Some("loaded" | "not-found"))
+        && ((matches!(v["ActiveState"].as_str(), Some("inactive" | "failed"))
+            && matches!(v["SubState"].as_str(), Some("dead" | "failed" | "exited")))
+            || (v["LoadState"] == "loaded"
+                && v["ActiveState"] == "active"
+                && v["SubState"] == "exited"
+                && v["Result"] == "success"
+                && v["ExecMainStatus"] == "0"))
 }
 fn denied(v: &Value) -> Result<()> {
     for k in [
@@ -220,6 +229,7 @@ fn validate_origin(c: &Claim, i: &Inputs) -> Result<()> {
         "capped work lacks the actual exact admitted launch/source identities"
     );
     denied(l)?;
+    lifecycle::origin(c, i)?;
     for key in [
         "canonical_sidecar_authorized",
         "publication_authorized",
@@ -233,6 +243,13 @@ fn stage_from_guard(g: &Value) -> Result<Stage> {
     Ok(match string(&g["phase"], "stage")? {
         "waiting_for_guard" => Stage::WaitingForGuard,
         "prefix_validation" => Stage::PrefixValidation,
+        "native_restore"
+            if g["processes"]["workers"]
+                .as_array()
+                .is_some_and(|w| w.len() == 1) =>
+        {
+            Stage::SuffixExecution
+        }
         "native_restore" => Stage::NativeRestore,
         "suffix_validation" => Stage::SuffixValidation,
         "assembly" | "complete" => Stage::Assembly,
@@ -311,7 +328,7 @@ fn evaluate(
             && evidence::bound(&observed, false)? == *observer,
         "capped work detached from deployed corrected observer provenance"
     );
-    evidence::bytes(&executable, true)?;
+    evidence::executable(&executable)?;
     ensure!(
         f["schema"] == "jetstreamer-capped204205-work-frame-v1"
             && f["epoch"] == c.epoch
@@ -329,7 +346,24 @@ fn evaluate(
         "capped work frame is stale, changed, or detached from the coordinated complete census"
     );
     denied(f)?;
+    let handoffs: Vec<BoundFile> =
+        serde_json::from_value(f["authenticated_other_host_handoffs"].clone())?;
+    for handoff in &handoffs {
+        evidence::bound(handoff, true)?;
+    }
+    ensure!(
+        handoffs.is_empty(),
+        "authenticated other-host handoff protects this epoch; use its qualified owner's status publisher"
+    );
     let unit = string(p, "producer_unit")?;
+    let (original, _, _, _) = profile(c.epoch)?;
+    capped204205_admission::original_idle(
+        census
+            .get(original)
+            .context("original capped owner omitted")?,
+        c.epoch,
+    )?;
+    lifecycle::policy(c, &i.policy)?;
     let producer = census
         .get(unit)
         .context("capped producer absent from census")?;
@@ -338,7 +372,7 @@ fn evaluate(
     for (name, current) in census {
         ensure!(
             !capture::epoch_scope(c.epoch, name)
-                || !live(current)
+                || idle(current)
                 || name == unit
                 || name == string(p, "guard_unit")?
                 || actors.iter().any(|a| a.unit == *name),
@@ -348,6 +382,7 @@ fn evaluate(
     if live(producer) {
         ensure!(
             producer["InvocationID"] == l["invocation_id"]
+                && string(producer, "MainPID")?.parse::<u64>()? == number(l, "main_pid")?
                 && pipeline_status::same_exec_start(
                     string(l, "expected_exec_start")?,
                     string(producer, "ExecStart")?
@@ -356,6 +391,11 @@ fn evaluate(
         );
         let guard = evidence::bound(&serde_json::from_value(f["guard_snapshot"].clone())?, true)?;
         evidence::guard(p, l, &guard, census, sample_ms)?;
+        ensure!(
+            guard["kernel_limits"] == i.admission["kernel_limits"]
+                && guard["resource_proposal"] == i.admission["resource_proposal"],
+            "continuation guard lost the admitted kernel limits or resource proposal"
+        );
         let stage = stage_from_guard(&guard)?;
         active.push((
             unit,
@@ -369,6 +409,7 @@ fn evaluate(
             idle(producer),
             "capped producer is neither positively active nor terminal"
         );
+        lifecycle::terminal_frame(p, l, f, census)?;
     }
     for actor in &actors {
         evidence::actor(c.epoch, c, &i.launch, actor)?;
@@ -376,6 +417,15 @@ fn evaluate(
             .get(&actor.unit)
             .context("downstream owner omitted")?;
         if live(current) {
+            ensure!(
+                !live(producer),
+                "downstream owner overlaps the private producer"
+            );
+            let terminal = lifecycle::terminal_frame(p, l, f, census)?;
+            ensure!(
+                terminal["outcome"] == "natural_success",
+                "downstream handoff requires natural private completion"
+            );
             ensure!(
                 current["InvocationID"] == actor.invocation_id
                     && pipeline_status::same_exec_start(
@@ -413,7 +463,19 @@ fn evaluate(
         let elapsed = sample_ms
             .checked_sub(number(l, "epoch_started_unix_millis")?)
             .context("epoch elapsed clock overflow")?;
-        let eta = remaining(&i.policy, stage, sample_ms - started)?;
+        ensure!(
+            i.policy["current_stage"] == stage.key(),
+            "ETA model does not name the observed current continuation stage"
+        );
+        let stage_remaining = number(&i.policy, "current_stage_remaining_millis")?;
+        ensure!(
+            stage_remaining > 0,
+            "active ETA needs a definite positive current-stage forecast"
+        );
+        let eta = remaining(&i.policy, stage, u64::MAX)?
+            .checked_sub(number(&i.policy, "current_stage_overrun_remaining_millis")?)
+            .and_then(|n| n.checked_add(stage_remaining))
+            .context("current observed-stage sidecar ETA overflow")?;
         sample_ms
             .checked_add(eta)
             .context("absolute sidecar ETA overflow")?;
@@ -476,7 +538,12 @@ pub(super) fn rows(
         .iter()
         .map(|c| {
             ensure!(epochs.insert(c.epoch), "duplicate capped epoch claim");
-            Ok(evaluate(c, &read_inputs(c)?, observer, census, now)?.row)
+            let input = read_inputs(c)?;
+            validate_origin(c, &input)?;
+            Ok(match evaluate(c, &input, observer, census, now) {
+                Ok(result) => result.row,
+                Err(error) => lifecycle::unresolved(c, &input.plan, census, &error.to_string()),
+            })
         })
         .collect()
 }
@@ -556,6 +623,19 @@ pub(super) fn origin_scope(epoch: u64, unit: &str) -> Result<()> {
         "capped origin is not the exact original continuation namespace"
     );
     Ok(())
+}
+
+pub(super) fn cleanup_allowed(f: &Value, epoch: u64) -> bool {
+    lifecycle::cleanup_allowed(f, epoch)
+}
+
+pub(super) fn cleanup_current(
+    f: &Value,
+    epoch: u64,
+    current: &BTreeMap<String, Value>,
+    owners: &[(String, String)],
+) -> Result<bool> {
+    lifecycle::cleanup_current(f, epoch, current, owners)
 }
 
 pub(super) fn capture() -> Result<()> {
