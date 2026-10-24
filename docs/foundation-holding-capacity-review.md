@@ -124,6 +124,147 @@ qualification and fresh ownership/reference/staged-input checks; it preserves
 receipts and every original archive-specific gate. Never offload live/mmap-backed
 AccountsDb, SIGSTOP images, or unqualified resumable state.
 
-No Foundation mutation entry point, eligibility receipt, or retirement authority
-has been added by this review. A nonzero candidate and the adapter must pass root
-review, tests, sealing and actual transport qualification first.
+The candidate adapter below must pass root review, tests, sealing and actual
+transport qualification before operational use. It adds no retirement authority.
+
+## Follow-up: exact213 closure and staged consumers
+
+The saved accepted fleet342 (`2026-10-24T03:01:00Z`, SHA-256
+`ce0e99460a6099513e15af7704ee48896efc6cb996f32c52d23bb364b03745b8`)
+continues to show the canonical213 ready pair and no active213 job. No new
+replay/resource observation was taken for this review.
+
+An explicit read-only systemd metadata check found the original prefix producer
+still at invocation `331a5c69fd0a4f2e8dd35f7ace0f51a4`, failed/timeout/status9,
+PID0, Restart=no, NRestarts0 and no queued job. The later continuation, private
+verifier and uploader are also terminal. The exact raw segment and independent
+validation retain digests `1d74158c...e0581` and `e7adb91a...25b93`, respectively.
+
+These installed historical consumers still reference the source. They have no
+PID, queued job, restart, timer/socket trigger or OnFailure action. Their known
+OnSuccess chain cannot advance from the original failed producer on its own:
+
+| Unit (all `.service`) | Remaining dependency |
+| --- | --- |
+| `horizon-qualify-213-selected-store8-v2` | Writes the old prefix; OnSuccess still names the legacy validator. |
+| `horizon-independent-verify-213-selected-store8-v2` | Reads it; effective cleanup drop-in still has OnSuccess to the scratch-retirer. |
+| `horizon-independent-verify-213-selected-store8-v2-recovery-16384` | Can read it again; its positive segment-file condition still holds. |
+| `horizon-independent-verify-213-recovered-v1` | References it; currently condition-blocked by its existing success receipt. |
+| `horizon-independent-full-read-213-recovered-v1` | References the original source in its failed reader deployment. |
+| `horizon-independent-full-read-213-recovered-v2` | References it; currently condition-blocked because the segment exists. |
+| `horizon-retire-scratch-213-selected-store8-v2` | Uses it as retained-archive evidence before scratch retirement. |
+
+No staged service under the dedicated private `systemd-staging` directory matched
+the source in this text search. The completed ready213 work queue and terminal
+owners distinguish these old definitions from a new staged replay. Do not infer
+pending work merely from their continued presence. Immutable deployment copies and the
+completed continuation plan also reference it. They are restoration/provenance
+dependencies, not proof that another job is currently running. The continuation
+plan's exact digest remains
+`83eeb441502e39510ad7610ae6dac9165d9f5a6f32afaeab1f19205e9ab6f144`.
+Restoration must preserve the raw segment bytes, old file name/metadata, original
+lineage and validation bindings before any such consumer can run again.
+
+The candidate `jetstreamer-foundation-holding-review213` command records a bounded
+before/after scan using the existing Rust `process_references` library and a
+stable census of installed, transient and staged unit metadata. Known closed
+historical consumers become explicit restore-on-reuse dependencies; a new consumer,
+an enabling `.wants`/`.requires` link, a private staged unit or an unscanned directory
+alias is a blocker. It optionally rehashes the exact source; metadata-only mode
+cannot issue positive custody eligibility. It reports blockers, current source identity and zero
+reclaimable bytes, never grants retirement or transport authority, and does not
+take a replay/resource sample. Foundation mapping validation is separate from
+the existing node02 transport; the latter is unchanged.
+
+Until any actual staged-reference blockers are resolved and the custody/restore
+round trip is qualified, this remains125.3GB of retained input, not free capacity.
+All historical consumers require exact byte restoration before manual reuse.
+
+## Candidate Foundation implementation
+
+The new candidate commands are separate from node02:
+
+```text
+jetstreamer-r2 holding-foundation213-park SPEC --spec-sha256 SHA --self-sha256 SHA
+jetstreamer-r2 holding-foundation213-admit-restore SPEC --spec-sha256 SHA --self-sha256 SHA
+jetstreamer-r2 holding-foundation213-restore SPEC --spec-sha256 SHA --self-sha256 SHA
+```
+
+They accept only the exact old213 prefix or a dedicated immutable20,144-byte
+public-genesis transport probe at
+`/var/lib/jetstreamer/horizon-foundation-holding-probe-input-v1/genesis.tar.bz2`.
+The large prefix cannot park until a successful Foundation probe park/readback/
+restore receipt is bound. No artifact path, prefix, overwrite or deletion option
+is accepted. The authenticated bucket and mapping are fixed. The existing node02
+mapping validator, state directory, resource policy and command behavior remain.
+
+The adapters share extracted conditional owner creation, multipart upload/full
+readback and resumable protected-floor byte restoration with the reviewed holding
+implementation. Foundation state is root-private under
+`/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1`, with separate
+`receipts/`, `restores/` and an exclusive transition lock. All state must be on the
+admitted root filesystem. Create these exact root-owned0700 directories before
+qualification; the binary refuses another host, mapping, owner or unsafe state.
+
+An initial probe park plan is:
+
+```json
+{
+  "schema": "jetstreamer-foundation-holding-park-plan-v1",
+  "mapping": {"path": "/var/lib/jetstreamer/horizon-r2-holding-foundation-node-01-user-mapping-v1/mapping.json", "sha256": "50736c4c6633b4a97f4a717a1ba5f83374b4e2af4b7ef22c90ed4e007cad35b6"},
+  "artifact": "genesis-probe",
+  "accepted_fleet": null,
+  "transport_qualification": null
+}
+```
+
+For the prefix, use artifact `prefix213` and bind the current accepted201-300
+fleet plus the successful probe restore receipt. The exact source must still
+match its original identity; the common read-only policy rechecks lineage,
+closed owners, process references and staged metadata before and after transport.
+The uploader independently hashes the actual source before upload and again
+after full remote SHA-256 readback. The holding manifest preserves the raw1,809-byte
+segment bytes verbatim (base64 with exact digest), not a reserialized substitute.
+
+A restore-admission plan has schema
+`jetstreamer-foundation-holding-restore-admission-plan-v1`, `mapping`, `custody`
+and `resource_basis`. The latter contains only bound `observer`, `fleet` and
+`protected_guards`. The Foundation maintenance adapter reuses the complete
+century inventory and reviewed current peer/guard growth calculations. It does
+not claim a missing epoch, inherit node02's reserve, lower an existing guard
+floor, or credit an unmodeled owner. Native owners outside the qualified peer
+model are a refusal until separately modeled or terminally reconciled. Partial
+restore credit is the smaller of logical and allocated bytes, never sparse holes.
+Admission adds two1MiB metadata allowances: one may cover admission publication,
+and one remains above the protected floor during byte restoration for the raw
+segment and bounded final receipt. Metadata publication checks free space before
+and after the writes; archive bytes cannot consume that final allowance.
+
+Restoration must be an exclusive campaign maintenance reservation: root must
+serialize new lane admissions until it completes or is deliberately stopped.
+This is an operator integration requirement, not a claim that the new private
+transition lock fences every pre-existing campaign launcher. Keep routine status
+observations running. Use a bounded transfer process (two network parts; an
+appropriate small process memory cap), and re-admit from the existing next
+coordinated observation if the900-second admission or1800-second sample expires.
+An interrupted transfer retains one private partial; no second full copy is
+created. The floor writer continues to preserve protected free space.
+
+A restore plan has schema `jetstreamer-foundation-holding-restore-plan-v1` and
+binds `mapping`, `custody`, and `admission`. The destination is the private,
+content-addressed `.blob`, with the original raw segment restored separately.
+Every byte and remote identity is checked before a durable staging-only restore
+receipt is produced. Original file names, permissions and lineage remain in its
+manifest for a separately qualified no-clobber restoration to the historical
+consumer path. No job is resumed, no source is removed, and no canonical sidecar
+or local retirement permission is produced. A successful full-prefix byte restore
+is required before proposing any exact-file retirement; the original archive,
+canonical public copy and V4 assembly remain in place throughout qualification.
+
+Source validation passed seven exact Foundation observer tests, the full R2
+suite (618 passed,47 host-specific tests ignored), and strict production
+R2/observer Clippy. Independent read-only review covered the host/prefix and
+manifest bindings, shared node02 transport behavior, retry preservation and the
+metadata floor. Immutable candidate sealing and actual authenticated probe/prefix
+custody and restoration remain separate operational gates. No such R2 operation
+has been performed by the review agent.
