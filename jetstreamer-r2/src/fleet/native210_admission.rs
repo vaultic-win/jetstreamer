@@ -101,12 +101,13 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
             "210 resource pressure:{counter}"
         );
     }
-    let mut rows = o["replays"]
+    let accounting = native227_terminal_observation::view(f, o)?;
+    let mut rows = accounting["replays"]
         .as_array()
         .context("210 ordinary sample census")?
         .iter()
         .collect::<Vec<_>>();
-    for diagnostic in o["diagnostic_replays"]
+    for diagnostic in accounting["diagnostic_replays"]
         .as_array()
         .context("210 diagnostic census")?
     {
@@ -227,11 +228,13 @@ pub(super) fn run() -> Result<()> {
     let o = bound_json(&s.observer)?;
     let f = bound_json(&s.fleet)?;
     let p = bound_json(&s.resource_plan)?;
+    let accounting_o = native227_terminal_observation::view(&f, &o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("210 sample clock")?)?;
     let floor = singleton227_admission::century_floor_for(&f, 210)?;
     let free_before = singleton227_admission::disk_free()?;
-    let (growth, measurements) = prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (growth, measurements) =
+        prefix223_live_peer::disk(&f, &accounting_o, &s.protected_guards, t, now)?;
     let (computed, existing_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let protected = p["guard_minimum_free_bytes"]
@@ -296,8 +299,14 @@ pub(super) fn run() -> Result<()> {
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     sample(&s, &o, &f, now, required)?;
+    let after_accounting_o = native227_terminal_observation::view(&f, &o)?;
+    ensure!(
+        accounting_o["terminal_observation_accounting"]
+            == after_accounting_o["terminal_observation_accounting"],
+        "210 terminal observation accounting changed during admission"
+    );
     let (after_growth, after_measurements) =
-        prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+        prefix223_live_peer::disk(&f, &after_accounting_o, &s.protected_guards, t, now)?;
     let (after_auxiliary, after_auxiliary_measurements) = prefix223_live_peer::memory(&f)?;
     ensure!(
         after_growth <= growth
@@ -311,7 +320,7 @@ pub(super) fn run() -> Result<()> {
         "protected_existing_floor_bytes":protected,"required_initial_free_bytes":required,"century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,
         "computed_existing_floor_bytes":computed,"maximum_existing_bound_guard_floor_bytes":existing_guard_floor,"protected_growth_measurements_before":measurements,"protected_growth_measurements_after":after_measurements,
         "auxiliary_remaining_memory_growth_bytes":auxiliary_growth,"auxiliary_memory_before":auxiliary_measurements,"auxiliary_memory_after":after_auxiliary_measurements,
-        "protected_memory_limits":caps,"unit_census_before":before,"unit_census_after":after,"memory_target_percent":90,
+        "terminal_observation_accounting":accounting_o["terminal_observation_accounting"],"protected_memory_limits":caps,"unit_census_before":before,"unit_census_after":after,"memory_target_percent":90,
         "available_memory_bytes":memory,"available_disk_bytes":free,"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),
         "cold_plan":private157::binding(&s.cold_plan),"resource_plan":private157::binding(&s.resource_plan),"protected_guards":s.protected_guards,
         "fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"all_immutable_inputs_rehashed":true,"snapshot_restored":false,
