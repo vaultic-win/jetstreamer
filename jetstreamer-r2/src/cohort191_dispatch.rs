@@ -18,10 +18,28 @@ const OS_BUDGET: (&str, &str) = (
     "/usr/local/lib/jetstreamer/horizon-v1425-portability-os-budget-20261023-v2/budget.json",
     "2e95927a3c49972630c9de458e32359a859b90de7b0fa9b195d6dbb1083ed620",
 );
+#[path = "cohort191_os_claims.rs"]
+mod os_claims;
 // Eight fixed tasks, each with at most two 16 MiB logs, plus bounded custody files.
 // Reserve 64 MiB per task and 8 MiB for dispatcher evidence; retain completed files.
 const OS_ALLOWANCE: u64 = 520 << 20;
 const GIB: u64 = 1 << 30;
+/// Authentication/accounting only; never admits or launches a stage.
+pub(super) fn growth_transfer_delivery_budget(transfer: &Bound, other_os: u64) -> Result<Value> {
+    let floor = os_claims::base(Some(transfer), other_os)?;
+    ensure!(
+        other_os >= 23_505_223_680,
+        "191 transfer drops other OS reservations"
+    );
+    Ok(
+        json!({"os_transfer":transfer,"filesystem":"/var/lib","os_floor_bytes":floor,
+        "other_os_bytes":other_os,"serial_all_stage_log_evidence_bytes":OS_ALLOWANCE,
+        "memory_envelope_bytes":84*GIB,"verifier_memory_bytes":64*GIB,
+        "queue_memory_bytes":2*GIB,"serial_uploader_memory_bytes":2*GIB,"shared_compiler_memory_bytes":16*GIB,
+        "shared_compiler_counted_once":true,"restore_authorized":false,"retirement_authorized":false,
+        "publication_authorized":false,"new_execution_authorized":false,"new_resource_samples":0}),
+    )
+}
 const FULL_DIR: &str =
     "/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts";
 const PLUGIN_DIR: &str =
@@ -56,6 +74,8 @@ struct Plan {
     // Explicit coordinator accounting for other newly admitted OS allocations.
     // This is not permission to reassign any old compiler/fixture reservation.
     other_pending_os_growth_bytes: u64,
+    #[serde(default)]
+    os_claim_transfer: Option<Bound>,
     output_directory: PathBuf,
 }
 fn unit(epoch: u64, stage: Stage) -> String {
@@ -141,6 +161,10 @@ fn make_directory(path: &Path) -> Result<()> {
     File::open(path.parent().context("191 directory parent")?)?.sync_all()?;
     Ok(())
 }
+fn prepare_verifier_state(path: &Path, mut create: impl FnMut(&Path) -> Result<()>) -> Result<()> {
+    create(path)?;
+    create(&path.join("receipts"))
+}
 fn clock() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
@@ -205,7 +229,7 @@ fn resources(observer: &Bound, o: &Value, c: &Value, now: u64) -> Result<()> {
     );
     Ok(())
 }
-fn os_capacity(other_pending_os_growth_bytes: u64) -> Result<u64> {
+fn os_capacity(other_pending_os_growth_bytes: u64, transfer: Option<&Bound>) -> Result<u64> {
     let root = Path::new(ROOT);
     private_directory(root)?;
     ensure!(
@@ -222,7 +246,7 @@ fn os_capacity(other_pending_os_growth_bytes: u64) -> Result<u64> {
         .f_bavail
         .checked_mul(s.f_frsize)
         .context("191 free-space overflow")?;
-    let required = OLD_OS_PROTECTED
+    let required = os_claims::base(transfer, other_pending_os_growth_bytes)?
         .checked_add(other_pending_os_growth_bytes)
         .and_then(|n| n.checked_add(OS_ALLOWANCE))
         .context("191 OS budget overflow")?;
@@ -294,6 +318,7 @@ pub(super) fn check_resources(
     observer: &Bound,
     completion: &Bound,
     other_pending_os_growth_bytes: u64,
+    os_claim_transfer: Option<&Bound>,
 ) -> Result<Value> {
     let budget = custody::bound(
         &Bound {
@@ -310,9 +335,9 @@ pub(super) fn check_resources(
     let c = custody::bound(completion, false)?;
     resources(observer, &o, &c, clock()?)?;
     let owners = fresh_owners(&o)?;
-    let available = os_capacity(other_pending_os_growth_bytes)?;
+    let available = os_capacity(other_pending_os_growth_bytes, os_claim_transfer)?;
     Ok(
-        json!({"schema":"jetstreamer-cohort191-downstream-resource-recheck-v1","observer":observer,"routine_completion":completion,"owners":owners,"old_os_claims_protected_bytes":OLD_OS_PROTECTED,"other_pending_os_growth_bytes":other_pending_os_growth_bytes,"cohort_os_allowance_bytes":OS_ALLOWANCE,"os_available_bytes":available,"new_resource_samples":0,"replay_launch_authorized":false,"reservation_release_authorized":false,"r2_mutations":false}),
+        json!({"schema":"jetstreamer-cohort191-downstream-resource-recheck-v1","observer":observer,"routine_completion":completion,"owners":owners,"old_os_claims_protected_bytes":OLD_OS_PROTECTED,"other_pending_os_growth_bytes":other_pending_os_growth_bytes,"os_claim_transfer":os_claim_transfer,"os_base_floor_bytes":os_claims::base(os_claim_transfer,other_pending_os_growth_bytes)?,"cohort_os_allowance_bytes":OS_ALLOWANCE,"os_available_bytes":available,"new_resource_samples":0,"replay_launch_authorized":false,"reservation_release_authorized":false,"r2_mutations":false}),
     )
 }
 fn bounded_command(program: &str, args: &[String], maximum: usize) -> Result<Vec<u8>> {
@@ -594,7 +619,10 @@ pub(super) fn run() -> Result<()> {
     let c = custody::bound(&p.routine_completion, false)?;
     resources(&p.observer, &o, &c, clock()?)?;
     fresh_owners(&o)?;
-    let available = os_capacity(p.other_pending_os_growth_bytes)?;
+    let available = os_capacity(
+        p.other_pending_os_growth_bytes,
+        p.os_claim_transfer.as_ref(),
+    )?;
     let before = census(&p)?;
     // Immutable executables are streamed, not passed through the JSON reader.
     let im = fs::symlink_metadata(&p.program.path)?;
@@ -636,8 +664,8 @@ pub(super) fn run() -> Result<()> {
     } else {
         private_directory(&epoch_parent)?;
     }
-    make_directory(&state(&p))?;
-    let intent = json!({"schema":"jetstreamer-cohort191-verification-dispatch-intent-v1","plan":plan_bound,"self_sha256":a[6],"epoch":p.epoch,"stage":p.stage,"unit":unit(p.epoch,p.stage),"source_batch":p.source_batch,"public_batch":p.public_batch,"native_import":import,"program":p.program,"verifier_plan":p.verifier_plan,"observer":p.observer,"routine_completion":p.routine_completion,"before":before,"os_available_bytes":available,"old_os_claims_protected_bytes":OLD_OS_PROTECTED,"other_pending_os_growth_bytes":p.other_pending_os_growth_bytes,"new_os_allowance_bytes":OS_ALLOWANCE,"argv":argv(&p),"verification_complete":false,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
+    prepare_verifier_state(&state(&p), make_directory)?;
+    let intent = json!({"schema":"jetstreamer-cohort191-verification-dispatch-intent-v1","plan":plan_bound,"self_sha256":a[6],"epoch":p.epoch,"stage":p.stage,"unit":unit(p.epoch,p.stage),"source_batch":p.source_batch,"public_batch":p.public_batch,"native_import":import,"program":p.program,"verifier_plan":p.verifier_plan,"observer":p.observer,"routine_completion":p.routine_completion,"before":before,"os_available_bytes":available,"old_os_claims_protected_bytes":OLD_OS_PROTECTED,"other_pending_os_growth_bytes":p.other_pending_os_growth_bytes,"os_claim_transfer":p.os_claim_transfer,"os_base_floor_bytes":os_claims::base(p.os_claim_transfer.as_ref(),p.other_pending_os_growth_bytes)?,"new_os_allowance_bytes":OS_ALLOWANCE,"argv":argv(&p),"verification_complete":false,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
     fleet::persist(&p.output_directory.join("intent.json"), &intent)?;
     ensure!(
         census(&p)? == before,
@@ -652,7 +680,10 @@ pub(super) fn run() -> Result<()> {
         clock()?,
     )?;
     fresh_owners(&o)?;
-    os_capacity(p.other_pending_os_growth_bytes)?;
+    os_capacity(
+        p.other_pending_os_growth_bytes,
+        p.os_claim_transfer.as_ref(),
+    )?;
     bounded_command("/usr/bin/systemd-run", &argv(&p), 1 << 20)?;
     let name = unit(p.epoch, p.stage);
     let deadline = Instant::now() + Duration::from_secs(15);
@@ -679,6 +710,28 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fresh_verifier_state_contains_private_receipts_before_wrapper_launch() {
+        use std::os::unix::fs::DirBuilderExt;
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("full");
+        prepare_verifier_state(&state, |p| {
+            fs::DirBuilder::new().mode(0o700).create(p)?;
+            Ok(())
+        })
+        .unwrap();
+        assert!(state.join("receipts").is_dir());
+        assert_eq!(
+            fs::symlink_metadata(state.join("receipts")).unwrap().mode() & 0o777,
+            0o700
+        );
+        assert!(
+            fs::read_dir(state.join("receipts"))
+                .unwrap()
+                .next()
+                .is_none()
+        );
+    }
     fn bound(path: &str) -> Bound {
         Bound {
             path: path.into(),
@@ -700,6 +753,7 @@ mod tests {
             observer,
             routine_completion: bound("/native/cycle"),
             other_pending_os_growth_bytes: 0,
+            os_claim_transfer: None,
             output_directory: format!("{ROOT}/epoch-191-full").into(),
         };
         let spec = json!({"schema":"horizon-verify-canonical-pair-dev-samjohnson191-v1","epoch":191,"stage":"full","archive_directory":"/home/sol/horizon","state_directory":state(&p),"admission_observer":p.observer,"threads_per_command":4,"expected_archive_sha256":"b".repeat(64),"verifier":{"path":"/usr/local/lib/jetstreamer/horizon-epoch198-compatible-verifiers-20261021-v1/verify_archive","sha256":"5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574"}});

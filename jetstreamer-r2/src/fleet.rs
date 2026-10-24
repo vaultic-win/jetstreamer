@@ -2742,7 +2742,10 @@ pub(super) async fn run() -> Result<()> {
         );
         register_pipeline_claim(&mut pipeline_units, claim)?;
         for evidence in &claim.evidence {
-            bound_json(evidence)?;
+            let proof = bound_json(evidence)?;
+            if (191..=194).contains(&claim.epoch) && claim.phase == "cohort191-delivery" {
+                names.extend(super::cohort191_delivery::fleet_peers(&proof)?);
+            }
         }
         names.insert(claim.unit.clone());
     }

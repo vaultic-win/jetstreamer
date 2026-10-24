@@ -22,6 +22,10 @@ const FLEET_ROOT_101: &str = "/var/lib/jetstreamer-horizon-fleet-101-200-2026101
 const LIMIT: u64 = 16 << 20;
 const BUCKET: &str = "solana-archive-with-accounts-data";
 
+#[path = "routine_failed1046_next.rs"]
+mod failed1046_next;
+#[path = "routine_missed_cadence.rs"]
+mod missed_cadence;
 #[path = "routine_next.rs"]
 mod next_preparation;
 #[path = "routine_publication144_recover.rs"]
@@ -34,6 +38,10 @@ mod terminal_handoff;
 mod census141_poh;
 #[path = "routine_cohort191_gate_recovery.rs"]
 mod cohort191_gate_recovery;
+#[path = "routine_cohort191_native_recovery.rs"]
+mod cohort191_native_recovery;
+#[path = "routine_cohort191_raw0546.rs"]
+mod cohort191_raw0546;
 #[path = "routine_delivery160.rs"]
 mod delivery160;
 #[path = "routine_delivery198.rs"]
@@ -112,6 +120,8 @@ mod publication144;
 mod repair183;
 #[path = "routine_repair185.rs"]
 mod repair185;
+#[path = "routine_repair_gate_notes.rs"]
+mod repair_gate_notes;
 #[path = "routine_terminal185.rs"]
 mod terminal185;
 
@@ -140,9 +150,13 @@ struct Plan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     delayed_schedule_utc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    missed_cadence: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     repair183_handoff: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repair185_handoff: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cohort191_raw0546: Option<Bound>,
     endpoint_sha256: String,
     bucket: String,
     observer: PathBuf,
@@ -315,6 +329,13 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if memory152::enabled(p)
+        && p.cohort191_delivery
+            .as_ref()
+            .is_some_and(|s| !s.import_pending)
+    {
+        return "memory152-rebind-terminal191-repair141-v1";
+    }
     if memory152::enabled(p) {
         return "memory152-rebind-guard-stopped185-import-pending191-repair141-v2";
     }
@@ -786,12 +807,13 @@ fn validate_templates(
         .as_str()
         .context("old observer time missing")?;
     let scheduled = scheduled_target(p)?;
-    let qualified_interval =
+    let qualified_interval = missed_cadence::interval(p, old_time)?.unwrap_or(
         memory152::interval(p)?.unwrap_or(cohort191_delivery::interval(p, old_time)?.unwrap_or(
             terminal185::interval(p, old_time)?.unwrap_or(
                 original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?),
             ),
-        ));
+        )),
+    );
     ensure!(
         utc_seconds(scheduled)?.checked_sub(utc_seconds(old_time)?) == Some(qualified_interval),
         "routine target must follow its qualified predecessor interval"
@@ -1422,6 +1444,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     original141::derive_fleet(p, &mut fleet)?;
     terminal141::derive_fleet(p, &mut fleet)?;
     repair141_status::derive_fleet(p, &mut fleet)?;
+    repair_gate_notes::apply(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1672,6 +1695,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     original141::derive_fleet(p, &mut fleet.clone())?;
     terminal141::derive_fleet(p, &mut fleet.clone())?;
     repair141_status::derive_fleet(p, &mut fleet.clone())?;
+    repair_gate_notes::validate(p)?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1983,8 +2007,11 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-missed-cadence"
                             | "--prepare-next-memory152-rebind"
                             | "--prepare-next-delivery191"
+                            | "--recover-native191-tail"
+                            | "--check-native191-tail"
                             | "--prepare-next-import191"
                             | "--prepare-next-repair141"
                             | "--prepare-next-terminal185"
@@ -2012,6 +2039,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--prepare-raw0546-native191"
                             | "--recover-import191-gates"
                             | "--check-import191-gate-recovery"
                             | "--recover-publication144-history"
@@ -2025,6 +2053,7 @@ fn main() {
                             | "--recover-delivery198"
                             | "--promote-partial2018"
                             | "--prepare-next"
+                            | "--prepare-after-failed1046"
                             | "--prepare-next-controller-rebind"
                             | "--prepare-next-upload198"
                             | "--prepare-next-delivery160"
@@ -2064,6 +2093,41 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--prepare-missed-cadence")
+        {
+            return missed_cadence::prepare(
+                &plan,
+                &bound,
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                &args[5],
+            );
+        }
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--prepare-raw0546-native191")
+        {
+            return cohort191_raw0546::prepare(&plan, &bound);
+        }
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--recover-native191-tail" || a == "--check-native191-tail")
+        {
+            return cohort191_native_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                args[6] == "--check-native191-tail",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             matches!(
                 a.as_str(),
@@ -2226,6 +2290,12 @@ fn main() {
                 &fs::read_link("/proc/self/exe")?,
                 &args[5],
             );
+        }
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--prepare-after-failed1046")
+        {
+            return failed1046_next::prepare(&plan, &bound, &args[5]);
         }
         if args.get(6).is_some_and(|arg| preparation_mode(arg)) {
             let spec = if args.len() == 10 {

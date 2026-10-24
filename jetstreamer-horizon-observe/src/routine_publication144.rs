@@ -78,8 +78,11 @@ pub(super) fn composite_reader(p: &Plan) -> bool {
             || original141::reader(p))
 }
 const ACTIVE: &str = "Track exact 144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
+const LEGACY_ACTIVE: &str = "Track exact144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
 const SUCCESS: &str = "Exact 144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
+const LEGACY_SUCCESS: &str = "Exact144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
 const FAILED: &str = "Exact 144 publisher terminated unsuccessfully; capture terminal evidence immediately, preserve original and partial/copy/transaction receipts, remove any owned stale countdown through qualified lifecycle, and diagnose/recover the exact no-clobber transaction. Never blindly restart or discard valid artifacts.";
+const LEGACY_FAILED: &str = "Exact144 publisher terminated unsuccessfully; capture terminal evidence immediately, preserve original and partial/copy/transaction receipts, remove any owned stale countdown through qualified lifecycle, and diagnose/recover the exact no-clobber transaction. Never blindly restart or discard valid artifacts.";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
@@ -210,8 +213,10 @@ fn retained_gate_from(f: &Value, claim: &Value, launch: &Bound) -> Result<Option
                 .is_some_and(|a| a.contains(&serde_json::to_value(launch).unwrap()))
             && matches!(
                 (gate["state"].as_str(), gate["next_action"].as_str()),
-                (Some("post-replay-pipeline"), Some(ACTIVE | SUCCESS))
-                    | (Some("failed-needs-repair"), Some(FAILED))
+                (
+                    Some("post-replay-pipeline"),
+                    Some(ACTIVE | SUCCESS | LEGACY_ACTIVE | LEGACY_SUCCESS)
+                ) | (Some("failed-needs-repair"), Some(FAILED | LEGACY_FAILED))
             ),
         "publisher history/gate changed"
     );
@@ -394,6 +399,36 @@ mod tests {
         let c = json!({"unit":UNIT,"invocation_id":"b".repeat(32)});
         let f = json!({"pipeline_claims":[c],"gates":{"144":{"state":"post-replay-pipeline","next_action":ACTIVE,"evidence":[b]}}});
         assert!(retained_gate_from(&f, &c, &b).unwrap().is_some());
+        for (state, action) in [
+            ("post-replay-pipeline", ACTIVE),
+            ("post-replay-pipeline", SUCCESS),
+            ("post-replay-pipeline", LEGACY_ACTIVE),
+            ("post-replay-pipeline", LEGACY_SUCCESS),
+            ("failed-needs-repair", FAILED),
+            ("failed-needs-repair", LEGACY_FAILED),
+        ] {
+            let mut v = f.clone();
+            v["gates"]["144"]["state"] = json!(state);
+            v["gates"]["144"]["next_action"] = json!(action);
+            assert_eq!(retained_gate_from(&v, &c, &b).unwrap().unwrap().1, action);
+            for (pointer, value) in [
+                (
+                    "/gates/144/state",
+                    json!(if state == "failed-needs-repair" {
+                        "post-replay-pipeline"
+                    } else {
+                        "failed-needs-repair"
+                    }),
+                ),
+                ("/gates/144/evidence", json!([])),
+                ("/pipeline_claims/0/invocation_id", json!("c".repeat(32))),
+                ("/gates/144/next_action", json!(format!("{action} "))),
+            ] {
+                let mut bad = v.clone();
+                *bad.pointer_mut(pointer).unwrap() = value;
+                assert!(retained_gate_from(&bad, &c, &b).is_err(), "{pointer}");
+            }
+        }
         for (pointer, value) in [
             ("/gates/144/next_action", json!("unknown newer action")),
             ("/gates/144/state", json!("remote-ready")),
