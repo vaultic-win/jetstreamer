@@ -3528,6 +3528,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("retire-warmup223-scratch") {
         return fleet::retire_warmup223_scratch();
     }
+    if env::args().nth(1).as_deref() == Some("capture-assembly223-launch") {
+        return fleet::capture_assembly223_launch();
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-assembly223-fleet") {
+        return fleet::prepare_assembly223_fleet();
+    }
     if env::args().nth(1).as_deref() == Some("admit-assembly223-capacity") {
         return fleet::admit_assembly223_capacity();
     }

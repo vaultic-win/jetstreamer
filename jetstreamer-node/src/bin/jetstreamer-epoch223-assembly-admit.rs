@@ -59,7 +59,7 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
             && c["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|t| t <= now && now - t <= 900),
-        "private223 capacity identity/scope/freshness differs"
+        "private 223 capacity identity/scope/freshness differs"
     );
     for key in [
         "replay_launch_authorized",
@@ -77,10 +77,10 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
     let floor = c["minimum_free_bytes"]
         .as_u64()
         .filter(|n| *n >= 2_000_000_000_000)
-        .context("private223 protected disk floor")?;
+        .context("private 223 protected disk floor")?;
     let required = floor
         .checked_add((160 << 30) + (32 << 20))
-        .context("private223 capacity disk overflow")?;
+        .context("private 223 capacity disk overflow")?;
     ensure!(
         c["required_initial_free_bytes"] == required
             && c["sampled_available_bytes"]
@@ -89,7 +89,7 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
             && c["actual_available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= required),
-        "private223 capacity disk does not fit"
+        "private 223 capacity disk does not fit"
     );
     let mut required_memory = 0;
     for key in ["memory_before", "memory_after"] {
@@ -97,15 +97,15 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
         let total = m["host_total_memory_bytes"]
             .as_u64()
             .filter(|n| *n > 0)
-            .context("private223 total memory")?;
+            .context("private 223 total memory")?;
         let growth = m["protected_existing_memory_growth_bytes"]
             .as_u64()
-            .context("private223 protected memory growth")?;
+            .context("private 223 protected memory growth")?;
         let required = total
             .div_ceil(10)
             .checked_add(growth)
             .and_then(|n| n.checked_add(64 << 30))
-            .context("private223 memory overflow")?;
+            .context("private 223 memory overflow")?;
         ensure!(
             m["candidate_memory_max_bytes"] == (64u64 << 30)
                 && m["memory_target_percent"] == 90
@@ -116,7 +116,7 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
                 && m["actual_available_memory_bytes"]
                     .as_u64()
                     .is_some_and(|n| n >= required),
-            "private223 candidate memory does not fit"
+            "private 223 candidate memory does not fit"
         );
         required_memory = required_memory.max(required);
     }
@@ -134,14 +134,14 @@ fn scope(p: &Plan) -> Result<()> {
                 .and_then(|n| n.to_str())
                 .is_some_and(|n| n.starts_with("horizon-223-assembly-admission-"))
             && p.output.file_name().is_some_and(|n| n == "admission.json"),
-        "private223 admission request/output differs"
+        "private 223 admission request/output differs"
     );
     Ok(())
 }
 fn run() -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
-        "private223 admission requires root"
+        "private 223 admission requires root"
     );
     let args: Vec<_> = env::args().skip(1).collect();
     ensure!(args.len() == 3, "usage: PLAN PLAN_SHA256 SELF_SHA256");
@@ -181,14 +181,14 @@ fn run() -> Result<()> {
     // Freshness and all metadata identities must survive the complete idle census.
     ensure!(
         read(&p.capacity)? == c && read(&p.handoff_receipt)? == actual,
-        "private223 evidence changed during admission"
+        "private 223 evidence changed during admission"
     );
     capacity(&c, &p.capacity_tool_sha256, seconds()?)?;
-    let parent = p.output.parent().context("private223 admission parent")?;
+    let parent = p.output.parent().context("private 223 admission parent")?;
     let m = fs::symlink_metadata(parent)?;
     ensure!(
         parent.canonicalize()? == parent && m.is_dir() && m.uid() == 0 && m.mode() & 0o777 == 0o700,
-        "private223 admission output must be canonical root-private"
+        "private 223 admission output must be canonical root-private"
     );
     let output_meta = fs::symlink_metadata(OUTPUT)?;
     ensure!(
@@ -196,7 +196,7 @@ fn run() -> Result<()> {
             && output_meta.uid() == 0
             && output_meta.mode() & 0o077 == 0
             && Path::new(OUTPUT).canonicalize()? == Path::new(OUTPUT),
-        "private223 assembly output root differs"
+        "private 223 assembly output root differs"
     );
     let mut receipt = json!({"schema":"jetstreamer-private223-v3-assembly-admission-v1","admitted":true,"assembly_only_no_replay":true,
         "request":plan_binding,"self_sha256":args[2],"capacity":p.capacity,"assembler_sha256":p.assembler_sha256,
@@ -226,7 +226,7 @@ fn run() -> Result<()> {
     out.write_all(b"\n")?;
     out.as_file().sync_all()?;
     out.persist_noclobber(&p.output)
-        .map_err(|e| anyhow::anyhow!("private223 admission occupied: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("private 223 admission occupied: {e}"))?;
     File::open(parent)?.sync_all()?;
     Ok(())
 }

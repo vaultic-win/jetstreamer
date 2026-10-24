@@ -3,15 +3,15 @@
 This route is source preparation. No actual-prefix completion, new prefix
 reread, handoff execution, archive scan, Bank run, admission, service launch or
 R2 mutation has been performed. There is no operational plan populated with
-future hashes. Keep the healthy native20 prefix unchanged.
+future hashes. Keep the healthy native 20 prefix unchanged.
 
-## Existing independent reader: use its exact native20 profile
+## Existing independent reader: use its exact native 20 profile
 
 The current `jetstreamer-qualification-verify` source already supports
-`qualification-223-v1620-prefix-*`, full workera651b7a6, native20 revision
+`qualification-223-v1620-prefix-*`, full workera651b7a6, native 20 revision
 77bdb45d and the431,523-slot known-root span. No new reader algorithm or
 permissive generic fallback is needed. Build/test/seal this current executable;
-do not assume an older sealed native25 tail reader includes that profile.
+do not assume an older sealed native 25 tail reader includes that profile.
 
 After the actual prefix naturally completes with original terminal manager
 success, root preserves its original receipt, manifest and journal. Under a
@@ -34,7 +34,7 @@ SEALED_QUALIFICATION_VERIFIER
 This is an argument specification, not a launched command. The actual sealed
 reader digest, safe execution envelope and unoccupied no-clobber receipt path
 must be bound at that time. The reader must finish its full archive/manifest
-reread, both canonical-root checks and exact native20 identity checks. Preserve
+reread, both canonical-root checks and exact native 20 identity checks. Preserve
 and root-seal copies of its actual receipt, producer completion and manifest,
 plus original terminal/PID1 journal evidence. No receipt or digest is predicted.
 
@@ -44,7 +44,7 @@ Run the already qualified/sealed f44af401 tool-only gate only after those actual
 inputs exist. Its binary digest is
 137b5a3a767604ea4c9f7405dd0af7af0eb860f30e5ece52ce49017825d35c22.
 Follow `epoch223-cross-runtime-handoff-plan.md`; keep its immutable request and
-actual output. It binds the exact corrected native25 input d79e374e, requires
+actual output. It binds the exact corrected native 25 input d79e374e, requires
 full consensus tuple equality and plans validator-local cursor normalization.
 Its output grants no assembly or publication authority.
 
@@ -74,7 +74,7 @@ after exact zero-restart success, a fresh root-owned0700 empty output root on
 the source filesystem, exact persistent owner identity and a separate fresh
 resource admission. The assembler requires unit
 `horizon-assemble-223-native20-native25-v1.service`, root, Type=exec,
-Restart=no, zero restarts,24h RuntimeMax,64GiB MemoryMax,48GiB MemoryHigh,
+Restart=no, zero restarts,24h RuntimeMax,64 GiB MemoryMax,48 GiB MemoryHigh,
 swap0, CPU400%, Tasks512, UMask0077, PrivateNetwork=yes,
 ProtectHome=read-only, ProtectSystem=strict, NoNewPrivileges=yes and exactly
 the fixed output root writable. Root's unit must retain only the traversal
@@ -101,15 +101,15 @@ or synthesize current fields after systemd collection.
 
 The assembler pins both opened private sources, requiring uid1000, mode0600,
 one link and no checksum sidecar. It invokes the existing `merge_runtime_segments`
-with their independent manifest digests/terminal hashes and exact native20/
-native25 V3 provenance. V4 remains same-runtime-only. The shared merger hashes
+with their independent manifest digests/terminal hashes and exact native 20/
+native 25 V3 provenance. V4 remains same-runtime-only. The shared merger hashes
 and decodes the complete sources, checks PoH and all metadata/update phases,
 rejects write gaps/duplicates/missing events, and performs the checked normalized
 mapping. No raw cursor equality, padding, truncation or event dropping occurs.
 
-Output is no-clobber mode0600 `epoch-223-private-v3.jet`, bounded to160GiB and
+Output is no-clobber mode0600 `epoch-223-private-v3.jet`, bounded to160 GiB and
 24h. Every write preserves the independently admitted filesystem floor, which
-must be at least2TB plus any older protected claims; cgroup memory/CPU/task
+must be at least 2 TB plus any older protected claims; cgroup memory/CPU/task
 bounds protect the host. It fsyncs the output/directory, rechecks both original
 source identities and owners, hashes the completed output through a pinned
 handle and writes a private no-clobber `assembly.json`. `intent.json` is durable
@@ -118,15 +118,15 @@ is no automatic retry, cleanup, resume or replacement authority.
 
 ## Prepared independent admission; qualification still required
 
-The existing epoch144 assembly admission/fleet adapters are closed to144 and
-cannot be borrowed. Source now includes an independent two-stage actual223
+The existing epoch 144 assembly admission/fleet adapters are closed to144 and
+cannot be borrowed. Source now includes an independent two-stage actual 223
 adapter producing `jetstreamer-private223-v3-assembly-admission-v1`. It remains
 unqualified and unsealed until the actual prefix completes and its real
 independent reread/terminal/equality evidence is available. Its contract binds the actual assembler, handoff
-request/receipt, prefix/tail digests, output filesystem/device,160GiB maximum
-output,64/48GiB memory limits,24h time limit, complete accepted fleet ledger,
+request/receipt, prefix/tail digests, output filesystem/device,160 GiB maximum
+output,64/48 GiB memory limits,24h time limit, complete accepted fleet ledger,
 fresh invocation-bound observer and all preserved older guards/century claims.
-It records protected disk/memory reserves and a sample no older than15minutes.
+It records protected disk/memory reserves and a sample no older than 15minutes.
 The assembler rehashes those bound ledger/observer files and refuses missing,
 stale, mismatching or insufficient capacity evidence. It does not manufacture
 that independent admission. Do not hand-write a positive admission JSON or
@@ -145,14 +145,14 @@ normal full/plugin/boundary/publication checks may the normal authenticated
 uploader commit a matching sidecar. Keep223 open until the verified ready pair.
 
 
-The first stage is `jetstreamer-r2 admit-assembly223-capacity SPEC
+The first stage is `jetstreamer-r2 admit-assembly 223-capacity SPEC
 --spec-sha256 HEX --self-sha256 HEX`. Its closed spec schema is
 `jetstreamer-private223-assembly-capacity-spec-v1`, with `resource_basis`
 (the existing exact observer/fleet/protected_guards map) and a no-clobber
 `/var/lib/jetstreamer/horizon-223-assembly-capacity-NAME/capacity.json` output.
 It reuses the neutral `maintenance_capacity` complete-owner core. Foundation's
 wrapper preserves its old successful receipt shape and disk-only behavior.
-Assembly adds the sealed 160GiB output plus32MiB metadata reservation, at least 2TB protected floor, a 64GiB
+Assembly adds the sealed 160 GiB output plus32 MiB metadata reservation, at least 2 TB protected floor, a 64 GiB
 candidate memory cap, complete typed remaining owner memory, and 10% host memory
 reserve. Sampled and fresh available memory must fit both before and after.
 It requires every protected timer active and the exact latest completed guard
@@ -160,7 +160,7 @@ fire in both brackets. Unknown owners, active223 sources, mismatching observer
 bindings, terminal histories or caps refuse admission. This stage authenticates
 capacity only and explicitly denies source completion and assembly launch.
 
-The second stage is `jetstreamer-epoch223-assembly-admit PLAN PLAN_SHA256
+The second stage is `jetstreamer-epoch 223-assembly-admit PLAN PLAN_SHA256
 SELF_SHA256`. Its closed request schema is
 `jetstreamer-private223-assembly-admission-request-v1`, with bound
 `handoff_request`, `handoff_receipt`, `capacity`, separately supplied
@@ -182,8 +182,8 @@ admission file alone is not authority to bypass them.
 
 ## Exact qualification and seal checklist
 
-1. Keep the original native20 producer and native25 tail untouched. After actual
-   native20 PID1 success, preserve its original completion, segment manifest,
+1. Keep the original native 20 producer and native 25 tail untouched. After actual
+   native 20 PID1 success, preserve its original completion, segment manifest,
    terminal journal and independent prefix reread. Invoke the previously
    qualified gate in `horizon-223-handoff-plan-tool-f44af401-v2`; require the
    shared metadata recomputation to reproduce its real result. A loaded-to-unloaded
@@ -212,9 +212,9 @@ admission file alone is not authority to bypass them.
    handoff, rather than trusting a hash copied from the assembled header. The
    strict existing `verify_archive --full --anchor SLOT HASH
    --expected-terminal SLOT HASH --expected-provenance-sha256 HEX --threads 8`
-   supports this independent provenance binding. For epoch223 the adjacent
+   supports this independent provenance binding. For epoch 223 the adjacent
    anchor slot is **96335999** and terminal slot is **96767999**. The original
-   native20 bootstrap checkpoint **96335538 is not the adjacent anchor**;
+   native 20 bootstrap checkpoint **96335538 is not the adjacent anchor**;
    preserve separate sealed finalized boundary metadata for the actual hashes.
 6. The private V3 runner must stage one unchanged canonical-name
    `epoch-223.jet` outside `HORIZON_DIR`, bind independent full and current-plugin
@@ -228,8 +228,8 @@ admission file alone is not authority to bypass them.
    upload/readback/sidecar gates remain mandatory. Status cleanup follows the
    canonical remote sidecar commit, with no anonymous-origin dependency.
 
-The assembly capacity reservation includes32MiB for bounded admission/capacity
-and assembly metadata, and the assembler withholds a further1MiB above its
+The assembly capacity reservation includes32 MiB for bounded admission/capacity
+and assembly metadata, and the assembler withholds a further1 MiB above its
 admitted floor throughout archive writes until its final receipt is durable.
 It rechecks that final metadata did not cross the protected floor.
 
@@ -237,7 +237,7 @@ It rechecks that final metadata did not cross the protected floor.
 The next source candidate also adds `source_idle223::observe_assembly(actual_iid)`
 for the final V3 consumer. It keeps the original Prefix/Tail API and fixed
 namespace unchanged, accepts only the fixed assembly unit/archive and a real
-nonzero lowercase32-hex invocation, and reuses the complete loaded/unloaded
+nonzero lowercase 32-hex invocation, and reuses the complete loaded/unloaded
 manager/cgroup/process-reference brackets. It grants no historical success;
 the consumer must first authenticate actual completion and PID1 evidence.
 This API and the coordinated `ceil(total_memory/10)` reserve/validator change

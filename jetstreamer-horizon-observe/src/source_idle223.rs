@@ -76,7 +76,7 @@ fn assembly_owner(invocation: &str) -> Result<Owner<'_>> {
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
             && invocation.bytes().any(|b| b != b'0'),
-        "invalid actual223 assembly invocation"
+        "invalid actual 223 assembly invocation"
     );
     Ok(Owner {
         unit: "horizon-assemble-223-native20-native25-v1.service",
@@ -316,7 +316,7 @@ fn stable(before: &Snapshot, after: &Snapshot) -> Result<()> {
 pub fn observe(source: Source) -> Result<Value> {
     observe_owner(source.into())
 }
-/// Current idle only for the fixed private223 assembler. This does not prove
+/// Current idle only for the fixed private 223 assembler. This does not prove
 /// historical success; caller must first bind its real completion and PID1
 /// terminal evidence. No future invocation or positive receipt is invented.
 pub fn observe_assembly(invocation: &str) -> Result<Value> {

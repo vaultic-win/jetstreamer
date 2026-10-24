@@ -1,4 +1,4 @@
-//! Independent fresh complete-owner capacity for private223 assembly only.
+//! Independent fresh complete-owner capacity for private 223 assembly only.
 //! Does not authenticate future prefix completion; the node admission does that.
 use super::*;
 #[derive(Deserialize)]
@@ -18,7 +18,7 @@ fn scope(s: &Spec) -> Result<()> {
                 .and_then(|n| n.to_str())
                 .is_some_and(|n| n.starts_with("horizon-223-assembly-capacity-"))
             && s.output.file_name().is_some_and(|n| n == "capacity.json"),
-        "private223 capacity scope differs"
+        "private 223 capacity scope differs"
     );
     Ok(())
 }
@@ -33,10 +33,10 @@ pub(super) fn run() -> Result<()> {
     ensure!(
         !f["active"]
             .as_array()
-            .context("private223 complete active census")?
+            .context("private 223 complete active census")?
             .iter()
             .any(|row| row["epoch"] == 223),
-        "private223 source still has active work"
+        "private 223 source still has active work"
     );
     capacity["schema"] = json!("jetstreamer-private223-assembly-capacity-v1");
     capacity["spec"] = private157::binding(&binding);
@@ -46,7 +46,7 @@ pub(super) fn run() -> Result<()> {
     capacity["assembly_launch_authorized"] = json!(false);
     ensure!(
         serde_json::to_vec_pretty(&capacity)?.len() < 8 << 20,
-        "private223 capacity exceeds the independently readable 8MiB metadata envelope"
+        "private 223 capacity exceeds the independently readable 8 MiB metadata envelope"
     );
     private157::immutable_receipt(&s.output, &capacity)
 }

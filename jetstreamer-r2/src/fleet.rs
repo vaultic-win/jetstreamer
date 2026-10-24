@@ -8,7 +8,9 @@ const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-
 mod assembly144;
 mod assembly144_admission;
 mod assembly144_prepare;
+mod assembly223;
 mod assembly223_capacity;
+mod assembly223_prepare;
 mod bounded205;
 mod census141_poh;
 mod cold223_scan;
@@ -297,6 +299,12 @@ pub(super) fn native209_terminal_status_identity(proof: &Value) -> Result<(Strin
 }
 pub(super) fn admit_native210_input() -> Result<()> {
     native210_admission::run()
+}
+pub(super) fn capture_assembly223_launch() -> Result<()> {
+    assembly223::capture()
+}
+pub(super) fn prepare_assembly223_fleet() -> Result<()> {
+    assembly223_prepare::run()
 }
 pub(super) fn admit_assembly223_capacity() -> Result<()> {
     assembly223_capacity::run()
@@ -1016,6 +1024,7 @@ fn validate_same_sample_admission(
         144 if assembly144::namespace(claim) => {
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
+        223 if assembly223::namespace(claim) => assembly223::GUARD_SHA,
         223 if tail223::namespace(claim) => tail223::GUARD_SHA,
         223 if prefix223::namespace(claim) => prefix223::GUARD_SHA,
         223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
@@ -1112,6 +1121,7 @@ fn validate_same_sample_admission(
                 || native144::namespace(claim)
                 || continuation144::namespace(claim)
                 || assembly144::namespace(claim)
+                || assembly223::namespace(claim)
             {
                 // The pinned eca guard predates bounded-canary fields.
                 guard.get("canary_target_error").is_none()
@@ -1189,7 +1199,7 @@ fn private_qualification_inventory_state(gate_state: &str) -> &str {
 }
 
 fn diagnostic_guard_workers_match(claim: &DiagnosticClaim, workers: &[Value]) -> bool {
-    if assembly144::namespace(claim) {
+    if assembly144::namespace(claim) || assembly223::namespace(claim) {
         workers.is_empty()
     } else {
         workers.len() == 1
@@ -1209,6 +1219,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if assembly223::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| assembly223::guard_matches(claim, &r, plan));
+    }
     if original141_capped::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| original141_capped::guard_matches(claim, &r, plan));
@@ -1358,6 +1372,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     }
     if native141::namespace(claim) || receipt["schema"] == native141::SCHEMA {
         return native141::launch(receipt, claim);
+    }
+    if assembly223::namespace(claim) || receipt["schema"] == assembly223::SCHEMA {
+        return assembly223::launch(receipt, claim);
     }
     if assembly144::namespace(claim) || receipt["schema"] == assembly144::SCHEMA {
         return assembly144::launch(receipt, claim);
@@ -3036,6 +3053,9 @@ pub(super) async fn run() -> Result<()> {
             if continuation144::namespace(claim) {
                 continuation144::validate_live(claim, current)?;
             }
+            if assembly223::namespace(claim) {
+                assembly223::validate_live(claim, current)?;
+            }
             if assembly144::namespace(claim) {
                 assembly144::validate_live(claim, current)?;
             }
@@ -3169,7 +3189,7 @@ pub(super) async fn run() -> Result<()> {
                 "private-poh-diagnostic"
             } else if native141::namespace(claim) {
                 "native-ledger-read-only"
-            } else if assembly144::namespace(claim) {
+            } else if assembly144::namespace(claim) || assembly223::namespace(claim) {
                 "private-assembly-only"
             } else if continuation144::namespace(claim) || continuation203::namespace(claim) {
                 "private-checkpoint-continuation"

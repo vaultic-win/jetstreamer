@@ -1,4 +1,4 @@
-//! Prepared private223 V3 assembly. No replay, sidecar, publication or R2.
+//! Prepared private 223 V3 assembly. No replay, sidecar, publication or R2.
 #![recursion_limit = "256"]
 #[allow(dead_code)]
 #[path = "../../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
@@ -491,13 +491,13 @@ fn run() -> Result<()> {
         "assembly completion consumed protected disk floor"
     );
     println!(
-        "private223 V3 assembly completed; final full/plugin/publication/repair gates remain separate"
+        "private 223 V3 assembly completed; final full/plugin/publication/repair gates remain separate"
     );
     Ok(())
 }
 fn main() {
     if let Err(error) = run() {
-        eprintln!("private223 V3 assembly refused: {error:#}");
+        eprintln!("private 223 V3 assembly refused: {error:#}");
         std::process::exit(1)
     }
 }

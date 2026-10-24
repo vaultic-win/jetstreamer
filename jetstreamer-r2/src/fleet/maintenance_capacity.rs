@@ -155,7 +155,7 @@ fn memory_sample(o: &Value, f: &Value, candidate: u64) -> Result<Value> {
     let actual = native209_admission::actual_memory()?;
     ensure!(
         sampled >= required && actual >= required,
-        "maintenance candidate consumes protected memory/90percent target"
+        "maintenance candidate consumes protected memory/90 percent target"
     );
     Ok(
         json!({"candidate_memory_max_bytes":candidate,"memory_target_percent":90,
