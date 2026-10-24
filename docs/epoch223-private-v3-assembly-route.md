@@ -232,3 +232,15 @@ The assembly capacity reservation includes32MiB for bounded admission/capacity
 and assembly metadata, and the assembler withholds a further1MiB above its
 admitted floor throughout archive writes until its final receipt is durable.
 It rechecks that final metadata did not cross the protected floor.
+
+
+The next source candidate also adds `source_idle223::observe_assembly(actual_iid)`
+for the final V3 consumer. It keeps the original Prefix/Tail API and fixed
+namespace unchanged, accepts only the fixed assembly unit/archive and a real
+nonzero lowercase32-hex invocation, and reuses the complete loaded/unloaded
+manager/cgroup/process-reference brackets. It grants no historical success;
+the consumer must first authenticate actual completion and PID1 evidence.
+This API and the coordinated `ceil(total_memory/10)` reserve/validator change
+are source preparation until their own tests/build/seal. The already qualified
+529fc90f candidate remains unchanged. Do not deploy a helper-only rounding
+upgrade with the older strict node capacity validator.

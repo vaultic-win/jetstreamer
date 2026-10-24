@@ -135,7 +135,8 @@ fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
         total > 0 && candidate > 0 && candidate <= total,
         "invalid maintenance memory envelope"
     );
-    (total / 10)
+    total
+        .div_ceil(10)
         .checked_add(reserve)
         .and_then(|n| n.checked_add(candidate))
         .context("maintenance memory reservation overflow")
@@ -302,6 +303,7 @@ mod tests {
     fn candidate_memory_preserves_remaining_owner_charge_and_ninety_percent_target() {
         assert_eq!(memory_required(80, 1000, 64).unwrap(), 244);
         assert_eq!(memory_required(0, 1000, 64).unwrap(), 164);
+        assert_eq!(memory_required(0, 1001, 64).unwrap(), 165);
         assert!(memory_required(1, 0, 64).is_err());
         assert!(memory_required(1, 1000, 1001).is_err());
         assert!(memory_required(u64::MAX, 1000, 64).is_err());

@@ -40,6 +40,52 @@ impl Source {
         })
     }
 }
+// Keep the public historical Source API closed and unchanged. The later
+// assembly owner has an actual future invocation, supplied only after its
+// separate completion/PID1 history has been authenticated by the caller.
+#[derive(Clone, Copy)]
+struct Owner<'a> {
+    unit: &'static str,
+    invocation: &'a str,
+    archive: &'static Path,
+}
+impl<'a> Owner<'a> {
+    fn unit(self) -> &'static str {
+        self.unit
+    }
+    fn historical_invocation(self) -> &'a str {
+        self.invocation
+    }
+    fn archive(self) -> &'static Path {
+        self.archive
+    }
+}
+impl From<Source> for Owner<'static> {
+    fn from(source: Source) -> Self {
+        Self {
+            unit: source.unit(),
+            invocation: source.historical_invocation(),
+            archive: source.archive(),
+        }
+    }
+}
+fn assembly_owner(invocation: &str) -> Result<Owner<'_>> {
+    ensure!(
+        invocation.len() == 32
+            && invocation
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            && invocation.bytes().any(|b| b != b'0'),
+        "invalid actual223 assembly invocation"
+    );
+    Ok(Owner {
+        unit: "horizon-assemble-223-native20-native25-v1.service",
+        invocation,
+        archive: Path::new(
+            "/var/lib/jetstreamer/horizon-223-native20-native25-private-assembly-v1/epoch-223-private-v3.jet",
+        ),
+    })
+}
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -107,7 +153,7 @@ fn properties(bytes: &[u8]) -> Result<Value> {
     }
     Ok(Value::Object(fields))
 }
-fn loaded_terminal(source: Source, p: &Value) -> Result<()> {
+fn loaded_terminal(source: Owner<'_>, p: &Value) -> Result<()> {
     for (key, value) in [
         ("Id", source.unit()),
         ("LoadState", "loaded"),
@@ -138,7 +184,7 @@ struct Snapshot {
     evidence: Value,
 }
 fn validate_snapshot(
-    source: Source,
+    source: Owner<'_>,
     units: &[u8],
     pending: &[u8],
     props: Option<Value>,
@@ -176,7 +222,7 @@ fn output(args: &[&str], maximum: usize) -> Result<Vec<u8>> {
     );
     Ok(out.stdout)
 }
-fn snapshot(source: Source) -> Result<Snapshot> {
+fn snapshot(source: Owner<'_>) -> Result<Snapshot> {
     let units = output(
         &[
             "list-units",
@@ -206,7 +252,7 @@ fn snapshot(source: Source) -> Result<Snapshot> {
     };
     validate_snapshot(source, &units, &pending, props)
 }
-fn group(cgroup_root: &Path, source: Source) -> Result<Value> {
+fn group(cgroup_root: &Path, source: Owner<'_>) -> Result<Value> {
     use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
     let parent = cgroup_root.join("system.slice");
     ensure!(
@@ -268,6 +314,15 @@ fn stable(before: &Snapshot, after: &Snapshot) -> Result<()> {
 /// An unloaded unit is accepted only after successful complete manager queries,
 /// no queued job, empty/absent exact cgroup and a complete archive-reference scan.
 pub fn observe(source: Source) -> Result<Value> {
+    observe_owner(source.into())
+}
+/// Current idle only for the fixed private223 assembler. This does not prove
+/// historical success; caller must first bind its real completion and PID1
+/// terminal evidence. No future invocation or positive receipt is invented.
+pub fn observe_assembly(invocation: &str) -> Result<Value> {
+    observe_owner(assembly_owner(invocation)?)
+}
+fn observe_owner(source: Owner<'_>) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "source-idle census requires root"
@@ -295,13 +350,49 @@ pub fn observe(source: Source) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn terminal(source: Source) -> Value {
+    fn terminal(source: Owner<'_>) -> Value {
         json!({"Id":source.unit(),"LoadState":"loaded","MainPID":"0","NRestarts":"0","Restart":"no",
         "Result":"success","ExecMainStatus":"0","ActiveState":"inactive","SubState":"dead","Job":"","InvocationID":source.historical_invocation(),"ControlGroup":""})
     }
     #[test]
+    fn assembly_owner_is_exact_and_requires_the_real_nonzero_lowercase_invocation() {
+        let id = "1234567890abcdef1234567890abcdef";
+        let owner = assembly_owner(id).unwrap();
+        assert_eq!(
+            owner.unit(),
+            "horizon-assemble-223-native20-native25-v1.service"
+        );
+        assert_eq!(
+            owner.archive(),
+            Path::new(
+                "/var/lib/jetstreamer/horizon-223-native20-native25-private-assembly-v1/epoch-223-private-v3.jet"
+            )
+        );
+        let units = format!("{} loaded inactive dead Exact assembly\n", owner.unit());
+        validate_snapshot(owner, units.as_bytes(), b"", Some(terminal(owner))).unwrap();
+        validate_snapshot(
+            owner,
+            b"unrelated.service loaded active running X\n",
+            b"",
+            None,
+        )
+        .unwrap();
+        let mut wrong = terminal(owner);
+        wrong["InvocationID"] = json!("a".repeat(32));
+        assert!(validate_snapshot(owner, units.as_bytes(), b"", Some(wrong)).is_err());
+        for bad in [
+            "",
+            "0",
+            "00000000000000000000000000000000",
+            "1234567890ABCDEF1234567890abcdef",
+            "1234567890abcdef1234567890abcdeg",
+        ] {
+            assert!(assembly_owner(bad).is_err(), "{bad}");
+        }
+    }
+    #[test]
     fn complete_unloaded_census_is_distinct_from_failed_show_or_missing_properties() {
-        let source = Source::Tail;
+        let source = Owner::from(Source::Tail);
         let units = b"unrelated.service loaded active running Example\n";
         let s = validate_snapshot(source, units, b"No jobs running.", None).unwrap();
         assert!(!s.present);
@@ -313,7 +404,7 @@ mod tests {
     }
     #[test]
     fn loaded_sources_require_exact_terminal_identity_and_no_queue() {
-        for source in [Source::Prefix, Source::Tail] {
+        for source in [Source::Prefix, Source::Tail].map(Owner::from) {
             let units = format!("{} loaded inactive dead Original\n", source.unit());
             let good = terminal(source);
             validate_snapshot(source, units.as_bytes(), b"", Some(good.clone())).unwrap();
@@ -348,7 +439,7 @@ mod tests {
     }
     #[test]
     fn partial_duplicate_or_changing_manager_snapshots_refuse() {
-        let source = Source::Prefix;
+        let source = Owner::from(Source::Prefix);
         let line = format!("{} loaded inactive dead X\n", source.unit());
         assert!(loaded(format!("{line}{line}").as_bytes()).is_err());
         assert!(jobs(b"1 x.service start waiting\n1 y.service start waiting\n").is_err());
@@ -371,19 +462,19 @@ mod tests {
         let path = root.path().join("system.slice").join(Source::Prefix.unit());
         fs::create_dir(root.path().join("system.slice")).unwrap();
         assert_eq!(
-            group(root.path(), Source::Prefix).unwrap()["state"],
+            group(root.path(), Source::Prefix.into()).unwrap()["state"],
             "absent"
         );
         fs::create_dir_all(&path).unwrap();
         fs::write(path.join("cgroup.events"), b"populated 0\nfrozen 0\n").unwrap();
         assert_eq!(
-            group(root.path(), Source::Prefix).unwrap()["state"],
+            group(root.path(), Source::Prefix.into()).unwrap()["state"],
             "unpopulated"
         );
         fs::write(path.join("cgroup.events"), b"populated 1\nfrozen 0\n").unwrap();
-        assert!(group(root.path(), Source::Prefix).is_err());
+        assert!(group(root.path(), Source::Prefix.into()).is_err());
         fs::remove_file(path.join("cgroup.events")).unwrap();
         symlink("/not-allowed", path.join("cgroup.events")).unwrap();
-        assert!(group(root.path(), Source::Prefix).is_err());
+        assert!(group(root.path(), Source::Prefix.into()).is_err());
     }
 }

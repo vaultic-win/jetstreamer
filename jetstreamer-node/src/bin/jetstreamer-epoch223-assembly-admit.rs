@@ -101,7 +101,8 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
         let growth = m["protected_existing_memory_growth_bytes"]
             .as_u64()
             .context("private223 protected memory growth")?;
-        let required = (total / 10)
+        let required = total
+            .div_ceil(10)
             .checked_add(growth)
             .and_then(|n| n.checked_add(64 << 30))
             .context("private223 memory overflow")?;
