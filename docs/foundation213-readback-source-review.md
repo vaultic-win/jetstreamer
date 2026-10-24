@@ -120,3 +120,108 @@ production Clippy passed with `-D warnings` on the final source. Rustfmt and
 was executed against R2. Keep a hard deadline on any later diagnostic service:
 the five-second DNS await cannot forcibly cancel a blocking OS resolver call
 already started by Tokio.
+
+## Actual private comparison, supplied by root
+
+The bounded diagnostic has now succeeded. Do not rerun it. Root sealed the
+exact production helper with SHA256
+`e91c6b5c7072e1a8a80a17da4eba45a2d6990aabd9083065f03b34c88efa171d`
+at `/var/lib/jetstreamer/horizon-holding213-transport-tools-e91c6b5c-v1`.
+The actual private receipt is
+`/var/lib/jetstreamer/horizon-holding213-transport-probe-cycle352-v1/probe.json`,
+SHA256 `ee630e91fbfdb9d37896381450390fcfbc93f851888138fa278adf085b993beb`.
+Every exact 32 MiB window matched the original local window digest
+`13dc9431c5760ee02c3627dc2124aaae03eb582d4a65be6c12a24aee32fd3112`:
+
+| Comparison | Elapsed | Approximate accepted-body throughput |
+| --- | ---: | ---: |
+| Fresh SDK client | 2,796 ms | 12.00 MB/s |
+| Direct IPv4 | 2,329 ms | 14.41 MB/s |
+| Direct IPv6 | 1,366 ms | 24.56 MB/s |
+
+Root's preserved private journal through the existing 08:11 UTC cutoff contains
+124 rows and zero application retry warnings:
+`.codex/tmp-readiness/park213-readback-through-cycle352-private.jsonl`, SHA256
+`3aaec19e117285b7cc3b1fa35f475368adf91c655fa74263c30112fe144c15ec`.
+These actual results and proof bindings were supplied by root; this agent made
+no additional live observation, service change or network request. The old park
+unit and its invocation remain unchanged, with no later park poll implied.
+
+Both address families and the SDK can read this exact window successfully.
+These results do not justify changing address family. They do not measure
+long-lived-client throughput, the two concurrent 64 MiB whole-object ranges,
+the live unit's CPU quota, or whole-object integrity. Zero warning rows exclude
+observed application retry warnings in that preserved interval; they do not
+exclude SDK-internal retries, slow successful bodies or later retries.
+
+## Next source hypothesis and minimum scheduled metadata
+
+The original park creates one SDK client before upload and reuses it for HEAD,
+multipart upload and whole-object readback. The diagnostic creates a fresh
+client. The same frozen Cargo lock selects Smithy HTTP client 1.1.12; the SDK
+client builder does not override connection-pool lifetime, HTTP version or body
+read timeouts. Therefore connection reuse is a testable distinction, but source
+alone cannot identify a bad connection or prove that reuse caused the slowdown.
+
+The other concrete difference is ordered concurrency. Futures Util 0.3.32
+`Buffered::poll_next` fills a `FuturesOrdered` queue only while its length is
+below two. `FuturesOrdered::len` includes completed outputs awaiting an earlier
+output. If one 64 MiB range finishes and its predecessor remains slow, the
+completed range occupies the second slot: no third GET replaces it until an
+ordered result is yielded. Both range futures are polled by the same parent
+task; they are not independent spawned Tokio tasks. This is genuine bounded
+head-of-line blocking, while preserving the correct digest order.
+
+After a range is yielded, copying and SHA-256 run synchronously in that parent
+task before its next await. During this time neither range body is consumed by
+that task, even though the runtime has two worker threads. Readback performs
+one SHA-256 pass and writes to a sink. The more expensive local proof performs
+SHA-256 twice plus per-part MD5, but that phase is before or after readback,
+not concurrent with this readback loop. SHA2 0.10.9 uses runtime detection for
+the x86 SHA instruction backend when available; no build-time assumption about
+the host CPU or numeric hash throughput follows from the source.
+
+At root's already scheduled 08:42 UTC collection, the minimum useful private
+metadata is the following. Restrict every process and socket row to the exact
+park helper PID and invocation; avoid environment, command payloads, HTTP
+headers, request bodies, TLS keys, signed URLs or arbitrary system-wide socket
+dumps.
+
+1. Bind unit, invocation ID, main PID, boot ID, process start time and cgroup
+   path once. Record monotonic timestamps for all counters and reject PID or
+   invocation changes. Include the existing bounded journal capture in this
+   scheduled collection: latest readback marker, any warnings and terminal
+   state. No extra readback poll is needed outside the scheduled collection.
+2. Read `cpu.max`, `cpu.weight`, effective CPU affinity/cpuset once, and ancestor
+   `cpu.max` values to account for a stricter inherited quota. Collect
+   `cpu.stat` (usage/user/system microseconds, periods, throttled periods and
+   throttled microseconds) plus cgroup `cpu.pressure`. Cumulative counters alone
+   cannot locate current pressure after the initial local hashing/upload.
+3. Prefer deltas from an existing identity-matched saved counter sample. If no
+   suitable baseline exists, root can obtain two tiny counter snapshots one
+   second apart inside this single scheduled collection, without another
+   campaign/resource poll. Include each thread's user/system ticks, current
+   state and wait channel at those same instants. Record clock tick frequency.
+   Per-thread deltas distinguish a busy hashing/SDK thread from an idle parent,
+   though neither counters nor wait channels identify a specific Rust function.
+4. Enumerate only socket inode links owned by this PID, then collect matching
+   TCP metadata: address family, local/peer address and port, TCP state, receive
+   and send queue lengths, `bytes_received`, `bytes_acked`, retransmissions,
+   RTT and, where exposed, receive window and `lastrecv`. Take the same bounded
+   second counter point if needed for byte deltas. Associate each row by inode
+   or socket cookie, not merely by a reused local port. This reveals whether
+   one or two connections are active and whether receive queues accumulate;
+   it does not reveal HTTP stream identity or HTTP/2 negotiated protocol.
+
+Interpret conservatively: high CPU usage and increasing quota throttling,
+especially with queued receive bytes, supports a CPU/consumption bottleneck.
+Low CPU with low receive progress and empty queues supports waiting for the
+connection/server rather than hash work. Uneven socket progress is consistent
+with an ordered window held by a slow range. An HTTP/2 connection could carry
+both ranges on one socket; socket count alone cannot prove missing concurrency.
+A single aggregate snapshot cannot distinguish connection-pool reuse from
+server pacing or prove ordered blockage. If these minimal counters do not
+resolve it, the next source generation can record sanitized per-range
+start/header/body-complete/ordered-hash timings under a separate closed bounded
+diagnostic. No second network probe, live instrumentation or reader change is
+authorized by this handoff.
