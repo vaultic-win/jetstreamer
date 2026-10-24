@@ -249,10 +249,13 @@ not claim a missing epoch, inherit node02's reserve, lower an existing guard
 floor, or credit an unmodeled owner. Native owners outside the qualified peer
 model are a refusal until separately modeled or terminally reconciled. Partial
 restore credit is the smaller of logical and allocated bytes, never sparse holes.
-Admission adds two1MiB metadata allowances: one may cover admission publication,
+Admission adds two16MiB metadata allowances: one may cover admission publication,
 and one remains above the protected floor during byte restoration for the raw
 segment and bounded final receipt. Metadata publication checks free space before
 and after the writes; archive bytes cannot consume that final allowance.
+Foundation receipts are bounded at8MiB, including their final newline; the exact
+serialized size is checked and logged before publication. Their receipt reader
+uses the same bound. Node02's original1MiB evidence and retry bounds remain.
 
 Restoration must be an exclusive campaign maintenance reservation: root must
 serialize new lane admissions until it completes or is deliberately stopped.
@@ -320,3 +323,15 @@ and metadata. This run did not rehash the125GB body and therefore issued neither
 positive custody-copy eligibility nor retirement authority; reclaimable bytes
 remain zero. The park command must independently verify the source before and
 after complete authenticated remote readback.
+
+The first probe restoration admission reached its complete capacity check but
+refused receipt publication because the512KiB initial limit was too small for
+the full257-unit before/after evidence. No admission receipt or restore was
+published. The bounded budget correction retains every raw census field, reserves
+32MiB total plus the remaining data before metadata publication, keeps16MiB
+above the independent live-growth/guard floor during restoration, and checks the
+remaining metadata gap before publication. Admission/restore require the already
+existing transition lock, so no new lock file is allocated ahead of admission.
+Real-scale257-owner before/after persistence, oversized-no-write and exact floor
+boundary tests accompany the change; the full isolated R2 suite passed631 tests
+with47 host-specific tests ignored.
