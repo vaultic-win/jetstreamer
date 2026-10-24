@@ -86,6 +86,8 @@ mod assembly144_scans_recover;
 mod cohort191;
 #[path = "routine_cohort191_delivery.rs"]
 mod cohort191_delivery;
+#[path = "routine_cohort191_import.rs"]
+mod cohort191_import;
 #[path = "routine_completed144.rs"]
 mod completed144;
 #[path = "routine_continuation144.rs"]
@@ -307,6 +309,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if cohort191_import::enabled(p) {
+        return "guard-stopped185-import-pending191-repair141-v1";
+    }
     if terminal185::enabled(p) {
         return if p.cohort191_delivery.is_some() {
             "guard-stopped185-and-terminal191-repair141-v1"
@@ -1966,6 +1971,7 @@ fn main() {
                         args[6].as_str(),
                         "--prepare-next-delivery198"
                             | "--prepare-next-delivery191"
+                            | "--prepare-next-import191"
                             | "--prepare-next-repair141"
                             | "--prepare-next-terminal185"
                             | "--capture-terminal185"

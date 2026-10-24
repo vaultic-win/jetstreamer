@@ -321,7 +321,10 @@ pub(super) fn prepare(
     } else {
         None
     };
-    let transition191 = mode == "--prepare-next-delivery191";
+    let transition191 = matches!(
+        mode,
+        "--prepare-next-delivery191" | "--prepare-next-import191"
+    );
     let delivery_spec = if transition191
         || prefix_spec.is_some()
         || native_spec.is_some()
@@ -385,6 +388,7 @@ pub(super) fn prepare(
             &mut next_config,
             &model,
             handoff_spec.context("191 transition needs its actual sealed handoff spec")?,
+            mode == "--prepare-next-import191",
         )?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
     }
