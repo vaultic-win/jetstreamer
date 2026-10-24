@@ -1,0 +1,194 @@
+# Active capped prefixes 204 and 205: source completion handoff
+
+Source preparation in an isolated worktree based on `38d5115c`. The horizon-r2
+checkpoint-continuation rules apply. No new resource poll, archive scan, Bank
+restore/replay, service operation, immutable-package change or R2 request was
+performed. The latest campaign observation remains root's cycle 353 at 08:42
+UTC. Preserve both healthy producers and their original scratch/output.
+
+## Frozen authorities and coverage
+
+| Epoch | Original invocation | Output start | Known-root prefix terminal | Canonical end | Missing tail |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 204 | `448da7f2a3a34217afe7e115120b3cea` | 88128000 | 88559361 | 88559999 | 638 slots |
+| 205 | `373359a11aef4993a1a949e19ff617c3` | 88560000 | 88991050 | 88991999 | 949 slots |
+
+These are not inferred from live file sizes. Exact sealed launch receipts:
+
+- `/var/lib/jetstreamer/horizon-prefix204-launch-fcbf3992-v1/launch.json`, SHA256
+  `a1b38f09bb1314c9280ca924602bab1523d28755146919912f604c1ee9bbfdfb`.
+- `/var/lib/jetstreamer/horizon-prefix205-launch-5c01bf93-v1/launch.json`, SHA256
+  `febbbb44b1d2b16afc3511e171dbb1f1aab732890893be1ce2f72239bc01ca9e`.
+
+They bind the exact units
+`horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service` and
+`horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service`, respectively.
+Their resource plans hash to `cc5109ed54c4b5cdc7db99a7e839708753b677cee11b7ca867c30e7a198911ba`
+and `7dd71710d60017224fd1f6fabd97f228642b687802da98a11f8927aea67b6485`.
+Both bind parent node `025757b9b337abf05435c427f143f590d9bfa542b5e4493aae783c158b4f2d3d`
+and capped worker `4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc`.
+Their runner digests are `1cd9bfe3418616add2319802adc4caf66b86e3f6fdf6c903c4be2648b10c0baa`
+and `fb41a1193c86749db27ef609f487a25de334a7e58b3440093288aecc75ae4801`.
+Runtime is Solana v1.6.16, revision `86c26f843276581509c3434acc2efbf4202c44e0`.
+The unchanged node generation is
+`jetstreamer-node/0.7.0/old-faithful-to-horizon-v2@3de96e71010a8a2f5e629f666227b137483bff7b`;
+the same sealed node's generation binding is retained in the qualified 203
+continuation scope, not replaced by this worktree's current build revision.
+
+The 204 sealed `epoch204-incomplete-span-blocker.json` in
+`horizon-focused-204-complete-span-store8-ca2e38b-v1`, SHA256
+`be015943dc8812566ad5417c25eba25f79ac0f3ea4834f9ce0d9cedba6adaeeb`,
+independently records the canonical 432000-slot epoch and the historical plugin
+rejection of its 638-slot deficit. A registry end of 88560000 never repaired
+that deficit or granted publication. The 205 immutable preparation below
+records canonical end 88991999 and 949 missing slots. Both also agree with the
+canonical arithmetic `(epoch + 1) * 432000 - 1`. Prefix counts remain 431362
+and 431051; do not rewrite either as a complete epoch.
+
+## Reusable inputs and incompatible older routes
+
+204's existing bootstrap is slot 88127580, accounts root
+`4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf`, compressed SHA256
+`d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6`.
+205's existing bootstrap at 88559361 is exactly the prospective 204 tail
+snapshot: accounts root `83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA`,
+8,225,957,010 compressed bytes, SHA256
+`24b722b37fa87462876dc05916bafa98da13f095c95aaed7159e9008efa7352e`,
+retained in `/var/lib/jetstreamer/horizon-focused-205-store8-3de96e7-v1`.
+Its generation-bound GCS identity is preserved by `snapshot-bindings-205.json`
+(SHA256 `06dc3b7beb14bbb943fa3c92e663548b94e897ee3b574734a2d629a07befa029`).
+
+The prospective 205 tail snapshot at 88991050 has accounts root
+`BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp`, 8,407,269,066 bytes and
+SHA256 `1b2a41f022847dc2ba9609e5a13aadc0e79b213b5245166b06954bf8c6d9042f`.
+The immutable package is `/var/lib/jetstreamer/horizon-terminal205-input-e94ae66-v1`.
+The preparer's source binds GCS generation 1634790073611030; compressed input
+custody alone is not native initialization proof.
+
+`/var/lib/jetstreamer/horizon-native205-restore-prepared-d0780f0-v1/preparation.json`,
+SHA256 `0d0e3f475bde6badd7475b29efe68f361d39251afa2d1e16714be41353dc7daf`,
+is explicitly **not executed** and grants no suffix/assembly authority. Its
+probe binds the older `3f5e8efe...` worker, the older
+`qualification-205-prefix-store8-v1` pathname and a different generation
+expectation. It cannot read or qualify the current capped producer by changing
+its JSON or forwarding a new prefix path. Keep that package unchanged.
+
+The preserved 204 complete-span epoch-hashes input has SHA256
+`e8cd76bc5193fc19f3cb9acb3cac349d8e4acf055edd03b132efe4df3f011b3d`;
+the active cropped prefix input has SHA256
+`50475cb66daf0a5126a23fa7f84b7ed5f95718d5b866c258860b71d5b624feec`.
+205's bound epoch-hashes file has SHA256
+`09cd3c3a244aed0bea058453eaf68dedd6b5587934427ecfacc553dab1a5e65b`.
+Future tail preparation must positively qualify actual tail metadata through
+88559999/88991999, not assume a filename or prefix input contains it. This
+review did not parse those potentially large inputs or scan either archive.
+
+## Smallest missing source path implemented
+
+The current independent qualification reader had an exact capped 203 path and
+exact native 20/25 profiles for 223, but neither current capped 204/205 output
+name was admitted. New `qualification_verify/prefix204205.rs` adds only those
+two exact private roots, `output/epoch-N-prefix.jet`, original capped worker,
+Solana revision/generation, bootstrap/output/terminal slots and the two known
+snapshot accounts roots. A namespace guard also rejects the generic
+`epoch-N-through-SLOT.jet` fallback when these roots are misspelled or their
+scope is changed. Complete canonical filenames and sidecar creation remain
+outside this reader.
+
+The existing full `read_and_validate_segment_manifest` path still hashes and
+deeply validates the entire original archive, typed manifest and account-update
+semantics; before/after identities, private ownership and absent canonical
+sidecar requirements are unchanged. Successful receipts explicitly deny native
+restart, complete-epoch coverage, assembly, runtime promotion and publication.
+The known accounts roots are independent; the reader does **not** claim an
+independently known canonical terminal Bank hash. Every raw Bank/checkpoint
+integer and write cursor remains in the original typed manifest and its
+semantic digest, for the actual native full-tuple comparison later.
+
+After natural producer success and actual manifest closure, the reader's
+argument template is its original archive positional argument followed by:
+
+```
+--private-root=/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-EPOCH-PROFILE-v1
+--expected-epoch=EPOCH
+--expected-output-start-slot=START
+--expected-bootstrap-slot=BOOTSTRAP
+--expected-terminal-slot=TERMINAL
+--expected-runtime-profile=solana-v1.6.16
+--expected-worker-sha256=4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc
+--receipt=EXACT_PRIVATE_NO_CLOBBER_RECEIPT.validation.json
+```
+
+Use the exact table/scope above, not literal template labels. Build/seal the
+actual reader only after the shared Cargo window and qualify its sandboxed
+read path. Do not schedule an archive read while either healthy writer is
+still active. Preserve original producer completion and successful PID1 raw
+history, exact original IID/PID/command, original segment and actual reader
+receipt as separate artifacts. A completed producer alone is not an independent
+reread, and a reader success is not native suffix admission.
+
+## Concrete remaining gates to the canonical sidecar
+
+1. **Completion and reread dispatch:** add/reuse a closed terminal-history and
+   source-idle adapter for these exact units and IIDs, including collected-unit
+   history, zero restarts and complete process/cgroup/reference checks. Keep
+   existing producers/guards unchanged. `bounded_resource_runner` already
+   writes original natural-success/manifest evidence; consume it rather than
+   rerunning a Bank merely to change its evidence format. No future terminal,
+   manifest digest or reader receipt is predicted here.
+2. **Native inputs/admission:** qualify exact new capped-worker profiles for
+   each real prefix manifest, independent reread and retained terminal snapshot.
+   Include genesis, full raw snapshot hash, original generation and prefix
+   bootstrap/terminal tuples. Existing 205 preparation is useful input custody,
+   not a compatible native comparator. Fresh capacity must protect every actual
+   owner, effective internal/external floor, output growth and admission/guard
+   metadata; the historical cycle 353 sample is not a future admission. Bind
+   isolated zero-restart persistent owners and qualified reserve/VMA guards
+   before any future native restore or suffix execution.
+3. **Actual suffix barrier and execution:** in the worker that executes slots
+   88559362..88559999 or 88991051..88991999, compare native slot, Bank hash,
+   accounts hash/kind, last blockhash, capitalization, transaction count, tick
+   height and complete-slot state with the real verified prefix terminal before
+   any entry. Require zero bootstrap writes and exact unchanged capped worker.
+   No previous restore-only probe substitutes for this actual barrier. Preserve
+   validator-local initialized write cursors as raw integers; do not force them
+   to equal the prefix cursor. Require exact block/entry/tick metadata and final
+   canonical boundary hashes; no zero-filled slots or synthetic metadata.
+4. **Private assembly/provenance:** prefer the already qualified 203 same-worker
+   V4 restart algorithms, generalized only through new closed 204/205 profiles
+   and fixtures. V4 requires exact same runtime identity **including worker
+   executable hash**. Reusing the older `3f5e8efe...` worker is not equivalent.
+   The 223 V3 route supplies useful shared metadata/checkpoint, normalization,
+   merge, source-idle and admission patterns; its fixed native 20/native 25
+   identities and cross-runtime authority do not admit either epoch here.
+   Bind original source hashes, complete PoH/slot coverage, raw independent
+   write intervals and checked normalization arithmetic. Preserve distinct
+   source generations rather than projecting restart provenance into V1/V2.
+5. **Independent final/current-plugin route:** independently derive expected V4
+   provenance from original manifests and actual restart evidence. Full-scan
+   the private canonical-name assembled bytes with initial adjacent anchors
+   88127999/88559999 and final terminals 88559999/88991999 respectively, each
+   bound to independently qualified actual hashes. Run the current plugin over
+   those exact same bytes, binding final digest, archive identity, provenance
+   expectation, tool versions and durable logs/receipts. Do not trust a digest
+   copied only from the assembled header or reuse a prefix-only plugin receipt.
+6. **Import/publication/delivery:** qualify exact per-epoch V4 import/publication
+   adapters (the fixed 203 publisher cannot publish these epochs). Only after
+   independent full and current-plugin gates may a canonical local pair become
+   eligible. Receipt-gated Rust R2 delivery uploads and whole-object-verifies
+   the .jet, revalidates its source, then commits the canonical .sha256 sidecar;
+   authenticated ready-pair proof precedes status cleanup. Adjacent-boundary
+   receipts separately gate local retirement, not the remote upload. Preserve
+   active post-replay status ownership and include this complete route in ETA;
+   a plan or temporary terminal event does not release capacity claims.
+
+## Qualification state
+
+Two dependency-free Rust profile regression tests pass with `-D warnings`,
+covering both counts/tails, exact roots/paths, worker/runtime/revision/generation,
+root identities and malformed/generic-name fallback rejection. The main reader
+also has an actual CLI-routing regression ready for its coordinated Cargo
+qualification. Rustfmt and `git diff --check` pass. No shared Cargo build has
+been taken while agent 223 owns its current Node/observer qualification window.
+The source reader integration and future operational path remain unsealed;
+there is no claim that these two prefixes are ready for publication.

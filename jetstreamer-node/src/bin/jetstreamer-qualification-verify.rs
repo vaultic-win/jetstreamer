@@ -2,6 +2,8 @@
 
 #[path = "qualification_verify/prefix203.rs"]
 mod prefix203;
+#[path = "qualification_verify/prefix204205.rs"]
+mod prefix204205;
 #[path = "qualification_verify/prefix223.rs"]
 mod prefix223;
 #[path = "qualification_verify/tail223.rs"]
@@ -366,7 +368,28 @@ fn retained_prefix_157(arguments: &Arguments) -> bool {
             == "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819"
 }
 
+fn capped_prefix_scope(arguments: &Arguments) -> prefix204205::Scope<'_> {
+    prefix204205::Scope {
+        private_root: &arguments.private_root,
+        archive: &arguments.archive,
+        epoch: arguments.expected_epoch,
+        start: arguments.expected_output_start_slot,
+        bootstrap: arguments.expected_bootstrap_slot,
+        terminal: arguments.expected_terminal_slot,
+        runtime: &arguments.expected_runtime_profile,
+        worker: &arguments.expected_worker_sha256,
+        conflict: arguments.expected_conflict.is_some(),
+    }
+}
+
 fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), String> {
+    if prefix204205::namespace(&arguments.private_root)
+        && !prefix204205::matches(capped_prefix_scope(arguments))
+    {
+        return Err(
+            "capped 204/205 prefix namespace requires its exact active producer scope".into(),
+        );
+    }
     if prefix223::namespace(arguments) && !prefix223::matches(arguments) {
         return Err(
             "epoch223 prefix namespace requires its exact checkpoint-bounded partial scope".into(),
@@ -383,6 +406,7 @@ fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), St
         && !(archive == arguments.archive
             && (root_prefix_203(arguments)
                 || complete_span_225(arguments)
+                || prefix204205::matches(capped_prefix_scope(arguments))
                 || tail223::matches(arguments)
                 || prefix223::matches(arguments)
                 || retained_prefix_157(arguments)))
@@ -495,6 +519,13 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
                 .to_string(),
         );
     }
+    prefix204205::validate_roots(
+        capped_prefix_scope(arguments),
+        &manifest.bootstrap.accounts_hash,
+        &manifest.terminal.accounts_hash,
+        &manifest.runtime.runtime_revision,
+        &manifest.runtime.generation_profile,
+    )?;
     validate_prefix_root_identity(
         arguments,
         &manifest.terminal.accounts_hash,
@@ -606,6 +637,17 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
         "worker_executable_sha256": worker_sha256,
         "conflict_write_gate": conflict_write_gate,
     });
+    if prefix204205::matches(capped_prefix_scope(arguments)) {
+        receipt["qualification_scope"] = json!({
+            "known_root_prefix_reread":true,"complete_epoch_span_covered":false,
+            "bootstrap_and_terminal_accounts_roots_independently_known":true,
+            "terminal_bank_hash_independently_known":false,
+            "canonical_prefix_qualified":false,"native_restart_qualified":false,
+            "assembly_qualified":false,"full_cold_epoch_peak_qualified":false,
+            "runtime_promotion_authorized":false,"canonical_sidecar_authorized":false,
+            "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
+        });
+    }
     tail223::annotate(arguments, &mut receipt);
     prefix223::annotate(arguments, &mut receipt);
     Ok(receipt)
@@ -757,6 +799,33 @@ mod tests {
             "--expected-runtime-profile=solana-v1.6.16".to_string(),
             format!("--expected-worker-sha256={}", "a".repeat(64)),
         ]
+    }
+
+    #[test]
+    fn capped_204205_reader_cli_preserves_exact_scope_and_no_generic_name_fallback() {
+        for (epoch, suffix, start, bootstrap, terminal) in [
+            (204, "fcbf3992", 88128000, 88127580, 88559361),
+            (205, "5c01bf93", 88560000, 88559361, 88991050),
+        ] {
+            let root = format!(
+                "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-{epoch}-{suffix}-v1"
+            );
+            let raw = vec![format!("{root}/output/epoch-{epoch}-prefix.jet"),
+                format!("--private-root={root}"), format!("--expected-epoch={epoch}"),
+                format!("--expected-output-start-slot={start}"),format!("--expected-bootstrap-slot={bootstrap}"),
+                format!("--expected-terminal-slot={terminal}"),"--expected-runtime-profile=solana-v1.6.16".into(),
+                "--expected-worker-sha256=4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc".into()];
+            let args = parse_arguments(raw.clone()).unwrap();
+            validate_archive_name(&args, &args.archive).unwrap();
+            let mut wrong = raw.clone();
+            wrong[0] = format!("{root}/output/epoch-{epoch}-through-{terminal}.jet");
+            let args = parse_arguments(wrong).unwrap();
+            assert!(validate_archive_name(&args, &args.archive).is_err());
+            let mut wrong = raw;
+            wrong[5] = format!("--expected-terminal-slot={}", (epoch + 1) * 432000 - 1);
+            let args = parse_arguments(wrong).unwrap();
+            assert!(validate_archive_name(&args, &args.archive).is_err());
+        }
     }
 
     #[test]
