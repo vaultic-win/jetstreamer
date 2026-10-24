@@ -120,6 +120,56 @@ pub(super) fn interval(p: &Plan, old_time: &str) -> Result<Option<u64>> {
     ))
 }
 
+pub(super) fn prepare(p: &Plan, pb: &Bound, proof_bound: &Bound, self_sha: &str) -> Result<()> {
+    let (proof, previous, completion, config) = load(proof_bound)?;
+    ensure!(
+        serde_json::to_value(p)? == serde_json::to_value(&previous)?,
+        "proof uses another predecessor"
+    );
+    let next = derive(p, pb, &completion, &config, &proof, proof_bound)?;
+    let model = bound_json(&next.model_template, true)?;
+    let fleet_plan = bound_json(&next.fleet_template, true)?;
+    let fleet = bound_json(&next.previous_fleet, false)?;
+    let estimates = bound_json(&next.previous_estimates, false)?;
+    let observed = bound_json(&next.previous_observer, false)?;
+    next_preparation::validate_folded_scope(p, &fleet_plan)?;
+    validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observed)?;
+    validate_observer_config(&next, &model, &bound_json(&next.observer_config, true)?)?;
+    latest_fleet_unchanged(&next, &fleet)?;
+    let mark = stamp(&next.sample_target_utc);
+    let root = Path::new("/var/lib/jetstreamer/horizon-next-preparations-101-200-v2");
+    private_dir(root)?;
+    let stage = root.join(format!("{mark}-missed-cadence-v1"));
+    absent(&stage)?;
+    fs::create_dir(&stage)?;
+    fs::set_permissions(&stage, fs::Permissions::from_mode(0o700))?;
+    File::open(root)?.sync_all()?;
+    let source = write_new(
+        &stage.join("cycle-plan.json"),
+        &serde_json::to_value(&next)?,
+    )?;
+    let destination = Path::new("/var/lib/jetstreamer").join(format!(
+        "horizon-routine-plan-101-200-{mark}-{}",
+        generation_101(p)
+    ));
+    let seal = write_new(
+        &stage.join("cycle-seal-plan.json"),
+        &next_preparation::seal_plan(
+            &stage,
+            "cycle-plan.json",
+            &destination,
+            "cycle-plan.json",
+            &source.sha256,
+        ),
+    )?;
+    let receipt = write_new(
+        &stage.join("preparation.json"),
+        &json!({"schema":"jetstreamer-horizon-missed-cadence-preparation-v1","previous_plan":pb,"proof":proof_bound,"self_sha256":self_sha,"cycle_source":source,"cycle_seal_plan":seal,"cycle_destination":destination,"new_resource_samples":0,"completion_fabricated":false,"status_publications_repeated":false,"service_state_changed":false,"r2_mutations":false,"deployment_authorized":false,"preflight_required":true}),
+    )?;
+    println!("{}", receipt.path.display());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,53 +272,4 @@ mod tests {
         proof.completion.path = "/foreign/completion.json".into();
         assert!(derive(&p, &pb, &c, &cfg, &proof, &binding).is_err());
     }
-}
-pub(super) fn prepare(p: &Plan, pb: &Bound, proof_bound: &Bound, self_sha: &str) -> Result<()> {
-    let (proof, previous, completion, config) = load(proof_bound)?;
-    ensure!(
-        serde_json::to_value(p)? == serde_json::to_value(&previous)?,
-        "proof uses another predecessor"
-    );
-    let next = derive(p, pb, &completion, &config, &proof, proof_bound)?;
-    let model = bound_json(&next.model_template, true)?;
-    let fleet_plan = bound_json(&next.fleet_template, true)?;
-    let fleet = bound_json(&next.previous_fleet, false)?;
-    let estimates = bound_json(&next.previous_estimates, false)?;
-    let observed = bound_json(&next.previous_observer, false)?;
-    next_preparation::validate_folded_scope(p, &fleet_plan)?;
-    validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observed)?;
-    validate_observer_config(&next, &model, &bound_json(&next.observer_config, true)?)?;
-    latest_fleet_unchanged(&next, &fleet)?;
-    let mark = stamp(&next.sample_target_utc);
-    let root = Path::new("/var/lib/jetstreamer/horizon-next-preparations-101-200-v2");
-    private_dir(root)?;
-    let stage = root.join(format!("{mark}-missed-cadence-v1"));
-    absent(&stage)?;
-    fs::create_dir(&stage)?;
-    fs::set_permissions(&stage, fs::Permissions::from_mode(0o700))?;
-    File::open(root)?.sync_all()?;
-    let source = write_new(
-        &stage.join("cycle-plan.json"),
-        &serde_json::to_value(&next)?,
-    )?;
-    let destination = Path::new("/var/lib/jetstreamer").join(format!(
-        "horizon-routine-plan-101-200-{mark}-{}",
-        generation_101(p)
-    ));
-    let seal = write_new(
-        &stage.join("cycle-seal-plan.json"),
-        &next_preparation::seal_plan(
-            &stage,
-            "cycle-plan.json",
-            &destination,
-            "cycle-plan.json",
-            &source.sha256,
-        ),
-    )?;
-    let receipt = write_new(
-        &stage.join("preparation.json"),
-        &json!({"schema":"jetstreamer-horizon-missed-cadence-preparation-v1","previous_plan":pb,"proof":proof_bound,"self_sha256":self_sha,"cycle_source":source,"cycle_seal_plan":seal,"cycle_destination":destination,"new_resource_samples":0,"completion_fabricated":false,"status_publications_repeated":false,"service_state_changed":false,"r2_mutations":false,"deployment_authorized":false,"preflight_required":true}),
-    )?;
-    println!("{}", receipt.path.display());
-    Ok(())
 }
