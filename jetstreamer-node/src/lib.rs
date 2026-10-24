@@ -2,6 +2,7 @@
 
 pub mod archive_checksum;
 pub mod archive_publish;
+pub mod capped_control204205;
 pub mod capped_prefix204205;
 pub mod epoch228_extract;
 pub mod handoff_snapshot;

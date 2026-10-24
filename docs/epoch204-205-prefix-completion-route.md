@@ -285,3 +285,146 @@ normalization overflow. The initial two CLI scope/argument tests passed. Final
 CLI fixture lifecycle tests, the full library suite, strict Clippy and a review
 binary build are pending the shared Cargo lease after agent 227. No live source
 read, host poll, Bank run, service action or R2 mutation occurred.
+
+## Persistent closed continuation source integration
+
+The later source integration adds the exclusive node feature
+`capped204205-checkpoint-continuation-diagnostic`, dispatched through the existing
+`--checkpoint-continuation-plan=PATH` and
+`--checkpoint-continuation-plan-sha256=SHA` options. Its only legal invocation
+selects exactly epoch 204 or exactly epoch 205, one explicit `--verify` and the
+plan's explicit private `ledger` destination. It cannot reach ordinary replay,
+recovery, a public destination or checksum creation. Combining another diagnostic
+or qualification feature fails at compile time. The frozen 203/213 continuations
+and older 205 restore-only preparation are unchanged.
+
+`capped_control204205::{Plan, Metadata, Bound}` defines the strict input contract.
+The plan includes actual future prefix/capture/reader digests, a newly built node
+digest, the independent guard digest and isolated producer/guard names. No
+future manifest, terminal success or positive admission is manufactured. All
+metadata is reauthenticated from the original launch, natural runner result,
+terminal properties, PID1 history, typed manifest and independent full-reader
+receipt. Root-private evidence must first be copied unchanged into a root-owned,
+immutable package that UID 1000 can traverse/read. A copied original launch is
+accepted only by its exact original raw hash; it retains its original identities.
+Keep the original package and evidence untouched.
+
+The separate `jetstreamer-capped204205-control` binary has three explicit modes:
+
+```
+control capture CAPTURE_PLAN --plan-sha256 SHA --self-sha256 SHA
+control validate-plan CONTINUATION_PLAN --plan-sha256 SHA --self-sha256 SHA
+control guard CONTINUATION_PLAN --plan-sha256 SHA --self-sha256 SHA --producer-iid ACTUAL_IID
+```
+
+All modes require root, a separately sealed immutable plan and their actual
+executable hash. The capture mode consumes real already captured terminal/reader
+evidence, then reuses the reviewed complete manager/job, descendant-cgroup and
+process-reference closure algorithm for only the exact original 204/205 owners.
+It scans the entire original root. Only after natural success and current
+idleness does it freeze the original archive and manifest as root-owned readonly
+files, without rewriting their content. It checks original identities again
+after a second complete idle census, and emits a no-clobber `source-capture.json`
+in `/var/lib/jetstreamer/horizon-capped-capture-EPOCH-UNIQUE/`. This source capture
+does not read an archive body, claim native initialization, publish or retire.
+The original archive descriptor remains open and its captured identity is checked
+through the later executing producer's full reread and assembly.
+
+`validate-plan` is the source admission precondition exposed to the separate R2
+resource emitter. It returns a bounded (64-KiB maximum)
+`jetstreamer-capped204205-admission-inputs-v1` object containing the complete
+typed proposal, rederived metadata policy, actual frozen source and retained
+snapshot identities, and a current whole-original-root lifecycle idle proof.
+It checks only retained snapshot metadata and small executable/genesis hashes;
+it reads no archive/snapshot body, takes no resource sample and writes nothing.
+The emitter may call it once before and once after its real admission transaction.
+It grants neither resource admission nor native/suffix/guard authority.
+
+The producer requires a root-immutable fresh admission at the plan's
+`admission_receipt` path, published **after the final plan is sealed**. The receipt
+binds that actual plan hash, source-capture hash, all exact package identities,
+full existing protected floor and the incremental restore/suffix/validation/
+assembly envelope. Using a path here avoids a circular plan/admission hash pair.
+The receipt binds a real immutable fleet observation whose bytes the producer
+also authenticates. Age is at most 15 minutes; full-path initial free space must
+still fit. A minimum 256-GiB experiment envelope is not an observed peak or
+automatic admission. The actual fleet review must protect every current owner,
+effective internal/external guard, remaining output growth and overlapping phase.
+The admission also binds an immutable `resource_proposal` and numeric
+`kernel_limits`: requested memory max/high, swap max zero, tasks, CPU quota in
+microseconds per second, and maximum runtime in microseconds. These must come
+from qualified whole-path sandbox/resource evidence, not from an initial RSS
+guess. The guard checks exact requested manager limits, kernel page-rounded
+memory caps, swap, pids limit and CPU quota/period ratio. Raw D-Bus integer
+properties bind actual `RuntimeMaxUSec` and `CPUQuotaPerSecUSec` without parsing
+humanized systemctl time strings.
+
+Before any archive-body reread or Bank restore, the fresh UID-1000 producer
+publishes `continuation-phase.json` and waits up to 90 seconds for a real first
+fire of its independent, non-restarting root guard. The guard authenticates its
+own persistent unit and the actual supplied producer invocation, then checks
+the exact node and worker mapped executable identities, complete producer cgroup,
+whole-lane process RSS, worker VMA ceiling, protected disk floor and the complete
+own-root physical ceiling. Executable hashes are measured once, with original
+identities rechecked on every sample. Unknown cgroup processes fail closed.
+The physical scan reuses the existing descriptor-relative guard algorithm.
+The complete process census is bracketed by sorted exact cgroup PID sets. After
+all per-process reads, every recorded PID/start/executable/mapped-inode identity
+is revalidated together; executable descriptors remain open through this check.
+A worker appearing late, an earlier PID reused during a later read, incomplete
+records or an executable replacement fails closed. Churn shares a bounded
+three-attempt retry with stable phase sampling. No observer binary from this
+older branch is a replacement for the separately deployed 42bac936-based observer.
+
+Workerless work is allowed only in the closed finite stages `waiting_for_guard`,
+`prefix_validation`, `suffix_validation`, `assembly` and `complete`.
+`native_restore` includes the exact worker's restore and suffix execution.
+Producer transitions are sequential; observed guard phases cannot rewind or
+renew the same stage's absolute deadline. Phase and process censuses are retried
+together across normal stage changes or disappearing worker PIDs. This does not
+add a blanket workerless exemption to the existing standalone guard.
+
+The guard publishes root-owned readonly atomic heartbeats plus an immutable first
+fire; a trip creates an immutable stop intent and stops only the still-bound
+producer. A producer watchdog rejects a guard invocation change, stop intent or
+heartbeat older than 60 seconds, and exits even if an archive read is stalled.
+Its required `KillMode=control-group` reaps the worker. These protective guard
+checks are separate from the unchanged 30-minute campaign observation cadence.
+Precreate the guard's unique directory root-owned and readable/traversable by
+UID 1000, with no group/other write permission; the run root stays UID-1000/0700.
+Both service definitions explicitly use `Restart=no`, `KillMode=control-group`,
+`Delegate=no`; the producer uses `User=ubuntu`, the guard `User=root`.
+
+The actual suffix path performs a fresh complete prefix reread, starts the exact
+retained snapshot with its full hash/size pinned, and invokes the new native
+barrier from the existing worker's actual pre-entry `RestartProof` hook. It
+records the actual independent initialized cursor in memory; it never restores
+authority by deserializing an older native JSON. It executes only the 638 or 949
+slots, writes and independently reads the actual suffix manifest, reconstructs
+V4 from that same actual barrier and writes a durable private suffix receipt
+**before** beginning assembly. A separately admitted guarded no-clobber sink
+feeds the reviewed V4 merger. Source descriptors and path identities, complete
+metadata/PoH/raw-write checks and absent canonical checksums remain mandatory.
+
+An assembly failure preserves the completed suffix, source prefix and all
+private receipts. It does not grant an unqualified assembly-only restart; a
+future resume adapter must authenticate that actual prior producer's terminal
+history and suffix/native receipt rather than reconstructing execution authority
+from arbitrary JSON. Final/current-plugin verification, independent adjacent
+boundary anchors, exact per-epoch V4 import and canonical publication adapters
+remain separate from this private native-suffix source integration.
+
+At this source checkpoint, edition-2024 formatting and diff whitespace checks
+pass. The new controller/guard/capture fixtures have not yet run: the shared Cargo
+lease is held by other campaign work. The earlier 122 library plus four native
+input CLI tests remain the last completed suite; their source is preserved, and
+the terminal PID Clippy correction parses the property string as `u64`. Do not
+deploy, call these fixtures passed, or claim strict Clippy/release-build success
+until the new exclusive build and relevant tests are actually qualified.
+
+The exact remaining source dependency is the fresh full-fleet admission emitter
+for `jetstreamer-capped204205-continuation-admission-v1`; its validator and frozen
+plan/receipt contract are now present in `capped_control204205.rs`. The next
+source action is to connect actual fleet/growth/guard evidence to that emitter,
+then exercise its output against this validator. This is owned by the separate
+admission agent; no positive receipt is emitted from a plan or old observation.

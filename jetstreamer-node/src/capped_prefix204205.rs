@@ -346,7 +346,10 @@ fn terminal_properties(p: Profile, launch: &Value, value: &Value) -> Result<()> 
                 && value["ExecMainCode"] == "1"
                 && value["ExecMainStatus"] == "0"
                 && value["Restart"] == "no"
-                && value["ExecMainPID"] == p.original_pid.to_string()
+                && value["ExecMainPID"]
+                    .as_str()
+                    .and_then(|pid| pid.parse::<u64>().ok())
+                    == Some(p.original_pid)
                 && launch["expected_exec_start"]
                     .as_str()
                     .and_then(command_identity)

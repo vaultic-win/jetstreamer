@@ -322,6 +322,39 @@ pub fn observe(source: Source) -> Result<Value> {
 pub fn observe_assembly(invocation: &str) -> Result<Value> {
     observe_owner(assembly_owner(invocation)?)
 }
+
+/// Closed capped 204/205 source lifecycle check. Scan the whole original root,
+/// not only the archive. Historical natural success is separately mandatory;
+/// this observation never launches, freezes, reads archive bodies or retires.
+pub fn observe_capped204205(epoch: u64) -> Result<Value> {
+    let source = capped_owner(epoch)?;
+    let mut value = observe_owner(source)?;
+    value["schema"] = json!("jetstreamer-capped204205-source-idle-v1");
+    value["epoch"] = json!(epoch);
+    value["source_root"] = json!(source.archive());
+    value.as_object_mut().unwrap().remove("source_archive");
+    Ok(value)
+}
+
+fn capped_owner(epoch: u64) -> Result<Owner<'static>> {
+    Ok(match epoch {
+        204 => Owner {
+            unit: "horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service",
+            invocation: "448da7f2a3a34217afe7e115120b3cea",
+            archive: Path::new(
+                "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-204-fcbf3992-v1",
+            ),
+        },
+        205 => Owner {
+            unit: "horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service",
+            invocation: "373359a11aef4993a1a949e19ff617c3",
+            archive: Path::new(
+                "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-205-5c01bf93-v1",
+            ),
+        },
+        _ => anyhow::bail!("only original capped 204/205 source owners are admitted"),
+    })
+}
 fn observe_owner(source: Owner<'_>) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -353,6 +386,40 @@ mod tests {
     fn terminal(source: Owner<'_>) -> Value {
         json!({"Id":source.unit(),"LoadState":"loaded","MainPID":"0","NRestarts":"0","Restart":"no",
         "Result":"success","ExecMainStatus":"0","ActiveState":"inactive","SubState":"dead","Job":"","InvocationID":source.historical_invocation(),"ControlGroup":""})
+    }
+    #[test]
+    fn capped_owners_are_closed_and_cover_the_entire_original_root() {
+        for epoch in [204, 205] {
+            let owner = capped_owner(epoch).unwrap();
+            assert!(owner.unit().starts_with(&format!(
+                "horizon-qualify-{epoch}-shrink-root-prefix-resource-"
+            )));
+            assert!(
+                owner
+                    .archive()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with(&format!("shrink-root-prefix-resource-{epoch}-"))
+            );
+            assert_eq!(owner.historical_invocation().len(), 32);
+            let units = format!("{} loaded inactive dead Exact original\n", owner.unit());
+            validate_snapshot(owner, units.as_bytes(), b"", Some(terminal(owner))).unwrap();
+            let pending = format!("7 {} start waiting\n", owner.unit());
+            assert!(
+                validate_snapshot(
+                    owner,
+                    units.as_bytes(),
+                    pending.as_bytes(),
+                    Some(terminal(owner))
+                )
+                .is_err()
+            );
+        }
+        for epoch in [0, 203, 206, u64::MAX] {
+            assert!(capped_owner(epoch).is_err());
+        }
     }
     #[test]
     fn assembly_owner_is_exact_and_requires_the_real_nonzero_lowercase_invocation() {

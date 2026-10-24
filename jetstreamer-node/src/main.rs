@@ -1,6 +1,7 @@
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
+mod checkpoint_continuation204205;
 mod epoch141_original_entry;
 mod epoch207_singleton;
 mod epoch223_qualification;
@@ -10,6 +11,30 @@ mod epoch225_qualification;
 mod failed_prefix220;
 mod singletons209_212;
 mod singletons209_212_profile;
+
+#[cfg(all(
+    feature = "capped204205-checkpoint-continuation-diagnostic",
+    any(
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification",
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-20-prefix-qualification",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("capped 204/205 continuation requires its own exclusive diagnostic build");
 
 #[cfg(all(
     feature = "epoch223-v1-6-20-prefix-qualification",
@@ -19726,6 +19751,7 @@ async fn main() {
     // A continuation build never reaches ordinary replay, recovery, or any
     // public destination/sidecar setup. A default build rejects its new flags.
     if cfg!(any(
+        feature = "capped204205-checkpoint-continuation-diagnostic",
         feature = "epoch213-checkpoint-continuation-diagnostic",
         feature = "epoch144-checkpoint-continuation-diagnostic",
         feature = "epoch203-checkpoint-continuation-diagnostic"
@@ -19757,7 +19783,15 @@ async fn main() {
                 feature = "epoch225-v1-6-25-diagnostic",
                 feature = "epoch225-v1-6-25-qualification"
             ));
-        let validation = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
+        let validation = if cfg!(feature = "capped204205-checkpoint-continuation-diagnostic") {
+            checkpoint_continuation204205::validate_cli(
+                (start_epoch, end_epoch),
+                explicit_verify,
+                verify_option_count,
+                explicit_destination,
+                forbidden,
+            )
+        } else if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::validate_cli(
                 (start_epoch, end_epoch),
                 explicit_verify,
@@ -19791,7 +19825,17 @@ async fn main() {
             eprintln!("private continuation requires both plan and SHA-256 options");
             exit(2);
         };
-        let result = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
+        let result = if cfg!(feature = "capped204205-checkpoint-continuation-diagnostic") {
+            checkpoint_continuation204205::run(
+                plan,
+                hash,
+                dest_dir,
+                shutdown,
+                cursor,
+                restart_tracker,
+            )
+            .await
+        } else if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::run(plan, hash, dest_dir, shutdown, cursor, restart_tracker)
                 .await
         } else if cfg!(feature = "epoch144-checkpoint-continuation-diagnostic") {

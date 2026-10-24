@@ -28,6 +28,8 @@ epoch213-checkpoint-continuation-diagnostic = []
 epoch144-checkpoint-continuation-diagnostic = []
 # Exact retained203 prefix/native checkpoint plus419slots; private V4 only.
 epoch203-checkpoint-continuation-diagnostic = []
+# Exact original capped204/205 prefix plus native suffix; private V4 only.
+capped204205-checkpoint-continuation-diagnostic = []
 # Private epoch223 cold/tail comparison, never the ordinary runtime route.
 epoch223-v1-6-25-qualification = []
 # Independently checkpointed v1.6.20 cold prefix, ending before the known tail
@@ -47,6 +49,10 @@ epoch224-v1-6-25-qualification = []
 epoch225-v1-6-25-diagnostic = []
 # Complete private epoch225 plus its first later-root verification suffix.
 epoch225-v1-6-25-qualification = []
+
+[[bin]]
+name = "jetstreamer-capped204205-control"
+path = "src/bin/jetstreamer-capped204205-control.rs"
 
 [[bin]]
 name = "jetstreamer-capped204205-native-input"
