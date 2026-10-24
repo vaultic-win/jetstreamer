@@ -87,8 +87,12 @@ does not authorize their retirement:
   not a full epoch or reusable runtime checkpoint.
 - 227: unit `horizon-native-input-227-v1625-small-v2.service`, scratch
   `/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2/scratch`.
-  Bind the independently accepted actual small-generation terminal proof before
-  preparing any retirement profile; its96GB cap is not a current byte census.
+  The independently accepted small-generation terminal proof is
+  `/var/lib/jetstreamer/horizon-native227-v1625-terminal-proof-small-v2/proof.json`,
+  SHA256 `da6e00906c266f5993e0332b2abb864558db4ab4c0786d765d1828e658675d7b`,
+  invocation `36b96647e20e41a4a82c92b77b1bb290`, original PID456026.
+  Revalidate that exact proof and unchanged owner before preparing any
+  retirement profile; its96GB cap is not a current byte census.
   Preserve the entire immutable `horizon-stage227-bootstrap-dcaafc6-v1` package,
   snapshot `77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07`,
   genesis, worker/test deployments, origins, journals and typed proof.
