@@ -186,9 +186,27 @@ reread, and a reader success is not native suffix admission.
 
 Two dependency-free Rust profile regression tests pass with `-D warnings`,
 covering both counts/tails, exact roots/paths, worker/runtime/revision/generation,
-root identities and malformed/generic-name fallback rejection. The main reader
-also has an actual CLI-routing regression ready for its coordinated Cargo
-qualification. Rustfmt and `git diff --check` pass. No shared Cargo build has
-been taken while agent 223 owns its current Node/observer qualification window.
+root identities and malformed/generic-name fallback rejection. The complete reader CLI integration suite now passes: 25 release tests,
+including the real 204/205 argument-routing regression, deep artifact validation,
+and all prior 203/223/225 profiles. Strict production Clippy passes with
+`-D warnings`. Rustfmt and `git diff --check` pass. Cargo was used only after
+agent 223 released its lease, with the shared target and two compiler jobs.
+No reader was deployed or run against a real archive.
+
+The next implementation is a new closed 204/205 continuation adapter using the
+203 V4 algorithms, not a relaxation of that frozen 203 profile. First add a
+metadata-only input-policy validator binding each original launch/IID, actual
+natural completion/PID1 proof, original full typed manifest and actual independent
+reader receipt to its retained terminal snapshot and exact capped worker. The
+future suffix driver must perform the actual snapshot initialize/freeze/full-tuple
+comparison before any replay entry, retain its own raw cursor, then execute only
+the 638/949 slots and build independently validated V4 provenance. A separate
+restore-only Bank run is not required merely to reformat evidence; existing
+valid actual native evidence should be consumed when applicable, while the
+actual suffix worker's own pre-entry comparison remains mandatory. Fresh native
+admission/guard and complete verification/import/publication paths remain
+independent gates. The already prepared 205 comparator remains incompatible
+with these current producer identities and is not silently repurposed.
+
 The source reader integration and future operational path remain unsealed;
 there is no claim that these two prefixes are ready for publication.
