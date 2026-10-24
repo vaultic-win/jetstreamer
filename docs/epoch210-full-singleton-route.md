@@ -81,3 +81,12 @@ work. This source work deliberately adds no210 delivery bypass, canonical
 sidecar, R2 upload, runtime promotion or local retirement. After a private
 candidate finishes, review the complete runtime/checkpoint result and build its
 separate exact delivery route; the native proof and live launch are insufficient.
+
+The guard is a separately compiled `epoch210-singleton-guard` profile; the
+existing209 guard rejects210 and cannot be borrowed. The candidate210 guard
+digest is `910cdfe2a1adb5f50c5223464a1c9a690dc48a44d6251374b1ab744faec28c9f`.
+Both210-feature and209-feature suites passed34 tests, and strict210 guard
+Clippy/release passed. Its non-production review copy is beneath
+`.codex/tmp-readiness/full210-candidate-artifacts-v1/`. Root must seal it at
+the profile's exact `horizon-210-singleton-main-guard-v1` path before launch;
+these source tests have not installed or executed that guard against a job.

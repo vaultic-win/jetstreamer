@@ -27,7 +27,7 @@ pub(super) const NATIVE_PROOF_SHA: &str =
 pub(super) const GUARD: &str =
     "/var/lib/jetstreamer/horizon-210-singleton-main-guard-v1/jetstreamer-horizon-standalone-guard";
 pub(super) const GUARD_SHA: &str =
-    "9eb141c40202fb34616b624e2977c8fb9b4e8b30cde151a24db952ebeff919df";
+    "910cdfe2a1adb5f50c5223464a1c9a690dc48a44d6251374b1ab744faec28c9f";
 pub(super) const SCRATCH: u64 = 300_000_000_000;
 pub(super) const PEAK: u64 = 471_798_691_840;
 pub(super) const METADATA_RESERVE: u64 = 32 << 20;

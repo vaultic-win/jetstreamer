@@ -22,7 +22,8 @@ pub(super) fn inputs() -> Result<()> {
             Some(20_144),
         ),
     ] {
-        native210_admission::sealed_file(&path, sha, length)?;
+        // Shared stable-file hasher; its implementation has no epoch209 scope.
+        native209_admission::sealed_file(&path, sha, length)?;
     }
     Ok(())
 }
