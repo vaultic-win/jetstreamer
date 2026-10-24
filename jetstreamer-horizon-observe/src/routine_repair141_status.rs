@@ -29,6 +29,19 @@ fn file(path: PathBuf) -> Result<Bound> {
         sha256: sha(&bytes),
     })
 }
+fn sample_digits(sample: &str) -> Result<String> {
+    utc_seconds(sample)?;
+    Ok(sample.chars().filter(char::is_ascii_digit).collect())
+}
+fn publication_path(sample: &str) -> Result<PathBuf> {
+    Ok(
+        Path::new("/home/sol/.jetstreamer-private/r2-status-receipts")
+            .join(format!("epoch-141.status-{}.json", sample_digits(sample)?)),
+    )
+}
+fn estimate_path(sample: &str) -> Result<PathBuf> {
+    Ok(Path::new(ROOT).join(format!("estimate-{}.json", sample_digits(sample)?)))
+}
 fn capture(s: &Profile) -> Result<Value> {
     let c = bound_json(&s.owner_capture, false)?;
     ensure!(
@@ -183,15 +196,12 @@ pub(super) fn publish(p: &Plan, prior: &Value, observer: &Bound) -> Result<Value
         let sample = latest["status"]["payload"]["sampled_at_utc"]
             .as_str()
             .context("141 previous status sample")?;
-        Some(file(
-            Path::new("/home/sol/.jetstreamer-private/r2-status-receipts")
-                .join(format!("epoch-141.status-{}.json", stamp(sample))),
-        )?)
+        Some(file(publication_path(sample)?)?)
     };
     let directory = p.cycle_directory.join("repair141-sealed");
     let plan = json!({"schema":"jetstreamer-epoch141-repair-status-plan-v2","epoch":141,"observer":observer,"fleet":provisional,
         "queue_plan":s.queue_plan,"owner_capture":s.owner_capture,"policy":{"path":directory.join("assessment.json"),"sha256":source.sha256},
-        "estimate_receipt":Path::new(ROOT).join(format!("estimate-{}.json",stamp(&p.sample_target_utc))),
+        "estimate_receipt":estimate_path(&p.sample_target_utc)?,
         "receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","previous_publication":previous,
         "exclusive_local_epoch_ownership":true,"authenticated_other_host_handoffs":[]});
     let plan_source = write_new(&p.cycle_directory.join("repair141-plan-source.json"), &plan)?;
@@ -226,12 +236,7 @@ pub(super) fn publish(p: &Plan, prior: &Value, observer: &Bound) -> Result<Value
         true,
         &p.cycle_directory.join("child-repair141-publish.json"),
     )?;
-    let receipt = file(
-        Path::new("/home/sol/.jetstreamer-private/r2-status-receipts").join(format!(
-            "epoch-141.status-{}.json",
-            stamp(&p.sample_target_utc)
-        )),
-    )?;
+    let receipt = file(publication_path(&p.sample_target_utc)?)?;
     validate_publication(p, &bound_json(&receipt, false)?, observer)?;
     Ok(
         json!({"enabled":true,"active_repair":true,"publication":receipt,"new_resource_samples":0,"publication_authorized":false}),
@@ -263,6 +268,20 @@ pub(super) fn completion(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn repair_receipts_use_the_publishers_canonical_numeric_sample_names() {
+        assert_eq!(
+            publication_path("2026-10-23T22:56:00Z").unwrap(),
+            Path::new("/home/sol/.jetstreamer-private/r2-status-receipts")
+                .join("epoch-141.status-20261023225600.json")
+        );
+        assert_eq!(
+            estimate_path("2026-10-24T00:26:00Z").unwrap(),
+            Path::new(ROOT).join("estimate-20261024002600.json")
+        );
+        assert!(publication_path("../2026-10-23T22:56:00Z").is_err());
+        assert!(estimate_path("2026-10-24T00:26:00Z/other").is_err());
+    }
     #[test]
     fn repair_fold_preserves_history_and_other_claims_and_rejects_owner_replacement() {
         let mut f = json!({"diagnostics":[{"epoch":141,"old":"preserve"}],"pipeline_claims":[{"epoch":198,"counter":u64::MAX}],"tracked_units":["other"],"gates":{"141":{"state":"failed-needs-repair","evidence":["old"]}}});
