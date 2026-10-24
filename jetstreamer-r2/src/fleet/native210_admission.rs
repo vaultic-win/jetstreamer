@@ -320,12 +320,13 @@ pub(super) fn run() -> Result<()> {
         "protected_existing_floor_bytes":protected,"required_initial_free_bytes":required,"century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,
         "computed_existing_floor_bytes":computed,"maximum_existing_bound_guard_floor_bytes":existing_guard_floor,"protected_growth_measurements_before":measurements,"protected_growth_measurements_after":after_measurements,
         "auxiliary_remaining_memory_growth_bytes":auxiliary_growth,"auxiliary_memory_before":auxiliary_measurements,"auxiliary_memory_after":after_auxiliary_measurements,
-        "terminal_observation_accounting":accounting_o["terminal_observation_accounting"],"protected_memory_limits":caps,"unit_census_before":before,"unit_census_after":after,"memory_target_percent":90,
+        "protected_memory_limits":caps,"unit_census_before":before,"unit_census_after":after,"memory_target_percent":90,
         "available_memory_bytes":memory,"available_disk_bytes":free,"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),
         "cold_plan":private157::binding(&s.cold_plan),"resource_plan":private157::binding(&s.resource_plan),"protected_guards":s.protected_guards,
         "fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"all_immutable_inputs_rehashed":true,"snapshot_restored":false,
         "producer_started":false,"resource_samples_taken":0,"recorded_unix_seconds":now,"maximum_launch_delay_seconds":900,
         "spec_sha256":binding.sha256,"self_sha256":self_sha});
+    r["terminal_observation_accounting"] = accounting_o["terminal_observation_accounting"].clone();
     for flag in [
         "entry_replay",
         "replay_launch_authorized",
