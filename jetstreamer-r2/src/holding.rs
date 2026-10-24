@@ -5,6 +5,8 @@ use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
 #[path = "holding_epoch136.rs"]
 mod epoch136;
+#[path = "holding_epoch185.rs"]
+mod epoch185;
 
 const HOST: &str = "dev-samjohnson";
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";
@@ -1101,7 +1103,7 @@ pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -1145,6 +1147,9 @@ pub(super) async fn run() -> Result<()> {
     );
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
+    if args[1] == "holding-inspect185" {
+        return epoch185::inspect(&m, &serde_json::from_value(v)?, &spec);
+    }
     if args[1] == "holding-inspect136" {
         return epoch136::inspect(&m, &serde_json::from_value(v)?, &spec);
     }
@@ -1163,6 +1168,8 @@ pub(super) async fn run() -> Result<()> {
         "holding-restore-genesis-probe" => {
             restore_genesis_probe(&client, &m, &serde_json::from_value(v)?).await
         }
+        "holding-check-retire185" => epoch185::retire_local(&client, &m, v, &spec, true).await,
+        "holding-retire185" => epoch185::retire_local(&client, &m, v, &spec, false).await,
         "holding-check-retire136" => epoch136::retire_local(&client, &m, v, &spec, true).await,
         "holding-retire136" => epoch136::retire_local(&client, &m, v, &spec, false).await,
         _ => bail!("unsupported holding action"),
