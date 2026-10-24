@@ -12,6 +12,8 @@ pub(super) struct Profile {
     pub event_directory: PathBuf,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub import_pending: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub native_handoff_event: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     terminal_collector: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -142,6 +144,13 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.starts_with("horizon-cohort191-delivery-events-")),
         "foreign191 publisher, event namespace or duplicate ordinary claim"
+    );
+    ensure!(
+        !s.native_handoff_event
+            || (!s.import_pending
+                && s.public_context.is_some()
+                && p.sample_target_utc == "2026-10-24T05:16:00Z"),
+        "191 native event selector is restricted to exact0516recovery"
     );
     tool_ok(&s.publisher)?;
     if let Some(context) = &s.public_context {
@@ -529,7 +538,7 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
                 &[(
                     "plan.json",
                     json!({
-                "schema":"jetstreamer-cohort191-public-observation-plan-v1","context":context,"observer":observer,"output":output}),
+                "schema":"jetstreamer-cohort191-public-observation-plan-v1","context":context,"observer":observer,"output":output,"native_handoff_event":s.native_handoff_event}),
                 )],
             )?;
             let plan = file(package.join("plan.json"), true)?;
@@ -549,10 +558,16 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
         }
         let b = file(event_path(p).context("191 current event path")?, false)?;
         let v = bound_json(&b, false)?;
-        terminal(&v, utc_seconds(&p.sample_target_utc)?)?;
+        let event_sample = v["sampled_at_utc"].as_str().context("191 native sample")?;
+        let event_time = utc_seconds(event_sample)?;
+        terminal(&v, event_time)?;
         ensure!(
-            v["sampled_at_utc"] == p.sample_target_utc
-                && v["observer"] == serde_json::to_value(observer)?
+            (if s.native_handoff_event {
+                event_time > utc_seconds(&p.sample_target_utc)?
+                    && v["native_event_clock"].is_object()
+            } else {
+                event_sample == p.sample_target_utc && v["native_event_clock"].is_null()
+            }) && v["observer"] == serde_json::to_value(observer)?
                 && v["capture_self_sha256"] == s.publisher.sha256
                 && v["capture_program"].as_str() == s.publisher.path.to_str(),
             "191 current custody is stale, backdated or produced by another reader"
@@ -691,7 +706,7 @@ pub(super) fn publish(p: &Plan, provisional: &Value, observer: &Bound) -> Result
                 .cycle_directory
                 .join(format!("cohort191-status-{epoch}/sealed"));
             let path = root.join("pipeline-plan.json");
-            let model = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":epoch,"phase":phase,
+            let mut model = json!({"schema":"jetstreamer-horizon-pipeline-status-plan-v1","epoch":epoch,"phase":phase,
                 "binding":{"unit":c["unit"],"invocation_id":c["invocation_id"],"expected_exec_start":c["expected_exec_start"],
                 "claim_phase":c["phase"],"origin_unit":UNIT,"origin_invocation_id":IID,"model_path":path,"model_sha256":"",
                 "fleet_path":fleet.path,"fleet_sha256":fleet.sha256},"observer":observer,"fleet":fleet,
@@ -701,6 +716,10 @@ pub(super) fn publish(p: &Plan, provisional: &Value, observer: &Bound) -> Result
                 "jet_path":v["archives"][epoch.to_string()]["path"],
                 "expected_jet_size_bytes":v["archives"][epoch.to_string()]["length"],"peer_units":[],
                 "receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
+            if s.native_handoff_event {
+                model["schema"] = json!("jetstreamer-cohort191-native-handoff-status-plan-v2");
+                model["phase_handoff_event"] = json!(event);
+            }
             // The canonical sealer, rather than a writable generated model,
             // owns every per-epoch publication plan.
             let package = delivery198::seal_values(
@@ -722,8 +741,10 @@ pub(super) fn publish(p: &Plan, provisional: &Value, observer: &Bound) -> Result
                 &p.cycle_directory
                     .join(format!("child-cohort191-status-{epoch}.json")),
             )?;
-            let digits: String = p
-                .sample_target_utc
+            let publication_sample = v["sampled_at_utc"]
+                .as_str()
+                .context("191 publication sample")?;
+            let digits: String = publication_sample
                 .chars()
                 .filter(char::is_ascii_digit)
                 .collect();
@@ -736,7 +757,7 @@ pub(super) fn publish(p: &Plan, provisional: &Value, observer: &Bound) -> Result
             ensure!(
                 r["authenticated_readback"] == true
                     && r["epoch"] == epoch
-                    && r["status"]["sampled_at_utc"] == p.sample_target_utc
+                    && r["status"]["sampled_at_utc"] == publication_sample
                     && r["status"]["estimated_remaining_millis"]
                         == v["estimated_remaining_millis"][epoch.to_string()],
                 "191 publication readback receipt differs"
@@ -940,6 +961,7 @@ mod tests {
             import_pending: false,
             terminal_collector: None,
             public_context: None,
+            native_handoff_event: false,
         };
         p.cohort191_delivery = Some(profile());
         assert!(interval(&p, "2026-10-24T01:16:00Z").unwrap().is_none());

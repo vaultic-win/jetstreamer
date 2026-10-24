@@ -890,6 +890,8 @@ pub(super) async fn run() -> Result<()> {
     let (object_etag, previous_object_etag) =
         if plan.epoch == 144 && plan.phase_handoff_event.is_some() {
             publish_initial144_handoff_status(&s3, &r2, &status).await?
+        } else if (191..=194).contains(&plan.epoch) && plan.phase_handoff_event.is_some() {
+            event191::publish(&s3, &r2, &status, &plan).await?
         } else {
             publish_epoch_status(&s3, &r2, &status).await?
         };

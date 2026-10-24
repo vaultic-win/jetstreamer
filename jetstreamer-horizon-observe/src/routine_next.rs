@@ -44,7 +44,8 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                 || public198::promoted(p, c)?
                 || repair183_fleet_recovery::completed_plan(p, c)?
                 || repair185_fleet_recovery::completed_plan(p, c)?
-                || cohort191_gate_recovery::completed(p, c)?),
+                || cohort191_gate_recovery::completed(p, c)?
+                || cohort191_native_recovery::completed(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [
@@ -186,6 +187,7 @@ pub(super) fn derive_next(
     next_config["output"] = json!(next_observer);
     let observer_sha = sha(&encoded(&next_config)?);
     let mut next: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    cohort191_native_recovery::successor(p, c, &mut next)?;
     next.sample_target_utc = next_time;
     next.delayed_schedule_utc = None;
     next.observer = serde_json::from_value(next_config["output"].clone())?;

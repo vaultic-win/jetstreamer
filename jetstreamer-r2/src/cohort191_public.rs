@@ -135,11 +135,13 @@ pub(super) fn run() -> Result<()> {
         bound(&immutable_state, true)?;
         let clock = json!({"schema":"jetstreamer-cohort191-native-handoff-clock-v2","observer":p.observer,
             "recorded_unix_seconds":event,"sampled_at_utc":native_clock::utc(event)?,
-            "queue_state":immutable_state,"queue_plan":ctx.queue_plan,"queue_invocation_id":state["invocation_id"],
+            "queue_state":immutable_state,"recovery_anchor":{"path":"/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1/history/state-000003.json","sha256":"3e3d7ee6f52fdfca86504c1125e1d7d790a4277636d89e0fe1b4c4886acc2a7a"},"queue_plan":ctx.queue_plan,"queue_invocation_id":state["invocation_id"],
             "terminal":ctx.terminal,"resource_samples_taken":0,"publication_authorized":false,"r2_mutations":false});
         let path = p.output.with_extension("native-clock.json");
         fleet::persist(&path, &clock)?;
         fs::set_permissions(&path, fs::Permissions::from_mode(0o400))?;
+        File::open(&path)?.sync_all()?;
+        File::open(path.parent().context("191 event clock directory")?)?.sync_all()?;
         let b = Bound {
             sha256: hex_lower(&Sha256::digest(fs::read(&path)?)),
             path,

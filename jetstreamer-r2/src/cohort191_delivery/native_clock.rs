@@ -16,6 +16,17 @@ pub(super) fn sample(p: &Capture, observer: &Value) -> Result<String> {
         .as_str()
         .context("191 native event UTC")?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let anchor_binding: Bound = serde_json::from_value(proof["recovery_anchor"].clone())?;
+    ensure!(
+        anchor_binding.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1/history/state-000003.json"
+            )
+            && anchor_binding.sha256
+                == "3e3d7ee6f52fdfca86504c1125e1d7d790a4277636d89e0fe1b4c4886acc2a7a",
+        "191 recovery lineage anchor changed"
+    );
+    let anchor = bound(&anchor_binding, true)?;
     let state = bound(&serde_json::from_value(proof["queue_state"].clone())?, true)?;
     ensure!(
         proof["schema"] == "jetstreamer-cohort191-native-handoff-clock-v2"
@@ -26,16 +37,10 @@ pub(super) fn sample(p: &Capture, observer: &Value) -> Result<String> {
                 .as_ref()
                 .is_some_and(|q| proof["queue_plan"] == json!(q.plan)
                     && proof["queue_state"] == json!(q.state))
-            && proof["queue_state"]["sha256"]
-                == "3e3d7ee6f52fdfca86504c1125e1d7d790a4277636d89e0fe1b4c4886acc2a7a"
             && p.observer.sha256
                 == "0db9966d4b29d38984e8a2d9d0938d61dfb005356195a29e63362ea7ca4e70f1"
-            && state["status"] == "managing"
-            && state["revision"] == 3
-            && state["invocation_id"] == "0defba8ed0844040a2601c68d79060b2"
+            && lineage(&anchor, &state)
             && proof["queue_invocation_id"] == state["invocation_id"]
-            && state["epochs"][0]["task_owner"]["invocation_id"]
-                == "2ea71518e5ea48a3986c8f2fb07b34e5"
             && state["updated_unix_millis"]
                 .as_u64()
                 .is_some_and(|n| n <= event.saturating_mul(1000))
@@ -152,4 +157,29 @@ pub(super) fn utc(time: u64) -> Result<String> {
         "191 UTC roundtrip"
     );
     Ok(value)
+}
+
+fn lineage(anchor: &Value, state: &Value) -> bool {
+    state["status"] == "managing"
+        && state["revision"].as_u64().is_some_and(|n| n >= 3)
+        && state["invocation_id"] == "0defba8ed0844040a2601c68d79060b2"
+        && anchor["revision"] == 3
+        && anchor["invocation_id"] == state["invocation_id"]
+        && anchor["plan"] == state["plan"]
+        && anchor["epochs"][0]["task_owner"]["invocation_id"] == "2ea71518e5ea48a3986c8f2fb07b34e5"
+}
+#[cfg(test)]
+mod lineage_tests {
+    use super::*;
+    #[test]
+    fn later_real_stage_keeps_recovery_anchor_without_claiming_old_actor_current() {
+        let anchor = json!({"revision":3,"invocation_id":"0defba8ed0844040a2601c68d79060b2","plan":"sealedqueue","epochs":[{"task_owner":{"invocation_id":"2ea71518e5ea48a3986c8f2fb07b34e5"}}]});
+        let later = json!({"status":"managing","revision":4,"invocation_id":anchor["invocation_id"],"plan":anchor["plan"],"epochs":[{"stage":"queued-plugin","task_owner":null}]});
+        assert!(lineage(&anchor, &later));
+        for key in ["status", "revision", "invocation_id", "plan"] {
+            let mut bad = later.clone();
+            bad[key] = json!("foreign");
+            assert!(!lineage(&anchor, &bad));
+        }
+    }
 }

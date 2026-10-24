@@ -34,6 +34,8 @@ mod terminal_handoff;
 mod census141_poh;
 #[path = "routine_cohort191_gate_recovery.rs"]
 mod cohort191_gate_recovery;
+#[path = "routine_cohort191_native_recovery.rs"]
+mod cohort191_native_recovery;
 #[path = "routine_delivery160.rs"]
 mod delivery160;
 #[path = "routine_delivery198.rs"]
@@ -1989,6 +1991,8 @@ fn main() {
                         "--prepare-next-delivery198"
                             | "--prepare-next-memory152-rebind"
                             | "--prepare-next-delivery191"
+                            | "--recover-native191-tail"
+                            | "--check-native191-tail"
                             | "--prepare-next-import191"
                             | "--prepare-next-repair141"
                             | "--prepare-next-terminal185"
@@ -2068,6 +2072,21 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--recover-native191-tail" || a == "--check-native191-tail")
+        {
+            return cohort191_native_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                args[6] == "--check-native191-tail",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             matches!(
                 a.as_str(),
