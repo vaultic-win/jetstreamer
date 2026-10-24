@@ -24727,7 +24727,7 @@ mod early_snapshot_tests {
         }
         for segment in plan_replay_for_invocation(replay, true, true).unwrap() {
             let compatibility::EraBackend::Available(descriptor) = segment.execution.backend else {
-                panic!("unsupported private227 segment")
+                panic!("unsupported private epoch 227 segment")
             };
             assert_eq!(descriptor.identity.name, "solana-v1.6.25");
             historical_worker_profile(descriptor).unwrap();

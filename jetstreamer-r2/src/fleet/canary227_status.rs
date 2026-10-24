@@ -44,7 +44,7 @@ fn jet_measurement(root: &Path, uid: u32) -> Result<Value> {
         let m = fs::symlink_metadata(&path)?;
         ensure!(
             path.canonicalize()? == path && m.is_dir() && m.uid() == uid && m.mode() & 0o077 == 0,
-            "canary227 output directory is not canonical/owner-private"
+            "canary 227 output directory is not canonical/owner-private"
         );
         dirs.push((path, m.dev(), m.ino()));
     }
@@ -53,7 +53,7 @@ fn jet_measurement(root: &Path, uid: u32) -> Result<Value> {
         Ok(m) => {
             ensure!(
                 m.is_file() && m.uid() == uid && m.nlink() == 1,
-                "canary227 unsafe partial archive"
+                "canary 227 unsafe partial archive"
             );
             (m.len(), Some((m.dev(), m.ino())))
         }
@@ -69,7 +69,7 @@ fn jet_measurement(root: &Path, uid: u32) -> Result<Value> {
                 && after.dev() == dev
                 && after.ino() == ino
                 && after.len() >= bytes,
-            "canary227 partial archive replaced or shrank"
+            "canary 227 partial archive replaced or shrank"
         );
     }
     for (path, dev, ino) in dirs {
@@ -81,7 +81,7 @@ fn jet_measurement(root: &Path, uid: u32) -> Result<Value> {
                 && m.mode() & 0o077 == 0
                 && m.dev() == dev
                 && m.ino() == ino,
-            "canary227 output directory changed"
+            "canary 227 output directory changed"
         );
     }
     Ok(
@@ -100,23 +100,23 @@ fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
     let launch = bound_json(binding)?;
     let rows = launch["evidence"]["units"]
         .as_array()
-        .context("canary227 launch owner census")?;
+        .context("canary 227 launch owner census")?;
     ensure!(
         launch["launched"] == true
             && rows.len() == 1
             && rows[0]["unit"] == c::UNIT
             && rows[0]["restarts"] == 0,
-        "canary227 exact launch owner absent"
+        "canary 227 exact launch owner absent"
     );
     let iid = rows[0]["invocation_id"]
         .as_str()
-        .context("canary227 launch IID")?;
+        .context("canary 227 launch IID")?;
     ensure!(
         iid.len() == 32
             && iid
                 .bytes()
                 .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()),
-        "canary227 launch IID invalid"
+        "canary 227 launch IID invalid"
     );
     let d = DiagnosticClaim {
         epoch: 227,
@@ -131,7 +131,7 @@ fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
     validate_diagnostic_launch(&launch, &d)?;
     ensure!(
         c::launch_matches(&d, &launch),
-        "canary227 exact launch differs"
+        "canary 227 exact launch differs"
     );
     let guard = bound_json(&serde_json::from_value(launch["guard_sample"].clone())?)?;
     let plan_binding: BoundFile = serde_json::from_value(launch["guard_plan"].clone())?;
@@ -157,16 +157,16 @@ fn claim(binding: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
             ]
             .iter()
             .all(|k| guard.get(*k).is_some_and(Value::is_null)),
-        "canary227 first actual guard differs"
+        "canary 227 first actual guard differs"
     );
     let completion = &launch["actual_guard_timer_proof"]["manager_completion"];
     ensure!(
         completion["_PID"] == "1"
-            && completion["UNIT"] == "horizon-canary227-v1625-protective-v1.service"
+            && completion["UNIT"] == "horizon-canary227-v1625-protective-selection-v2.service"
             && completion["INVOCATION_ID"] == guard["guard_invocation_id"]
             && completion["MESSAGE"]
-                == "horizon-canary227-v1625-protective-v1.service: Deactivated successfully.",
-        "canary227 first guard lacks exact PID1 completion"
+                == "horizon-canary227-v1625-protective-selection-v2.service: Deactivated successfully.",
+        "canary 227 first guard lacks exact PID1 completion"
     );
     let history = &launch["actual_guard_timer_proof"]["completed_guard"]["history"];
     warmup223::validate_completed_guard_history(history, &guard)?;
@@ -176,11 +176,11 @@ fn registered(d: &DiagnosticClaim, f: &Value) -> Result<()> {
     let p: Plan = serde_json::from_value(bound_json(&BoundFile {
         path: f["plan"]
             .as_str()
-            .context("canary227 accepted plan")?
+            .context("canary 227 accepted plan")?
             .into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("canary227 accepted plan SHA")?
+            .context("canary 227 accepted plan SHA")?
             .into(),
     })?)?;
     let owners = p
@@ -194,7 +194,7 @@ fn registered(d: &DiagnosticClaim, f: &Value) -> Result<()> {
             && owners[0].invocation_id == d.invocation_id
             && owners[0].scratch_path == d.scratch_path
             && owners[0].launch_receipt == d.launch_receipt,
-        "canary227 launch is not its accepted diagnostic owner"
+        "canary 227 launch is not its accepted diagnostic owner"
     );
     Ok(())
 }
@@ -219,18 +219,18 @@ fn live(d: &DiagnosticClaim, f: &Value, launch: &Value) -> Result<Value> {
         owner(&u, &d.invocation_id, launch)
             && owner(old, &d.invocation_id, launch)
             && u["MainPID"] == old["MainPID"],
-        "canary227 live identity changed"
+        "canary 227 live identity changed"
     );
     Ok(u)
 }
 fn observed<'a>(o: &'a Value, iid: &str) -> Result<&'a Value> {
     let rows = o["diagnostic_replays"]
         .as_array()
-        .context("canary227 diagnostic observation census")?
+        .context("canary 227 diagnostic observation census")?
         .iter()
         .filter(|r| r["producer_unit"] == c::UNIT)
         .collect::<Vec<_>>();
-    ensure!(rows.len() == 1, "canary227 observation missing/duplicate");
+    ensure!(rows.len() == 1, "canary 227 observation missing/duplicate");
     let r = rows[0];
     let v = &r["observation"];
     ensure!(
@@ -240,7 +240,7 @@ fn observed<'a>(o: &'a Value, iid: &str) -> Result<&'a Value> {
             && r["expected_producer_invocation_id"] == iid
             && v["invocation_binding_stable"] == true
             && v["useful_work"]["journal_invocation_id"] == iid,
-        "canary227 observation differs"
+        "canary 227 observation differs"
     );
     for k in [
         "controller_before",
@@ -253,7 +253,7 @@ fn observed<'a>(o: &'a Value, iid: &str) -> Result<&'a Value> {
                 && v[k]["restarts"] == 0
                 && v[k]["active_state"] == "active"
                 && v[k]["sub_state"] == "running",
-            "canary227 observation is not stable live work"
+            "canary 227 observation is not stable live work"
         );
     }
     Ok(&v["useful_work"])
@@ -269,7 +269,7 @@ fn elapsed(sample: u64, launch: &Value) -> Result<u64> {
         .output()?;
     ensure!(
         out.status.success(),
-        "canary227 invocation start unavailable"
+        "canary 227 invocation start unavailable"
     );
     let start_micros = std::str::from_utf8(&out.stdout)?.trim().parse::<u64>()?;
     ensure!(
@@ -277,28 +277,28 @@ fn elapsed(sample: u64, launch: &Value) -> Result<u64> {
             .as_str()
             .and_then(|n| n.parse::<u64>().ok())
             == Some(start_micros),
-        "canary227 manager start differs from captured launch"
+        "canary 227 manager start differs from captured launch"
     );
     let start = start_micros / 1000;
-    ensure!(start > 0, "canary227 invocation start absent");
+    ensure!(start > 0, "canary 227 invocation start absent");
     let mut clock = std::mem::MaybeUninit::<libc::timespec>::uninit();
     ensure!(
         unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, clock.as_mut_ptr()) } == 0,
-        "canary227 monotonic clock unavailable"
+        "canary 227 monotonic clock unavailable"
     );
     let clock = unsafe { clock.assume_init() };
     let now = u64::try_from(clock.tv_sec)?
         .checked_mul(1000)
         .and_then(|n| n.checked_add(u64::try_from(clock.tv_nsec).ok()? / 1_000_000))
-        .context("canary227 clock overflow")?;
+        .context("canary 227 clock overflow")?;
     let age = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_millis()
         .checked_sub(u128::from(sample) * 1000)
-        .context("canary227 future sample")?;
+        .context("canary 227 future sample")?;
     now.checked_sub(start)
         .and_then(|n| n.checked_sub(u64::try_from(age).ok()?))
-        .context("canary227 sample predates invocation")
+        .context("canary 227 sample predates invocation")
 }
 fn decimal(message: &str, key: &str) -> Option<u64> {
     let tail = message.split_once(key)?.1;
@@ -318,7 +318,7 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
         .output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 16 << 20,
-        "canary227 launch journal unavailable/oversized"
+        "canary 227 launch journal unavailable/oversized"
     );
     let rows = out
         .stdout
@@ -328,18 +328,18 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
         .collect::<std::result::Result<Vec<_>, _>>()?;
     ensure!(
         rows.len() < 8192,
-        "canary227 launch journal truncated; use the coordinated observation"
+        "canary 227 launch journal truncated; use the coordinated observation"
     );
     let mut last = None;
     let mut markers = Vec::new();
     for row in rows {
         ensure!(
             row["_SYSTEMD_INVOCATION_ID"] == iid && row["_SYSTEMD_UNIT"] == c::UNIT,
-            "canary227 foreign launch journal"
+            "canary 227 foreign launch journal"
         );
         let msg = row["MESSAGE"]
             .as_str()
-            .context("canary227 launch journal message")?;
+            .context("canary 227 launch journal message")?;
         if let Some(tail) = msg
             .split_once("progress slot ")
             .or_else(|| msg.split_once("warmup slot "))
@@ -347,17 +347,17 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
         {
             let slot = tail
                 .split_once('/')
-                .context("canary227 malformed progress")?
+                .context("canary 227 malformed progress")?
                 .0
                 .parse::<u64>()?;
-            let terminal = decimal(tail, "/").context("canary227 progress terminal")?;
+            let terminal = decimal(tail, "/").context("canary 227 progress terminal")?;
             ensure!(
                 (terminal == TERMINAL || terminal == 98_063_999)
                     && (FIRST..=TARGET).contains(&slot),
-                "canary227 foreign progress interval"
+                "canary 227 foreign progress interval"
             );
             last = Some(
-                json!({"slot":slot,"terminal_slot":terminal,"transactions":decimal(msg,"txs=").context("canary227 transaction counter")?,"account_updates":decimal(msg,"accounts=").context("canary227 account counter")?}),
+                json!({"slot":slot,"terminal_slot":terminal,"transactions":decimal(msg,"txs=").context("canary 227 transaction counter")?,"account_updates":decimal(msg,"accounts=").context("canary 227 account counter")?}),
             );
             markers.push(row);
         }
@@ -369,7 +369,7 @@ fn initial_progress(iid: &str, sample: u64) -> Result<Value> {
 fn validate_progress_counters(progress: &Value) -> Result<()> {
     let resets = progress["counter_resets"]
         .as_u64()
-        .context("canary227 reset count missing")?;
+        .context("canary 227 reset count missing")?;
     if resets == 0 {
         return Ok(());
     }
@@ -380,27 +380,27 @@ fn validate_progress_counters(progress: &Value) -> Result<()> {
     let last = &progress["last"];
     let a = first["slot"]
         .as_u64()
-        .context("canary227 first slot missing")?;
+        .context("canary 227 first slot missing")?;
     let b = last["slot"]
         .as_u64()
-        .context("canary227 last slot missing")?;
+        .context("canary 227 last slot missing")?;
     let start = first["realtime_microseconds"]
         .as_u64()
-        .context("canary227 first clock missing")?;
+        .context("canary 227 first clock missing")?;
     let end = last["realtime_microseconds"]
         .as_u64()
-        .context("canary227 last clock missing")?;
+        .context("canary 227 last clock missing")?;
     let duration = end
         .checked_sub(start)
         .filter(|n| *n > 0)
-        .context("canary227 invalid progress clock")?;
+        .context("canary 227 invalid progress clock")?;
     let delta = b
         .checked_sub(a)
-        .context("canary227 slot counter moved backwards")?;
+        .context("canary 227 slot counter moved backwards")?;
     let rate = delta as f64 / (duration as f64 / 1_000_000.0);
     let reported = progress["slots_per_second"]
         .as_f64()
-        .context("canary227 slot rate missing")?;
+        .context("canary 227 slot rate missing")?;
     ensure!(
         progress["sufficient_for_rates"] == true
             && progress["matching_markers"]
@@ -415,7 +415,7 @@ fn validate_progress_counters(progress: &Value) -> Result<()> {
             && rate > 0.0
             && reported.is_finite()
             && (reported - rate).abs() <= (rate * 1e-9).max(1e-12),
-        "canary227 accounting resets lack an independently monotonic slot window"
+        "canary 227 accounting resets lack an independently monotonic slot window"
     );
     Ok(())
 }
@@ -432,25 +432,25 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
             && p.downstream_allowance_millis
                 .values()
                 .all(|n| *n > 0 && *n <= 30 * 86_400_000),
-        "canary227 complete inclusive model required"
+        "canary 227 complete inclusive model required"
     );
     let downstream = p
         .downstream_allowance_millis
         .values()
         .try_fold(0u64, |a, b| {
-            a.checked_add(*b).context("canary227 downstream overflow")
+            a.checked_add(*b).context("canary 227 downstream overflow")
         })?;
     validate_progress_counters(progress)?;
     let slot = progress["last"]["slot"].as_u64();
     ensure!(
         slot.is_none() || valid_progress_terminal(&progress["last"]),
-        "canary227 progress terminal differs"
+        "canary 227 progress terminal differs"
     );
     let replay = slot.is_some();
     let observed_slot = slot.unwrap_or(FIRST - 1);
     ensure!(
         (FIRST - 1..=TARGET).contains(&observed_slot),
-        "canary227 progress outside exact epoch"
+        "canary 227 progress outside exact epoch"
     );
     let current = observed_slot.max(FIRST - 1);
     if current == TARGET {
@@ -459,8 +459,8 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
     let rate = if replay && progress["sufficient_for_rates"] == true {
         let r = progress["slots_per_second"]
             .as_f64()
-            .context("canary227 rate missing")?;
-        ensure!(r.is_finite() && r > 0.0, "canary227 invalid measured rate");
+            .context("canary 227 rate missing")?;
+        ensure!(r.is_finite() && r > 0.0, "canary 227 invalid measured rate");
         r
     } else {
         p.fallback_slots_per_second
@@ -468,7 +468,7 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
     let replay_millis = ((TARGET - current) as f64 * 1000.0 / rate).ceil();
     ensure!(
         replay_millis.is_finite() && replay_millis >= 0.0 && replay_millis < u64::MAX as f64,
-        "canary227 ETA overflow"
+        "canary 227 ETA overflow"
     );
     let initialization = if replay {
         0
@@ -478,12 +478,12 @@ fn estimate(progress: &Value, elapsed: u64, p: &Model) -> Result<(String, u64)> 
         elapsed
             .checked_div(2)
             .and_then(|n| n.checked_add(p.initialization_allowance_millis / 2))
-            .context("canary227 overdue initialization overflow")?
+            .context("canary 227 overdue initialization overflow")?
     };
     let remaining = (replay_millis as u64)
         .checked_add(downstream)
         .and_then(|n| n.checked_add(initialization))
-        .context("canary227 total ETA overflow")?;
+        .context("canary 227 total ETA overflow")?;
     Ok((
         if replay { "replay" } else { "verification" }.into(),
         remaining,
@@ -494,7 +494,7 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
         receipt.epoch == 227
             && receipt.pipeline_binding.is_none()
             && matches!(receipt.status.phase.as_str(), "verification" | "replay"),
-        "not a canary227 status receipt"
+        "not a canary 227 status receipt"
     );
     let evidence = bound_json(&BoundFile {
         path: receipt.observer_receipt.clone(),
@@ -502,7 +502,7 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
     })?;
     ensure!(
         evidence["schema"] == ESTIMATE_SCHEMA && evidence["status"] == json!(receipt.status),
-        "canary227 frozen observation differs"
+        "canary 227 frozen observation differs"
     );
     let (d, launch) = claim(&serde_json::from_value(evidence["launch"].clone())?)?;
     let p: Model = serde_json::from_value(bound_json(&serde_json::from_value(
@@ -515,11 +515,11 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
             && private157::binding(&p.launch) == evidence["launch"]
             && private157::binding(&p.observer) == evidence["observer"]
             && private157::binding(&p.fleet) == evidence["fleet"],
-        "canary227 frozen model bindings differ"
+        "canary 227 frozen model bindings differ"
     );
     ensure!(
         !p.estimate_basis.trim().is_empty() && !p.estimate_evidence.is_empty(),
-        "canary227 frozen basis missing"
+        "canary 227 frozen basis missing"
     );
     for e in &p.estimate_evidence {
         bound_json(e)?;
@@ -531,19 +531,19 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
         owner(&f["unit_census"][c::UNIT], &d.invocation_id, &launch)
             && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && f["observer_sha256"] == p.observer.sha256,
-        "canary227 frozen observation lacks original owner"
+        "canary 227 frozen observation lacks original owner"
     );
     let expected_clock = if p.mode == "launch-event" {
         let launch = bound_json(&p.launch)?;
         publication203::utc(
             launch["recorded_unix_seconds"]
                 .as_u64()
-                .context("canary227 frozen launch clock")?,
+                .context("canary 227 frozen launch clock")?,
         )?
     } else {
         observer["recorded_at_utc"]
             .as_str()
-            .context("canary227 frozen observer clock")?
+            .context("canary 227 frozen observer clock")?
             .into()
     };
     let (phase, remaining) = estimate(
@@ -555,12 +555,12 @@ fn frozen(receipt: &StatusPublicationReceipt) -> Result<(DiagnosticClaim, Value)
         receipt.status.sampled_at_utc == expected_clock
             && receipt.status.phase == phase
             && receipt.status.estimated_remaining_millis == remaining,
-        "canary227 frozen status does not reproduce its model"
+        "canary 227 frozen status does not reproduce its model"
     );
     ensure!(
         receipt.controller_invocation_id == d.invocation_id
             && receipt.producer_invocation_id == d.invocation_id,
-        "canary227 receipt owner differs"
+        "canary 227 receipt owner differs"
     );
     Ok((d, evidence))
 }
@@ -597,7 +597,7 @@ pub(super) fn inactive_owner(
     let bytes = read_stable_bounded(
         &receipt.observer_receipt,
         MAX_OBSERVER_RECEIPT_BYTES,
-        "canary227 status origin",
+        "canary 227 status origin",
     )?;
     let value: Value = serde_json::from_slice(&bytes)?;
     if value["schema"] != ESTIMATE_SCHEMA {
@@ -621,7 +621,7 @@ pub(super) async fn run() -> Result<()> {
             && own.nlink() == 1
             && own.mode() & 0o222 == 0
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == args[6],
-        "canary227 status helper unsealed"
+        "canary 227 status helper unsealed"
     );
     let binding = BoundFile {
         path: args[2].clone().into(),
@@ -633,7 +633,7 @@ pub(super) async fn run() -> Result<()> {
             && matches!(p.mode.as_str(), "launch-event" | "observation")
             && !p.estimate_basis.trim().is_empty()
             && !p.estimate_evidence.is_empty(),
-        "canary227 estimate scope/evidence absent"
+        "canary 227 estimate scope/evidence absent"
     );
     for e in &p.estimate_evidence {
         bound_json(e)?;
@@ -644,7 +644,7 @@ pub(super) async fn run() -> Result<()> {
     registered(&d, &f)?;
     let observer_time = o["recorded_at_utc"]
         .as_str()
-        .context("canary227 observer UTC")?;
+        .context("canary 227 observer UTC")?;
     let observed_seconds = utc_seconds(observer_time)?;
     ensure!(
         o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -655,12 +655,12 @@ pub(super) async fn run() -> Result<()> {
             && f["observer_receipt"].as_str() == p.observer.path.to_str()
             && f["observer_sha256"] == p.observer.sha256
             && f["sampled_at_utc"] == observer_time,
-        "canary227 unaccepted observer/fleet"
+        "canary 227 unaccepted observer/fleet"
     );
     let seconds = if p.mode == "launch-event" {
         launch["recorded_unix_seconds"]
             .as_u64()
-            .context("canary227 launch event clock")?
+            .context("canary 227 launch event clock")?
     } else {
         observed_seconds
     };
@@ -671,14 +671,14 @@ pub(super) async fn run() -> Result<()> {
             && now - seconds <= 1800
             && (p.mode != "launch-event"
                 || (now - seconds <= 300 && seconds - observed_seconds <= 1800)),
-        "canary227 stale/future observation event"
+        "canary 227 stale/future observation event"
     );
     let first = live(&d, &f, &launch)?;
     let evidence = if p.estimate_receipt.try_exists()? {
         let old: Value = serde_json::from_slice(&read_stable_bounded(
             &p.estimate_receipt,
             MAX_OBSERVER_RECEIPT_BYTES,
-            "canary227 frozen estimate",
+            "canary 227 frozen estimate",
         )?)?;
         ensure!(
             old["schema"] == ESTIMATE_SCHEMA
@@ -686,7 +686,7 @@ pub(super) async fn run() -> Result<()> {
                 && old["launch"] == private157::binding(&p.launch)
                 && old["observer"] == private157::binding(&p.observer)
                 && old["fleet"] == private157::binding(&p.fleet),
-            "canary227 retry estimate differs"
+            "canary 227 retry estimate differs"
         );
         old
     } else {
@@ -702,7 +702,7 @@ pub(super) async fn run() -> Result<()> {
             epoch: 227,
             jet_size_bytes: measurement["jet_size_bytes"]
                 .as_u64()
-                .context("canary227 archive size")?,
+                .context("canary 227 archive size")?,
             elapsed_execution_millis: elapsed,
             estimated_remaining_millis: remaining,
             sampled_at_utc: publication203::utc(seconds)?,
@@ -725,7 +725,7 @@ pub(super) async fn run() -> Result<()> {
             && status.phase == expected_phase
             && status.estimated_remaining_millis == expected_remaining
             && matches!(status.phase.as_str(), "verification" | "replay"),
-        "canary227 frozen payload differs"
+        "canary 227 frozen payload differs"
     );
     if args.len() == 8 {
         println!("{evidence}");
@@ -733,7 +733,7 @@ pub(super) async fn run() -> Result<()> {
     }
     ensure!(
         first == live(&d, &f, &launch)?,
-        "canary227 owner changed before status publish"
+        "canary 227 owner changed before status publish"
     );
     preflight_status_receipt_write(&p.receipt_directory)?;
     let source: BoundFile = serde_json::from_value(private157::file_binding(&p.estimate_receipt)?)?;
@@ -761,7 +761,7 @@ pub(super) async fn run() -> Result<()> {
         let old: StatusPublicationReceipt = serde_json::from_slice(&read_stable_bounded(
             &path,
             MAX_STATUS_BYTES,
-            "canary227 status publication",
+            "canary 227 status publication",
         )?)?;
         ensure!(
             old.status == receipt.status
@@ -770,14 +770,14 @@ pub(super) async fn run() -> Result<()> {
                 && old.producer_invocation_id == receipt.producer_invocation_id
                 && old.controller_invocation_id == receipt.controller_invocation_id
                 && old.authenticated_readback,
-            "canary227 prior status receipt differs"
+            "canary 227 prior status receipt differs"
         );
     } else {
         write_status_receipt(&p.receipt_directory, &receipt)?;
     }
     ensure!(
         first == live(&d, &f, &launch)?,
-        "canary227 owner changed during status publish"
+        "canary 227 owner changed during status publish"
     );
     println!("{}", path.display());
     Ok(())

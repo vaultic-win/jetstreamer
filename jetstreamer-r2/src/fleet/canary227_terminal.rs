@@ -169,7 +169,7 @@ pub(super) fn capture() -> Result<()> {
         s.schema == "jetstreamer-private-epoch227-v1625-canary-terminal-spec-v1"
             && s.output
                 == Path::new(
-                    "/var/lib/jetstreamer/horizon-227-v1625-canary-terminal-v1/proof.json"
+                    "/var/lib/jetstreamer/horizon-227-v1625-canary-terminal-selection-v2/proof.json"
                 ),
         "227 terminal destination or result differs"
     );

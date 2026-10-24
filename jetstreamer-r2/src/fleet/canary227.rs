@@ -1,21 +1,21 @@
-//! Observational-only registration of the exact first227 upstream canary.
+//! Observational-only registration of the exact first epoch 227 upstream canary.
 //! Target completion is transport evidence, never a canonical checkpoint/archive.
 use super::*;
 
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch227-v1625-comparison-launch-v1";
-pub(super) const UNIT: &str = "horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.service";
+pub(super) const UNIT: &str = "horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service";
 pub(super) const ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-v1";
+    "/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-selection-v2";
 pub(super) const NODE: &str =
-    "/var/lib/jetstreamer/horizon-227-v1625-bounded-parent-4f40a7d3-v1/jetstreamer-node";
+    "/var/lib/jetstreamer/horizon-227-v1625-selection-parent-v2/jetstreamer-node";
 pub(super) const NODE_SHA: &str =
-    "4f40a7d3c2b83797c96cf1191ca707a16800d8fd44a214bad4c3f30d97af04a2";
+    "79963ff4872ad7470acced6b04b944a8744ec2de2acccd6d6e843584fcddcb92";
 pub(super) const WORKER: &str = "/var/lib/jetstreamer/horizon-227-v1625-diagnostic-d01adb19-v1/jetstreamer-historical-worker-v1-6-25";
 pub(super) const WORKER_SHA: &str =
     "d01adb1980ee52a59a7aff7a3a0496746ca325e5fc655817d9a7743a1913ef62";
-pub(super) const RUNNER: &str = "/var/lib/jetstreamer/horizon-227-v1625-canary-runner-afa58153-v1/jetstreamer-epoch227-v1625-bounded-resource";
+pub(super) const RUNNER: &str = "/var/lib/jetstreamer/horizon-227-v1625-selection-runner-v2/jetstreamer-epoch227-v1625-bounded-resource";
 pub(super) const RUNNER_SHA: &str =
-    "afa581530785c357f6a113abc01f3ce12b7c7637e000efd554e660ce8bf3225e";
+    "81a804e354fdb986d46ad847f9c687131513baee7858687be85eeb65a72b8500";
 pub(super) const GUARD: &str = "/var/lib/jetstreamer/horizon-227-v1625-canary-guard-90e6fe78-v1/jetstreamer-horizon-standalone-guard";
 pub(super) const GUARD_SHA: &str =
     "90e6fe78049664cd4da8f62a9a02c75056d63ac73ae2edc11c200039b5079d89";
@@ -404,7 +404,7 @@ mod tests {
             ("resource_plan","/var/lib/jetstreamer/horizon-227-v1625-canary-resource-x/../resource-plan.json"),
             ("resource_plan","/var/lib/jetstreamer/horizon-227-v1625-canary-resource-x extra/resource-plan.json"),
             ("fresh_resource_admission","/tmp/horizon-227-v1625-canary-admission-test/admission.json"),
-            ("input_capability","/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-v1/receipts/capability.json"),
+            ("input_capability","/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-selection-v2/receipts/capability.json"),
             ("input_capability","/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test/./receipts/capability.json"),
         ] {let mut bad=r.clone();bad[key]["path"]=json!(path);assert!(!launch_matches(&c,&bad),"{path}");}
         assert!(same_command(

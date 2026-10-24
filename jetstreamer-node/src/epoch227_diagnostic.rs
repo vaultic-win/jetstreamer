@@ -1,4 +1,4 @@
-//! Private227 SDK comparison. The real terminal checkpoint is never fabricated.
+//! Private epoch 227 SDK comparison. The real terminal checkpoint is never fabricated.
 use std::path::Path;
 pub(crate) const BOOTSTRAP: u64 = 98_063_464;
 pub(crate) const TERMINAL_ROOT: u64 = 98_495_291;
@@ -20,7 +20,7 @@ pub(crate) fn validate_launch(
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch227-v1-6-25-diagnostic requires exact private focused227, snapshot98063464 and canonical underlying root98495291; ordinary replay, root cohorts, recovery and inherited leases are unavailable".into());
+        return Err("epoch227-v1-6-25-diagnostic requires exact private focused epoch 227, snapshot 98063464 and canonical underlying root 98495291; ordinary replay, root cohorts, recovery and inherited leases are unavailable".into());
     }
     let (ledger, output, scratch) =
         paths.ok_or("227 comparison needs private ledger/output/scratch")?;

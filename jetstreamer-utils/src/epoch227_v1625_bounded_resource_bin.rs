@@ -1,12 +1,12 @@
-//! Private epoch227 v1.6.25 comparison through the original failing complete slot.
+//! Private epoch 227 v1.6.25 comparison through the original failing complete slot.
 //! The transport target is never a canonical checkpoint or publication boundary.
 #![recursion_limit = "256"]
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-227-canary.jet";
-    pub const PARENT_SHA: &str = "4f40a7d3c2b83797c96cf1191ca707a16800d8fd44a214bad4c3f30d97af04a2";
+    pub const PARENT_SHA: &str = "79963ff4872ad7470acced6b04b944a8744ec2de2acccd6d6e843584fcddcb92";
     pub const PARENT_PATH: &str =
-        "/var/lib/jetstreamer/horizon-227-v1625-bounded-parent-4f40a7d3-v1/jetstreamer-node";
+        "/var/lib/jetstreamer/horizon-227-v1625-selection-parent-v2/jetstreamer-node";
     pub const WORKER: &str = "d01adb1980ee52a59a7aff7a3a0496746ca325e5fc655817d9a7743a1913ef62";
     pub const WORKER_PATH: &str = "/var/lib/jetstreamer/horizon-227-v1625-diagnostic-d01adb19-v1/jetstreamer-historical-worker-v1-6-25";
     pub const WORKER_ENV: &str = "JETSTREAMER_HISTORICAL_WORKER_V1_6_25";
@@ -214,7 +214,7 @@ mod bounded_resource_runner {
         let period = fields[1].parse::<u64>()?;
         ensure!(
             (1000..=1_000_000).contains(&period) && period.checked_mul(8) == Some(quota),
-            "227 CPU quota differs from8cores"
+            "227 CPU quota differs from 8 cores"
         );
         Ok(())
     }

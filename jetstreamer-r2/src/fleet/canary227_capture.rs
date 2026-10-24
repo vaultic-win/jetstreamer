@@ -2,10 +2,10 @@
 use super::canary227 as c;
 use super::singleton227_capture::{journal, properties, require};
 use super::*;
-const OUTPUT: &str = "/var/lib/jetstreamer/horizon-227-v1625-canary-capture-v1/launch.json";
+const OUTPUT: &str = "/var/lib/jetstreamer/horizon-227-v1625-canary-capture-selection-v2/launch.json";
 const UNIT_FILE: &str =
-    "/etc/systemd/system/horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.service";
-const PROTECTIVE: &str = "horizon-canary227-v1625-protective-v1.service";
+    "/etc/systemd/system/horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service";
+const PROTECTIVE: &str = "horizon-canary227-v1625-protective-selection-v2.service";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
@@ -241,7 +241,7 @@ fn bindings(s: &Spec) -> Result<()> {
     );
     native209_admission::sealed_file(&s.unit_file.path, &s.unit_file.sha256, None)?;
     let m = fs::symlink_metadata(&s.unit_file.path)?;
-    ensure!(m.mode() & 0o7777 == 0o444, "227 unit must be root0444");
+    ensure!(m.mode() & 0o7777 == 0o444, "227 unit must be owned by root with mode 0444");
     for b in [
         &s.resource_plan,
         &s.resource_proposal,

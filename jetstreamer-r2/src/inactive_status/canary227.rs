@@ -1,6 +1,6 @@
-//! Status-only cleanup for a positively terminal227 canary; no archive claim.
+//! Status-only cleanup for a positively terminal epoch 227 canary; no archive claim.
 use super::*;
-const UNIT: &str = "horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.service";
+const UNIT: &str = "horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service";
 pub(super) fn recognized(f: &Value, owners: &[(String, String)]) -> bool {
     owners.len() == 1 && owners[0].0 == UNIT && f["metadata_event"].is_object()
 }
