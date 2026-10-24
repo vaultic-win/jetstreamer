@@ -90,3 +90,21 @@ Clippy/release passed. Its non-production review copy is beneath
 `.codex/tmp-readiness/full210-candidate-artifacts-v1/`. Root must seal it at
 the profile's exact `horizon-210-singleton-main-guard-v1` path before launch;
 these source tests have not installed or executed that guard against a job.
+
+`capture-full210-terminal` binds the original full210 launch/mainPID/invocation,
+a sealed bounded raw producer+PID1 journal, current exact execution start/exit
+monotonic values and boot ID. It accepts a cleared manager InvocationID only
+for the exact loaded successful inactive unit with positive PID1 provenance;
+failures retain their original IID. The proof schema is
+`jetstreamer-private-full210-terminal-proof-v1` and capture spec is
+`jetstreamer-full210-terminal-capture-spec-v1` with
+`launch,journal,observer,fleet,output` bindings. Raw journal and output names
+are respectively `horizon-full210-terminal-raw-*/journal.json` and
+`horizon-full210-terminal-proof-*/proof.json` beneath `/var/lib/jetstreamer`.
+Its metadata event preserves the accepted raw observer, all original diagnostic
+claims and unrelated gates, while retaining unresolved qualification and adding
+only the exact terminal proof. It grants zero capacity credit and no content,
+checkpoint or full-replay success. The typed inactive cleanup adapter requires
+that accepted event plus the unchanged current execution, then delegates the
+normal exact-owner conditional status deletion. No generic empty-IID or census
+checks are relaxed.

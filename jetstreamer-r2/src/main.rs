@@ -3483,6 +3483,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-singleton210") {
         return fleet::capture_singleton210();
     }
+    if env::args().nth(1).as_deref() == Some("capture-full210-terminal") {
+        return fleet::capture_full210_terminal();
+    }
     if env::args().nth(1).as_deref() == Some("prepare-singleton209-inputs") {
         return fleet::prepare_singleton209_inputs();
     }

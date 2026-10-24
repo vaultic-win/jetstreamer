@@ -24,6 +24,7 @@ mod foundation_holding_capacity;
 mod full209_status;
 mod full210_peer;
 mod full210_status;
+mod full210_terminal;
 mod full227_failure;
 mod full227_status;
 mod maintenance_capacity;
@@ -180,6 +181,18 @@ pub(super) fn admit_singleton210() -> Result<()> {
 }
 pub(super) fn capture_singleton210() -> Result<()> {
     singleton210_capture::run()
+}
+pub(super) fn capture_full210_terminal() -> Result<()> {
+    full210_terminal::capture()
+}
+pub(super) fn full210_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    Ok((
+        singleton210::UNIT.into(),
+        full210_terminal::validate(proof)?.0,
+    ))
+}
+pub(super) fn full210_terminal_current(proof: &Value, u: &Value) -> Result<()> {
+    full210_terminal::current(proof, u)
 }
 pub(super) fn full209_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
@@ -2524,6 +2537,8 @@ pub(super) async fn run() -> Result<()> {
                 )?;
             } else if event["schema"] == full227_failure::SCHEMA {
                 full227_failure::predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == full210_terminal::SCHEMA {
+                full210_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native207_terminal::SCHEMA {
                 native207_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native209_terminal::SCHEMA {
@@ -2766,6 +2781,7 @@ pub(super) async fn run() -> Result<()> {
     cold223_scan::native20_terminal_census(&plan, &before)?;
     singleton227_terminal::terminal_census(&plan, &before)?;
     full227_failure::census_check(&plan, &before)?;
+    full210_terminal::census_check(&plan, &before)?;
     native207_terminal::census_check(&plan, &before)?;
     native209_terminal::census_check(&plan, &before)?;
     native210_terminal::census_check(&plan, &before)?;
