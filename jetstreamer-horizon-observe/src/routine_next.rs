@@ -329,6 +329,7 @@ pub(super) fn prepare(
         || acquisition_spec.is_some()
         || mode == "--prepare-next-publication144"
         || mode == "--prepare-next-original141"
+        || mode == "--prepare-next-repair141"
     {
         None
     } else {
