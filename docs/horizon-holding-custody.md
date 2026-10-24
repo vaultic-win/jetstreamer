@@ -114,3 +114,67 @@ requires separate staged-reference and retirement review. Feed only this
 separately sealed eligibility proof to the ordinary no-clobber holding park
 operation; neither inspection nor backup repairs epoch136 or qualifies it for
 canonical publication or job resume.
+
+`holding-disable136-retry` retires only the configuration of the already-stopped
+original136–147 controller. Its plan schema is
+`jetstreamer-horizon-holding-disable136-retry-plan-v2`, with `mapping`, `terminal`,
+`qualification` and `archived_unit` bindings. It requires the exact original
+failure lineage, no live/restarted owner or relaunch/handoff trigger, and the
+separately sealed controller configuration with compiled SHA-256. It fsyncs an
+intent under
+`/var/lib/jetstreamer/horizon-terminal136-controller-retirement-20261023-v1`,
+copies and hashes the exact configuration there with create-new semantics, and
+fsyncs the retained copy and its parent. It then atomically exchanges the original
+configuration with a prepared `/dev/null` symlink in the same `/etc` parent.
+The copy crosses sandbox bind mounts safely; each rename stays within one parent.
+After manager reload it proves that service remains stopped and masked. It
+preserves the sealed backup and retained bytes, handles interrupted copy and mask
+exchange, and records the exchanged original inode before removing that temporary
+configuration. It rejects differing bytes, conflicting retained/partial copies or
+an unexplained mask. A durable completion records that the original bytes were
+retained but the original inode was not. It neither signals a
+producer nor removes replay data, changes active service limits or repairs136.
+
+Run this only in its separate root sandbox with write access to that exact
+receipt/configuration-retention directory, the holding state lock, and
+`/etc/systemd/system` for the fixed service path. A full holding backup owns the
+same exclusive transition lock; let it complete before the configuration action.
+Keep the old controller masked during subsequent artifact-specific retirement
+so its obsolete staged definition cannot consume a removed local prefix. The
+archive still requires authenticated custody, fresh reference checks and a
+separately qualified local-retirement path; masking is not archive deletion
+authority. Healthy controllers and their immutable deployments remain in place.
+
+`holding-check-retire136` and `holding-retire136` implement that separate path for
+only the compiled failed partial. Both take a hash-bound plan with schema
+`jetstreamer-horizon-holding-retire136-plan-v2` and bindings named `mapping`,
+`terminal`, `qualification`, `inspection`, `custody`, `controller_mask`, and
+`capacity_completion`. The destructive invocation additionally requires
+`prior_check`, binding the successful check receipt from the previous 900 seconds.
+Both commands require separately supplied spec and executable SHA-256 values.
+There are no source, destination or epoch selectors.
+
+The check revalidates full authenticated holding custody, prefix ownership,
+manifest and blob identity, the original stopped-owner/failure lineage, and the
+durably masked controller. It requires a fresh complete fleet/capacity completion,
+rejects changed owners or any live replacement/downstream claim for136, and scans
+the whole original lane and quarantine for process or staged-service references
+without exclusions. Adjacent sidecars and remote canonical epoch136 archive or
+sidecar objects must remain absent. It hashes the local partial without moving or
+removing it and writes only a private capability receipt.
+
+Retirement repeats those gates, writes a durable intent, and moves the exact
+partial without replacement into the compiled root-private `retirements/`
+quarantine on the same home filesystem. The quarantine directory must already
+exist, be root-owned mode0700, and share a single writable sandbox ancestor with
+the source: separate writable bind mounts cause `EXDEV` even on one filesystem.
+Use only `/home/sol/.jetstreamer-private` as that shared writable ancestor, with
+the sealed executable constraining all actual paths; never make `/` writable.
+After fsyncing both parents the tool rehashes the quarantined bytes, verifies
+their multipart ETag and original ownership/mode, and writes a durable moved proof.
+It binds the raw moved-proof digest into a durable unlink intent, repeats current
+ownership/reference/remote checks, unlinks only the quarantine and fsyncs its parent.
+A completion preserves all evidence. Retries recover each durable frontier;
+unexplained absence, changed bytes, conflicting markers, or a reappearing source
+after completion fail closed. Neither command writes R2, repairs136, qualifies
+canonical publication, exports a runtime checkpoint, or authorizes job resume.

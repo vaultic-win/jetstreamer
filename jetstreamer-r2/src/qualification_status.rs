@@ -3,7 +3,7 @@ use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
     path: PathBuf,
@@ -19,6 +19,8 @@ struct Plan {
     estimate_receipt: PathBuf,
     downstream_allowance_millis: BTreeMap<u64, u64>,
     estimate_basis: String,
+    #[serde(default)]
+    epoch141_delivery_policy: Option<Bound>,
 }
 struct Profile {
     first: u64,
@@ -27,8 +29,9 @@ struct Profile {
     iid: &'static str,
     root: &'static str,
     terminal: u64,
+    execution_terminal: u64,
 }
-const PROFILES: [Profile; 3] = [
+const PROFILES: [Profile; 4] = [
     Profile {
         first: 204,
         last: 204,
@@ -36,6 +39,7 @@ const PROFILES: [Profile; 3] = [
         iid: "448da7f2a3a34217afe7e115120b3cea",
         root: "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-204-fcbf3992-v1",
         terminal: 88_559_361,
+        execution_terminal: 88_559_361,
     },
     Profile {
         first: 205,
@@ -44,6 +48,7 @@ const PROFILES: [Profile; 3] = [
         iid: "373359a11aef4993a1a949e19ff617c3",
         root: "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-205-5c01bf93-v1",
         terminal: 88_991_050,
+        execution_terminal: 88_991_050,
     },
     Profile {
         first: 225,
@@ -52,8 +57,151 @@ const PROFILES: [Profile; 3] = [
         iid: "4cd76ae1353a4411885b997f04306402",
         root: "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1",
         terminal: 98_063_464,
+        execution_terminal: 98_063_464,
+    },
+    Profile {
+        first: 141,
+        last: 141,
+        unit: "horizon-qualify-141-original-entry-capped-root-20261023-v1.service",
+        iid: "e639f007d482464f8a251455659d2ede",
+        root: "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1",
+        terminal: 61_343_999,
+        execution_terminal: 61_328_765,
     },
 ];
+
+const DELIVERY141_STAGES: [&str; 6] = [
+    "suffix_input_restore_and_qualification",
+    "assembly_close_import",
+    "independent_full_verification",
+    "current_plugin_verification",
+    "required_boundary_checks",
+    "upload_readback_source_revalidation_sidecar",
+];
+fn delivery141(v: &Value) -> Result<u64> {
+    ensure!(
+        v["schema"] == "jetstreamer-epoch141-sidecar-planning-v2"
+            && v["epoch"] == 141
+            && v["live_execution_terminal_slot"] == 61_328_765
+            && v["epoch_terminal_slot"] == 61_343_999
+            && v["separate_suffix_slots"] == 15_234
+            && v["root_invocation_continues_through_suffix"] == false
+            && v["runtime_checkpoint_resume_qualified"] == false
+            && v["publication_authorized"] == false
+            && v["replay_launch_authorized"] == false
+            && v["planning_evidence"]
+                .as_array()
+                .is_some_and(|a| a.len() >= 2 && a.len() <= 16)
+            && v["estimate_uncertainty"]
+                .as_str()
+                .is_some_and(|s| !s.trim().is_empty()),
+        "141 ETA must distinguish stopping root execution from unqualified suffix and delivery work"
+    );
+    let stages = v["stage_allowance_millis"]
+        .as_object()
+        .context("141 delivery stages missing")?;
+    ensure!(
+        stages
+            .keys()
+            .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            == std::collections::BTreeSet::from(DELIVERY141_STAGES),
+        "141 delivery stages missing or foreign"
+    );
+    stages.values().try_fold(0u64, |total, value| {
+        let n = value
+            .as_u64()
+            .filter(|n| *n > 0)
+            .context("141 stage needs positive integer planning allowance")?;
+        total.checked_add(n).context("141 allowance overflow")
+    })
+}
+fn policy141(b: &Bound) -> Result<Value> {
+    let m = fs::symlink_metadata(&b.path)?;
+    ensure!(
+        b.path.canonicalize()? == b.path
+            && m.is_file()
+            && m.nlink() == 1
+            && m.uid() == 0
+            && m.mode() & 0o222 == 0,
+        "141 delivery policy is not sealed"
+    );
+    let value = bound(b)?;
+    delivery141(&value)?;
+    let mut launch_bound = false;
+    for item in value["planning_evidence"].as_array().unwrap() {
+        let evidence: Bound = serde_json::from_value(item.clone())?;
+        let proof = bound(&evidence)?;
+        if evidence.path
+            == Path::new(
+                "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1/receipts/launch.json",
+            )
+        {
+            ensure!(
+                evidence.sha256
+                    == "fddefbddec6d98f344f9b7c2411cfcf874fee365e1af9fa4a6b380745021e28f"
+                    && proof["unit"] == PROFILES[3].unit
+                    && proof["invocation_id"] == PROFILES[3].iid
+                    && proof["terminal_root_slot"] == PROFILES[3].execution_terminal
+                    && proof["maximum_runtime_seconds"] == 432_000
+                    && proof["worker_sha256"]
+                        == "fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759"
+                    && proof["node_sha256"]
+                        == "d0c784a403d65819de70a499fc4d981217fd16fc30b70fac7e5ec979d0423ff0",
+                "141 planning source is not the exact stopping-root invocation"
+            );
+            launch_bound = true;
+        }
+    }
+    ensure!(
+        launch_bound,
+        "141 policy omits the exact stopping-root launch"
+    );
+    Ok(value)
+}
+pub(super) fn repair141_downstream(path: &Path, sha: &str) -> Result<u64> {
+    let v = policy141(&Bound {
+        path: path.into(),
+        sha256: sha.into(),
+    })?;
+    delivery141(&v)
+}
+fn plan_epochs(p: &Plan) -> Result<Vec<u64>> {
+    let epochs = p
+        .downstream_allowance_millis
+        .keys()
+        .copied()
+        .collect::<Vec<_>>();
+    ensure!(
+        !p.estimate_basis.trim().is_empty() && p.estimate_receipt.is_absolute(),
+        "qualification estimate basis/output missing"
+    );
+    if p.schema == "jetstreamer-qualification141-status-plan-v2" {
+        ensure!(
+            epochs == [141]
+                && p.receipt_directory
+                    == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
+            "foreign141 status scope"
+        );
+        let policy = policy141(
+            p.epoch141_delivery_policy
+                .as_ref()
+                .context("141 sidecar delivery policy missing")?,
+        )?;
+        ensure!(
+            delivery141(&policy)? == p.downstream_allowance_millis[&141],
+            "141 downstream allowance differs from staged policy"
+        );
+    } else {
+        ensure!(
+            p.schema == "jetstreamer-qualification-status-plan-v1"
+                && epochs == [204, 205, 225, 226]
+                && p.epoch141_delivery_policy.is_none(),
+            "qualification status plan differs"
+        );
+    }
+    Ok(epochs)
+}
 fn bound(b: &Bound) -> Result<Value> {
     ensure!(
         b.path.is_absolute() && is_lower_hex(&b.sha256, 64),
@@ -90,9 +238,21 @@ fn observed<'a>(o: &'a Value, p: &Profile) -> Result<&'a Value> {
     );
     let r = matches[0];
     let row = &r["observation"];
+    if p.first == 141 {
+        ensure!(
+            row["scratch_path"].as_str() == Some(format!("{}/scratch", p.root).as_str())
+                && row["useful_work"]["last"]["terminal_slot"] == p.execution_terminal,
+            "141 observed root/scratch scope differs"
+        );
+    }
     ensure!(
         r["status"] == "observed"
-            && r["range"] == format!("{}-{}", p.first, p.last)
+            && r["range"]
+                == if p.first == 141 {
+                    "141".into()
+                } else {
+                    format!("{}-{}", p.first, p.last)
+                }
             && r["expected_producer_invocation_id"] == p.iid
             && row["invocation_binding_stable"] == true
             && row["useful_work"]["journal_invocation_id"] == p.iid,
@@ -184,14 +344,18 @@ fn remaining(row: &Value, p: &Profile, allowance: u64) -> Result<u64> {
         .as_u64()
         .context("qualification slot missing")?;
     ensure!(
-        slot <= p.terminal,
+        slot <= p.execution_terminal,
         "qualification stage changed beyond replay terminal"
     );
     let rate = row["useful_work"]["slots_per_second"]
         .as_f64()
         .context("qualification rate missing")?;
     ensure!(rate.is_finite() && rate > 0.0, "qualification rate invalid");
-    let millis = ((p.terminal - slot) as f64 * 1000.0 / rate).ceil();
+    //141 stops at the root. The suffix is a separate, still-unqualified run;
+    //using its measured-profile rate is an explicit planning assumption only.
+    let live_millis = ((p.execution_terminal - slot) as f64 * 1000.0 / rate).ceil();
+    let suffix_millis = ((p.terminal - p.execution_terminal) as f64 * 1000.0 / rate).ceil();
+    let millis = live_millis + suffix_millis;
     ensure!(
         millis.is_finite() && millis >= 0.0 && millis < u64::MAX as f64,
         "qualification ETA overflow"
@@ -200,8 +364,77 @@ fn remaining(row: &Value, p: &Profile, allowance: u64) -> Result<u64> {
         .checked_add(allowance)
         .context("qualification ETA overflow")
 }
+fn deadline141(row: &Value, p: &Profile, elapsed_millis: u64) -> Result<Value> {
+    ensure!(
+        p.first == 141 && p.last == 141,
+        "foreign141 deadline profile"
+    );
+    let slot = row["useful_work"]["last"]["slot"]
+        .as_u64()
+        .context("141 deadline slot missing")?;
+    let rate = row["useful_work"]["slots_per_second"]
+        .as_f64()
+        .context("141 deadline rate missing")?;
+    ensure!(
+        row["useful_work"]["sufficient_for_rates"] == true
+            && slot <= p.execution_terminal
+            && rate.is_finite()
+            && rate > 0.0,
+        "141 deadline needs a valid root rate"
+    );
+    let maximum_runtime_millis = 432_000_000u64;
+    // The hard stop is operational risk evidence, never a filter selecting
+    // only forecasts that happen to fit it. Live ownership is checked separately.
+    let remaining_runtime_millis = maximum_runtime_millis.saturating_sub(elapsed_millis);
+    let remaining_runtime_millis_signed =
+        i128::from(maximum_runtime_millis) - i128::from(elapsed_millis);
+    let projection = ((p.execution_terminal - slot) as f64 * 1000.0 / rate).ceil();
+    ensure!(
+        projection.is_finite() && projection >= 0.0 && projection < u64::MAX as f64,
+        "141 root runtime projection overflow"
+    );
+    let projected_root_replay_millis = projection as u64;
+    let root_replay_margin_millis =
+        remaining_runtime_millis_signed - i128::from(projected_root_replay_millis);
+    let projected_runtime_overrun_millis = -root_replay_margin_millis;
+    // Every difference of these u64 inputs fits i128. serde_json supports the
+    // corresponding signed/unsigned JSON integer range, including negative margins.
+    let signed_json = |value: i128| -> Result<Value> {
+        if let Ok(value) = i64::try_from(value) {
+            Ok(json!(value))
+        } else if let Ok(value) = u64::try_from(value) {
+            Ok(json!(value))
+        } else {
+            anyhow::bail!("141 signed runtime risk exceeds JSON integer range")
+        }
+    };
+    Ok(
+        json!({"schema":"jetstreamer-qualification141-runtime-window-v3",
+        "maximum_runtime_millis":maximum_runtime_millis,
+        "elapsed_execution_millis":elapsed_millis,
+        "remaining_runtime_millis":remaining_runtime_millis,
+        "projected_root_replay_millis":projected_root_replay_millis,
+        "remaining_runtime_millis_signed":signed_json(remaining_runtime_millis_signed)?,
+        "root_replay_margin_millis":signed_json(root_replay_margin_millis)?,
+        "projected_runtime_overrun_millis":signed_json(projected_runtime_overrun_millis)?,
+        "root_projection_reaches_runtime_cap":root_replay_margin_millis <= 0,
+        "runtime_cap_exhausted":elapsed_millis >= maximum_runtime_millis,
+        "forecast_basis":"observed-slot-rate-plus-separate-suffix-and-policy-allowances",
+        "forecast_conditional_on_continued_progress":true,
+        "cap_miss_recovery_route_qualified":false,
+        "cap_miss_recovery_delay_measured":false,
+        "forecast_includes_measured_cap_miss_recovery_delay":false,
+        "runtime_cap_is_forecast_publication_gate":false,
+        "root_projection_excludes_terminal_work":true,
+        "root_projection_is_measured_bound":false,
+        "suffix_runs_in_current_invocation":false,
+        "runtime_extension_authorized":false,"runtime_checkpoint_resume_qualified":false}),
+    )
+}
 fn jet(p: &Profile, epoch: u64) -> Result<u64> {
-    let name = if p.first < 225 {
+    let name = if p.first == 141 {
+        "private.jet".to_string()
+    } else if p.first < 225 {
         format!("epoch-{epoch}-prefix.jet")
     } else {
         format!("epoch-{epoch}.jet")
@@ -226,7 +459,7 @@ pub(super) fn matches(
     let Some(u) = census.get(p.unit) else {
         return false;
     };
-    matches!(receipt.status.phase.as_str(), "replay" | "qualification")
+    (receipt.status.phase == "replay" || (epoch != 141 && receipt.status.phase == "qualification"))
         && receipt.epoch == epoch
         && receipt.producer_invocation_id == p.iid
         && receipt.controller_invocation_id == p.iid
@@ -288,16 +521,7 @@ pub(super) async fn run() -> Result<()> {
         sha256: args[4].clone(),
     };
     let p: Plan = serde_json::from_value(bound(&plan_bound)?)?;
-    ensure!(
-        p.schema == "jetstreamer-qualification-status-plan-v1"
-            && p.downstream_allowance_millis
-                .keys()
-                .copied()
-                .eq([204, 205, 225, 226])
-            && !p.estimate_basis.trim().is_empty()
-            && p.estimate_receipt.is_absolute(),
-        "qualification status plan differs"
-    );
+    let epochs = plan_epochs(&p)?;
     let o = bound(&p.observer)?;
     let f = bound(&p.fleet)?;
     let sampled = o["recorded_at_utc"]
@@ -312,17 +536,24 @@ pub(super) async fn run() -> Result<()> {
             && f["observer_receipt"].as_str() == p.observer.path.to_str()
             && f["observer_sha256"] == p.observer.sha256
             && f["sampled_at_utc"] == sampled
-            && f["first_epoch"] == 201
-            && f["last_epoch"] == 300
+            && f["first_epoch"] == if epochs == [141] { 101 } else { 201 }
+            && f["last_epoch"] == if epochs == [141] { 200 } else { 300 }
             && f["inventory"]["anomalies"] == 0,
         "qualification status needs fresh accepted fleet"
     );
     let mut states = Vec::new();
     let mut owners = BTreeMap::new();
-    for profile in &PROFILES {
+    let mut execution141_window = None;
+    for profile in PROFILES
+        .iter()
+        .filter(|profile| epochs.contains(&profile.first))
+    {
         let row = observed(&o, profile)?;
         owners.insert(profile.unit, live(profile, &f)?);
         let elapsed = elapsed(profile, seconds)?;
+        if profile.first == 141 {
+            execution141_window = Some(deadline141(row, profile, elapsed)?);
+        }
         for epoch in profile.first..=profile.last {
             states.push(EpochStatus {
                 epoch,
@@ -353,7 +584,7 @@ pub(super) async fn run() -> Result<()> {
         );
         states = serde_json::from_value(saved["statuses"].clone())?;
         ensure!(
-            states.iter().map(|s| s.epoch).eq([204, 205, 225, 226])
+            states.iter().map(|s| s.epoch).eq(epochs.iter().copied())
                 && states.iter().all(|s| s.sampled_at_utc == sampled
                     && matches!(s.phase.as_str(), "replay" | "qualification")),
             "qualification estimate receipt differs"
@@ -361,16 +592,18 @@ pub(super) async fn run() -> Result<()> {
     } else if args.len() == 7 {
         fleet::persist(
             &p.estimate_receipt,
-            &json!({"schema":"jetstreamer-qualification-status-estimate-v1","plan_sha256":plan_bound.sha256,
+            &json!({"schema":if epochs == [141] {"jetstreamer-qualification141-status-estimate-v2"} else {"jetstreamer-qualification-status-estimate-v1"},"plan_sha256":plan_bound.sha256,
             "observer_sha256":p.observer.sha256,"fleet_sha256":p.fleet.sha256,"estimate_basis":p.estimate_basis,
-            "downstream_allowance_millis":p.downstream_allowance_millis,"statuses":states,"archive_or_sidecar_mutation_authorized":false}),
+            "downstream_allowance_millis":p.downstream_allowance_millis,"epoch141_delivery_policy":p.epoch141_delivery_policy,
+            "separate_suffix_slots":if epochs == [141] {15234} else {0},"execution141_window":execution141_window,
+            "statuses":states,"archive_or_sidecar_mutation_authorized":false}),
         )?;
     }
     if args.len() == 8 {
         println!(
             "{}",
             serde_json::to_string(
-                &json!({"statuses":states,"memory_target":fleet_memory::report(&o, &f),"r2_mutations":false})
+                &json!({"statuses":states,"memory_target":if epochs == [141] {Value::Null} else {fleet_memory::report(&o, &f)},"r2_mutations":false})
             )?
         );
         return Ok(());
@@ -433,6 +666,73 @@ pub(super) async fn run() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn epoch141_deadline_separates_root_runtime_from_future_suffix_and_delivery() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":60926156},"slots_per_second":1.0021996518807004}});
+        let v = deadline141(&row, p, 13_936_388).unwrap();
+        assert_eq!(v["remaining_runtime_millis"], 418_063_612u64);
+        assert_eq!(v["projected_root_replay_millis"], 401_725_345u64);
+        assert_eq!(v["root_replay_margin_millis"], 16_338_267u64);
+        assert_eq!(v["suffix_runs_in_current_invocation"], false);
+        assert_eq!(v["runtime_extension_authorized"], false);
+        assert_eq!(v["runtime_checkpoint_resume_qualified"], false);
+        assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 546_525_910);
+    }
+    #[test]
+    fn epoch141_runtime_risk_keeps_current_forecast_and_denies_runtime_authority() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":p.execution_terminal-100},"slots_per_second":2.0}});
+        for (elapsed, margin, overrun, exhausted) in [
+            (432_000_000 - 50_001, 1, -1, false),
+            (432_000_000 - 50_000, 0, 0, false),
+            (432_000_000 - 49_999, -1, 1, false),
+            (432_000_000, -50_000, 50_000, true),
+            (432_000_001, -50_001, 50_001, true),
+        ] {
+            let risk = deadline141(&row, p, elapsed).unwrap();
+            assert_eq!(risk["root_replay_margin_millis"], margin);
+            assert_eq!(risk["projected_runtime_overrun_millis"], overrun);
+            assert_eq!(risk["root_projection_reaches_runtime_cap"], margin <= 0);
+            assert_eq!(risk["runtime_cap_exhausted"], exhausted);
+            assert_eq!(
+                risk["remaining_runtime_millis"],
+                432_000_000u64.saturating_sub(elapsed)
+            );
+            assert_eq!(risk["maximum_runtime_millis"], 432_000_000u64);
+            assert_eq!(risk["runtime_extension_authorized"], false);
+            assert_eq!(risk["runtime_checkpoint_resume_qualified"], false);
+            assert_eq!(risk["runtime_cap_is_forecast_publication_gate"], false);
+            assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 137_267_000);
+        }
+        for (key, value) in [
+            ("slots_per_second", json!(0)),
+            ("slots_per_second", json!(-1)),
+            ("sufficient_for_rates", json!(false)),
+        ] {
+            let mut bad = row.clone();
+            bad["useful_work"][key] = value;
+            assert!(deadline141(&bad, p, 1).is_err());
+        }
+        let mut bad = row;
+        bad["useful_work"]["last"]["slot"] = json!(p.execution_terminal + 1);
+        assert!(deadline141(&bad, p, 1).is_err());
+        assert!(deadline141(&bad, &PROFILES[0], 1).is_err());
+    }
+    #[test]
+    fn epoch141_observed_cap_overrun_does_not_select_a_faster_rate() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":60929552},"slots_per_second":0.8954750570114269}});
+        let risk = deadline141(&row, p, 17_536_387).unwrap();
+        assert_eq!(risk["projected_root_replay_millis"], 445_811_413u64);
+        assert_eq!(risk["root_replay_margin_millis"], -31_347_800i64);
+        assert_eq!(risk["projected_runtime_overrun_millis"], 31_347_800u64);
+        assert_eq!(risk["cap_miss_recovery_route_qualified"], false);
+        assert_eq!(remaining(&row, p, 129_600_000).unwrap(), 592_423_613);
+    }
+    #[test]
     fn eta_includes_every_queued_slot_and_downstream_work() {
         let p = &PROFILES[2];
         let row = json!({"useful_work":{"sufficient_for_rates":true,"last":{"slot":p.terminal-120},"slots_per_second":2.0}});
@@ -446,16 +746,57 @@ mod tests {
         assert!(remaining(&bad, p, 90_000).is_err());
     }
     #[test]
-    fn closed_scope_has_four_epochs_across_three_owners() {
+    fn legacy_scope_keeps_four_epochs_and_141_has_its_distinct_closed_owner() {
         assert!(profile(223).is_err());
         assert!(profile(203).is_err());
         assert_eq!(profile(225).unwrap().unit, profile(226).unwrap().unit);
         assert_eq!(
             PROFILES
                 .iter()
+                .filter(|p| p.first != 141)
                 .flat_map(|p| p.first..=p.last)
                 .collect::<Vec<_>>(),
             vec![204, 205, 225, 226]
         );
+        let p = profile(141).unwrap();
+        assert_eq!(p.terminal - p.execution_terminal, 15234);
+        assert_eq!(p.first, p.last);
+    }
+    #[test]
+    fn epoch141_eta_includes_separate_suffix_after_stopping_root_and_denies_authority() {
+        let p = profile(141).unwrap();
+        let row = json!({"useful_work":{"sufficient_for_rates":true,
+            "last":{"slot":p.execution_terminal-100},"slots_per_second":2.0}});
+        assert_eq!(
+            remaining(&row, p, 3_600_000).unwrap(),
+            (100 + 15234) * 500 + 3_600_000
+        );
+        let mut bad = row;
+        bad["useful_work"]["last"]["slot"] = json!(p.execution_terminal + 1);
+        assert!(remaining(&bad, p, 3_600_000).is_err());
+        let mut policy = json!({"schema":"jetstreamer-epoch141-sidecar-planning-v2","epoch":141,
+            "live_execution_terminal_slot":61328765,"epoch_terminal_slot":61343999,"separate_suffix_slots":15234,
+            "root_invocation_continues_through_suffix":false,"runtime_checkpoint_resume_qualified":false,
+            "publication_authorized":false,"replay_launch_authorized":false,"estimate_uncertainty":"pending suffix route",
+            "planning_evidence":[{},{}],"stage_allowance_millis":{}});
+        for stage in DELIVERY141_STAGES {
+            policy["stage_allowance_millis"][stage] = json!(60_000);
+        }
+        assert_eq!(delivery141(&policy).unwrap(), 360_000);
+        for field in [
+            "root_invocation_continues_through_suffix",
+            "runtime_checkpoint_resume_qualified",
+            "publication_authorized",
+            "replay_launch_authorized",
+        ] {
+            let mut bad = policy.clone();
+            bad[field] = json!(true);
+            assert!(delivery141(&bad).is_err(), "{field}");
+        }
+        policy["stage_allowance_millis"]
+            .as_object_mut()
+            .unwrap()
+            .remove(DELIVERY141_STAGES[0]);
+        assert!(delivery141(&policy).is_err());
     }
 }

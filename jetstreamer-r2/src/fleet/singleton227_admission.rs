@@ -173,8 +173,7 @@ fn native207_guard(
     Ok(())
 }
 pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
-    let mut total = 0u64;
-    let mut evidence = Vec::new();
+    let (mut total, mut evidence) = canary227_peer::memory(f)?;
     for row in f["active"]
         .as_array()
         .context("227 auxiliary owner census")?
@@ -239,7 +238,10 @@ fn century_floor(f: &Value) -> Result<u64> {
 }
 pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> {
     ensure!(
-        matches!(candidate_epoch, 207 | 209 | 210 | 223 | 227 | 228),
+        matches!(
+            candidate_epoch,
+            204 | 205 | 207 | 209 | 210 | 223 | 227 | 228
+        ),
         "unregistered native candidate century"
     );
     century_inventory_floor(f, Some(candidate_epoch))
@@ -305,6 +307,23 @@ fn century_inventory_floor(f: &Value, candidate_epoch: Option<u64>) -> Result<u6
         .div_ceil(count))
 }
 pub(super) fn protected_growth(
+    f: &Value,
+    observer: &Value,
+    guards: &BTreeMap<String, BoundFile>,
+    sample: u64,
+    now: u64,
+) -> Result<(u64, Vec<Value>)> {
+    let (view, guards, extra, mut evidence) =
+        canary227_peer::split(f, observer, guards, sample, now)?;
+    let (base, rest) = protected_growth_base(&view, observer, &guards, sample, now)?;
+    evidence.extend(rest);
+    Ok((
+        base.checked_add(extra)
+            .context("canary peer total protected growth overflow")?,
+        evidence,
+    ))
+}
+fn protected_growth_base(
     f: &Value,
     observer: &Value,
     guards: &BTreeMap<String, BoundFile>,
@@ -588,6 +607,7 @@ fn owners_inner(
     current: &BTreeMap<String, Value>,
     context: Option<&crate::holding::Foundation213RestoreContext<'_>>,
 ) -> Result<()> {
+    canary227_peer::current(f, current)?;
     let old = f["unit_census"]
         .as_object()
         .context("227 predecessor census")?;
@@ -657,10 +677,25 @@ fn owners_inner(
     Ok(())
 }
 pub(super) fn limits(f: &Value) -> Result<Value> {
+    let canary_caps = canary227_peer::limits(f)?;
     let mut result = serde_json::Map::new();
     for row in f["active"].as_array().context("227 active cap census")? {
         let owner = active_owner(row)?;
         let name = owner["Id"].as_str().context("227 cap owner")?;
+        if name == canary227::UNIT {
+            ensure!(
+                result
+                    .insert(
+                        name.to_owned(),
+                        canary_caps
+                            .clone()
+                            .context("missing authenticated canary caps")?
+                    )
+                    .is_none(),
+                "duplicate canary cap owner"
+            );
+            continue;
+        }
         let output=ProcessCommand::new("/usr/bin/systemctl").args(["show",name,"--no-pager","--property=MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ControlGroup"]).output()?;
         ensure!(
             output.status.success() && output.stdout.len() < 16384,

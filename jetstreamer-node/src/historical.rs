@@ -536,7 +536,8 @@ pub const SOLANA_V1_6_20_CANDIDATE: WorkerProfile = WorkerProfile {
         feature = "epoch224-v1-6-25-diagnostic",
         feature = "epoch224-v1-6-25-qualification",
         feature = "epoch225-v1-6-25-diagnostic",
-        feature = "epoch225-v1-6-25-qualification"
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "epoch227-v1-6-25-diagnostic"
     )) {
         SOLANA_V1_6_25_BACKEND_ID
     } else {
@@ -547,7 +548,8 @@ pub const SOLANA_V1_6_20_CANDIDATE: WorkerProfile = WorkerProfile {
         feature = "epoch224-v1-6-25-diagnostic",
         feature = "epoch224-v1-6-25-qualification",
         feature = "epoch225-v1-6-25-diagnostic",
-        feature = "epoch225-v1-6-25-qualification"
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "epoch227-v1-6-25-diagnostic"
     )) {
         SOLANA_V1_6_25_TAG
     } else {
@@ -558,7 +560,8 @@ pub const SOLANA_V1_6_20_CANDIDATE: WorkerProfile = WorkerProfile {
         feature = "epoch224-v1-6-25-diagnostic",
         feature = "epoch224-v1-6-25-qualification",
         feature = "epoch225-v1-6-25-diagnostic",
-        feature = "epoch225-v1-6-25-qualification"
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "epoch227-v1-6-25-diagnostic"
     )) {
         SOLANA_V1_6_25_COMMIT
     } else {

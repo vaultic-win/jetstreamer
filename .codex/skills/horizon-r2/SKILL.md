@@ -62,6 +62,11 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   history view. Read [references/dashboard-status.md](references/dashboard-status.md) before
   changing an ETA model, handling a dropped/failed lane, or retiring stale status metadata.
   A plausible old countdown is not an acceptable substitute for a current, evidence-backed estimate.
+- Always provide a definite numeric ETA for active work, including active repair. Do not propose
+  hiding its countdown or displaying "ETA unavailable" as the solution to a failed estimate.
+  Repair the estimate model and owner binding; include explicit recovery and delivery allowances
+  and disclose uncertainty in private evidence and human status updates. See the dashboard-status
+  reference for the distinction between active recovery and genuinely inactive work.
 - Publish one mutable R2 object named `epoch-N.epoch-status.json` for every epoch actively being
   worked on, including input preparation, qualification, repair, replay and post-replay delivery,
   until its canonical `.sha256` sidecar is committed. Internal labels such as "private" or

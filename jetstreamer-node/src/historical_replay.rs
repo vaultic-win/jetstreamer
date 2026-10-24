@@ -329,16 +329,28 @@ impl HistoricalReplay {
             client.executable_sha256(),
             current_slot,
             live_start_slot,
-        );
-        if diagnostic_warmup_target.is_some() && !client.supports_entry_batches() {
-            return Err("bounded epoch223 warmup requires the approved batched worker".into());
-        }
-        if diagnostic_warmup_target.is_some()
-            && (!checkpoint_slots.contains(&96_335_538) || !checkpoint_slots.contains(&96_767_522))
+        )
+        .or_else(|| {
+            bounded_epoch227_comparison_target(
+                client.executable_sha256(),
+                current_slot,
+                live_start_slot,
+            )
+        });
+        if cfg!(feature = "epoch227-v1-6-25-diagnostic")
+            && diagnostic_warmup_target != Some(98_091_122)
         {
             return Err(
-                "bounded epoch223 warmup retains both real canonical checkpoint gates".into(),
+                "bounded227 requires its exact worker, bootstrap and live-start scope".into(),
             );
+        }
+        if diagnostic_warmup_target.is_some() && !client.supports_entry_batches() {
+            return Err("bounded diagnostic requires the approved batched worker".into());
+        }
+        if diagnostic_warmup_target
+            .is_some_and(|target| !bounded_diagnostic_checkpoints(target, &checkpoint_slots))
+        {
+            return Err("bounded diagnostic retains both real canonical checkpoint gates".into());
         }
         let replay = Self {
             state: Mutex::new(HistoricalReplayState {
@@ -1195,7 +1207,11 @@ fn cooperate_bounded_warmup_stop(
     // response. Never enqueue the worker's first forbidden batch. The
     // reviewed supervisor captures the stopped group, then resumes/drains it.
     failure.shutdown.store(true, Ordering::SeqCst);
-    info!(target: "jetstreamer_node", "private epoch223 warmup complete slot={slot} complete=true");
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic") && slot == 98_091_122 {
+        info!(target: "jetstreamer_node", "private epoch227 v1625 comparison complete slot={slot} complete=true");
+    } else {
+        info!(target: "jetstreamer_node", "private epoch223 warmup complete slot={slot} complete=true");
+    }
     std::io::Write::flush(&mut std::io::stderr())
         .map_err(|e| format!("bounded warmup marker flush: {e}"))?;
     if unsafe { libc::raise(libc::SIGSTOP) } != 0 {
@@ -1221,6 +1237,32 @@ fn bounded_epoch223_warmup_target(
         && bootstrap == 96_335_538
         && live_start == 96_336_000)
         .then_some(96_335_554)
+}
+
+fn bounded_epoch227_comparison_target(
+    worker: [u8; 32],
+    bootstrap: Slot,
+    live_start: Slot,
+) -> Option<Slot> {
+    const WORKER: [u8; 32] = [
+        0xd0, 0x1a, 0xdb, 0x19, 0x80, 0xee, 0x52, 0xa5, 0x9a, 0x7a, 0xff, 0x7a, 0x3a, 0x04, 0x96,
+        0x74, 0x6c, 0xa3, 0x25, 0xe5, 0xfc, 0x65, 0x58, 0x17, 0xd9, 0xa7, 0x74, 0x3a, 0x19, 0x13,
+        0xef, 0x62,
+    ];
+    (cfg!(feature = "epoch227-v1-6-25-diagnostic")
+        && worker == WORKER
+        && bootstrap == 98_063_464
+        && live_start == 98_064_000)
+        .then_some(98_091_122)
+}
+
+fn bounded_diagnostic_checkpoints(target: Slot, canonical: &BTreeSet<Slot>) -> bool {
+    let required = match target {
+        96_335_554 => [96_335_538, 96_767_522],
+        98_091_122 => [98_063_464, 98_495_291],
+        _ => return false,
+    };
+    required.iter().all(|slot| canonical.contains(slot))
 }
 
 fn ready_entry_signature(entry: &ReadyEntry) -> Option<String> {
@@ -1431,6 +1473,57 @@ fn assemble_evidence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn bounded227_selection_rejects_full_worker_and_preserves_real_checkpoint_pair() {
+        let bytes = |text: &str| {
+            std::array::from_fn(|i| u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).unwrap())
+        };
+        let bounded = bytes("d01adb1980ee52a59a7aff7a3a0496746ca325e5fc655817d9a7743a1913ef62");
+        assert_eq!(
+            bounded_epoch227_comparison_target(bounded, 98_063_464, 98_064_000),
+            cfg!(feature = "epoch227-v1-6-25-diagnostic").then_some(98_091_122)
+        );
+        for (worker, bootstrap, start) in [
+            (bounded, 98_063_463, 98_064_000),
+            (bounded, 98_063_464, 98_064_001),
+            (
+                bytes("7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a"),
+                98_063_464,
+                98_064_000,
+            ),
+            (
+                bytes("710f6523d15b960f79d91935d18d581a341e04e649df26ccd0a2b31ae9bc3eeb"),
+                98_063_464,
+                98_064_000,
+            ),
+        ] {
+            assert!(bounded_epoch227_comparison_target(worker, bootstrap, start).is_none());
+        }
+        let canonical = BTreeSet::from([98_063_464, 98_495_291]);
+        assert!(bounded_diagnostic_checkpoints(98_091_122, &canonical));
+        assert!(!bounded_diagnostic_checkpoints(98_091_123, &canonical));
+        assert!(!bounded_diagnostic_checkpoints(
+            98_091_122,
+            &BTreeSet::from([98_063_464, 98_091_122])
+        ));
+        let mut transport = canonical.clone();
+        transport.insert(98_091_122);
+        let batches = partition_entry_batches(
+            vec![
+                encoded_ready(98_091_122, 0, 0),
+                encoded_ready(98_091_122, 1, 0),
+                encoded_ready(98_091_123, 0, 0),
+            ],
+            &transport,
+        );
+        assert_eq!(
+            batch_slots(&batches),
+            vec![vec![98_091_122, 98_091_122], vec![98_091_123]]
+        );
+        assert_eq!(canonical, BTreeSet::from([98_063_464, 98_495_291]));
+        assert!(!canonical.contains(&98_091_122));
+    }
+
     #[test]
     fn bounded_warmup_selection_is_exact_and_never_applies_to_full_prefix_worker() {
         let bytes = |text: &str| {

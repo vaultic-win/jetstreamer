@@ -28,6 +28,8 @@ fn utc_string(seconds: u64) -> Result<String> {
 
 pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()> {
     is_101(p)?;
+    qualification141_status::completion(p, c)?;
+    cohort191_delivery::completion(p, c)?;
     ensure!(
         c["schema"] == "jetstreamer-horizon-routine-cycle-completion-v1"
             && c["sampled_at_utc"] == p.sample_target_utc
@@ -176,6 +178,8 @@ pub(super) fn derive_next(
     );
     let mut next_config = config.clone();
     terminal141::next_config(p, &mut next_config)?;
+    cohort191_delivery::next_config(p, &mut next_config)?;
+    terminal185::config(p, &mut next_config)?;
     next_config["not_before_utc"] = json!(next_time);
     next_config["previous_sample"] = json!(p.observer);
     next_config["output"] = json!(next_observer);
@@ -317,13 +321,17 @@ pub(super) fn prepare(
     } else {
         None
     };
-    let delivery_spec = if prefix_spec.is_some()
+    let transition191 = mode == "--prepare-next-delivery191";
+    let delivery_spec = if transition191
+        || prefix_spec.is_some()
         || native_spec.is_some()
         || rejection_spec.is_some()
         || scans_spec.is_some()
         || acquisition_spec.is_some()
         || mode == "--prepare-next-publication144"
         || mode == "--prepare-next-original141"
+        || mode == "--prepare-next-repair141"
+        || mode == "--prepare-next-terminal185"
     {
         None
     } else {
@@ -371,6 +379,23 @@ pub(super) fn prepare(
         delivery198::consume_recovery(&mut next)?;
     }
     let model = bound_json(&next.model_template, true)?;
+    if transition191 {
+        cohort191_delivery::enable(
+            &mut next,
+            &mut next_config,
+            &model,
+            handoff_spec.context("191 transition needs its actual sealed handoff spec")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
+    if mode == "--prepare-next-terminal185" {
+        terminal185::enable(
+            &mut next,
+            &mut next_config,
+            handoff_spec.context("185 terminal handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
     controller_recovery::consume(&mut next, &model)?;
     if enable_terminal157 {
         terminal_handoff::enable(&mut next, &model)?;
@@ -392,6 +417,7 @@ pub(super) fn prepare(
     )?;
     let effective = repair183::effective_model(&next, &effective)?;
     let effective = repair185::effective_model(&next, &effective)?;
+    let effective = cohort191_delivery::effective_model(&next, &effective)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     if (prefix_spec.is_none() && mode != "--prepare-next-original141")
@@ -421,7 +447,7 @@ pub(super) fn prepare(
             .context("status estimate missing")?;
         validate_status(&s, p, &next.previous_observer, estimate)?;
         ensure!(
-            next.expected_epochs.contains(&epoch)
+            p.expected_epochs.contains(&epoch)
                 && seen.insert(epoch)
                 && s["authenticated_readback"] == true
                 && s["status"]["sampled_at_utc"] == p.sample_target_utc
@@ -520,6 +546,15 @@ pub(super) fn prepare(
         tool_ok(&next.tools.r2)?;
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         publication144::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
+    if mode == "--prepare-next-repair141" {
+        repair141_status::enable(
+            &mut next,
+            handoff_spec.context("repair141 cadence handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        repair141_status::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
     if mode == "--prepare-next-original141" {
         original141::enable(

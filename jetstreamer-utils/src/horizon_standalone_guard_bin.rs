@@ -99,6 +99,55 @@ fn read_canary_evidence(path: &Path, uid: u32, maximum: u64) -> Result<Vec<u8>> 
     Ok(bytes)
 }
 
+const CANARY227_UNIT_PREFIX: &str = "horizon-qualify-227-v1625-bounded-resource-";
+fn canary227_suffix(unit: &str) -> Option<&str> {
+    let suffix = unit
+        .strip_prefix(CANARY227_UNIT_PREFIX)?
+        .strip_suffix(".service")?;
+    (suffix
+        .as_bytes()
+        .first()
+        .is_some_and(u8::is_ascii_alphanumeric)
+        && suffix
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b)))
+    .then_some(suffix)
+}
+fn canary227_profile(plan: &Plan) -> bool {
+    let root = plan
+        .worker_root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.strip_prefix("bounded-resource-227-v1625-"));
+    cfg!(feature = "epoch227-v1625-canary-guard")
+        && canary227_suffix(&plan.unit).is_some()
+        && plan.filesystem == Path::new("/")
+        && plan.worker_root.parent() == Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        && root.is_some_and(|s| {
+            s.as_bytes().first().is_some_and(u8::is_ascii_alphanumeric)
+                && s.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+        })
+        && plan
+            .worker_root
+            .to_str()
+            .is_some_and(|s| !s.contains("//") && !s.contains("/./") && !s.contains("/../"))
+        && !plan.worker_root.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::CurDir | std::path::Component::ParentDir
+            )
+        })
+        && plan.maximum_root_physical_bytes == Some(300_000_000_000)
+        && plan.maximum_worker_vmas == 3_500_000
+        && plan.native_main.is_none()
+        && plan.bounded_measurement.is_none()
+        && plan.bounded_canary.as_ref().is_some_and(|c| {
+            c.expected_uid == 1000
+                && c.maximum_drainage_seconds == 120
+                && c.target_stop_intent == plan.worker_root.join("receipts/target-stop.json")
+        })
+}
 fn canary_scope(unit: &str) -> Result<(&'static str, u64)> {
     ensure!(
         unit.ends_with(".service")
@@ -107,7 +156,12 @@ fn canary_scope(unit: &str) -> Result<(&'static str, u64)> {
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
         "invalid bounded-canary unit"
     );
-    if unit.starts_with("horizon-qualify-225-bounded-resource-") {
+    if cfg!(feature = "epoch227-v1625-canary-guard") && canary227_suffix(unit).is_some() {
+        Ok((
+            "jetstreamer-private-epoch227-v1625-comparison-stop-v1",
+            98_091_122,
+        ))
+    } else if unit.starts_with("horizon-qualify-225-bounded-resource-") {
         Ok((
             "jetstreamer-private-epoch225-canary-target-stop-v1",
             97_202_500,
@@ -142,13 +196,20 @@ fn validate_canary_target(
     maximum_age: u64,
 ) -> Result<()> {
     let (schema, target) = canary_scope(unit)?;
+    let canary227 =
+        cfg!(feature = "epoch227-v1625-canary-guard") && canary227_suffix(unit).is_some();
     ensure!(
         intent["schema"] == schema
             && intent["invocation_id"] == invocation
             && intent["target_slot"] == target
             && intent["observed_slot"]
                 .as_u64()
-                .is_some_and(|s| (target..=target + 1000).contains(&s))
+                .is_some_and(|s| if canary227 {
+                    s == target
+                } else {
+                    (target..=target + 1000).contains(&s)
+                })
+            && (!canary227 || intent["target_stop_protocol"] == "cooperative-resume-only")
             && intent["child_pid"]
                 .as_u64()
                 .is_some_and(|p| p > 1 && p <= i32::MAX as u64)
@@ -191,7 +252,12 @@ fn validate_canary_target(
             ))
             && capture["scratch"]["physical_bytes"]
                 .as_u64()
-                .is_some_and(|b| b <= 256u64 << 30)
+                .is_some_and(|b| b
+                    <= if canary227 {
+                        300_000_000_000
+                    } else {
+                        256u64 << 30
+                    })
             && capture["accounts_state"]["regular_files"]
                 .as_u64()
                 .is_some_and(|n| n > 0)
@@ -611,6 +677,9 @@ fn supported_unit(plan: &Plan) -> bool {
             && plan.bounded_measurement.is_none()
             && plan.bounded_canary.is_none();
     }
+    if plan.unit.starts_with(CANARY227_UNIT_PREFIX) {
+        return canary227_profile(plan);
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -1026,6 +1095,143 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
+    fn canary227_scope_requires_its_exact_root_budget_and_cooperative_drainage_profile() {
+        let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon-qualify-227-v1625-bounded-resource-test.service","invocation_id":"a".repeat(32),
+            "filesystem":"/","minimum_free_bytes":245383154903u64,"worker_root":"/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test",
+            "maximum_root_physical_bytes":300_000_000_000u64,"maximum_worker_vmas":3500000,
+            "receipt_directory":"/var/lib/jetstreamer/canary227-test-receipts",
+            "bounded_canary":{"expected_uid":1000,"maximum_drainage_seconds":120,
+                "target_stop_intent":"/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test/receipts/target-stop.json"}});
+        let p: Plan = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            validate_plan(&p).is_ok(),
+            cfg!(feature = "epoch227-v1625-canary-guard")
+        );
+        for (pointer, change) in [
+            (
+                "/worker_root",
+                json!("/tmp/bounded-resource-227-v1625-test"),
+            ),
+            (
+                "/worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-"),
+            ),
+            (
+                "/worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-../test"),
+            ),
+            ("/filesystem", json!("/home/ubuntu")),
+            ("/maximum_root_physical_bytes", json!(300_000_000_001u64)),
+            ("/maximum_worker_vmas", json!(3500001)),
+            ("/bounded_canary/expected_uid", json!(0)),
+            ("/bounded_canary/maximum_drainage_seconds", json!(121)),
+            (
+                "/bounded_canary/target_stop_intent",
+                json!("/other/target-stop.json"),
+            ),
+        ] {
+            let mut bad = value.clone();
+            *bad.pointer_mut(pointer).unwrap() = change;
+            assert!(
+                validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{pointer}"
+            );
+        }
+        let mut bad = value.clone();
+        bad["native_main"] =
+            json!({"executable":"/sealed/native","sha256":"a".repeat(64),"main_pid":2});
+        assert!(validate_plan(&serde_json::from_value(bad).unwrap()).is_err());
+        let mut bad = value;
+        bad["bounded_measurement"] = json!({"intent_path":"/some/path","producer_uid":1000,"target_slot":98091122,"maximum_drain_seconds":120});
+        assert!(validate_plan(&serde_json::from_value::<Plan>(bad).unwrap()).is_err());
+        assert!(canary_scope("horizon-qualify-227-v1625-bounded-resource-.service").is_err());
+    }
+    #[test]
+    fn canary227_target_is_exact_and_capture_limit_does_not_change_older_profiles() {
+        if !cfg!(feature = "epoch227-v1625-canary-guard") {
+            return;
+        }
+        let unit = "horizon-qualify-227-v1625-bounded-resource-test.service";
+        let root = Path::new("/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test");
+        let iid = "a".repeat(32);
+        let capture = json!({"scratch":{"path":root.join("scratch"),"physical_bytes":300_000_000_000u64},
+            "accounts_state":{"path":root.join("scratch/runtime/accounts-state"),"regular_files":1},"cgroup":{"memory.current":"1"}});
+        let intent = json!({"schema":"jetstreamer-private-epoch227-v1625-comparison-stop-v1","invocation_id":iid,
+            "target_slot":98091122,"observed_slot":98091122,"child_pid":42,"scratch_snapshot_captured":true,
+            "external_signal":0,"written_unix_seconds":100,"capture_path":root.join("receipts/target-capture.json"),
+            "capture_canonical_json_sha256":sha(&serde_json::to_vec(&capture).unwrap()),"target_stop_protocol":"cooperative-resume-only"});
+        validate_canary_target(unit, &intent, &capture, &iid, root, 100, 120).unwrap();
+        for (key, v) in [
+            ("observed_slot", json!(98091123)),
+            ("target_stop_protocol", Value::Null),
+            ("target_stop_protocol", json!("resume-and-interrupt")),
+        ] {
+            let mut bad = intent.clone();
+            bad[key] = v;
+            assert!(
+                validate_canary_target(unit, &bad, &capture, &iid, root, 100, 120).is_err(),
+                "{key}"
+            );
+        }
+        let mut over = capture.clone();
+        over["scratch"]["physical_bytes"] = json!(300_000_000_001u64);
+        let mut bound = intent.clone();
+        bound["capture_canonical_json_sha256"] = json!(sha(&serde_json::to_vec(&over).unwrap()));
+        assert!(validate_canary_target(unit, &bound, &over, &iid, root, 100, 120).is_err());
+        let mut old = intent;
+        old["schema"] = json!("jetstreamer-private-epoch225-canary-target-stop-v1");
+        old["target_slot"] = json!(97202500);
+        old["observed_slot"] = json!(97202501);
+        assert!(
+            validate_canary_target(
+                "horizon-qualify-225-bounded-resource-test.service",
+                &old,
+                &capture,
+                &iid,
+                root,
+                100,
+                180
+            )
+            .is_err()
+        );
+        let mut smaller = capture;
+        smaller["scratch"]["physical_bytes"] = json!(256u64 << 30);
+        old["capture_canonical_json_sha256"] = json!(sha(&serde_json::to_vec(&smaller).unwrap()));
+        validate_canary_target(
+            "horizon-qualify-225-bounded-resource-test.service",
+            &old,
+            &smaller,
+            &iid,
+            root,
+            100,
+            180,
+        )
+        .unwrap();
+    }
+    #[test]
+    fn canary227_handshake_is_selected_only_in_its_separate_guard_generation() {
+        let selected =
+            canary_scope("horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.service");
+        if cfg!(feature = "epoch227-v1625-canary-guard") {
+            assert_eq!(
+                selected.unwrap(),
+                (
+                    "jetstreamer-private-epoch227-v1625-comparison-stop-v1",
+                    98_091_122
+                )
+            );
+        } else {
+            assert!(selected.is_err());
+        }
+        assert!(
+            canary_scope("horizon-qualify-227-v1620-bounded-resource-d01adb19-v1.service").is_err()
+        );
+        assert!(
+            canary_scope("horizon-qualify-227-v1625-bounded-resource-d01adb19-v1.timer").is_err()
+        );
+    }
+    #[test]
     fn root_capability_never_falls_through_to_the_producer_stop_path() {
         use std::cell::Cell;
         let published = Cell::new(false);
@@ -1059,6 +1265,20 @@ mod tests {
     #[test]
     fn complete_native_plans_pass_the_same_validator_used_before_runtime_observation() {
         for (unit, root, exe, sha, enabled) in [
+            (
+                "archive-210-v1616-native-input-small-v2.service",
+                "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2",
+                "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
+                "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
+                cfg!(feature = "epoch210-native-small"),
+            ),
+            (
+                "horizon-native-input-227-v1625-small-v2.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2",
+                "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
+                "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef",
+                cfg!(feature = "epoch227-v1625-native-small"),
+            ),
             (
                 "horizon-native-input-227-v1625-7a831420-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1",
@@ -1102,12 +1322,22 @@ mod tests {
                 cfg!(feature = "epoch227-native-main-guard"),
             ),
         ] {
+            let root_bytes = if unit.ends_with("-small-v2.service") {
+                96_000_000_000u64
+            } else {
+                300_000_000_000u64
+            };
             let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":unit,"invocation_id":"a".repeat(32),
                 "filesystem":"/","minimum_free_bytes":1,"worker_root":root,"maximum_worker_vmas":3500000,
-                "maximum_root_physical_bytes":300_000_000_000u64,"receipt_directory":"/sealed/receipts",
+                "maximum_root_physical_bytes":root_bytes,"receipt_directory":"/sealed/receipts",
                 "native_main":{"executable":exe,"sha256":sha,"main_pid":42}});
             let plan: Plan = serde_json::from_value(value.clone()).unwrap();
             assert_eq!(validate_plan(&plan).is_ok(), enabled, "{unit}");
+            if root_bytes == 96_000_000_000 {
+                let mut wrong = value.clone();
+                wrong["maximum_root_physical_bytes"] = json!(300_000_000_000u64);
+                assert!(validate_plan(&serde_json::from_value(wrong).unwrap()).is_err());
+            }
             for (pointer, replacement) in [
                 ("/schema", json!("unknown")),
                 ("/unit", json!("horizon-qualify-unknown.service")),
