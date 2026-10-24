@@ -438,7 +438,7 @@ fn run() -> Result<()> {
                 && path_matches_archive_identity(path, *identity)?,
             "source changed during merge"
         );
-        no_sidecar(&path)?;
+        no_sidecar(path)?;
     }
     let target_pin = open_regular_nofollow(&target)?;
     let measured = measure_open_archive(&target_pin)?;

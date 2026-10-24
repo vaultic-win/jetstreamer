@@ -79,6 +79,11 @@ swap0, CPU400%, Tasks512, UMask0077, PrivateNetwork=yes,
 ProtectHome=read-only, ProtectSystem=strict, NoNewPrivileges=yes and exactly
 the fixed output root writable. Root's unit must retain only the traversal
 capability needed to read the existing user-private inputs; never relax them.
+If an original transient source unit has been fully unloaded, this generation
+refuses that ambiguous current-state observation. A separately qualified exact
+manager-absence/no-live-source-owner adapter is required before launch in that
+case; historical success alone is not current absence evidence. Do not relaunch
+an old producer, invent its current fields or weaken the gate to work around it.
 
 The assembler pins both opened private sources, requiring uid1000, mode0600,
 one link and no checksum sidecar. It invokes the existing `merge_runtime_segments`

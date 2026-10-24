@@ -1,7 +1,5 @@
 //! Metadata-only future223 handoff gate. Never opens an epoch archive.
-#[allow(dead_code)]
-#[path = "../../../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
-mod evidence;
+use crate::evidence;
 
 use anyhow::{Context, Result, ensure};
 use jetstreamer_horizon::archive::*;
