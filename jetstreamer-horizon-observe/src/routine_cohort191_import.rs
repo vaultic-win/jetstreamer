@@ -19,7 +19,7 @@ pub(super) fn adoption_clocks(old: u64, target: u64, captured: u64) -> Result<()
         .checked_sub(old)
         .context("191 pending adoption precedes accepted predecessor")?;
     ensure!(
-        (1800..=5400).contains(&gap) && gap % 1800 == 0,
+        (1800..=7200).contains(&gap) && gap % 1800 == 0,
         "191 import adoption must retain bounded original30minute grid"
     );
     ensure!(
@@ -178,10 +178,10 @@ mod tests {
     use super::*;
     #[test]
     fn pending_adoption_uses_real_capture_and_only_the_original_grid() {
-        for gap in [1800, 3600, 5400] {
+        for gap in [1800, 3600, 5400, 7200] {
             adoption_clocks(10000, 10000 + gap, 11000).unwrap();
         }
-        for target in [9999, 10000, 11799, 11801, 12400, 15401, 17200] {
+        for target in [9999, 10000, 11799, 11801, 12400, 15401, 17201, 19000] {
             assert!(adoption_clocks(10000, target, 11000).is_err());
         }
         for captured in [9999, 10000, 15401] {
