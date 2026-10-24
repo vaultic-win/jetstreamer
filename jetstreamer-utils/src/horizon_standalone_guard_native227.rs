@@ -9,6 +9,15 @@ pub(super) struct Binding {
     pub main_pid: u32,
 }
 pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
+    let profile227_v1625 = cfg!(feature = "epoch227-v1625-native-main-guard")
+        && p.unit == "horizon-native-input-227-v1625-7a831420-v1.service"
+        && p.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1")
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
+            )
+        && n.sha256 == "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef";
     let profile227 = cfg!(feature = "epoch227-native-main-guard")
         && p.unit == "horizon-native-input-227-capped-710f6523-v1.service"
         && p.worker_root
@@ -55,7 +64,7 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
             )
         && n.sha256 == "d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827";
     ensure!(
-        (profile227 || profile207 || profile209 || profile210 || profile228)
+        (profile227_v1625 || profile227 || profile207 || profile209 || profile210 || profile228)
             && n.main_pid > 1
             && p.maximum_root_physical_bytes == Some(300_000_000_000)
             && p.maximum_worker_vmas == 3500000

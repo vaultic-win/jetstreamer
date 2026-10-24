@@ -1,5 +1,9 @@
 # Epoch 210 native cold preparation
 
+The closed Rust [native lifecycle commands and operator protocol](epoch210-native-lifecycle.md)
+cover admission, running capture, fleet/status registration and independent
+terminal capture. Preparation artifacts alone remain insufficient for launch.
+
 This is dormant preparation for the independent singleton described in
 [epochs209–212](epochs209-212-singleton-qualification.md). It does not qualify a
 Bank, launch replay, promote a runtime, or authorize publication. Keep epoch
@@ -108,7 +112,7 @@ replay, runtime-promotion and publication authority remains false.
    their remaining whole-root growth and hard memory growth. Preserve the
    largest bound guard minimum-free baseline, current century floor and all
    remaining reservations. No capacity claim follows from this document.
-3. Install the persistent file only after admission. Bind original PID1
+3. Keep the installed persistent file inactive until admission succeeds. Bind original PID1
    invocation/MainPID and prove the guard's first actual sandboxed no-trip
    fire. Register the exact origin promptly through an authenticated lifecycle
    event that permits the epoch210 blocked-qualification transition. Publish

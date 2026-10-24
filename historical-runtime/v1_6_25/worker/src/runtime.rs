@@ -89,6 +89,28 @@ const EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 96_767_522;
 const EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 97_199_617;
 const EPOCH225_DIAGNOSTIC_END_EXCLUSIVE: u64 = 97_202_600;
 const EPOCH225_QUALIFICATION_END_EXCLUSIVE: u64 = 98_063_465;
+const EPOCH227_SNAPSHOT_SLOT: u64 = 98_063_464;
+const EPOCH227_DIAGNOSTIC_END_EXCLUSIVE: u64 = 98_091_123;
+const EPOCH227_QUALIFICATION_END_EXCLUSIVE: u64 = 98_496_000;
+#[cfg(all(
+    any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    ),
+    any(
+        all(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        ),
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch227 comparison/qualification must be an exclusive build profile");
 #[cfg(all(
     feature = "epoch225-v1-6-25-qualification",
     any(
@@ -395,6 +417,16 @@ impl RuntimeState {
             )));
         }
 
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) && self.enforce_candidate_range
+        {
+            for request in &requests {
+                validate_candidate_entry_slot(request.slot)
+                    .map_err(ProcessEntriesError::Runtime)?;
+            }
+        }
         let prepared_results: Vec<Result<PreparedEntry, String>> = self
             .poh_pool
             .install(|| requests.into_par_iter().map(prepare_entry).collect());
@@ -790,6 +822,14 @@ impl RuntimeState {
             ));
         }
         let mut writes = self.freeze_root_and_drain()?;
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) && (98_091_119..=98_091_122).contains(&self.bank.slot())
+        {
+            let delta = self.bank.accounts().bank_hash_info_at(self.bank.slot());
+            eprintln!("epoch227 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
+        }
         if cfg!(feature = "epoch225-v1-6-25-diagnostic")
             && (97_199_876..=97_199_878).contains(&self.bank.slot())
         {
@@ -938,6 +978,16 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    )) && slot != EPOCH227_SNAPSHOT_SLOT
+    {
+        return Err(format!(
+            "epoch227 requires exact snapshot {}",
+            EPOCH227_SNAPSHOT_SLOT
+        ));
+    }
     if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
     {
         return Err("epoch223 fee/load diagnostic requires the exact cold snapshot".into());
@@ -981,7 +1031,12 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
 // does not extend any runtime snapshot or entry envelope.
 #[cfg(test)]
 pub(crate) fn boundary_snapshot_test_slot() -> u64 {
-    if cfg!(feature = "epoch223-v1-6-25-qualification") {
+    if cfg!(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    )) {
+        EPOCH227_SNAPSHOT_SLOT
+    } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
         epoch223_snapshot_test_anchor(
             env::var("JETSTREAMER_V1_6_25_EPOCH223_TEST_ANCHOR")
                 .ok()
@@ -1034,7 +1089,12 @@ fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
 }
 
 fn effective_min_supported_entry_slot() -> u64 {
-    if cfg!(feature = "epoch223-v1-6-25-qualification") {
+    if cfg!(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    )) {
+        EPOCH227_SNAPSHOT_SLOT + 1
+    } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
         EPOCH223_COLD_SNAPSHOT_SLOT + 1
     } else if cfg!(any(
         feature = "epoch225-v1-6-25-diagnostic",
@@ -1049,7 +1109,11 @@ fn effective_min_supported_entry_slot() -> u64 {
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic") {
+        EPOCH227_DIAGNOSTIC_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch227-v1-6-25-qualification") {
+        EPOCH227_QUALIFICATION_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
         EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE
     } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
         EPOCH223_END_EXCLUSIVE
@@ -1689,6 +1753,33 @@ mod tests {
     }
 
     #[test]
+    fn epoch227_wire_fixture_demotes_called_program_without_changing_wire_header() {
+        let transaction: Transaction = bincode::deserialize(include_bytes!(
+            "../../fixtures/epoch227-writable-token-program.bin"
+        ))
+        .unwrap();
+        assert_eq!(transaction.signatures[0].to_string(),
+            "5SZbyiFj1XnvQbE7AGdn8DK8JoWnVzsLzXP34gvRP4FUPvcYEKopyt3TdScfqCKN22BWDZwCXziRhTmYQvH5rpSU");
+        let message = &transaction.message;
+        assert_eq!(message.account_keys.len(), 15);
+        assert_eq!(message.header.num_readonly_unsigned_accounts, 4);
+        let key = message.account_keys[8];
+        assert_eq!(
+            key.to_string(),
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        );
+        assert!(
+            8 < message.account_keys.len() - message.header.num_readonly_unsigned_accounts as usize
+        );
+        assert!(message.is_key_called_as_program(8));
+        assert!(message.is_key_passed_to_program(8));
+        assert!(message.is_non_loader_key(&key, 8));
+        assert!(!message.is_writable(8));
+        let attribution = writable_key_attribution(&[transaction]).unwrap();
+        assert!(!attribution.contains_key(key.as_ref()));
+    }
+
+    #[test]
     fn epoch225_wire_fixture_called_program_writability() {
         let wire = bs58::decode(
             include_str!("../../../fixtures/epoch225-writable-token-program.base58").trim(),
@@ -2016,7 +2107,14 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) {
+            assert!(validate_candidate_snapshot_slot(EPOCH227_SNAPSHOT_SLOT).is_ok());
+            assert!(validate_candidate_snapshot_slot(EPOCH227_SNAPSHOT_SLOT - 1).is_err());
+            assert!(validate_candidate_snapshot_slot(EPOCH227_SNAPSHOT_SLOT + 1).is_err());
+        } else if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
             assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT).is_ok());
             assert!(validate_candidate_snapshot_slot(EPOCH223_TAIL_SNAPSHOT_SLOT).is_err());
             assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT - 1).is_err());
@@ -2068,7 +2166,11 @@ mod tests {
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+            if cfg!(feature = "epoch227-v1-6-25-diagnostic") {
+                EPOCH227_DIAGNOSTIC_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch227-v1-6-25-qualification") {
+                EPOCH227_QUALIFICATION_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
                 EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE
             } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
                 EPOCH223_END_EXCLUSIVE
@@ -2087,6 +2189,32 @@ mod tests {
                 MAX_SUPPORTED_SLOT_EXCLUSIVE
             }
         );
+    }
+
+    #[cfg(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    ))]
+    #[test]
+    fn epoch227_out_of_scope_batch_is_rejected_before_decode_or_bank_mutation() {
+        let (mut state, _) = test_state(2, Some(4));
+        state.enforce_candidate_range = true;
+        let cursor = state.write_cursor;
+        let ticks = state.bank.tick_height();
+        let slot = state.bank.slot();
+        for rejected in &[
+            EPOCH227_SNAPSHOT_SLOT,
+            effective_max_supported_entry_slot_exclusive(),
+        ] {
+            let mut request = request_for(&state, *rejected, 0, 1, &[]);
+            request.transactions = vec![vec![255]];
+            let error = state.process_entries(vec![request]).unwrap_err();
+            assert!(error.contains("outside"), "{}", error);
+            assert_eq!(state.write_cursor, cursor);
+            assert_eq!(state.bank.tick_height(), ticks);
+            assert_eq!(state.bank.slot(), slot);
+            assert_eq!(state.next_entry_index, 0);
+        }
     }
 
     #[cfg(feature = "epoch223-fee-load-warmup-diagnostic")]
@@ -3123,6 +3251,119 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[cfg(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    ))]
+    fn native_epoch227_v1625_cold_input_matches_canonical_accounts_commitment() {
+        use sha2::{Digest, Sha256};
+        use std::{
+            fs,
+            io::Read,
+            os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+        };
+        let snapshot = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst";
+        let ledger = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1";
+        let scratch = env::var("JETSTREAMER_EPOCH227_V1625_TEST_SCRATCH")
+            .expect("explicit isolated227 native test scratch required");
+        let path = Path::new(&scratch);
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
+        let root = path.parent().unwrap();
+        assert_eq!(
+            root.parent(),
+            Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        );
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("native-input227-v1625-"));
+        let metadata = fs::symlink_metadata(path).unwrap();
+        assert!(
+            metadata.is_dir()
+                && metadata.uid() == unsafe { libc::geteuid() }
+                && metadata.permissions().mode() & 0o077 == 0
+        );
+        assert_eq!(fs::canonicalize(path).unwrap(), path);
+        assert!(fs::read_dir(path).unwrap().next().is_none());
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(snapshot)
+            .unwrap();
+        let before = file.metadata().unwrap();
+        assert!(
+            before.is_file()
+                && before.uid() == 0
+                && before.nlink() == 1
+                && before.permissions().mode() & 0o222 == 0
+        );
+        assert_eq!(before.len(), 10_261_480_487);
+        let mut digest = Sha256::new();
+        let mut buffer = vec![0u8; 1024 * 1024];
+        loop {
+            let n = file.read(&mut buffer).unwrap();
+            if n == 0 {
+                break;
+            }
+            digest.input(&buffer[..n]);
+        }
+        assert_eq!(
+            format!("{:x}", digest.result()),
+            "77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07"
+        );
+        let identity = |m: &fs::Metadata| {
+            (
+                m.dev(),
+                m.ino(),
+                m.len(),
+                m.mtime(),
+                m.mtime_nsec(),
+                m.ctime(),
+                m.ctime_nsec(),
+                m.mode(),
+                m.nlink(),
+            )
+        };
+        assert_eq!(identity(&before), identity(&file.metadata().unwrap()));
+        assert_eq!(
+            identity(&before),
+            identity(&fs::symlink_metadata(snapshot).unwrap())
+        );
+        let (mut state, initialized) = RuntimeState::initialize(
+            ledger,
+            &jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+                archive_path: snapshot.into(),
+            },
+            Some(&scratch),
+        )
+        .unwrap();
+        assert_eq!(initialized.slot, EPOCH227_SNAPSHOT_SLOT);
+        let original_transactions = state.bank.transaction_count();
+        let checkpoint = state.freeze_checkpoint(EPOCH227_SNAPSHOT_SLOT).unwrap();
+        assert!(checkpoint.slot_complete && checkpoint.writes.is_empty());
+        assert_eq!(
+            checkpoint.next_write_version,
+            initialized.next_write_version
+        );
+        assert_eq!(checkpoint.transaction_count, original_transactions);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR"
+        );
+        assert_eq!(
+            identity(&before),
+            identity(&fs::symlink_metadata(snapshot).unwrap())
+        );
+        println!("epoch227-v1625-native-input slot={} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transaction_count={} tick_height={} next_write_version={} replay_entries=0 bootstrap_writes=0",
+            checkpoint.slot, Hash::new(&checkpoint.bank_hash), Hash::new(&checkpoint.accounts_hash),
+            Hash::new(&checkpoint.last_blockhash), checkpoint.capitalization, checkpoint.transaction_count,
+            checkpoint.tick_height, checkpoint.next_write_version);
+    }
+
+    #[test]
+    #[ignore]
     fn initializes_and_checkpoints_v1_6_25_boundary_snapshot() {
         let archive = std::env::var("JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT")
             .or_else(|_| std::env::var("JETSTREAMER_SNAPSHOT_93311535"))
@@ -3171,7 +3412,12 @@ mod tests {
     fn boundary_snapshot_test_anchor_matches_the_strict_build_profile() {
         let slot = boundary_snapshot_test_slot();
         validate_candidate_snapshot_slot(slot).unwrap();
-        if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) {
+            assert_eq!(slot, EPOCH227_SNAPSHOT_SLOT);
+        } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
             assert_eq!(slot, 96_335_538);
         } else if cfg!(any(
             feature = "epoch225-v1-6-25-diagnostic",

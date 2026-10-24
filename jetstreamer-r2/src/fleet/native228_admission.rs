@@ -331,7 +331,7 @@ pub(super) fn protected_growth(
         evidence,
     ))
 }
-fn protected_floor(
+pub(super) fn protected_floor(
     floor: u64,
     growth: u64,
     guards: &BTreeMap<String, BoundFile>,

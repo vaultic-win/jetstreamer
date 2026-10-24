@@ -239,7 +239,7 @@ fn century_floor(f: &Value) -> Result<u64> {
 }
 pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> {
     ensure!(
-        matches!(candidate_epoch, 207 | 209 | 227 | 228),
+        matches!(candidate_epoch, 207 | 209 | 210 | 223 | 227 | 228),
         "unregistered native candidate century"
     );
     let inventory = &f["inventory"];
@@ -1112,6 +1112,31 @@ mod tests {
             "sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)});
         completed["inventory"]["ready_pairs"] = json!(15);
         assert!(century_floor_for(&completed, 228).is_err());
+    }
+    #[test]
+    fn prepared210_and_native20_prefix223_share_century_but_require_their_own_missing_epoch() {
+        let mut baseline = inventory();
+        let mut relocated = baseline["inventory"]["entries"][9].clone();
+        relocated["epoch"] = json!(215);
+        baseline["inventory"]["entries"][9] = json!({"epoch":210,"state":"missing"});
+        baseline["inventory"]["entries"][14] = relocated;
+        for candidate in [210u64, 223] {
+            let f = baseline.clone();
+            assert_eq!(century_floor_for(&f, candidate).unwrap(), 2415);
+            let mut completed = f.clone();
+            completed["inventory"]["entries"][(candidate - 201) as usize] = json!({
+                "epoch":candidate,"state":"ready-pair","archive_length":1,
+                "sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)
+            });
+            completed["inventory"]["ready_pairs"] = json!(15);
+            assert!(century_floor_for(&completed, candidate).is_err());
+            let other = if candidate == 210 { 223 } else { 210 };
+            assert_eq!(century_floor_for(&completed, other).unwrap(), 2255);
+            let mut staged = f;
+            staged["inventory"]["entries"][(candidate - 201) as usize]["state"] =
+                json!("archive-only");
+            assert!(century_floor_for(&staged, candidate).is_err());
+        }
     }
     #[test]
     fn owner_shape_never_silently_drops_an_auxiliary_or_controller() {

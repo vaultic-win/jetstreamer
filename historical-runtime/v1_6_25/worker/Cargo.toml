@@ -28,6 +28,10 @@ epoch224-v1-6-25-qualification = []
 # Private bounded epoch-225 comparison; no default era or publication change.
 epoch225-v1-6-25-diagnostic = []
 epoch225-v1-6-25-qualification = []
+# Isolated epoch227 native/bounded comparison through the first failed vote.
+epoch227-v1-6-25-diagnostic = []
+# Exact epoch227 checkpoint qualification; no era or publication promotion.
+epoch227-v1-6-25-qualification = []
 
 [dependencies]
 bincode = "=1.3.1"

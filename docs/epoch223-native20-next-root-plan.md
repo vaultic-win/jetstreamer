@@ -81,6 +81,18 @@ admission/capture/observer/status adapter remains a required next gate.**
    cannot be inferred from a prefix's terminal hash or from a successful tail
    comparison. Keep the separately sealed native25 suffix comparison isolated;
    its earlier success cannot qualify the native20 prefix retroactively.
+   First capture the existing native25 input evidence as described in
+   `epoch223-tail-exact-evidence.md`; do not restore another Bank merely to
+   format that historical receipt. The raw producer journal and sealed segment
+   preserve the exact initialized/bootstrap cursor and full consensus tuple;
+   the older terminal summary rounded both capitalization integers and is
+   explicitly nonauthoritative for those values. Require the future native20
+   independently reread terminal consensus tuple to equal this native25 input
+   tuple before qualifying a handoff. Raw write cursors are local to separately
+   restored validators, so prefix and suffix cursor equality is not a handoff
+   condition; prove their separate contiguous emitted ranges and checked
+   normalization instead. The dormant native25 restart-test candidate remains
+   a contingency for a genuinely missing obligation, not required extra replay.
 4. Qualify the477-slot suffix96767523..96767999 and an explicit cursor/event
    mapping. Assemble only with proven ordered, non-overlapping coverage of all
    432,000 epoch slots and all existing cross-runtime boundary requirements.

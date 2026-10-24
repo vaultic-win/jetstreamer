@@ -3588,6 +3588,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-native227-terminal") {
         return fleet::capture_native227_terminal();
     }
+    if env::args().nth(1).as_deref() == Some("capture-full227-failure") {
+        return fleet::capture_full227_failure();
+    }
     if env::args().nth(1).as_deref() == Some("capture-native223-input") {
         return fleet::capture_native223_input();
     }
@@ -3614,6 +3617,24 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("admit-native209-input") {
         return fleet::admit_native209_input();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-native227-v1625-input") {
+        return fleet::admit_native227_v1625_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native227-v1625-input") {
+        return fleet::capture_native227_v1625_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native227-v1625-terminal") {
+        return fleet::capture_native227_v1625_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-native210-input") {
+        return fleet::admit_native210_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native210-input") {
+        return fleet::capture_native210_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native210-terminal") {
+        return fleet::capture_native210_terminal();
     }
     if env::args().nth(1).as_deref() == Some("capture-native209-input") {
         return fleet::capture_native209_input();
