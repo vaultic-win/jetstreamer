@@ -99,13 +99,17 @@ not a rewritten launch or a broad exception in `guard_matches`:
    memory/VMA/root caps and all raw original proof remain unchanged.
 2. Bind the exact fresh accepted observer and complete fleet, per-owner original
    growth reservations and baselines, validated allocation/output credits,
-   century inventory and every effective external/internal floor. Recompute P
-   using checked integer arithmetic; the transition cannot discount any claim.
+   century inventory and every effective external/internal floor. Compute
+   `P_after = max(C + G, all external floors except only the explicitly superseded
+   old guard, all internal floors)` with checked arithmetic; no growth claim,
+   allocation requirement or internal floor is removed. During overlap the
+   effective floor remains `P_overlap = max(P_after, old_external_floor)`.
    Bind a complete same-sample before/after census and current guard allocation
    evidence. Preserve auxiliary writers and outstanding metadata reservations.
 3. Bind a distinct new guard binary/plan/service/timer and its exact requested
-   threshold. The threshold must cover recomputed P and every still-effective
-   internal floor. A native 223 overlay claiming an effective floor below 2 TB
+   threshold. The new threshold must cover P_after. Handoff itself must protect
+   P_overlap; subsequent admissions cannot use the lower prospective value until
+   real old-guard retirement is authenticated. A native 223 overlay claiming an effective floor below 2 TB
    must be rejected for this immutable runner, regardless of proposed capacity.
 4. Qualify the new guard under the unchanged producer identity and prove its
    actual successful PID1 fire plus armed timer before retiring old external
