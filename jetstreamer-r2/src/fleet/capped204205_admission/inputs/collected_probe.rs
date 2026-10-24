@@ -68,6 +68,10 @@ fn collected_journal(
     executed: &BoundFile,
     result: &Value,
 ) -> Result<()> {
+    ensure!(
+        number(result, "probe_main_pid")? > 1,
+        "collected probe lost its actual executed PID"
+    );
     journal(v, p, executed, result)?;
     let rows = v.as_array().context("collected probe journal array")?;
     let boot = rows[0]["_BOOT_ID"]
