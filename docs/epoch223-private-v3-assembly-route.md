@@ -116,12 +116,13 @@ handle and writes a private no-clobber `assembly.json`. `intent.json` is durable
 before output creation. Failure preserves all inputs and partial output; there
 is no automatic retry, cleanup, resume or replacement authority.
 
-## Explicit remaining admission gap
+## Prepared independent admission; qualification still required
 
 The existing epoch144 assembly admission/fleet adapters are closed to144 and
-cannot be borrowed. A reviewed actual223 adapter producing
-`jetstreamer-private223-v3-assembly-admission-v1` remains required before this
-assembler is launchable. Its contract binds the actual assembler, handoff
+cannot be borrowed. Source now includes an independent two-stage actual223
+adapter producing `jetstreamer-private223-v3-assembly-admission-v1`. It remains
+unqualified and unsealed until the actual prefix completes and its real
+independent reread/terminal/equality evidence is available. Its contract binds the actual assembler, handoff
 request/receipt, prefix/tail digests, output filesystem/device,160GiB maximum
 output,64/48GiB memory limits,24h time limit, complete accepted fleet ledger,
 fresh invocation-bound observer and all preserved older guards/century claims.
@@ -142,3 +143,87 @@ full/plugin/fleet adapters separately; do not route this source through a
 single-runtime V2 verifier or the203 same-runtime V4 publisher. Only after all
 normal full/plugin/boundary/publication checks may the normal authenticated
 uploader commit a matching sidecar. Keep223 open until the verified ready pair.
+
+
+The first stage is `jetstreamer-r2 admit-assembly223-capacity SPEC
+--spec-sha256 HEX --self-sha256 HEX`. Its closed spec schema is
+`jetstreamer-private223-assembly-capacity-spec-v1`, with `resource_basis`
+(the existing exact observer/fleet/protected_guards map) and a no-clobber
+`/var/lib/jetstreamer/horizon-223-assembly-capacity-NAME/capacity.json` output.
+It reuses the neutral `maintenance_capacity` complete-owner core. Foundation's
+wrapper preserves its old successful receipt shape and disk-only behavior.
+Assembly adds the sealed 160GiB output, at least 2TB protected floor, a 64GiB
+candidate memory cap, complete typed remaining owner memory, and 10% host memory
+reserve. Sampled and fresh available memory must fit both before and after.
+It requires every protected timer active and the exact latest completed guard
+fire in both brackets. Unknown owners, active223 sources, mismatching observer
+bindings, terminal histories or caps refuse admission. This stage authenticates
+capacity only and explicitly denies source completion and assembly launch.
+
+The second stage is `jetstreamer-epoch223-assembly-admit PLAN PLAN_SHA256
+SELF_SHA256`. Its closed request schema is
+`jetstreamer-private223-assembly-admission-request-v1`, with bound
+`handoff_request`, `handoff_receipt`, `capacity`, separately supplied
+`capacity_tool_sha256` and `assembler_sha256`, and no-clobber output
+`/var/lib/jetstreamer/horizon-223-assembly-admission-NAME/admission.json`.
+The tool reruns the shared real metadata handoff preparation, requires the
+actual old qualified gate's exact receipt, validates the independent capacity
+and its freshness, rehashes the original ledger/observer and performs the
+shared exact loaded/unloaded source-idle checks. It writes mode0400, fsyncs the
+receipt and parent, records the actual output device, and grants only the
+fixed private assembly. No sample, future output hash, completion receipt,
+checkpoint or admission may be invented to exercise this route operationally.
+
+Before operational use, qualify and seal both stages plus the rebuilt
+assembler; add the exact assembly fleet/capture and protective guard adapters,
+then prepare the private V3 independent full/current-plugin/import route.
+These last adapters remain a real deployment blocker; a source test or an
+admission file alone is not authority to bypass them.
+
+## Exact qualification and seal checklist
+
+1. Keep the original native20 producer and native25 tail untouched. After actual
+   native20 PID1 success, preserve its original completion, segment manifest,
+   terminal journal and independent prefix reread. Invoke the previously
+   qualified gate in `horizon-223-handoff-plan-tool-f44af401-v2`; require the
+   shared metadata recomputation to reproduce its real result. A loaded-to-unloaded
+   manager transition needs the shared complete absence adapter, not a recreated
+   service or an invented successful `systemctl show` row.
+2. Validate the new observer core fixtures, node assembler integration and
+   admission fixtures, R2 maintenance-capacity/closed-scope fixtures, and strict
+   production Clippy. Build the actual release binaries once in a coordinated
+   shared Cargo window. No test invokes source-idle `observe` or real host
+   admission by default.
+3. Hash the actual rebuilt assembler, admission writer and R2 binary. The Rust
+   deployment sealer must seal those exact bytes, source revision/tree and unit
+   templates without altering the two older packages. No future binary digest
+   may be substituted in a spec before this step. The minimal sandbox proof
+   must demonstrate private traversal and complete `/proc` scanning with only
+   `cap_dac_override cap_sys_ptrace` while the sources remain read-only.
+4. Prepare the exact assembly namespace in fleet/observer/guard code and seal
+   it before launch. Fresh capacity uses the accepted normal sample at that
+   time, plus complete owner and active-timer/latest-fire brackets. Then the
+   node admission authenticates the real handoff/source-idle and produces the
+   private mode0400 admission. A successful admission grants only the fixed
+   bounded private assembly, never any next-stage gate.
+5. After the actual assembler terminal, bind its actual invocation, output
+   identity, full hash, provenance and completion with successful PID1 history.
+   Recompute the independent V3 expectation from the original two manifests and
+   handoff, rather than trusting a hash copied from the assembled header. The
+   strict existing `verify_archive --full --anchor SLOT HASH
+   --expected-terminal SLOT HASH --expected-provenance-sha256 HEX --threads 8`
+   supports this independent provenance binding. For epoch223 the adjacent
+   anchor slot is **96335999** and terminal slot is **96767999**. The original
+   native20 bootstrap checkpoint **96335538 is not the adjacent anchor**;
+   preserve separate sealed finalized boundary metadata for the actual hashes.
+6. The private V3 runner must stage one unchanged canonical-name
+   `epoch-223.jet` outside `HORIZON_DIR`, bind independent full and current-plugin
+   scans to those same bytes, preserve before/after identities and fsynced logs,
+   and leave runtime promotion/import/sidecar/R2 gates false. Its exact service,
+   complete-owner admission, fleet/capture and import adapter still require
+   implementation/qualification; neither the ordinary V2 qualification reader
+   nor the fixed203 V4 publisher supplies this route.
+7. Only the separately qualified import/publication path may produce a local
+   canonical pair. The usual full/plugin/boundary and authenticated remote
+   upload/readback/sidecar gates remain mandatory. Status cleanup follows the
+   canonical remote sidecar commit, with no anonymous-origin dependency.

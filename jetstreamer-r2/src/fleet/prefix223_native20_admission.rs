@@ -122,7 +122,7 @@ fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
         _ => anyhow::bail!("unmodeled protective selector:{name}"),
     })
 }
-fn completed_guards(
+pub(super) fn completed_guards(
     f: &Value,
     guards: &BTreeMap<String, BoundFile>,
     sample: u64,

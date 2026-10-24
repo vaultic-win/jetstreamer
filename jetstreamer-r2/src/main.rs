@@ -3525,6 +3525,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("retire-warmup223-scratch") {
         return fleet::retire_warmup223_scratch();
     }
+    if env::args().nth(1).as_deref() == Some("admit-assembly223-capacity") {
+        return fleet::admit_assembly223_capacity();
+    }
     if env::args().nth(1).as_deref() == Some("admit-prefix223-native20") {
         return fleet::admit_prefix223_native20();
     }

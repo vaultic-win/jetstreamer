@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
+mod assembly223_capacity;
 mod assembly144_admission;
 mod assembly144_prepare;
 mod bounded205;
@@ -20,6 +21,7 @@ mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
 mod foundation_holding_capacity;
+mod maintenance_capacity;
 mod full209_status;
 mod full227_failure;
 mod full227_status;
@@ -295,6 +297,9 @@ pub(super) fn native209_terminal_status_identity(proof: &Value) -> Result<(Strin
 }
 pub(super) fn admit_native210_input() -> Result<()> {
     native210_admission::run()
+}
+pub(super) fn admit_assembly223_capacity() -> Result<()> {
+    assembly223_capacity::run()
 }
 pub(super) fn foundation_holding_capacity(spec: &Value, additional_bytes: u64) -> Result<Value> {
     foundation_holding_capacity::check(spec, additional_bytes)
