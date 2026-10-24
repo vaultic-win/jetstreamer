@@ -3,6 +3,42 @@ use super::*;
 #[cfg(test)]
 mod tests;
 
+// This profile constructs an exact metadata-free command. Accept only the one
+// well-formed systemd display record; never normalize argv or other profiles.
+fn probe_exec_start_matches(expected: &str, actual: &str) -> bool {
+    if expected == actual {
+        return true;
+    }
+    let Some(expected) = expected.strip_suffix(" }") else {
+        return false;
+    };
+    let Some((identity, metadata)) = actual.split_once(" ; start_time=") else {
+        return false;
+    };
+    if identity != expected {
+        return false;
+    }
+    let Some(metadata) = metadata.strip_suffix(" }") else {
+        return false;
+    };
+    let fields: Vec<_> = metadata.split(" ; ").collect();
+    let timestamp = |s: &str| {
+        s.strip_prefix('[')
+            .and_then(|s| s.strip_suffix(']'))
+            .is_some_and(|s| !s.is_empty() && !s.contains(['[', ']', '{', '}', ';', '\n', '\r']))
+    };
+    fields.len() == 5
+        && timestamp(fields[0])
+        && fields[1].strip_prefix("stop_time=").is_some_and(timestamp)
+        && fields[2].strip_prefix("pid=").is_some_and(|s| {
+            !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && s.parse::<u32>().is_ok()
+        })
+        && matches!(fields[3], "code=exited" | "code=killed" | "code=dumped")
+        && fields[4].strip_prefix("status=").is_some_and(|s| {
+            !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && s.parse::<u32>().is_ok()
+        })
+}
+
 pub(super) fn proposal(s: &Spec, p: &Value, r: &Value) -> Result<()> {
     let epoch = number(p, "epoch")?;
     original(epoch)?;
@@ -262,7 +298,7 @@ pub(super) fn capability(s: &Spec, p: &Value, r: &Value) -> Result<Value> {
         probe.sha256
     );
     ensure!(
-        pipeline_status::same_exec_start(&command, string(&terminal, "ExecStart")?),
+        probe_exec_start_matches(&command, string(&terminal, "ExecStart")?),
         "capped probe command differs from exact package/plan"
     );
     let journal = native209::immutable_json(&bound_member(&v["manager_journal"])?)?;

@@ -1,6 +1,6 @@
 # Fresh resource admission for original capped 204/205 continuation
 
-The new `jetstreamer-r2 admit-capped204205-continuation SPEC --plan-sha256 SHA
+The new `jetstreamer-r2 admit-capped204205-continuation SPEC --spec-sha256 SHA
 --self-sha256 SHA` command is a root-only, one-shot admission transaction. This
 source implementation does not call it, initialize a Bank, read source archive or
 snapshot bodies, run a replay, change a producer, or contact R2. No successful
@@ -208,7 +208,7 @@ canonical sidecar remain distinct gates.
 
 ## Qualification state
 
-The 12 targeted adversarial tests passed; the complete R2 suite passed 782 tests
+The original emitter's 12 targeted adversarial tests passed; its complete R2 suite passed 782 tests
 with 48 existing ignored. Strict production/test all-target Clippy passed, using
 the shared absolute target, incremental off, locked offline release profile and
 two build jobs. Logs: `/tmp/capped204205-admission-targeted-tests.log`,
@@ -227,3 +227,18 @@ live probe or R2 operation has been performed from this worktree. The later
 frozen release candidate build is a source artifact, with full tracked source,
 Cargo lock/toolchain and literal production-dependency records; it is not a
 runtime deployment or an observer executable.
+
+
+## Actual manager command compatibility
+
+The capped 204/205 capability consumer accepts its exact metadata-free probe
+command and the same single systemd ExecStart record with complete display
+metadata. Path, argv, digests and `ignore_errors=no` remain byte-exact. The local
+adapter rejects missing, malformed, reordered or extra metadata fields and any
+trailing command or record; the generic command matcher remains unchanged.
+
+
+The command-compatibility successor passed 13 targeted tests and the full R2
+suite (783 passed, 48 existing ignored). The regression exercises an actual
+metadata-bearing manager command and adversarial changes to argv, immutable
+bindings, ignore-errors policy, numeric fields and command-record boundaries.

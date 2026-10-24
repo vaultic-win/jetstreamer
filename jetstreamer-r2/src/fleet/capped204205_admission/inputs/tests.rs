@@ -282,3 +282,32 @@ fn generated_probe_result_binds_real_kernel_controls_and_exact_artifact() {
         );
     }
 }
+
+#[test]
+fn probe_command_accepts_one_actual_manager_record_without_relaxing_identity() {
+    let expected = "{ path=/sealed/probe ; argv[]=/sealed/probe /sealed/plan --plan-sha256 abc --self-sha256 def ; ignore_errors=no }";
+    let actual = expected.trim_end_matches(" }").to_owned()
+        + " ; start_time=[Fri 2026-10-24 00:00:00 UTC] ; stop_time=[Fri 2026-10-24 00:00:01 UTC] ; pid=300 ; code=exited ; status=0 }";
+    assert!(probe_exec_start_matches(expected, expected));
+    assert!(probe_exec_start_matches(expected, &actual));
+    for bad in [
+        actual.replace("path=/sealed/probe", "path=/wrong/probe"),
+        actual.replace("argv[]=/sealed/probe", "argv[]=/wrong/probe"),
+        actual.replace("/sealed/plan --", "/sealed/other --"),
+        actual.replace("sha256 abc", "sha256 xyz"),
+        actual.replace("ignore_errors=no", "ignore_errors=yes"),
+        actual.replace("pid=300", "pid=+300"),
+        actual.replace("pid=300", "pid=4294967296"),
+        actual.replace("code=exited", "code="),
+        actual.replace("status=0", "status="),
+        actual.replace("status=0", "status=0 trailing"),
+        actual.replace("stop_time=[Fri 2026-10-24 00:00:01 UTC]", "stop_time=[]"),
+        actual.replace(" ; pid=300", " ; extra=1 ; pid=300"),
+        actual.clone() + " trailing",
+        actual.clone() + " ; " + expected,
+        actual.replace("status=0 }", "status=0 } { path=/evil }"),
+        actual.replace(" ; stop_time=", " stop_time="),
+    ] {
+        assert!(!probe_exec_start_matches(expected, &bad), "accepted {bad}");
+    }
+}
