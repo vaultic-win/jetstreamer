@@ -6,14 +6,14 @@ SHA256 `e03e6f171b5b6eac6011ff62e172cd333290e25df1d58fb6de1009c7d532e25b`.
 That proof establishes bootstrap accounts commitment only. It grants no full
 replay, runtime registry promotion, archive verification, or publication.
 
-This source candidate adapts the isolated209 singleton lifecycle to210 while
-preserving the original209 modules and healthy producer. It binds the existing
+This source candidate adapts the isolated 209 singleton lifecycle to 210 while
+preserving the original 209 modules and healthy producer. It binds the existing
 sealed node `e4b1df9aa6430456e703c283a7ed3512f5b5ada489d016b98e9d47332836ec4f`,
 shrink-budget v1.6.16 worker
 `4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc`,
 and exact input package
 `/var/lib/jetstreamer/horizon-focused-210-complete-span-store8-ca2e38b-v1`.
-Its8,579,041,139-byte bootstrap snapshot digest is
+Its 8,579,041,139-byte bootstrap snapshot digest is
 `3f67f416d254d7fb795bc902d5c47a6ae374fa36c173c00411d4b541fc610ccd`.
 Genesis retains digest
 `133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945`.
@@ -23,8 +23,8 @@ The existing sealed `preflight210-singleton.json` in
 `5a3df330f13cb1bd67053ee8f3eecb1300136eeb94f0b0b7842bea7d777bfbf1` and
 manifest fingerprint
 `sha256:723578e0e7eef4daa09b68bb2a45263f61bcb19ce49daef094d3174ee1f65b6b`.
-Bootstrap is slot90,719,638. Output covers all432,000 slots90,720,000–91,151,999;
-the independently committed checkpoint is91,151,575, followed by424 output
+Bootstrap is slot 90,719,638. Output covers all 432,000 slots 90,720,000–91,151,999;
+the independently committed checkpoint is 91,151,575, followed by 424 output
 slots. An archive ending at that checkpoint is incomplete. The expected
 checkpoint accounts hash is `xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx`.
 
@@ -38,15 +38,15 @@ successful small attempt. The source-only service template is dormant and
 requires separately sealed actual unit/binaries/plans, equivalent sandbox
 qualification and fresh complete admission before any host start.
 
-The envelope is300,000,000,000 scratch bytes plus160GiB output, with a separate
-32MiB phase-metadata reservation. The225,000,000,000-byte memory maximum must
-fit within1.5x the observed maximum lane RSS of this century. Complete neutral
+The envelope is 300,000,000,000 scratch bytes plus 160 GiB output, with a separate
+32 MiB phase-metadata reservation. The 225,000,000,000-byte memory maximum must
+fit within 1.5x the observed maximum lane RSS of this century. Complete neutral
 capacity admission protects every accepted current peer's remaining disk/memory
-growth, existing guard floors, the dynamic2x century-average `.jet` floor and
-the10% host memory reserve. It also checks pressure, VMA floor, exact owner/cap
+growth, existing guard floors, the dynamic 2x century-average `.jet` floor and
+the 10% host memory reserve. It also checks pressure, VMA floor, exact owner/cap
 brackets, active guard timers and their latest successful fires. No native-only
-96GB envelope, omitted peer, historic free-space measurement, or failed original
-full227 attempt can be treated as released live capacity.
+96 GB envelope, omitted peer, historic free-space measurement, or failed original
+full 227 attempt can be treated as released live capacity.
 
 Commands are `prepare-singleton210-inputs`, `admit-singleton210`,
 `capture-singleton210` and `status-publish-full210`, each using the ordinary
@@ -55,37 +55,37 @@ sealed Rust self/spec bindings. Admission spec schema is
 `resource_basis`, `resource_plan`, `capability`, `native_input`, and a private
 `horizon-210-singleton-admission-*/admission.json` output. The resource plan has
 schema `jetstreamer-private-epoch210-singleton-resource-plan-v1` and pins
-epoch/mode/unit/root, candidate peak, scratch, memory max/high,32MiB metadata,
+epoch/mode/unit/root, candidate peak, scratch, memory max/high, 32 MiB metadata,
 node/worker digests and manifest fingerprint; every publication/runtime
 promotion flag remains false. Capture is a separate exact real first-fire
 operation. Merely preparing/admitting the candidate starts no service.
 
-Full210 peer accounting is added to the shared capacity path so later
+Full 210 peer accounting is added to the shared capacity path so later
 admissions cannot omit its remaining whole-root or hard-cgroup growth. Guard
 allocation credit uses the smaller of coordinated same-invocation observation
 and current authenticated guard allocation. Actual memory limits must match
-the requested225GB/150GB values after kernel page rounding; swap stays zero.
+the requested 225 GB / 150 GB values after kernel page rounding; swap stays zero.
 All raw accepted observer/fleet evidence and original failed-attempt history
 remain intact.
 
-Status publication follows the209 model: supported `verification` during
+Status publication follows the 209 model: supported `verification` during
 initialization/warmup, `replay` during actual epoch execution, definite ETA
 through sidecar commit, generated bytes measured from the actual private
 archive, no counter-reset shortcut, and exact inactive-owner cleanup support.
-Use the existing single30-minute observation cadence and event/request
+Use the existing single 30-minute observation cadence and event/request
 exceptions. There is no extra polling loop or direct public status mutation.
 
 Full runtime/checkpoint, independent content/plugin/boundary verification,
 full-tail coverage and receipt-gated delivery remain separate qualification
-work. This source work deliberately adds no210 delivery bypass, canonical
+work. This source work deliberately adds no 210 delivery bypass, canonical
 sidecar, R2 upload, runtime promotion or local retirement. After a private
 candidate finishes, review the complete runtime/checkpoint result and build its
 separate exact delivery route; the native proof and live launch are insufficient.
 
 The guard is a separately compiled `epoch210-singleton-guard` profile; the
-existing209 guard rejects210 and cannot be borrowed. The candidate210 guard
+existing 209 guard rejects 210 and cannot be borrowed. The candidate 210 guard
 digest is `910cdfe2a1adb5f50c5223464a1c9a690dc48a44d6251374b1ab744faec28c9f`.
-Both210-feature and209-feature suites passed34 tests, and strict210 guard
+Both the 210 and 209 feature suites passed 34 tests, and strict 210 guard
 Clippy/release passed. Its non-production review copy is beneath
 `.codex/tmp-readiness/full210-candidate-artifacts-v1/`. Root must seal it at
 the profile's exact `horizon-210-singleton-main-guard-v1` path before launch;
@@ -111,10 +111,10 @@ checks are relaxed.
 
 ## Source qualification result
 
-At source `b456559b`, the complete R2 small-feature suite passed665 tests with
+At source `b456559b`, the complete R2 small-feature suite passed 665 tests with
 48 host-specific tests ignored; strict production Clippy and release build
-passed. The exact210 guard feature and compatibility209 guard feature each
-passed34 tests, with strict210 guard Clippy/release also passing. Independent
+passed. The exact 210 guard feature and compatibility 209 guard feature each
+passed 34 tests, with strict 210 guard Clippy/release also passing. Independent
 review identified the original guard-profile and cleared-IID cleanup gaps;
 both were corrected before this final qualification.
 
@@ -126,10 +126,10 @@ Review copies are in
 - `jetstreamer-horizon-standalone-guard`: SHA256
   `910cdfe2a1adb5f50c5223464a1c9a690dc48a44d6251374b1ab744faec28c9f`.
 
-These copies are source/build evidence, not root-sealed deployments. No210 job,
+These copies are source/build evidence, not root-sealed deployments. No 210 job,
 guard fire, resource observation, R2 mutation, snapshot restoration or Bank
 rerun was performed. Root still owns exact deployment sealing, actual sandbox
 qualification and fresh complete admission before any start. The shared
-capacity dependency is the qualified223 `f28d4be4` API; later coordinated223
+capacity dependency is the qualified 223 `f28d4be4` API; later coordinated 223
 memory-rounding/validator changes must be integrated as a pair rather than
 silently changing only this helper's arithmetic.
