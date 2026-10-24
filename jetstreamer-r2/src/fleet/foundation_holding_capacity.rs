@@ -3,6 +3,8 @@
 use super::*;
 #[path = "foundation_holding_capacity_guards.rs"]
 mod continuation_guards;
+#[path = "foundation_holding_terminal_pair.rs"]
+mod terminal_pair;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -107,6 +109,9 @@ fn check_inner(
         unsafe { libc::geteuid() } == 0,
         "Foundation restore capacity requires root"
     );
+    if value["schema"] == terminal_pair::SCHEMA {
+        return terminal_pair::check(value, additional, context);
+    }
     if let Some(context) = context {
         ensure!(
             additional == 0,

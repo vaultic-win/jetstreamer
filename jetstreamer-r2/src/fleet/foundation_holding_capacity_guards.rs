@@ -41,7 +41,7 @@ fn roster(f: &Value) -> Result<BTreeMap<String, &'static str>> {
     );
     Ok(services)
 }
-fn same_guard(old: &Value, current: &Value, plan: &Value, owner: &Value) -> Result<()> {
+pub(super) fn same_guard(old: &Value, current: &Value, plan: &Value, owner: &Value) -> Result<()> {
     for key in [
         "plan",
         "plan_sha256",
@@ -84,6 +84,34 @@ pub(super) fn refresh(
     now: u64,
 ) -> Result<(BTreeMap<String, BoundFile>, Value)> {
     let services = roster(f)?;
+    refresh_selected(f, original, sample, now, services)
+}
+/// The caller has separately proved the closed two-terminal transition. Keep
+/// the original five-owner wrapper and every live guard predicate unchanged.
+pub(super) fn refresh_terminal_pair(
+    f: &Value,
+    original: &BTreeMap<String, BoundFile>,
+    sample: u64,
+    now: u64,
+) -> Result<(BTreeMap<String, BoundFile>, Value)> {
+    super::terminal_pair::live_roster(f)?;
+    let services = original
+        .keys()
+        .map(|name| Ok((name.clone(), selector(name)?)))
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    ensure!(
+        services.len() == 3,
+        "terminal-pair continuation needs its three exact live guards"
+    );
+    refresh_selected(f, original, sample, now, services)
+}
+fn refresh_selected(
+    f: &Value,
+    original: &BTreeMap<String, BoundFile>,
+    sample: u64,
+    now: u64,
+    services: BTreeMap<String, &'static str>,
+) -> Result<(BTreeMap<String, BoundFile>, Value)> {
     ensure!(
         services.keys().eq(original.keys()),
         "continuation changed the original protective owner roster"
@@ -142,8 +170,8 @@ pub(super) fn refresh(
         selected.insert(name.into(), binding);
     }
     ensure!(
-        selected.len() == 5 && selected.keys().eq(original.keys()),
-        "continuation must preserve all five original protective guards"
+        selected.keys().eq(services.keys()) && selected.keys().eq(original.keys()),
+        "continuation must preserve its complete validated protective guard roster"
     );
     Ok((selected, Value::Object(histories)))
 }

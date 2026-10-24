@@ -1,0 +1,39 @@
+{
+  "scope": "Root-provided static terminal evidence for parser tests. Result/manager fixtures select only required nonsensitive fields. Launch and PID 1 bytes are unchanged. No current observation was taken.",
+  "files": [
+    {
+      "epoch": 204,
+      "launch_sha256": "a1b38f09bb1314c9280ca924602bab1523d28755146919912f604c1ee9bbfdfb",
+      "selected_static_root_metadata": {
+        "result204.json": {
+          "source_path": "/var/lib/jetstreamer/horizon-capped204-original-terminal-and-reader-launch-v1/producer-result.json",
+          "source_sha256": "a650179aadb678475386b680b49147f73e89cfd824226eba5cf4c1e2b1f21818",
+          "selected_fixture_sha256": "914a6307fab4aff423828ba9f4ae7d023259f0227361623b9424dbc538481a00"
+        },
+        "manager204.json": {
+          "source_path": "/var/lib/jetstreamer/horizon-capped204-original-terminal-and-reader-launch-v1/terminal-manager-explicit.json",
+          "source_sha256": "1d9e76ecd887a532c1e74bff1ad1e122920c5f82ee4740729f61a1d0d23ebb3c",
+          "selected_fixture_sha256": "671c86023f306bf553db17f7a5eaea1a463ae292a2a922821f35a75c6223b8a0"
+        }
+      },
+      "complete_pid1_journal_sha256": "90d8963d050ce5399d31dfba54bb8b587eabda73145f4f6f2483e7d77a40a33a"
+    },
+    {
+      "epoch": 205,
+      "launch_sha256": "febbbb44b1d2b16afc3511e171dbb1f1aab732890893be1ce2f72239bc01ca9e",
+      "selected_static_root_metadata": {
+        "result205.json": {
+          "source_path": "/var/lib/jetstreamer/horizon-capped205-original-terminal-and-reader-launch-v1/producer-result.json",
+          "source_sha256": "1298a50d00ca349bae8328b640718d601c37692071ea5c3cf53ba072386418fb",
+          "selected_fixture_sha256": "eec045baad53181eb456c047d57806f834481e3dd52e84f81a5830d49f53184e"
+        },
+        "manager205.json": {
+          "source_path": "/var/lib/jetstreamer/horizon-capped205-original-terminal-and-reader-launch-v1/terminal-manager-full.json",
+          "source_sha256": "2e406e5dffa2917a2605795115e59b1ab6006f1570275328dbeddfa837af5d25",
+          "selected_fixture_sha256": "618f2afa4595d772ee2886162211c000f70943792ca76791371b6d7dbd3c75f7"
+        }
+      },
+      "complete_pid1_journal_sha256": "d39320d8f233113a93129ae7dc5d9bace6868b57ec0859f6e6f10375c26a2a69"
+    }
+  ]
+}

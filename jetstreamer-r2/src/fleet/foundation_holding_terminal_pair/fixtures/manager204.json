@@ -1,0 +1,13 @@
+{
+  "Id": "horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service",
+  "LoadState": "loaded",
+  "ActiveState": "inactive",
+  "SubState": "dead",
+  "InvocationID": "",
+  "MainPID": "0",
+  "NRestarts": "0",
+  "ControlGroup": "",
+  "Result": "success",
+  "ExecMainStatus": "0",
+  "ExecStart": "{ path=/var/lib/jetstreamer/horizon-prefix204-input-capability-fcbf3992-v1/jetstreamer-epoch204-shrink-root-prefix-resource ; argv[]=/var/lib/jetstreamer/horizon-prefix204-input-capability-fcbf3992-v1/jetstreamer-epoch204-shrink-root-prefix-resource /var/lib/jetstreamer/horizon-prefix204-resource-fcbf3992-v1/resource-plan.json --plan-sha256 cc5109ed54c4b5cdc7db99a7e839708753b677cee11b7ca867c30e7a198911ba --self-sha256 1cd9bfe3418616add2319802adc4caf66b86e3f6fdf6c903c4be2648b10c0baa ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+}
