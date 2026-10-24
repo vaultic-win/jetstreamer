@@ -102,8 +102,12 @@ pub(super) fn validate(p: &Value) -> Result<()> {
     );
     ensure!(
         pipeline_status::same_exec_start(
-            custody::bound(&binding(&r["wrapper_launch"])?, false)?["claim"]["expected_exec_start"].as_str().context("191 wrapper command missing")?,
-            u["ExecStart"].as_str().context("191 manager command missing")?
+            custody::bound(&binding(&r["wrapper_launch"])?, false)?["claim"]["expected_exec_start"]
+                .as_str()
+                .context("191 wrapper command missing")?,
+            u["ExecStart"]
+                .as_str()
+                .context("191 manager command missing")?
         ),
         "191 repaired verifier command changed"
     );
