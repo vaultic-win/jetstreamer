@@ -15,7 +15,7 @@ struct Plan {
 fn producer() -> Result<Value> {
     let mut u = fleet::unit(UNIT)?;
     let out = Command::new("/usr/bin/systemctl")
-        .args(["show", UNIT, "--property=Job"])
+        .args(["show", UNIT, "--all", "--property=Job"])
         .output()?;
     ensure!(
         out.status.success() && out.stdout.len() < 1024,
