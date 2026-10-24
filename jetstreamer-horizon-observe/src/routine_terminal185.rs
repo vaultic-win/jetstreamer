@@ -308,6 +308,48 @@ pub(super) fn config(p: &Plan, c: &mut Value) -> Result<()> {
     rows.retain(|r| r["range"] != "185-185");
     Ok(())
 }
+fn recovery_target(ordinary_next: &str, target: &str) -> Result<()> {
+    let delay = utc_seconds(target)?
+        .checked_sub(utc_seconds(ordinary_next)?)
+        .context("185 recovery target precedes ordinary successor")?;
+    ensure!(
+        delay <= 1800,
+        "185 recovery target exceeds one recovery window"
+    );
+    Ok(())
+}
+// An explicit sealed handoff may delay this first transition only. The accepted
+// predecessor and all proof/sample clocks remain unchanged; no clock is guessed.
+fn retime(p: &mut Plan, c: &mut Value, target: &str) -> Result<()> {
+    recovery_target(&p.sample_target_utc, target)?;
+    let new = stamp(target);
+    let observer = p
+        .observer
+        .parent()
+        .context("185 observer parent")?
+        .join(format!("sample-{new}.json"));
+    let estimates = p
+        .estimate_output
+        .parent()
+        .context("185 estimate parent")?
+        .join(format!(
+            "horizon-r2-status-estimates-{new}-cohort-gated-v5.json"
+        ));
+    let fleet = p
+        .fleet_output
+        .parent()
+        .context("185 fleet parent")?
+        .join(format!("fleet-{new}.json"));
+    p.observer = observer;
+    p.estimate_output = estimates;
+    p.fleet_output = fleet;
+    p.sample_target_utc = target.into();
+    c["not_before_utc"] = json!(target);
+    c["output"] = json!(p.observer);
+    // Caller regenerates the package, cycle and observer-config namespaces via
+    // prefix157::namespaces after this authenticated transition is enabled.
+    Ok(())
+}
 pub(super) fn enable(p: &mut Plan, c: &mut Value, spec: &Bound) -> Result<()> {
     let v = bound_json(spec, true)?;
     ensure!(
@@ -318,6 +360,15 @@ pub(super) fn enable(p: &mut Plan, c: &mut Value, spec: &Bound) -> Result<()> {
             && p.terminal185.is_none(),
         "foreign185 handoff"
     );
+    if let Some(target) = v.get("sample_target_utc") {
+        retime(
+            p,
+            c,
+            target
+                .as_str()
+                .context("185 recovery target must be explicit UTC")?,
+        )?;
+    }
     p.terminal185 = Some(serde_json::from_value(v["profile"].clone())?);
     validate(p)?;
     config(p, c)?;
@@ -350,6 +401,58 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn explicit_recovery_target_respects_ordinary_floor_and_bounded_window() {
+        for target in [
+            "2026-10-24T00:56:00Z",
+            "2026-10-24T01:06:00Z",
+            "2026-10-24T01:26:00Z",
+        ] {
+            recovery_target("2026-10-24T00:56:00Z", target).unwrap();
+        }
+        for target in [
+            "2026-10-24T00:26:00Z",
+            "2026-10-24T00:55:59Z",
+            "2026-10-24T01:26:01Z",
+            "not-a-clock",
+        ] {
+            assert!(recovery_target("2026-10-24T00:56:00Z", target).is_err());
+        }
+    }
+    #[test]
+    fn recovery_retimes_only_successor_outputs_and_preserves_predecessor_and_proof() {
+        let b = || json!({"path":"/evidence","sha256":"a".repeat(64)});
+        let mut p: Plan = serde_json::from_value(json!({"schema":PLAN_SCHEMA,
+            "sample_target_utc":"2026-10-24T00:56:00Z", "endpoint_sha256":"a".repeat(64), "bucket":BUCKET,
+            "observer":"/observers/sample-20261024T005600Z.json", "observer_config":b(),
+            "previous_observer":b(), "model_template":b(), "fleet_template":b(), "previous_estimates":b(), "previous_fleet":b(),
+            "tools":{"sealer":b(),"estimator":b(),"r2":b()}, "expected_epochs":[152,153],
+            "cycle_directory":"/cycles/original", "cycle_unit":"original.service",
+            "estimate_output":"/estimates/horizon-r2-status-estimates-20261024T005600Z-cohort-gated-v5.json",
+            "fleet_output":"/fleet/fleet-20261024T005600Z.json", "terminal185":{"proof":b()}})).unwrap();
+        let mut c = json!({"not_before_utc":p.sample_target_utc,"output":p.observer,
+            "previous_sample":"/accepted/sample-20261024T002600Z.json", "minimum_interval_seconds":1800,
+            "replays":[{"range":"152-153","iid":"unchanged"}]});
+        let before = serde_json::to_value(&p).unwrap();
+        let old_config = c.clone();
+        retime(&mut p, &mut c, "2026-10-24T01:06:00Z").unwrap();
+        let mut expected = before;
+        expected["sample_target_utc"] = json!("2026-10-24T01:06:00Z");
+        expected["observer"] = json!("/observers/sample-20261024T010600Z.json");
+        expected["estimate_output"] =
+            json!("/estimates/horizon-r2-status-estimates-20261024T010600Z-cohort-gated-v5.json");
+        expected["fleet_output"] = json!("/fleet/fleet-20261024T010600Z.json");
+        assert_eq!(serde_json::to_value(&p).unwrap(), expected);
+        let mut expected_config = old_config;
+        expected_config["not_before_utc"] = json!(p.sample_target_utc);
+        expected_config["output"] = json!(p.observer);
+        assert_eq!(c, expected_config);
+        let unchanged = serde_json::to_value(&p).unwrap();
+        let unchanged_config = c.clone();
+        assert!(retime(&mut p, &mut c, "2026-10-24T01:05:59Z").is_err());
+        assert_eq!(serde_json::to_value(&p).unwrap(), unchanged);
+        assert_eq!(c, unchanged_config);
+    }
     #[test]
     fn guarded_stop_never_becomes_readiness_or_capacity_credit() {
         let base = json!({"controller_unit":CONTROLLER,"producer_unit":PRODUCER,"expected_controller_invocation_id":CID,"expected_producer_invocation_id":PID,"filesystem":"/home/sol","minimum_free_bytes":FLOOR,"r2_mutations":false,"remote_mutations":false});
