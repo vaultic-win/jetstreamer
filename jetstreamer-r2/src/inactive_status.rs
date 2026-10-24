@@ -14,6 +14,7 @@ mod native228;
 mod natural144;
 mod preserved144;
 mod publication144;
+mod terminal185;
 mod warmup223;
 pub(super) fn validate_capped141_repair_terminal(e: &Value) -> Result<()> {
     capped141::time(e)?;
@@ -402,6 +403,11 @@ fn fresh_census(
         ensure!(plan.epoch == 141, "foreign capped141 cleanup epoch");
         capped141::validate_current(&current, terminal_fleet, owners)?;
     }
+    let terminal185 = terminal185::recognized(terminal_fleet);
+    if terminal185 {
+        terminal185::time(plan, terminal_fleet)?;
+        terminal185::validate_current(&current, terminal_fleet, owners)?;
+    }
     let native223 = plan.epoch == 223 && native223::recognized(terminal_fleet, owners);
     if native223 {
         native223::validate(&current, terminal_fleet, owners)?;
@@ -444,6 +450,7 @@ fn fresh_census(
             && !missing157
             && !natural144
             && !capped141
+            && !terminal185
             && !native223
             && !native207
             && !native209
@@ -622,7 +629,9 @@ pub(super) async fn run() -> Result<()> {
     no_local_delivery(&plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
-    let history_time = if capped141::recognized(&history) {
+    let history_time = if terminal185::recognized(&history) {
+        terminal185::time(&plan, &history)?
+    } else if capped141::recognized(&history) {
         ensure!(plan.epoch == 141, "foreign capped141 terminal evidence");
         capped141::time(&history)?
     } else if natural144::recognized(&history) {
