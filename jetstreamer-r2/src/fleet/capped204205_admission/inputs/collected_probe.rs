@@ -79,6 +79,7 @@ fn collected_journal(
     let mut start = None;
     let mut success = None;
     let mut stdout = None;
+    let pid = number(result, "probe_main_pid")?.to_string();
     for row in rows {
         let timestamp = row["__REALTIME_TIMESTAMP"]
             .as_str()
@@ -133,7 +134,7 @@ fn collected_journal(
             }
         } else {
             ensure!(
-                row["_PID"] == number(result, "probe_main_pid")?.to_string()
+                row["_PID"].as_str() == Some(pid.as_str())
                     && row["_SYSTEMD_UNIT"] == p.probe_unit
                     && row["_SYSTEMD_INVOCATION_ID"] == result["probe_invocation_id"]
                     && row["_TRANSPORT"] == "stdout"
@@ -197,12 +198,13 @@ fn validate_ack(ack: &Value, records: &Value, executed: &BoundFile, result: &Val
             "native acknowledged identity differs: {key}"
         );
     }
+    let pid = number(result, "probe_main_pid")?.to_string();
     let message = row["MESSAGE"]
         .as_str()
         .context("acknowledged complete message")?;
     ensure!(
         row["_EXE"].as_str() == executed.path.to_str()
-            && row["_PID"] == number(result, "probe_main_pid")?.to_string()
+            && row["_PID"].as_str() == Some(pid.as_str())
             && serde_json::from_str::<Value>(message)? == *result
             && ack["message_sha256"] == message_digest(message.as_bytes())
             && row["__REALTIME_TIMESTAMP"]
