@@ -273,6 +273,9 @@ fn proof(p: &Plan) -> Result<Option<Handoff>> {
     Ok(Some(h))
 }
 pub(super) fn validate_live(p: &Plan) -> Result<()> {
+    if terminal185::enabled(p) {
+        return terminal185::validate(p);
+    }
     if let Some(h) = proof(p)? {
         if p.controller_rebind.is_some() {
             return controller_rebind::validate_live(p);
@@ -282,6 +285,9 @@ pub(super) fn validate_live(p: &Plan) -> Result<()> {
     Ok(())
 }
 pub(super) fn extend_epochs(p: &Plan, epochs: &mut BTreeSet<u64>) -> Result<()> {
+    if terminal185::enabled(p) {
+        return terminal185::validate(p);
+    }
     if let Some(h) = proof(p)? {
         epochs.insert(185);
         scope(&h)?;
@@ -358,6 +364,9 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
 }
 pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     let rebound = controller_rebind::model(p, model)?;
+    if terminal185::enabled(p) {
+        return terminal185::model(p, &rebound);
+    }
     let model = &rebound;
     let Some(h) = proof(p)? else {
         return Ok(model.clone());
@@ -427,6 +436,9 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn for_observation(p: &Plan, model: &Value, observed: &Value) -> Result<Value> {
+    if terminal185::enabled(p) {
+        return terminal185::model(p, model);
+    }
     let Some(h) = proof(p)? else {
         return Ok(model.clone());
     };

@@ -1,5 +1,6 @@
 //! Reusable, scope-bound safety components; no autonomous polling or launch.
 pub mod bootstrap227_cache_retire;
+pub mod cohort191_delivery_model;
 pub mod dev_cache_check;
 pub mod epoch136_inputs;
 pub mod native141_admit;

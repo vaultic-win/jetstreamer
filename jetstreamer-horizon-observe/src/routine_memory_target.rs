@@ -260,6 +260,31 @@ mod tests {
         assert_eq!(r["admission_authorized"], false);
     }
     #[test]
+    fn post191_four_owner_memory_envelope_does_not_require_five_owner_disk_budget() {
+        let mut o = fixture();
+        for pid in [4, 5] {
+            let mut row = o["replays"][0].clone();
+            for role in ["controller", "producer"] {
+                for point in ["before", "after"] {
+                    row[format!("{role}_{point}")]["rss"]["processes"][0]["pid"] = json!(pid);
+                }
+            }
+            o["replays"].as_array_mut().unwrap().push(row);
+            o["host_resident_memory"]["after"]["rss"]["processes"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"pid":pid,"start_ticks":10,"rss_bytes":100*1024}));
+        }
+        o["host_resident_memory"]["after"]["rss"]["aggregate_rss_bytes"] = json!(500 * 1024);
+        let r = report(&o, 4, 0);
+        assert_eq!(r["valid"], true, "{r}");
+        assert_eq!(r["executing_production_lanes"], 4);
+        assert_eq!(r["host_resident_planning_bytes"], 500 * 1024);
+        assert_eq!(r["reservation_ceiling_bytes"], 150 * 1024);
+        assert_eq!(r["admission_authorized"], false);
+        assert_eq!(report(&o, 5, 0)["valid"], false);
+    }
+    #[test]
     fn centuries_keep_independent_history_and_reservation_bounds() {
         let mut o = fixture();
         o["lane_rss_history"]["200"] = o["lane_rss_history"]["100"].clone();

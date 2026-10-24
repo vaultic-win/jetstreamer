@@ -24,6 +24,9 @@ const BATCH_SHA: &str = "84edb7b4c90f8a78d218d3992b28831ea8279b51f1cfe3af9acbaea
 const COMMIT: &str = "root-checkpoint cohort 216-219 published 4 archive(s) with checksums in transaction 2958b2841e8e4c0307c2478e81ffe63254355da59ed0e782d09b48eb4d744d54; receipt ";
 
 pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == super::cohort191_delivery::UNIT {
+        return Ok(191..=194);
+    }
     if unit == super::cohort160_finalization::UNIT {
         return Ok(160..=160);
     }
@@ -34,6 +37,9 @@ pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
     Ok(216..=219)
 }
 pub(super) fn handoff_scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == super::cohort191_delivery::CONTROLLER {
+        return Ok(191..=194);
+    }
     if unit == super::cohort160_handoff::CONTROLLER {
         return Ok(160..=160);
     }

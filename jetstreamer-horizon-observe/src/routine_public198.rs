@@ -17,6 +17,210 @@ const ORIGIN: &str =
     "jetstreamer-root-sweep-e198-readerfix-20261019-v1-r2-e198-198-lane-a-1.service";
 const IID: &str = "e5612ef00a5b4fcab04df2c13a6b35b0";
 const IMPORT: &str = "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1-import/destination-ae2f530244e391ea343ca338abe7f4673c52fd4bc8814369fd5234d07a8db1e1/evidence/archive-batches/destination-000000000000fc00-0000000011520001/batch-b1dbb924f902ff4ad61ff937a96b2564566885d6eb950d8d5bf543f939ef9039.json";
+// Fold reporting only. Existing replay/import/publisher/retirement claims stay
+// intact. This uses the coordinated fleet and existing durable receipts only.
+pub(super) fn ready_delivery(
+    p: &Plan,
+    provisional: &Bound,
+    observer: &Bound,
+    epoch: u64,
+) -> Result<Option<Value>> {
+    let ledger = bound_json(provisional, false)?;
+    ensure!(
+        ledger["sampled_at_utc"] == p.sample_target_utc
+            && ledger["observer_sha256"] == observer.sha256,
+        "ready delivery requires the coordinated fleet"
+    );
+    let inventory = ledger["inventory"]["entries"]
+        .as_array()
+        .context("ready inventory absent")?;
+    let Some(entry) = inventory
+        .iter()
+        .find(|e| e["epoch"] == epoch && e["state"] == "ready-pair")
+    else {
+        return Ok(None);
+    };
+    let (archive_sha, deletion_sha, publication_sha, publication_name, digest, length) = match epoch
+    {
+        144 => (
+            "b3fc91d860bd61623229a1c420c45dcb28db1df70892084b2d58dbae8e853b3f",
+            "933608fea384df58469fb0dd751bdf33fc05db43bd6ef61cea8f078ee8ad2eb8",
+            "65e97b5e054ebd8e84fcd22cf1c6fb6e21c65aa261d0a5214dc4671d78860520",
+            "epoch-144.status-20261023012958.json",
+            "153d3e5e5b7cbdc31bb4229315786000b84442a75b3b83cf4a50184b20b84a33",
+            109177480876u64,
+        ),
+        198 => (
+            "81470e448a855612c57c2727e11f08dbb9b52a19bbe6168cea440fe1b17ae1f3",
+            "8cde4a6ed200a4765cffd06136ba301fad69b68cfc0dd65dda0ca3c8a539a25c",
+            "b0fa20d71d916905b1791889819c56e33c84da28e1a36f779a55682b94505ae8",
+            "epoch-198.status-20261021225800.json",
+            "4a1252a650f7b50f45326a07c0a58090b8c0174cf547099a16eeca45869f7ffb",
+            99381250591u64,
+        ),
+        _ => anyhow::bail!("foreign completed delivery epoch"),
+    };
+    let archive = Bound {
+        path: format!("/home/sol/.jetstreamer-private/r2-receipts/epoch-{epoch}.r2.json").into(),
+        sha256: archive_sha.into(),
+    };
+    let bytes = read_checked(&archive.path, LIMIT, 1001, false)?;
+    ensure!(
+        sha(&bytes) == archive.sha256,
+        "ready archive receipt changed"
+    );
+    let a: Value = serde_json::from_slice(&bytes)?;
+    let deletion = Bound {
+        path: format!(
+            "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-{epoch}.status-deletion.json"
+        )
+        .into(),
+        sha256: deletion_sha.into(),
+    };
+    let d = bound_json(&deletion, false)?;
+    let publication = Bound {
+        path: Path::new("/home/sol/.jetstreamer-private/r2-status-receipts").join(publication_name),
+        sha256: publication_sha.into(),
+    };
+    let r = bound_json(&publication, false)?;
+    no_newer_publication(&publication.path, epoch)?;
+    ready_values(
+        &ledger,
+        entry,
+        &a,
+        &d,
+        &r,
+        (epoch, digest, length),
+        utc_seconds(&p.sample_target_utc)?,
+    )?;
+    ensure!(
+        d["archive_receipt"].as_str() == archive.path.to_str()
+            && d["archive_receipt_sha256"] == archive.sha256
+            && d["status_publication_receipt"].as_str() == publication.path.to_str()
+            && d["status_publication_receipt_sha256"] == publication.sha256,
+        "ready deletion receipt lost authenticated lineage"
+    );
+    Ok(Some(
+        json!({"provisional_fleet":provisional,"publication_skipped":true,"delivery_completed":true,
+        "epoch":epoch,"reason":"Authenticated ready pair and completed owned-status cleanup; preserve archive/import history and ordinary boundary retirement gates",
+        "archive_receipt":archive,"status_deletion_receipt":deletion,"last_owned_publication":publication,
+        "status_absent_verified_unix_seconds":d["verified_unix_seconds"],"new_resource_samples":0,
+        "archive_mutations":false,"sidecar_mutations":false,"r2_status_mutation":false,"local_retirement_authorized":false}),
+    ))
+}
+fn no_newer_publication(publication: &Path, epoch: u64) -> Result<()> {
+    let parent = publication.parent().context("ready publication parent")?;
+    let accepted = publication
+        .file_name()
+        .and_then(|n| n.to_str())
+        .context("ready publication filename")?;
+    let prefix = format!("epoch-{epoch}.status-");
+    for entry in fs::read_dir(parent)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_str().context("non-UTF8 status receipt filename")?;
+        if newer_publication_name(name, &prefix, accepted) {
+            anyhow::bail!(
+                "ready delivery has a newer owned publication; reconcile status lifecycle"
+            );
+        }
+    }
+    Ok(())
+}
+fn newer_publication_name(name: &str, prefix: &str, accepted: &str) -> bool {
+    name.strip_prefix(prefix)
+        .and_then(|s| s.strip_suffix(".json"))
+        .is_some_and(|digits| {
+            digits.len() == 14 && digits.bytes().all(|b| b.is_ascii_digit()) && name > accepted
+        })
+}
+fn ready_values(
+    ledger: &Value,
+    entry: &Value,
+    a: &Value,
+    d: &Value,
+    r: &Value,
+    exact: (u64, &str, u64),
+    sample: u64,
+) -> Result<()> {
+    let (epoch, digest, length) = exact;
+    ensure!(
+        ledger["inventory"]["anomalies"] == 0
+            && !ledger["active"]
+                .as_array()
+                .context("ready active census absent")?
+                .iter()
+                .any(|x| x["epoch"] == epoch)
+            && ledger["epochs"]
+                .as_array()
+                .context("ready epoch census absent")?
+                .iter()
+                .any(|x| x["epoch"] == epoch && x["state"] == "remote-ready")
+            && entry["epoch"] == epoch
+            && entry["state"] == "ready-pair"
+            && entry["archive_length"] == length
+            && entry["archive_metadata_sha256"] == digest
+            && entry["sidecar_sha256"] == digest,
+        "ready delivery has active work, conflicting inventory or wrong exact pair"
+    );
+    if let Some(rows) = ledger["diagnostics"].as_array() {
+        ensure!(
+            !rows.iter().any(|x| x["live"] == true
+                && (x["epoch"] == epoch
+                    || x["scope_first_epoch"]
+                        .as_u64()
+                        .zip(x["scope_last_epoch"].as_u64())
+                        .is_some_and(|(a, b)| a <= epoch && epoch <= b))),
+            "ready delivery has active private replacement"
+        );
+    }
+    ensure!(
+        a["schema"] == "jetstreamer-horizon-r2-receipt-v1"
+            && a["epoch"] == epoch
+            && a["bucket"] == BUCKET
+            && a["archive_key"] == format!("epoch-{epoch}.jet")
+            && a["checksum_key"] == format!("epoch-{epoch}.jet.sha256")
+            && a["archive_length"] == length
+            && a["archive_sha256"] == digest
+            && a["archive_etag"] == entry["archive_etag"]
+            && a["remote_sha256_readback"] == true,
+        "ready pair differs from retained whole-file readback receipt"
+    );
+    ensure!(
+        d["schema"] == "jetstreamer-horizon-r2-status-authenticated-deletion-receipt-v1"
+            && d["bucket"] == BUCKET
+            && d["epoch"] == epoch
+            && d["key"] == format!("epoch-{epoch}.epoch-status.json")
+            && d["archive_sha256"] == digest
+            && d["archive_etag"] == a["archive_etag"]
+            && d["deleted_status"] == r["status"]
+            && d["deleted_object_etag"] == r["object_etag"]
+            && r["epoch"] == epoch,
+        "ready status cleanup differs from exact owned publication"
+    );
+    for flag in [
+        "conditional_delete_request_sent",
+        "authenticated_ready_pair_before",
+        "authenticated_status_absent_after",
+        "authenticated_ready_pair_after",
+    ] {
+        ensure!(d[flag] == true, "ready status cleanup lacks {flag}");
+    }
+    let publication = r["verified_unix_seconds"]
+        .as_u64()
+        .context("ready publication clock missing")?;
+    let verified = a["verified_unix_seconds"]
+        .as_u64()
+        .context("ready readback clock missing")?;
+    let deleted = d["verified_unix_seconds"]
+        .as_u64()
+        .context("ready cleanup clock missing")?;
+    ensure!(
+        publication <= deleted && verified <= deleted && deleted <= sample,
+        "ready delivery proof chronology differs"
+    );
+    Ok(())
+}
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
@@ -808,8 +1012,27 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
     value["output"] = json!(ledger_path);
     let package = delivery198::seal_values(p, "public198-stage", &[("fleet-plan.json", value)])?;
     let plan = file(package.join("fleet-plan.json"), true)?;
+    publish_sealed(
+        p,
+        observer,
+        &plan,
+        &p.cycle_directory.join("child-public198-fleet.json"),
+    )
+}
+pub(super) fn publish_sealed(
+    p: &Plan,
+    observer: &Bound,
+    plan: &Bound,
+    result: &Path,
+) -> Result<Value> {
+    let profile = p
+        .public198_delivery
+        .as_ref()
+        .context("198 public profile")?;
+    read(profile)?;
+    let ledger_path = p.cycle_directory.join("public198-provisional-fleet.json");
     child(
-        &p.tools.r2,
+        cohort191_delivery::fleet_reader(p),
         &[
             "fleet-reconcile".into(),
             plan.path.display().to_string(),
@@ -817,10 +1040,13 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
             plan.sha256.clone(),
         ],
         true,
-        &p.cycle_directory.join("child-public198-fleet.json"),
+        result,
     )?;
     let provisional = file(ledger_path, false)?;
     let ledger = bound_json(&provisional, false)?;
+    if let Some(completed) = ready_delivery(p, &provisional, observer, 198)? {
+        return Ok(completed);
+    }
     let owner = ledger["active"]
         .as_array()
         .context("198 active census")?
@@ -907,6 +1133,14 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         "198 public fleet path differs"
     );
     bound_json(&provisional, false)?;
+    if d["delivery_completed"] == true {
+        let observer: Bound = serde_json::from_value(c["observer"].clone())?;
+        ensure!(
+            ready_delivery(p, &provisional, &observer, 198)?.as_ref() == Some(d),
+            "198 completed delivery metadata differs from authenticated history"
+        );
+        return Ok(());
+    }
     if d["publication_skipped"] == true {
         ensure!(
             d["publication"].is_null(),
@@ -959,6 +1193,104 @@ fn validate_completed_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root-only accepted01:16 fleet and existing144/198 receipts; no network, new resource observation or mutation"]
+    fn exact_ready144_and198_fold_from_accepted_inventory_and_existing_cleanup_receipts() {
+        let plan = file("/var/lib/jetstreamer/horizon-routine-plan-101-200-20261024T011600Z-guard-stopped185-repair141-v1/cycle-plan.json".into(), true).unwrap();
+        let p: Plan = serde_json::from_value(bound_json(&plan, true).unwrap()).unwrap();
+        let fleet = Bound {
+            path:
+                "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261024T011600Z.json"
+                    .into(),
+            sha256: "3b81454c00718d7ead6f6bcffe337c81b3b7a94a1e801a1183027f2537f371e5".into(),
+        };
+        let ledger = bound_json(&fleet, false).unwrap();
+        let observer = Bound {
+            path: ledger["observer_receipt"].as_str().unwrap().into(),
+            sha256: ledger["observer_sha256"].as_str().unwrap().into(),
+        };
+        for epoch in [144, 198] {
+            let result = ready_delivery(&p, &fleet, &observer, epoch)
+                .unwrap()
+                .unwrap();
+            assert_eq!(result["delivery_completed"], true);
+            assert_eq!(result["epoch"], epoch);
+            assert_eq!(result["new_resource_samples"], 0);
+            assert_eq!(result["r2_status_mutation"], false);
+        }
+    }
+    #[test]
+    fn completed_ready_reporting_requires_exact_pair_owned_cleanup_and_no_new_work() {
+        for epoch in [144, 198] {
+            let entry = json!({"epoch":epoch,"state":"ready-pair","archive_length":100,"archive_metadata_sha256":"digest","sidecar_sha256":"digest","archive_etag":"etag"});
+            let ledger = json!({"inventory":{"anomalies":0},"active":[],"diagnostics":[],"epochs":[{"epoch":epoch,"state":"remote-ready"}]});
+            let a = json!({"schema":"jetstreamer-horizon-r2-receipt-v1","epoch":epoch,"bucket":BUCKET,"archive_key":format!("epoch-{epoch}.jet"),"checksum_key":format!("epoch-{epoch}.jet.sha256"),"archive_length":100,"archive_sha256":"digest","archive_etag":"etag","remote_sha256_readback":true,"verified_unix_seconds":20});
+            let r = json!({"epoch":epoch,"status":{"epoch":epoch,"phase":"readback"},"object_etag":"owned","verified_unix_seconds":10});
+            let d = json!({"schema":"jetstreamer-horizon-r2-status-authenticated-deletion-receipt-v1","bucket":BUCKET,"epoch":epoch,"key":format!("epoch-{epoch}.epoch-status.json"),"archive_sha256":"digest","archive_etag":"etag","deleted_status":r["status"],"deleted_object_etag":"owned","conditional_delete_request_sent":true,"authenticated_ready_pair_before":true,"authenticated_status_absent_after":true,"authenticated_ready_pair_after":true,"verified_unix_seconds":30});
+            let check = |f: &Value, e: &Value, a: &Value, d: &Value, r: &Value, sample| {
+                ready_values(f, e, a, d, r, (epoch, "digest", 100), sample)
+            };
+            check(&ledger, &entry, &a, &d, &r, 40).unwrap();
+            for (pointer, value) in [
+                ("/active", json!([{"epoch":epoch}])),
+                ("/inventory/anomalies", json!(1)),
+                ("/epochs/0/state", json!("failed-needs-repair")),
+                (
+                    "/diagnostics",
+                    json!([{"live":true,"scope_first_epoch":epoch-1,"scope_last_epoch":epoch+1}]),
+                ),
+            ] {
+                let mut bad = ledger.clone();
+                *bad.pointer_mut(pointer).unwrap() = value;
+                assert!(check(&bad, &entry, &a, &d, &r, 40).is_err(), "{pointer}");
+            }
+            for (pointer, value) in [
+                ("/archive_etag", json!("replaced")),
+                ("/sidecar_sha256", json!("mismatch")),
+                ("/archive_length", json!(99)),
+            ] {
+                let mut bad = entry.clone();
+                *bad.pointer_mut(pointer).unwrap() = value;
+                assert!(check(&ledger, &bad, &a, &d, &r, 40).is_err(), "{pointer}");
+            }
+            for (pointer, value) in [
+                ("/deleted_object_etag", json!("other")),
+                ("/authenticated_status_absent_after", json!(false)),
+                ("/authenticated_ready_pair_after", json!(false)),
+                ("/verified_unix_seconds", json!(19)),
+            ] {
+                let mut bad = d.clone();
+                *bad.pointer_mut(pointer).unwrap() = value;
+                assert!(
+                    check(&ledger, &entry, &a, &bad, &r, 40).is_err(),
+                    "{pointer}"
+                );
+            }
+            assert!(check(&ledger, &entry, &a, &d, &r, 29).is_err());
+            let mut bad = a.clone();
+            bad["remote_sha256_readback"] = json!(false);
+            assert!(check(&ledger, &entry, &bad, &d, &r, 40).is_err());
+        }
+    }
+    #[test]
+    fn later_owned_publication_blocks_completed_status_fold() {
+        let prefix = "epoch-144.status-";
+        let accepted = "epoch-144.status-20261023012958.json";
+        assert!(newer_publication_name(
+            "epoch-144.status-20261024011600.json",
+            prefix,
+            accepted
+        ));
+        for name in [
+            accepted,
+            "epoch-144.status-20261022012958.json",
+            "epoch-144.status-deletion.json",
+            "epoch-198.status-20261024011600.json",
+            "epoch-144.status-20261024011600.json.tmp",
+        ] {
+            assert!(!newer_publication_name(name, prefix, accepted), "{name}");
+        }
+    }
     #[test]
     fn successor_accepts_exact_upload_receipt_without_relabeling_it_verification() {
         let plan = Bound {
