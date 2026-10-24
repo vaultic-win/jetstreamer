@@ -7,9 +7,34 @@ mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
+mod epoch227_diagnostic;
 mod failed_prefix220;
 mod singletons209_212;
 mod singletons209_212_profile;
+
+#[cfg(all(
+    feature = "epoch227-v1-6-25-diagnostic",
+    any(
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification",
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-20-prefix-qualification",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("epoch227 v1.6.25 comparison requires its own exclusive private build");
 
 #[cfg(all(
     feature = "epoch223-v1-6-20-prefix-qualification",
@@ -19755,7 +19780,8 @@ async fn main() {
         let forbidden = forbidden
             || cfg!(any(
                 feature = "epoch225-v1-6-25-diagnostic",
-                feature = "epoch225-v1-6-25-qualification"
+                feature = "epoch225-v1-6-25-qualification",
+                feature = "epoch227-v1-6-25-diagnostic"
             ));
         let validation = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::validate_cli(
@@ -20071,6 +20097,25 @@ async fn main() {
                 &dest_dir,
             )
         })
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic")
+        && let Err(error) = epoch227_diagnostic::validate_launch(
+            start_epoch,
+            end_epoch,
+            qualification.map(|plan| (plan.bootstrap_slot, plan.end_inclusive)),
+            root_checkpoint_cohort,
+            recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease,
+            horizon_output
+                .as_deref()
+                .zip(replay_scratch.as_deref())
+                .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
+        )
     {
         eprintln!("error: {error}");
         exit(2);
