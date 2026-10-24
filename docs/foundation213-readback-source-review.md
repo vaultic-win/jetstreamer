@@ -86,3 +86,29 @@ two-range window, transient/retry behavior and the live unit's CPU pressure at
 the next authorized coordinated observation. If both are slow, increasing
 concurrency alone is not yet justified. No live restart, quota change or
 unbounded benchmarking is needed for this comparison.
+
+## Source implementation and historical transport evidence
+
+The new separate `probe-transport-holding213` source profile implements the
+closed comparison above, with SDK, IPv4 and IPv6 attempted sequentially. Missing
+families are recorded as unsuccessful comparisons. Its maximum accepted body
+bytes are 96 MiB across the three comparisons; SDK internal retries and protocol
+overhead are not represented as application body bytes. It exposes only
+`--output` and `--self-sha256`; endpoint/account, bucket, key, original local
+source, ETag, object length and window are compiled constants. The receipt has
+its own schema and explicitly denies custody, whole-object verification,
+retirement and publication authority. This is new source, not a deployment or
+permission to invoke the old sealed helper with a new command.
+
+Read-only preserved receipts:
+
+- `/var/lib/jetstreamer/horizon-203-transport-probe-ee307f24-v1/probe.json`,
+  SHA256 `de47e570124cb266beed240ab59890c86fd7e04ec90abe771ff298c8afda6656`:
+  SDK 32 MiB in 1,255 ms; IPv4 32 MiB in 2,839 ms; IPv6 body failure at 20,003 ms.
+- `/var/lib/jetstreamer/horizon-217-transport-probe-20261021-v1/probe.json`,
+  SHA256 `c9c197f414c20bf909f41ee8fa430ea727cf08b3272b4b9b365ab10dbf9421e5`:
+  the older 1 MiB profile succeeded with IPv4 in 1,311 ms and IPv6 in 1,293 ms.
+
+These historical results motivate the separate family comparison. They are
+neither present-day rate measurements nor evidence of this holding object's
+integrity, route or completion time.
