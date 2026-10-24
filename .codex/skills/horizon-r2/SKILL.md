@@ -1143,6 +1143,20 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- Finish guard and controller setup before starting a timed qualification worker. A guard
+  capability command may require its receipt directory to exist already. Pre-create the exact
+  directories, verify custody and sandbox write/fsync/read access, and check the sealed controller
+  script's readability and syntax through its intended privileged reader. Capture complete native
+  command arrays and effective properties; when retaining a completed setup control for that
+  capture, explicitly stop and drain it before the worker starts.
+- Before bounded local retirement, check the helper's effective UID against the existing shared
+  mutation-lock owner and verify receipt access as that UID. Preserve both lock identities and
+  private receipt permissions. When needed, seal byte-identical, non-sensitive receipt copies in
+  a readable, immutable same-host bundle. If the helper requires its lock inside the original
+  receipt directory, expose only the copied receipt through a private read-only file bind at its
+  original pathname. Prove the absolute projected inode, read-only mount, unchanged host original,
+  and intended payload UID/capabilities in an equivalent sandbox before policy preflight. Keep all
+  ordinary full/plugin/boundary, no-consumer and authenticated R2 retirement gates intact.
 - Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
   exhausted by Tokio's core runtime threads. `retire-local` performs its archive
   proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
