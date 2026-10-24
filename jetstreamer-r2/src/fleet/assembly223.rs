@@ -140,11 +140,19 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     shape(r, c)?;
     let p: BoundFile = serde_json::from_value(r["assembly_plan"].clone())?;
     let a: BoundFile = serde_json::from_value(r["admission"].clone())?;
-    bindings(r, &bound_json(&p)?, &bound_json(&a)?, &a)
+    bindings(r, &bound_json(&p)?, &bound_json(&a)?, &a)?;
+    let gb: BoundFile = serde_json::from_value(r["guard_plan"].clone())?;
+    ensure!(
+        guard_matches(c, r, &bound_json(&gb)?),
+        "assembly 223 immutable guard binding differs"
+    );
+    Ok(())
 }
 pub(super) fn guard_matches(c: &DiagnosticClaim, r: &Value, p: &Value) -> bool {
     namespace(c)
         && shape(r, c).is_ok()
+        && p["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
+        && p["maximum_worker_vmas"] == 3_500_000
         && p["unit"] == UNIT
         && p["invocation_id"] == c.invocation_id
         && p["filesystem"] == "/home/ubuntu"
@@ -234,6 +242,7 @@ struct CaptureSpec {
     schema: String,
     assembly_plan: BoundFile,
     admission: BoundFile,
+    guard_plan: BoundFile,
 }
 pub(super) fn capture() -> Result<()> {
     let (sb, self_sha) = publication203::parsed_args("capture-assembly223-launch")?;
@@ -262,7 +271,7 @@ pub(super) fn capture() -> Result<()> {
     };
     let mut r = json!({"schema":SCHEMA,"epoch":223,"unit":UNIT,"invocation_id":c.invocation_id,"launched":true,
         "assembly_only_no_replay":true,"assembler_sha256":TOOL_SHA,"assembly_plan":private157::binding(&s.assembly_plan),
-        "admission":private157::binding(&s.admission),"previous_fleet":a["fleet_ledger"],"observer":a["observer_receipt"],
+        "admission":private157::binding(&s.admission),"guard_plan":private157::binding(&s.guard_plan),"previous_fleet":a["fleet_ledger"],"observer":a["observer_receipt"],
         "output_root":ROOT,"maximum_runtime_seconds":86400,"maximum_archive_bytes":160u64<<30,"candidate_incremental_peak_bytes":PEAK,
         "maximum_memory_bytes":MEMORY,"required_guard_minimum_free_bytes":a["required_guard_minimum_free_bytes"],
         "expected_exec_start":before["ExecStart"],"recorded_unix_seconds":now,"capture_spec":private157::binding(&sb),"capture_self_sha256":self_sha});
@@ -422,7 +431,7 @@ mod tests {
     #[test]
     fn only_exact_assembly_has_natural_zero_worker_guard_profile() {
         let (c, r, _, _, _) = fixture();
-        let gp = json!({"unit":UNIT,"invocation_id":c.invocation_id,"filesystem":"/home/ubuntu","worker_root":ROOT,
+        let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","maximum_worker_vmas":3500000,"unit":UNIT,"invocation_id":c.invocation_id,"filesystem":"/home/ubuntu","worker_root":ROOT,
             "minimum_free_bytes":2_000_000_000_000u64,"receipt_directory":GUARD_RECEIPTS});
         assert!(guard_matches(&c, &r, &gp));
         assert!(diagnostic_guard_workers_match(&c, &[]));
