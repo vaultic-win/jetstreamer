@@ -36,6 +36,8 @@ mod census141_poh;
 mod cohort191_gate_recovery;
 #[path = "routine_cohort191_native_recovery.rs"]
 mod cohort191_native_recovery;
+#[path = "routine_cohort191_raw0546.rs"]
+mod cohort191_raw0546;
 #[path = "routine_delivery160.rs"]
 mod delivery160;
 #[path = "routine_delivery198.rs"]
@@ -145,6 +147,8 @@ struct Plan {
     repair183_handoff: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repair185_handoff: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cohort191_raw0546: Option<Bound>,
     endpoint_sha256: String,
     bucket: String,
     observer: PathBuf,
@@ -2020,6 +2024,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--prepare-raw0546-native191"
                             | "--recover-import191-gates"
                             | "--check-import191-gate-recovery"
                             | "--recover-publication144-history"
@@ -2072,6 +2077,12 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|a| a == "--prepare-raw0546-native191")
+        {
+            return cohort191_raw0546::prepare(&plan, &bound);
+        }
         if args
             .get(6)
             .is_some_and(|a| a == "--recover-native191-tail" || a == "--check-native191-tail")

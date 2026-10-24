@@ -188,6 +188,7 @@ pub(super) fn derive_next(
     let observer_sha = sha(&encoded(&next_config)?);
     let mut next: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
     cohort191_native_recovery::successor(p, c, &mut next)?;
+    next.cohort191_raw0546 = None;
     next.sample_target_utc = next_time;
     next.delayed_schedule_utc = None;
     next.observer = serde_json::from_value(next_config["output"].clone())?;
