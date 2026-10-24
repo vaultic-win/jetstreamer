@@ -524,6 +524,46 @@ fn current_refs() -> Result<Value> {
     allowed_staged(&staged)?;
     Ok(staged)
 }
+fn metadata_frontier(
+    intent: Option<&Value>,
+    complete: Option<&Value>,
+    expected: &Value,
+    done: &Value,
+) -> Result<()> {
+    if let Some(old) = intent {
+        ensure!(old == expected, "185 metadata collection intent conflict");
+    }
+    if let Some(old) = complete {
+        ensure!(
+            intent.is_some() && old == done,
+            "185 metadata completion missing intent or conflicting"
+        );
+    }
+    Ok(())
+}
+fn completion_scope(v: &Value, p: &Reconcile, spec: &Bound, mask: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == "jetstreamer-terminal185-staged-reconciliation-v2"
+            && v["host"] == HOST
+            && v["preservation"] == serde_json::to_value(&p.preservation)?
+            && v["inspection_plan"] == serde_json::to_value(&p.inspection_plan)?
+            && v["diagnostic"] == serde_json::to_value(&p.diagnostic)?
+            && v["spec"] == serde_json::to_value(spec)?
+            && v["mask_intent"] == *mask
+            && v["original_controller_masked"] == true
+            && v["all8metadata_jobs_collected"] == true
+            && v["staged_after"]["references"] == json!([])
+            && v["staged_after"]["terminal_fragment_exclusions"] == json!([])
+            && v["replay_data_removed"] == false
+            && v["processes_signalled"] == false
+            && v["growth_claims_released"] == false
+            && v["replay_launch_authorized"] == false
+            && v["remote_mutations"] == false
+            && v["r2_mutations"] == false,
+        "185 reconciliation completion scope conflicts"
+    );
+    Ok(())
+}
 fn collect_job(j: Job, p: &Reconcile, preserved: &Value) -> Result<()> {
     let row = preserved["members"]
         .as_array()
@@ -537,18 +577,11 @@ fn collect_job(j: Job, p: &Reconcile, preserved: &Value) -> Result<()> {
     let descriptor = json!({"schema":"jetstreamer-terminal185-metadata-collection-intent-v2","unit":j.unit,
         "invocation_id":j.iid,"config_sha256":j.sha,"preservation":p.preservation,
         "process_signals_authorized":false,"replay_data_removed":false,"growth_claims_released":false});
+    let done = json!({"schema":"jetstreamer-terminal185-metadata-collected-v2","intent":descriptor,
+        "fragment_absent":true,"manager_collected":true,"replay_data_removed":false,"processes_signalled":false});
     let old = state_record(&intent, 0)?;
     let prior_done = state_record(&completed, 0)?;
-    ensure!(
-        prior_done.is_none() || old.is_some(),
-        "185 metadata completion without durable intent"
-    );
-    if let Some(old) = &old {
-        ensure!(
-            *old == descriptor,
-            "185 metadata collection intent conflict"
-        );
-    }
+    metadata_frontier(old.as_ref(), prior_done.as_ref(), &descriptor, &done)?;
     let before = manager(j.unit)?;
     job_shape(&before, j, old.is_some())?;
     if before["LoadState"] != "not-found" {
@@ -584,8 +617,6 @@ fn collect_job(j: Job, p: &Reconcile, preserved: &Value) -> Result<()> {
         after["LoadState"] == "not-found" && absent(&config_path(j.unit))?,
         "185 metadata not yet collected; preserve intent and retry later"
     );
-    let done = json!({"schema":"jetstreamer-terminal185-metadata-collected-v2","intent":descriptor,
-        "fragment_absent":true,"manager_collected":true,"replay_data_removed":false,"processes_signalled":false});
     if let Some(old) = state_record(&completed, 0)? {
         ensure!(old == done, "185 metadata completion conflict");
     } else {
@@ -647,6 +678,17 @@ pub(super) fn reconcile(m: &Mapping, p: &Reconcile, spec: &Bound) -> Result<()> 
     );
     allowed_staged(&d["staged"])?;
     let preserved = preservation(p, &d)?;
+    let completion_path = Path::new(ROOT).join("completion.json");
+    let prior_completion = state_record(&completion_path, 0)?;
+    if let Some(old) = &prior_completion {
+        ensure!(
+            prior_transaction.is_some(),
+            "185 completion lacks transaction"
+        );
+        let mask = state_record(&Path::new(ROOT).join("mask-intent.json"), 0)?
+            .context("185 completion lacks mask intent")?;
+        completion_scope(old, p, spec, &mask)?;
+    }
     // The exact source remains local throughout metadata-only reconciliation.
     let _ = retained_source()?;
     current_refs()?;
@@ -663,6 +705,17 @@ pub(super) fn reconcile(m: &Mapping, p: &Reconcile, spec: &Bound) -> Result<()> 
         remaining["references"] == json!([ORIGINAL]) || remaining["references"] == json!([]),
         "185 consumers remain after collection"
     );
+    if prior_completion.is_some() {
+        ensure!(
+            old_gate()?["LoadState"] == "masked"
+                && fs::read_link(ORIGINAL)? == Path::new("/dev/null")
+                && remaining["references"] == json!([]),
+            "185 completed mask or reference state changed"
+        );
+        checked_bytes(Path::new(RETAINED), OLD_SHA, 0)?;
+        println!("{}", completion_path.display());
+        return Ok(());
+    }
     let intent = Path::new(ROOT).join("mask-intent.json");
     let exchanged = Path::new(ROOT).join("mask-exchanged.json");
     let mut descriptor = json!({"schema":"jetstreamer-terminal185-obsolete-controller-mask-intent-v2",
@@ -1036,6 +1089,23 @@ fn retain_and_mask(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn metadata_conflicting_or_missing_frontiers_fail_before_owner_mutation() {
+        let intent = json!({"unit":JOBS[0].unit,"invocation_id":JOBS[0].iid});
+        let done = json!({"intent":intent,"manager_collected":true});
+        metadata_frontier(None, None, &intent, &done).unwrap();
+        metadata_frontier(Some(&intent), None, &intent, &done).unwrap();
+        metadata_frontier(Some(&intent), Some(&done), &intent, &done).unwrap();
+        assert!(metadata_frontier(None, Some(&done), &intent, &done).is_err());
+        assert!(metadata_frontier(Some(&json!({"unit":"other"})), None, &intent, &done).is_err());
+        assert!(metadata_frontier(
+            Some(&intent),
+            Some(&json!({"intent":"other"})),
+            &intent,
+            &done
+        )
+        .is_err());
+    }
     #[test]
     fn command_arrays_require_typed_positive_empty_evidence() {
         empty_command_array(&json!({"type":"a(sasbttttuii)","data":[]})).unwrap();
