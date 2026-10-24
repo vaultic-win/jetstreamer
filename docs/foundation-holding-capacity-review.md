@@ -32,6 +32,15 @@ serialize admissions through its terminal, seal the exact helper/plans/unit, and
 prove the equivalent sandbox before launch. Maintenance of the already-ready213
 epoch creates no public epoch-status object or canonical sidecar.
 
+The unit uses one writable bind of `/home/ubuntu/.jetstreamer-private`.
+Separate source/state `ReadWritePaths` binds are distinct mount instances and
+can make an atomic quarantine rename fail with `EXDEV` despite equal device
+numbers. The common bind preserves atomic rename while the reviewed Rust
+adapter still permits only the exact original/qualification-copy mutations and
+its private state. The public canonical archive and sealed deployments remain
+outside this writable mount. Validate this actual namespace before launch;
+do not replace atomic rename with copy-and-unlink after an `EXDEV` refusal.
+
 Fresh restoration admission reserves all125,316,500,795 potential restoration
 bytes plus the existing metadata budget, all current live growth, the century
 floor and existing guard floors. Its900s lifetime and1800s observer freshness
