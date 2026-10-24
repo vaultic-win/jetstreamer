@@ -4,6 +4,32 @@ use futures_util::{StreamExt, stream};
 use std::{future::Future, os::fd::AsRawFd};
 const CONCURRENCY: usize = 8;
 const RANGE: u64 = 32 << 20;
+const BODY_ATTEMPTS: usize = 3;
+const BODY_RETRY_WINDOW: std::time::Duration = std::time::Duration::from_secs(120);
+const SDK_DOWNLOAD_STALL: &str =
+    "minimum throughput was specified at 1 B/s, but throughput of 0 B/s was observed";
+#[derive(Debug)]
+struct RetryableBodyStall;
+impl std::fmt::Display for RetryableBodyStall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("pinned SDK download body stalled")
+    }
+}
+impl std::error::Error for RetryableBodyStall {}
+fn body_interruption(error: anyhow::Error) -> anyhow::Error {
+    // The pinned SDK's private throughput error has no public typed classifier.
+    // Match its exact source message only here, after a streaming body error.
+    // Header/identity/checksum/length/SHA/write errors never enter this path.
+    let stalled = error
+        .chain()
+        .any(|cause| cause.to_string() == SDK_DOWNLOAD_STALL);
+    let error = if stalled {
+        error.context(RetryableBodyStall)
+    } else {
+        error
+    };
+    error.context("resumed holding range body interrupted")
+}
 #[derive(Clone, Debug, PartialEq)]
 struct Stamp {
     regular: bool,
@@ -153,14 +179,51 @@ async fn pinned_range(
     start: u64,
     end: u64,
 ) -> Result<Vec<u8>> {
+    // Preserve the first attempt's existing SDK/service time bounds. A fixed
+    // retry deadline begins only after a positively classified body stall;
+    // ordinary writer backpressure must not create a new initial timeout.
+    let mut deadline = None;
+    for attempt in 1..=BODY_ATTEMPTS {
+        let result = if let Some(deadline) = deadline {
+            tokio::time::timeout_at(deadline, pinned_range_once(client, spec, start, end))
+                .await
+                .context("resumed range body retry window exhausted")?
+        } else {
+            pinned_range_once(client, spec, start, end).await
+        };
+        match result {
+            Err(error)
+                if error.downcast_ref::<RetryableBodyStall>().is_some()
+                    && attempt < BODY_ATTEMPTS =>
+            {
+                deadline.get_or_insert_with(|| tokio::time::Instant::now() + BODY_RETRY_WINDOW);
+                // No bytes from this attempt escape its private Vec. Repeat
+                // the exact complete range and If-Match under one fixed budget.
+                eprintln!(
+                    "{}",
+                    json!({"event":"holding-resume-stalled-range-retry","start":start,"end":end,"failed_attempt":attempt,"maximum_attempts":BODY_ATTEMPTS,"fixed_window_millis":BODY_RETRY_WINDOW.as_millis()})
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+            result => return result,
+        }
+    }
+    unreachable!("bounded range attempts return on the final attempt")
+}
+async fn pinned_range_once(
+    client: &Client,
+    spec: RemoteReadSpec<'_>,
+    start: u64,
+    end: u64,
+) -> Result<Vec<u8>> {
     ensure!(
         start < end && end <= spec.expected_length && end - start <= RANGE,
         "invalid resumed range"
     );
     let range = format!("bytes={start}-{}", end - 1);
     let expected_range = format!("bytes {start}-{}/{}", end - 1, spec.expected_length);
-    // SDK transient retries remain bounded by its configured policy. Identity
-    // and body failures return immediately, retaining durable local progress.
+    // SDK request retries remain unchanged. Only the exact SDK download stall
+    // from body polling can request a bounded whole-range repeat above.
     let response = client
         .get_object()
         .bucket(spec.bucket)
@@ -188,7 +251,7 @@ async fn pinned_range(
     let mut body = response.body;
     let mut bytes = Vec::with_capacity(usize::try_from(end - start)?);
     while let Some(chunk) = body.next().await {
-        let chunk = chunk.context("resumed holding range body interrupted")?;
+        let chunk = chunk.map_err(|error| body_interruption(anyhow::Error::new(error)))?;
         ensure!(
             bytes
                 .len()
@@ -446,6 +509,210 @@ mod tests {
             .unwrap();
         f.write_all(bytes).unwrap();
         (d, p, f)
+    }
+    fn monitored_client(endpoint: String) -> Client {
+        Client::from_conf(
+            client(endpoint)
+                .config()
+                .to_builder()
+                .stalled_stream_protection(
+                    aws_sdk_s3::config::StalledStreamProtectionConfig::enabled()
+                        .grace_period(Duration::ZERO)
+                        .build(),
+                )
+                .build(),
+        )
+    }
+    fn monitored_server(
+        body: Arc<Vec<u8>>,
+        faults: Vec<&'static str>,
+        writer_pause: Option<Arc<std::sync::atomic::AtomicBool>>,
+    ) -> (
+        Client,
+        std::thread::JoinHandle<()>,
+        Arc<Mutex<Vec<(u64, u64)>>>,
+    ) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+        let opened = Arc::new(AtomicUsize::new(0));
+        let join = std::thread::spawn(move || {
+            let mut handlers = Vec::new();
+            for fault in faults {
+                let deadline = Instant::now() + Duration::from_secs(10);
+                let (mut socket, _) = loop {
+                    match listener.accept() {
+                        Ok(s) => break s,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline);
+                            std::thread::sleep(Duration::from_millis(2));
+                        }
+                        Err(e) => panic!("{e}"),
+                    }
+                };
+                let body = body.clone();
+                let recorded = recorded.clone();
+                let opened = opened.clone();
+                let writer_pause = writer_pause.clone();
+                handlers.push(std::thread::spawn(move || {
+                    socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                    socket.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
+                    let mut raw=Vec::new();while !raw.ends_with(b"\r\n\r\n") {let mut byte=[0];socket.read_exact(&mut byte).unwrap();raw.push(byte[0]);assert!(raw.len()<16384);}
+                    let request=String::from_utf8(raw).unwrap().to_lowercase();assert!(request.contains("if-match: \"pinned\"\r\n"));
+                    let r=request.lines().find_map(|line|line.strip_prefix("range: bytes=")).unwrap();let (a,b)=r.split_once('-').unwrap();let start=a.parse::<u64>().unwrap();let end=b.parse::<u64>().unwrap()+1;
+                    assert!(start<end && end<=body.len() as u64);recorded.lock().unwrap().push((start,end));
+                    let etag=if fault=="etag" {"changed"} else {"pinned"};
+                    let header=format!("HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {start}-{}/{}\r\nETag: \"{etag}\"\r\nConnection: close\r\n\r\n",end-start,end-1,body.len());
+                    socket.write_all(header.as_bytes()).unwrap();opened.fetch_add(1,Ordering::SeqCst);
+                    let bytes=&body[start as usize..end as usize];
+                    if let Some(pause)=writer_pause {
+                        let deadline=Instant::now()+Duration::from_secs(8);
+                        if start==0 {
+                            while opened.load(Ordering::SeqCst)<2 {assert!(Instant::now()<deadline);std::thread::sleep(Duration::from_millis(2));}
+                            let _=socket.write_all(bytes);
+                        } else {
+                            let _=socket.write_all(&bytes[..1]);
+                            while !pause.load(Ordering::SeqCst) {assert!(Instant::now()<deadline);std::thread::sleep(Duration::from_millis(2));}
+                            let _=socket.write_all(&bytes[1..]);
+                        }
+                    } else if fault=="stall" {
+                        let _=socket.write_all(&bytes[..bytes.len()/2]);
+                        std::thread::sleep(Duration::from_millis(2500));
+                    } else {let _=socket.write_all(bytes);}
+                    let _=socket.shutdown(Shutdown::Both);
+                }));
+            }
+            for handler in handlers {
+                handler.join().unwrap();
+            }
+        });
+        (monitored_client(endpoint), join, seen)
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn real_sdk_stalled_body_retries_exact_whole_range_and_exhaustion_preserves_prefix() {
+        let body = Arc::new(body());
+        let sha = hex_lower(&Sha256::digest(body.as_slice()));
+        for faults in [
+            vec!["stall", "ok"],
+            vec!["stall", "stall", "stall"],
+            vec!["stall", "etag"],
+        ] {
+            let expected = faults.len();
+            let recover = faults.last() == Some(&"ok");
+            let identity = faults.last() == Some(&"etag");
+            let (client, join, seen) = monitored_server(body.clone(), faults, None);
+            let (_d, p, mut file) = fixture_file(&body[..37]);
+            let (digest, start, _) = seed(&mut file).unwrap();
+            let s = spec(&sha, body.len() as u64);
+            let result = tokio::time::timeout(
+                Duration::from_secs(12),
+                append(s, start, digest, &mut file, |a, b| {
+                    pinned_range(&client, s, a, b)
+                }),
+            )
+            .await
+            .unwrap();
+            join.join().unwrap();
+            assert_eq!(
+                *seen.lock().unwrap(),
+                vec![(37, body.len() as u64); expected]
+            );
+            if recover {
+                result.unwrap();
+                assert_eq!(fs::read(&p).unwrap(), body.as_slice());
+            } else {
+                let error = result.unwrap_err();
+                if identity {
+                    assert!(error.to_string().contains("ETag mismatch"), "{error:#}");
+                } else {
+                    assert!(
+                        error
+                            .chain()
+                            .any(|cause| cause.to_string() == SDK_DOWNLOAD_STALL),
+                        "{error:#}"
+                    );
+                }
+                assert_eq!(fs::read(&p).unwrap(), body[..37]);
+                assert_eq!(fs::metadata(&p).unwrap().mode() & 0o777, 0o600);
+            }
+        }
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn actual_sdk_body_exempts_slow_writer_no_polling_without_any_range_retry() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        struct SlowWriter {
+            bytes: Vec<u8>,
+            pause: Arc<AtomicBool>,
+            paused: bool,
+        }
+        impl Write for SlowWriter {
+            fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+                self.bytes.extend_from_slice(b);
+                Ok(b.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                if !self.paused {
+                    self.paused = true;
+                    self.pause.store(true, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(1500));
+                }
+                Ok(())
+            }
+        }
+        let body = Arc::new(
+            (0..RANGE as usize + 131087)
+                .map(|i| (i % 251) as u8)
+                .collect::<Vec<_>>(),
+        );
+        let sha = hex_lower(&Sha256::digest(body.as_slice()));
+        let pause = Arc::new(AtomicBool::new(false));
+        let (client, join, seen) =
+            monitored_server(body.clone(), vec!["ok", "ok"], Some(pause.clone()));
+        let mut writer = SlowWriter {
+            bytes: Vec::new(),
+            pause,
+            paused: false,
+        };
+        let s = spec(&sha, body.len() as u64);
+        tokio::time::timeout(
+            Duration::from_secs(12),
+            append(s, 0, Sha256::new(), &mut writer, |a, b| {
+                pinned_range(&client, s, a, b)
+            }),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        join.join().unwrap();
+        assert!(writer.paused);
+        assert_eq!(writer.bytes, body.as_slice());
+        let mut requests = seen.lock().unwrap().clone();
+        requests.sort_unstable();
+        assert_eq!(requests, vec![(0, RANGE), (RANGE, body.len() as u64)]);
+    }
+    #[test]
+    fn only_exact_sdk_body_stall_is_retryable_and_attempt_budget_is_fixed() {
+        let known = body_interruption(anyhow::anyhow!(SDK_DOWNLOAD_STALL));
+        assert!(known.downcast_ref::<RetryableBodyStall>().is_some());
+        for message in [
+            "checksum mismatch",
+            "resumed range ETag mismatch",
+            "body truncated",
+            "unrelated streaming error",
+        ] {
+            assert!(
+                body_interruption(anyhow::anyhow!(message))
+                    .downcast_ref::<RetryableBodyStall>()
+                    .is_none()
+            );
+        }
+        assert_eq!(BODY_ATTEMPTS, 3);
+        assert_eq!(BODY_RETRY_WINDOW, Duration::from_secs(120));
+        assert_eq!(CONCURRENCY, 8);
+        assert_eq!(2 * RANGE * CONCURRENCY as u64, REMOTE_READ_BUFFER_BUDGET);
     }
     #[tokio::test]
     async fn every_arbitrary_prefix_offset_rehashes_then_requests_only_the_missing_suffix() {
