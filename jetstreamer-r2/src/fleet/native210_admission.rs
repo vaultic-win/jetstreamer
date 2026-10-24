@@ -274,7 +274,7 @@ pub(super) fn run() -> Result<()> {
             .is_some_and(|u| !diagnostic_stage_running(u)),
         "210 native owner already live"
     );
-    let caps = singleton227_admission::limits(&f)?;
+    let caps = prefix223_live_peer::limits(&f)?;
     let memory = actual_memory()?;
     let free = free_before.min(singleton227_admission::disk_free()?);
     ensure!(
@@ -291,7 +291,7 @@ pub(super) fn run() -> Result<()> {
     prefix223_live_peer::current(&f, &after)?;
     singleton227_admission::owners(&f, &after)?;
     ensure!(
-        before == after && caps == singleton227_admission::limits(&f)?,
+        before == after && caps == prefix223_live_peer::limits(&f)?,
         "210 owners/caps changed during admission"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

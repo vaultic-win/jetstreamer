@@ -363,6 +363,65 @@ fn without_peer(f: &Value) -> Result<Value> {
         });
     Ok(view)
 }
+// Preserve the generic cap contract for every other owner. Only the exact
+// authenticated full-prefix223 peer is split into its existing launch/sandbox
+// validator; the derived view is never a fleet replacement.
+fn protected_caps(row: &Value, launch: &Value, p: &BTreeMap<String, String>) -> Result<Value> {
+    roster_scope(&json!({"active":[row]}))?;
+    let owner = singleton227_admission::active_owner(row)?;
+    ensure!(
+        owner["Id"] == c::UNIT && owner["ControlGroup"] == format!("/system.slice/{}", c::UNIT),
+        "peer223 protected cap owner differs"
+    );
+    prefix223_native20_capture::sandbox(p)?;
+    let mut caps = serde_json::Map::new();
+    for key in [
+        "MemoryHigh",
+        "MemoryMax",
+        "MemorySwapMax",
+        "CPUQuotaPerSecUSec",
+        "TasksMax",
+    ] {
+        let observed = p.get(key).context("peer223 missing protected cap")?;
+        ensure!(
+            launch["sandbox"][key] == *observed,
+            "peer223 cap differs from immutable launch:{key}"
+        );
+        caps.insert(key.into(), json!(observed));
+    }
+    ensure!(
+        p.get("ControlGroup").map(String::as_str) == owner["ControlGroup"].as_str(),
+        "peer223 protected control group differs"
+    );
+    caps.insert("ControlGroup".into(), json!(p["ControlGroup"]));
+    Ok(Value::Object(caps))
+}
+pub(super) fn limits(f: &Value) -> Result<Value> {
+    roster(f)?;
+    let mut result = singleton227_admission::limits(&without_peer(f)?)?;
+    for row in f["active"]
+        .as_array()
+        .context("peer223 cap census")?
+        .iter()
+        .filter(|r| r["epoch"] == 223)
+    {
+        let (d, launch) = claim(f, row)?;
+        let properties = singleton227_capture::properties(
+            &d.unit,
+            "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ProtectHome,ProtectSystem,ProtectControlGroups,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,Environment,OOMPolicy,OOMScoreAdjust,Result,ActiveState,SubState,NRestarts,ExecStart,ControlGroup",
+        )?;
+        let caps = protected_caps(row, &launch, &properties)?;
+        ensure!(
+            result
+                .as_object_mut()
+                .context("peer223 cap object")?
+                .insert(d.unit, caps)
+                .is_none(),
+            "peer223 duplicate protected cap owner"
+        );
+    }
+    Ok(result)
+}
 pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
     let view = without_peer(f)?;
     let mut names = prefix223_native20_admission::roster(&view)?;
@@ -475,6 +534,61 @@ mod tests {
             "../../tests/fixtures/prefix223-peer/launch.json"
         ))
         .unwrap()
+    }
+    #[test]
+    fn protected_caps_keep_actual_223_envelope_and_reject_changed_owner_or_limits() {
+        let row = fixture_row();
+        let launch = launch();
+        let mut props = launch["sandbox"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_str().unwrap().to_owned()))
+            .collect::<BTreeMap<_, _>>();
+        props.insert("ControlGroup".into(), format!("/system.slice/{}", c::UNIT));
+        let caps = protected_caps(&row, &launch, &props).unwrap();
+        assert_eq!(caps["MemoryMax"], "225000000000");
+        assert_eq!(caps["MemoryHigh"], "150000000000");
+        assert_eq!(caps.as_object().unwrap().len(), 6);
+        for key in [
+            "MemoryMax",
+            "MemoryHigh",
+            "MemorySwapMax",
+            "CPUQuotaPerSecUSec",
+            "TasksMax",
+            "ControlGroup",
+        ] {
+            let mut changed = props.clone();
+            changed.insert(key.into(), "0".into());
+            assert!(protected_caps(&row, &launch, &changed).is_err(), "{key}");
+            changed.remove(key);
+            assert!(
+                protected_caps(&row, &launch, &changed).is_err(),
+                "missing {key}"
+            );
+        }
+        for pointer in [
+            "/epoch",
+            "/producer/InvocationID",
+            "/producer/Id",
+            "/producer/ControlGroup",
+            "/launch_receipt_sha256",
+        ] {
+            let mut changed = row.clone();
+            *changed.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(
+                protected_caps(&changed, &launch, &props).is_err(),
+                "{pointer}"
+            );
+        }
+        let mut changed = launch.clone();
+        changed["sandbox"]["MemoryMax"] = json!("137438953472");
+        assert!(protected_caps(&row, &changed, &props).is_err());
+        let f = json!({"active":[row,{"epoch":207,"unit":{"Id":"unchanged-other.service"}}]});
+        let original = f.clone();
+        let view = without_peer(&f).unwrap();
+        assert_eq!(view["active"], json!([f["active"][1]]));
+        assert_eq!(f, original);
     }
     #[test]
     fn actual_launch_and_guard_fixture_bind_the_exact_new_attempt_without_host_observation() {
