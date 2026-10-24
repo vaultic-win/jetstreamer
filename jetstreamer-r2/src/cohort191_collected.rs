@@ -72,6 +72,16 @@ pub(super) fn lifecycle(current: &Value, history: &Value, cutoff: u64) -> Result
         current_program()?,
         "191 collected lifecycle requires separate qualified namespace"
     );
+    native_lifecycle(current, history, cutoff)
+}
+pub(super) fn growth_lifecycle(current: &Value, history: &Value, cutoff: u64) -> Result<Value> {
+    ensure!(
+        growth_transfer::native_context()?,
+        "191 growth lifecycle requires its exact qualified read-only context"
+    );
+    native_lifecycle(current, history, cutoff)
+}
+fn native_lifecycle(current: &Value, history: &Value, cutoff: u64) -> Result<Value> {
     let raw = controller_properties()?;
     cleared(&raw, history)?;
     ensure!(

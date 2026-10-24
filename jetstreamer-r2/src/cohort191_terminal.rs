@@ -90,6 +90,43 @@ fn cache_bindings(v: &Value, p: &Capture) -> Result<()> {
 pub(super) fn retained_events(proof: &Bound, p: &Capture, cutoff: u64) -> Result<Value> {
     let v = bound(proof, false)?;
     cache_scope(&v, p, cutoff)?;
+    authenticated_cache(proof, &v, &p.origins, cutoff)
+}
+pub(super) fn growth_terminal(
+    proof: &Bound,
+    source: &Bound,
+    public: &Bound,
+    cutoff: u64,
+) -> Result<Value> {
+    ensure!(
+        growth_transfer::native_context()?,
+        "191 growth terminal requires exact read-only context"
+    );
+    let v = bound(proof, false)?;
+    jetstreamer_horizon_observe::cohort191_delivery_model::validate_terminal_transition(
+        &v, cutoff,
+    )?;
+    ensure!(
+        v["source_batch"] == json!(source) && v["public_batch"] == json!(public),
+        "191 growth terminal batch lineage differs"
+    );
+    let origins: BTreeMap<u64, Bound> = serde_json::from_value(v["origins"].clone())?;
+    ensure!(
+        origins.keys().copied().eq(191..=194),
+        "191 growth original launch census incomplete"
+    );
+    for (epoch, b) in &origins {
+        original(b, *epoch, cutoff)?;
+    }
+    let events = authenticated_cache(proof, &v, &origins, cutoff)?;
+    Ok(json!({"terminal":proof,"native_events":events,"origins":origins}))
+}
+fn authenticated_cache(
+    proof: &Bound,
+    v: &Value,
+    expected_origins: &BTreeMap<u64, Bound>,
+    cutoff: u64,
+) -> Result<Value> {
     let capture: Bound = serde_json::from_value(v["capture_plan"].clone())?;
     let plan: Plan = serde_json::from_value(bound(&capture, true)?)?;
     collection_root(&plan)?;
@@ -104,7 +141,7 @@ pub(super) fn retained_events(proof: &Bound, p: &Capture, cutoff: u64) -> Result
     member(&plan.program.path, &plan.program.sha256)?;
     if let Some(origins) = &plan.origins {
         ensure!(
-            json!(origins) == v["origins"] && json!(p.origins) == v["origins"],
+            json!(origins) == v["origins"] && json!(expected_origins) == v["origins"],
             "191 terminal cached original launch bindings differ"
         );
     }

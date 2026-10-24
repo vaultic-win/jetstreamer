@@ -24,6 +24,22 @@ mod os_claims;
 // Reserve64MiB per task and8MiB for dispatcher evidence; retain completed files.
 const OS_ALLOWANCE: u64 = 520 << 20;
 const GIB: u64 = 1 << 30;
+/// Authentication/accounting only; never admits or launches a stage.
+pub(super) fn growth_transfer_delivery_budget(transfer: &Bound, other_os: u64) -> Result<Value> {
+    let floor = os_claims::base(Some(transfer), other_os)?;
+    ensure!(
+        other_os >= 23_505_223_680,
+        "191 transfer drops other OS reservations"
+    );
+    Ok(
+        json!({"os_transfer":transfer,"filesystem":"/var/lib","os_floor_bytes":floor,
+        "other_os_bytes":other_os,"serial_all_stage_log_evidence_bytes":OS_ALLOWANCE,
+        "memory_envelope_bytes":84*GIB,"verifier_memory_bytes":64*GIB,
+        "queue_memory_bytes":2*GIB,"serial_uploader_memory_bytes":2*GIB,"shared_compiler_memory_bytes":16*GIB,
+        "shared_compiler_counted_once":true,"restore_authorized":false,"retirement_authorized":false,
+        "publication_authorized":false,"new_execution_authorized":false,"new_resource_samples":0}),
+    )
+}
 const FULL_DIR: &str =
     "/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts";
 const PLUGIN_DIR: &str =

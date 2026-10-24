@@ -3518,6 +3518,14 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;
     }
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some(
+            "check-original191-growth" | "transfer-original191-growth" | "read-original191-growth"
+        )
+    ) {
+        return cohort191_delivery::original_growth_transfer();
+    }
     if env::args().nth(1).as_deref() == Some("capture-terminal191") {
         return cohort191_delivery::capture_terminal_transition();
     }

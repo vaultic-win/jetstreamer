@@ -2,12 +2,17 @@
 use super::*;
 #[path = "cohort191_collected.rs"]
 mod collected;
+#[path = "cohort191_growth_transfer.rs"]
+mod growth_transfer;
 #[path = "cohort191_import_pending.rs"]
 mod import_pending;
 #[path = "cohort191_public.rs"]
 mod public;
 #[path = "cohort191_terminal.rs"]
 mod terminal_transition;
+pub(super) fn original_growth_transfer() -> Result<()> {
+    growth_transfer::run()
+}
 use serde_json::json;
 mod queue;
 use std::{
@@ -577,6 +582,9 @@ fn controller_lifecycle(
     );
     if collected::current_program()? {
         return collected::lifecycle(current, history, cutoff);
+    }
+    if growth_transfer::native_context()? {
+        return collected::growth_lifecycle(current, history, cutoff);
     }
     let events = controller_terminal_events(history, cutoff)?;
     let actual = controller_properties()?;
