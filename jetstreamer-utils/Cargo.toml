@@ -252,6 +252,10 @@ name = "jetstreamer-horizon-standalone-guard"
 path = "src/horizon_standalone_guard_bin.rs"
 
 [[bin]]
+name = "jetstreamer-epoch227-v1625-bounded-resource"
+path = "src/epoch227_v1625_bounded_resource_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch225-bounded-resource"
 path = "src/epoch225_bounded_resource_bin.rs"
 
