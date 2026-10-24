@@ -7,6 +7,7 @@ mod metadata_cycle;
 mod missing157;
 mod native207;
 mod native209;
+mod native210;
 mod native223;
 mod native227;
 mod native228;
@@ -376,6 +377,10 @@ fn fresh_census(
         native207::validate(&current, terminal_fleet, owners)?;
     }
     let native209 = plan.epoch == 209 && native209::recognized(terminal_fleet, owners);
+    let native210 = plan.epoch == 210 && native210::recognized(terminal_fleet, owners);
+    if native210 {
+        native210::validate(&current, terminal_fleet, owners)?;
+    }
     if native209 {
         native209::validate(&current, terminal_fleet, owners)?;
     }
@@ -411,6 +416,7 @@ fn fresh_census(
             && !native223
             && !native207
             && !native209
+            && !native210
             && !native228
             && !warmup223
             && !native227
