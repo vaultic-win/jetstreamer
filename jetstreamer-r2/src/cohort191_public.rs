@@ -162,6 +162,8 @@ pub(super) fn run() -> Result<()> {
     );
     let (head, _) = queue::read_head()?;
     let (selected, state, _, _) = queue::selected_state(&head, cutoff)?;
+    let queue_plan_value = bound(&ctx.queue_plan, true)?;
+    let queue_program: Bound = serde_json::from_value(queue_plan_value["program"].clone())?;
     let manager = fleet::unit(queue::UNIT)?;
     let iid = manager["InvocationID"]
         .as_str()
@@ -284,7 +286,7 @@ pub(super) fn run() -> Result<()> {
                     .as_str()
                     .context("191 actual queue argv")?
                     .into(),
-                program: Some(ctx.publisher.clone()),
+                program: Some(queue_program.clone()),
             });
         }
         epochs.push(json!({"epoch":epoch,"full":full,"plugin":plugin,"boundary":if ready{complete.clone()}else{queued(ctx.boundary_budget_millis)},"upload":upload,"readback":readback,"source_revalidation_and_sidecar":tail,"authenticated_ready_pair":ready}));

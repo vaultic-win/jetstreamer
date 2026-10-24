@@ -531,7 +531,11 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
             let output = event_path(p).context("191 current public event path")?;
             let package = delivery198::seal_values(
                 p,
-                "public191-capture",
+                if s.native_handoff_event {
+                    "public191-native-capture-v2"
+                } else {
+                    "public191-capture"
+                },
                 &[(
                     "plan.json",
                     json!({
@@ -550,7 +554,11 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
                     s.publisher.sha256.clone(),
                 ],
                 false,
-                &p.cycle_directory.join("child-public191-capture.json"),
+                &p.cycle_directory.join(if s.native_handoff_event {
+                    "child-public191-native-capture-v2.json"
+                } else {
+                    "child-public191-capture.json"
+                }),
             )?;
         }
         let b = file(event_path(p).context("191 current event path")?, false)?;
@@ -591,7 +599,11 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
         }
         Err(error) => {
             write_new(
-                &p.cycle_directory.join("cohort191-incident.json"),
+                &p.cycle_directory.join(if s.native_handoff_event {
+                    "cohort191-native-incident-v2.json"
+                } else {
+                    "cohort191-incident.json"
+                }),
                 &json!({"schema":"jetstreamer-cohort191-status-incident-v2","epochs":[191,192,193,194],
             "sampled_at_utc":p.sample_target_utc,"error":format!("{error:#}"),"publication_skipped":true,
             "repair_priority":"Restore exact current native custody/forecast before publishing these four statuses",

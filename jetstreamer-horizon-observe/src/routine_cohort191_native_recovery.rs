@@ -6,7 +6,7 @@ const PLAN_SHA: &str = "61d0de19d0e401d692565dcb32edc414fcacf9d261f23d0702016470
 const FAILED_SHA: &str = "32a6f4f0fb82198ea13901b583b3716a23822e4f9df83261dbac0e1df600606c";
 const OBSERVER_SHA: &str = "0db9966d4b29d38984e8a2d9d0938d61dfb005356195a29e63362ea7ca4e70f1";
 const OLD_IID: &str = "4116fa9b09124b56906ede24e25cbc2c";
-const UNIT: &str = "horizon-cohort191-native-event-tail-recovery-20261024-v1.service";
+const UNIT: &str = "horizon-cohort191-native-event-tail-recovery-20261024-v2.service";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
@@ -198,7 +198,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, spec: &Bound, check: boo
     latest_fleet_unchanged(p, &bound_json(&p.previous_fleet, false)?)?;
     absent(&p.fleet_output)?;
     absent(&p.cycle_directory.join("completion.json"))?;
-    let root = p.cycle_directory.join("cohort191-native-event-recovery-v2");
+    let root = p.cycle_directory.join("cohort191-native-event-recovery-v3");
     absent(&root)?;
     ensure!(
         sha(env::var("HORIZON_S3_ENDPOINT")?.as_bytes()) == p.endpoint_sha256,
@@ -296,7 +296,7 @@ pub(super) fn completed(p: &Plan, c: &Value) -> Result<bool> {
     ensure!(
         intent.path
             == p.cycle_directory
-                .join("cohort191-native-event-recovery-v2/intent.json")
+                .join("cohort191-native-event-recovery-v3/intent.json")
             && proof["schema"] == "jetstreamer-cohort191-native-tail-recovery-v2"
             && proof["failed_child"]["sha256"] == FAILED_SHA
             && proof["new_resource_samples"] == 0
