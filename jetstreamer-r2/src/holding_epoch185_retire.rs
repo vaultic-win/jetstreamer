@@ -277,7 +277,12 @@ fn after_growth_projection_claims(view: &Value) -> Result<()> {
         original141.len() == 1
             && original141[0]["epoch"] == 141
             && original141[0]["producer_invocation_id"] == "e639f007d482464f8a251455659d2ede"
-            && original141[0]["outstanding_bytes"] == 549_755_813_888u64,
+            && original141[0]["outstanding_bytes"] == 549_755_813_888u64
+            && rows
+                .iter()
+                .filter(|row| row["producer_invocation_id"] == "e639f007d482464f8a251455659d2ede")
+                .count()
+                == 1,
         "185 retirement projection must preserve exact original141 whole-root cap"
     );
     Ok(())
@@ -1118,6 +1123,14 @@ mod tests {
         let mut reduced = rows.clone();
         reduced["projected_reservation_rows"][0]["outstanding_bytes"] = json!(1);
         assert!(after_growth_projection_claims(&reduced).is_err());
+        let mut alias = rows.clone();
+        let mut aliased = rows["projected_reservation_rows"][0].clone();
+        aliased["claim_key"] = json!("foreign-original141-alias");
+        alias["projected_reservation_rows"]
+            .as_array_mut()
+            .unwrap()
+            .push(aliased);
+        assert!(after_growth_projection_claims(&alias).is_err());
         assert!(after_growth_projection_claims(&json!({"projected_reservation_rows":[]})).is_err());
     }
     #[test]
