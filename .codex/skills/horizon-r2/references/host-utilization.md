@@ -57,6 +57,27 @@ sample binds every live invocation and scratch tree before and after measurement
 restarts, preserves the century `.jet`-derived filesystem floor, and remains below the VMA stops.
 Do not transfer a proven count between materially different machines or lane shapes without new evidence.
 
+### Change live limits with their controller policy
+
+When a lane shows sustained `memory.high` events and direct reclaim despite ample host capacity,
+consider a bounded memory-limit experiment on one lane. First inspect its actual controller's
+adoption checks and saved configuration fingerprint. Some controllers require `MemoryHigh`,
+`MemoryMax`, CPU and other native properties to match their launch arguments exactly, and include
+those arguments in the saved-state hash. An isolated `systemctl set-property` change can therefore
+make a healthy producer fail controller adoption and exhaust controller retries. Qualify the
+matching controller/state/guard policy transition before changing such a live producer's limits;
+do not rewrite a saved configuration hash to bypass that check.
+If its current guard becomes unarmed while the controller is inactive, qualify a temporary
+producer-bound guard before a planned controller handoff; an active timer alone does not cover it.
+
+If recovery requires restoring limits, keep the producer alive. Check actual usage and reclaimable
+versus anonymous/unevictable memory before lowering a hard cap; where appropriate restore the soft
+cap first, allow safe reclaim, then verify enough headroom before restoring the hard cap. Preserve
+failed controller history and bind any real replacement controller ID plus its first healthy native
+guard fire before resuming the observation chain. Evaluate an experiment over a complete ordinary
+observation interval after the change; a mixed interval or interrupted controller is not proof of a
+throughput improvement. Keep every unrelated growth claim and guard floor intact.
+
 ## Qualify measured admission budgets
 
 Preserve the protective free-space thresholds of every existing live owner when admitting a
