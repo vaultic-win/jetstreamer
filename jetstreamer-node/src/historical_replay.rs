@@ -51,7 +51,7 @@ fn verify_epoch224_transaction_write_lamports(
         }
         let Some(signature) = write.transaction_signature else {
             info!(
-                "epoch224 freeze write: slot={} write_version={} pubkey={} lamports={} owner={} executable={} rent_epoch={} stored_hash={} data_sha256={:x}",
+                "epoch 224 freeze write: slot={} write_version={} pubkey={} lamports={} owner={} executable={} rent_epoch={} stored_hash={} data_sha256={:x}",
                 write.slot,
                 write.write_version,
                 Address::new_from_array(write.pubkey),

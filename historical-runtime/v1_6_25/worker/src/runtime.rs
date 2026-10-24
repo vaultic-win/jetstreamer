@@ -828,13 +828,13 @@ impl RuntimeState {
         )) && (98_091_119..=98_091_122).contains(&self.bank.slot())
         {
             let delta = self.bank.accounts().bank_hash_info_at(self.bank.slot());
-            eprintln!("epoch227 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
+            eprintln!("epoch 227 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
         }
         if cfg!(feature = "epoch225-v1-6-25-diagnostic")
             && (97_199_876..=97_199_878).contains(&self.bank.slot())
         {
             let delta = self.bank.accounts().bank_hash_info_at(self.bank.slot());
-            eprintln!("epoch225 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
+            eprintln!("epoch 225 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
         }
         if self.diagnostic_singleton_execution {
             eprintln!(

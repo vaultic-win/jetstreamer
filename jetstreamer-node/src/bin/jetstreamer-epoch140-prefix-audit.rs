@@ -844,7 +844,7 @@ fn run(args: &[String]) -> Result<()> {
             runtime,
         },
     };
-    eprintln!("epoch140 selected-prefix audit phase=whole-source-hash-before");
+    eprintln!("epoch 140 selected-prefix audit phase=whole-source-hash-before");
     source.seek(SeekFrom::Start(0))?;
     ensure!(
         hash_file(&mut source)? == SOURCE_SHA,
@@ -855,7 +855,7 @@ fn run(args: &[String]) -> Result<()> {
     reader.verify_chain = true;
     let mut audit = Audit::new();
     eprintln!(
-        "epoch140 selected-prefix audit phase=selected-prefix-decode first={START} last={CUT}"
+        "epoch 140 selected-prefix audit phase=selected-prefix-decode first={START} last={CUT}"
     );
     for index in 0..reader.bucket_count() {
         if reader.bucket_index()[index].first_slot > CUT {
@@ -875,7 +875,7 @@ fn run(args: &[String]) -> Result<()> {
         );
         if index % 128 == 0 {
             eprintln!(
-                "epoch140 selected-prefix audit bucket={index} next_slot={} elapsed_seconds={}",
+                "epoch 140 selected-prefix audit bucket={index} next_slot={} elapsed_seconds={}",
                 audit.next_slot,
                 started.elapsed().as_secs()
             );
@@ -884,7 +884,7 @@ fn run(args: &[String]) -> Result<()> {
     let selection = audit.finish()?;
     drop(reader);
     eprintln!(
-        "epoch140 selected-prefix audit phase=whole-source-hash-after elapsed_seconds={}",
+        "epoch 140 selected-prefix audit phase=whole-source-hash-after elapsed_seconds={}",
         started.elapsed().as_secs()
     );
     source.seek(SeekFrom::Start(0))?;

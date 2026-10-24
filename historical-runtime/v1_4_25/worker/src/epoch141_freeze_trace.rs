@@ -103,7 +103,7 @@ fn frozen(bank: &Bank) -> Result<Value, String> {
 
 pub(crate) fn record(bank: &Bank) -> Result<(), String> {
     if bank.slot() == PRE_BOUNDARY || bank.slot() == 60_912_004 || bank.slot() == TERMINAL {
-        eprintln!("epoch141 frozen-bank components: {}", frozen(bank)?);
+        eprintln!("epoch 141 frozen-bank components: {}", frozen(bank)?);
     }
     Ok(())
 }
