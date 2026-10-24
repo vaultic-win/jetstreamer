@@ -32,6 +32,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
                 "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
             ),
+            227 if self.unit == "horizon-native-input-227-v1625-7a831420-v1.service" => (
+                "horizon-native-input-227-v1625-7a831420-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1/scratch",
+                "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
+                "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef",
+            ),
             227 => (
                 "horizon-native-input-227-capped-710f6523-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch",
@@ -219,10 +225,48 @@ pub(super) fn sample(configs: &[NativeConfig]) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::os::unix::fs::{PermissionsExt, symlink};
     fn config() -> NativeConfig {
         serde_json::from_value(serde_json::json!({"epoch":227,"unit":"horizon-native-input-227-capped-710f6523-v1.service","expected_invocation_id":"a".repeat(32),"main_pid":42,"scratch_path":"/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch","executable":"/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test","executable_sha256":"1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"})).unwrap()
     }
+    #[test]
+    fn epoch227_v1625_full_runner_never_borrows_v1620_or_diagnostic_telemetry() {
+        let old = config();
+        old.validate().unwrap();
+        let mut new = config();
+        new.unit = "horizon-native-input-227-v1625-7a831420-v1.service".into();
+        new.scratch_path =
+            "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1/scratch".into();
+        new.executable =
+            "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner"
+                .into();
+        new.executable_sha256 =
+            "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef".into();
+        new.validate().unwrap();
+        for (key, value) in [
+            ("unit", json!(old.unit)),
+            ("scratch_path", json!(old.scratch_path)),
+            ("executable", json!(old.executable)),
+            ("executable_sha256", json!(old.executable_sha256)),
+            ("epoch", json!(210)),
+            (
+                "executable_sha256",
+                json!("f9ca164d16ec78429293effeba083da122c1ae36c4de45ffc2ddba537b652400"),
+            ),
+        ] {
+            let mut bad = serde_json::to_value(&new).unwrap();
+            bad[key] = value;
+            assert!(
+                serde_json::from_value::<NativeConfig>(bad)
+                    .unwrap()
+                    .validate()
+                    .is_err(),
+                "{key}"
+            );
+        }
+    }
+
     #[test]
     fn config_pins_complete_native_tuple_and_keeps_unavailable_rows_non_authorizing() {
         let n = config();
