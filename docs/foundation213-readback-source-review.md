@@ -112,3 +112,11 @@ Read-only preserved receipts:
 These historical results motivate the separate family comparison. They are
 neither present-day rate measurements nor evidence of this holding object's
 integrity, route or completion time.
+
+Validation: four focused release tests passed (closed arguments, exact response
+identity, bounded/exact bytes, family selection and denied authority). Strict
+production Clippy passed with `-D warnings` on the final source. Rustfmt and
+`git diff --check` passed. No production helper was deployed and no diagnostic
+was executed against R2. Keep a hard deadline on any later diagnostic service:
+the five-second DNS await cannot forcibly cancel a blocking OS resolver call
+already started by Tokio.
