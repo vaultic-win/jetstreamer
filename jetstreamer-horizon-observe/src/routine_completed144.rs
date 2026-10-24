@@ -232,7 +232,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     *f = history;
     ensure!(
         proof["prior_admission_event_accepted"] == false,
-        "completed144 must not invent event acceptance"
+        "completed 144 must not invent event acceptance"
     );
     Ok(())
 }
@@ -242,7 +242,7 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
             && next.completed144_prefix.is_none()
             && next.prefix144_audit.is_none()
             && next.prefix157_audit.is_some(),
-        "completed144 requires original campaign history"
+        "completed 144 requires original campaign history"
     );
     let s: Spec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(
@@ -250,12 +250,12 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
             && !s.replay_launch_authorized
             && !s.publication_authorized
             && !s.r2_mutations,
-        "completed144 spec grants authority"
+        "completed 144 spec grants authority"
     );
     let template = bound_json(&next.fleet_template, true)?;
     let action = template["gates"]["144"]["next_action"]
         .as_str()
-        .context("completed144 prior action")?;
+        .context("completed 144 prior action")?;
     next.completed144_prefix = Some(Profile {
         proof: s.proof,
         prior_action_sha256: sha(action.as_bytes()),
@@ -272,7 +272,7 @@ pub(super) fn enable(next: &mut Plan, spec: &Bound) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact sealed10:58 scans successor regression; read-only no sampling or remote access"]
+    #[ignore = "root exact sealed 10:58 scans successor regression; read-only no sampling or remote access"]
     fn actual_scans_successor_preserves_newer_action_and_history_idempotently() {
         let pb=Bound{path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261022T105800Z-native141-rejection-assembly144-scans-upload198-refresh-completed144-v1/cycle-plan.json".into(),sha256:"068340c662fce8b48356fa05c15d1fa0054186693db750752814d18f9d2e24b8".into()};
         let p: Plan = serde_json::from_value(bound_json(&pb, true).unwrap()).unwrap();

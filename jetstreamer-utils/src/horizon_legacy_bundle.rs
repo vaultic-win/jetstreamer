@@ -18,7 +18,7 @@ use {
 /// Exact completed original-shred acquisition used by this qualification profile.
 pub const ACQUISITION_SHA256: &str =
     "0335b1131663c0f8df77b3cddb5f79e49af2956067ebc46af74b9a08adafb949";
-/// Complete18283targetPoH diagnostic; no failures or missing boundaries.
+/// Complete 18283-target PoH diagnostic; no failures or missing boundaries.
 pub const POH_COMPLETION_SHA256: &str =
     "12cb942626d34662080dfc981dd0588b8baef39ee31e5fb35bd8fd1593e5cd4f";
 /// Independent finalized gap census, including pre-epoch warmup targets.

@@ -307,7 +307,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, is_terminal: bool) -> Re
             "archive_verification_or_ready_pair_proven":false,"publication_authorized":false,"retirement_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         )?;
         println!(
-            "exact144 declined attempt captured; no delivery, client,queue or remote mutation"
+            "exact 144 declined attempt captured; no delivery, client, queue or remote mutation"
         );
         return Ok(());
     }
@@ -382,7 +382,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, is_terminal: bool) -> Re
         )?;
     }
     println!(
-        "exact144 delivery ownership captured; no lock acquisition,archive hash or remote access"
+        "exact 144 delivery ownership captured; no lock acquisition, archive hash or remote access"
     );
     Ok(())
 }

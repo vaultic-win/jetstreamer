@@ -77,14 +77,14 @@ pub(crate) fn validate_cli(
             && count == 1
             && destination
             && !forbidden,
-        "private203 continuation requires its dedicated build, only203, one --verify, explicit private destination, and no ordinary override",
+        "private203 continuation requires its dedicated build, only 203, one --verify, explicit private destination, and no ordinary override",
     )
 }
 fn validate_plan(p: &Plan, destination: &Path) -> Result<(), String> {
     require(
         p.schema == "jetstreamer-private-epoch203-checkpoint-continuation-plan-v1"
             && p.epoch == EPOCH,
-        "wrong203 continuation plan",
+        "wrong 203 continuation plan",
     )?;
     require(
         p.producer_unit
@@ -433,7 +433,7 @@ pub(crate) async fn run(
 ) -> Result<(), String> {
     require(
         cfg!(feature = "epoch203-checkpoint-continuation-diagnostic"),
-        "dedicated203 continuation build required",
+        "dedicated 203 continuation build required",
     )?;
     let p: Plan = serde_json::from_slice(&sealed_bytes(
         &Evidence {
@@ -635,7 +635,7 @@ pub(crate) async fn run(
     verifier.finish()?;
     require(
         fs::metadata(&suffix).map_err(|e| e.to_string())?.len() <= 8u64 << 30,
-        "203 suffix exceeded experimental8GiB reservation; preserve output and requalify peak before assembly",
+        "203 suffix exceeded experimental 8 GiB reservation; preserve output and requalify peak before assembly",
     )?;
     publish_historical_segment_manifest(EPOCH, q, &suffix, &result, candidate)?;
     require_no_checksum(&suffix)?;

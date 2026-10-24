@@ -396,7 +396,7 @@ pub(in crate::fleet) fn event_predecessor(
     }
     ensure!(
         p.gates[&223].state == "failed-needs-repair",
-        "native input test cannot close223 repair"
+        "native input test cannot close 223 repair"
     );
     Ok(())
 }

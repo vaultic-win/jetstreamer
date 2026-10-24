@@ -499,7 +499,7 @@ mod tests {
         assert!(scratch_census(root.path()).is_err());
     }
     #[test]
-    #[ignore = "root read-only exact retained144 manifest/pass/clock qualification; no restoration"]
+    #[ignore = "root read-only exact retained 144 manifest/pass/clock qualification; no restoration"]
     fn root_actual_sources_match_the_exact144_expectation() {
         use sha2::{Digest, Sha256};
         assert_eq!(unsafe { libc::geteuid() }, 0);

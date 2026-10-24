@@ -91,7 +91,7 @@ fn bytes(text: &str) -> Result<(u64, Vec<u32>)> {
     Ok((total, fds.into_iter().collect()))
 }
 fn forecast(received: u64, elapsed: u64, revalidation: u64) -> Result<(u64, u64)> {
-    // Deduct1MiB/socket for TLS/HTTP/control traffic and discount another 10%.
+    // Deduct 1 MiB/socket for TLS/HTTP/control traffic and discount another 10%.
     // Closed connections are omitted, conservatively undercounting transport.
     // These are approximate received bytes, explicitly not authenticated bytes.
     let useful = received
@@ -212,7 +212,7 @@ pub(super) fn estimate(sample: u64, calibration: &Value) -> Result<(u64, Value)>
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact live160 overdue-readback event diagnostic only; no resource observer, archive read, R2 request or status publication"]
+    #[ignore = "root exact live 160 overdue-readback event diagnostic only; no resource observer, archive read, R2 request or status publication"]
     fn actual_readback_transport_revision_is_bound_to_live_child() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let now = std::time::SystemTime::now()

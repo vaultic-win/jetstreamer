@@ -50,7 +50,7 @@ include!("private_v4_verify_runner.rs");
 mod tests203 {
     use super::*;
     #[test]
-    #[ignore = "requires root and exact immutable203 RPC/provenance metadata; read-only, no archive access"]
+    #[ignore = "requires root and exact immutable 203 RPC/provenance metadata; read-only, no archive access"]
     fn actual203_independent_metadata_matches_shared_verifier_without_target_access() {
         let p:Plan=serde_json::from_value(json!({"schema":PLAN_SCHEMA,
             "producer_outcome":{"path":"/not-opened/continuation.json","sha256":"a".repeat(64)},

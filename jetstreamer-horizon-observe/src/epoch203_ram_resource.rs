@@ -316,7 +316,7 @@ fn validate_evidence(e: &Envelope, inputs: &Evidence, now: u64) -> Result<()> {
             .as_u64()
             .and_then(|n| n.checked_mul(1024))
             .is_some_and(|n| n >= 864 << 30),
-        "sample cannot reserve complete320GiB above544GiB"
+        "sample cannot reserve complete 320 GiB above 544 GiB"
     );
     let ordinary = o["replays"].as_array().context("ordinary census")?;
     let diagnostic = o["diagnostic_replays"]
@@ -502,7 +502,7 @@ fn unit_check(unit: &str, id: &str, active: &str) -> Result<()> {
         for expected in ["MainPID=0", "ControlGroup="] {
             ensure!(
                 raw.lines().any(|l| l == expected),
-                "stopped225 has live resources"
+                "stopped 225 has live resources"
             );
         }
     } else {
@@ -566,7 +566,7 @@ fn validate_live_census(units: &[Value], own: &str) -> Result<Vec<String>> {
     }
     ensure!(
         seen == allowed,
-        "fresh live service census differs from exact3primary-plus-supervisor set"
+        "fresh live service census differs from exact 3 primary-plus-supervisor set"
     );
     Ok(seen.into_iter().collect())
 }

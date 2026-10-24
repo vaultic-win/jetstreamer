@@ -204,7 +204,7 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "requires root and exact sealed14:38 host plan; no sampling, processes or writes"]
+    #[ignore = "requires root and exact sealed 14:38 host plan; no sampling, processes or writes"]
     fn host_configuration_migration_is_exact_and_non_mutating() {
         let plan = Bound {
             path: "/var/lib/jetstreamer/horizon-routine-plan-101-200-20261021T143800Z-v2/cycle-plan.json".into(),

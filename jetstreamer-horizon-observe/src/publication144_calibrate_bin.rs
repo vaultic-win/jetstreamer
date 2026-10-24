@@ -80,7 +80,7 @@ fn budgets(d: [u64; 3]) -> Result<Value> {
         .and_then(|n| n.checked_add(600_000))
         .context("total timing overflow")?;
     Ok(
-        json!({"target_archive_bytes":TARGET,"scaled_hash_millis":hash,"copy_hash_and_independent_reread_millis":import,"scaled_upload_millis":upload,"scaled_readback_and_revalidation_millis":readback,"r2_hash_upload_readback_sidecar_millis":r2,"dispatch_margin_millis":600000,"publication_to_sidecar_millis":total,"method":"Scale exact198 phase durations by complete144/198 byte ratio with ceiling. Import gets three hash-equivalent passes for copy/write/hash plus independent reread. R2 retains its separate hash/upload/readback/source-revalidation/sidecar debt; add10minutes dispatch margin. Forecast only, not a gate or upper bound; diagnose observed slowdown rather than indefinitely resetting deadline."}),
+        json!({"target_archive_bytes":TARGET,"scaled_hash_millis":hash,"copy_hash_and_independent_reread_millis":import,"scaled_upload_millis":upload,"scaled_readback_and_revalidation_millis":readback,"r2_hash_upload_readback_sidecar_millis":r2,"dispatch_margin_millis":600000,"publication_to_sidecar_millis":total,"method":"Scale exact 198 phase durations by complete 144/198 byte ratio with ceiling. Import gets three hash-equivalent passes for copy/write/hash plus independent reread. R2 retains its separate hash/upload/readback/source-revalidation/sidecar debt; add 10 minutes dispatch margin. Forecast only, not a gate or upper bound; diagnose observed slowdown rather than indefinitely resetting deadline."}),
     )
 }
 fn run() -> Result<()> {

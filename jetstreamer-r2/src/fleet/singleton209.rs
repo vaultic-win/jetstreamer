@@ -273,7 +273,7 @@ mod tests {
         };
         assert!(
             native(&foreign).is_err(),
-            "207 bootstrap success cannot qualify209"
+            "207 bootstrap success cannot qualify 209"
         );
         let p = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","filesystem":"/","worker_root":ROOT,
             "minimum_free_bytes":1000,"maximum_root_physical_bytes":PEAK,"maximum_worker_vmas":3500000});

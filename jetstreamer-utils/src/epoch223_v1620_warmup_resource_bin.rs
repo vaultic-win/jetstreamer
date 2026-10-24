@@ -1,4 +1,4 @@
-//! Separate v1.6.20 first16-entry qualification; no root or publication authority.
+//! Separate v1.6.20 first 16-entry qualification; no root or publication authority.
 //! The old parent requires an epoch/root output range, so it retains that request.
 //! The exact worker rejects every entry after 96335554 before decoding or mutation.
 //! Neither a target stop nor any produced artifact qualifies an epoch or root.

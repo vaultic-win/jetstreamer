@@ -140,7 +140,7 @@ pub(super) fn run() -> Result<()> {
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false,
         "remote_mutations":false,"resource_observation_performed":false}),
     )?;
-    println!("cold223 input proof captured; no replay or publication authority");
+    println!("cold 223 input proof captured; no replay or publication authority");
     Ok(())
 }
 #[cfg(test)]

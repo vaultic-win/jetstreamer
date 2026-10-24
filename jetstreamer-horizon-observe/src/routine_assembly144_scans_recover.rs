@@ -191,7 +191,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool, tail: bool)
     );
     if check {
         println!(
-            "exact10:28 recovery evidence passed; no sampling, writes, status publication or remote access"
+            "exact 10:28 recovery evidence passed; no sampling, writes, status publication or remote access"
         );
         return Ok(());
     }
@@ -272,7 +272,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool, tail: bool)
         "new_resource_samples":0,"archive_mutations":false,"sidecar_mutations":false,"replay_launch_authorized":false,"deletions":false}),
     )?;
     println!(
-        "exact10:28 fleet recovered; original sample, estimate, nine statuses and failures preserved"
+        "exact 10:28 fleet recovered; original sample, estimate, nine statuses and failures preserved"
     );
     Ok(())
 }
@@ -384,7 +384,7 @@ fn finish_tail(
     next_preparation::completion_bindings(p, pb, &completion)?;
     write_new(&p.cycle_directory.join("completion.json"), &completion)?;
     println!(
-        "exact10:28 recovery complete; all original failures/sample/estimates/statuses preserved"
+        "exact 10:28 recovery complete; all original failures/sample/estimates/statuses preserved"
     );
     Ok(())
 }

@@ -124,7 +124,7 @@ fn closed_native209_inputs_reject_changed_writable_or_symlinked_files() {
 #[ignore]
 fn native_epoch209_cold_input_matches_canonical_accounts_commitment() {
     let scratch = env::var("JETSTREAMER_EPOCH209_V1616_TEST_SCRATCH")
-        .expect("explicit isolated209test scratch required");
+        .expect("explicit isolated 209 test scratch required");
     let path = Path::new(&scratch);
     assert!(scratch_namespace(path));
     for directory in &[path.parent().unwrap(), path] {

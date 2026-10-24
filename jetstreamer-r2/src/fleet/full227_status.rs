@@ -498,7 +498,7 @@ pub(super) fn inactive_owner(
     let bytes = read_stable_bounded(
         &receipt.observer_receipt,
         MAX_OBSERVER_RECEIPT_BYTES,
-        "full227 status origin",
+        "full 227 status origin",
     )?;
     let value: Value = serde_json::from_slice(&bytes)?;
     if value["schema"] != ESTIMATE_SCHEMA {
@@ -579,7 +579,7 @@ pub(super) async fn run() -> Result<()> {
         let old: Value = serde_json::from_slice(&read_stable_bounded(
             &p.estimate_receipt,
             MAX_OBSERVER_RECEIPT_BYTES,
-            "full227 frozen estimate",
+            "full 227 frozen estimate",
         )?)?;
         ensure!(
             old["schema"] == ESTIMATE_SCHEMA
@@ -667,7 +667,7 @@ pub(super) async fn run() -> Result<()> {
         let old: StatusPublicationReceipt = serde_json::from_slice(&read_stable_bounded(
             &path,
             MAX_STATUS_BYTES,
-            "full227 status publication",
+            "full 227 status publication",
         )?)?;
         ensure!(
             old.status == receipt.status

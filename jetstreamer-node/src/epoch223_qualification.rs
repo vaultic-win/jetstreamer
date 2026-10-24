@@ -374,7 +374,7 @@ pub(crate) fn tail_expectations(
         || plan.output_slot_start != TAIL_BOOTSTRAP + 1
         || plan.end_inclusive != OUTPUT_END
     {
-        return Err("tail comparison expectation scope is not exact477slots".into());
+        return Err("tail comparison expectation scope is not exact 477 slots".into());
     }
     let known = BankHashExpectation::LegacyAccountsHash(
         "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7"

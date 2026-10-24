@@ -194,7 +194,7 @@ pub(super) fn report(p: &Plan, o: &Value) -> Value {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact sealed1456 plan and accepted observer; immutable evidence reads only, no sampling"]
+    #[ignore = "root exact sealed 1456 plan and accepted observer; immutable evidence reads only, no sampling"]
     fn actual_accepted1456_budget_preserves_all_live_growth() {
         let plan = Bound {
             path: "/var/lib/jetstreamer/horizon-routine-plan-101-200-20261023T145600Z-controller-rebind-capped141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/cycle-plan.json".into(),

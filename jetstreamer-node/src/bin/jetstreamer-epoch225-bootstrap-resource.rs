@@ -238,7 +238,7 @@ fn scratch_metrics(root: &Path) -> Result<serde_json::Value, String> {
             physical = physical
                 .checked_add(meta.blocks().checked_mul(512).ok_or("block overflow")?)
                 .ok_or("physical overflow")?;
-            require(physical <= MAX_SCRATCH, "diagnostic scratch exceeds256GiB")?;
+            require(physical <= MAX_SCRATCH, "diagnostic scratch exceeds 256 GiB")?;
             if meta.is_dir() {
                 pending.push((entry.path(), depth + 1));
             } else if meta.file_type().is_symlink() {
@@ -248,7 +248,7 @@ fn scratch_metrics(root: &Path) -> Result<serde_json::Value, String> {
                 apparent = apparent
                     .checked_add(meta.len())
                     .ok_or("apparent overflow")?;
-                require(physical <= MAX_SCRATCH, "diagnostic scratch exceeds256GiB")?;
+                require(physical <= MAX_SCRATCH, "diagnostic scratch exceeds 256 GiB")?;
             } else {
                 return Err("unexpected scratch object".into());
             }

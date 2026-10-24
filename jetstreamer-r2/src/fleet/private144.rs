@@ -338,7 +338,7 @@ mod tests {
         assert!(private_pipeline_shape(&c, false));
     }
     #[test]
-    #[ignore = "root exact10:28 assembly/scans observation; read-only no resource sample or remote access"]
+    #[ignore = "root exact 10:28 assembly/scans observation; read-only no resource sample or remote access"]
     fn actual_assembly_observation_accepts_bound_scans_without_live_replay_claim() {
         let path = Path::new(
             "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261022T102800Z-native141-rejection-assembly144-scans-upload198-refresh-completed144-v1/sealed/fleet-plan.json",
@@ -461,7 +461,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "root exact failed23:28native observer regression; no resource sampling, writes or network"]
+    #[ignore = "root exact failed 23:28 native observer regression; no resource sampling, writes or network"]
     fn actual_native_observer_requires_exact_bound_native_claim_and_preserves_old_owner_proof() {
         let b=BoundFile {path:"/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261021T232800Z-native144-upload198-refresh-completed144-v1/public198-stage/sealed/fleet-plan.json".into(),sha256:"10424be36b3a6edab8520811f20dc586cb8716926654022b06df646261597421".into()};
         let p: Plan = serde_json::from_value(bound_json(&b).unwrap()).unwrap();
@@ -481,7 +481,7 @@ mod tests {
         assert!(observe(&bad, &o, &c, "sample").is_err());
     }
     #[test]
-    #[ignore = "root-only exact retained144 verifier plan and real terminal manager journal; no remote access"]
+    #[ignore = "root-only exact retained 144 verifier plan and real terminal manager journal; no remote access"]
     fn exact_completed_old144_can_coexist_only_with_its_private_verifier() {
         let p:Plan=serde_json::from_value(bound_json(&BoundFile{path:"/usr/local/lib/jetstreamer/horizon-prefix144-admission-plan-20261021-v1/fleet-plan.json".into(),sha256:"1a070f224017cb3364173bee353c71cdcd6f053a27e6a72068a88640ab18e8af".into()}).unwrap()).unwrap();
         let o = bound_json(&p.observer).unwrap();

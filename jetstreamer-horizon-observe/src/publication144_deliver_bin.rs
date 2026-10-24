@@ -507,14 +507,14 @@ fn run(p: &Plan, pb: &Bound, self_sha: &str, mode: &str) -> Result<()> {
             "144 delivery output already occupied"
         );
         println!(
-            "exact144 delivery configuration qualified; no owner query, lock wait, archive hash or remote access"
+            "exact 144 delivery configuration qualified; no owner query, lock wait, archive hash or remote access"
         );
         return Ok(());
     }
     let before = gates(p, &v)?;
     if mode == "--check-only" {
         println!(
-            "exact144 terminal/full/plugin/canonical gates pass; no lock wait or remote access"
+            "exact 144 terminal/full/plugin/canonical gates pass; no lock wait or remote access"
         );
         return Ok(());
     }

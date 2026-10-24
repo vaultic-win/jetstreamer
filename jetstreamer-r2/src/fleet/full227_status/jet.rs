@@ -91,7 +91,7 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
                 && state_meta.mode() & 0o777 == 0o600,
             "full 227 unsafe cohort state"
         );
-        let bytes = read_stable_bounded(&state_path, 65536, "full227 cohort state")?;
+        let bytes = read_stable_bounded(&state_path, 65536, "full 227 cohort state")?;
         let state: Value = serde_json::from_slice(&bytes)?;
         ensure!(
             state

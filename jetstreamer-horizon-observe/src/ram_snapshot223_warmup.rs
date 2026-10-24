@@ -339,7 +339,7 @@ fn owners(f: &Value) -> Result<Vec<&Value>> {
                     .as_str()
                     .and_then(|s| s.parse::<u64>().ok())
                     .is_some_and(|n| n > 0),
-            "foreign203 delivery owner"
+            "foreign 203 delivery owner"
         );
         result.push(u);
     }

@@ -193,7 +193,7 @@ mod tests {
         assert!(!exact185(&plan, &p, &b).unwrap());
     }
     #[test]
-    #[ignore = "root-only exact16:38 completed metadata cycle; read-only full claim census, no R2 access"]
+    #[ignore = "root-only exact 16:38 completed metadata cycle; read-only full claim census, no R2 access"]
     fn exact_metadata_completion_is_the_only_changed_census_row() {
         let b=Bound {path:"/usr/local/lib/jetstreamer/horizon-epoch157-status-cleanup-plan-20261021-v1/plan.json".into(),sha256:"e66010c184f37c6d6805137bdd6f100e15a9343da611c66043c7fd391eb4cd15".into()};
         let mut p: Plan = serde_json::from_value(bound_json(&b).unwrap()).unwrap();

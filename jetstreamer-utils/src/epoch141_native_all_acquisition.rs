@@ -292,7 +292,7 @@ pub(super) fn run(
     );
     bounded_write(&plan.output_receipt, &output)?;
     println!(
-        "all18283 native acquisition attempts retained after source revalidation; acquired={acquired} rejected={rejected}; no recovery/PoH/publication authority"
+        "all 18283 native acquisition attempts retained after source revalidation; acquired={acquired} rejected={rejected}; no recovery/PoH/publication authority"
     );
     Ok(())
 }

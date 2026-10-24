@@ -269,7 +269,7 @@ pub(super) fn scan_children(
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root read-only exact progressive198 child proof; no network, sampling or writes"]
+    #[ignore = "root read-only exact progressive 198 child proof; no network, sampling or writes"]
     fn root_actual198_progressive_upload_child_is_readable() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let before = unit(UPLOAD).unwrap();
@@ -314,7 +314,7 @@ mod tests {
         assert!(!namespace("full-verification", UPLOAD));
     }
     #[test]
-    #[ignore = "root read-only actual198 watcher child sandbox capability; no resources sampled or remote access"]
+    #[ignore = "root read-only actual 198 watcher child sandbox capability; no resources sampled or remote access"]
     fn root_actual198_children_are_scoped_and_readable() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let mut active = 0;
@@ -325,7 +325,7 @@ mod tests {
             }
             assert_eq!(unit(name).unwrap(), before);
         }
-        assert!(active > 0, "no active198 verifier child");
+        assert!(active > 0, "no active 198 verifier child");
     }
     #[test]
     fn a_live_watcher_or_other_epoch_is_not_actual198_work() {

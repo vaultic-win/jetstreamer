@@ -514,7 +514,7 @@ pub(super) fn prepare() -> Result<()> {
     let gate = &mut plan["gates"]["157"];
     gate["state"] = json!("blocked-qualification");
     gate["next_action"] = json!(
-        "Complete private independent retained-prefix reread under exact157 verifier; preserve source and snapshot. Full epoch, native v1.5.8 restart, remaining suffix/assembly and publication are not yet qualified."
+        "Complete private independent retained-prefix reread under exact 157 verifier; preserve source and snapshot. Full epoch, native v1.5.8 restart, remaining suffix/assembly and publication are not yet qualified."
     );
     gate["evidence"]
         .as_array_mut()

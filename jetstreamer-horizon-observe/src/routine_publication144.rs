@@ -77,9 +77,9 @@ pub(super) fn composite_reader(p: &Plan) -> bool {
                 && p.tools.r2.sha256 == HISTORY_READER_SHA)
             || original141::reader(p))
 }
-const ACTIVE: &str = "Track exact144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
-const SUCCESS: &str = "Exact144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
-const FAILED: &str = "Exact144 publisher terminated unsuccessfully; capture terminal evidence immediately, preserve original and partial/copy/transaction receipts, remove any owned stale countdown through qualified lifecycle, and diagnose/recover the exact no-clobber transaction. Never blindly restart or discard valid artifacts.";
+const ACTIVE: &str = "Track exact 144 local publisher; preserve original assembly and independently scanned/copy-hashed artifact. Capture terminal outcome promptly, then dispatch only exact full/plugin-gated authenticated R2 upload/readback and sidecar. Local publication is not remote readiness or retirement authority.";
+const SUCCESS: &str = "Exact 144 publisher is terminal-success; capture terminal receipt and revalidate actual committed publication, canonical archive/checksum and private full/plugin gates before authenticated R2 delivery. Service success alone is not archive or ready-pair proof.";
+const FAILED: &str = "Exact 144 publisher terminated unsuccessfully; capture terminal evidence immediately, preserve original and partial/copy/transaction receipts, remove any owned stale countdown through qualified lifecycle, and diagnose/recover the exact no-clobber transaction. Never blindly restart or discard valid artifacts.";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {

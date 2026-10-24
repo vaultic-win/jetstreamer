@@ -334,7 +334,7 @@ pub(super) fn prepare() -> Result<()> {
         "new203_own_root_physical_limit_bytes":c::PEAK,"new203_stop_floor_bytes":stop203,"new225_stop_floor_bytes":stop225,
         "new203_guard_sha256":NEW_GUARD_SHA,"unchanged225_guard_sha256":OLD225_GUARD_SHA,
         "new203_guard_plan":private157::file_binding(&plan203)?,"new225_guard_plan":private157::file_binding(&plan225)?,
-        "required_order":"prove new225 timer while old225 remains; prove new203 protective timer while old203 remains; capture exact first fires, then stop only superseded timers",
+        "required_order":"prove new 225 timer while old 225 remains; prove new 203 protective timer while old 203 remains; capture exact first fires, then stop only superseded timers",
         "replacement_guard_start_authorized":true,"superseded_guard_stop_authorized":false,
         "first_protective_fires_proven":false,"producer_signal_authorized":false,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false,"recorded_unix_seconds":now}),

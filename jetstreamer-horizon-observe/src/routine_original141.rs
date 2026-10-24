@@ -639,7 +639,7 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     }
     f["gates"]["141"]["next_action"] = if s.capped_root {
         json!(
-            "Advance the freshly built corrected/capped v1.4.25 worker to canonical root61328765 under its512GiB whole-root and5day experimental stops. Preserve all prior diagnostic roots and the strictly passed60912005vote evidence. Reassess actual growth/RSS/pressure at each coordinated sample; this budget is not an adopted full-cold peak. Root success qualifies only the416766slot prefix;15234epoch141suffix slots and independent complete-span/full/plugin/delivery gates remain before a ready pair."
+            "Advance the freshly built corrected/capped v1.4.25 worker to canonical root 61328765 under its 512 GiB whole-root and 5 day experimental stops. Preserve all prior diagnostic roots and the strictly passed 60912005 vote evidence. Reassess actual growth/RSS/pressure at each coordinated sample; this budget is not an adopted full-cold peak. Root success qualifies only the 416766-slot prefix; 15234 epoch 141 suffix slots and independent complete-span/full/plugin/delivery gates remain before a ready pair."
         )
     } else if s.vote_prefix {
         json!(
@@ -647,11 +647,11 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
         )
     } else if s.freeze_components {
         json!(
-            "Capture the bounded worker's frozen Bank components at60911999 and60912004 and its native terminal result. Compare parent/account-delta/signature-count/blockhash/hardfork inputs and epoch-transition rewards/clock/collector. A worker stop at60912004 is diagnostic evidence, not the parent's61328765 checkpoint or full141 recovery. Preserve both earlier failed roots and keep incident open through a verified ready pair."
+            "Capture the bounded worker's frozen Bank components at 60911999 and 60912004 and its native terminal result. Compare parent/account-delta/signature-count/blockhash/hardfork inputs and epoch-transition rewards/clock/collector. A worker stop at 60912004 is diagnostic evidence, not the parent's 61328765 checkpoint or full 141 recovery. Preserve both earlier failed roots and keep incident open through a verified ready pair."
         )
     } else {
         json!(
-            "Preserve exact private original-entry root qualification60911751..61328765 and guard/observer ownership. Capture actual terminal/checkpoint result promptly; partial-root success is not full141 or a sidecar ETA. Keep incident open through complete-span qualification and verified ready pair."
+            "Preserve exact private original-entry root qualification 60911751..61328765 and guard/observer ownership. Capture actual terminal/checkpoint result promptly; partial-root success is not full 141 or a sidecar ETA. Keep incident open through complete-span qualification and verified ready pair."
         )
     };
     Ok(())
@@ -681,7 +681,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
             }
             if f["gates"]["186"]["state"] == "blocked-qualification" {
                 f["gates"]["186"]["next_action"] = json!(
-                    "Capped 1.6.15 worker, cohesive 186 inputs and input capability are staged. Implement its distinct bounded admission/guard/fleet path against the current five production claims plus any live141remaining-growth claim. Reassess after each accepted event/sample; require a clean expanded operating point before another experimental lane. The512GiB/384GiB draft is not a qualified full-cold budget."
+                    "Capped 1.6.15 worker, cohesive 186 inputs and input capability are staged. Implement its distinct bounded admission/guard/fleet path against the current five production claims plus any live 141 remaining-growth claim. Reassess after each accepted event/sample; require a clean expanded operating point before another experimental lane. The 512 GiB/384 GiB draft is not a qualified full-cold budget."
                 );
             }
         }
@@ -1308,7 +1308,7 @@ mod tests {
         assert!(checked(&s, &r, &e, &p, &bad).is_err());
     }
     #[test]
-    #[ignore = "root exact sealed0709 controller-rebound five-lane templates only; no sampling, remote requests or writes"]
+    #[ignore = "root exact sealed 0709 controller-rebound five-lane templates only; no sampling, remote requests or writes"]
     fn actual_five_lane_and_private_census_compatibility() {
         let b=Bound{path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261023T070958Z-controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/cycle-plan.json".into(),sha256:"b2b5c98aacf9b732449bcb24cbaf3e2d5b100b7e52e43264ada8371465c44012".into()};
         let mut p: Plan = serde_json::from_value(bound_json(&b, true).unwrap()).unwrap();

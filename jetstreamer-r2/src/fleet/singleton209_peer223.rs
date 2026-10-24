@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(evidence(Some(&peer))["reclaimed_memory_credit_bytes"], 0);
     }
     #[test]
-    #[ignore = "root-only immutable334 metadata reader; no terminal claim, process/resource observation or network"]
+    #[ignore = "root-only immutable 334 metadata reader; no terminal claim, process/resource observation or network"]
     fn root_saved334_binds_the_exact223v2_peer_without_claiming_it_is_terminal() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let f=bound_json(&BoundFile{path:"/var/lib/jetstreamer/horizon-campaign-fleet/20261023T225300Z-v334/fleet-ledger.json".into(),sha256:"cbb5d8ef13b2f458203b5d2513271483a60c1f8e94cb83616252a137516f029f".into()}).unwrap();

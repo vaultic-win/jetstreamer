@@ -404,7 +404,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "requires root and exact retained198 deployment; preflight only, no terminal event or handoff claimed"]
+    #[ignore = "requires root and exact retained 198 deployment; preflight only, no terminal event or handoff claimed"]
     fn host_controller_preflight_denies_terminal_or_publication_claims() {
         let current = fleet::unit(CONTROLLER).unwrap();
         preflight(&current).unwrap();

@@ -8,9 +8,9 @@ const PROGRESS_SHA: &str = "d0f084a53c3b1eed735f826f2139cf459eb4b1a85558fc02ab8c
 const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1";
 const LENGTH: u64 = 109177480876;
 const DIGEST: &str = "153d3e5e5b7cbdc31bb4229315786000b84442a75b3b83cf4a50184b20b84a33";
-const ACTIVE_UPLOAD: &str = "Track exact144 nonqueued upload/readback using authenticated child progress and original publisher clock;preserve canonical and private assembly. Capture terminal event promptly;ready requires authenticated matching sidecar,not service success.";
-const SUCCESS_UPLOAD: &str = "Exact144 upload worker is terminal-success;reconcile authenticated ready pair and owned-status cleanup receipts immediately. Preserve canonical/private artifacts until ordinary boundary retirement gates pass.";
-const FAILED_UPLOAD: &str = "Exact144 upload worker is positively terminal unsuccessful;capture terminal evidence,remove owned stale status through qualified inactive lifecycle,and repair idempotently from preserved canonical/staged artifacts. Keep repair open;never overwrite R2 or retry over occupied attempt state.";
+const ACTIVE_UPLOAD: &str = "Track exact 144 nonqueued upload/readback using authenticated child progress and original publisher clock; preserve canonical and private assembly. Capture terminal event promptly; ready requires authenticated matching sidecar, not service success.";
+const SUCCESS_UPLOAD: &str = "Exact 144 upload worker is terminal-success; reconcile authenticated ready pair and owned-status cleanup receipts immediately. Preserve canonical/private artifacts until ordinary boundary retirement gates pass.";
+const FAILED_UPLOAD: &str = "Exact 144 upload worker is positively terminal unsuccessful; capture terminal evidence, remove owned stale status through qualified inactive lifecycle, and repair idempotently from preserved canonical/staged artifacts. Keep repair open; never overwrite R2 or retry over occupied attempt state.";
 fn id(v: &Value) -> bool {
     v.as_str().is_some_and(|s| {
         s.len() == 32
@@ -275,7 +275,7 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
         Ok(v) => Ok(v),
         Err(e) => Ok(
             json!({"provisional_fleet":provisional,"publication_skipped":true,
-            "reason":format!("Exact144 upload progress/status incident;repair promptly without restarting healthy work:{e:#}"),"delivery_kind":"upload144"}),
+            "reason":format!("Exact 144 upload progress/status incident; repair promptly without restarting healthy work: {e:#}"),"delivery_kind":"upload144"}),
         ),
     }
 }
@@ -387,7 +387,7 @@ fn publish_inner(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> 
             .join(format!("child-upload144-status-{name}.json"));
         if let Err(e) = child(&p.tools.r2, &args, !check, &capture) {
             return Ok(
-                json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":bound(capture,false)?,"reason":format!("Exact144 upload status requires prompt repair:{e:#}"),"delivery_kind":"upload144"}),
+                json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":bound(capture,false)?,"reason":format!("Exact 144 upload status requires prompt repair: {e:#}"),"delivery_kind":"upload144"}),
             );
         }
     }

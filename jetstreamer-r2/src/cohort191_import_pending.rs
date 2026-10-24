@@ -493,7 +493,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "root-only exact retained191 native proof and latest PID1 producer terminal; no replay/resource/R2 observation or mutation"]
+    #[ignore = "root-only exact retained 191 native proof and latest PID1 producer terminal; no replay/resource/R2 observation or mutation"]
     fn retained_native_proof_cannot_be_borrowed_by_public_or_foreign_phase() {
         let proof = Bound {
             path:
