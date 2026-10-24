@@ -106,7 +106,7 @@ pub(super) fn run() -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-cohort191-public-observation-plan-v1"
             && ctx.schema == "jetstreamer-cohort191-public-context-v1"
-            && ctx.publisher.path == Path::new(collected::PROGRAM)
+            && collected::is_program(&ctx.publisher.path)
             && ctx.publisher.sha256 == a[6]
             && fs::read_link("/proc/self/exe")? == ctx.publisher.path
             && ctx.boundary_budget_millis > 0,

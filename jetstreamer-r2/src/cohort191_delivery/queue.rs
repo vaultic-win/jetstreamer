@@ -4,7 +4,7 @@ use super::*;
 pub(super) const PHASE: &str = "cohort191-delivery";
 pub(super) const UNIT: &str = "horizon-cohort191-delivery-queue-20261023-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1";
-const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-delivery-tools-20261024-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Binding {
@@ -475,7 +475,11 @@ fn child(
         "sync"
     };
     ensure!(
-        admission.path == Path::new(ROOT).join(format!("admissions/epoch-{epoch}-{kind}.json"))
+        (admission.path == Path::new(ROOT).join(format!("admissions/epoch-{epoch}-{kind}.json"))
+            || (epoch == 191
+                && kind == "full"
+                && admission.path == Path::new(ROOT).join("recovery-full191-v1/admission.json")
+                && a["recovery"].is_object()))
             && a["schema"] == "jetstreamer-cohort191-delivery-queue-admission-v2"
             && a["queue_invocation_id"] == manager_iid
             && same_bound(&a["queue_plan"], plan)?
@@ -499,7 +503,14 @@ fn child(
                 && p.public_batch
                     .as_ref()
                     .is_some_and(|s| same_bound(&d["public_batch"], s).unwrap_or(false))
-                && l["schema"] == "jetstreamer-cohort191-verification-dispatch-launch-v1"
+                && (l["schema"] == "jetstreamer-cohort191-verification-dispatch-launch-v1"
+                    || (epoch == 191
+                        && kind == "full"
+                        && l["schema"] == "jetstreamer-cohort191-verification-recovery-launch-v1"
+                        && l["failure"]["sha256"]
+                            == "410644c73b496d4659deedc8c26d9767bec81f3833a53680b6cc674f2d5c4e6e"
+                        && l["wrapper_launch"]["sha256"]
+                            == "8224b860dc820590e8a78ef4ffa1ab57f9a564a5d17f465f63e14d6b7b4dffa7"))
                 && l["epoch"] == epoch
                 && l["stage"] == kind
                 && l["native_owner"]["Id"] == c.unit

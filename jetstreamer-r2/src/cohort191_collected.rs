@@ -13,8 +13,14 @@ fn bootstrap() -> Bound {
         sha256: "6b930ce0c0c162ae81e1f1d86edd7cb134cbd2370d1dc7b6e0f19cfef15afe8e".into(),
     }
 }
+pub(super) fn is_program(p: &Path) -> bool {
+    p == Path::new(PROGRAM)
+        || p == Path::new(
+            "/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2",
+        )
+}
 pub(super) fn current_program() -> Result<bool> {
-    Ok(fs::read_link("/proc/self/exe")? == Path::new(PROGRAM))
+    Ok(is_program(&fs::read_link("/proc/self/exe")?))
 }
 pub(super) fn native_records(cutoff: u64) -> Result<Value> {
     Ok(import_pending::historical_records(&bootstrap(), cutoff)?["native_events"].clone())

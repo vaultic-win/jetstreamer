@@ -145,6 +145,10 @@ fn make_directory(path: &Path) -> Result<()> {
     File::open(path.parent().context("191 directory parent")?)?.sync_all()?;
     Ok(())
 }
+fn prepare_verifier_state(path: &Path, mut create: impl FnMut(&Path) -> Result<()>) -> Result<()> {
+    create(path)?;
+    create(&path.join("receipts"))
+}
 fn clock() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
@@ -644,7 +648,7 @@ pub(super) fn run() -> Result<()> {
     } else {
         private_directory(&epoch_parent)?;
     }
-    make_directory(&state(&p))?;
+    prepare_verifier_state(&state(&p), make_directory)?;
     let intent = json!({"schema":"jetstreamer-cohort191-verification-dispatch-intent-v1","plan":plan_bound,"self_sha256":a[6],"epoch":p.epoch,"stage":p.stage,"unit":unit(p.epoch,p.stage),"source_batch":p.source_batch,"public_batch":p.public_batch,"native_import":import,"program":p.program,"verifier_plan":p.verifier_plan,"observer":p.observer,"routine_completion":p.routine_completion,"before":before,"os_available_bytes":available,"old_os_claims_protected_bytes":OLD_OS_PROTECTED,"other_pending_os_growth_bytes":p.other_pending_os_growth_bytes,"os_claim_transfer":p.os_claim_transfer,"os_base_floor_bytes":os_claims::base(p.os_claim_transfer.as_ref(),p.other_pending_os_growth_bytes)?,"new_os_allowance_bytes":OS_ALLOWANCE,"argv":argv(&p),"verification_complete":false,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
     fleet::persist(&p.output_directory.join("intent.json"), &intent)?;
     ensure!(
@@ -690,6 +694,28 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fresh_verifier_state_contains_private_receipts_before_wrapper_launch() {
+        use std::os::unix::fs::DirBuilderExt;
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("full");
+        prepare_verifier_state(&state, |p| {
+            fs::DirBuilder::new().mode(0o700).create(p)?;
+            Ok(())
+        })
+        .unwrap();
+        assert!(state.join("receipts").is_dir());
+        assert_eq!(
+            fs::symlink_metadata(state.join("receipts")).unwrap().mode() & 0o777,
+            0o700
+        );
+        assert!(
+            fs::read_dir(state.join("receipts"))
+                .unwrap()
+                .next()
+                .is_none()
+        );
+    }
     fn bound(path: &str) -> Bound {
         Bound {
             path: path.into(),

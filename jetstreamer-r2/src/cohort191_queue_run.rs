@@ -2,6 +2,8 @@
 //! observations; a queued slot never contains an invented child or future hash.
 use super::*;
 use crate::cohort191_delivery::{self as custody, Bound};
+#[path = "cohort191_queue_recovery.rs"]
+mod recovery;
 use serde_json::json;
 use std::{
     collections::BTreeSet,
@@ -11,7 +13,7 @@ use std::{
 };
 const UNIT: &str = "horizon-cohort191-delivery-queue-20261023-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1";
-const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-delivery-tools-20261024-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2";
 const RECEIPTS: &str = "/home/sol/.jetstreamer-private/r2-receipts";
 // Confirmed fixed deployment contract; never accept an admission-supplied envfile.
 const ENVFILE: &str = "/etc/jetstreamer/horizon-r2.env";
@@ -1048,16 +1050,20 @@ pub(super) fn run() -> Result<()> {
             && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "191 queue lease unsafe/busy"
     );
-    ensure!(
-        !Path::new(ROOT).join("state.json").try_exists()?
-            && fs::read_dir(Path::new(ROOT).join("history"))?
-                .next()
-                .is_none()
-            && fs::read_dir(Path::new(ROOT).join("intents"))?
-                .next()
-                .is_none(),
-        "191 queue already has custody/history; manual reconciliation required, never retry"
-    );
+    if p.get("recovery_full191").is_some() {
+        recovery::validate(&p)?;
+    } else {
+        ensure!(
+            !Path::new(ROOT).join("state.json").try_exists()?
+                && fs::read_dir(Path::new(ROOT).join("history"))?
+                    .next()
+                    .is_none()
+                && fs::read_dir(Path::new(ROOT).join("intents"))?
+                    .next()
+                    .is_none(),
+            "191 queue already has custody/history; manual reconciliation required, never retry"
+        );
+    }
     let iid = env::var("INVOCATION_ID")?;
     let u = manager(UNIT)?;
     let expected = format!(
@@ -1095,6 +1101,9 @@ pub(super) fn run() -> Result<()> {
     let pid = u64::from(std::process::id());
     let start = ticks(pid)?;
     let mut state = json!({"schema":"jetstreamer-cohort191-delivery-queue-state-v2","revision":0,"plan":plan,"unit":UNIT,"invocation_id":iid,"manager_pid":pid,"manager_start_ticks":start,"updated_unix_millis":0,"status":"managing","epochs":p["imported_members"].as_array().context("191 imported rows")?.iter().map(|r|json!({"epoch":r["epoch"],"archive_sha256":r["archive_sha256"],"archive_length":r["archive_length"],"stage":"queued-full","task_owner":null})).collect::<Vec<_>>()});
+    if p.get("recovery_full191").is_some() {
+        state = recovery::state(&p, &plan, &iid, pid, start)?;
+    }
     process(&json!({"pid":pid,"start_ticks":start,"unit":UNIT,"program":program}))?;
     persist(&mut state)?;
     if let Err(e) = execute(&mut state, &plan, &a[6]) {
