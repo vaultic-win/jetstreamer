@@ -1,8 +1,18 @@
 //! Closed bootstrap-only 227 owner. Never an epoch replay/publication gate.
+//! `native227-small` selects a separately bound96GB native-only generation.
+//! Default retains the original300GB tuple; neither changes replay capacity.
 use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch227-v1625-native-input-running-v1";
-pub(super) const UNIT: &str = "horizon-native-input-227-v1625-7a831420-v1.service";
-pub(super) const ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1";
+pub(super) const UNIT: &str = if cfg!(feature = "native227-small") {
+    "horizon-native-input-227-v1625-small-v2.service"
+} else {
+    "horizon-native-input-227-v1625-7a831420-v1.service"
+};
+pub(super) const ROOT: &str = if cfg!(feature = "native227-small") {
+    "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2"
+} else {
+    "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1"
+};
 pub(super) const TEST: &str =
     "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner";
 pub(super) const TEST_SHA: &str =
@@ -10,9 +20,16 @@ pub(super) const TEST_SHA: &str =
 pub(super) const WORKER: &str = "/var/lib/jetstreamer/horizon-227-v1625-qualification-7a831420-v1/jetstreamer-historical-worker-v1-6-25";
 pub(super) const WORKER_SHA: &str =
     "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a";
-pub(super) const GUARD: &str = "/var/lib/jetstreamer/horizon-227-v1625-native-main-guard-v1/jetstreamer-horizon-standalone-guard";
-pub(super) const GUARD_SHA: &str =
-    "c06f20aca5a87358bd23ea6a22607b978545f38828c04a4aa693f2bd14718a9b";
+pub(super) const GUARD: &str = if cfg!(feature = "native227-small") {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-small-main-guard-v2/jetstreamer-horizon-standalone-guard"
+} else {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-main-guard-v1/jetstreamer-horizon-standalone-guard"
+};
+pub(super) const GUARD_SHA: &str = if cfg!(feature = "native227-small") {
+    "2f4f33097a90579d4433a7e9ab0aaeb4e7d3a422b5ff36b188b0e6c5d1a8e38d"
+} else {
+    "c06f20aca5a87358bd23ea6a22607b978545f38828c04a4aa693f2bd14718a9b"
+};
 pub(super) const INPUT: &str = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1";
 pub(super) const SNAPSHOT: &str =
     "snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst";
@@ -21,20 +38,86 @@ pub(super) const SNAPSHOT_SHA: &str =
 pub(super) const GENESIS_SHA: &str =
     "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 pub(super) const ACCOUNTS_HASH: &str = "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR";
-pub(super) const PLAN: &str =
-    "/var/lib/jetstreamer/horizon-227-v1625-native-cold-plan-v1/native-cold-plan.json";
-pub(super) const PLAN_SHA: &str =
-    "1285c668693e09e4b5dd087fd9698e208b90c3b9ed1efb32d003d5ff7631df21";
-pub(super) const SCRATCH: u64 = 300_000_000_000;
+pub(super) const PLAN: &str = if cfg!(feature = "native227-small") {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-cold-plan-small-v2/native-cold-plan.json"
+} else {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-cold-plan-v1/native-cold-plan.json"
+};
+pub(super) const PLAN_SHA: &str = if cfg!(feature = "native227-small") {
+    "4497d05a5fed5d9b5bcc0f64b0eab4a04a868e4ab6ba266b16d5fa2d61df3152"
+} else {
+    "1285c668693e09e4b5dd087fd9698e208b90c3b9ed1efb32d003d5ff7631df21"
+};
+pub(super) const SCRATCH: u64 = if cfg!(feature = "native227-small") {
+    96_000_000_000
+} else {
+    300_000_000_000
+};
 pub(super) const MEMORY: u64 = 128u64 << 30;
-pub(super) const UNIT_FILE: &str =
-    "/etc/systemd/system/horizon-native-input-227-v1625-7a831420-v1.service";
-pub(super) const UNIT_FILE_SHA: &str =
-    "f7b921b31063265ff15cc8b6c84e73837c9e4473a9a724f91551911ff2c1a15f";
-pub(super) const ORIGIN: &str =
-    "/var/lib/jetstreamer/horizon-227-v1625-native-capture-actual-v1/intent.json";
+pub(super) const UNIT_FILE: &str = if cfg!(feature = "native227-small") {
+    "/etc/systemd/system/horizon-native-input-227-v1625-small-v2.service"
+} else {
+    "/etc/systemd/system/horizon-native-input-227-v1625-7a831420-v1.service"
+};
+pub(super) const UNIT_FILE_SHA: &str = if cfg!(feature = "native227-small") {
+    "135a4b4dee78f6779cf06e87cc83e37418f8dd1150f8a5530d9cb2fdda357b53"
+} else {
+    "f7b921b31063265ff15cc8b6c84e73837c9e4473a9a724f91551911ff2c1a15f"
+};
+pub(super) const ORIGIN: &str = if cfg!(feature = "native227-small") {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-capture-small-v2/intent.json"
+} else {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-capture-actual-v1/intent.json"
+};
+pub(super) fn small_envelope(cold: &Value) -> Result<()> {
+    if !cfg!(feature = "native227-small") {
+        return Ok(());
+    }
+    let binding = small_model(cold)?;
+    small_census(&immutable_json(&binding)?)
+}
+fn small_model(cold: &Value) -> Result<BoundFile> {
+    let binding: BoundFile = serde_json::from_value(cold["snapshot_census"].clone())?;
+    ensure!(
+        binding.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-native227-snapshot-census-actual-v1/census.json"
+            )
+            && binding.sha256 == "6f5ec8b8f384bfb3531689fb0654b076c1febc1aad35058abf9398153bcd1a1f"
+            && cold["disk_envelope_model"]
+                == json!({"formula":"2*dense_4096_rounded_file_bytes+metadata_allowance_bytes+1073741824",
+            "modeled_bytes":77_949_771_776u64,"maximum_root_physical_bytes":SCRATCH,"bounded_experiment_only":true,
+            "original_300gb_generation_preserved":true}),
+        "227 small census/model binding differs"
+    );
+    Ok(binding)
+}
+fn small_census(census: &Value) -> Result<()> {
+    ensure!(
+        census["schema"] == "jetstreamer-native-readonly-snapshot-census-v1"
+            && census["epoch"] == 227
+            && census["snapshot_sha256"] == SNAPSHOT_SHA
+            && census["census"]["dense_4096_rounded_file_bytes"] == 35_098_120_192u64
+            && census["census"]["metadata_allowance_bytes"] == 6_679_789_568u64
+            && census["census"]["twice_dense_plus_metadata_plus_one_gib_bytes"]
+                == 77_949_771_776u64
+            && census["snapshot_extracted"] == false
+            && census["bank_constructed"] == false
+            && census["native_execution_authorized"] == false
+            && 77_949_771_776u64 < SCRATCH,
+        "227 small census scope differs"
+    );
+    Ok(())
+}
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
     phase == "private-cold-snapshot-verification" && unit == UNIT
+}
+pub(super) fn unit_name(unit: &str) -> bool {
+    matches!(
+        unit,
+        "horizon-native-input-227-v1625-7a831420-v1.service"
+            | "horizon-native-input-227-v1625-small-v2.service"
+    )
 }
 pub(super) fn command() -> String {
     format!(
@@ -181,6 +264,48 @@ pub(super) fn live(c: &PipelineClaim, current: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn small_generation_model_and_census_cannot_borrow_or_expand_authority() {
+        let mut cold = json!({"snapshot_census":{
+            "path":"/var/lib/jetstreamer/horizon-native227-snapshot-census-actual-v1/census.json",
+            "sha256":"6f5ec8b8f384bfb3531689fb0654b076c1febc1aad35058abf9398153bcd1a1f"},
+            "disk_envelope_model":{"formula":"2*dense_4096_rounded_file_bytes+metadata_allowance_bytes+1073741824",
+                "modeled_bytes":77_949_771_776u64,"maximum_root_physical_bytes":SCRATCH,"bounded_experiment_only":true,
+                "original_300gb_generation_preserved":true}});
+        small_model(&cold).unwrap();
+        let mut receipt = json!({"schema":"jetstreamer-native-readonly-snapshot-census-v1","epoch":227,
+            "snapshot_sha256":SNAPSHOT_SHA,"census":{"dense_4096_rounded_file_bytes":35_098_120_192u64,
+                "metadata_allowance_bytes":6_679_789_568u64,"twice_dense_plus_metadata_plus_one_gib_bytes":77_949_771_776u64},
+            "snapshot_extracted":false,"bank_constructed":false,"native_execution_authorized":false});
+        small_census(&receipt).unwrap();
+        for pointer in [
+            "/snapshot_census/path",
+            "/snapshot_census/sha256",
+            "/disk_envelope_model/modeled_bytes",
+            "/disk_envelope_model/maximum_root_physical_bytes",
+            "/disk_envelope_model/bounded_experiment_only",
+        ] {
+            let mut bad = cold.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(small_model(&bad).is_err(), "{pointer}");
+        }
+        for pointer in [
+            "/epoch",
+            "/snapshot_sha256",
+            "/census/twice_dense_plus_metadata_plus_one_gib_bytes",
+            "/snapshot_extracted",
+            "/bank_constructed",
+            "/native_execution_authorized",
+        ] {
+            let mut bad = receipt.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(small_census(&bad).is_err(), "{pointer}");
+        }
+        cold["disk_envelope_model"]["maximum_root_physical_bytes"] = json!(64_000_000_000u64);
+        receipt["epoch"] = json!(210);
+        assert!(small_model(&cold).is_err());
+        assert!(small_census(&receipt).is_err());
+    }
     fn fixture() -> (PipelineClaim, Value) {
         let c = PipelineClaim {
             epoch: 227,
@@ -211,6 +336,18 @@ mod tests {
     }
     #[test]
     fn native227_v1625_owner_fingerprints_and_mode_are_closed() {
+        assert!(unit_name(
+            "horizon-native-input-227-v1625-7a831420-v1.service"
+        ));
+        assert!(unit_name("horizon-native-input-227-v1625-small-v2.service"));
+        assert!(!unit_name("horizon-native-input-227-v1625-other.service"));
+        let other = if cfg!(feature = "native227-small") {
+            "horizon-native-input-227-v1625-7a831420-v1.service"
+        } else {
+            "horizon-native-input-227-v1625-small-v2.service"
+        };
+        assert!(!scope("private-cold-snapshot-verification", other));
+
         let (c, r) = fixture();
         checked(&c, &r).unwrap();
         assert_eq!(pipeline_unit_range(&c.phase, &c.unit).unwrap(), 227..=227);

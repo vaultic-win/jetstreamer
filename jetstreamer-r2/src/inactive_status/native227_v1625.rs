@@ -1,6 +1,10 @@
 //! Status-only cleanup after independently proved native227_v1625 terminal success.
 use super::*;
-const UNIT: &str = "horizon-native-input-227-v1625-7a831420-v1.service";
+const UNIT: &str = if cfg!(feature = "native227-small") {
+    "horizon-native-input-227-v1625-small-v2.service"
+} else {
+    "horizon-native-input-227-v1625-7a831420-v1.service"
+};
 pub(super) fn recognized(f: &Value, owners: &[(String, String)]) -> bool {
     owners.len() == 1 && owners[0].0 == UNIT && f["metadata_event"].is_object()
 }
@@ -33,4 +37,22 @@ pub(super) fn validate(
         );
     }
     Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn selected_generation_cleanup_never_matches_another_native_owner() {
+        let fleet = json!({"metadata_event":{"path":"/proof.json","sha256":"a".repeat(64)}});
+        let current = vec![(UNIT.to_owned(), "a".repeat(32))];
+        assert!(recognized(&fleet, &current));
+        let other = if cfg!(feature = "native227-small") {
+            "horizon-native-input-227-v1625-7a831420-v1.service"
+        } else {
+            "horizon-native-input-227-v1625-small-v2.service"
+        };
+        assert!(!recognized(&fleet, &[(other.to_owned(), "a".repeat(32))]));
+        assert!(!recognized(&fleet, &[]));
+        assert!(!recognized(&json!({}), &current));
+    }
 }

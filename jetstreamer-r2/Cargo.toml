@@ -12,6 +12,7 @@ keywords.workspace = true
 [features]
 # Separate native-only generation; default keeps the immutable original300GB tuple.
 native210-small = []
+native227-small = []
 
 [dependencies]
 anyhow.workspace = true
