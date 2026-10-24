@@ -181,6 +181,7 @@ pub(super) fn bindings(c: &DiagnosticClaim, launch: &Value) -> Result<()> {
         "210 full singleton admission substituted or stale"
     );
     no_publication(&a)?;
+    maintenance_capacity::singleton210_memory_proven(&a["capacity"])?;
     Ok(())
 }
 pub(super) fn guard_matches(c: &DiagnosticClaim, launch: &Value, p: &Value) -> bool {

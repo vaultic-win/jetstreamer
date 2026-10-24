@@ -533,3 +533,25 @@ async fn shared_transport_keeps_canonical_and_holding_uploads_conditional_and_fu
         assert_eq!(fs::read(&path).unwrap(), BODY);
     }
 }
+
+#[test]
+fn top_level_dispatch_preserves_legacy_actions_and_routes_resumable_restore() {
+    for action in [
+        "holding-park",
+        "holding-restore",
+        "holding-admit-restore",
+        "holding-restore-genesis-probe",
+        "holding-inspect136",
+        "holding-foundation213-park",
+        "holding-foundation213-admit-restore",
+        "holding-foundation213-restore",
+        "holding-foundation213-restore-resumable",
+        "holding-foundation213-retire",
+        "holding-foundation213-maintain",
+        "holding-foundation213-maintenance-finalize",
+    ] {
+        assert!(command(action), "top-level route missing {action}");
+    }
+    assert!(!command("holding-foundation213-restore-resumable-typo"));
+    assert!(!command("upload"));
+}

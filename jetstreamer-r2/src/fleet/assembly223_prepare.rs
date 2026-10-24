@@ -59,8 +59,7 @@ fn owners(f: &Value) -> Result<BTreeMap<String, Value>> {
     let current = census(&names, 201, 300)?;
     let mut old = current.clone();
     old.remove(c::UNIT);
-    singleton227_admission::owners(f, &old)?;
-    prefix223_live_peer::current(f, &old)?;
+    maintenance_capacity::current_owners(f, &old)?;
     Ok(current)
 }
 pub(super) fn run() -> Result<()> {

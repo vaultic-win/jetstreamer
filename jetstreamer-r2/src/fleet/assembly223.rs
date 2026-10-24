@@ -340,8 +340,7 @@ pub(super) fn capture() -> Result<()> {
     let all = census(&names, 201, 300)?;
     let mut older = all.clone();
     older.remove(UNIT);
-    singleton227_admission::owners(&fleet, &older)?;
-    prefix223_live_peer::current(&fleet, &older)?;
+    maintenance_capacity::current_owners(&fleet, &older)?;
     ensure!(
         all.get(UNIT) == Some(&before) && unit(UNIT)? == before,
         "assembly 223 owner changed during capture"

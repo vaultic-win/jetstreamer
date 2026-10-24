@@ -29,6 +29,9 @@ use {
     },
 };
 
+#[path = "horizon_retire_failed_native227.rs"]
+mod native227;
+
 const PLAN_SCHEMA: &str = "jetstreamer-horizon-failed-diagnostic-retirement-plan-v1";
 const RECEIPT_SCHEMA: &str = "jetstreamer-horizon-failed-diagnostic-retirement-receipt-v1";
 const OUTCOME_SCHEMA: &str = "jetstreamer-horizon-epoch224-singleton-diagnostic-outcome-v1";
@@ -43,6 +46,8 @@ struct Plan {
     restore_only_probe: bool,
     #[serde(default)]
     warmup223_v3: bool,
+    #[serde(default)]
+    native227_small_unregistered: bool,
     private_root: PathBuf,
     run_root: PathBuf,
     targets: Vec<PathBuf>,
@@ -353,7 +358,10 @@ fn validate_warmup223_outcome(plan: &Plan, outcome: &Value) -> Result<()> {
 }
 
 fn disposable_targets(plan: &Plan) -> Result<BTreeSet<PathBuf>> {
-    if plan.warmup223_v3 {
+    if plan.native227_small_unregistered {
+        native227::profile(plan)?;
+        Ok(BTreeSet::from([plan.run_root.join("scratch")]))
+    } else if plan.warmup223_v3 {
         validate_warmup223_profile(plan)?;
         Ok(BTreeSet::from([plan.run_root.join("scratch")]))
     } else if plan.restore_only_probe {
@@ -450,7 +458,9 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         ensure!(
             item.path.is_absolute()
                 && (item.path.starts_with(&plan.private_root)
-                    || ((plan.restore_only_probe || plan.warmup223_v3)
+                    || ((plan.restore_only_probe
+                        || plan.warmup223_v3
+                        || plan.native227_small_unregistered)
                         && item.path.starts_with(Path::new("/var/lib/jetstreamer"))))
                 && valid_sha256(&item.sha256),
             "invalid evidence binding"
@@ -516,7 +526,11 @@ fn collected_guard(state: &UnitState) -> bool {
         && state.exec_main_status == 0
 }
 
-fn sample_unit(expectation: &UnitExpectation, allow_collected_guard: bool) -> Result<UnitState> {
+fn sample_unit(
+    expectation: &UnitExpectation,
+    allow_collected_guard: bool,
+    allow_cleared_terminal: bool,
+) -> Result<UnitState> {
     let output = Command::new("systemctl")
         .args(["show", &expectation.unit, "--property=LoadState,ActiveState,SubState,Result,MainPID,InvocationID,NRestarts,ExecMainCode,ExecMainStatus"])
         .output()?;
@@ -557,7 +571,8 @@ fn sample_unit(expectation: &UnitExpectation, allow_collected_guard: bool) -> Re
     }
     ensure!(state.load_state == "loaded", "bound unit is not loaded");
     ensure!(
-        state.invocation_id == expectation.invocation_id,
+        state.invocation_id == expectation.invocation_id
+            || (allow_cleared_terminal && state.invocation_id.is_empty()),
         "bound invocation changed"
     );
     ensure!(
@@ -913,7 +928,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let outcome: Value = serde_json::from_slice(&outcome_bytes)?;
     ensure!(
         outcome.pointer("/schema").and_then(Value::as_str)
-            == Some(if plan.warmup223_v3 {
+            == Some(if plan.native227_small_unregistered {
+                native227::OUTCOME_SCHEMA
+            } else if plan.warmup223_v3 {
                 "jetstreamer-private-epoch223-warmup-resource-v1"
             } else if plan.restore_only_probe {
                 RESTORE_OUTCOME_SCHEMA
@@ -941,7 +958,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
             "failed restore probe has a checkpoint receipt; review its successful result separately"
         );
     }
-    if plan.warmup223_v3 {
+    if plan.native227_small_unregistered {
+        native227::outcome(plan, &outcome)?;
+    } else if plan.warmup223_v3 {
         validate_warmup223_outcome(plan, &outcome)?;
     } else {
         ensure!(
@@ -981,8 +1000,12 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
         );
         evidence.push(json!({"path": item.path, "sha256": observed}));
     }
-    let producer = sample_unit(&plan.producer, false)?;
-    let guard = sample_unit(&plan.guard, plan.restore_only_probe || plan.warmup223_v3)?;
+    let producer = sample_unit(&plan.producer, false, plan.native227_small_unregistered)?;
+    let guard = sample_unit(
+        &plan.guard,
+        plan.restore_only_probe || plan.warmup223_v3,
+        plan.native227_small_unregistered,
+    )?;
     let mut inactive = Vec::new();
     for unit in &plan.inactive_units {
         inactive.push(require_inactive_unit(unit)?);
@@ -1018,6 +1041,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
 
 fn main() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "must run as root");
+    if env::args().nth(1).as_deref() == Some("--native227-small-prelaunch") {
+        return native227::prelaunch();
+    }
     let (plan_path, expected_plan_sha256, expected_self_sha256, check_only) = parse_args();
     verify_self(&expected_self_sha256)?;
     ensure!(valid_sha256(&expected_plan_sha256), "invalid plan SHA-256");
@@ -1180,6 +1206,7 @@ mod tests {
             schema: PLAN_SCHEMA.into(),
             restore_only_probe: true,
             warmup223_v3: false,
+            native227_small_unregistered: false,
             private_root: "/home/ubuntu/.jetstreamer-private".into(),
             targets: vec![root.join("scratch")],
             producer: UnitExpectation {

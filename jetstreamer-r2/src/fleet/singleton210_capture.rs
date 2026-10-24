@@ -19,6 +19,7 @@ pub(super) fn protection(
     now: u64,
     plan_sha: &str,
 ) -> Result<String> {
+    maintenance_capacity::singleton210_memory_proven(&a["capacity"])?;
     let admitted = a["recorded_unix_seconds"]
         .as_u64()
         .context("210 full admission clock")?;

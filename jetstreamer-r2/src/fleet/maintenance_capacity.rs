@@ -1,6 +1,13 @@
-//! Shared bounded maintenance capacity, never a replay/native launch admission.
-//! Reuses exact current peer/guard growth accounting and preserves old floors.
+//! Fresh bounded private223 maintenance with every accepted owner protected.
+//! Capped peers retain their raw fleet/observer history and full hard limits.
 use super::*;
+mod singleton210_memory;
+#[derive(Clone, Copy)]
+enum MemoryMode {
+    Existing,
+    Full210,
+    Full209Delivery,
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -89,14 +96,12 @@ fn sampled(o: &Value, f: &Value, now: u64) -> Result<u64> {
     );
     Ok(sampled)
 }
+
 #[derive(Clone, Copy)]
 pub(super) struct Candidate {
     pub additional_bytes: u64,
     pub memory_max_bytes: u64,
     pub minimum_protected_disk_bytes: u64,
-}
-pub(super) fn check(value: &Value, additional: u64) -> Result<Value> {
-    check_inner(value, additional, None)
 }
 pub(super) fn check_candidate(value: &Value, candidate: Candidate) -> Result<Value> {
     ensure!(
@@ -105,7 +110,34 @@ pub(super) fn check_candidate(value: &Value, candidate: Candidate) -> Result<Val
             && candidate.minimum_protected_disk_bytes > 0,
         "invalid bounded maintenance candidate"
     );
-    check_inner(value, candidate.additional_bytes, Some(candidate))
+    check_inner(value, candidate, MemoryMode::Existing)
+}
+pub(super) fn check_singleton210(value: &Value, minimum_disk: u64) -> Result<Value> {
+    ensure!(minimum_disk > 0, "210 protected disk floor missing");
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes: singleton210::PEAK
+                .checked_add(singleton210::METADATA_RESERVE)
+                .context("210 added metadata overflow")?,
+            memory_max_bytes: singleton210::MEMORY,
+            minimum_protected_disk_bytes: minimum_disk,
+        },
+        MemoryMode::Full210,
+    )
+}
+pub(super) fn singleton210_memory_proven(capacity: &Value) -> Result<()> {
+    singleton210_memory::validate_capacity(capacity)
+}
+pub(super) fn check_singleton209_delivery(value: &Value, candidate: Candidate) -> Result<Value> {
+    ensure!(
+        candidate.additional_bytes == 1 << 30
+            && matches!(candidate.memory_max_bytes,
+        n if n==16<<30 || n==32<<30 || n==64<<30)
+            && candidate.minimum_protected_disk_bytes > 0,
+        "209 delivery memory or metadata envelope differs"
+    );
+    check_inner(value, candidate, MemoryMode::Full209Delivery)
 }
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
     check_candidate(
@@ -117,18 +149,34 @@ pub(super) fn assembly223(value: &Value) -> Result<Value> {
         },
     )
 }
-fn completed_guards(
-    f: &Value,
-    guards: &BTreeMap<String, BoundFile>,
-    sample: u64,
-    now: u64,
-) -> Result<Value> {
-    prefix223_native20_admission::completed_guards_for(
-        &prefix223_live_peer::roster(f)?,
-        guards,
-        sample,
-        now,
-    )
+fn legacy_observer(o: &Value, names: &BTreeSet<String>) -> Result<Value> {
+    let mut view = o.clone();
+    view["diagnostic_replays"]
+        .as_array_mut()
+        .context("maintenance diagnostic census")?
+        .retain(|row| {
+            !row["producer_unit"]
+                .as_str()
+                .is_some_and(|name| names.contains(name))
+        });
+    Ok(view)
+}
+fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
+    // These authenticate the complete launch/frame/registration before a peer
+    // can leave the legacy-only resource view. Raw evidence is never modified.
+    capped204205_work::peer_observation(f, o)?;
+    let names = capped204205_work::peer_names(f)?;
+    Ok((
+        capped204205_work::peer_legacy_view(f)?,
+        legacy_observer(o, &names)?,
+    ))
+}
+pub(super) fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+    native210_peer_history::current(f, current)?;
+    prefix223_live_peer::current(&capped204205_work::peer_legacy_view(f)?, current)?;
+    // Only proven auxiliary guards leave this comparison. Every producer stays
+    // in the raw active roster, so an omitted or changed actor still fails.
+    singleton227_admission::owners(f, &capped204205_work::peer_current(f, current)?)
 }
 fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
     ensure!(
@@ -141,7 +189,14 @@ fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
         .and_then(|n| n.checked_add(candidate))
         .context("maintenance memory reservation overflow")
 }
-fn memory_sample(o: &Value, f: &Value, candidate: u64) -> Result<Value> {
+fn memory_sample(
+    o: &Value,
+    f: &Value,
+    reserve: u64,
+    owners: Vec<Value>,
+    candidate: u64,
+    mode: MemoryMode,
+) -> Result<Value> {
     let total = o["host_memory"]["total_kib"]
         .as_u64()
         .and_then(|n| n.checked_mul(1024))
@@ -150,21 +205,32 @@ fn memory_sample(o: &Value, f: &Value, candidate: u64) -> Result<Value> {
         .as_u64()
         .and_then(|n| n.checked_mul(1024))
         .context("maintenance sampled available memory")?;
-    let (reserve, owners) = prefix223_live_peer::memory(f)?;
-    let required = memory_required(reserve, total, candidate)?;
+    let (required, policy) = match mode {
+        MemoryMode::Existing => (memory_required(reserve, total, candidate)?, None),
+        MemoryMode::Full210 => {
+            let (n, p) = singleton210_memory::required(f, total, reserve, candidate)?;
+            (n, Some(("full210_memory_policy", p)))
+        }
+        MemoryMode::Full209Delivery => {
+            let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
+            (n, Some(("full209_delivery_memory_policy", p)))
+        }
+    };
     let actual = native209_admission::actual_memory()?;
     ensure!(
         sampled >= required && actual >= required,
         "maintenance candidate consumes protected memory/90 percent target"
     );
-    Ok(
-        json!({"candidate_memory_max_bytes":candidate,"memory_target_percent":90,
+    let mut result = json!({"candidate_memory_max_bytes":candidate,"memory_target_percent":90,
         "host_total_memory_bytes":total,"protected_existing_memory_growth_bytes":reserve,
         "protected_memory_evidence":owners,"minimum_available_memory_bytes":required,
-        "sampled_available_memory_bytes":sampled,"actual_available_memory_bytes":actual}),
-    )
+        "sampled_available_memory_bytes":sampled,"actual_available_memory_bytes":actual});
+    if let Some((key, policy)) = policy {
+        result[key] = policy;
+    }
+    Ok(result)
 }
-fn check_inner(value: &Value, additional: u64, candidate: Option<Candidate>) -> Result<Value> {
+fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "Maintenance capacity requires root"
@@ -184,26 +250,12 @@ fn check_inner(value: &Value, additional: u64, candidate: Option<Candidate>) -> 
         "Maintenance fleet is not bound to the exact observer"
     );
     let accounting_o = native227_terminal_observer_view(&f, &o)?;
+    let (legacy, legacy_o) = accounting_views(&f, &accounting_o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let t = sampled(&accounting_o, &f, now)?;
-    let guard_history = candidate
-        .map(|_| completed_guards(&f, &s.protected_guards, t, now))
-        .transpose()?;
-    // Reject unknown/native peers rather than invent a zero-growth reservation.
-    prefix223_live_peer::roster(&f)?;
+    let t = sampled(&legacy_o, &legacy, now)?;
+    prefix223_live_peer::roster(&legacy)?;
     native210_peer_history::validate(&f)?;
     let floor = singleton227_admission::century_floor_for_maintenance(&f)?;
-    let (growth, measurements) =
-        prefix223_live_peer::disk(&f, &accounting_o, &s.protected_guards, t, now)?;
-    let (minimum, largest_guard_floor) =
-        native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
-    // A separately authenticated candidate may require a larger sealed floor.
-    // Ordinary Foundation maintenance retains its existing dynamic floor.
-    let minimum = candidate.map_or(minimum, |c| minimum.max(c.minimum_protected_disk_bytes));
-    let sampled_free = o["filesystem"]["conservative_available_bytes"]
-        .as_u64()
-        .context("Maintenance sampled disk")?;
-    let required = envelope(minimum, additional, sampled_free)?;
     let names = f["unit_census"]
         .as_object()
         .context("Maintenance fleet units")?
@@ -211,94 +263,136 @@ fn check_inner(value: &Value, additional: u64, candidate: Option<Candidate>) -> 
         .cloned()
         .collect::<BTreeSet<_>>();
     let before = census(&names, 201, 300)?;
-    native210_peer_history::current(&f, &before)?;
-    prefix223_live_peer::current(&f, &before)?;
-    singleton227_admission::owners(&f, &before)?;
-    let caps = prefix223_live_peer::limits(&f)?;
-    let memory_before = candidate
-        .map(|c| memory_sample(&accounting_o, &f, c.memory_max_bytes))
-        .transpose()?;
+    current_owners(&f, &before)?;
+    // Share the already qualified sibling accounting policy, including the
+    // complete guard-key union, genuine latest fires and independent guard caps.
+    let guard_history = capped204205_admission::guards(&f, &s.protected_guards, &before, t, now)?;
+    let caps = capped204205_admission::combined_limits(&f, &s.protected_guards, &before, now)?;
+    let (growth, measurements, memory_growth, memory_evidence) =
+        capped204205_admission::combined_resources(
+            &f,
+            &accounting_o,
+            &s.protected_guards,
+            &before,
+            t,
+            now,
+        )?;
+    let (minimum, largest_guard_floor) =
+        native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
+    let minimum = minimum.max(candidate.minimum_protected_disk_bytes);
+    let sampled_free = o["filesystem"]["conservative_available_bytes"]
+        .as_u64()
+        .context("Maintenance sampled disk")?;
+    let required = envelope(minimum, candidate.additional_bytes, sampled_free)?;
+    let memory_before = memory_sample(
+        &accounting_o,
+        &f,
+        memory_growth,
+        memory_evidence,
+        candidate.memory_max_bytes,
+        mode,
+    )?;
     let actual_free = singleton227_admission::disk_free()?;
-    envelope(minimum, additional, actual_free)?;
+    envelope(minimum, candidate.additional_bytes, actual_free)?;
     let after = census(&names, 201, 300)?;
-    native210_peer_history::current(&f, &after)?;
-    prefix223_live_peer::current(&f, &after)?;
-    singleton227_admission::owners(&f, &after)?;
+    current_owners(&f, &after)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
-        before == after && caps == prefix223_live_peer::limits(&f)?,
+        before == after
+            && caps
+                == capped204205_admission::combined_limits(&f, &s.protected_guards, &after, now)?,
         "Maintenance owners/caps changed during capacity admission"
     );
-    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let after_accounting_o = native227_terminal_observer_view(&f, &o)?;
-    sampled(&after_accounting_o, &f, now)?;
+    let (after_legacy, after_legacy_o) = accounting_views(&f, &after_accounting_o)?;
+    sampled(&after_legacy_o, &after_legacy, now)?;
     ensure!(
         accounting_o["terminal_observation_accounting"]
             == after_accounting_o["terminal_observation_accounting"],
         "Maintenance terminal observation accounting changed during admission"
     );
-    let (after_growth, after_measurements) =
-        prefix223_live_peer::disk(&f, &after_accounting_o, &s.protected_guards, t, now)?;
+    let guard_history_after =
+        capped204205_admission::guards(&f, &s.protected_guards, &after, t, now)?;
+    let (after_growth, after_measurements, after_memory_growth, after_memory_evidence) =
+        capped204205_admission::combined_resources(
+            &f,
+            &after_accounting_o,
+            &s.protected_guards,
+            &after,
+            t,
+            now,
+        )?;
     ensure!(
-        after_growth <= growth,
-        "Maintenance protected growth increased during admission"
+        after_growth <= growth && after_memory_growth <= memory_growth,
+        "Maintenance protected resource growth increased during admission"
     );
-    envelope(minimum, additional, singleton227_admission::disk_free()?)?;
-    let guard_history_after = candidate
-        .map(|_| completed_guards(&f, &s.protected_guards, t, now))
-        .transpose()?;
-    let memory_after = candidate
-        .map(|c| memory_sample(&after_accounting_o, &f, c.memory_max_bytes))
-        .transpose()?;
-    if let (Some(before), Some(after)) = (&memory_before, &memory_after) {
-        ensure!(
-            after["protected_existing_memory_growth_bytes"].as_u64()
-                <= before["protected_existing_memory_growth_bytes"].as_u64(),
-            "maintenance protected memory growth increased"
-        );
-    }
-    // Assembly's added memory/timer checks must be inside a complete manager
-    // bracket too; leave Foundation's established two-census shape unchanged.
-    let final_census = if candidate.is_some() {
-        let current = census(&names, 201, 300)?;
-        native210_peer_history::current(&f, &current)?;
-        prefix223_live_peer::current(&f, &current)?;
-        singleton227_admission::owners(&f, &current)?;
-        ensure!(
-            before == current && caps == prefix223_live_peer::limits(&f)?,
-            "maintenance owners/caps changed across final memory/guard checks"
-        );
-        envelope(minimum, additional, singleton227_admission::disk_free()?)?;
-        Some(current)
-    } else {
-        None
-    };
+    let memory_after = memory_sample(
+        &after_accounting_o,
+        &f,
+        after_memory_growth,
+        after_memory_evidence,
+        candidate.memory_max_bytes,
+        mode,
+    )?;
+    let current = census(&names, 201, 300)?;
+    current_owners(&f, &current)?;
+    ensure!(
+        before == current
+            && caps
+                == capped204205_admission::combined_limits(&f, &s.protected_guards, &current, now)?,
+        "maintenance owners/caps changed across final memory/guard checks"
+    );
+    let final_free = singleton227_admission::disk_free()?;
+    envelope(minimum, candidate.additional_bytes, final_free)?;
     let mut capacity = json!({"schema":"jetstreamer-horizon-maintenance-capacity-v1","host":"horizon-vaultic","first_epoch":201,"last_epoch":300,
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"sampled_at_utc":f["sampled_at_utc"],
         "resource_basis":value,"century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,
-        "maximum_existing_guard_floor_bytes":largest_guard_floor,"minimum_free_bytes":minimum,"additional_bytes":additional,
-        "required_initial_free_bytes":required,"sampled_available_bytes":sampled_free,"actual_available_bytes":actual_free,
+        "maximum_existing_guard_floor_bytes":largest_guard_floor,"minimum_free_bytes":minimum,"additional_bytes":candidate.additional_bytes,
+        "required_initial_free_bytes":required,"sampled_available_bytes":sampled_free,"actual_available_bytes":actual_free.min(final_free),
         "protected_growth_before":measurements,"protected_growth_after":after_measurements,"protected_caps":caps,
         "unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":now,"maximum_age_seconds":900,
         "maintenance_only":true,"all_live_growth_and_century_floor_protected":true,"new_resource_samples":0,
-        "replay_launch_authorized":false,"local_retirement_authorized":false,"publication_authorized":false,"r2_mutations":false});
+        "replay_launch_authorized":false,"local_retirement_authorized":false,"publication_authorized":false,"r2_mutations":false,
+        "protected_guard_history_before":guard_history,"protected_guard_history_after":guard_history_after,
+        "unit_census_after_memory_and_guard_checks":current,"memory_before":memory_before,"memory_after":memory_after,
+        "capped_peer_accounting":{"raw_fleet_and_observer_preserved":true,"producer_and_independent_guard_hard_memory_charged":true,
+            "full_admitted_disk_envelopes_charged":true,"allocation_credit_bytes":0}});
     if let Some(evidence) = accounting_o.get("terminal_observation_accounting") {
         capacity["terminal_observation_accounting"] = evidence.clone();
-    }
-    if let Some(before) = memory_before {
-        capacity["protected_guard_history_before"] =
-            guard_history.context("missing maintenance guard history")?;
-        capacity["protected_guard_history_after"] =
-            guard_history_after.context("missing maintenance final guard history")?;
-        capacity["unit_census_after_memory_and_guard_checks"] =
-            json!(final_census.context("missing final maintenance census")?);
-        capacity["memory_before"] = before;
-        capacity["memory_after"] = memory_after.context("missing maintenance final memory")?;
     }
     Ok(capacity)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capped_legacy_observation_is_derived_without_dropping_other_rows_or_history() {
+        let original = json!({"recorded_at_utc":"2026-10-24T10:00:00Z",
+            "diagnostic_replays":[{"producer_unit":"capped.service","status":"unavailable","error":"registered failure"},
+                {"producer_unit":"legacy.service","status":"observed","observation":{"exact":123}}],
+            "host_memory":{"total_kib":1000},"history":[{"iid":"actual"}]});
+        let snapshot = original.clone();
+        let view = legacy_observer(&original, &BTreeSet::from(["capped.service".into()])).unwrap();
+        assert_eq!(original, snapshot);
+        assert_eq!(
+            view["diagnostic_replays"],
+            json!([original["diagnostic_replays"][1]])
+        );
+        assert_eq!(view["host_memory"], original["host_memory"]);
+        assert_eq!(view["history"], original["history"]);
+        assert_eq!(
+            legacy_observer(&original, &BTreeSet::new()).unwrap(),
+            original
+        );
+    }
+    #[test]
+    fn unknown_capped_claim_never_acquires_a_legacy_accounting_view() {
+        let f = json!({"active":[{"epoch":204,"phase":"capped204205-continuation",
+            "unit":{"Id":"horizon-qualify-204-capped-continuation-foreign.service"}}]});
+        let o = json!({"diagnostic_replays":[]});
+        assert!(accounting_views(&f, &o).is_err());
+        assert_eq!(f["active"].as_array().unwrap().len(), 1);
+    }
     #[test]
     fn candidate_memory_preserves_remaining_owner_charge_and_ninety_percent_target() {
         assert_eq!(memory_required(80, 1000, 64).unwrap(), 244);

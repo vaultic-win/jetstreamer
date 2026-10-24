@@ -1,0 +1,39 @@
+# Source template only. Root seals concrete executable/spec/credentials paths.
+# Keep this exact tracked alias; do not rename it to avoid census accounting.
+[Unit]
+Description=Exact already-admitted Foundation 213 resumable byte restoration
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=exec
+User=root
+Group=root
+EnvironmentFile=@ROOT_PRIVATE_R2_CREDENTIALS@
+ExecStart=@SEALED_R2_HELPER@ holding-foundation213-restore-resumable @SEALED_RESTORE_SPEC@ --spec-sha256 @RESTORE_SPEC_SHA256@ --self-sha256 @HELPER_SHA256@
+Restart=no
+RuntimeMaxSec=4h
+TimeoutStartSec=90s
+TimeoutStopSec=120s
+KillMode=control-group
+Delegate=no
+MemoryMax=6G
+MemoryHigh=5G
+MemorySwapMax=0
+TasksMax=256
+CPUQuota=100%
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.jetstreamer-private
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+# No ExecStopPost/OnSuccess/OnFailure, timer or automatic retry. The old
+# maintenance-finalize command accepts another schema and is not this path.

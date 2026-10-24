@@ -7,9 +7,34 @@ mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
+mod epoch227_diagnostic;
 mod failed_prefix220;
 mod singletons209_212;
 mod singletons209_212_profile;
+
+#[cfg(all(
+    feature = "epoch227-v1-6-25-diagnostic",
+    any(
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification",
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-20-prefix-qualification",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("epoch227 v1.6.25 comparison requires its own exclusive private build");
 
 #[cfg(all(
     feature = "epoch223-v1-6-20-prefix-qualification",
@@ -11819,6 +11844,8 @@ async fn run_geyser_replay(
     checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
     epoch223_tail_mode: epoch223_qualification::TailMode,
 ) -> Result<ReplayRunOutcome, String> {
+    let comparison227_preflight =
+        epoch223_tail_mode == epoch223_qualification::TailMode::Epoch227PlanningPreflight;
     let prefix_preflight =
         epoch223_tail_mode == epoch223_qualification::TailMode::PrefixPlanningPreflight;
     let tail_comparison = matches!(
@@ -11857,6 +11884,26 @@ async fn run_geyser_replay(
             epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight,
             focused,
             ledger_dir,
+        )?;
+    }
+    if comparison227_preflight {
+        if !cfg!(feature = "epoch227-v1-6-25-diagnostic")
+            || carried_state.is_some()
+            || audited_cohort_bootstrap.is_some()
+            || verification_end_inclusive.is_some()
+            || handoff_export_directory.is_some()
+            || retain_runtime_state
+            || checkpoint_restart.is_some()
+        {
+            return Err("227 comparison preflight cannot borrow cohort, carried, handoff or recovery authority".into());
+        }
+        epoch227_diagnostic::validate_launch(
+            epoch,
+            epoch,
+            qualification.map(|p| (p.bootstrap_slot, p.end_inclusive)),
+            false,
+            false,
+            Some((ledger_dir, &horizon_output, replay_scratch_dir)),
         )?;
     }
     #[cfg(feature = "epoch141-original-entry-qualification")]
@@ -12081,6 +12128,20 @@ async fn run_geyser_replay(
         end_inclusive.saturating_add(1),
     );
 
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic") {
+        historical_worker_profile(runtime_descriptor)?;
+        let executable = configured_historical_worker_executable(runtime_descriptor)?;
+        let digest =
+            historical::measure_executable_sha256(&executable).map_err(|e| e.to_string())?;
+        epoch227_diagnostic::validate_worker_sha(digest)?;
+        if comparison227_preflight {
+            let plan = qualification.ok_or("227 comparison requires exact qualification")?;
+            let mut report = epoch227_diagnostic::planning_report(plan, &execution);
+            report["worker_profile_validated"] = serde_json::json!(true);
+            report["worker_executable"] = serde_json::json!(executable);
+            return Ok(ReplayRunOutcome::PlanningPreflight(report));
+        }
+    }
     // The real execution and planning-only paths share every no-worker gate
     // above, including candidate checkpoint policy. Never return earlier in
     // top-level CLI planning: that hid the second gate in the failed v2 launch.
@@ -19524,6 +19585,7 @@ async fn main() {
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
     let mut epoch223_prefix_preflight = false;
+    let mut epoch227_comparison_preflight = false;
     // Internal flags set by the range supervisor when spawning per-epoch
     // children: pre-fetched snapshot hashes (so the child never touches
     // gcloud) and the overall range for the child's overall-progress line.
@@ -19545,7 +19607,16 @@ async fn main() {
     let mut continuation_plan: Option<PathBuf> = None;
     let mut continuation_plan_sha256: Option<String> = None;
     for arg in args {
-        if arg == "--epoch223-tail-comparison"
+        if arg == "--epoch227-comparison-preflight" {
+            if !cfg!(feature = "epoch227-v1-6-25-diagnostic")
+                || std::mem::replace(&mut epoch227_comparison_preflight, true)
+            {
+                eprintln!(
+                    "epoch227 planning flag requires its exclusive private build and cannot repeat"
+                );
+                exit(2);
+            }
+        } else if arg == "--epoch223-tail-comparison"
             || arg == "--epoch223-tail-preflight"
             || arg == "--epoch223-prefix-preflight"
         {
@@ -19755,7 +19826,8 @@ async fn main() {
         let forbidden = forbidden
             || cfg!(any(
                 feature = "epoch225-v1-6-25-diagnostic",
-                feature = "epoch225-v1-6-25-qualification"
+                feature = "epoch225-v1-6-25-qualification",
+                feature = "epoch227-v1-6-25-diagnostic"
             ));
         let validation = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::validate_cli(
@@ -20071,6 +20143,25 @@ async fn main() {
                 &dest_dir,
             )
         })
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic")
+        && let Err(error) = epoch227_diagnostic::validate_launch(
+            start_epoch,
+            end_epoch,
+            qualification.map(|plan| (plan.bootstrap_slot, plan.end_inclusive)),
+            root_checkpoint_cohort,
+            recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease,
+            horizon_output
+                .as_deref()
+                .zip(replay_scratch.as_deref())
+                .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
+        )
     {
         eprintln!("error: {error}");
         exit(2);
@@ -21683,7 +21774,9 @@ async fn main() {
                 .map(Path::new),
             epoch < end_epoch,
             None,
-            if epoch223_prefix_preflight {
+            if epoch227_comparison_preflight {
+                epoch223_qualification::TailMode::Epoch227PlanningPreflight
+            } else if epoch223_prefix_preflight {
                 epoch223_qualification::TailMode::PrefixPlanningPreflight
             } else if epoch223_tail_preflight {
                 epoch223_qualification::TailMode::PlanningPreflight
@@ -24589,6 +24682,57 @@ mod early_snapshot_tests {
 
     fn qualification_snapshot(slot: Slot, hash: Hash) -> PathBuf {
         PathBuf::from(format!("snapshot-{slot}-{hash}.tar.bz2"))
+    }
+
+    #[cfg(feature = "epoch227-v1-6-25-diagnostic")]
+    #[test]
+    fn epoch227_actual_focused_selection_matches_the_compiled_worker_before_spawn() {
+        // Reproduce both parent selection passes from the failed capability:
+        // output planning first, then the real snapshot-warmup replay selection.
+        let output = 98_064_000..98_495_292;
+        let replay = 98_063_465..98_495_292;
+        let assert_selection = |selection: compatibility::RuntimeSelection| {
+            assert_eq!(selection.descriptor.identity.name, "solana-v1.6.25");
+            assert_eq!(
+                selection.descriptor.identity.revision,
+                "7de8a55b54d3e11058b82f9483bb405d143b455c"
+            );
+            let worker = selection.descriptor.worker.unwrap();
+            assert_eq!(worker.identity, "jetstreamer-historical-worker-v1-6-25");
+            assert_eq!(
+                worker.environment_override,
+                "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
+            );
+            assert!(worker.default_manifest_relative_path.contains("/v1_6_25/"));
+            let profile = historical_worker_profile(selection.descriptor).unwrap();
+            assert_eq!(profile.backend_id, "solana-v1.6.25");
+            assert_eq!(
+                profile.solana_commit,
+                selection.descriptor.identity.revision
+            );
+        };
+        assert_selection(select_runtime_for_invocation(output.clone(), true, true).unwrap());
+        assert_selection(
+            select_runtime_with_snapshot_warmup_for_invocation(
+                replay.start,
+                output.clone(),
+                true,
+                true,
+            )
+            .unwrap(),
+        );
+        assert_selection(select_runtime_for_invocation(replay.clone(), true, true).unwrap());
+        for span in plan_runtime_spans_for_invocation(output.clone(), true, true).unwrap() {
+            assert_selection(runtime_span_selection(&span).unwrap());
+        }
+        for segment in plan_replay_for_invocation(replay, true, true).unwrap() {
+            let compatibility::EraBackend::Available(descriptor) = segment.execution.backend else {
+                panic!("unsupported private epoch 227 segment")
+            };
+            assert_eq!(descriptor.identity.name, "solana-v1.6.25");
+            historical_worker_profile(descriptor).unwrap();
+        }
+        assert!(select_runtime_for_invocation(output, false, true).is_err());
     }
 
     #[test]

@@ -18,6 +18,10 @@ epoch207-native-main-guard = ["epoch227-native-main-guard"]
 epoch209-native-main-guard = ["epoch227-native-main-guard"]
 epoch228-native-main-guard = ["epoch227-native-main-guard"]
 epoch227-v1625-native-main-guard = ["epoch227-native-main-guard"]
+epoch210-native-small = ["epoch227-native-main-guard"]
+epoch227-v1625-native-small = ["epoch227-native-main-guard"]
+# Closed complete-slot227 canary handshake; no runtime/publication promotion.
+epoch227-v1625-canary-guard = []
 epoch227-singleton-guard = []
 epoch209-singleton-guard = []
 epoch210-singleton-guard = []
@@ -249,6 +253,10 @@ path = "src/epoch140_initial_boundary_bin.rs"
 [[bin]]
 name = "jetstreamer-horizon-standalone-guard"
 path = "src/horizon_standalone_guard_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch227-v1625-bounded-resource"
+path = "src/epoch227_v1625_bounded_resource_bin.rs"
 
 [[bin]]
 name = "jetstreamer-epoch225-bounded-resource"

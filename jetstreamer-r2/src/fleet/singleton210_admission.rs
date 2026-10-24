@@ -103,15 +103,9 @@ pub(super) fn run() -> Result<()> {
         "210 already has active work; do not launch a duplicate"
     );
     memory(&o)?;
-    let capacity = maintenance_capacity::check_candidate(
+    let capacity = maintenance_capacity::check_singleton210(
         &s.resource_basis,
-        maintenance_capacity::Candidate {
-            additional_bytes: c::PEAK
-                .checked_add(c::METADATA_RESERVE)
-                .context("210 added metadata overflow")?,
-            memory_max_bytes: c::MEMORY,
-            minimum_protected_disk_bytes: singleton227_admission::century_floor_for(&f, 210)?,
-        },
+        singleton227_admission::century_floor_for(&f, 210)?,
     )?;
     let names = f["unit_census"]
         .as_object()

@@ -29,6 +29,7 @@ const LEGACY: [(&str, &str); 4] = [
     (singleton227::UNIT, "a10f37b57711425a81633c62c66438d5"),
 ];
 pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
+    canary227_peer::roster(f)?;
     let mut names = BTreeSet::new();
     for row in f["active"]
         .as_array()
@@ -45,6 +46,8 @@ pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
                 u["InvocationID"] == *iid,
                 "prefix protected legacy invocation changed"
             );
+        } else if name == canary227::UNIT {
+            canary227_peer::row_scope(row)?;
         } else if name == native228::UNIT {
             ensure!(
                 row["epoch"] == 228
@@ -93,7 +96,7 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>, candidate: bo
     }
     Ok(())
 }
-fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
+pub(super) fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
     Ok(match name {
         "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service" => (
             "horizon-ownroot225-protective-v1.service",
@@ -122,6 +125,7 @@ fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
             "horizon-singleton210-protective-v1.service",
             "/var/lib/jetstreamer/horizon-singleton210-guard-receipts-v1",
         ),
+        canary227::UNIT => (canary227_peer::PROTECTIVE, ""),
         native228::UNIT => (
             "horizon-native228-protective-v1.service",
             "/var/lib/jetstreamer/horizon-native228-guard-receipts-v1",
@@ -150,7 +154,7 @@ pub(super) fn completed_guards_for(
     let mut history = BTreeMap::new();
     for (name, bound) in guards {
         let (unit, dir) = guard_selector(name)?;
-        let dir = if name == singleton209::UNIT {
+        let dir = if name == singleton209::UNIT || name == canary227::UNIT {
             let parent = bound.path.parent().context("full209 bound guard parent")?;
             ensure!(
                 parent.starts_with("/var/lib/jetstreamer"),
@@ -561,7 +565,7 @@ mod tests {
     }
     #[test]
     fn complete_roster_rejects_unknown_duplicate_restarted_and_old223_owners() {
-        let good = json!({"active":[{"epoch":227,"unit":{"Id":singleton227::UNIT,"InvocationID":LEGACY[3].1,"NRestarts":"0"}}]});
+        let good = json!({"unit_census":{},"active":[{"epoch":227,"unit":{"Id":singleton227::UNIT,"InvocationID":LEGACY[3].1,"NRestarts":"0"}}]});
         assert_eq!(roster(&good).unwrap().len(), 1);
         for (key, value) in [
             ("Id", json!("unaccounted.service")),

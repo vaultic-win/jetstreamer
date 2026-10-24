@@ -1,0 +1,9 @@
+{
+  "source": "Root-preserved terminal evidence, read without service or process queries",
+  "invocation_id": "dc6b1b8b8de44050a2b95c15c0b3602f",
+  "pid": 803491,
+  "manager_show_sha256": "d2ecea55e2dac0414df4286bbfc4e16ff22d4ac20f195b7ec2148436f4d3dc75",
+  "each_exact_hook_raw_reply_sha256": "c2732de4326d4404f99f2b7381cafaefeae0d981ca769ab36d077e68529f7d2b",
+  "all_five_hook_replies_byte_identical": true,
+  "environment_queried": false
+}

@@ -1,0 +1,9 @@
+Id=horizon-foundation-holding213-maintenance-v1.service
+LoadState=loaded
+ActiveState=failed
+SubState=failed
+InvocationID=dc6b1b8b8de44050a2b95c15c0b3602f
+MainPID=0
+Result=exit-code
+NRestarts=0
+ExecMainStatus=1

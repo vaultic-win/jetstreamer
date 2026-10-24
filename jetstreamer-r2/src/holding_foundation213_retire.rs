@@ -100,10 +100,41 @@ fn closed(p: &Spec) -> Result<Value> {
     );
     Ok(r)
 }
-fn restoration(r: &Value, c: &Value, p: &Spec) -> Result<()> {
+fn restoration_transport(r: &Value) -> Result<()> {
+    if r["schema"] == "jetstreamer-foundation-holding-restore-v1" {
+        ensure!(
+            r["remote_sha256_readback"] == true,
+            "legacy restoration lacks full remote readback"
+        );
+        return Ok(());
+    }
     ensure!(
-        r["schema"] == "jetstreamer-foundation-holding-restore-v1"
-            && r["host"] == review::HOST
+        r["schema"] == "jetstreamer-foundation-holding-resumable-restore-v1"
+            && r["artifact"] == "prefix213"
+            && r["length"] == review::LENGTH
+            && r["sha256"] == review::SOURCE_SHA
+            && r["independent_local_sha256_verified"] == true
+            && r["conditional_remote_identity_revalidated"] == true
+            && r["resumable_transport"]["whole_file_sha256_verified"] == true,
+        "new restoration lacks the exact independent whole-file proof"
+    );
+    let prefix = r["resumable_transport"]["local_prefix_bytes"]
+        .as_u64()
+        .context("restored local prefix byte count")?;
+    let suffix = r["resumable_transport"]["network_suffix_bytes"]
+        .as_u64()
+        .context("restored network suffix byte count")?;
+    ensure!(
+        prefix.checked_add(suffix) == Some(review::LENGTH)
+            && r["remote_sha256_readback"] == (prefix == 0),
+        "restoration byte counts or network/local distinction differ"
+    );
+    Ok(())
+}
+fn restoration(r: &Value, c: &Value, p: &Spec) -> Result<()> {
+    restoration_transport(r)?;
+    ensure!(
+        r["host"] == review::HOST
             && r["prefix"] == review::PREFIX
             && r["artifact"] == "prefix213"
             && r["mapping"] == serde_json::to_value(&p.mapping)?
@@ -114,7 +145,6 @@ fn restoration(r: &Value, c: &Value, p: &Spec) -> Result<()> {
             && r["object_key"] == c["object_key"]
             && r["object_etag"] == c["object_etag"]
             && r["restoration_complete"] == true
-            && r["remote_sha256_readback"] == true
             && r["owner_checked"] == true
             && r["staging_only"] == true
             && r["local_source_mutated"] == false,
@@ -546,6 +576,43 @@ pub(super) async fn run(client: &Client, v: Value, spec: &Bound) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn resumable_restoration_requires_exact_complete_proof_without_relabeling_network_reads() {
+        let good = json!({"schema":"jetstreamer-foundation-holding-resumable-restore-v1","artifact":"prefix213",
+            "sha256":review::SOURCE_SHA,"length":review::LENGTH,"remote_sha256_readback":false,
+            "independent_local_sha256_verified":true,"conditional_remote_identity_revalidated":true,
+            "resumable_transport":{"local_prefix_bytes":37,"network_suffix_bytes":review::LENGTH-37,"whole_file_sha256_verified":true}});
+        restoration_transport(&good).unwrap();
+        for (pointer, value) in [
+            ("/artifact", json!("genesis-probe")),
+            ("/sha256", json!(PROBE_SHA)),
+            ("/remote_sha256_readback", json!(true)),
+            ("/independent_local_sha256_verified", json!(false)),
+            ("/conditional_remote_identity_revalidated", json!(false)),
+            (
+                "/resumable_transport/whole_file_sha256_verified",
+                json!(false),
+            ),
+            (
+                "/resumable_transport/network_suffix_bytes",
+                json!(review::LENGTH - 38),
+            ),
+            ("/resumable_transport/local_prefix_bytes", json!(u64::MAX)),
+        ] {
+            let mut bad = good.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(restoration_transport(&bad).is_err(), "{pointer}");
+        }
+        let mut full = good.clone();
+        full["resumable_transport"]["local_prefix_bytes"] = json!(0);
+        full["resumable_transport"]["network_suffix_bytes"] = json!(review::LENGTH);
+        full["remote_sha256_readback"] = json!(true);
+        restoration_transport(&full).unwrap();
+        let mut legacy = json!({"schema":"jetstreamer-foundation-holding-restore-v1","remote_sha256_readback":true});
+        restoration_transport(&legacy).unwrap();
+        legacy["remote_sha256_readback"] = json!(false);
+        assert!(restoration_transport(&legacy).is_err());
+    }
     #[test]
     fn only_the_exact_two_files_are_selectable_and_probe_is_not_a_retirement_profile() {
         let b = json!({"path":"/sealed/evidence.json","sha256":"a".repeat(64)});

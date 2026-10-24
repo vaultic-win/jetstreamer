@@ -7,6 +7,7 @@ use std::{
     fs,
     path::Path,
 };
+use std::{fmt, io};
 
 #[derive(Deserialize, Serialize)]
 struct Maximum {
@@ -109,6 +110,15 @@ pub(crate) struct Report {
     census_stable: bool,
     error: Option<String>,
 }
+#[derive(Debug)]
+struct CensusChurn(&'static str);
+impl fmt::Display for CensusChurn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
+    }
+}
+impl std::error::Error for CensusChurn {}
+
 fn members(root: &Path) -> Result<BTreeSet<u32>> {
     let mut pending = vec![root.to_path_buf()];
     let mut pids = BTreeSet::new();
@@ -117,16 +127,24 @@ fn members(root: &Path) -> Result<BTreeSet<u32>> {
         visited += 1;
         ensure!(visited <= 4096, "RSS cgroup tree exceeds bound");
         ensure!(
-            fs::symlink_metadata(&dir)?.file_type().is_dir(),
+            fs::symlink_metadata(&dir)
+                .with_context(|| format!("RSS cgroup metadata {}", dir.display()))?
+                .file_type()
+                .is_dir(),
             "RSS cgroup is not a directory"
         );
-        for pid in fs::read_to_string(dir.join("cgroup.procs"))?.split_whitespace() {
+        for pid in fs::read_to_string(dir.join("cgroup.procs"))
+            .with_context(|| format!("RSS cgroup members {}", dir.display()))?
+            .split_whitespace()
+        {
             let pid: u32 = pid.parse()?;
             ensure!(pid > 0, "zero RSS process ID");
             pids.insert(pid);
             ensure!(pids.len() <= 65536, "RSS process census exceeds bound");
         }
-        for entry in fs::read_dir(dir)? {
+        for entry in
+            fs::read_dir(&dir).with_context(|| format!("RSS cgroup children {}", dir.display()))?
+        {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
                 pending.push(entry.path());
@@ -215,7 +233,10 @@ fn capture_processes(
     let mut aggregate = 0u64;
     for pid in &before {
         let root = proc_root.join(pid.to_string());
-        let stat = fs::read_to_string(root.join("stat"))?;
+        let read = |name: &str| {
+            fs::read_to_string(root.join(name)).with_context(|| format!("RSS process {pid} {name}"))
+        };
+        let stat = read("stat")?;
         let start = start_ticks(&stat, *pid)?;
         let kernel = stat
             .rsplit_once(')')
@@ -230,9 +251,9 @@ fn capture_processes(
         let (rss, high) = if allow_kernel && kernel {
             (0, 0)
         } else {
-            status(&fs::read_to_string(root.join("status"))?, *pid)?
+            status(&read("status")?, *pid)?
         };
-        let membership = fs::read_to_string(root.join("cgroup"))?;
+        let membership = read("cgroup")?;
         let current = membership
             .lines()
             .find_map(|s| s.strip_prefix("0::"))
@@ -241,10 +262,9 @@ fn capture_processes(
             Path::new(current).starts_with(group),
             "RSS process left its lane"
         );
-        ensure!(
-            start_ticks(&fs::read_to_string(root.join("stat"))?, *pid)? == start,
-            "RSS PID reused"
-        );
+        if start_ticks(&read("stat")?, *pid)? != start {
+            return Err(CensusChurn("RSS PID reused").into());
+        }
         aggregate = aggregate.checked_add(rss).context("lane RSS overflow")?;
         processes.push(Process {
             pid: *pid,
@@ -253,7 +273,17 @@ fn capture_processes(
             rss_high_water_bytes: high,
         });
     }
-    ensure!(members(cgroup)? == before, "RSS process census changed");
+    if members(cgroup)? != before {
+        return Err(CensusChurn("RSS process census changed").into());
+    }
+    if allow_kernel {
+        // Recheck every measured identity, not just the numeric PID set: a PID
+        // can be recycled after its individual read and before the end census.
+        validate_host_identities(proc_root, &processes)?;
+        if members(cgroup)? != before {
+            return Err(CensusChurn("RSS final process census changed").into());
+        }
+    }
     Ok(Report {
         aggregate_rss_bytes: Some(aggregate),
         processes,
@@ -261,6 +291,18 @@ fn capture_processes(
         error: None,
     })
 }
+fn validate_host_identities(proc_root: &Path, processes: &[Process]) -> Result<()> {
+    for process in processes {
+        let path = proc_root.join(process.pid.to_string()).join("stat");
+        let stat = fs::read_to_string(&path)
+            .with_context(|| format!("RSS final identity {}", path.display()))?;
+        if start_ticks(&stat, process.pid)? != process.start_ticks {
+            return Err(CensusChurn("RSS final PID identity changed").into());
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn capture(cgroup: &Path, group: &Path) -> Report {
     checked_capture(cgroup, group, Path::new("/proc")).unwrap_or_else(|e| Report {
         error: Some(format!("{e:#}")),
@@ -271,8 +313,38 @@ pub(crate) fn capture(cgroup: &Path, group: &Path) -> Report {
 /// System process RSS and kernel allocations use a resident-byte basis. Keep
 /// MemAvailable separate: reclaimable file mappings are present in both RSS
 /// and MemAvailable and cannot be subtracted to infer non-lane use.
+// Retry a complete host census only for transient disappearance or positively
+// detected identity/membership churn. Failed attempts contribute no partial sum.
+// This is bounded work inside one observation, never a new campaign sample.
+fn host_resident_attempts(mut attempt: impl FnMut() -> Result<Value>) -> Value {
+    const MAX_ATTEMPTS: usize = 3;
+    let mut failures = Vec::new();
+    for number in 1..=MAX_ATTEMPTS {
+        match attempt() {
+            Ok(mut value) => {
+                value["census_attempts"] = Value::from(number);
+                value["discarded_attempt_errors"] = serde_json::json!(failures);
+                return value;
+            }
+            Err(error) => {
+                let retryable = error.downcast_ref::<CensusChurn>().is_some()
+                    || error
+                        .downcast_ref::<io::Error>()
+                        .is_some_and(|e| e.kind() == io::ErrorKind::NotFound);
+                failures.push(format!("{error:#}"));
+                if !retryable || number == MAX_ATTEMPTS {
+                    return serde_json::json!({"status":"unavailable",
+                        "error":failures.last(),"census_attempts":number,
+                        "discarded_attempt_errors":failures});
+                }
+            }
+        }
+    }
+    unreachable!("bounded census attempts always return")
+}
+
 pub(crate) fn host_resident() -> Value {
-    let result = (|| -> Result<Value> {
+    host_resident_attempts(|| {
         let report = capture_processes(
             Path::new("/sys/fs/cgroup"),
             Path::new("/"),
@@ -284,10 +356,7 @@ pub(crate) fn host_resident() -> Value {
             "kernel_components_bytes":kernel,"scope":"entire visible cgroup hierarchy",
             "accounting_basis":"process RSS plus Slab,KernelStack,PageTables,Percpu; unmapped file cache excluded",
             "shared_pages_may_be_counted_per_process":true,"admission_authorized":false}))
-    })();
-    result.unwrap_or_else(
-        |error| serde_json::json!({"status":"unavailable","error":format!("{error:#}")}),
-    )
+    })
 }
 
 fn kernel_bytes(text: &str) -> Result<BTreeMap<String, u64>> {
@@ -325,6 +394,107 @@ fn kernel_bytes(text: &str) -> Result<BTreeMap<String, u64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn fixture_process(proc_root: &Path, pid: u32, start: u64) {
+        let root = proc_root.join(pid.to_string());
+        fs::create_dir_all(&root).unwrap();
+        let mut fields = vec!["0".to_string(); 20];
+        fields[0] = "S".into();
+        fields[19] = start.to_string();
+        fs::write(
+            root.join("stat"),
+            format!("{pid} (fixture) {}", fields.join(" ")),
+        )
+        .unwrap();
+        fs::write(
+            root.join("status"),
+            format!("Pid: {pid}\nTgid: {pid}\nVmRSS: 100 kB\nVmHWM: 300 kB\n"),
+        )
+        .unwrap();
+        fs::write(root.join("cgroup"), "0::/\n").unwrap();
+    }
+
+    #[test]
+    fn host_restarts_whole_census_after_disappearance_never_omits_pid() {
+        let temp = tempfile::tempdir().unwrap();
+        let cg = temp.path().join("cg");
+        let proc_root = temp.path().join("proc");
+        fs::create_dir_all(&cg).unwrap();
+        fs::write(cg.join("cgroup.procs"), "7\n8\n").unwrap();
+        fixture_process(&proc_root, 7, 10);
+        let mut calls = 0;
+        let result = host_resident_attempts(|| {
+            calls += 1;
+            if calls == 2 {
+                // Simulate a now-complete new census: the retry must read both
+                // processes, never keep the first attempt's partial aggregate.
+                fixture_process(&proc_root, 8, 11);
+            }
+            let rss = capture_processes(&cg, Path::new("/"), &proc_root, true)?;
+            Ok(serde_json::json!({"status":"observed", "rss":rss}))
+        });
+        assert_eq!(calls, 2);
+        assert_eq!(result["rss"]["aggregate_rss_bytes"], 204800);
+        assert_eq!(result["rss"]["processes"].as_array().unwrap().len(), 2);
+        assert_eq!(result["census_attempts"], 2);
+        assert!(
+            result["discarded_attempt_errors"][0]
+                .as_str()
+                .unwrap()
+                .contains("RSS process 8 stat")
+        );
+    }
+
+    #[test]
+    fn host_churn_retry_is_bounded_and_keeps_every_failure() {
+        let mut calls = 0;
+        let result = host_resident_attempts(|| {
+            calls += 1;
+            Err(CensusChurn("RSS process census changed").into())
+        });
+        assert_eq!(calls, 3);
+        assert_eq!(result["status"], "unavailable");
+        assert_eq!(
+            result["discarded_attempt_errors"].as_array().unwrap().len(),
+            3
+        );
+        assert!(result.get("rss").is_none());
+        let result = host_resident_attempts(|| {
+            Err(io::Error::from(io::ErrorKind::NotFound)).context("fixture missing stat")
+        });
+        assert_eq!(result["census_attempts"], 3);
+        assert_eq!(result["status"], "unavailable");
+    }
+
+    #[test]
+    fn host_does_not_retry_permission_parse_or_membership_errors() {
+        for error in [
+            anyhow::Error::from(io::Error::from(io::ErrorKind::PermissionDenied)),
+            anyhow::anyhow!("RSS PID mismatch"),
+            anyhow::anyhow!("RSS process left its lane"),
+        ] {
+            let mut error = Some(error);
+            let result = host_resident_attempts(|| Err(error.take().expect("must not retry")));
+            assert_eq!(result["census_attempts"], 1);
+            assert_eq!(result["status"], "unavailable");
+        }
+    }
+
+    #[test]
+    fn host_rechecks_start_identity_even_with_same_numeric_pid_census() {
+        let temp = tempfile::tempdir().unwrap();
+        fixture_process(temp.path(), 7, 10);
+        let processes = vec![Process {
+            pid: 7,
+            start_ticks: 10,
+            rss_bytes: 102400,
+            rss_high_water_bytes: 307200,
+        }];
+        validate_host_identities(temp.path(), &processes).unwrap();
+        fixture_process(temp.path(), 7, 11);
+        let error = validate_host_identities(temp.path(), &processes).unwrap_err();
+        assert!(error.downcast_ref::<CensusChurn>().is_some());
+    }
+
     #[test]
     fn kernel_resident_components_do_not_double_count_slab_children() {
         let text = "Slab: 10 kB\nSReclaimable: 7 kB\nSUnreclaim: 3 kB\nKernelStack: 2 kB\nPageTables: 3 kB\nPercpu: 1 kB\n";

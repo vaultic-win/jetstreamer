@@ -1,0 +1,32 @@
+{
+  "schema": "jetstreamer-private-epoch205-shrink-root-prefix-resource-v1",
+  "epoch": 205,
+  "unit": "horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service",
+  "invocation_id": "373359a11aef4993a1a949e19ff617c3",
+  "success": true,
+  "error": null,
+  "child_return_code": 0,
+  "external_signal": 0,
+  "natural_parent_completion_required": true,
+  "producer_canonical_root_prefix_present": true,
+  "target_slot": 88991050,
+  "terminal_root_slot": 88991050,
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon-prefix205-resource-5c01bf93-v1/resource-plan.json",
+    "sha256": "7dd71710d60017224fd1f6fabd97f228642b687802da98a11f8927aea67b6485"
+  },
+  "runner_sha256": "fb41a1193c86749db27ef609f487a25de334a7e58b3440093288aecc75ae4801",
+  "node_sha256": "025757b9b337abf05435c427f143f590d9bfa542b5e4493aae783c158b4f2d3d",
+  "worker_sha256": "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc",
+  "snapshot_sha256": "24b722b37fa87462876dc05916bafa98da13f095c95aaed7159e9008efa7352e",
+  "authority": {
+    "canonical_prefix_independently_qualified": false,
+    "canonical_sidecar_authorized": false,
+    "full_cold_epoch_peak_qualified": false,
+    "ordinary_replay_authorized": false,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "runtime_promotion_authorized": false
+  }
+}
