@@ -221,8 +221,10 @@ fn terminal_shape(p: Profile, launch: &Value, u: &Value, full: bool) -> Result<(
             "another original invocation owns the unit"
         );
         if full {
+            let expected_pid = p.pid.to_string();
             ensure!(
-                u["ExecMainPID"] == p.pid.to_string() && u["ExecMainCode"] == "1",
+                u["ExecMainPID"].as_str() == Some(expected_pid.as_str())
+                    && u["ExecMainCode"] == "1",
                 "original retained exit differs"
             );
         }
