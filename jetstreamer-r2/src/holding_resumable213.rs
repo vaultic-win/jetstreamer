@@ -6,6 +6,7 @@ const CONCURRENCY: usize = 8;
 const RANGE: u64 = 32 << 20;
 const BODY_ATTEMPTS: usize = 3;
 const BODY_RETRY_WINDOW: std::time::Duration = std::time::Duration::from_secs(120);
+const BODY_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(250);
 const SDK_DOWNLOAD_STALL: &str =
     "minimum throughput was specified at 1 B/s, but throughput of 0 B/s was observed";
 #[derive(Debug)]
@@ -29,6 +30,27 @@ fn body_interruption(error: anyhow::Error) -> anyhow::Error {
         error
     };
     error.context("resumed holding range body interrupted")
+}
+#[derive(Default)]
+struct BodyRetryBudget {
+    deadline: Option<tokio::time::Instant>,
+}
+impl BodyRetryBudget {
+    fn after_failure(
+        &mut self,
+        error: &anyhow::Error,
+        failed_attempt: usize,
+        now: tokio::time::Instant,
+    ) -> Option<tokio::time::Instant> {
+        if !(1..BODY_ATTEMPTS).contains(&failed_attempt)
+            || error.downcast_ref::<RetryableBodyStall>().is_none()
+        {
+            return None;
+        }
+        // Return the same deadline even if it has expired. The caller must
+        // fail its bounded delay/attempt rather than start a renewed window.
+        Some(*self.deadline.get_or_insert(now + BODY_RETRY_WINDOW))
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 struct Stamp {
@@ -182,9 +204,9 @@ async fn pinned_range(
     // Preserve the first attempt's existing SDK/service time bounds. A fixed
     // retry deadline begins only after a positively classified body stall;
     // ordinary writer backpressure must not create a new initial timeout.
-    let mut deadline = None;
+    let mut budget = BodyRetryBudget::default();
     for attempt in 1..=BODY_ATTEMPTS {
-        let result = if let Some(deadline) = deadline {
+        let result = if let Some(deadline) = budget.deadline {
             tokio::time::timeout_at(deadline, pinned_range_once(client, spec, start, end))
                 .await
                 .context("resumed range body retry window exhausted")?
@@ -192,18 +214,21 @@ async fn pinned_range(
             pinned_range_once(client, spec, start, end).await
         };
         match result {
-            Err(error)
-                if error.downcast_ref::<RetryableBodyStall>().is_some()
-                    && attempt < BODY_ATTEMPTS =>
-            {
-                deadline.get_or_insert_with(|| tokio::time::Instant::now() + BODY_RETRY_WINDOW);
+            Err(error) => {
+                let Some(deadline) =
+                    budget.after_failure(&error, attempt, tokio::time::Instant::now())
+                else {
+                    return Err(error);
+                };
                 // No bytes from this attempt escape its private Vec. Repeat
                 // the exact complete range and If-Match under one fixed budget.
                 eprintln!(
                     "{}",
                     json!({"event":"holding-resume-stalled-range-retry","start":start,"end":end,"failed_attempt":attempt,"maximum_attempts":BODY_ATTEMPTS,"fixed_window_millis":BODY_RETRY_WINDOW.as_millis()})
                 );
-                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                tokio::time::timeout_at(deadline, tokio::time::sleep(BODY_RETRY_DELAY))
+                    .await
+                    .context("resumed range body retry window exhausted during delay")?;
             }
             result => return result,
         }
@@ -565,7 +590,13 @@ mod tests {
                     let r=request.lines().find_map(|line|line.strip_prefix("range: bytes=")).unwrap();let (a,b)=r.split_once('-').unwrap();let start=a.parse::<u64>().unwrap();let end=b.parse::<u64>().unwrap()+1;
                     assert!(start<end && end<=body.len() as u64);recorded.lock().unwrap().push((start,end));
                     let etag=if fault=="etag" {"changed"} else {"pinned"};
-                    let header=format!("HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {start}-{}/{}\r\nETag: \"{etag}\"\r\nConnection: close\r\n\r\n",end-start,end-1,body.len());
+                    let header_start=if fault=="range" {0} else {start};
+                    let header_length=end-start+u64::from(fault=="length");
+                    let header=if fault=="stale" {
+                        "HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into()
+                    } else {
+                        format!("HTTP/1.1 206 Partial Content\r\nContent-Length: {header_length}\r\nContent-Range: bytes {header_start}-{}/{}\r\nETag: \"{etag}\"\r\nConnection: close\r\n\r\n",end-1,body.len())
+                    };
                     socket.write_all(header.as_bytes()).unwrap();opened.fetch_add(1,Ordering::SeqCst);
                     let bytes=&body[start as usize..end as usize];
                     if let Some(pause)=writer_pause {
@@ -578,6 +609,10 @@ mod tests {
                             while !pause.load(Ordering::SeqCst) {assert!(Instant::now()<deadline);std::thread::sleep(Duration::from_millis(2));}
                             let _=socket.write_all(&bytes[1..]);
                         }
+                    } else if fault=="stale" {
+                        // No body is valid for a failed If-Match request.
+                    } else if fault=="interrupt" {
+                        let _=socket.write_all(&bytes[..bytes.len()/2]);
                     } else if fault=="stall" {
                         let _=socket.write_all(&bytes[..bytes.len()/2]);
                         std::thread::sleep(Duration::from_millis(2500));
@@ -599,10 +634,21 @@ mod tests {
             vec!["stall", "ok"],
             vec!["stall", "stall", "stall"],
             vec!["stall", "etag"],
+            vec!["stall", "range"],
+            vec!["stall", "length"],
+            vec!["stall", "stale"],
+            vec!["stall", "interrupt"],
         ] {
             let expected = faults.len();
             let recover = faults.last() == Some(&"ok");
-            let identity = faults.last() == Some(&"etag");
+            let fatal = match faults.last().copied() {
+                Some("etag") => Some("ETag mismatch"),
+                Some("range") => Some("Content-Range mismatch"),
+                Some("length") => Some("Content-Length mismatch"),
+                Some("stale") => Some("conditional resumable holding range request failed"),
+                Some("interrupt") => Some("resumed holding range body interrupted"),
+                _ => None,
+            };
             let (client, join, seen) = monitored_server(body.clone(), faults, None);
             let (_d, p, mut file) = fixture_file(&body[..37]);
             let (digest, start, _) = seed(&mut file).unwrap();
@@ -625,8 +671,9 @@ mod tests {
                 assert_eq!(fs::read(&p).unwrap(), body.as_slice());
             } else {
                 let error = result.unwrap_err();
-                if identity {
-                    assert!(error.to_string().contains("ETag mismatch"), "{error:#}");
+                if let Some(message) = fatal {
+                    assert!(error.to_string().contains(message), "{error:#}");
+                    assert!(error.downcast_ref::<RetryableBodyStall>().is_none());
                 } else {
                     assert!(
                         error
@@ -711,8 +758,33 @@ mod tests {
         }
         assert_eq!(BODY_ATTEMPTS, 3);
         assert_eq!(BODY_RETRY_WINDOW, Duration::from_secs(120));
+        assert_eq!(BODY_RETRY_DELAY, Duration::from_millis(250));
         assert_eq!(CONCURRENCY, 8);
         assert_eq!(2 * RANGE * CONCURRENCY as u64, REMOTE_READ_BUFFER_BUDGET);
+    }
+    #[test]
+    fn body_retry_deadline_is_fixed_after_first_stall_and_never_granted_to_fatal_errors() {
+        let start = tokio::time::Instant::now();
+        let stall = body_interruption(anyhow::anyhow!(SDK_DOWNLOAD_STALL));
+        let mut budget = BodyRetryBudget::default();
+        let fatal = anyhow::anyhow!("resumed range ETag mismatch");
+        assert!(budget.after_failure(&fatal, 1, start).is_none());
+        assert!(budget.deadline.is_none());
+        let deadline = budget.after_failure(&stall, 1, start).unwrap();
+        assert_eq!(deadline, start + BODY_RETRY_WINDOW);
+        for elapsed in [119, 120, 121] {
+            assert_eq!(
+                budget.after_failure(&stall, 2, start + Duration::from_secs(elapsed)),
+                Some(deadline)
+            );
+        }
+        // A changed identity after a real stall still fails immediately, even
+        // when retry time remains. Exhaustion never grants a fourth attempt.
+        assert!(budget.after_failure(&fatal, 2, start).is_none());
+        for attempt in [0, BODY_ATTEMPTS, BODY_ATTEMPTS + 1] {
+            assert!(budget.after_failure(&stall, attempt, start).is_none());
+        }
+        assert_eq!(budget.deadline, Some(deadline));
     }
     #[tokio::test]
     async fn every_arbitrary_prefix_offset_rehashes_then_requests_only_the_missing_suffix() {
