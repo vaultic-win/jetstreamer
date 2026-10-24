@@ -176,6 +176,13 @@ reclaimable bytes, never grants retirement or transport authority, and does not
 take a replay/resource sample. Foundation mapping validation is separate from
 the existing node02 transport; the latter is unchanged.
 
+The first actual metadata-only review stopped at the unrelated dangling
+`multi-user.target.wants/pollinate.service` installed link. The corrected census
+records a stable missing-target symlink's raw target digest without pretending
+there are file bytes to read. A dangling target that names the213 tree remains
+a reference blocker; permission errors, link/target changes and directory aliases
+still refuse. No installed link or unit was changed.
+
 Until any actual staged-reference blockers are resolved and the custody/restore
 round trip is qualified, this remains125.3GB of retained input, not free capacity.
 All historical consumers require exact byte restoration before manual reuse.

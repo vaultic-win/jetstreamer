@@ -389,6 +389,35 @@ fn units() -> Result<BTreeMap<String, Value>> {
     Ok(result)
 }
 fn staged_file(path: &Path, owner: u32) -> Result<(String, bool)> {
+    let link_before = fs::symlink_metadata(path)?;
+    if link_before.file_type().is_symlink()
+        && path
+            .canonicalize()
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+    {
+        ensure!(
+            (link_before.uid() == 0 || link_before.uid() == owner) && link_before.len() <= 4096,
+            "untrusted/oversized dangling staged link"
+        );
+        let target = fs::read_link(path)?;
+        let bytes = target.as_os_str().as_encoded_bytes();
+        let needle = Path::new(SOURCE)
+            .parent()
+            .unwrap()
+            .as_os_str()
+            .as_encoded_bytes();
+        ensure!(
+            same(&link_before, &fs::symlink_metadata(path)?)
+                && path
+                    .canonicalize()
+                    .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+            "dangling staged link or target changed"
+        );
+        return Ok((
+            format!("missing-symlink-target:{}", hex(bytes)),
+            bytes.windows(needle.len()).any(|w| w == needle),
+        ));
+    }
     let real = path.canonicalize()?;
     if real == Path::new("/dev/null") {
         return Ok(("masked-dev-null".into(), false));
@@ -766,6 +795,34 @@ mod tests {
             "/etc/systemd/system",
             "/etc/systemd/system/new-repair.service"
         ));
+    }
+    #[test]
+    fn dangling_optional_unit_is_recorded_but_a_dangling_source_reference_is_not_hidden() {
+        let root = tempfile::tempdir().unwrap();
+        let ordinary = root.path().join("pollinate.service");
+        std::os::unix::fs::symlink(
+            "/missing-optional-unit-package/pollinate.service",
+            &ordinary,
+        )
+        .unwrap();
+        let owner = unsafe { libc::geteuid() };
+        let first = staged(root.path(), owner).unwrap();
+        assert!(
+            first[&ordinary.display().to_string()]
+                .0
+                .starts_with("missing-symlink-target:")
+        );
+        assert!(!first[&ordinary.display().to_string()].1);
+        let reference = root.path().join("pending.service");
+        std::os::unix::fs::symlink(
+            format!(
+                "{}/missing-unit",
+                Path::new(SOURCE).parent().unwrap().display()
+            ),
+            &reference,
+        )
+        .unwrap();
+        assert!(staged(root.path(), owner).unwrap()[&reference.display().to_string()].1);
     }
     #[test]
     fn plan_cannot_select_another_artifact_or_request_mutation() {
