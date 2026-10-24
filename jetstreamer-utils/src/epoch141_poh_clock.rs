@@ -21,6 +21,8 @@ const BANK: &[u8] =
 // Subsequent trace/capped-storage candidates are a separate provenance pin.
 const REVIEWED_WORKER: &[u8] =
     include_bytes!("../tests/fixtures/epoch141-clock-reviewed-worker-a6e0d6ab.rs.txt");
+// The current source pin includes the prose spacing cleanup. Historical proof
+// remains bound to the unchanged reviewed-worker fixture above.
 const CURRENT_WORKER: &[u8] =
     include_bytes!("../../historical-runtime/v1_4_25/worker/src/runtime.rs");
 #[derive(Debug, Serialize)]
@@ -115,7 +117,7 @@ fn validate(c: &Value, n: &Value) -> Result<ClockBindings> {
     ensure!(
         bank == "f136ec6b4d40bced37936df1800cc7f2d64484a0640d76edb2839dd04599d4ac"
             && worker == "ae01b0813fa1564511e450acc693941268076659e4d741aae085fb288d0fd2ac"
-            && current_worker == "8400f8053bc2efdf40ee100d2883e6c80ea4c470029bc85279df015c30b84abe",
+            && current_worker == "1b4dc1c973d67707596b2971ddd9c2027038ce8845d4e75db09b7f045a21c5f5",
         "reviewed clock inheritance source changed"
     );
     let bank_text = std::str::from_utf8(BANK)?;
@@ -167,7 +169,7 @@ mod tests {
         );
         assert_eq!(
             bindings.current_worker_runtime_source_sha256,
-            "8400f8053bc2efdf40ee100d2883e6c80ea4c470029bc85279df015c30b84abe"
+            "1b4dc1c973d67707596b2971ddd9c2027038ce8845d4e75db09b7f045a21c5f5"
         );
         for (pointer, value) in [
             ("/census/clock/hashes_per_tick", json!(1)),
