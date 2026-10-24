@@ -206,11 +206,43 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
     Ok((t, required_memory))
 }
 pub(super) fn run() -> Result<()> {
-    let (binding, self_sha) = publication203::parsed_args("admit-canary227-v1625")?;
-    let s: Spec = serde_json::from_value(bound_json(&binding)?)?;
+    run_profile(false)
+}
+pub(super) fn run_output_metadata() -> Result<()> {
+    run_profile(true)
+}
+fn parse_spec(mut raw: Value, sampled: bool) -> Result<Spec> {
+    if sampled {
+        ensure!(
+            raw.as_object_mut()
+                .context("sampled output spec must be an object")?
+                .remove("output_metadata_profile")
+                == Some(json!(output_credit204205::PROFILE)),
+            "new output metadata profile missing or unsupported"
+        );
+    }
+    let spec: Spec = serde_json::from_value(raw)?;
     ensure!(
-        s.schema == "jetstreamer-private-epoch227-v1625-canary-admission-spec-v1"
-            && s.mode == "bounded-canary"
+        spec.schema
+            == if sampled {
+                "jetstreamer-private-epoch227-v1625-canary-admission-output-spec-v1"
+            } else {
+                "jetstreamer-private-epoch227-v1625-canary-admission-spec-v1"
+            },
+        "canary spec/profile mismatch"
+    );
+    Ok(spec)
+}
+fn run_profile(sampled: bool) -> Result<()> {
+    let command = if sampled {
+        "admit-canary227-v1625-output-metadata-v1"
+    } else {
+        "admit-canary227-v1625"
+    };
+    let (binding, self_sha) = publication203::parsed_args(command)?;
+    let s = parse_spec(bound_json(&binding)?, sampled)?;
+    ensure!(
+        s.mode == "bounded-canary"
             && s.canary_plan.path.parent().and_then(Path::parent)
                 == Some(Path::new("/var/lib/jetstreamer"))
             && s.canary_plan
@@ -233,7 +265,12 @@ pub(super) fn run() -> Result<()> {
         ensure!(
             old["spec_sha256"] == binding.sha256
                 && old["self_sha256"] == self_sha
-                && old["admitted"] == true,
+                && old["admitted"] == true
+                && if sampled {
+                    old["output_credit_profile"] == output_credit204205::PROFILE
+                } else {
+                    old.get("output_credit_profile").is_none()
+                },
             "227 admission conflicts"
         );
         return Ok(());
@@ -296,11 +333,19 @@ pub(super) fn run() -> Result<()> {
     let o = bound_json(&s.observer)?;
     let f = bound_json(&s.fleet)?;
     let p = bound_json(&s.resource_proposal)?;
+    if sampled {
+        output_credit204205::maintenance_idle(&f)?;
+    }
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = utc_seconds(o["recorded_at_utc"].as_str().context("227 sample clock")?)?;
     let floor = singleton227_admission::century_floor_for(&f, 227)?;
     let free_before = singleton227_admission::disk_free()?;
     let (growth, measurements) = prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (growth, measurements, output_credit_before) = if sampled {
+        output_credit204205::apply(&f, &o, t, now, growth, measurements)?
+    } else {
+        (growth, measurements, Value::Null)
+    };
     let (computed, existing_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let protected = p["guard_minimum_free_bytes"]
@@ -367,6 +412,11 @@ pub(super) fn run() -> Result<()> {
     sample(&s, &o, &f, now, required)?;
     let (after_growth, after_measurements) =
         prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (after_growth, after_measurements, output_credit_after) = if sampled {
+        output_credit204205::apply(&f, &o, t, now, after_growth, after_measurements)?
+    } else {
+        (after_growth, after_measurements, Value::Null)
+    };
     let (after_auxiliary, after_auxiliary_measurements) = prefix223_live_peer::memory(&f)?;
     ensure!(
         after_growth <= growth
@@ -386,6 +436,12 @@ pub(super) fn run() -> Result<()> {
         "fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"all_immutable_inputs_rehashed":true,"snapshot_restored":false,
         "producer_started":false,"resource_samples_taken":0,"recorded_unix_seconds":now,"maximum_launch_delay_seconds":900,
         "spec_sha256":binding.sha256,"self_sha256":self_sha});
+    if sampled {
+        r["output_credit_profile"] = json!(output_credit204205::PROFILE);
+        r["output_credit_evidence_before"] = output_credit_before;
+        r["output_credit_evidence_after"] = output_credit_after;
+        r["park_maintenance_idle_required"] = json!(true);
+    }
     r["input_capability"] = private157::binding(&s.input_capability);
     r["capability_origin"] = capability_origin;
     r["bounded_replay_resource_admitted"] = json!(true);
@@ -408,6 +464,23 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn new_metadata_route_is_explicit_and_legacy_spec_stays_strict() {
+        let b = json!({"path":"/private/file.json","sha256":"a".repeat(64)});
+        let legacy = json!({"schema":"jetstreamer-private-epoch227-v1625-canary-admission-spec-v1",
+            "mode":"bounded-canary","observer":b,"fleet":b,"canary_plan":b,"input_capability":b,
+            "resource_proposal":b,"protected_guards":{},"output":"/private/admission.json"});
+        parse_spec(legacy.clone(), false).unwrap();
+        assert!(parse_spec(legacy.clone(), true).is_err());
+        let mut sampled = legacy.clone();
+        sampled["schema"] =
+            json!("jetstreamer-private-epoch227-v1625-canary-admission-output-spec-v1");
+        sampled["output_metadata_profile"] = json!(output_credit204205::PROFILE);
+        parse_spec(sampled.clone(), true).unwrap();
+        assert!(parse_spec(sampled.clone(), false).is_err());
+        sampled["output_metadata_profile"] = json!("logical-size-fallback");
+        assert!(parse_spec(sampled, true).is_err());
+    }
     #[test]
     fn native_capability_cannot_claim_replay_or_substitute_checkpoint() {
         let mut v = json!({"schema":"jetstreamer-private-epoch227-v1625-comparison-capability-v1","node_sha256":c::NODE_SHA,"worker_sha256":c::WORKER_SHA,"snapshot_sha256":c::SNAPSHOT_SHA,"bindings":{"self_sha256":c::RUNNER_SHA},"worker_started":false,"entry_replay":false,"parent_planning_report":{"pre_worker_barrier_reached":true,"runtime_checkpoint_policy_validated":true,"worker_spawned":false,"archive_created":false,"worker_entry_start":c::BOOTSTRAP+1,"worker_entry_end_exclusive":c::TARGET+1},"canonical_checkpoint_slots":[c::BOOTSTRAP,c::TERMINAL],"target_slot":c::TARGET,"target_is_checkpoint":false,"target_stop_protocol":"cooperative-resume-only","native_input":{"sha256":c::NATIVE_SHA}});

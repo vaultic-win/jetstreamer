@@ -12,6 +12,7 @@ mod bounded205;
 mod canary227;
 mod canary227_capability;
 mod canary227_admission;
+mod output_credit204205;
 mod canary227_capture;
 mod canary227_event;
 mod canary227_terminal;
@@ -330,6 +331,7 @@ pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<V
 pub(super) fn capture_canary227_v1625_terminal()->Result<()> {canary227_terminal::capture()}
 pub(super) fn canary227_terminal_status_identity(proof:&Value)->Result<(String,String,u64)> {Ok((canary227::UNIT.into(),canary227_terminal::validate(proof)?,proof["main_pid"].as_u64().context("227 canary terminal PID")?))}
 pub(super) fn admit_canary227_v1625() -> Result<()> { canary227_admission::run() }
+pub(super) fn admit_canary227_v1625_output_metadata() -> Result<()> { canary227_admission::run_output_metadata() }
 pub(super) fn capture_canary227_v1625() -> Result<()> { canary227_capture::run() }
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
