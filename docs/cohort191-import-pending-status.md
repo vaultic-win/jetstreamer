@@ -44,3 +44,14 @@ not an accepted observation. Public delivery still requires actual committed
 public import, natural controller completion and independent verification.
 No source-only merge restarts a producer, retires an archive or authorizes an
 R2 archive overwrite or deletion.
+
+The first real03:16 observer succeeded, but fleet derivation initially left
+accepted importer claims under the qualification-blocked gate. The reconciler
+correctly rejected that classification after six ordinary status writes. The
+qualified correction assigns the independently evidenced post-replay gate and
+supports one exact failure-bound continuation: it verifies the six durable
+status receipts without rewriting them, preserves the failed attempt, and
+finishes the remaining statuses and fleet reconciliation using the same real
+observer. The continuation completed successfully; source d6ce8e09 passed229
+routine tests, strict Clippy and release qualification. No second observation
+or healthy producer restart was used to recover this metadata failure.
