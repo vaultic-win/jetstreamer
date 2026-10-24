@@ -7,6 +7,7 @@ const SOURCE_PATHS: &[&str] = &[
     "Cargo.lock",
     "jetstreamer-firehose",
     "jetstreamer-horizon",
+    "jetstreamer-horizon-observe",
     "jetstreamer-node",
     "historical-runtime",
     "vendor/solana-runtime-3.1.12",
