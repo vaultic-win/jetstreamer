@@ -44,6 +44,10 @@ pub(super) fn run() -> Result<()> {
     capacity["assembly_only_no_replay"] = json!(true);
     capacity["source_completion_authenticated"] = json!(false);
     capacity["assembly_launch_authorized"] = json!(false);
+    ensure!(
+        serde_json::to_vec_pretty(&capacity)?.len() < 8 << 20,
+        "private223 capacity exceeds the independently readable 8MiB metadata envelope"
+    );
     private157::immutable_receipt(&s.output, &capacity)
 }
 #[cfg(test)]

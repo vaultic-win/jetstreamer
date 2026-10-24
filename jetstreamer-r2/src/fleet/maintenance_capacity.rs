@@ -93,7 +93,7 @@ pub(super) fn check(value: &Value, additional: u64) -> Result<Value> {
     check_inner(value, additional, None)
 }
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
-    check_inner(value, 160 << 30, Some(64 << 30))
+    check_inner(value, (160 << 30) + (32 << 20), Some(64 << 30))
 }
 fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
     ensure!(

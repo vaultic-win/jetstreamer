@@ -55,7 +55,7 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
             && c["first_epoch"] == 201
             && c["last_epoch"] == 300
             && c["new_resource_samples"] == 0
-            && c["additional_bytes"] == (160u64 << 30)
+            && c["additional_bytes"] == ((160u64 << 30) + (32 << 20))
             && c["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|t| t <= now && now - t <= 900),
@@ -79,7 +79,7 @@ fn capacity(c: &Value, tool: &str, now: u64) -> Result<(u64, u64)> {
         .filter(|n| *n >= 2_000_000_000_000)
         .context("private223 protected disk floor")?;
     let required = floor
-        .checked_add(160 << 30)
+        .checked_add((160 << 30) + (32 << 20))
         .context("private223 capacity disk overflow")?;
     ensure!(
         c["required_initial_free_bytes"] == required
@@ -246,12 +246,12 @@ mod tests {
             "actual_available_memory_bytes":244u64<<30});
         json!({"schema":"jetstreamer-private223-assembly-capacity-v1","self_sha256":"a".repeat(64),
             "assembly_only_no_replay":true,"all_live_growth_and_century_floor_protected":true,
-            "first_epoch":201,"last_epoch":300,"new_resource_samples":0,"additional_bytes":160u64<<30,
+            "first_epoch":201,"last_epoch":300,"new_resource_samples":0,"additional_bytes":(160u64<<30)+(32<<20),
             "recorded_unix_seconds":1000,"replay_launch_authorized":false,"local_retirement_authorized":false,
             "publication_authorized":false,"r2_mutations":false,"assembly_launch_authorized":false,
             "source_completion_authenticated":false,"minimum_free_bytes":floor,
-            "required_initial_free_bytes":floor+(160u64<<30),"sampled_available_bytes":floor+(160u64<<30),
-            "actual_available_bytes":floor+(160u64<<30),"memory_before":memory,"memory_after":memory})
+            "required_initial_free_bytes":floor+(160u64<<30)+(32<<20),"sampled_available_bytes":floor+(160u64<<30)+(32<<20),
+            "actual_available_bytes":floor+(160u64<<30)+(32<<20),"memory_before":memory,"memory_after":memory})
     }
     #[test]
     fn admission_keeps_capacity_tool_identity_floor_memory_and_freshness_closed() {

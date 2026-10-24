@@ -152,7 +152,7 @@ The first stage is `jetstreamer-r2 admit-assembly223-capacity SPEC
 `/var/lib/jetstreamer/horizon-223-assembly-capacity-NAME/capacity.json` output.
 It reuses the neutral `maintenance_capacity` complete-owner core. Foundation's
 wrapper preserves its old successful receipt shape and disk-only behavior.
-Assembly adds the sealed 160GiB output, at least 2TB protected floor, a 64GiB
+Assembly adds the sealed 160GiB output plus32MiB metadata reservation, at least 2TB protected floor, a 64GiB
 candidate memory cap, complete typed remaining owner memory, and 10% host memory
 reserve. Sampled and fresh available memory must fit both before and after.
 It requires every protected timer active and the exact latest completed guard
@@ -227,3 +227,8 @@ admission file alone is not authority to bypass them.
    canonical pair. The usual full/plugin/boundary and authenticated remote
    upload/readback/sidecar gates remain mandatory. Status cleanup follows the
    canonical remote sidecar commit, with no anonymous-origin dependency.
+
+The assembly capacity reservation includes32MiB for bounded admission/capacity
+and assembly metadata, and the assembler withholds a further1MiB above its
+admitted floor throughout archive writes until its final receipt is durable.
+It rechecks that final metadata did not cross the protected floor.

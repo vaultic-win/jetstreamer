@@ -417,7 +417,10 @@ fn run() -> Result<()> {
         file,
         bytes: 0,
         started,
-        floor,
+        // Keep final intent/completion metadata above the admitted disk floor.
+        floor: floor
+            .checked_add(1 << 20)
+            .context("assembly metadata floor overflow")?,
     };
     let (mut output, stats) =
         merge_runtime_segments(sources, output, ArchiveWriterConfig::default(), &provenance)?;
@@ -453,6 +456,10 @@ fn run() -> Result<()> {
     let source_idle_after = idle_sources()?;
     ensure!(properties(UNIT)? == own, "owner changed before completion");
     no_sidecar(&target)?;
+    ensure!(
+        free(Path::new(OUTPUT))? >= floor + (1 << 20),
+        "assembly final metadata reserve consumed"
+    );
     let expected_updates = provenance
         .runtime_segments
         .last()
@@ -479,6 +486,10 @@ fn run() -> Result<()> {
         "current_plugin_verification_passed":false,"canonical_sidecar_authorized":false,"publication_authorized":false,
         "runtime_promotion_authorized":false,"retirement_authorized":false,"repair_closed":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
+    ensure!(
+        free(Path::new(OUTPUT))? >= floor,
+        "assembly completion consumed protected disk floor"
+    );
     println!(
         "private223 V3 assembly completed; final full/plugin/publication/repair gates remain separate"
     );
