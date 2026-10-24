@@ -56,6 +56,11 @@ mod prefix205;
 mod prefix205_admission;
 mod prefix205_capture;
 mod prefix223;
+mod prefix223_native20;
+mod prefix223_native20_admission;
+mod prefix223_native20_capture;
+mod prefix223_native20_peer228;
+mod prefix223_native20_status;
 mod private144;
 mod private144_scan;
 mod private157;
@@ -99,6 +104,20 @@ pub(super) fn capture_warmup223_input() -> Result<()> {
 }
 pub(super) fn capture_warmup223_terminal() -> Result<()> {
     warmup223::capture_terminal()
+}
+pub(super) fn admit_prefix223_native20() -> Result<()> {
+    prefix223_native20_admission::run()
+}
+pub(super) fn capture_prefix223_native20() -> Result<()> {
+    prefix223_native20_capture::run()
+}
+pub(super) async fn publish_prefix223_native20_status() -> Result<()> {
+    prefix223_native20_status::run().await
+}
+pub(super) fn prefix223_native20_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    prefix223_native20_status::inactive_owner(receipt)
 }
 pub(super) fn retire_warmup223_scratch() -> Result<()> {
     warmup223_retire::run()
@@ -496,6 +515,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
         let evidence: BoundFile = serde_json::from_value(launch["capability"].clone())?;
         prefix223::capability(&bound_json(&evidence)?)?;
         prefix223::terminal203_release(&launch)?;
+    }
+    if prefix223_native20::namespace(claim) {
+        prefix223_native20::bindings(claim, &launch)?;
     }
     if prefix205::namespace(claim) {
         prefix205::bindings(claim, &launch)?;
@@ -921,6 +943,7 @@ fn validate_same_sample_admission(
         }
         223 if tail223::namespace(claim) => tail223::GUARD_SHA,
         223 if prefix223::namespace(claim) => prefix223::GUARD_SHA,
+        223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -1153,6 +1176,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if singleton209::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| singleton209::guard_matches(claim, &r, plan))
+    } else if prefix223_native20::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| prefix223_native20::guard_matches(claim, &r, plan))
     } else if prefix223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
@@ -1296,6 +1322,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
     let tail_223 = receipt["schema"] == tail223::SCHEMA;
     let prefix_223 = receipt["schema"] == prefix223::SCHEMA;
+    let prefix_223_native20 = receipt["schema"] == prefix223_native20::SCHEMA;
     let prefix_205 = receipt["schema"] == prefix205::SCHEMA;
     let prefix_204 = receipt["schema"] == prefix204::SCHEMA;
     let singleton_227 = receipt["schema"] == singleton227::SCHEMA;
@@ -1319,6 +1346,10 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     ensure!(
         !prefix223::namespace(claim) || prefix_223,
         "prefix223 namespace requires its own private schema"
+    );
+    ensure!(
+        !prefix223_native20::namespace(claim) || prefix_223_native20,
+        "native20 prefix223 namespace requires its own private schema"
     );
     ensure!(
         !tail223::namespace(claim) || tail_223,
@@ -1362,6 +1393,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || bounded_205
             || tail_223
             || prefix_223
+            || prefix_223_native20
             || prefix_205
             || prefix_204
             || singleton_227
@@ -1387,6 +1419,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         prefix204::launch_matches(claim, receipt)
     } else if prefix_205 {
         prefix205::launch_matches(claim, receipt)
+    } else if prefix_223_native20 {
+        prefix223_native20::launch_matches(claim, receipt)
     } else if prefix_223 {
         prefix223::launch_matches(claim, receipt)
     } else if tail_223 {
@@ -2895,6 +2929,17 @@ pub(super) async fn run() -> Result<()> {
                     "prefix223 diagnostic live command changed"
                 );
             }
+            if prefix223_native20::namespace(claim) {
+                ensure!(
+                    prefix223_native20::same_command(&current["ExecStart"]),
+                    "native20 full-prefix live command changed"
+                );
+                let props = singleton227_capture::properties(
+                    &claim.unit,
+                    "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ProtectHome,ProtectSystem,ProtectControlGroups,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,Environment,OOMPolicy,OOMScoreAdjust,Result,ActiveState,SubState,NRestarts,ExecStart",
+                )?;
+                prefix223_native20_capture::sandbox(&props)?;
+            }
             if bounded205::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -2957,6 +3002,7 @@ pub(super) async fn run() -> Result<()> {
             } else if original141::namespace(claim) {
                 "private-original-entry-root-qualification"
             } else if prefix223::namespace(claim)
+                || prefix223_native20::namespace(claim)
                 || prefix205::namespace(claim)
                 || prefix204::namespace(claim)
             {
@@ -3127,6 +3173,7 @@ pub(super) async fn run() -> Result<()> {
                     qualification_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
+                        || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                 });
