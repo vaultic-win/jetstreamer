@@ -20,7 +20,7 @@ reader arguments are:
 
 ```text
 SEALED_QUALIFICATION_VERIFIER
-  --archive=/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1/output/epoch-223.jet
+  /home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1/output/epoch-223.jet
   --private-root=/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1
   --expected-epoch=223
   --expected-output-start-slot=96336000
