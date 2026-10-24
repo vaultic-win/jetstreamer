@@ -574,6 +574,20 @@ pub(super) fn disk_free() -> Result<u64> {
         .context("227 disk overflow")
 }
 pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+    owners_inner(f, current, None)
+}
+pub(super) fn owners_with_foundation_restore(
+    f: &Value,
+    current: &BTreeMap<String, Value>,
+    context: &crate::holding::Foundation213RestoreContext<'_>,
+) -> Result<()> {
+    owners_inner(f, current, Some(context))
+}
+fn owners_inner(
+    f: &Value,
+    current: &BTreeMap<String, Value>,
+    context: Option<&crate::holding::Foundation213RestoreContext<'_>>,
+) -> Result<()> {
     let old = f["unit_census"]
         .as_object()
         .context("227 predecessor census")?;
@@ -581,6 +595,10 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()>
     for row in f["active"].as_array().context("227 active owners")? {
         let p = active_owner(row)?;
         let unit = p["Id"].as_str().context("227 owner name")?;
+        ensure!(
+            context.is_none_or(|c| unit != c.unit_name()),
+            "self-maintenance cannot be promoted into the accepted replay roster"
+        );
         ensure!(
             old.get(unit) == Some(p),
             "227 owner absent from accepted unit census"
@@ -614,10 +632,27 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()>
         active.insert(unit.to_owned());
     }
     for (name, value) in current {
+        if diagnostic_stage_running(value) && !active.contains(name) {
+            if let Some(context) = context {
+                ensure!(
+                    name == context.unit_name(),
+                    "227 unaccounted live competitor:{name}"
+                );
+                context.match_row(name, value)?;
+            } else {
+                anyhow::bail!("227 unaccounted live competitor:{name}");
+            }
+        }
+    }
+    if let Some(context) = context {
+        let row = current
+            .get(context.unit_name())
+            .context("tracked self-restore row omitted from complete census")?;
         ensure!(
-            !diagnostic_stage_running(value) || active.contains(name),
-            "227 unaccounted live competitor:{name}"
+            diagnostic_stage_running(row),
+            "tracked self-restoration ceased to be active during capacity check"
         );
+        context.match_row(context.unit_name(), row)?;
     }
     Ok(())
 }
@@ -1056,6 +1091,67 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typed_self_restore_keeps_five_peers_and_rejects_every_unknown_or_changed_owner() {
+        let alias = "horizon-foundation-holding213-maintenance-v1.service";
+        let row = |name: &str, pid: u32| json!({"Id":name,"LoadState":"loaded","Type":"exec","ActiveState":"active","SubState":"running","InvocationID":"1".repeat(32),"NRestarts":"0","ControlGroup":format!("/system.slice/{name}"),"MainPID":pid.to_string(),"Result":"success","ExecMainStatus":"0","ExecStart":format!("{{ path=/sealed/{pid} ; argv[]=/sealed/{pid} ; ignore_errors=no }}")});
+        let own = row(alias, 4242);
+        let file = tempfile::tempfile().unwrap();
+        let context = crate::holding::Foundation213RestoreContext::fixture_for_owner_tests(
+            &file,
+            own.clone(),
+        );
+        let mut current = BTreeMap::new();
+        let mut prior = serde_json::Map::new();
+        let mut active = Vec::new();
+        for n in 0..5 {
+            let name = format!("protected-original-{n}.service");
+            let value = row(&name, 5000 + n);
+            prior.insert(name.clone(), value.clone());
+            current.insert(name, value.clone());
+            active.push(json!({"unit":value}));
+        }
+        let fleet = json!({"active":active,"unit_census":prior});
+        current.insert(alias.into(), own.clone());
+        let untouched = current.clone();
+        let original = fleet.clone();
+        assert!(owners(&fleet, &current).is_err());
+        owners_with_foundation_restore(&fleet, &current, &context).unwrap();
+        assert_eq!(current, untouched);
+        assert_eq!(fleet, original);
+        for key in ["MainPID", "InvocationID", "ExecStart"] {
+            let mut bad = current.clone();
+            bad.get_mut(alias).unwrap()[key] = json!("changed");
+            assert!(
+                owners_with_foundation_restore(&fleet, &bad, &context).is_err(),
+                "{key}"
+            );
+        }
+        let mut unknown = current.clone();
+        let other = "horizon-other-maintenance.service";
+        unknown.insert(other.into(), row(other, 4242));
+        assert!(owners_with_foundation_restore(&fleet, &unknown, &context).is_err());
+        let mut absent = current.clone();
+        absent.remove(alias);
+        assert!(owners_with_foundation_restore(&fleet, &absent, &context).is_err());
+        let mut dead = current.clone();
+        dead.get_mut(alias).unwrap()["ActiveState"] = json!("inactive");
+        dead.get_mut(alias).unwrap()["SubState"] = json!("dead");
+        assert!(owners_with_foundation_restore(&fleet, &dead, &context).is_err());
+        for n in 0..5 {
+            let mut bad = current.clone();
+            bad.get_mut(&format!("protected-original-{n}.service"))
+                .unwrap()["InvocationID"] = json!("2".repeat(32));
+            assert!(owners_with_foundation_restore(&fleet, &bad, &context).is_err());
+        }
+        let mut promoted = fleet.clone();
+        promoted["active"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"unit":own}));
+        promoted["unit_census"][alias] = own;
+        assert!(owners_with_foundation_restore(&promoted, &current, &context).is_err());
+    }
     fn inventory() -> Value {
         let rows=(201..=300).map(|epoch|if epoch<215 {json!({"epoch":epoch,"state":"ready-pair","archive_length":1000u64+epoch,"sidecar_sha256":"a".repeat(64),"archive_metadata_sha256":"a".repeat(64)})}else{json!({"epoch":epoch,"state":"missing"})}).collect::<Vec<_>>();
         json!({"inventory":{"schema":"jetstreamer-horizon-r2-inventory-v1","first_epoch":201,"last_epoch":300,"anomalies":0,"ready_pairs":14,"entries":rows}})

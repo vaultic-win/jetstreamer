@@ -4,8 +4,11 @@ use jetstreamer_horizon_observe::foundation_holding213_review as review;
 use std::os::fd::AsRawFd;
 #[path = "holding_foundation213_maintenance.rs"]
 mod maintenance;
+#[path = "holding_foundation213_restore_self.rs"]
+mod restore_self;
 #[path = "holding_foundation213_retire.rs"]
 mod retirement;
+pub(crate) use restore_self::Context as RestoreContext;
 
 const STATE: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1";
 const PROBE: &str =
@@ -451,11 +454,13 @@ fn metadata_space(minimum: u64, free: u64) -> Result<()> {
     );
     Ok(())
 }
-fn admission(v: &Value, custody_binding: &Bound, a: Artifact) -> Result<()> {
+fn admission_scope(v: &Value, custody_binding: &Bound, a: Artifact) -> Result<()> {
+    admission_scope_at(v, custody_binding, a, clock()?)
+}
+fn admission_scope_at(v: &Value, custody_binding: &Bound, a: Artifact, now: u64) -> Result<()> {
     let at = v["recorded_unix_seconds"]
         .as_u64()
         .context("Foundation admission clock")?;
-    let now = clock()?;
     ensure!(
         v["schema"] == "jetstreamer-foundation-holding-restore-admission-v1"
             && v["host"] == review::HOST
@@ -473,14 +478,40 @@ fn admission(v: &Value, custody_binding: &Bound, a: Artifact) -> Result<()> {
         v["metadata_budget"] == metadata_budget(),
         "Foundation admission uses a foreign metadata budget"
     );
-    let current = fleet::foundation_holding_capacity(&v["resource_basis"], 0)?;
-    ensure!(
-        current["minimum_free_bytes"]
-            .as_u64()
-            .zip(v["capacity"]["minimum_free_bytes"].as_u64())
-            .is_some_and(|(new, old)| new <= old),
-        "Foundation protected growth/floors increased after admission"
-    );
+    Ok(())
+}
+fn admission(v: &Value, custody_binding: &Bound, a: Artifact) -> Result<()> {
+    admission_with_context(v, custody_binding, a, None)
+}
+fn admission_with_context(
+    v: &Value,
+    custody_binding: &Bound,
+    a: Artifact,
+    context: Option<&RestoreContext<'_>>,
+) -> Result<()> {
+    if let Some(context) = context {
+        admission_scope_at(v, custody_binding, a, context.entry_clock())?;
+    } else {
+        admission_scope(v, custody_binding, a)?;
+    }
+    let current = if let Some(context) = context {
+        fleet::foundation_holding_capacity_with_restore(&v["resource_basis"], 0, context)?
+    } else {
+        fleet::foundation_holding_capacity(&v["resource_basis"], 0)?
+    };
+    let minimum = current["minimum_free_bytes"]
+        .as_u64()
+        .context("current Foundation protected floor")?;
+    if let Some(context) = context {
+        context.complete_capacity_check(minimum)?;
+    } else {
+        ensure!(
+            v["capacity"]["minimum_free_bytes"]
+                .as_u64()
+                .is_some_and(|old| minimum <= old),
+            "Foundation protected growth/floors increased after admission"
+        );
+    }
     Ok(())
 }
 fn admit(p: &AdmitSpec, spec: &Bound) -> Result<()> {
@@ -571,13 +602,14 @@ fn preserve_segment(c: &Value, a: Artifact) -> Result<Option<PathBuf>> {
     Ok(Some(path))
 }
 async fn restore(client: &Client, p: &RestoreSpec, spec: &Bound) -> Result<()> {
-    restore_with_mode(client, p, spec, false).await
+    restore_with_mode(client, p, spec, false, None).await
 }
 async fn restore_with_mode(
     client: &Client,
     p: &RestoreSpec,
     spec: &Bound,
     resumable: bool,
+    context: Option<&RestoreContext<'_>>,
 ) -> Result<()> {
     ensure!(
         p.schema
@@ -588,6 +620,10 @@ async fn restore_with_mode(
             },
         "foreign Foundation restore plan"
     );
+    ensure!(
+        resumable == context.is_some(),
+        "only the typed actual resumable restoration has self-accounting"
+    );
     mapping_binding(&p.mapping)?;
     let c = receipt_bound(&p.custody)?;
     let a = custody(&c)?;
@@ -596,7 +632,7 @@ async fn restore_with_mode(
         "resumable path is closed to the exact Foundation213 prefix"
     );
     let admitted = receipt_bound(&p.admission)?;
-    admission(&admitted, &p.custody, a)?;
+    admission_with_context(&admitted, &p.custody, a, context)?;
     let expected_owner = owner()?;
     ensure!(
         get_mutable_object(client, BUCKET, &format!("{}owner.json", review::PREFIX))
@@ -636,16 +672,24 @@ async fn restore_with_mode(
         minimum: write_floor(minimum)?,
     };
     let (destination, resume_proof) = if resumable {
-        let (path, proof) =
-            resumable213::restore(client, target, || admission(&admitted, &p.custody, a)).await?;
+        let (path, proof) = resumable213::restore(client, target, || {
+            admission_with_context(&admitted, &p.custody, a, context)
+        })
+        .await?;
         (path, Some(proof))
     } else {
         (
-            restore_blob(client, target, || admission(&admitted, &p.custody, a)).await?,
+            restore_blob(client, target, || {
+                admission_with_context(&admitted, &p.custody, a, context)
+            })
+            .await?,
             None,
         )
     };
-    metadata_space(minimum, available(Path::new(STATE))?)?;
+    metadata_space(
+        context.map_or(minimum, |c| c.protected_floor()),
+        available(Path::new(STATE))?,
+    )?;
     let segment = preserve_segment(&c, a)?;
     let proof = hash_and_etag(
         &destination,
@@ -661,7 +705,7 @@ async fn restore_with_mode(
         .context("Foundation object disappeared")?;
     remote_matches(&current, &artifact_key, a.length(), a.sha(), Some(etag))?;
     native_checksum(&current, &proof, a.length())?;
-    admission(&admitted, &p.custody, a)?;
+    admission_with_context(&admitted, &p.custody, a, context)?;
     let mut receipt = json!({"schema":if resumable {"jetstreamer-foundation-holding-resumable-restore-v1"} else {"jetstreamer-foundation-holding-restore-v1"},"host":review::HOST,"prefix":review::PREFIX,
         "mapping":p.mapping,"artifact":a,"custody":p.custody,"admission":p.admission,"spec":spec,"sha256":a.sha(),"length":a.length(),
         "object_key":artifact_key,"object_etag":etag,"destination":destination,"raw_segment_destination":segment,"original_file_metadata":c["manifest"],
@@ -673,16 +717,25 @@ async fn restore_with_mode(
         receipt["independent_local_sha256_verified"] = json!(true);
         receipt["conditional_remote_identity_revalidated"] = json!(true);
     }
+    if let Some(context) = context {
+        receipt["self_maintenance_restore_accounting"] = context.evidence();
+    }
     no_authority(&receipt)?;
     let path = Path::new(STATE)
         .join("receipts")
         .join(format!("restore-{}.json", spec.sha256));
-    metadata_space(minimum, available(Path::new(STATE))?)?;
+    metadata_space(
+        context.map_or(minimum, |c| c.protected_floor()),
+        available(Path::new(STATE))?,
+    )?;
     durable_receipt(&path, &receipt)?;
     ensure!(
-        available(Path::new(STATE))? >= minimum,
+        available(Path::new(STATE))? >= context.map_or(minimum, |c| c.protected_floor()),
         "Foundation metadata consumed protected free space"
     );
+    if let Some(context) = context {
+        context.revalidate()?;
+    }
     println!("{}", path.display());
     Ok(())
 }
@@ -722,6 +775,15 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     if action == "holding-foundation213-maintenance-finalize" {
         return maintenance::finalize(v, spec);
     }
+    if action == "holding-foundation213-restore-resumable" {
+        let plan: RestoreSpec = serde_json::from_value(v)?;
+        let context = RestoreContext::begin(action, &plan, spec, &lock)?;
+        let r2 = r2_config_from_env()?;
+        ensure!(r2.bucket == BUCKET, "foreign Foundation bucket");
+        let client = s3_client(&r2);
+        restore_with_mode(&client, &plan, spec, true, Some(&context)).await?;
+        return Ok(());
+    }
     let r2 = r2_config_from_env()?;
     ensure!(r2.bucket == BUCKET, "foreign Foundation bucket");
     let client = s3_client(&r2);
@@ -729,9 +791,6 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
         "holding-foundation213-park" => park(&client, &serde_json::from_value(v)?, spec).await,
         "holding-foundation213-restore" => {
             restore(&client, &serde_json::from_value(v)?, spec).await
-        }
-        "holding-foundation213-restore-resumable" => {
-            restore_with_mode(&client, &serde_json::from_value(v)?, spec, true).await
         }
         "holding-foundation213-retire" => retirement::run(&client, v, spec).await,
         "holding-foundation213-maintain" => maintenance::run(&client, v, spec).await,
@@ -764,11 +823,9 @@ mod tests {
     }
     #[test]
     fn only_two_exact_public_artifacts_and_the_user_namespace_are_addressable() {
-        assert!(
-            key(review::SOURCE_SHA)
-                .unwrap()
-                .starts_with("foundation_node_01/objects/")
-        );
+        assert!(key(review::SOURCE_SHA)
+            .unwrap()
+            .starts_with("foundation_node_01/objects/"));
         assert!(key(PROBE_SHA).unwrap().ends_with(".blob"));
         assert!(key("953e8c9efbdfc0dc49e4f066d30046e3b44e1a13e065b340a5bcc7b093632261").is_err());
         assert!(key("../epoch-213.jet").is_err());

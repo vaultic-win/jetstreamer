@@ -1,0 +1,416 @@
+[
+  {
+    "owner": {
+      "Id": "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+      "InvocationID": "4cd76ae1353a4411885b997f04306402",
+      "MainPID": "2637480",
+      "ControlGroup": "/system.slice/horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service"
+    },
+    "binding": {
+      "path": "/var/lib/jetstreamer/horizon-ownroot225-rebased-guard-receipts-v1/sample-26c8a88c852747a1a5135ade57628b0f.json",
+      "sha256": "c15dd44c6d68fcf0cfb7f21ea8d7d87b1f6fb03a52765e6df1bceecc8a331a8c"
+    },
+    "receipt": {
+      "available_bytes": 2079170424832,
+      "bounded_canary": null,
+      "bounded_measurement": false,
+      "canary_target_error": null,
+      "canary_target_stop_valid": false,
+      "guard_invocation_id": "26c8a88c852747a1a5135ade57628b0f",
+      "guard_sha256": "cc3536dfcc268c913feccf1603a25e3cdbdf2807289c9061e04884027d1b1560",
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 317008659347,
+      "plan": "/var/lib/jetstreamer/horizon-ownroot203-rebase-plans-v1/guard-225.json",
+      "plan_sha256": "831f3eae5d4326d04ae399b4046532cda5cceb32e8e3f89b87a1de0b299a3d22",
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+        "delegated": false,
+        "invocation_id": "4cd76ae1353a4411885b997f04306402",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 2637480,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "producer_invocation_id": "4cd76ae1353a4411885b997f04306402",
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1792850304,
+      "remote_mutations": false,
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "scratch_deleted": false,
+      "target_handoff": null,
+      "target_handoff_error": null,
+      "trip_reason": null,
+      "worker_observation_error": null,
+      "workers": [
+        [
+          2637512,
+          414071
+        ]
+      ]
+    },
+    "plan": {
+      "filesystem": "/",
+      "invocation_id": "4cd76ae1353a4411885b997f04306402",
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 317008659347,
+      "receipt_directory": "/var/lib/jetstreamer/horizon-ownroot225-rebased-guard-receipts-v1",
+      "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+      "unit": "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+      "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1"
+    }
+  },
+  {
+    "owner": {
+      "Id": "horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service",
+      "InvocationID": "373359a11aef4993a1a949e19ff617c3",
+      "MainPID": "3730044",
+      "ControlGroup": "/system.slice/horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service"
+    },
+    "binding": {
+      "path": "/var/lib/jetstreamer/horizon-prefix205-guard-receipts-v1/sample-324b9bdc530c48c8935ef052c9cca575.json",
+      "sha256": "b885341300cd79e6db2a406318ddbefb502fcaf475b972cc29b05fbc2d22f21d"
+    },
+    "receipt": {
+      "available_bytes": 2079157743616,
+      "bounded_canary": null,
+      "bounded_measurement": false,
+      "canary_target_error": null,
+      "canary_target_stop_valid": false,
+      "guard_invocation_id": "324b9bdc530c48c8935ef052c9cca575",
+      "guard_sha256": "134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be",
+      "maximum_root_physical_bytes": 300000000000,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 1210361856915,
+      "plan": "/var/lib/jetstreamer/horizon-prefix205-guard-plan-5c01bf93-v1/guard-plan.json",
+      "plan_sha256": "2b639357a4754b914ad9f4af949fb7c38085a37b9cac7aa0b2c519950ee963e7",
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service",
+        "delegated": false,
+        "invocation_id": "373359a11aef4993a1a949e19ff617c3",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 3730044,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "producer_invocation_id": "373359a11aef4993a1a949e19ff617c3",
+      "producer_stop_enabled": true,
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1792850304,
+      "remote_mutations": false,
+      "root_physical_observation": {
+        "conservative_physical_bytes": 188759040000,
+        "exceeds_budget": false,
+        "first": {
+          "directories": 15,
+          "entries": 305465,
+          "physical_bytes": 188759040000,
+          "symlinks": 0,
+          "vanished_entries": 1
+        },
+        "maximum_physical_bytes": 300000000000,
+        "second": {
+          "directories": 15,
+          "entries": 305463,
+          "physical_bytes": 188709457920,
+          "symlinks": 0,
+          "vanished_entries": 0
+        }
+      },
+      "root_physical_observation_error": null,
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "scratch_deleted": false,
+      "target_handoff": null,
+      "target_handoff_error": null,
+      "trip_reason": null,
+      "worker_observation_error": null,
+      "workers": [
+        [
+          3730090,
+          305994
+        ]
+      ]
+    },
+    "plan": {
+      "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+      "filesystem": "/",
+      "unit": "horizon-qualify-205-shrink-root-prefix-resource-5c01bf93-v1.service",
+      "invocation_id": "373359a11aef4993a1a949e19ff617c3",
+      "worker_root": "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-205-5c01bf93-v1/scratch",
+      "maximum_root_physical_bytes": 300000000000,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 1210361856915,
+      "receipt_directory": "/var/lib/jetstreamer/horizon-prefix205-guard-receipts-v1"
+    }
+  },
+  {
+    "owner": {
+      "Id": "horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service",
+      "InvocationID": "448da7f2a3a34217afe7e115120b3cea",
+      "MainPID": "3822861",
+      "ControlGroup": "/system.slice/horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service"
+    },
+    "binding": {
+      "path": "/var/lib/jetstreamer/horizon-prefix204-guard-receipts-v1/sample-d3330061e23a483ba3443b04e5120a81.json",
+      "sha256": "e719a1d5c152aa3c601f0ffd305ec8f9ff92d9dbd25e1700f128cc62c983442f"
+    },
+    "receipt": {
+      "available_bytes": 2079157743616,
+      "bounded_canary": null,
+      "bounded_measurement": false,
+      "canary_target_error": null,
+      "canary_target_stop_valid": false,
+      "guard_invocation_id": "d3330061e23a483ba3443b04e5120a81",
+      "guard_sha256": "134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be",
+      "maximum_root_physical_bytes": 300000000000,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 1372922903443,
+      "plan": "/var/lib/jetstreamer/horizon-prefix204-guard-plan-fcbf3992-v1/guard-plan.json",
+      "plan_sha256": "dfa45f5f8de36fab51fff7a669ceff8e0089bde058bf60be53fcfa7f02a4cd7d",
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service",
+        "delegated": false,
+        "invocation_id": "448da7f2a3a34217afe7e115120b3cea",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 3822861,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "producer_invocation_id": "448da7f2a3a34217afe7e115120b3cea",
+      "producer_stop_enabled": true,
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1792850304,
+      "remote_mutations": false,
+      "root_physical_observation": {
+        "conservative_physical_bytes": 175252242432,
+        "exceeds_budget": false,
+        "first": {
+          "directories": 15,
+          "entries": 298254,
+          "physical_bytes": 175158808576,
+          "symlinks": 0,
+          "vanished_entries": 0
+        },
+        "maximum_physical_bytes": 300000000000,
+        "second": {
+          "directories": 15,
+          "entries": 298256,
+          "physical_bytes": 175252242432,
+          "symlinks": 0,
+          "vanished_entries": 0
+        }
+      },
+      "root_physical_observation_error": null,
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "scratch_deleted": false,
+      "target_handoff": null,
+      "target_handoff_error": null,
+      "trip_reason": null,
+      "worker_observation_error": null,
+      "workers": [
+        [
+          3822902,
+          298764
+        ]
+      ]
+    },
+    "plan": {
+      "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+      "filesystem": "/",
+      "unit": "horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service",
+      "invocation_id": "448da7f2a3a34217afe7e115120b3cea",
+      "worker_root": "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-204-fcbf3992-v1/scratch",
+      "maximum_root_physical_bytes": 300000000000,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 1372922903443,
+      "receipt_directory": "/var/lib/jetstreamer/horizon-prefix204-guard-receipts-v1"
+    }
+  },
+  {
+    "owner": {
+      "Id": "horizon-singleton-209-capped-4aeca563-v1.service",
+      "InvocationID": "1bf0db73ccd44c2c90461889498d4f82",
+      "MainPID": "307346",
+      "ControlGroup": "/system.slice/horizon-singleton-209-capped-4aeca563-v1.service"
+    },
+    "binding": {
+      "path": "/var/lib/jetstreamer/horizon-singleton209-guard-receipts-v1/sample-61f52dcc2e2c47d1b3039a97aeceadd8.json",
+      "sha256": "c886eb59acd41eab41770ee66c17631e5ecb38024722df0580b0c5c62eb6c500"
+    },
+    "receipt": {
+      "available_bytes": 2079233662976,
+      "bounded_canary": null,
+      "bounded_measurement": false,
+      "canary_target_error": null,
+      "canary_target_stop_valid": false,
+      "guard_invocation_id": "61f52dcc2e2c47d1b3039a97aeceadd8",
+      "guard_sha256": "9eb141c40202fb34616b624e2977c8fb9b4e8b30cde151a24db952ebeff919df",
+      "maximum_root_physical_bytes": 471798691840,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 2000000000000,
+      "native_main": null,
+      "plan": "/var/lib/jetstreamer/horizon-full209-guard-plan-1bf0db73-v1/guard-plan.json",
+      "plan_sha256": "ba244db849d9c031cd508c068d43d63569a5a5ab4e7f39e793c35303bdda375e",
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-singleton-209-capped-4aeca563-v1.service",
+        "delegated": false,
+        "invocation_id": "1bf0db73ccd44c2c90461889498d4f82",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 307346,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "producer_invocation_id": "1bf0db73ccd44c2c90461889498d4f82",
+      "producer_stop_enabled": true,
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1792850241,
+      "remote_mutations": false,
+      "root_physical_observation": {
+        "conservative_physical_bytes": 170581151744,
+        "exceeds_budget": false,
+        "first": {
+          "directories": 32,
+          "entries": 394908,
+          "physical_bytes": 170581151744,
+          "symlinks": 0,
+          "vanished_entries": 0
+        },
+        "maximum_physical_bytes": 471798691840,
+        "second": {
+          "directories": 32,
+          "entries": 394907,
+          "physical_bytes": 170552344576,
+          "symlinks": 0,
+          "vanished_entries": 0
+        }
+      },
+      "root_physical_observation_error": null,
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "scratch_deleted": false,
+      "target_handoff": null,
+      "target_handoff_error": null,
+      "trip_reason": null,
+      "worker_observation_error": null,
+      "workers": [
+        [
+          307629,
+          395930
+        ]
+      ]
+    },
+    "plan": {
+      "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+      "unit": "horizon-singleton-209-capped-4aeca563-v1.service",
+      "invocation_id": "1bf0db73ccd44c2c90461889498d4f82",
+      "filesystem": "/",
+      "minimum_free_bytes": 2000000000000,
+      "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1",
+      "maximum_worker_vmas": 3500000,
+      "maximum_root_physical_bytes": 471798691840,
+      "receipt_directory": "/var/lib/jetstreamer/horizon-singleton209-guard-receipts-v1"
+    }
+  },
+  {
+    "owner": {
+      "Id": "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+      "InvocationID": "e70aaf097e7c4583b216aba454145910",
+      "MainPID": "386102",
+      "ControlGroup": "/system.slice/horizon-qualify-223-v1620-root-prefix-resource-full-v1.service"
+    },
+    "binding": {
+      "path": "/var/lib/jetstreamer/horizon-native223-prefix-guard-receipts-v1/sample-f41124461c884ad9b088611c25adddf0.json",
+      "sha256": "17d12334756c3524dcc0e1aed95983f0876ad60860d1ba3a9cdc25be1a33ea10"
+    },
+    "receipt": {
+      "available_bytes": 2079157743616,
+      "bounded_canary": null,
+      "bounded_measurement": false,
+      "canary_target_error": null,
+      "canary_target_stop_valid": false,
+      "guard_invocation_id": "f41124461c884ad9b088611c25adddf0",
+      "guard_sha256": "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f",
+      "maximum_root_physical_bytes": 471798691840,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 2000000000000,
+      "native_main": null,
+      "plan": "/var/lib/jetstreamer/horizon-native223-prefix-guard-actual-v1/guard-plan.json",
+      "plan_sha256": "03021fe17498a242a99ee9a73a8a8ad8f47260c8189921d0b092370edbee4766",
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+        "delegated": false,
+        "invocation_id": "e70aaf097e7c4583b216aba454145910",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 386102,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "producer_invocation_id": "e70aaf097e7c4583b216aba454145910",
+      "producer_stop_enabled": true,
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1792850304,
+      "remote_mutations": false,
+      "root_physical_observation": {
+        "conservative_physical_bytes": 141146578944,
+        "exceeds_budget": false,
+        "first": {
+          "directories": 29,
+          "entries": 407020,
+          "physical_bytes": 141113217024,
+          "symlinks": 0,
+          "vanished_entries": 0
+        },
+        "maximum_physical_bytes": 471798691840,
+        "second": {
+          "directories": 29,
+          "entries": 407020,
+          "physical_bytes": 141146578944,
+          "symlinks": 0,
+          "vanished_entries": 0
+        }
+      },
+      "root_physical_observation_error": null,
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "scratch_deleted": false,
+      "target_handoff": null,
+      "target_handoff_error": null,
+      "trip_reason": null,
+      "worker_observation_error": null,
+      "workers": [
+        [
+          386181,
+          408012
+        ]
+      ]
+    },
+    "plan": {
+      "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+      "unit": "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+      "invocation_id": "e70aaf097e7c4583b216aba454145910",
+      "filesystem": "/",
+      "minimum_free_bytes": 2000000000000,
+      "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1",
+      "maximum_root_physical_bytes": 471798691840,
+      "maximum_worker_vmas": 3500000,
+      "receipt_directory": "/var/lib/jetstreamer/horizon-native223-prefix-guard-receipts-v1"
+    }
+  }
+]

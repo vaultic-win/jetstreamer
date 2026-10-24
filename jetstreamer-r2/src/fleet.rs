@@ -299,6 +299,13 @@ pub(super) fn admit_native210_input() -> Result<()> {
 pub(super) fn foundation_holding_capacity(spec: &Value, additional_bytes: u64) -> Result<Value> {
     foundation_holding_capacity::check(spec, additional_bytes)
 }
+pub(super) fn foundation_holding_capacity_with_restore(
+    spec: &Value,
+    additional_bytes: u64,
+    context: &crate::holding::Foundation213RestoreContext<'_>,
+) -> Result<Value> {
+    foundation_holding_capacity::check_with_restore(spec, additional_bytes, context)
+}
 pub(super) fn capture_native210_input() -> Result<()> {
     native210_capture::run()
 }

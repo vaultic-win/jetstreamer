@@ -9,6 +9,7 @@ mod epoch136;
 mod foundation213;
 #[path = "holding_resumable213.rs"]
 mod resumable213;
+pub(crate) use foundation213::RestoreContext as Foundation213RestoreContext;
 
 const HOST: &str = "dev-samjohnson";
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";
