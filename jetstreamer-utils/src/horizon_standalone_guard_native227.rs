@@ -36,6 +36,15 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
                 "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test",
             )
         && n.sha256 == "5276276827aab0ccc809d123ebc8bf78cc7bfc36e6def550566059e70a8d4842";
+    let profile210 = cfg!(feature = "epoch210-native-main-guard")
+        && p.unit == "archive-210-v1616-native-input-actual-v1.service"
+        && p.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1")
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
+            )
+        && n.sha256 == "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6";
     let profile228 = cfg!(feature = "epoch228-native-main-guard")
         && p.unit == "horizon-native-input-228-capped-1bfa8d51-v1.service"
         && p.worker_root
@@ -46,7 +55,7 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
             )
         && n.sha256 == "d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827";
     ensure!(
-        (profile227 || profile207 || profile209 || profile228)
+        (profile227 || profile207 || profile209 || profile210 || profile228)
             && n.main_pid > 1
             && p.maximum_root_physical_bytes == Some(300_000_000_000)
             && p.maximum_worker_vmas == 3500000
