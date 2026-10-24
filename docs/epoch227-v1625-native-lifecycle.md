@@ -47,9 +47,15 @@ memory and300GB scratch, with8CPU affinity,45-minute bound and no restart.
 It requires each of the four live producers204,205,209,225(shared226) to retain
 its exact observed invocation, original guards and remaining growth. It also
 retains the failed original227 diagnostic/IID/launch/gate/current-manager evidence;
-an unexplained omission or stale active original227 is rejected. Any newly live
-native210 or other unmodeled auxiliary blocks this four-owner admission. The
-parent coordinates launch order and fresh complete evidence.
+an unexplained omission or stale active original227 is rejected.
+The shared `prefix223_live_peer` adapter additionally accepts only the actual
+full-prefix223 invocation `e70aaf097e7c4583b216aba454145910`, with its immutable
+launch, sandbox, same-invocation whole-root allocation and fresh protective guard.
+It reserves the complete remaining disk envelope and exact kernel-rounded hard
+memory growth, including before progress or allocation has begun. No accepted
+owner or failed history is removed; a derived accounting view only feeds the
+unchanged base arithmetic. Native210 and any other unmodeled auxiliary still
+block admission. The parent coordinates launch order and fresh complete evidence.
 
 Central fleet registration adds only the new native claim and its exact metadata
 event. Preserve the original failed227 diagnostic and its launch evidence.
