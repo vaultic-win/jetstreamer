@@ -101,7 +101,7 @@ md-5.workspace = true
 bs58.workspace = true
 lencode.workspace = true
 libc.workspace = true
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["rustls"] }
 serde_cbor.workspace = true
 ripget = "0.1"
 serde = { workspace = true, features = ["derive"] }
