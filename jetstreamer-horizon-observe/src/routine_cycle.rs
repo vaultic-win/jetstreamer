@@ -769,10 +769,11 @@ fn validate_templates(
         .as_str()
         .context("old observer time missing")?;
     let scheduled = scheduled_target(p)?;
-    let qualified_interval =
+    let qualified_interval = cohort191_delivery::interval(p, old_time)?.unwrap_or(
         terminal185::interval(p, old_time)?.unwrap_or(
             original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?),
-        );
+        ),
+    );
     ensure!(
         utc_seconds(scheduled)?.checked_sub(utc_seconds(old_time)?) == Some(qualified_interval),
         "routine target must follow its qualified predecessor interval"
