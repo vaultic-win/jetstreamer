@@ -388,6 +388,18 @@ fn units() -> Result<BTreeMap<String, Value>> {
     }
     Ok(result)
 }
+fn private_ancestor(path: &Path, root: &Path, owner: u32) -> Result<bool> {
+    if !path.starts_with(root) {
+        return Ok(false);
+    }
+    let m = fs::symlink_metadata(root)?;
+    Ok(
+        root.canonicalize()? == root
+            && m.is_dir()
+            && m.uid() == owner
+            && m.mode() & 0o7777 == 0o700,
+    )
+}
 fn staged_file(path: &Path, owner: u32) -> Result<(String, bool)> {
     let link_before = fs::symlink_metadata(path)?;
     if link_before.file_type().is_symlink()
@@ -428,7 +440,13 @@ fn staged_file(path: &Path, owner: u32) -> Result<(String, bool)> {
             && before.len() <= 4 << 20
             && before.nlink() > 0
             && (before.uid() == 0 || before.uid() == owner)
-            && before.mode() & 0o022 == 0,
+            && (before.mode() & 0o022 == 0
+                || (before.nlink() == 1
+                    && private_ancestor(
+                        &real,
+                        Path::new("/home/ubuntu/.jetstreamer-private/systemd-staging"),
+                        owner
+                    )?)),
         "untrusted/oversized staged metadata"
     );
     let mut file = OpenOptions::new()
@@ -823,6 +841,25 @@ mod tests {
         )
         .unwrap();
         assert!(staged(root.path(), owner).unwrap()[&reference.display().to_string()].1);
+    }
+    #[test]
+    fn private_staging_access_requires_exact_owned_canonical0700_ancestor() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let owner = unsafe { libc::geteuid() };
+        fs::set_permissions(root, fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(private_ancestor(&root.join("staged.service"), root, owner).unwrap());
+        assert!(!private_ancestor(Path::new("/elsewhere/staged.service"), root, owner).unwrap());
+        fs::set_permissions(root, fs::Permissions::from_mode(0o770)).unwrap();
+        assert!(!private_ancestor(&root.join("staged.service"), root, owner).unwrap());
+        let link = root.parent().unwrap().join(format!(
+            "{}-alias",
+            root.file_name().unwrap().to_str().unwrap()
+        ));
+        std::os::unix::fs::symlink(root, &link).unwrap();
+        assert!(!private_ancestor(&link.join("staged.service"), &link, owner).unwrap());
+        fs::remove_file(link).unwrap();
     }
     #[test]
     fn plan_cannot_select_another_artifact_or_request_mutation() {
