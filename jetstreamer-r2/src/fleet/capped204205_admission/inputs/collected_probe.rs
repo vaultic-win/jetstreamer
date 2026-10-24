@@ -279,6 +279,8 @@ pub(super) fn validate(
     let capture_tool = bound_member(&cap["capture_tool"])?;
     native209_admission::sealed_file(&capture_tool.path, &capture_tool.sha256, None)?;
     let capture_plan = native209::immutable_json(&bound_member(&cap["capture_plan"])?)?;
+    let expected_output =
+        Path::new(string(probe_plan, "probe_root")?).join("resource-capability.json");
     ensure!(
         capture_plan.as_object().is_some_and(|o| o.len() == 8)
             && capture_plan["schema"] == cap["capture_plan_schema"]
@@ -288,11 +290,9 @@ pub(super) fn validate(
             && capture_plan["terminal_properties"] == cap["terminal_properties"]
             && capture_plan["manager_journal"] == cap["manager_journal"]
             && capture_plan["stdout_ack"] == cap["stdout_ack"]
-            && capture_plan["output"].as_str().map(Path::new)
-                == probe_plan["probe_root"]
-                    .as_str()
-                    .map(|p| Path::new(p).join("resource-capability.json"))
-                    .as_deref(),
+            && capture_plan["output"]
+                .as_str()
+                .is_some_and(|path| Path::new(path) == expected_output),
         "collected capability capture plan changed original identities or output"
     );
     let journal = native209::immutable_json(&bound_member(&cap["manager_journal"])?)?;
