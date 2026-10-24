@@ -617,7 +617,8 @@ pub(super) fn owner_run() -> Result<()> {
     let u = fleet::unit(UNIT)?;
     let iid = env::var("INVOCATION_ID")?;
     ensure!(
-        u["MainPID"] == std::process::id().to_string() && u["InvocationID"] == iid,
+        u["MainPID"].as_str().and_then(|v| v.parse::<u32>().ok()) == Some(std::process::id())
+            && u["InvocationID"] == iid,
         "141 repair job is not its actual PID1 invocation"
     );
     let capture = json!({"schema":"jetstreamer-epoch141-repair-owner-capture-v2","epoch":141,"unit":UNIT,"invocation_id":iid,
@@ -916,6 +917,24 @@ pub(super) async fn publish() -> Result<()> {
             && projection.1["estimate_owner_invocation_id"] == owner["InvocationID"],
         "141 forecast requires a newly reviewed assessment bound to this sample and actual repair owner"
     );
+    let assessment_state = if projection.1["repair_state"].is_object() {
+        let b: Bound = serde_json::from_value(projection.1["repair_state"].clone())?;
+        ensure!(
+            b.path == Path::new(ROOT).join("state.json"),
+            "141 assessment must use the actual current queue state"
+        );
+        let snapshot = read(&b, false)?;
+        ensure!(
+            snapshot["status"] == "managing-repair"
+                && snapshot["invocation_id"] == owner["InvocationID"]
+                && snapshot["checkpoint_beyond_bootstrap_proven"] == false
+                && snapshot["remaining_growth_released"] == false,
+            "141 current assessment cannot assume qualified recovery progress"
+        );
+        Some(b)
+    } else {
+        None
+    };
     let jet = regular_identity(&Path::new(PRIVATE).join("output/private.jet"))?;
     let status = EpochStatus {
         epoch: 141,
@@ -999,6 +1018,9 @@ pub(super) async fn publish() -> Result<()> {
     let (_, _, again) = owner_evidence(&capture, now)?;
     ensure!(again == owner, "141 repair owner changed before PUT");
     no_replacement(&f, &owner)?;
+    if let Some(state) = &assessment_state {
+        read(state, false)?;
+    }
     let (etag, previous) = publish_epoch_status_bound_previous(
         &s3,
         &r2,

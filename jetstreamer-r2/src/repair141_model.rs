@@ -50,8 +50,7 @@ pub fn forecast(rate: &Rate, p: &Policy) -> Result<Forecast, String> {
         p.checkpoint_close_restore_millis,
         p.downstream_millis,
     ]
-    .iter()
-    .any(|n| *n == 0)
+    .contains(&0)
     {
         return Err(
             "141 every unqualified recovery stage needs a positive reviewed allowance".into(),

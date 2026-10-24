@@ -285,6 +285,9 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     Ok(next)
 }
 pub(super) fn fleet_reader(p: &Plan) -> &Bound {
+    if repair141_status::enabled(p) {
+        return qualification141_status::fleet_reader(p);
+    }
     p.cohort191_delivery
         .as_ref()
         .map(|s| &s.publisher)

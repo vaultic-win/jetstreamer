@@ -5,10 +5,15 @@ use super::*;
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {
-    publisher: Bound,
+    pub(super) publisher: Bound,
     delivery_policy: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) active_repair: Option<repair141_status::Profile>,
 }
 pub(super) fn validate(p: &Plan) -> Result<()> {
+    if repair141_status::enabled(p) {
+        return repair141_status::validate(p);
+    }
     let Some(s) = &p.qualification141_status else {
         return Ok(());
     };
@@ -118,7 +123,7 @@ fn publish_with(
                     .join("qualification141-status-incident.json"),
                 &json!({"schema":"jetstreamer-qualification141-status-incident-v2",
                     "epoch":141,"sampled_at_utc":p.sample_target_utc,"observer":observer,
-                    "invocation_id":"e639f007d482464f8a251455659d2ede",
+                    "invocation_id":repair141_status::invocation(p).unwrap_or("e639f007d482464f8a251455659d2ede"),
                     "error":format!("{error:#}"),"status_refresh_succeeded":false,
                     "previous_status_must_not_be_presented_as_current":true,
                     "terminality_established":false,"inactive_cleanup_authorized":false,
@@ -134,6 +139,9 @@ fn publish_with(
     }
 }
 fn publish_current(p: &Plan, prior_pipeline: &Value, observer: &Bound) -> Result<Value> {
+    if repair141_status::enabled(p) {
+        return repair141_status::publish(p, prior_pipeline, observer);
+    }
     let Some(s) = &p.qualification141_status else {
         return Ok(json!({"enabled":false}));
     };
@@ -231,6 +239,9 @@ pub(super) fn completion(p: &Plan, c: &Value) -> Result<()> {
             );
             return Ok(());
         }
+        if repair141_status::enabled(p) {
+            return repair141_status::completion(p, c);
+        }
         let b: Bound = serde_json::from_value(c["qualification141_status"]["publication"].clone())?;
         let r = bound_json(&b, false)?;
         ensure!(
@@ -248,7 +259,8 @@ fn validate_incident(p: &Plan, r: &Value) -> Result<()> {
         r["schema"] == "jetstreamer-qualification141-status-incident-v2"
             && r["epoch"] == 141
             && r["sampled_at_utc"] == p.sample_target_utc
-            && r["invocation_id"] == "e639f007d482464f8a251455659d2ede"
+            && r["invocation_id"]
+                == repair141_status::invocation(p).unwrap_or("e639f007d482464f8a251455659d2ede")
             && r["error"].as_str().is_some_and(|s| !s.trim().is_empty())
             && r["status_refresh_succeeded"] == false
             && r["previous_status_must_not_be_presented_as_current"] == true
@@ -276,6 +288,7 @@ mod tests {
         p.qualification141_status = Some(Profile {
             publisher: dummy.clone(),
             delivery_policy: dummy.clone(),
+            active_repair: None,
         });
         let result = publish_with(
             &p,

@@ -63,6 +63,8 @@ mod private144;
 mod provisional141;
 #[path = "routine_qualification141_status.rs"]
 mod qualification141_status;
+#[path = "routine_repair141_status.rs"]
+mod repair141_status;
 #[path = "routine_original141_terminal.rs"]
 mod terminal141;
 
@@ -301,6 +303,13 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if repair141_status::enabled(p) {
+        return if p.cohort191_delivery.is_some() {
+            "repair141-and-cohort191-four-owner-v1"
+        } else {
+            "repair141-active-owner-v1"
+        };
+    }
     if p.cohort191_delivery.is_some() {
         return "cohort191-terminal-four-owner-delivery-v1";
     }
@@ -1375,6 +1384,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     repair185::derive_fleet(p, &mut fleet)?;
     original141::derive_fleet(p, &mut fleet)?;
     terminal141::derive_fleet(p, &mut fleet)?;
+    repair141_status::derive_fleet(p, &mut fleet)?;
     Ok((model, fleet))
 }
 
@@ -1624,6 +1634,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
     repair185::derive_fleet(p, &mut fleet.clone())?;
     original141::derive_fleet(p, &mut fleet.clone())?;
     terminal141::derive_fleet(p, &mut fleet.clone())?;
+    repair141_status::derive_fleet(p, &mut fleet.clone())?;
     private_dir(p.cycle_directory.parent().context("cycle parent missing")?)?;
     private_dir(
         p.estimate_output
@@ -1936,6 +1947,7 @@ fn main() {
                         args[6].as_str(),
                         "--prepare-next-delivery198"
                             | "--prepare-next-delivery191"
+                            | "--prepare-next-repair141"
                             | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-native141-all-retry"
                             | "--prepare-next-census141-poh"

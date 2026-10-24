@@ -116,3 +116,41 @@ byte readback and a durable normal pipeline status receipt remain mandatory.
 Only `epoch-141.epoch-status.json` may change; this route has no deletion command.
 The source-only implementation must pass package tests and Clippy before sealing,
 then actual launch/observation/fleet checks before any remote mutation.
+
+## Coordinated cadence adoption
+
+The reviewed routine coordinator adds
+`--prepare-next-repair141 HANDOFF --handoff-sha256 SHA` using its normal
+prepare-next argument shape. The immutable handoff schema is
+`jetstreamer-epoch141-repair-routine-handoff-v2`, with `publisher` bound to the
+same newly sealed native r2 program, `active_repair:{queue_plan,owner_capture,
+planning_policy,invocation_id}`, and explicit false `replay_launch_authorized`,
+`publication_authorized`, `r2_mutations`. This requires an actual queue capture;
+there are no future or fabricated IIDs. It preserves the existing historical
+original141 profile and diagnostic input, leaves ordinary replay publisher pins
+unchanged and disables the old141 replay-status hook by selecting active repair.
+The coordinator must be sealed from this combined source, not an older helper.
+
+The new successor uses a distinct repair141 namespace, preserves the current
+observer configuration and single scheduled sample, injects only the real141
+repair pipeline claim and tracked unit, and keeps its failed-needs-repair gate.
+Both provisional and final fleet reads use the new repair-capable reader, including
+when the191 delivery profile is also present. No healthy producer is restarted.
+Parent must replace the previously prepared coordinator/timer through the normal
+single-successor lifecycle; preparing a second package alone does not remove the
+old scheduled owner. The first sample must be at or after actual queue start.
+
+Each accepted sample fingerprints the current queue state, checks the unchanged
+unqualified checkpoint/growth facts, and recalculates a definite full cold recovery
+projection from the measured rate and reviewed remaining stage allowances. A task
+returning exit0 does not count as export/restore, checkpoint or resource admission
+qualification. Until a qualified milestone exists, retain its full positive
+allowance and explain that lack of credit in private assessment evidence. This can
+move the landing time later when progress remains unqualified; never silently
+count down an old root ETA. Revise the reviewed planning policy for measured
+engineering overruns, new throughput or qualified milestone evidence, and hand off
+to a supported next-phase publisher when real recovery/replay begins.
+Publication failure records a same-sample incident under the actual repair IID,
+keeps the repair open and does not suppress other epochs, final fleet or the one
+successor cadence. Completion validates the authenticated verification-phase
+receipt and exact owner. No extra resource observer is introduced.

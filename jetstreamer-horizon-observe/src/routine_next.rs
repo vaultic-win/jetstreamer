@@ -536,6 +536,15 @@ pub(super) fn prepare(
         validate_templates(&next, &model, &fleet_plan, &fleet, &estimates, &observer)?;
         publication144::derive_fleet(&next, &mut fleet_plan.clone())?;
     }
+    if mode == "--prepare-next-repair141" {
+        repair141_status::enable(
+            &mut next,
+            handoff_spec.context("repair141 cadence handoff required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+        validate_observer_config(&next, &effective, &next_config)?;
+        repair141_status::derive_fleet(&next, &mut fleet_plan.clone())?;
+    }
     if mode == "--prepare-next-original141" {
         original141::enable(
             &mut next,
