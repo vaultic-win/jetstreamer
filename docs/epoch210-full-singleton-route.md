@@ -108,3 +108,28 @@ checkpoint or full-replay success. The typed inactive cleanup adapter requires
 that accepted event plus the unchanged current execution, then delegates the
 normal exact-owner conditional status deletion. No generic empty-IID or census
 checks are relaxed.
+
+## Source qualification result
+
+At source `b456559b`, the complete R2 small-feature suite passed665 tests with
+48 host-specific tests ignored; strict production Clippy and release build
+passed. The exact210 guard feature and compatibility209 guard feature each
+passed34 tests, with strict210 guard Clippy/release also passing. Independent
+review identified the original guard-profile and cleared-IID cleanup gaps;
+both were corrected before this final qualification.
+
+Review copies are in
+`/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/full210-candidate-artifacts-v1/`:
+
+- `jetstreamer-r2`: SHA256
+  `86693cddd7e5e6f272467ba8a7e33565d5efe0d444a7e943125033a63d7b155b`.
+- `jetstreamer-horizon-standalone-guard`: SHA256
+  `910cdfe2a1adb5f50c5223464a1c9a690dc48a44d6251374b1ab744faec28c9f`.
+
+These copies are source/build evidence, not root-sealed deployments. No210 job,
+guard fire, resource observation, R2 mutation, snapshot restoration or Bank
+rerun was performed. Root still owns exact deployment sealing, actual sandbox
+qualification and fresh complete admission before any start. The shared
+capacity dependency is the qualified223 `f28d4be4` API; later coordinated223
+memory-rounding/validator changes must be integrated as a pair rather than
+silently changing only this helper's arithmetic.
