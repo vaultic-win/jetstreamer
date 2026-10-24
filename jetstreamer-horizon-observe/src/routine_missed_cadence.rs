@@ -84,6 +84,13 @@ fn load(proof_bound: &Bound) -> Result<(Proof, Plan, Value, Value)> {
     bound_bytes(&proof.observer_config, true)?;
     Ok((proof, previous, completion, config))
 }
+pub(super) fn active(p: &Plan) -> Result<bool> {
+    let Some(binding) = &p.missed_cadence else {
+        return Ok(false);
+    };
+    let (_, previous, _, _) = load(binding)?;
+    Ok(interval(p, &previous.sample_target_utc)?.is_some())
+}
 pub(super) fn interval(p: &Plan, old_time: &str) -> Result<Option<u64>> {
     let Some(binding) = &p.missed_cadence else {
         return Ok(None);

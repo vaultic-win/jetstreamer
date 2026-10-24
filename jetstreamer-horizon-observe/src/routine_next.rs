@@ -124,7 +124,8 @@ pub(super) fn derive_next(
                 && ((p.epoch198_delivery.is_none() && p.observer_config.path == legacy_config)
                     || p.observer_config.path == prepared_config
                     || terminal141::matches(p)
-                    || provisional141::candidate(p)),
+                    || provisional141::candidate(p)
+                    || missed_cadence::active(p)?),
             "101observer/config is outside its exact manual or prepared namespace"
         );
         (
@@ -187,6 +188,7 @@ pub(super) fn derive_next(
     next_config["output"] = json!(next_observer);
     let observer_sha = sha(&encoded(&next_config)?);
     let mut next: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    next.missed_cadence = None;
     cohort191_native_recovery::successor(p, c, &mut next)?;
     next.cohort191_raw0546 = None;
     next.sample_target_utc = next_time;
