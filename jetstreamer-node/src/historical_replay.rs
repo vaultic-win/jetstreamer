@@ -337,8 +337,15 @@ impl HistoricalReplay {
                 live_start_slot,
             )
         });
+        if cfg!(feature = "epoch227-v1-6-25-diagnostic")
+            && diagnostic_warmup_target != Some(98_091_122)
+        {
+            return Err(
+                "bounded227 requires its exact worker, bootstrap and live-start scope".into(),
+            );
+        }
         if diagnostic_warmup_target.is_some() && !client.supports_entry_batches() {
-            return Err("bounded epoch223 warmup requires the approved batched worker".into());
+            return Err("bounded diagnostic requires the approved batched worker".into());
         }
         if diagnostic_warmup_target
             .is_some_and(|target| !bounded_diagnostic_checkpoints(target, &checkpoint_slots))

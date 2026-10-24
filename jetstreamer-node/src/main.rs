@@ -11844,6 +11844,8 @@ async fn run_geyser_replay(
     checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
     epoch223_tail_mode: epoch223_qualification::TailMode,
 ) -> Result<ReplayRunOutcome, String> {
+    let comparison227_preflight =
+        epoch223_tail_mode == epoch223_qualification::TailMode::Epoch227PlanningPreflight;
     let prefix_preflight =
         epoch223_tail_mode == epoch223_qualification::TailMode::PrefixPlanningPreflight;
     let tail_comparison = matches!(
@@ -11882,6 +11884,26 @@ async fn run_geyser_replay(
             epoch223_tail_mode == epoch223_qualification::TailMode::PlanningPreflight,
             focused,
             ledger_dir,
+        )?;
+    }
+    if comparison227_preflight {
+        if !cfg!(feature = "epoch227-v1-6-25-diagnostic")
+            || carried_state.is_some()
+            || audited_cohort_bootstrap.is_some()
+            || verification_end_inclusive.is_some()
+            || handoff_export_directory.is_some()
+            || retain_runtime_state
+            || checkpoint_restart.is_some()
+        {
+            return Err("227 comparison preflight cannot borrow cohort, carried, handoff or recovery authority".into());
+        }
+        epoch227_diagnostic::validate_launch(
+            epoch,
+            epoch,
+            qualification.map(|p| (p.bootstrap_slot, p.end_inclusive)),
+            false,
+            false,
+            Some((ledger_dir, &horizon_output, replay_scratch_dir)),
         )?;
     }
     #[cfg(feature = "epoch141-original-entry-qualification")]
@@ -12106,6 +12128,20 @@ async fn run_geyser_replay(
         end_inclusive.saturating_add(1),
     );
 
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic") {
+        historical_worker_profile(runtime_descriptor)?;
+        let executable = configured_historical_worker_executable(runtime_descriptor)?;
+        let digest =
+            historical::measure_executable_sha256(&executable).map_err(|e| e.to_string())?;
+        epoch227_diagnostic::validate_worker_sha(digest)?;
+        if comparison227_preflight {
+            let plan = qualification.ok_or("227 comparison requires exact qualification")?;
+            let mut report = epoch227_diagnostic::planning_report(plan, &execution);
+            report["worker_profile_validated"] = serde_json::json!(true);
+            report["worker_executable"] = serde_json::json!(executable);
+            return Ok(ReplayRunOutcome::PlanningPreflight(report));
+        }
+    }
     // The real execution and planning-only paths share every no-worker gate
     // above, including candidate checkpoint policy. Never return earlier in
     // top-level CLI planning: that hid the second gate in the failed v2 launch.
@@ -19549,6 +19585,7 @@ async fn main() {
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
     let mut epoch223_prefix_preflight = false;
+    let mut epoch227_comparison_preflight = false;
     // Internal flags set by the range supervisor when spawning per-epoch
     // children: pre-fetched snapshot hashes (so the child never touches
     // gcloud) and the overall range for the child's overall-progress line.
@@ -19570,7 +19607,16 @@ async fn main() {
     let mut continuation_plan: Option<PathBuf> = None;
     let mut continuation_plan_sha256: Option<String> = None;
     for arg in args {
-        if arg == "--epoch223-tail-comparison"
+        if arg == "--epoch227-comparison-preflight" {
+            if !cfg!(feature = "epoch227-v1-6-25-diagnostic")
+                || std::mem::replace(&mut epoch227_comparison_preflight, true)
+            {
+                eprintln!(
+                    "epoch227 planning flag requires its exclusive private build and cannot repeat"
+                );
+                exit(2);
+            }
+        } else if arg == "--epoch223-tail-comparison"
             || arg == "--epoch223-tail-preflight"
             || arg == "--epoch223-prefix-preflight"
         {
@@ -21728,7 +21774,9 @@ async fn main() {
                 .map(Path::new),
             epoch < end_epoch,
             None,
-            if epoch223_prefix_preflight {
+            if epoch227_comparison_preflight {
+                epoch223_qualification::TailMode::Epoch227PlanningPreflight
+            } else if epoch223_prefix_preflight {
                 epoch223_qualification::TailMode::PrefixPlanningPreflight
             } else if epoch223_tail_preflight {
                 epoch223_qualification::TailMode::PlanningPreflight

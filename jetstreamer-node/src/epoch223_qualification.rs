@@ -221,6 +221,7 @@ pub(crate) enum TailMode {
     Comparison,
     PlanningPreflight,
     PrefixPlanningPreflight,
+    Epoch227PlanningPreflight,
 }
 
 pub(crate) fn validate_prefix_preflight(

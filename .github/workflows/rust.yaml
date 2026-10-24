@@ -122,6 +122,10 @@ jobs:
             scope: "-p jetstreamer-node"
             flags: "--features epoch224-v1-6-25-qualification"
             examples: false
+          - name: node-epoch227-comparison
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch227-v1-6-25-diagnostic"
+            examples: false
           - name: node-epoch225-comparison
             scope: "-p jetstreamer-node"
             flags: "--features epoch225-v1-6-25-diagnostic"

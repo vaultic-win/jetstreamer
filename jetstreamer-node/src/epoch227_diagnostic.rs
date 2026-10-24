@@ -49,6 +49,38 @@ pub(crate) fn validate_launch(
     Ok(())
 }
 
+pub(crate) fn validate_worker_sha(sha: [u8; 32]) -> Result<(), String> {
+    const EXPECTED: [u8; 32] = [
+        0xd0, 0x1a, 0xdb, 0x19, 0x80, 0xee, 0x52, 0xa5, 0x9a, 0x7a, 0xff, 0x7a, 0x3a, 0x04, 0x96,
+        0x74, 0x6c, 0xa3, 0x25, 0xe5, 0xfc, 0x65, 0x58, 0x17, 0xd9, 0xa7, 0x74, 0x3a, 0x19, 0x13,
+        0xef, 0x62,
+    ];
+    if sha == EXPECTED {
+        Ok(())
+    } else {
+        Err("227 comparison requires its exact immutable entry-bounded v1.6.25 worker".into())
+    }
+}
+pub(crate) fn planning_report(
+    plan: crate::QualificationPlan,
+    selection: &crate::compatibility::RuntimeSelection,
+) -> serde_json::Value {
+    let worker = selection
+        .descriptor
+        .worker
+        .as_ref()
+        .expect("227 historical profile validated");
+    serde_json::json!({"schema":"jetstreamer-private-epoch227-comparison-planning-preflight-v1","epoch":227,
+        "bootstrap_slot":plan.bootstrap_slot,"terminal_slot":plan.end_inclusive,"controlled_target_slot":CONTROLLED_TARGET,
+        "worker_entry_start":BOOTSTRAP+1,"worker_entry_end_exclusive":CONTROLLED_TARGET+1,
+        "canonical_checkpoint_slots":[BOOTSTRAP,TERMINAL_ROOT],"controlled_target_is_checkpoint":false,
+        "runtime_profile":selection.descriptor.identity.name,"runtime_revision":selection.descriptor.identity.revision,
+        "worker_identity":worker.identity,"worker_environment_override":worker.environment_override,
+        "runtime_checkpoint_policy_validated":true,"pre_worker_barrier_reached":true,
+        "worker_spawned":false,"archive_created":false,"replay_launch_authorized":false,"runtime_promotion_authorized":false,
+        "canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false})
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,6 +92,22 @@ mod tests {
             ),
             Path::new("/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test/scratch"),
         ))
+    }
+    #[test]
+    fn only_the_sealed_entry_bounded_worker_can_reach_the_pre_worker_barrier() {
+        let parse = |s: &str| {
+            std::array::from_fn(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
+        };
+        validate_worker_sha(parse(
+            "d01adb1980ee52a59a7aff7a3a0496746ca325e5fc655817d9a7743a1913ef62",
+        ))
+        .unwrap();
+        for other in [
+            "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a",
+            "710f6523d15b960f79d91935d18d581a341e04e649df26ccd0a2b31ae9bc3eeb",
+        ] {
+            assert!(validate_worker_sha(parse(other)).is_err());
+        }
     }
     #[test]
     fn exact_underlying_checkpoint_and_private_paths_are_required() {
