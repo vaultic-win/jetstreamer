@@ -78,12 +78,26 @@ Restart=no, zero restarts,24h RuntimeMax,64GiB MemoryMax,48GiB MemoryHigh,
 swap0, CPU400%, Tasks512, UMask0077, PrivateNetwork=yes,
 ProtectHome=read-only, ProtectSystem=strict, NoNewPrivileges=yes and exactly
 the fixed output root writable. Root's unit must retain only the traversal
-capability needed to read the existing user-private inputs; never relax them.
-If an original transient source unit has been fully unloaded, this generation
-refuses that ambiguous current-state observation. A separately qualified exact
-manager-absence/no-live-source-owner adapter is required before launch in that
-case; historical success alone is not current absence evidence. Do not relaunch
-an old producer, invent its current fields or weaken the gate to work around it.
+capabilities needed to traverse private inputs and perform the complete
+read-only process-reference census: exactly cap_dac_override and cap_sys_ptrace
+in both bounding and ambient sets. Never relax the private inputs. The earlier
+sealed20e tool remains unchanged; this new source requires separate qualification
+and sealing before any operational use.
+
+The shared `jetstreamer-horizon-observe::source_idle223` component now supplies
+the source-idle check directly to the assembler and can also be called by its
+resource-admission adapter. It adds no independent gate service or poll loop.
+For each exact prefix/tail unit, successful complete loaded-unit and pending-job
+censuses bracket a full archive-reference scan and exact cgroup emptiness checks.
+A loaded unit must retain its original invocation (or a legitimately empty
+terminal invocation field), success/0, zero restarts, no PID/job and inactive/dead
+state. An unloaded unit needs two positive complete-manager absence observations,
+no queued job, an absent/unpopulated exact cgroup and no command/map/link/descriptor
+reference to its archive. Failed/partial queries, contradictory presence, changed
+manager identity, populated descendants and permission failures refuse the check.
+Historical success still comes from the actual hash-bound handoff evidence;
+current absence never substitutes for that history. Do not relaunch old producers
+or synthesize current fields after systemd collection.
 
 The assembler pins both opened private sources, requiring uid1000, mode0600,
 one link and no checksum sidecar. It invokes the existing `merge_runtime_segments`
