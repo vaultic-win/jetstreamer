@@ -23,6 +23,10 @@ a canonical checksum or verifier receipt.
 The exact sealed native owner is
 `/usr/local/lib/jetstreamer/horizon-epoch141-repair-status-tools-20261024-v1/jetstreamer-r2`
 and its exact unit is `horizon-repair-141-floor-20261024-v1.service`.
+Use `Type=simple` for this owner. Its clock validator accepts the trusted PID1
+`Started` event; `Type=exec` emits both `Starting` and `Started`, which this
+profile rejects as an ambiguous start. Preserve a rejected attempt's native
+journal and prove launch/state receipts absent before explicitly reconciling it.
 Use `repair-owner-141 PLAN --plan-sha256 SHA --self-sha256 SHA` only after
 normal sealing and independent parent admission. The queue plan schema is
 `jetstreamer-epoch141-repair-queue-plan-v2`, with fields `schema`, `epoch:141`,
