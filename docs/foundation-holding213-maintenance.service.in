@@ -1,0 +1,38 @@
+[Unit]
+Description=Exact retained213 prefix cold custody and qualified retirement
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+EnvironmentFile=/EXACT/ROOT/PRIVATE/CREDENTIALS.env
+ExecStart=/EXACT/SEALED/jetstreamer-r2 holding-foundation213-maintain /EXACT/SEALED/maintenance-plan.json --spec-sha256 EXACT_PLAN_SHA256 --self-sha256 EXACT_HELPER_SHA256
+ExecStopPost=/EXACT/SEALED/jetstreamer-r2 holding-foundation213-maintenance-finalize /EXACT/SEALED/maintenance-plan.json --spec-sha256 EXACT_PLAN_SHA256 --self-sha256 EXACT_HELPER_SHA256
+Restart=no
+TimeoutStartSec=4h
+TimeoutStopSec=120s
+KillMode=control-group
+MemoryMax=6G
+MemorySwapMax=0
+TasksMax=256
+CPUQuota=100%
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/qualification-213/diagnostic-output-selected-store8-v2
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# No Install section: root admits/starts this exact one-shot, never a timer.

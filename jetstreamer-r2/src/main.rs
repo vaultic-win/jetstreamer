@@ -3354,6 +3354,9 @@ async fn main() -> Result<()> {
                 | "holding-foundation213-park"
                 | "holding-foundation213-admit-restore"
                 | "holding-foundation213-restore"
+                | "holding-foundation213-retire"
+                | "holding-foundation213-maintain"
+                | "holding-foundation213-maintenance-finalize"
         )
     ) {
         return holding::run().await;

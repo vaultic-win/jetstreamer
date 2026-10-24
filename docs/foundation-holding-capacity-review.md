@@ -1,5 +1,114 @@
 # Foundation holding: retained artifact review
 
+## Source-only full-prefix maintenance candidate
+
+The follow-up exact213 candidate adds `holding-foundation213-retire`,
+`holding-foundation213-maintain` and
+`holding-foundation213-maintenance-finalize`. This section describes unlaunched
+source pending build, independent review, sealing, and fresh root admission. It
+does not report a125GB round trip or any recovered capacity.
+
+The maintenance plan has schema
+`jetstreamer-foundation-holding-maintenance-plan-v1`, the exact Foundation
+`mapping` binding, the sealed `park` plan binding, nullable `custody` and
+`restoration` bindings for restart, the current `resource_basis` accepted by
+Foundation capacity admission, and `maximum_execution_seconds: 14400`.
+The park plan still uses schema
+`jetstreamer-foundation-holding-park-plan-v1`, `artifact: "prefix213"`, the exact
+mapping, the accepted completed213 fleet, and the **actual** successful probe
+restore path/SHA recorded below. A different syntactically plausible probe
+receipt is not qualification.
+
+The Rust runner derives later private immutable plans only after it has actual
+custody/admission/restore receipts and their measured SHA-256 values. It holds
+the existing exclusive transition flock throughout, bounds the systemd
+invocation to4h/6GiB/256tasks with no restart, and records one private claim,
+durable phase receipts, application terminal, and an `ExecStopPost` PID1 outcome
+even when the main process was killed or timed out. The companion
+`foundation-holding213-maintenance.service.in` is a review template with
+deliberately unresolved deployment/credential/hash fields; it is never installed
+or started by the source work. Root must reserve this maintenance claim's memory,
+serialize admissions through its terminal, seal the exact helper/plans/unit, and
+prove the equivalent sandbox before launch. Maintenance of the already-ready213
+epoch creates no public epoch-status object or canonical sidecar.
+
+Fresh restoration admission reserves all125,316,500,795 potential restoration
+bytes plus the existing metadata budget, all current live growth, the century
+floor and existing guard floors. Its900s lifetime and1800s observer freshness
+remain enforced. A long park may therefore finish custody but leave restoration
+for the next coordinated admission. Resume with the actual custody binding and
+fresh resource evidence; never weaken freshness or add a separate poll. After
+restoration has qualified, resume with its exact preserved binding too. The
+restored bytes remain staging-only; this path proves no runtime replay resume.
+
+Retirement has a separate fixed plan schema
+`jetstreamer-foundation-holding-retirement-plan-v1`: exact `mapping`, `custody`,
+`restoration`, `accepted_fleet`, and `resource_basis`. It reserves another64MiB
+of metadata above the same protected capacity floor and freshly revalidates the
+authenticated owner/manifest/blob identity plus original terminal owners,
+original source-tree process references, and installed/transient/private staged
+consumers. It can select only two files: the exact original retained prefix and
+the root-owned complete restoration blob created for that qualified operation.
+It preserves both raw segments, every receipt/journal/manifest, the canonical213
+archive and the separate V4 assembly.
+
+The full restoration temporarily creates a second125GB local body. Therefore
+removing only the original produces **zero net capacity gain**. The candidate
+first retires the exact qualified restoration copy and then the original,
+recovering125.3GB relative to the pre-operation host only after both complete.
+The small transport probe is never counted as replay capacity.
+
+Each file has a durable initial identity/hash/reference intent before any move.
+`RENAME_NOREPLACE` moves it into an exact root-private quarantine; the body and
+metadata are checked again, with another full hash and fresh closed-reference
+review before a durable deletion intent permits the exact quarantine unlink.
+Parent directories are individually fsynced after rename/unlink. Recovery
+distinguishes pre-move, quarantined, unlink-before-receipt and complete states;
+conflicting/reappeared paths or absence without intent fail closed. The durable
+operation identity binds custody+restoration rather than a stale resource plan,
+so refreshed admission can resume that same operation. No R2 overwrite/delete,
+canonical publication, runtime-state offload, or generic cleanup is introduced.
+
+### Separate native210/227 scratch eligibility review
+
+Source review identifies only these terminal bootstrap profiles as possible
+future exact scratch candidates; this source work measured no current bytes and
+does not authorize their retirement:
+
+- 210: unit `archive-210-v1616-native-input-small-v2.service`, scratch
+  `/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2/scratch`.
+  Actual successful native proof is
+  `/var/lib/jetstreamer/horizon-native210-terminal-proof-small-v2/proof.json`,
+  SHA256 `e03e6f171b5b6eac6011ff62e172cd333290e25df1d58fb6de1009c7d532e25b`.
+  Preserve every other member of that root and the immutable
+  `horizon-focused-210-complete-span-store8-ca2e38b-v1` package, especially its
+  snapshot `3f67f416d254d7fb795bc902d5c47a6ae374fa36c173c00411d4b541fc610ccd`
+  and genesis. Bootstrap-only qualification proves zero replay entries/writes,
+  not a full epoch or reusable runtime checkpoint.
+- 227: unit `horizon-native-input-227-v1625-small-v2.service`, scratch
+  `/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2/scratch`.
+  Bind the independently accepted actual small-generation terminal proof before
+  preparing any retirement profile; its96GB cap is not a current byte census.
+  Preserve the entire immutable `horizon-stage227-bootstrap-dcaafc6-v1` package,
+  snapshot `77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07`,
+  genesis, worker/test deployments, origins, journals and typed proof.
+
+**Expected relief may be zero.** Both native tests construct a `RuntimeState`
+whose `_state_dir` is a `tempfile::TempDir`, created beneath the exact scratch
+root by `snapshot::private_state_dir`. On normal successful test exit it drops
+and automatically removes its extracted/genesis/AccountsDb directory. Evidence
+is in `historical-runtime/v1_6_16/worker/src/native_cold_common.rs`,
+`historical-runtime/v1_6_16/worker/src/snapshot.rs`, and the corresponding
+v1_6_25 snapshot/native test. Do not add96GB or the source-census77.95/64.84GB
+models to actual free space or prospective capacity. An operational check must
+reuse the sole coordinated observer cadence; do not add a speculative poll.
+If actual residual files exist, a separate exact Rust profile must prove their
+unchanged terminal owner/guard, no current process/mmap/descriptor or new staged
+consumer, immutable preserved input digests, no archive/snapshot/checkpoint/
+receipt member in the deletion tree, and durable interruption-safe intent.
+Re-running native tests is unnecessary and would recreate the very scratch
+being considered. Neither profile is covered by the exact two-file213 command.
+
 This is a source and metadata review on 2026-10-24. The document authorizes no
 remote write, local deletion, service change, replay launch, or runtime-state
 offload. Later exact read-only closure attempts and root-owned transport

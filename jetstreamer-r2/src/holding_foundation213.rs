@@ -1,7 +1,11 @@
-//! Exact Foundation custody/byte restoration, never local retirement or resume.
+//! Exact Foundation custody/byte restoration and separately gated local retirement.
 use super::*;
 use jetstreamer_horizon_observe::foundation_holding213_review as review;
 use std::os::fd::AsRawFd;
+#[path = "holding_foundation213_maintenance.rs"]
+mod maintenance;
+#[path = "holding_foundation213_retire.rs"]
+mod retirement;
 
 const STATE: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1";
 const PROBE: &str =
@@ -10,6 +14,9 @@ const PROBE_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6
 const METADATA_RESERVE: u64 = 16 * 1024 * 1024;
 const MAX_RECEIPT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADDITIONAL: u64 = review::LENGTH + 2 * METADATA_RESERVE;
+const QUALIFIED_PROBE_RESTORE: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1/receipts/restore-79e0c1c7fa31c580f57890d5692e46c685ccb5441679cb55d00ff1cc99c9460b.json";
+const QUALIFIED_PROBE_RESTORE_SHA: &str =
+    "a913fce8eb00ffb2dfa69f87272b041e4703ee9590118898f5a841e2cbe9bff6";
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -75,6 +82,9 @@ pub(super) fn command(s: &str) -> bool {
         "holding-foundation213-park"
             | "holding-foundation213-admit-restore"
             | "holding-foundation213-restore"
+            | "holding-foundation213-retire"
+            | "holding-foundation213-maintain"
+            | "holding-foundation213-maintenance-finalize"
     )
 }
 fn key(sha: &str) -> Result<String> {
@@ -201,6 +211,11 @@ fn review_for_park(p: &ParkSpec) -> Result<Value> {
                 .transport_qualification
                 .as_ref()
                 .context("Foundation transport not qualified")?;
+            ensure!(
+                q.path == Path::new(QUALIFIED_PROBE_RESTORE)
+                    && q.sha256 == QUALIFIED_PROBE_RESTORE_SHA,
+                "Foundation prefix must bind the actual qualified full genesis round trip"
+            );
             qualification(&receipt_bound(q)?)?;
             let f = p
                 .accepted_fleet
@@ -676,6 +691,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     if action == "holding-foundation213-admit-restore" {
         return admit(&serde_json::from_value(v)?, spec);
     }
+    if action == "holding-foundation213-maintenance-finalize" {
+        return maintenance::finalize(v, spec);
+    }
     let r2 = r2_config_from_env()?;
     ensure!(r2.bucket == BUCKET, "foreign Foundation bucket");
     let client = s3_client(&r2);
@@ -684,6 +702,8 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
         "holding-foundation213-restore" => {
             restore(&client, &serde_json::from_value(v)?, spec).await
         }
+        "holding-foundation213-retire" => retirement::run(&client, v, spec).await,
+        "holding-foundation213-maintain" => maintenance::run(&client, v, spec).await,
         _ => bail!("unsupported Foundation operation"),
     }
 }
