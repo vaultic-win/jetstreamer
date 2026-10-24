@@ -290,6 +290,9 @@ pub(super) fn normalize(g: &Guard, args: &[String]) -> Result<Value> {
         ensure!(
             Path::new(flags[key]).is_absolute()
                 && flags[key].starts_with("/var/lib/jetstreamer-adaptive-reserve-")
+                && flags[key][1..]
+                    .split('/')
+                    .all(|part| !part.is_empty() && part != "." && part != "..")
                 && Path::new(flags[key]).components().all(|c| matches!(
                     c,
                     std::path::Component::RootDir | std::path::Component::Normal(_)
