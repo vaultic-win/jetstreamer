@@ -407,7 +407,7 @@ pub(crate) fn validate_filesystem(ledger: &Path) -> Result<(), String> {
         match std::fs::symlink_metadata(&path) {
             Ok(_) => return Err("epoch 223 candidate requires fresh absent output and sidecar; preserve the existing generation".into()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
-            Err(e) => return Err(format!("epoch223 output identity: {e}")),
+            Err(e) => return Err(format!("epoch 223 output identity: {e}")),
         }
     }
     Ok(())

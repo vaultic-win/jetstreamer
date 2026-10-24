@@ -256,7 +256,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "requires actual root-private native141 attempt; read-only, no inventory or samples"]
+    #[ignore = "requires actual root-private native 141 attempt; read-only, no inventory or samples"]
     fn root_actual_native141_scope_and_sandbox() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let c = claim();
@@ -267,7 +267,7 @@ mod tests {
         } else {
             assert_eq!(current["InvocationID"], IID);
             assert_eq!(current["MainPID"], "0");
-            println!("native141 already terminal; no live proof claimed or restart attempted");
+            println!("native 141 already terminal; no live proof claimed or restart attempted");
         }
     }
 }

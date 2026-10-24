@@ -422,7 +422,7 @@ fn run() -> Result<()> {
 }
 fn main() {
     if let Err(e) = run() {
-        eprintln!("epoch223 prefix capability failed closed: {e:#}");
+        eprintln!("epoch 223 prefix capability failed closed: {e:#}");
         std::process::exit(1);
     }
 }

@@ -633,7 +633,7 @@ fn run() -> Result<()> {
 }
 fn main() {
     if let Err(e) = run() {
-        eprintln!("epoch223 tail package failed closed: {e:#}");
+        eprintln!("epoch 223 tail package failed closed: {e:#}");
         std::process::exit(1);
     }
 }

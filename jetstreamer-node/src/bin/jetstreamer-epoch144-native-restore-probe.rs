@@ -440,7 +440,7 @@ fn main() {
         ))
     };
     if let Err(e) = result {
-        eprintln!("private144 native-only probe failed:{e:#}");
+        eprintln!("private 144 native-only probe failed: {e:#}");
         std::process::exit(1);
     }
 }

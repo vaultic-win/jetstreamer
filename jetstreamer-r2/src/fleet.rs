@@ -2950,7 +2950,7 @@ pub(super) async fn run() -> Result<()> {
         let (is_active, finalization) = if (191..=194).contains(&claim.epoch) {
             // A same-cutoff native custody check can race a genuine importer
             // or verifier handoff. Preserve the failure in this durable fleet
-            // without suppressing seven ordinary lanes/private141/successors.
+            // without suppressing seven ordinary lanes/private 141/successors.
             let result = (|| -> Result<(bool, Value)> {
                 let live = pipeline_live(claim, current)?;
                 if !live {

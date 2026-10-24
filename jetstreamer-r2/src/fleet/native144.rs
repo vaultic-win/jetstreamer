@@ -147,7 +147,7 @@ fn live_limits(name: &str) -> Result<()> {
     );
     let mut limits = BTreeMap::new();
     for line in std::str::from_utf8(&out.stdout)?.lines() {
-        let (k, v) = line.split_once('=').context("native144 limit line")?;
+        let (k, v) = line.split_once('=').context("native 144 limit line")?;
         ensure!(limits.insert(k, v).is_none(), "duplicate native 144 limit");
     }
     validate_limits(&limits)
@@ -187,7 +187,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root read-only actual native144 sandbox limits on harmless non-owner fixture"]
+    #[ignore = "root read-only actual native 144 sandbox limits on harmless non-owner fixture"]
     fn root_actual_limits_fixture_matches_exact_native_contract() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         live_limits("horizon-epoch144-native-limits-fixture-20261021-v1.service").unwrap();

@@ -641,7 +641,7 @@ fn run(binding: Evidence, self_sha: &str) -> Result<()> {
     full_gate.write(format!("{} {FULL} {RUNNER}\n", plan.archive_sha256).as_bytes())?;
     plugin_gate.write(format!("{} {PLUGIN} {RUNNER}\n", plan.archive_sha256).as_bytes())?;
     acknowledge_archive_publication_batch(destination, publication.transaction_id)?;
-    println!("epoch213 exact V4 artifact committed locally; no R2 mutation or registry promotion");
+    println!("epoch 213 exact V4 artifact committed locally; no R2 mutation or registry promotion");
     Ok(())
 }
 
@@ -708,7 +708,7 @@ fn capability_probe(root: &Path, self_sha: &str) -> Result<()> {
     );
     drop_to_archive_owner()?;
     preflight_archive_publication(&stage, &destination)?;
-    let context = b"epoch213 private filesystem capability only; no archive admission";
+    let context = b"epoch 213 private filesystem capability only; no archive admission";
     let publication = publish_verified_archive_batch_if_absent_with_context_and_lock_timeout(
         Sha256::digest(context).into(),
         &[213],

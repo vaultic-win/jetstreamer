@@ -173,7 +173,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     );
     if check {
         println!(
-            "native144 cycle recovery preflight passed; no sampling, status writes or remote access"
+            "native 144 cycle recovery preflight passed; no sampling, status writes or remote access"
         );
         return Ok(());
     }

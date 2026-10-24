@@ -93,7 +93,7 @@ pub(in crate::fleet) fn run() -> Result<()> {
     let (profile, iid, success, _) = native20_event::terminal_proof(&event)?;
     ensure!(success, "native 223 input did not terminate successfully");
     let journal: BoundFile = serde_json::from_value(event["journal"].clone())?;
-    let bytes = read_stable_bounded(&journal.path, 16 << 20, "native223 qualification journal")?;
+    let bytes = read_stable_bounded(&journal.path, 16 << 20, "native 223 qualification journal")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == journal.sha256,
         "native 223 qualification journal digest"

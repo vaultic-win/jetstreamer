@@ -479,7 +479,7 @@ pub(super) fn run() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root read-only exact native144 capability/input/resource bindings; no admission or launch"]
+    #[ignore = "root read-only exact native 144 capability/input/resource bindings; no admission or launch"]
     fn root_native144_input_policy_gate_passes_without_a_worker() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         native_inputs(&Native {

@@ -395,7 +395,7 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(error) = run() {
-        eprintln!("epoch223 exact tail evidence refused: {error:#}");
+        eprintln!("epoch 223 exact tail evidence refused: {error:#}");
         std::process::exit(1);
     }
 }

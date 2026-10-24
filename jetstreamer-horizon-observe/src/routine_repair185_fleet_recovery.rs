@@ -166,7 +166,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         "recovery endpoint differs"
     );
     if check {
-        println!("epoch185 fleet recovery preflight passed; no resource sample or remote access");
+        println!("epoch 185 fleet recovery preflight passed; no resource sample or remote access");
         return Ok(());
     }
     let iid = authenticate_named_service(UNIT)?;

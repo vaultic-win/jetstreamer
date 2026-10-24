@@ -476,7 +476,7 @@ mod tests {
         assert!(history(&good, &origin(), 1792799467531267).is_err());
     }
     #[test]
-    #[ignore = "root current read-only native228 collected metadata; no resource sample, Bank, runtime mutation, receipt write or R2"]
+    #[ignore = "root current read-only native 228 collected metadata; no resource sample, Bank, runtime mutation, receipt write or R2"]
     fn actual_collected_native228_has_sealed_canonical_success_and_no_current_replacement() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let o = c::immutable_json(&original()).unwrap();

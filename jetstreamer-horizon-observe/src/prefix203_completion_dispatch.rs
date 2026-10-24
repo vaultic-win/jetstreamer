@@ -500,7 +500,7 @@ fn persist(v: &Value) -> Result<()> {
 }
 fn dispatch_unit_text(plan_path: &Path, plan_hash: &str, self_hash: &str) -> String {
     format!(
-        "[Unit]\nDescription=One-shot closed private epoch203 prefix reader handoff\nOnSuccess={READER}\nOnSuccessJobMode=fail\n\n[Service]\nType=oneshot\nUser=root\nGroup=root\nRestart=no\nKillMode=control-group\nTimeoutStartSec=2min\nUMask=0077\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nPrivateTmp=yes\nCapabilityBoundingSet=CAP_DAC_OVERRIDE\nAmbientCapabilities=CAP_DAC_OVERRIDE\nReadWritePaths={STATE}\nCPUQuota=100%\nMemoryHigh=2G\nMemoryMax=4G\nMemorySwapMax=0\nTasksMax=256\nExecStart={BINARY} {} --plan-sha256 {plan_hash} --self-sha256 {self_hash}\n",
+        "[Unit]\nDescription=One-shot closed private epoch 203 prefix reader handoff\nOnSuccess={READER}\nOnSuccessJobMode=fail\n\n[Service]\nType=oneshot\nUser=root\nGroup=root\nRestart=no\nKillMode=control-group\nTimeoutStartSec=2min\nUMask=0077\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nPrivateTmp=yes\nCapabilityBoundingSet=CAP_DAC_OVERRIDE\nAmbientCapabilities=CAP_DAC_OVERRIDE\nReadWritePaths={STATE}\nCPUQuota=100%\nMemoryHigh=2G\nMemoryMax=4G\nMemorySwapMax=0\nTasksMax=256\nExecStart={BINARY} {} --plan-sha256 {plan_hash} --self-sha256 {self_hash}\n",
         plan_path.display()
     )
 }
@@ -687,7 +687,7 @@ fn main() {
         execute(&p, Path::new(&a[0]), &a[2], &a[4])
     })();
     if let Err(e) = r {
-        eprintln!("prefix203 completion dispatch failed closed: {e:#}");
+        eprintln!("prefix 203 completion dispatch failed closed: {e:#}");
         std::process::exit(1);
     }
 }

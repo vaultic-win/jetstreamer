@@ -984,7 +984,7 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
     )) && slot != EPOCH227_SNAPSHOT_SLOT
     {
         return Err(format!(
-            "epoch227 requires exact snapshot {}",
+            "epoch 227 requires exact snapshot {}",
             EPOCH227_SNAPSHOT_SLOT
         ));
     }
@@ -1003,7 +1003,7 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
     )) && slot != EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT
     {
         return Err(format!(
-            "epoch225 diagnostic requires exact snapshot {}",
+            "epoch 225 diagnostic requires exact snapshot {}",
             EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT
         ));
     }
@@ -1064,10 +1064,10 @@ fn epoch223_snapshot_test_anchor(value: Option<&str>) -> Result<u64, String> {
         None => EPOCH223_COLD_SNAPSHOT_SLOT,
         Some(text) => text
             .parse::<u64>()
-            .map_err(|_| "invalid epoch223 test anchor")?,
+            .map_err(|_| "invalid epoch 223 test anchor")?,
     };
     if ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot) {
-        return Err("unsupported epoch223 test anchor".into());
+        return Err("unsupported epoch 223 test anchor".into());
     }
     if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
     {

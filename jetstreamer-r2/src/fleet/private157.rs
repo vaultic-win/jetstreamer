@@ -325,7 +325,7 @@ pub(super) fn immutable_receipt(path: &Path, value: &Value) -> Result<()> {
     t.write_all(b"\n")?;
     t.as_file().sync_all()?;
     t.persist_noclobber(path)
-        .map_err(|e| anyhow!("prefix157 receipt occupied:{e}"))?;
+        .map_err(|e| anyhow!("prefix 157 receipt occupied: {e}"))?;
     File::open(parent)?.sync_all()?;
     Ok(())
 }
@@ -400,7 +400,7 @@ pub(super) fn binding(b: &BoundFile) -> Value {
 }
 pub(super) fn file_binding(path: &Path) -> Result<Value> {
     Ok(
-        json!({"path":path,"sha256":hex_lower(&Sha256::digest(read_stable_bounded(path,16<<20,"prefix157 prepared file")?))}),
+        json!({"path":path,"sha256":hex_lower(&Sha256::digest(read_stable_bounded(path,16<<20,"prefix 157 prepared file")?))}),
     )
 }
 pub(super) fn prepare() -> Result<()> {
@@ -421,7 +421,7 @@ pub(super) fn prepare() -> Result<()> {
             && em.nlink() == 1
             && em.mode() & 0o222 == 0
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == a[6],
-        "unsealed prefix157 preparer"
+        "unsealed prefix 157 preparer"
     );
     let input = BoundFile {
         path: a[2].clone().into(),
@@ -438,14 +438,14 @@ pub(super) fn prepare() -> Result<()> {
         && s.stage==Path::new("/var/lib/jetstreamer/horizon-prefix157-fleet-preparation-20261021-v1")
         && s.destination==Path::new("/usr/local/lib/jetstreamer/horizon-prefix157-admission-plan-20261021-v1")
         && s.output.parent()==Some(Path::new("/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1"))
-        && s.output.file_name().and_then(|n|n.to_str()).is_some_and(|n|n.starts_with("fleet-") && n.ends_with("-prefix157-admitted.json")),"foreign prefix157 preparation scope");
+        && s.output.file_name().and_then(|n|n.to_str()).is_some_and(|n|n.starts_with("fleet-") && n.ends_with("-prefix157-admitted.json")),"foreign prefix 157 preparation scope");
     let sm = fs::symlink_metadata(&s.stage)?;
     ensure!(
         s.stage.canonicalize()? == s.stage
             && sm.is_dir()
             && sm.uid() == 0
             && sm.mode() & 0o077 == 0,
-        "unsafe prefix157 preparation directory"
+        "unsafe prefix 157 preparation directory"
     );
     let previous = bound_json(&s.previous_fleet)?;
     let r = bound_json(&s.launch)?;
@@ -472,7 +472,7 @@ pub(super) fn prepare() -> Result<()> {
                 && event["previous_fleet"] == binding(&s.previous_fleet)
                 && event["observer_sha256"] == s.observer.sha256
                 && event["admission_transition_guard"] == binding(&s.launch),
-            "prefix157 event proof differs"
+            "prefix 157 event proof differs"
         );
         let spec = json!({"schema":"jetstreamer-horizon-private-prefix157-routine-spec-v1","launch":binding(&s.launch),
             "event_fleet":file_binding(&s.output)?,"event_plan":pb,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});

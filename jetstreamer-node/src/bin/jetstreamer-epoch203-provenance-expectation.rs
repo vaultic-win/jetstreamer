@@ -95,7 +95,7 @@ fn expectation(
             && suffix.output_slot_count == 419
             && suffix.bootstrap.slot == 88_127_580
             && suffix.terminal.slot == 88_127_999,
-        "not the exact epoch203 source coverage",
+        "not the exact epoch 203 source coverage",
     )?;
     require(
         prefix.archive_sha256 == digest(PREFIX_ARCHIVE)?
@@ -237,7 +237,7 @@ fn run() -> Result<(), String> {
                     n.starts_with("horizon-203-provenance-expectation-")
                         && n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
                 }),
-        "output outside private203 expectation scope",
+        "output outside private 203 expectation scope",
     )?;
     require(
         output.is_absolute() && fs::canonicalize(parent).map_err(|e| e.to_string())? == parent,

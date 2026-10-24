@@ -41,7 +41,7 @@ fn bound(b: &Bound) -> Result<Value> {
         b.path.is_absolute() && is_lower_hex(&b.sha256, 64),
         "native 223 evidence binding"
     );
-    let bytes = read_stable_bounded(&b.path, MAX_OBSERVER_RECEIPT_BYTES, "native223 evidence")?;
+    let bytes = read_stable_bounded(&b.path, MAX_OBSERVER_RECEIPT_BYTES, "native 223 evidence")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == b.sha256,
         "native 223 evidence digest differs"
@@ -328,7 +328,7 @@ pub(super) async fn run() -> Result<()> {
         let saved: Value = serde_json::from_slice(&read_stable_bounded(
             &p.estimate_receipt,
             MAX_OBSERVER_RECEIPT_BYTES,
-            "native223 estimate",
+            "native 223 estimate",
         )?)?;
         ensure!(
             saved["schema"] == "jetstreamer-native223-status-estimate-v1"
@@ -371,7 +371,7 @@ pub(super) async fn run() -> Result<()> {
     let (etag, previous) = publish_epoch_status(&s3, &config, &status).await?;
     let path = status_receipt_path(&p.receipt_directory, &status);
     if path.exists() {
-        let bytes = read_stable_bounded(&path, MAX_STATUS_BYTES, "native223 publication")?;
+        let bytes = read_stable_bounded(&path, MAX_STATUS_BYTES, "native 223 publication")?;
         let old = validate_status_publication_receipt_bytes(
             &p.receipt_directory,
             &path,

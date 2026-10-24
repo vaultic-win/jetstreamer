@@ -118,7 +118,7 @@ fn checked(c: &PipelineClaim, intent: &Value) -> Result<()> {
             && intent["publication_authorized"] == false
             && intent["remote_mutations"] == false
             && intent["r2_mutations"] == false,
-        "private223 cold snapshot owner differs from the exact admitted test intent"
+        "private 223 cold snapshot owner differs from the exact admitted test intent"
     );
     Ok(())
 }
@@ -126,7 +126,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     let p = profile(&c.unit)?;
     ensure!(
         c.evidence.len() == 1 && c.evidence[0].path == Path::new(p.state).join("intent.json"),
-        "private223 cold snapshot needs its exact durable supervisor intent"
+        "private 223 cold snapshot needs its exact durable supervisor intent"
     );
     checked(c, &bound_json(&c.evidence[0])?)?;
     let plan = bound_json(&BoundFile {
@@ -137,7 +137,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
         plan["mode"] == "snapshot-tests"
             && plan["unit"] == p.unit
             && plan["schema"] == p.plan_schema,
-        "private223 cold snapshot plan differs"
+        "private 223 cold snapshot plan differs"
     );
     Ok(())
 }
@@ -146,12 +146,12 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     let p = profile(&c.unit)?;
     ensure!(
         current["Type"] == "oneshot",
-        "private223 cold snapshot must be oneshot"
+        "private 223 cold snapshot must be oneshot"
     );
     let out = ProcessCommand::new("systemctl").args(["show", &c.unit, "--property=User,Group,DynamicUser,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,ProtectControlGroups,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,TimeoutStartUSec,TemporaryFileSystem,OOMPolicy,OOMScoreAdjust"]).output()?;
     ensure!(
         out.status.success(),
-        "private223 cold snapshot sandbox unreadable"
+        "private 223 cold snapshot sandbox unreadable"
     );
     let text = std::str::from_utf8(&out.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|l| l.split_once('=')).collect();
@@ -191,7 +191,7 @@ pub(super) fn validate_live(c: &PipelineClaim, current: &Value) -> Result<()> {
     ] {
         ensure!(
             fields.get(key) == Some(&expected),
-            "private223 cold snapshot sandbox differs:{key}"
+            "private 223 cold snapshot sandbox differs: {key}"
         );
     }
     Ok(())

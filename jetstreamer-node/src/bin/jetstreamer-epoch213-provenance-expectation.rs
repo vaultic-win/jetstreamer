@@ -80,7 +80,7 @@ fn expectation(
             && suffix.output_slot_count == 457
             && suffix.bootstrap.slot == 92_447_542
             && suffix.terminal.slot == 92_447_999,
-        "not the exact epoch213 source coverage",
+        "not the exact epoch 213 source coverage",
     )?;
     require(
         prefix.archive_sha256 == digest(PREFIX_ARCHIVE)?

@@ -135,7 +135,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     let (gate, action) = if expanded && window["qualified"] == true {
         (
             "expanded operating-point guard/floor review and epoch 186 fresh guarded admission",
-            "The complete expanded fleet has a clean comparable observation window. Bind current no-trip guards and century-floor/growth evidence to an explicit operating-point promotion, then freshly admit the staged disjoint capped186 candidate. Do not repeat the awaiting-window hold or grant launch authority from this receipt.",
+            "The complete expanded fleet has a clean comparable observation window. Bind current no-trip guards and century-floor/growth evidence to an explicit operating-point promotion, then freshly admit the staged disjoint capped 186 candidate. Do not repeat the awaiting-window hold or grant launch authority from this receipt.",
         )
     } else if expanded {
         (
@@ -170,7 +170,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     };
     Ok(
         json!({"schema":"jetstreamer-horizon-capacity-decision-v2","question":"Can I fit another disjoint lane now?",
-        "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch 186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
+        "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch 186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch 141 original-entry partial-root qualification"},
         "memory_concurrency_target":memory_report,"expanded_fleet_window":window,
         "capped186_budget":candidate186::report(p,o),
         "live_production_lanes":live.len(),"proven_production_lanes":PROVEN,"live_owners":live,

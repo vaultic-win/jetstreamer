@@ -159,7 +159,7 @@ pub(super) fn run() -> Result<()> {
                 && old["capture_helper_sha256"] == args[6],
             "204 existing capture conflicts with this exact operation"
         );
-        println!("Exact capped204 capture already committed; no repeated launch or mutation");
+        println!("Exact capped 204 capture already committed; no repeated launch or mutation");
         return Ok(());
     }
     let a = bound_json(&s.admission)?;
@@ -301,7 +301,7 @@ pub(super) fn run() -> Result<()> {
     validate_output_destination(&s.output)?;
     private157::immutable_receipt(&s.output, &r)?;
     println!(
-        "Exact capped204 launch and first protective timer captured; publication remains closed"
+        "Exact capped 204 launch and first protective timer captured; publication remains closed"
     );
     Ok(())
 }

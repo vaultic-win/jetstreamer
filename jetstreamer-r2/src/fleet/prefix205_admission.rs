@@ -370,7 +370,7 @@ pub(super) fn run() -> Result<()> {
         "new_routine_resource_samples":0,"producer_started":false,"producer_signaled":false}),
     )?;
     println!(
-        "Private capped205 resource admission issued; launch and first guard proof remain separate"
+        "Private capped 205 resource admission issued; launch and first guard proof remain separate"
     );
     Ok(())
 }

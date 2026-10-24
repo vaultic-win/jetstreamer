@@ -428,7 +428,7 @@ pub(super) fn prepare_layout() -> Result<()> {
         "root":ROOT,"root_device":m.dev(),"root_inode":m.ino(),"lease":lease,"lease_device":lm.dev(),"lease_inode":lm.ino(),"uid":1001,"gid":gid,
         "self_sha256":args[3],"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"r2_mutations":false}),
     )?;
-    println!("private144 empty root and exact shared lease prepared; no admission or launch");
+    println!("private 144 empty root and exact shared lease prepared; no admission or launch");
     Ok(())
 }
 
@@ -545,7 +545,7 @@ pub(super) fn capture_launch() -> Result<()> {
         "members":[{"source":guard_source,"name":"guard-plan.json","sha256":guard_binding["sha256"],"mode":256}]}),
     )?;
     println!(
-        "captured exact live private144 owner; first real one-worker guard and fleet event still required"
+        "captured exact live private 144 owner; first real one-worker guard and fleet event still required"
     );
     Ok(())
 }
@@ -554,7 +554,7 @@ pub(super) fn capture_launch() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root read-only actual private144 sandbox on harmless non-owner fixture"]
+    #[ignore = "root read-only actual private 144 sandbox on harmless non-owner fixture"]
     fn root_actual_continuation_limits_fixture_matches() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         live_limits_for("horizon-continuation144-limits-fixture-20261022-v1.service").unwrap();
