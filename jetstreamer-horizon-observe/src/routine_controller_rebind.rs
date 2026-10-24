@@ -192,6 +192,27 @@ fn transform_after191(model: &Value, v: &Value) -> Result<Value> {
         .retain(|r| r["range"] != "191-194");
     transform_members(model, &proof, 4)
 }
+fn transform_terminal_members(model: &Value, v: &Value, retired: &BTreeSet<&str>) -> Result<Value> {
+    let actual: BTreeSet<_> = model["ranges"]
+        .as_array()
+        .context("terminal replay census")?
+        .iter()
+        .map(|r| r["range"].as_str().context("terminal range"))
+        .collect::<Result<_>>()?;
+    let original: BTreeSet<_> = RANGES.into_iter().collect();
+    ensure!(
+        actual.is_subset(&original)
+            && original.difference(&actual).all(|r| retired.contains(r))
+            && actual.len() == model["ranges"].as_array().unwrap().len(),
+        "terminal transition omitted another live rebound owner"
+    );
+    let mut proof = v.clone();
+    proof["bindings"]
+        .as_array_mut()
+        .context("terminal controller history")?
+        .retain(|r| r["range"].as_str().is_some_and(|r| actual.contains(r)));
+    transform_members(model, &proof, actual.len())
+}
 fn transform_members(model: &Value, v: &Value, expected: usize) -> Result<Value> {
     let mut m = model.clone();
     let rows = m["ranges"].as_array_mut().context("model ranges")?;
@@ -219,7 +240,17 @@ pub(super) fn model(p: &Plan, m: &Value) -> Result<Value> {
     let Some(v) = evidence(p)? else {
         return Ok(m.clone());
     };
-    let mut m = if p.cohort191_delivery.is_some() {
+    let mut m = if terminal185::enabled(p) {
+        terminal185::validate(p)?;
+        if p.cohort191_delivery.is_some() {
+            cohort191_delivery::validate(p)?;
+        }
+        let mut missing = BTreeSet::from(["185-185"]);
+        if p.cohort191_delivery.is_some() {
+            missing.insert("191-194");
+        }
+        transform_terminal_members(m, &v, &missing)?
+    } else if p.cohort191_delivery.is_some() {
         cohort191_delivery::validate(p)?;
         transform_after191(m, &v)?
     } else {
@@ -265,7 +296,13 @@ pub(super) fn validate_live(p: &Plan) -> Result<()> {
     if p.cohort191_delivery.is_some() {
         cohort191_delivery::validate(p)?;
     }
+    if terminal185::enabled(p) {
+        terminal185::validate(p)?;
+    }
     for row in v["bindings"].as_array().unwrap() {
+        if terminal185::enabled(p) && row["range"] == "185-185" {
+            continue;
+        }
         if p.cohort191_delivery.is_some() && row["range"] == "191-194" {
             // Historical rebind proof is retained. Current191 custody is owned
             // by its native delivery event, never a fake fifth live replay.
@@ -370,6 +407,31 @@ pub(super) fn enable(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stopped185_and_terminal191_keep_every_other_controller_clock_and_owner() {
+        let proof = json!({"bindings":RANGES.iter().map(|r|json!({"range":r,"producer_invocation_id":format!("p{r}"),"old_controller_invocation_id":format!("old{r}"),"new_controller_invocation_id":format!("new{r}")})).collect::<Vec<_>>()});
+        for retired in [
+            BTreeSet::from(["185-185"]),
+            BTreeSet::from(["185-185", "191-194"]),
+        ] {
+            let m = json!({"ranges":RANGES.iter().filter(|r|!retired.contains(**r)).map(|r|json!({"range":r,"expected_producer_invocation_id":format!("p{r}"),"expected_controller_invocation_id":format!("old{r}"),"elapsed_clock":u64::MAX,"downstream":43200})).collect::<Vec<_>>()});
+            let next = transform_terminal_members(&m, &proof, &retired).unwrap();
+            for row in next["ranges"].as_array().unwrap() {
+                assert_eq!(row["elapsed_clock"], u64::MAX);
+                assert_eq!(row["downstream"], 43200);
+            }
+            assert_eq!(
+                transform_terminal_members(&next, &proof, &retired).unwrap(),
+                next
+            );
+            let mut missing = m.clone();
+            missing["ranges"].as_array_mut().unwrap().remove(0);
+            assert!(transform_terminal_members(&missing, &proof, &retired).is_err());
+            let mut foreign = m;
+            foreign["ranges"][0]["expected_producer_invocation_id"] = json!("foreign");
+            assert!(transform_terminal_members(&foreign, &proof, &retired).is_err());
+        }
+    }
     #[test]
     fn producer_clocks_allowances_and_large_integers_survive_mapping() {
         let rows:Vec<_>=RANGES.iter().map(|r|json!({"range":r,"producer_invocation_id":format!("p{r}"),"old_controller_invocation_id":format!("old{r}"),"new_controller_invocation_id":format!("new{r}")})).collect();

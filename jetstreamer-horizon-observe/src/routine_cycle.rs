@@ -106,6 +106,8 @@ mod publication144;
 mod repair183;
 #[path = "routine_repair185.rs"]
 mod repair185;
+#[path = "routine_terminal185.rs"]
+mod terminal185;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -190,6 +192,8 @@ struct Plan {
     qualification141_status: Option<qualification141_status::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cohort191_delivery: Option<cohort191_delivery::Profile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal185: Option<terminal185::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     assembly144_scans: Option<assembly144_scans::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -303,6 +307,13 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if terminal185::enabled(p) {
+        return if p.cohort191_delivery.is_some() {
+            "guard-stopped185-and-terminal191-repair141-v1"
+        } else {
+            "guard-stopped185-repair141-v1"
+        };
+    }
     if repair141_status::enabled(p) {
         return if p.cohort191_delivery.is_some() {
             "repair141-and-cohort191-four-owner-v1"
@@ -866,6 +877,10 @@ fn validate_templates(
     publication144::validate(p)?;
     repair183::extend_epochs(p, &mut epochs)?;
     repair185::extend_epochs(p, &mut epochs)?;
+    if terminal185::enabled(p) {
+        terminal185::validate(p)?;
+        epochs.remove(&185);
+    }
     ensure!(
         p.expected_epochs.iter().copied().collect::<BTreeSet<_>>() == epochs
             && p.expected_epochs.len() == epochs.len()
@@ -1382,6 +1397,7 @@ fn derive(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) -> Result<(V
     publication144::derive_fleet(p, &mut fleet)?;
     repair183::derive_fleet(p, &mut fleet)?;
     repair185::derive_fleet(p, &mut fleet)?;
+    terminal185::derive_fleet(p, &mut fleet)?;
     original141::derive_fleet(p, &mut fleet)?;
     terminal141::derive_fleet(p, &mut fleet)?;
     repair141_status::derive_fleet(p, &mut fleet)?;
@@ -1948,6 +1964,8 @@ fn main() {
                         "--prepare-next-delivery198"
                             | "--prepare-next-delivery191"
                             | "--prepare-next-repair141"
+                            | "--prepare-next-terminal185"
+                            | "--capture-terminal185"
                             | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-native141-all-retry"
                             | "--prepare-next-census141-poh"
@@ -2156,6 +2174,20 @@ fn main() {
             .is_some_and(|arg| arg == "--recover-delivery198")
         {
             return delivery198_recover::run(&plan, &bound, &args[5]);
+        }
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--capture-terminal185")
+        {
+            return terminal185::capture(
+                &plan,
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                &fs::read_link("/proc/self/exe")?,
+                &args[5],
+            );
         }
         if args.get(6).is_some_and(|arg| preparation_mode(arg)) {
             let spec = if args.len() == 10 {
