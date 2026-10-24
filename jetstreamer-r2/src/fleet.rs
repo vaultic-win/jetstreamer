@@ -10,6 +10,7 @@ mod assembly144_admission;
 mod assembly144_prepare;
 mod assembly223;
 mod assembly223_capacity;
+mod assembly223_live_peer;
 mod assembly223_prepare;
 mod bounded205;
 mod census141_poh;
@@ -115,6 +116,9 @@ mod singleton227_terminal;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
+mod verification223;
+mod verification223_capacity;
+mod verification223_prepare;
 mod warmup223;
 mod warmup223_input_capture;
 mod warmup223_retire;
@@ -336,6 +340,15 @@ pub(super) fn native209_terminal_status_identity(proof: &Value) -> Result<(Strin
 }
 pub(super) fn admit_native210_input() -> Result<()> {
     native210_admission::run()
+}
+pub(super) fn admit_verification223_capacity() -> Result<()> {
+    verification223_capacity::run()
+}
+pub(super) fn capture_verification223_launch() -> Result<()> {
+    verification223::capture()
+}
+pub(super) fn prepare_verification223_fleet() -> Result<()> {
+    verification223_prepare::run()
 }
 pub(super) fn capture_assembly223_launch() -> Result<()> {
     assembly223::capture()
@@ -674,11 +687,70 @@ struct PipelineClaim {
 
 // Unit names describe scope, not authority. Every live claim still needs the
 // exact invocation/command, immutable evidence and an independent delivery gate.
+pub(super) fn private223_status_scope(phase: &str, unit: &str) -> bool {
+    matches!(
+        (phase, unit),
+        ("private-assembly-only", assembly223::UNIT)
+            | ("private-verification-only", verification223::UNIT)
+    )
+}
+pub(super) fn private223_status_origin(
+    phase: &str,
+    unit: &str,
+    iid: &str,
+    origin: &Value,
+    binding: &Value,
+    f: &Value,
+) -> Result<PathBuf> {
+    ensure!(
+        private223_status_scope(phase, unit),
+        "private 223 status phase/unit differs"
+    );
+    let p: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: f["plan"]
+            .as_str()
+            .context("private 223 status fleet plan")?
+            .into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("private 223 status fleet digest")?
+            .into(),
+    })?)?;
+    let claims = p
+        .diagnostics
+        .iter()
+        .filter(|d| d.epoch == 223 && d.unit == unit && d.invocation_id == iid)
+        .collect::<Vec<_>>();
+    ensure!(
+        claims.len() == 1,
+        "private 223 status needs one exact accepted diagnostic claim"
+    );
+    let c = claims[0];
+    ensure!(
+        private157::binding(&c.launch_receipt) == *binding
+            && checked_diagnostic_launch(c)? == *origin,
+        "private 223 status launch differs from accepted diagnostic"
+    );
+    if assembly223::namespace(c) {
+        Ok(Path::new(assembly223::ROOT).join("epoch-223-private-v3.jet"))
+    } else {
+        ensure!(
+            verification223::namespace(c),
+            "unknown private 223 status owner"
+        );
+        Ok(PathBuf::from(
+            "/var/lib/jetstreamer/horizon-223-native20-native25-private-assembly-v1/epoch-223-private-v3.jet",
+        ))
+    }
+}
 pub(super) fn pipeline_unit_range_for_epoch(
     phase: &str,
     unit: &str,
     epoch: u64,
 ) -> Result<std::ops::RangeInclusive<u64>> {
+    if epoch == 223 && private223_status_scope(phase, unit) {
+        return Ok(223..=223);
+    }
     if epoch == 160 && watch160::namespace(phase, unit) {
         return Ok(160..=160);
     }
@@ -1065,6 +1137,7 @@ fn validate_same_sample_admission(
             "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194"
         }
         223 if assembly223::namespace(claim) => assembly223::GUARD_SHA,
+        223 if verification223::namespace(claim) => verification223::GUARD_SHA,
         223 if tail223::namespace(claim) => tail223::GUARD_SHA,
         223 if prefix223::namespace(claim) => prefix223::GUARD_SHA,
         223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
@@ -1162,7 +1235,6 @@ fn validate_same_sample_admission(
                 || native144::namespace(claim)
                 || continuation144::namespace(claim)
                 || assembly144::namespace(claim)
-                || assembly223::namespace(claim)
             {
                 // The pinned eca guard predates bounded-canary fields.
                 guard.get("canary_target_error").is_none()
@@ -1240,7 +1312,10 @@ fn private_qualification_inventory_state(gate_state: &str) -> &str {
 }
 
 fn diagnostic_guard_workers_match(claim: &DiagnosticClaim, workers: &[Value]) -> bool {
-    if assembly144::namespace(claim) || assembly223::namespace(claim) {
+    if assembly144::namespace(claim)
+        || assembly223::namespace(claim)
+        || verification223::namespace(claim)
+    {
         workers.is_empty()
     } else {
         workers.len() == 1
@@ -1260,6 +1335,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if verification223::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| verification223::guard_matches(claim, &r, plan));
+    }
     if assembly223::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| assembly223::guard_matches(claim, &r, plan));
@@ -1416,6 +1495,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     }
     if native141::namespace(claim) || receipt["schema"] == native141::SCHEMA {
         return native141::launch(receipt, claim);
+    }
+    if verification223::namespace(claim) || receipt["schema"] == verification223::SCHEMA {
+        return verification223::launch(receipt, claim);
     }
     if assembly223::namespace(claim) || receipt["schema"] == assembly223::SCHEMA {
         return assembly223::launch(receipt, claim);
@@ -3108,6 +3190,9 @@ pub(super) async fn run() -> Result<()> {
             if continuation144::namespace(claim) {
                 continuation144::validate_live(claim, current)?;
             }
+            if verification223::namespace(claim) {
+                verification223::validate_live(claim, current)?;
+            }
             if assembly223::namespace(claim) {
                 assembly223::validate_live(claim, current)?;
             }
@@ -3252,6 +3337,8 @@ pub(super) async fn run() -> Result<()> {
                 "private-poh-diagnostic"
             } else if native141::namespace(claim) {
                 "native-ledger-read-only"
+            } else if verification223::namespace(claim) {
+                "private-verification-only"
             } else if assembly144::namespace(claim) || assembly223::namespace(claim) {
                 "private-assembly-only"
             } else if continuation144::namespace(claim) || continuation203::namespace(claim) {

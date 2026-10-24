@@ -1,0 +1,10 @@
+[Unit]
+Description=Protect private epoch 223 assembly capacity
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=5min
+AccuracySec=1s
+Unit=horizon-assembly223-protective-v1.service
+Persistent=no
+[Install]
+WantedBy=timers.target

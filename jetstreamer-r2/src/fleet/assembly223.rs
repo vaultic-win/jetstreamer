@@ -11,7 +11,7 @@ pub(super) const PLAN: &str =
     "/var/lib/jetstreamer/horizon-223-private-assembly-launch-v1/plan.json";
 pub(super) const STATE: &str = "/var/lib/jetstreamer/horizon-223-private-assembly-capture-v1";
 pub(super) const GUARD_SHA: &str =
-    "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194";
+    "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f";
 pub(super) const GUARD_UNIT: &str = "horizon-assembly223-protective-v1.service";
 pub(super) const GUARD_RECEIPTS: &str =
     "/var/lib/jetstreamer/horizon-assembly223-guard-receipts-v1";
@@ -206,7 +206,7 @@ fn limits(p: &BTreeMap<String, String>) -> Result<()> {
 pub(super) fn live_limits() -> Result<BTreeMap<String, String>> {
     let p = singleton227_capture::properties(
         UNIT,
-        "Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,User,UMask,CapabilityBoundingSet,AmbientCapabilities,ControlGroup",
+        "Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,User,UMask,CapabilityBoundingSet,AmbientCapabilities,ControlGroup,ExecMainStartTimestampMonotonic",
     )?;
     limits(&p)?;
     Ok(p)
@@ -289,7 +289,14 @@ pub(super) fn capture() -> Result<()> {
     }
     launch(&r, &c)?;
     live_owner(&r, &c, &before)?;
-    live_limits()?;
+    let captured_limits = live_limits()?;
+    ensure!(
+        captured_limits
+            .get("ExecMainStartTimestampMonotonic")
+            .and_then(|s| s.parse::<u64>().ok())
+            .is_some_and(|n| n > 0),
+        "assembly 223 authoritative invocation start is missing"
+    );
     // The actual checked assembler creates this intent only after authenticating
     // the genuine handoff, current idle sources, opened inputs and bounded owner.
     let intent_path = Path::new(ROOT).join("intent.json");
@@ -308,6 +315,8 @@ pub(super) fn capture() -> Result<()> {
             && intent["r2_mutations"] == false,
         "assembly 223 actual intent differs"
     );
+    r["producer_at_capture"] = before.clone();
+    r["producer_limits_at_capture"] = serde_json::to_value(&captured_limits)?;
     r["producer_intent"] = json!({"path":intent_path,"sha256":hex_lower(&Sha256::digest(&raw))});
     let f: BoundFile = serde_json::from_value(a["fleet_ledger"].clone())?;
     let o: BoundFile = serde_json::from_value(a["observer_receipt"].clone())?;

@@ -1,0 +1,27 @@
+# Source template only. Fill the plan digest from the actual immutable plan.
+[Unit]
+Description=Private epoch 223 native 20 and native 25 V3 assembly
+[Service]
+Type=exec
+User=root
+Group=root
+ExecStart=/var/lib/jetstreamer/horizon-223-private-assembly-tools-529fc90f-v1/jetstreamer-epoch223-private-assemble /var/lib/jetstreamer/horizon-223-private-assembly-launch-v1/plan.json @ACTUAL_PLAN_SHA256@ d1475bc12efb6f543c6772735c9ff08667b1ecd99660b01d6a390fbf87773eab
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=24h
+TimeoutStopSec=90s
+MemoryMax=64G
+MemoryHigh=48G
+MemorySwapMax=0
+CPUQuota=400%
+TasksMax=512
+UMask=0077
+PrivateNetwork=yes
+ProtectHome=read-only
+ProtectSystem=strict
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=/var/lib/jetstreamer/horizon-223-native20-native25-private-assembly-v1
+OOMPolicy=stop

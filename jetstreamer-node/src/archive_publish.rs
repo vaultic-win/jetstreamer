@@ -1175,6 +1175,83 @@ pub fn recover_archive_publication_batch(
     recover_archive_publication_batch_locked(destination_directory, &writer_lock)
 }
 
+/// Recover only the caller's exact armed batch, authenticating its manifest,
+/// epoch census and context while holding the destination writer lock before
+/// any recovery mutation. Foreign or unarmed batches are retained untouched.
+/// Existing unrestricted recovery remains a separate explicit policy API.
+pub fn recover_archive_publication_batch_with_expected_context(
+    destination_directory: &Path,
+    expected_destination: ArchiveBatchDestinationIdentity,
+    expected_manifest_fingerprint: [u8; 32],
+    expected_epochs: &[u64],
+    expected_context: &[u8],
+) -> Result<ArchiveBatchRecovery, ArchivePublicationError> {
+    if expected_manifest_fingerprint == [0; 32]
+        || expected_epochs.is_empty()
+        || expected_epochs.windows(2).any(|w| w[0] >= w[1])
+        || expected_context.is_empty()
+        || expected_context.len() > MAX_ARCHIVE_BATCH_CONTEXT_BYTES
+    {
+        return Err(preflight_error(
+            "invalid expected archive batch recovery scope".to_string(),
+        ));
+    }
+    let writer_lock =
+        acquire_archive_destination_writer_lock(destination_directory).map_err(|e| {
+            batch_indeterminate_error(
+                destination_directory,
+                format!("failed to acquire scoped archive recovery lock: {e}"),
+            )
+        })?;
+    if !writer_lock.binds_destination(expected_destination.device, expected_destination.inode) {
+        return Err(batch_indeterminate_error(
+            destination_directory,
+            "scoped archive recovery destination identity changed".to_string(),
+        ));
+    }
+    let destination = BoundDirectory::bind_absolute_nofollow(
+        destination_directory,
+        DirectoryPolicy::SharedDestination,
+    )
+    .map_err(preflight_error)?;
+    require_writer_lock_binding(&writer_lock, &destination)?;
+    let marker = bind_archive_batch_marker(&destination).map_err(preflight_error)?;
+    let outcome = bind_archive_batch_outcome(&destination).map_err(preflight_error)?;
+    if marker.is_some() && outcome.is_some() {
+        return Err(preflight_error(
+            "both active batch and completed outcome present".to_string(),
+        ));
+    }
+    let Some(marker) = marker.or(outcome) else {
+        return Ok(ArchiveBatchRecovery::None);
+    };
+    let completed = marker.path.file_name() == Some(OsStr::new(ARCHIVE_BATCH_OUTCOME_DIRECTORY));
+    lock_archive_batch_marker(&marker)
+        .map_err(|e| preflight_error_with_recovery(e, Some(marker.path.clone())))?;
+    let journal = read_archive_batch_journal(&destination, &marker)?.ok_or_else(|| {
+        preflight_error_with_recovery(
+            "scoped recovery refuses an unauthenticated unarmed batch".to_string(),
+            Some(marker.path.clone()),
+        )
+    })?;
+    if journal.manifest_fingerprint != expected_manifest_fingerprint
+        || journal.expected_epochs != expected_epochs
+        || journal.publication_context.as_deref() != Some(expected_context)
+    {
+        return Err(preflight_error_with_recovery(
+            "scoped recovery refuses a foreign batch manifest, epochs or publication context"
+                .to_string(),
+            Some(marker.path.clone()),
+        ));
+    }
+    if completed {
+        observe_finalized_archive_batch(&destination, &journal)
+            .map_err(|e| batch_indeterminate_error(destination_directory, e))
+    } else {
+        recover_bound_archive_batch(&destination, &marker, &journal)
+    }
+}
+
 fn recover_archive_publication_batch_locked(
     destination_directory: &Path,
     writer_lock: &ArchiveDestinationWriterLock,
@@ -6542,6 +6619,131 @@ mod tests {
             b"occupied"
         );
         assert!(items.iter().all(|item| item.staged_archive.is_file()));
+    }
+
+    #[test]
+    fn scoped_recovery_keeps_unarmed_and_foreign_active_markers_untouched() {
+        let (_root, items) = corrected_batch_fixture(8, false);
+        let destination = items[0].destination_archive.parent().unwrap();
+        let marker = destination.join(ARCHIVE_BATCH_TRANSACTION_DIRECTORY);
+        fs::create_dir(&marker).unwrap();
+        fs::set_permissions(&marker, fs::Permissions::from_mode(0o700)).unwrap();
+        let epochs = batch_expected_epochs(&items);
+        let context = b"exact private continuation recovery";
+        let error = recover_archive_publication_batch_with_expected_context(
+            destination,
+            expected_destination_identity(destination),
+            BATCH_MANIFEST_FINGERPRINT,
+            &epochs,
+            context,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("unarmed"), "{error}");
+        assert!(marker.is_dir());
+        assert_eq!(fs::read_dir(&marker).unwrap().count(), 0);
+        assert_batch_rolled_back(&items);
+        fs::remove_dir(&marker).unwrap();
+        let crashed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = publish_verified_archive_batch_with_expected_epochs_absence_and_hook(
+                BATCH_MANIFEST_FINGERPRINT,
+                &epochs,
+                &items,
+                Some(context),
+                false,
+                None,
+                |phase| {
+                    if phase == ArchiveBatchPhase::CommitDecisionDurable {
+                        panic!("simulated exact-context repair crash");
+                    }
+                    Ok(())
+                },
+            );
+        }));
+        assert!(crashed.is_err());
+        let journal = fs::read(marker.join(ARCHIVE_BATCH_JOURNAL)).unwrap();
+        let error = recover_archive_publication_batch_with_expected_context(
+            destination,
+            expected_destination_identity(destination),
+            BATCH_MANIFEST_FINGERPRINT,
+            &epochs,
+            b"unrelated repair",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("foreign batch"), "{error}");
+        assert_eq!(
+            fs::read(marker.join(ARCHIVE_BATCH_JOURNAL)).unwrap(),
+            journal
+        );
+        assert!(!destination.join(ARCHIVE_BATCH_OUTCOME_DIRECTORY).exists());
+        let ArchiveBatchRecovery::Committed(publication) =
+            recover_archive_publication_batch_with_expected_context(
+                destination,
+                expected_destination_identity(destination),
+                BATCH_MANIFEST_FINGERPRINT,
+                &epochs,
+                context,
+            )
+            .unwrap()
+        else {
+            panic!("expected authentic active commit recovery");
+        };
+        assert_batch_committed(&items);
+        acknowledge_archive_publication_batch(destination, publication.transaction_id).unwrap();
+    }
+
+    #[test]
+    fn scoped_recovery_authenticates_context_before_touching_a_completed_batch() {
+        let (_root, items) = corrected_batch_fixture(8, false);
+        let destination = items[0].destination_archive.parent().unwrap();
+        let epochs = batch_expected_epochs(&items);
+        let context = b"exact root-authenticated private repair context";
+        let publication = publish_verified_archive_batch_with_context(
+            BATCH_MANIFEST_FINGERPRINT,
+            &epochs,
+            &items,
+            context,
+        )
+        .unwrap();
+        let outcome = destination.join(ARCHIVE_BATCH_OUTCOME_DIRECTORY);
+        let before = fs::read(outcome.join(ARCHIVE_BATCH_JOURNAL)).unwrap();
+        for (fingerprint, scope, bytes) in [
+            ([9; 32], epochs.clone(), context.as_slice()),
+            (BATCH_MANIFEST_FINGERPRINT, vec![223], context.as_slice()),
+            (
+                BATCH_MANIFEST_FINGERPRINT,
+                epochs.clone(),
+                b"foreign context".as_slice(),
+            ),
+        ] {
+            let error = recover_archive_publication_batch_with_expected_context(
+                destination,
+                expected_destination_identity(destination),
+                fingerprint,
+                &scope,
+                bytes,
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("foreign batch"), "{error}");
+            assert_eq!(
+                fs::read(outcome.join(ARCHIVE_BATCH_JOURNAL)).unwrap(),
+                before
+            );
+            assert_batch_committed(&items);
+        }
+        let ArchiveBatchRecovery::Committed(recovered) =
+            recover_archive_publication_batch_with_expected_context(
+                destination,
+                expected_destination_identity(destination),
+                BATCH_MANIFEST_FINGERPRINT,
+                &epochs,
+                context,
+            )
+            .unwrap()
+        else {
+            panic!("expected exact committed recovery");
+        };
+        assert_eq!(recovered.transaction_id, publication.transaction_id);
+        acknowledge_archive_publication_batch(destination, publication.transaction_id).unwrap();
     }
 
     #[test]

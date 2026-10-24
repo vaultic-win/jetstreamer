@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, process::Command};
 mod event144;
 mod native_input;
 mod origin203;
+mod private223;
 mod warmup223;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -95,6 +96,7 @@ impl Binding {
             ("full-verification" | "plugin-verification", "verification")
             | ("private-cold-snapshot-verification", "verification")
             | ("private-warmup-reproduction", "verification")
+            | ("private-assembly-only" | "private-verification-only", "verification")
             | ("local-publication", "verification" | "publication")
             | ("producer-finalization", "verification" | "finalization")
             | ("controller-import-handoff", "verification" | "publication")
@@ -110,6 +112,8 @@ impl Binding {
             "producer-finalization"
                 | "private-cold-snapshot-verification"
                 | "private-warmup-reproduction"
+                | "private-assembly-only"
+                | "private-verification-only"
         ) {
             ensure!(
                 self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
@@ -453,6 +457,9 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
             && plan.binding.fleet_sha256 == plan.fleet.sha256,
         "pipeline model does not bind the coordinated fleet and v2 observation"
     );
+    if private223::selected(plan) {
+        return private223::sample(plan, observer, fleet, now);
+    }
     if native_input::selected(plan) {
         return native_input::sample(plan, observer, fleet, now);
     }
@@ -674,7 +681,9 @@ pub(super) async fn run() -> Result<()> {
     if plan.epoch == 144 {
         validate144_origin(&plan, &origin)?;
     }
-    if native_input::selected(&plan) {
+    if private223::selected(&plan) {
+        private223::validate_origin(&plan, &origin, &fleet)?;
+    } else if native_input::selected(&plan) {
         native_input::validate_origin(&plan, &origin, &fleet)?;
     } else if warmup223::selected(&plan) {
         warmup223::validate_origin(&plan, &origin, &fleet)?;
@@ -741,7 +750,9 @@ pub(super) async fn run() -> Result<()> {
         .checked_sub(origin_start)
         .context("producer origin starts after sample")?;
     let before = census(&plan, &fleet)?;
-    let identity = if native_input::selected(&plan) {
+    let identity = if private223::selected(&plan) {
+        private223::jet_identity(&plan)?
+    } else if native_input::selected(&plan) {
         native_input::zero_jet(&plan)?;
         None
     } else if warmup223::selected(&plan) {
@@ -769,7 +780,9 @@ pub(super) async fn run() -> Result<()> {
     validate_epoch_status(&status, plan.epoch)?;
     ensure!(
         census(&plan, &fleet)? == before
-            && if native_input::selected(&plan) {
+            && if private223::selected(&plan) {
+                private223::jet_identity(&plan)? == identity
+            } else if native_input::selected(&plan) {
                 native_input::zero_jet(&plan).is_ok()
             } else if warmup223::selected(&plan) {
                 warmup223::jet_identity(&plan)? == identity
@@ -827,7 +840,9 @@ pub(super) fn native_input_matches_status(
     epoch: u64,
     census: &BTreeMap<String, Value>,
 ) -> bool {
-    native_input::matches(receipt, epoch, census) || warmup223::matches(receipt, epoch, census)
+    native_input::matches(receipt, epoch, census)
+        || warmup223::matches(receipt, epoch, census)
+        || private223::matches(receipt, epoch, census)
 }
 
 #[cfg(test)]

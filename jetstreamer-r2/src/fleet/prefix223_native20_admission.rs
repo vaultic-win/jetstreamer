@@ -113,6 +113,7 @@ fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
         ),
         c::UNIT => (c::PROTECTIVE, c::GUARD_RECEIPTS),
         assembly223::UNIT => (assembly223::GUARD_UNIT, assembly223::GUARD_RECEIPTS),
+        verification223::UNIT => (verification223::GUARD_UNIT, verification223::GUARD_RECEIPTS),
         singleton209::UNIT => (
             "horizon-singleton209-protective-v1.service",
             "/var/lib/jetstreamer/horizon-singleton209-guard-receipts-v1",

@@ -28,6 +28,7 @@ const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2"
 mod append_log;
 mod host_pressure;
 mod native_input_diagnostic;
+mod private_archive223;
 mod rss;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
@@ -131,6 +132,8 @@ struct ReplayConfig {
     worker_executable_basename: String,
     #[serde(default)]
     append_log: Option<append_log::Config>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    private_archive223: Option<private_archive223::Binding>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -231,6 +234,8 @@ struct WorkerObservation {
     executable_beneath_bound_scratch: bool,
     vmas: u64,
     matching_workers: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    private_archive_parent: Option<private_archive223::Proof>,
 }
 
 #[derive(Debug, Serialize)]
@@ -455,9 +460,14 @@ fn validate_replay_configs(
     replays: &[ReplayConfig],
     diagnostic_replays: &[ReplayConfig],
 ) -> Result<()> {
+    ensure!(
+        replays.iter().all(|r| r.private_archive223.is_none()),
+        "private archive parent telemetry is diagnostic only"
+    );
     let mut ranges = std::collections::BTreeSet::new();
     let mut intervals = Vec::new();
     for replay in replays.iter().chain(diagnostic_replays) {
+        private_archive223::validate(replay)?;
         ensure!(!replay.range.is_empty(), "replay range is empty");
         ensure!(
             ranges.insert(&replay.range),
@@ -1279,6 +1289,7 @@ fn observe_worker(scratch: &Path, executable_basename: &str) -> Result<WorkerObs
         executable,
         vmas: maps.lines().count() as u64,
         matching_workers: 1,
+        private_archive_parent: None,
     })
 }
 
@@ -1460,8 +1471,11 @@ fn stable_worker(before: &WorkerObservation, after: &WorkerObservation) -> bool 
         && before.executable == after.executable
         && before.matching_workers == 1
         && after.matching_workers == 1
-        && before.executable_beneath_bound_scratch
-        && after.executable_beneath_bound_scratch
+        && ((before.executable_beneath_bound_scratch
+            && after.executable_beneath_bound_scratch
+            && before.private_archive_parent.is_none()
+            && after.private_archive_parent.is_none())
+            || private_archive223::stable(before, after))
 }
 
 fn decimal_after(message: &str, prefix: &str) -> Option<u64> {
@@ -1683,7 +1697,11 @@ fn observe_replay_for_role(
         &replay.expected_producer_invocation_id,
         role,
     )?;
-    let worker_before = observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?;
+    let worker_before = if replay.private_archive223.is_some() {
+        private_archive223::observe(replay, &producer_before)?
+    } else {
+        observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?
+    };
     let scratch_pass_1 = scan_scratch(&replay.scratch_path)?;
     let scratch_pass_2 = scan_scratch(&replay.scratch_path)?;
     let controller_after = observe_unit_for_role(
@@ -1696,7 +1714,11 @@ fn observe_replay_for_role(
         &replay.expected_producer_invocation_id,
         role,
     )?;
-    let worker_after = observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?;
+    let worker_after = if replay.private_archive223.is_some() {
+        private_archive223::observe(replay, &producer_after)?
+    } else {
+        observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?
+    };
     let producer_cgroup_counter_delta = counter_deltas(
         &producer_before.cgroup.counters,
         &producer_after.cgroup.counters,
@@ -2334,6 +2356,7 @@ mod tests {
             scratch_path: "/private/diagnostic/scratch".into(),
             worker_executable_basename: "historical-worker".into(),
             append_log: None,
+            private_archive223: None,
         }
     }
 
@@ -2843,6 +2866,7 @@ mod tests {
             scratch_path: PathBuf::from("/scratch"),
             worker_executable_basename: "worker".to_owned(),
             append_log: None,
+            private_archive223: None,
         };
         let producer_before = UnitObservation {
             unit: "producer.service".to_owned(),
@@ -2873,6 +2897,7 @@ mod tests {
             executable_beneath_bound_scratch: true,
             vmas: 120,
             matching_workers: 1,
+            private_archive_parent: None,
         };
         let useful_work = ProgressWindow {
             append_log_evidence: None,

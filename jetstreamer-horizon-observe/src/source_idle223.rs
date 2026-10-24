@@ -1,4 +1,4 @@
-//! Closed current-source-idle checks shared by223 admission and assembly.
+//! Closed current-source-idle checks shared by 223 admission and assembly.
 //! Historical success/lineage must be authenticated by the handoff caller.
 //! No resource sample, file mutation, service action, signal or remote access.
 use anyhow::{Context, Result, ensure};
@@ -47,7 +47,7 @@ impl Source {
 struct Owner<'a> {
     unit: &'static str,
     invocation: &'a str,
-    archive: &'static Path,
+    archive: &'a Path,
 }
 impl<'a> Owner<'a> {
     fn unit(self) -> &'static str {
@@ -56,7 +56,7 @@ impl<'a> Owner<'a> {
     fn historical_invocation(self) -> &'a str {
         self.invocation
     }
-    fn archive(self) -> &'static Path {
+    fn archive(self) -> &'a Path {
         self.archive
     }
 }
@@ -84,6 +84,28 @@ fn assembly_owner(invocation: &str) -> Result<Owner<'_>> {
         archive: Path::new(
             "/var/lib/jetstreamer/horizon-223-native20-native25-private-assembly-v1/epoch-223-private-v3.jet",
         ),
+    })
+}
+fn verification_owner<'a>(invocation: &'a str, archive: &'a Path) -> Result<Owner<'a>> {
+    // Reuse the exact nonzero invocation grammar; do not infer historical success.
+    assembly_owner(invocation)?;
+    ensure!(
+        archive.is_absolute()
+            && archive.file_name().is_some_and(|n| n == "epoch-223.jet")
+            && archive.parent().is_some_and(|directory| directory.parent()
+                == Some(Path::new("/var/lib/jetstreamer"))
+                && directory
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("horizon-223-private-v3-scan-")
+                        && n.len() > "horizon-223-private-v3-scan-".len()
+                        && n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))),
+        "verification archive escaped the private 223 scan namespace"
+    );
+    Ok(Owner {
+        unit: "horizon-verify-223-native20-native25-private-v3-v1.service",
+        invocation,
+        archive,
     })
 }
 fn digest(bytes: &[u8]) -> String {
@@ -322,6 +344,11 @@ pub fn observe(source: Source) -> Result<Value> {
 pub fn observe_assembly(invocation: &str) -> Result<Value> {
     observe_owner(assembly_owner(invocation)?)
 }
+/// Current idle only for the exact private 223 verifier and canonical-name copy.
+/// The caller must independently authenticate genuine terminal success first.
+pub fn observe_verification(invocation: &str, archive: &Path) -> Result<Value> {
+    observe_owner(verification_owner(invocation, archive)?)
+}
 fn observe_owner(source: Owner<'_>) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -389,6 +416,28 @@ mod tests {
         ] {
             assert!(assembly_owner(bad).is_err(), "{bad}");
         }
+    }
+    #[test]
+    fn verification_owner_is_scoped_to_one_private_scan_copy() {
+        let iid = "1".repeat(32);
+        let good =
+            Path::new("/var/lib/jetstreamer/horizon-223-private-v3-scan-attempt1/epoch-223.jet");
+        let owner = verification_owner(&iid, good).unwrap();
+        assert_eq!(owner.archive(), good);
+        assert_eq!(
+            owner.unit(),
+            "horizon-verify-223-native20-native25-private-v3-v1.service"
+        );
+        for bad in [
+            "/tmp/horizon-223-private-v3-scan-attempt1/epoch-223.jet",
+            "/var/lib/jetstreamer/horizon-223-private-v3-scan-/epoch-223.jet",
+            "/var/lib/jetstreamer/horizon-223-private-v3-scan-attempt1/epoch-224.jet",
+            "/var/lib/jetstreamer/horizon-223-private-v3-scan-attempt1/sub/epoch-223.jet",
+            "/var/lib/jetstreamer/horizon-223-private-v3-scan-../epoch-223.jet",
+        ] {
+            assert!(verification_owner(&iid, Path::new(bad)).is_err(), "{bad}");
+        }
+        assert!(verification_owner(&"0".repeat(32), good).is_err());
     }
     #[test]
     fn complete_unloaded_census_is_distinct_from_failed_show_or_missing_properties() {

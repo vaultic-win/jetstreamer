@@ -1,6 +1,6 @@
-//! Preserve all existing prefix/full210 owners and add only exact private assembly.
-use super::assembly223 as c;
-use super::prefix223_live_sources as base;
+//! Preserve all existing prefix/full210 owners and add only exact private verification.
+use super::assembly223_live_peer as base;
+use super::verification223 as c;
 use super::*;
 #[cfg(test)]
 pub(super) use base::fixture_row;
@@ -9,7 +9,7 @@ fn without(f: &Value) -> Result<Value> {
     let mut count = 0;
     for row in f["active"]
         .as_array()
-        .context("assembly 223 complete owner roster")?
+        .context("verification 223 complete owner roster")?
     {
         if row["epoch"] == 223 {
             count += 1;
@@ -21,7 +21,7 @@ fn without(f: &Value) -> Result<Value> {
         ensure!(
             !seen
                 && row["epoch"] == 223
-                && row["phase"] == "private-assembly-only"
+                && row["phase"] == "private-verification-only"
                 && row["ordinary_replay_claim"] == false
                 && owner["NRestarts"] == "0"
                 && owner["InvocationID"]
@@ -29,13 +29,13 @@ fn without(f: &Value) -> Result<Value> {
                     .is_some_and(|s| s.len() == 32)
                 && row["launch_receipt"] == format!("{}/launch.json", c::STATE)
                 && canonical_digest(&row["launch_receipt_sha256"]),
-            "assembly 223 duplicate, changed or unrelated owner"
+            "verification 223 duplicate, changed or unrelated owner"
         );
         seen = true;
     }
     ensure!(
         !seen || count == 1,
-        "assembly 223 overlaps another active epoch 223 owner"
+        "verification 223 overlaps another active epoch 223 owner"
     );
     let mut out = f.clone();
     out["active"]
@@ -48,11 +48,11 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
     let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
         path: f["plan"]
             .as_str()
-            .context("assembly 223 fleet plan")?
+            .context("verification 223 fleet plan")?
             .into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("assembly 223 plan digest")?
+            .context("verification 223 plan digest")?
             .into(),
     })?)?;
     let found = plan
@@ -62,7 +62,7 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
         .collect::<Vec<_>>();
     ensure!(
         found.len() == 1,
-        "assembly 223 needs exactly one authenticated claim"
+        "verification 223 needs exactly one authenticated claim"
     );
     let d = found[0];
     let owner = singleton227_admission::active_owner(row)?;
@@ -71,8 +71,8 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
             && owner["Id"] == d.unit
             && row["launch_receipt"].as_str() == d.launch_receipt.path.to_str()
             && row["launch_receipt_sha256"] == d.launch_receipt.sha256
-            && d.scratch_path == Path::new(c::ROOT),
-        "assembly 223 claim/accepted owner differs"
+            && c::root_scope(&d.scratch_path),
+        "verification 223 claim/accepted owner differs"
     );
     let r = checked_diagnostic_launch(d)?;
     Ok((
@@ -92,7 +92,7 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
 fn rows(f: &Value) -> Result<Vec<&Value>> {
     Ok(f["active"]
         .as_array()
-        .context("assembly 223 owner census")?
+        .context("verification 223 owner census")?
         .iter()
         .filter(|r| singleton227_admission::active_owner(r).is_ok_and(|u| u["Id"] == c::UNIT))
         .collect())
@@ -103,7 +103,7 @@ pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
     if !rows(f)?.is_empty() {
         ensure!(
             names.insert(c::UNIT.into()),
-            "assembly 223 duplicate capacity owner"
+            "verification 223 duplicate capacity owner"
         );
     }
     Ok(names)
@@ -135,13 +135,13 @@ pub(super) fn disk(
         let (d, r) = claim(f, row)?;
         let gb = remaining
             .remove(c::UNIT)
-            .context("assembly 223 protective guard omitted")?;
+            .context("verification 223 protective guard omitted")?;
         let g = bound_json(&gb)?;
         let pb: BoundFile = serde_json::from_value(r["guard_plan"].clone())?;
         let p = bound_json(&pb)?;
         let t = g["recorded_unix_seconds"]
             .as_u64()
-            .context("assembly 223 guard timestamp")?;
+            .context("verification 223 guard timestamp")?;
         ensure!(
             c::guard_matches(&d, &r, &p)
                 && g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
@@ -182,7 +182,7 @@ pub(super) fn disk(
                 .all(|k| g.get(*k).is_some_and(Value::is_null))
                 && g["r2_mutations"] == false
                 && g["remote_mutations"] == false,
-            "assembly 223 protective evidence changed/stale/tripped"
+            "verification 223 protective evidence changed/stale/tripped"
         );
         let selected = warmup223::completed_guard_binding(
             c::GUARD_UNIT,
@@ -192,7 +192,7 @@ pub(super) fn disk(
         )?;
         ensure!(
             selected["binding"] == private157::binding(&gb),
-            "assembly 223 guard is not latest completed fire"
+            "verification 223 guard is not latest completed fire"
         );
         let timer = singleton227_capture::properties(
             &c::GUARD_UNIT.replace(".service", ".timer"),
@@ -200,21 +200,21 @@ pub(super) fn disk(
         )?;
         ensure!(
             timer.get("ActiveState").is_some_and(|s| s == "active"),
-            "assembly 223 protective timer inactive"
+            "verification 223 protective timer inactive"
         );
-        // No guessed allocation credit: eca's natural guard does not measure the
+        // No guessed allocation credit: the natural guard does not measure the
         // root. Keep the entire capped archive/metadata claim reserved.
         extra = extra
             .checked_add(c::PEAK)
-            .context("assembly 223 growth overflow")?;
+            .context("verification 223 growth overflow")?;
         evidence.push(json!({"epoch":223,"unit":d.unit,"invocation_id":d.invocation_id,"guard":private157::binding(&gb),
-            "remaining_growth_bytes":c::PEAK,"scratch_growth_credit_bytes":0,"source":"exact bounded private assembler; conservative full output reservation"}));
+            "remaining_growth_bytes":c::PEAK,"scratch_growth_credit_bytes":0,"source":"exact bounded private verifier; conservative full output reservation"}));
     }
     let (n, more) = base::disk(&v, o, &remaining, sample, now)?;
     evidence.extend(more);
     Ok((
         n.checked_add(extra)
-            .context("assembly 223 combined growth overflow")?,
+            .context("verification 223 combined growth overflow")?,
         evidence,
     ))
 }
@@ -224,11 +224,11 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut proof = Vec::new();
     for row in rows(f)? {
         let (d, _) = claim(f, row)?;
-        c::live_limits()?;
+        c::live_limits(&d.scratch_path)?;
         let path = Path::new("/sys/fs/cgroup/system.slice").join(c::UNIT);
         ensure!(
             path.canonicalize()? == path,
-            "assembly 223 cgroup redirected"
+            "verification 223 cgroup redirected"
         );
         let read =
             |n: &str| -> Result<u64> { Ok(fs::read_to_string(path.join(n))?.trim().parse()?) };
@@ -239,18 +239,18 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
                 && read("memory.high")? == (48u64 << 30)
                 && read("memory.swap.max")? == 0
                 && charge <= cap,
-            "assembly 223 cgroup envelope changed"
+            "verification 223 cgroup envelope changed"
         );
         extra = extra
             .checked_add(cap - charge)
-            .context("assembly 223 memory overflow")?;
+            .context("verification 223 memory overflow")?;
         proof.push(json!({"unit":d.unit,"invocation_id":d.invocation_id,"hard_memory_cap_bytes":cap,"current_cgroup_charge_bytes":charge,"remaining_hard_memory_growth_bytes":cap-charge}));
     }
     let (n, more) = base::memory(&without(f)?)?;
     proof.extend(more);
     Ok((
         n.checked_add(extra)
-            .context("assembly 223 combined memory overflow")?,
+            .context("verification 223 combined memory overflow")?,
         proof,
     ))
 }
@@ -258,14 +258,14 @@ pub(super) fn limits(f: &Value) -> Result<Value> {
     roster(f)?;
     let mut out = base::limits(&without(f)?)?;
     for row in rows(f)? {
-        claim(f, row)?;
-        let p = c::live_limits()?;
+        let (d, _) = claim(f, row)?;
+        let p = c::live_limits(&d.scratch_path)?;
         ensure!(
             out.as_object_mut()
                 .context("protected caps")?
                 .insert(c::UNIT.into(), json!(p))
                 .is_none(),
-            "assembly 223 cap collision"
+            "verification 223 cap collision"
         );
     }
     Ok(out)
@@ -277,7 +277,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
         let (d, _) = claim(f, row)?;
         let live = current
             .get(c::UNIT)
-            .context("assembly 223 current owner omitted")?;
+            .context("verification 223 current owner omitted")?;
         c::validate_live(&d, live)?;
         let old = singleton227_admission::active_owner(row)?;
         for k in [
@@ -289,7 +289,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
             "ActiveState",
             "SubState",
         ] {
-            ensure!(old[k] == live[k], "assembly 223 owner changed:{k}");
+            ensure!(old[k] == live[k], "verification 223 owner changed:{k}");
         }
     }
     Ok(())
@@ -298,7 +298,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
 mod tests {
     use super::*;
     fn assembly() -> Value {
-        json!({"epoch":223,"phase":"private-assembly-only","ordinary_replay_claim":false,
+        json!({"epoch":223,"phase":"private-verification-only","ordinary_replay_claim":false,
             "launch_receipt":format!("{}/launch.json",c::STATE),"launch_receipt_sha256":"c".repeat(64),
             "producer":{"Id":c::UNIT,"InvocationID":"1".repeat(32),"NRestarts":"0"}})
     }

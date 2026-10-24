@@ -1,0 +1,21 @@
+# Reuse the already sealed Foundation guard bytes; preserve all older plans.
+[Unit]
+Description=Protect the private epoch 223 V3 assembler
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard @ACTUAL_GUARD_PLAN_PATH@ --plan-sha256 @ACTUAL_GUARD_PLAN_SHA256@ --self-sha256 044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f
+Restart=no
+TimeoutStartSec=180s
+MemoryMax=512M
+MemorySwapMax=0
+TasksMax=256
+UMask=0077
+PrivateNetwork=yes
+ProtectHome=read-only
+ProtectSystem=strict
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=/var/lib/jetstreamer/horizon-assembly223-guard-receipts-v1

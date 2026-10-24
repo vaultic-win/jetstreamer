@@ -1,0 +1,27 @@
+# Source template only. All digests and the private attempt path are actual inputs.
+[Unit]
+Description=Independently verify private epoch 223 V3 archive and current plugin
+[Service]
+Type=exec
+User=root
+Group=root
+ExecStart=@SEALED_PRIVATE_V3_VERIFIER@ @ACTUAL_VERIFICATION_PLAN@ @ACTUAL_PLAN_SHA256@ @ACTUAL_VERIFIER_SHA256@
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=24h
+TimeoutStopSec=90s
+MemoryMax=64G
+MemoryHigh=48G
+MemorySwapMax=0
+CPUQuota=800%
+TasksMax=512
+UMask=0077
+PrivateNetwork=yes
+ProtectHome=read-only
+ProtectSystem=strict
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=@ACTUAL_PRIVATE_VERIFICATION_DIRECTORY@
+OOMPolicy=stop
