@@ -352,14 +352,74 @@ fn no_queued_entry_jobs(jobs: &Value) -> Result<()> {
     Ok(())
 }
 fn queued_entry_check() -> Result<()> {
-    let out = std::process::Command::new("/usr/bin/systemctl")
-        .args(["list-jobs", "--output=json", "--no-pager"])
+    let out = std::process::Command::new("/usr/bin/busctl")
+        .args([
+            "--system",
+            "--json=short",
+            "call",
+            "org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1",
+            "org.freedesktop.systemd1.Manager",
+            "ListJobs",
+        ])
         .output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 1 << 20,
         "185 queued-job census unavailable"
     );
-    no_queued_entry_jobs(&serde_json::from_slice(&out.stdout)?)
+    no_queued_entry_jobs(&decode_native_jobs(
+        &serde_json::from_slice(&out.stdout).context("185 native ListJobs JSON framing")?,
+    )?)
+}
+fn decode_native_jobs(v: &Value) -> Result<Value> {
+    ensure!(
+        v["type"] == "a(usssoo)",
+        "185 native ListJobs signature differs"
+    );
+    let returns = v["data"]
+        .as_array()
+        .context("185 native ListJobs method returns")?;
+    ensure!(
+        returns.len() == 1,
+        "185 native ListJobs return count differs"
+    );
+    let jobs = returns[0]
+        .as_array()
+        .context("185 native ListJobs job array")?;
+    let mut rows = Vec::new();
+    let mut ids = std::collections::BTreeSet::new();
+    for value in jobs {
+        let job = value.as_array().context("185 native ListJobs tuple")?;
+        ensure!(job.len() == 6, "185 native ListJobs tuple arity differs");
+        let id = job[0]
+            .as_u64()
+            .filter(|id| *id > 0 && *id <= u64::from(u32::MAX))
+            .context("185 native ListJobs job ID")?;
+        let unit = job[1]
+            .as_str()
+            .filter(|unit| {
+                !unit.is_empty()
+                    && unit.len() <= 255
+                    && !unit
+                        .bytes()
+                        .any(|b| b.is_ascii_control() || b.is_ascii_whitespace())
+            })
+            .context("185 native ListJobs unit")?;
+        ensure!(
+            ids.insert(id)
+                && job[2].as_str().is_some_and(|s| !s.is_empty())
+                && matches!(job[3].as_str(), Some("waiting" | "running"))
+                && job[4] == format!("/org/freedesktop/systemd1/job/{id}")
+                && job[5]
+                    .as_str()
+                    .and_then(|s| s.strip_prefix("/org/freedesktop/systemd1/unit/"))
+                    .is_some_and(|s| !s.is_empty()
+                        && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')),
+            "185 native ListJobs identity, state or object path differs"
+        );
+        rows.push(json!({"unit":unit}));
+    }
+    Ok(Value::Array(rows))
 }
 fn fresh(p: &Close) -> Result<Value> {
     let c = bound(&p.census)?;
@@ -889,6 +949,51 @@ mod tests {
             assert!(no_queued_entry_jobs(&json!([{"unit":unit}])).is_err());
         }
         assert!(no_queued_entry_jobs(&json!([{}])).is_err());
+    }
+    #[test]
+    fn native_job_method_return_preserves_empty_and_running_queue_semantics() {
+        let empty = json!({"type":"a(usssoo)","data":[[]]});
+        assert_eq!(decode_native_jobs(&empty).unwrap(), json!([]));
+        let row = json!([
+            16313068,
+            "horizon-old185-listjobs-format-proof.service",
+            "start",
+            "running",
+            "/org/freedesktop/systemd1/job/16313068",
+            "/org/freedesktop/systemd1/unit/horizon_2dold185_2dlistjobs_2dformat_2dproof_2eservice"
+        ]);
+        let valid = json!({"type":"a(usssoo)","data":[[row]]});
+        let decoded = decode_native_jobs(&valid).unwrap();
+        no_queued_entry_jobs(&decoded).unwrap();
+        let mut entry = valid.clone();
+        entry["data"][0][0][1] = json!("jetstreamer-root-sweep-e185-replacement.service");
+        assert!(no_queued_entry_jobs(&decode_native_jobs(&entry).unwrap()).is_err());
+        for bad in [
+            json!({"type":"a(usssoo)","data":[]}),
+            json!({"type":"a(usssoo)","data":[row]}),
+            json!({"type":"wrong","data":[[]]}),
+            json!({"type":"a(usssoo)","data":[[row,row]]}),
+        ] {
+            assert!(decode_native_jobs(&bad).is_err());
+        }
+        for (i, value) in [
+            (0, json!(0)),
+            (1, json!("")),
+            (2, json!(false)),
+            (3, json!("unknown")),
+            (4, json!("/org/freedesktop/systemd1/job/1")),
+            (5, json!("/foreign/object")),
+        ] {
+            let mut bad = valid.clone();
+            bad["data"][0][0][i] = value;
+            assert!(decode_native_jobs(&bad).is_err(), "field{i}");
+        }
+        assert!(
+            serde_json::from_str::<Value>(
+                "16313068 horizon-old185-listjobs-format-proof.service start running\n"
+            )
+            .is_err()
+        );
     }
     #[test]
     fn guards_cover_exact_live_replay_owners_without_relabelling_private_work() {
