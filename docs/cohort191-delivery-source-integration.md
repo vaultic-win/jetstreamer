@@ -160,7 +160,10 @@ collector, and the fixed event-directory namespace; publication_authorized,
 replay_launch_authorized and r2_mutations are all false. This deliberately uses
 the observer-independent terminal-transition proof, not a future complete
 queue/status event. The normal plan/receipt readers enforce root ownership,
-actual SHA binding and immutable handoff/collection plans.
+actual SHA binding and immutable handoff/collection plans. An optional explicit sample_target_utc may postpone a
+missed successor only on the original30minute grid; the actual predecessor and
+minimum1800seconds remain unchanged. No timestamp is guessed from wall time and
+no extra resource observation is taken.
 
 The preparation consumes the last accepted completed five-owner cycle. It
 requires exactly152–153,155–156,191–194,183–184,185, unchanged paired owner IDs,
