@@ -67,6 +67,31 @@ fn shape(v: &Value, target: u64) -> Result<()> {
             && end["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448",
         "191 pending proof lacks native producer exit"
     );
+    let captured = v["recorded_unix_seconds"]
+        .as_u64()
+        .context("191 pending capture time missing")?;
+    let ended = end["__REALTIME_TIMESTAMP"]
+        .as_str()
+        .context("191 pending native end time missing")?
+        .parse::<u64>()?;
+    ensure!(
+        ended > 0
+            && ended
+                <= captured
+                    .checked_mul(1_000_000)
+                    .context("191 capture clock overflow")?,
+        "191 pending capture backdates native producer exit"
+    );
+    for role in ["controller", "importer"] {
+        ensure!(
+            v[role]["LoadState"] == "loaded"
+                && v[role]["NRestarts"] == "0"
+                && v[role]["MainPID"]
+                    .as_str()
+                    .is_some_and(|s| s.parse::<u64>().is_ok_and(|n| n > 0)),
+            "191 pending proof lacks a live original actor"
+        );
+    }
     jetstreamer_horizon_observe::cohort191_delivery_model::validate_native_terminal(
         &v["native_events"],
         target,
