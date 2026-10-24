@@ -654,7 +654,7 @@ mod tests {
                 .err()
                 .unwrap()
                 .to_string()
-                .contains("native207")
+                .contains("native 207")
         );
     }
 }
