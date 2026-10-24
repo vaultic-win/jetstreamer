@@ -247,12 +247,19 @@ pub(super) fn run() -> Result<()> {
         "node_sha256":c::NODE_SHA,"worker_sha256":c::WORKER_SHA,"snapshot_sha256":c::SNAPSHOT_SHA,"runtime":"solana-v1.6.20",
         "bootstrap_slot":96335538u64,"terminal_root_slot":96767522u64,"output_slot_start":96336000u64,"output_slot_count":431523,"uncovered_suffix_slots":477,
         "natural_parent_completion_required":true,"maximum_scratch_bytes":300_000_000_000u64,"experimental_envelope_bytes":c::PEAK,"maximum_memory_bytes":c::MEMORY,"maximum_runtime_seconds":259200,
-        "guard_minimum_free_bytes":c::FLOOR,"required_initial_free_bytes":c::INITIAL,"expected_exec_start":own["ExecStart"],
-        "capability":a["capability"],"resource_plan":a["resource_plan"],"warmup_terminal":a["warmup_terminal"],"admission":private157::binding(&s.admission),
+        "guard_minimum_free_bytes":c::FLOOR,"required_initial_free_bytes":c::INITIAL,"expected_exec_start":own["ExecStart"]});
+    let provenance = json!({"capability":a["capability"],"resource_plan":a["resource_plan"],"warmup_terminal":a["warmup_terminal"],"admission":private157::binding(&s.admission),
         "guard":private157::binding(&s.guard),"guard_plan":private157::binding(&s.guard_plan),"guard_manager":completed,"sandbox":props,
         "observer":a["observer"],"fleet":a["fleet"],"recorded_unix_seconds":now,"sampled_at_utc":publication203::utc(now)?,"resource_samples_taken":0,"entry_replay":true,"ordinary_replay_claim":false,"public_sidecar_countdown_authorized":true,
         "capture_spec":private157::binding(&binding),"capture_helper_sha256":self_sha,
         "evidence":{"units":[{"unit":c::UNIT,"invocation_id":iid,"restarts":0,"load_state":"loaded","active_state":"active","sub_state":"running","main_pid":g["producer"]["pid"],"result":"success"}]}});
+    for (key, field) in provenance
+        .as_object()
+        .context("prefix capture provenance")?
+    {
+        ensure!(v.get(key).is_none(), "duplicate prefix capture field:{key}");
+        v[key] = field.clone();
+    }
     for key in [
         "ordinary_replay_authorized",
         "full_cold_epoch_peak_qualified",

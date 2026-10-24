@@ -465,11 +465,21 @@ pub(super) fn run() -> Result<()> {
         "auxiliary_memory_growth_bytes":auxiliary,"host_total_memory_bytes":total,"required_available_memory_bytes":required_memory,
         "sampled_available_memory_bytes":available,"actual_available_memory_before_bytes":memory_before,"actual_available_memory_after_bytes":memory_after,
         "sampled_free_bytes":sampled_free,"actual_free_before_bytes":free_before,"actual_free_after_bytes":free_after,
-        "protected_growth_evidence":measurements,"protected_growth_evidence_after":after_measurements,"protected_memory_evidence":memory_evidence,
-        "capability":{"path":c::CAPABILITY,"sha256":c::CAPABILITY_SHA},"warmup_terminal":{"path":c::WARMUP,"sha256":c::WARMUP_SHA},"resource_plan":{"path":c::PLAN,"sha256":c::PLAN_SHA},
+        "protected_growth_evidence":measurements,"protected_growth_evidence_after":after_measurements,"protected_memory_evidence":memory_evidence});
+    let provenance = json!({"capability":{"path":c::CAPABILITY,"sha256":c::CAPABILITY_SHA},"warmup_terminal":{"path":c::WARMUP,"sha256":c::WARMUP_SHA},"resource_plan":{"path":c::PLAN,"sha256":c::PLAN_SHA},
         "spec":private157::binding(&binding),"self_sha256":self_sha,"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"protected_guards":s.protected_guards,"protected_guard_history":guard_history,
         "unit_census_before":before,"unit_census_after":after,"fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"memory_target_percent":90,
         "recorded_unix_seconds":now,"replay_launch_authorized":false});
+    for (key, field) in provenance
+        .as_object()
+        .context("prefix admission provenance")?
+    {
+        ensure!(
+            value.get(key).is_none(),
+            "duplicate prefix admission field:{key}"
+        );
+        value[key] = field.clone();
+    }
     for key in [
         "ordinary_replay_authorized",
         "full_cold_epoch_peak_qualified",
