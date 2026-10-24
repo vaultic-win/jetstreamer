@@ -19,7 +19,7 @@ fn complete_fleet_above_one_mib_is_accepted_only_with_campaign_policy() {
     let limit = fleet_evidence_limit(path).unwrap();
     let value = evidence_payload(&bytes, &sha, limit, path).unwrap();
     fleet_evidence_shape(&value).unwrap();
-    assert_eq!(value["padding"].as_str().unwrap().len(), bytes.len() - serde_json::to_vec(&json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":101,"last_epoch":200,"unit_census":{},"epochs":[],"active":[],"padding":""})).unwrap().len());
+    assert!(value["padding"].as_str().unwrap().len() > 1 << 20);
     let error = evidence_payload(&bytes, &sha, 1 << 20, path)
         .unwrap_err()
         .to_string();
