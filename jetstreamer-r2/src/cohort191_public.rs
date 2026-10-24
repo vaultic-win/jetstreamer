@@ -163,11 +163,7 @@ pub(super) fn run() -> Result<()> {
     let (head, _) = queue::read_head()?;
     let (selected, state, _, _) = queue::selected_state(&head, cutoff)?;
     let queue_plan_value = bound(&ctx.queue_plan, true)?;
-    let queue_program: Bound = serde_json::from_value(queue_plan_value["program"].clone())?;
     let manager = fleet::unit(queue::UNIT)?;
-    let iid = manager["InvocationID"]
-        .as_str()
-        .context("191 actual queue IID")?;
     let mut claims = vec![];
     let mut epochs = vec![];
     let mut gates = BTreeMap::new();
@@ -277,17 +273,7 @@ pub(super) fn run() -> Result<()> {
             tail = complete.clone();
             ready_receipts.insert(epoch, serde_json::from_value(row["ready_receipt"].clone())?);
         } else {
-            claims.push(Claim {
-                epoch,
-                phase: "cohort191-delivery".into(),
-                unit: queue::UNIT.into(),
-                invocation_id: iid.into(),
-                expected_exec_start: manager["ExecStart"]
-                    .as_str()
-                    .context("191 actual queue argv")?
-                    .into(),
-                program: Some(queue_program.clone()),
-            });
+            claims.push(native_queue_claim(epoch, &manager, &queue_plan_value)?);
         }
         epochs.push(json!({"epoch":epoch,"full":full,"plugin":plugin,"boundary":if ready{complete.clone()}else{queued(ctx.boundary_budget_millis)},"upload":upload,"readback":readback,"source_revalidation_and_sidecar":tail,"authenticated_ready_pair":ready}));
     }
@@ -346,9 +332,36 @@ pub(super) fn run() -> Result<()> {
     Ok(())
 }
 
+fn native_queue_claim(epoch: u64, manager: &Value, plan: &Value) -> Result<Claim> {
+    Ok(Claim {
+        epoch,
+        phase: "cohort191-delivery".into(),
+        unit: queue::UNIT.into(),
+        invocation_id: manager["InvocationID"]
+            .as_str()
+            .context("191 actual queue IID")?
+            .into(),
+        expected_exec_start: manager["ExecStart"]
+            .as_str()
+            .context("191 actual queue argv")?
+            .into(),
+        program: Some(serde_json::from_value(plan["program"].clone())?),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn independent_publisher_cannot_replace_actual_native_queue_program() {
+        let queue_program = json!({"path":"/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2","sha256":"a".repeat(64)});
+        let publisher = json!({"path":"/usr/local/lib/jetstreamer/horizon-cohort191-native-event-tools-20261024-v2/jetstreamer-r2","sha256":"b".repeat(64)});
+        let owner = json!({"InvocationID":"0defba8ed0844040a2601c68d79060b2","ExecStart":"actual unchanged queue command"});
+        let claim = native_queue_claim(191, &owner, &json!({"program":queue_program})).unwrap();
+        assert_eq!(json!(claim.program), queue_program);
+        assert_ne!(json!(claim.program), publisher);
+        assert_eq!(claim.invocation_id, owner["InvocationID"]);
+    }
     #[test]
     fn verifier_queue_uses_remaining_active_clock_and_actual_stage_budgets() {
         let (f, p, next) = verification("queued-full", 0, 1000000, 2000000, None).unwrap();
