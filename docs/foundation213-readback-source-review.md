@@ -225,3 +225,31 @@ resolve it, the next source generation can record sanitized per-range
 start/header/body-complete/ordered-hash timings under a separate closed bounded
 diagnostic. No second network probe, live instrumentation or reader change is
 authorized by this handoff.
+
+## Actual cycle 353 counter evidence, supplied by root
+
+The counter collector executed once successfully. Do not rerun it. Receipt:
+`/var/lib/jetstreamer/horizon-holding213-counter353-v1/counters.json`, SHA256
+`458848a23be1bd1dfa73a84487dfedcfd534f8e84eb5890fc1073f469523958f`.
+Its two snapshot starts differ by 1.010090781 seconds. The target invocation,
+PID, process start, executable and cgroup remained stable.
+
+- Cgroup CPU usage increased by 154,858 microseconds, about 15.3% of one core;
+  throttled-period and throttled-time deltas were both zero. Three threads were
+  observed.
+- Two stable PID-owned IPv6 sockets to the same R2 peer, cookies 98305 and 98306,
+  received 48,104,042 and 32,747,816 additional bytes: about 80 MB/s combined.
+  Both had zero retransmissions, empty send/receive queues and RTT around
+  4.3–4.6 milliseconds.
+- Root's scheduled readback markers had already advanced to 18,320,719,872 bytes
+  at 2,967,555 milliseconds, with the latest 1 GiB intervals taking roughly
+  21–23 seconds, around 47–50 MB/s. The earlier aggregate stall rate is not the
+  current readback rate.
+
+These short actual measurements show healthy current receive progress without
+observed CPU saturation, quota throttling or queued receive backlog. They give
+no present reason to change CPU limits, address family or the live reader.
+They do not retrospectively explain the early slow interval, prove a universal
+throughput rate, or substitute for whole-object SHA-256/custody verification.
+All original proofs remain unchanged. No source repair, additional probe, poll
+or tuning operation is proposed from this evidence.
