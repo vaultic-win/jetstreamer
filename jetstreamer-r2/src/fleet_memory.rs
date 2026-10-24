@@ -124,7 +124,14 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
 }
 
 pub(super) fn report(o: &Value, ledger: &Value) -> Value {
-    checked(o, ledger).unwrap_or_else(|e| json!({"valid":false,"target_percent":90,
+    (|| -> Result<Value> {
+        let accounting=crate::fleet::native227_terminal_observer_view(ledger,o)?;
+        let mut result=checked(&accounting,ledger)?;
+        if let Some(evidence)=accounting.get("terminal_observation_accounting") {
+            result["terminal_observation_accounting"]=evidence.clone();
+        }
+        Ok(result)
+    })().unwrap_or_else(|e| json!({"valid":false,"target_percent":90,
         "admission_authorized":false,"limiting_gate":format!("{e:#}"),
         "next_action":"Account every live replay, qualification and delivery owner in the same coordinated RSS sample; preserve all healthy work."}))
 }
@@ -162,6 +169,29 @@ mod tests {
             "lane_rss_history":{"200":{"maximum_observed_lane_rss_bytes":151_000_739_840u64,"reservation_ceiling_bytes":226_501_109_760u64}}});
         let ledger = json!({"first_epoch":201,"last_epoch":300,"sampled_at_utc":o["recorded_at_utc"],"active":active});
         (o, ledger)
+    }
+    #[test]
+    fn terminal_native_rss_retained_in_raw_host_snapshot_stays_non_lane_once() {
+        let (mut o, ledger) = fixture();
+        let baseline = checked(&o, &ledger).unwrap();
+        let old_native_rss = 64_493_019_136u64;
+        let host = &mut o["host_resident_memory"]["after"]["rss"];
+        let old = host["aggregate_rss_bytes"].as_u64().unwrap();
+        host["aggregate_rss_bytes"] = json!(old + old_native_rss);
+        host["processes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"pid":456026,"start_ticks":176783891,"rss_bytes":old_native_rss}));
+        let report = checked(&o, &ledger).unwrap();
+        assert_eq!(report["valid"], true, "{report}");
+        assert_eq!(report["executing_lanes"], baseline["executing_lanes"]);
+        assert_eq!(
+            report["non_lane_resident_planning_bytes"].as_u64().unwrap(),
+            baseline["non_lane_resident_planning_bytes"]
+                .as_u64()
+                .unwrap()
+                + old_native_rss
+        );
     }
     #[test]
     fn settled_qualifications_have_own_century_target_and_deduplicate_cohort_owners() {
