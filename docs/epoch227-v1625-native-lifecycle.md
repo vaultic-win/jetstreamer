@@ -79,3 +79,40 @@ status key, verifies authenticated absence and preserves receipts/history.
 All new replay, full-root, current-plugin, publication, upload and sidecar gates
 remain independent. In particular this component does not make the existing
 generic v1.6.20 node a valid v1.6.25 bounded/full parent.
+
+## Separate96GB native-only generation
+
+The additive R2 feature `native227-small` selects a new closed lifecycle tuple;
+`native210-small` may be enabled in the same deployment. Default builds retain
+the original300GB bindings. Every admission, capture, terminal, fleet, status and
+inactive-cleanup operation selects its generation consistently. Unit discovery
+recognizes both names so another generation cannot disappear from the census.
+The observer recognizes both exact small units independently.
+
+The227 small unit is `horizon-native-input-227-v1625-small-v2.service` and root is
+`/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2`.
+Its unit-file digest is
+`135a4b4dee78f6779cf06e87cc83e37418f8dd1150f8a5530d9cb2fdda357b53`.
+The same FULL test runner and worker remain mandatory. The small guard is
+`/var/lib/jetstreamer/horizon-227-v1625-native-small-main-guard-v2/jetstreamer-horizon-standalone-guard`,
+SHA256 `2f4f33097a90579d4433a7e9ab0aaeb4e7d3a422b5ff36b188b0e6c5d1a8e38d`.
+The exact small cold plan is
+`/var/lib/jetstreamer/horizon-227-v1625-native-cold-plan-small-v2/native-cold-plan.json`,
+SHA256 `4497d05a5fed5d9b5bcc0f64b0eab4a04a868e4ab6ba266b16d5fa2d61df3152`.
+Running origin is separately registered beneath
+`/var/lib/jetstreamer/horizon-227-v1625-native-capture-small-v2/`;
+the protective service is `horizon-native227-v1625-small-protective-v2.service`.
+
+Admission also binds the immutable read-only snapshot census
+`/var/lib/jetstreamer/horizon-native227-snapshot-census-actual-v1/census.json`,
+SHA256 `6f5ec8b8f384bfb3531689fb0654b076c1febc1aad35058abf9398153bcd1a1f`.
+Its35,098,120,192 dense rounded bytes,6,679,789,568 metadata allowance and1GiB
+margin give `2*dense + metadata + 1GiB = 77,949,771,776` bytes. The96,000,000,000
+byte whole-root cap is a bounded native-only experiment, not a lower replay
+scratch estimate. Snapshot extraction, Bank construction and native-execution
+authority in the census must remain false. Original300GB artifacts, failed227
+scratch, healthy peer growth and all filesystem floors remain protected.
+Memory maximum128GiB, high112GiB,8CPUs,45minutes and no-restart remain unchanged.
+No concurrent native210/native227 launch is modeled; serialize them with fresh
+complete admission for each. Preparation and census alone grant no launch,
+replay, runtime-promotion, publication or R2 mutation authority.

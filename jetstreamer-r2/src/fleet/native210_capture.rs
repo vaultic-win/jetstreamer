@@ -2,7 +2,11 @@
 use super::native210 as c;
 use super::singleton227_capture::{journal, require};
 use super::*;
-const PROTECTIVE: &str = "horizon-native210-protective-v1.service";
+const PROTECTIVE: &str = if cfg!(feature = "native210-small") {
+    "horizon-native210-small-protective-v2.service"
+} else {
+    "horizon-native210-protective-v1.service"
+};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {

@@ -1,8 +1,10 @@
 # Foundation holding: retained artifact review
 
-This is a source and metadata review on 2026-10-24. It authorizes no remote write,
-local deletion, service change, replay launch, or runtime-state offload. No new
-replay/resource observation, process-reference scan, or whole-archive hash was run.
+This is a source and metadata review on 2026-10-24. The document authorizes no
+remote write, local deletion, service change, replay launch, or runtime-state
+offload. Later exact read-only closure attempts and root-owned transport
+qualification are recorded below. The review agent took no new replay/resource
+observation or whole-archive hash.
 
 ## Existing host authorization
 
@@ -176,6 +178,18 @@ reclaimable bytes, never grants retirement or transport authority, and does not
 take a replay/resource sample. Foundation mapping validation is separate from
 the existing node02 transport; the latter is unchanged.
 
+The first actual metadata-only review stopped at the unrelated dangling
+`multi-user.target.wants/pollinate.service` installed link. The corrected census
+records a stable missing-target symlink's raw target digest without pretending
+there are file bytes to read. A dangling target that names the213 tree remains
+a reference blocker; permission errors, link/target changes and directory aliases
+still refuse. No installed link or unit was changed.
+The next pass found a mode0664 unrelated staged monitor beneath the exact
+UID1000/mode0700 `systemd-staging` directory. The candidate permits a single-link
+file's group-write bit only under that canonical private ancestor; other groups
+cannot traverse it. Installed/transient metadata keeps the original permission
+checks. Aliased, group-accessible or differently owned staging roots still refuse.
+
 Until any actual staged-reference blockers are resolved and the custody/restore
 round trip is qualified, this remains125.3GB of retained input, not free capacity.
 All historical consumers require exact byte restoration before manual reuse.
@@ -268,3 +282,28 @@ manifest bindings, shared node02 transport behavior, retry preservation and the
 metadata floor. Immutable candidate sealing and actual authenticated probe/prefix
 custody and restoration remain separate operational gates. No such R2 operation
 has been performed by the review agent.
+
+Root subsequently completed the dedicated20,144-byte probe park using the sealed
+`b5297102` candidate. Its custody receipt
+`/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1/receipts/custody-b86895ec0fb533fe40813892983ff1e86c0e8fda56b1d77b8470f7684882be5d.json`
+has digest `6683031470c506a7b5cd24f4b6962288bf711c6d3176f345a876d1cad826c788`.
+It records complete authenticated SHA-256 readback and source revalidation.
+The original runtime genesis remains in place. This is custody qualification
+only: the probe's separately admitted byte restoration has not yet completed,
+and the125GB prefix remains local and unparked.
+
+Foundation maintenance now consumes the shared
+`native227_terminal_observer_view(fleet, observer)` only for the exact344
+native227small terminal race. The typed `da6e0090...675d7b` proof, original
+`36b96647...bb290` invocation, current terminal manager/no later journal
+invocation and all five original older owners remain mandatory. The derived view
+removes only that observed diagnostic row; original observer bytes, host RSS and
+fleet/current census remain bound unchanged, with zero released-memory/disk
+credit. The view is checked before and after admission and its evidence is
+included in the capacity receipt. Fresh observations with no such row use the
+ordinary path; no generic terminal-row or native-peer exemption was added.
+The integrated isolated Foundation source passed nine observer tests,629 R2
+tests with47 host-only tests ignored, and strict production Clippy. R2 was
+qualified with `--all-features`, selecting `native227-small`; the corrected
+hyphenated terminal-spec parser is reused from the reviewed native227 validator.
+The parent still qualifies the cumulative source after integrating other work.

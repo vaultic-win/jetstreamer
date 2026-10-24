@@ -105,13 +105,15 @@ pub(super) fn check(value: &Value, additional: u64) -> Result<Value> {
             && f["observer_sha256"] == s.observer.sha256,
         "Foundation fleet is not bound to the exact observer"
     );
+    let accounting_o = native227_terminal_observer_view(&f, &o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let t = sampled(&o, &f, now)?;
+    let t = sampled(&accounting_o, &f, now)?;
     // Reject unknown/native peers rather than invent a zero-growth reservation.
     prefix223_live_peer::roster(&f)?;
     native210_peer_history::validate(&f)?;
     let floor = singleton227_admission::century_floor_for_maintenance(&f)?;
-    let (growth, measurements) = prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let (growth, measurements) =
+        prefix223_live_peer::disk(&f, &accounting_o, &s.protected_guards, t, now)?;
     let (minimum, largest_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let sampled_free = o["filesystem"]["conservative_available_bytes"]
@@ -140,16 +142,21 @@ pub(super) fn check(value: &Value, additional: u64) -> Result<Value> {
         "Foundation owners/caps changed during capacity admission"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    sampled(&o, &f, now)?;
+    let after_accounting_o = native227_terminal_observer_view(&f, &o)?;
+    sampled(&after_accounting_o, &f, now)?;
+    ensure!(
+        accounting_o["terminal_observation_accounting"]
+            == after_accounting_o["terminal_observation_accounting"],
+        "Foundation terminal observation accounting changed during admission"
+    );
     let (after_growth, after_measurements) =
-        prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+        prefix223_live_peer::disk(&f, &after_accounting_o, &s.protected_guards, t, now)?;
     ensure!(
         after_growth <= growth,
         "Foundation protected growth increased during admission"
     );
     envelope(minimum, additional, singleton227_admission::disk_free()?)?;
-    Ok(
-        json!({"schema":"jetstreamer-foundation-holding-capacity-v1","host":"horizon-vaultic","first_epoch":201,"last_epoch":300,
+    let mut capacity = json!({"schema":"jetstreamer-foundation-holding-capacity-v1","host":"horizon-vaultic","first_epoch":201,"last_epoch":300,
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"sampled_at_utc":f["sampled_at_utc"],
         "resource_basis":value,"century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,
         "maximum_existing_guard_floor_bytes":largest_guard_floor,"minimum_free_bytes":minimum,"additional_restore_bytes":additional,
@@ -157,8 +164,11 @@ pub(super) fn check(value: &Value, additional: u64) -> Result<Value> {
         "protected_growth_before":measurements,"protected_growth_after":after_measurements,"protected_caps":caps,
         "unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":now,"maximum_age_seconds":900,
         "restore_only":true,"all_live_growth_and_century_floor_protected":true,"new_resource_samples":0,
-        "replay_launch_authorized":false,"local_retirement_authorized":false,"publication_authorized":false,"r2_mutations":false}),
-    )
+        "replay_launch_authorized":false,"local_retirement_authorized":false,"publication_authorized":false,"r2_mutations":false});
+    if let Some(evidence) = accounting_o.get("terminal_observation_accounting") {
+        capacity["terminal_observation_accounting"] = evidence.clone();
+    }
+    Ok(capacity)
 }
 #[cfg(test)]
 mod tests {

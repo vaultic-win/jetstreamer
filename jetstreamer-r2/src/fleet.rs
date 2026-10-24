@@ -44,6 +44,7 @@ mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
 mod native227_v1625;
+mod native227_terminal_observation;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
 mod native227_v1625_event;
@@ -306,6 +307,10 @@ pub(super) fn capture_native210_terminal() -> Result<()> {
 }
 pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
     Ok((native210::UNIT.into(), native210_terminal::validate(proof)?))
+}
+/// A derived accounting view only; raw observer/fleet bindings stay immutable.
+pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<Value> {
+    native227_terminal_observation::view(f,o)
 }
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
@@ -2072,6 +2077,8 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
+            || ((first_epoch..=last_epoch).contains(&210) && native210::unit_name(name))
+            || ((first_epoch..=last_epoch).contains(&227) && native227_v1625::unit_name(name))
         {
             ensure!(
                 names.contains(name),
