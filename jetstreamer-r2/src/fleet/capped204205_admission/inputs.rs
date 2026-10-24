@@ -1,5 +1,6 @@
 //! Immutable package, metadata policy and disposable enforcement capability.
 use super::*;
+mod collected_probe;
 #[cfg(test)]
 mod tests;
 
@@ -270,6 +271,25 @@ pub(super) fn capability(s: &Spec, p: &Value, r: &Value) -> Result<Value> {
     probe_result(&v, &probe, &probe_plan_binding, &result)?;
     let terminal = native209::immutable_json(&bound_member(&v["terminal_properties"])?)?;
     dormant(&terminal, string(&v, "probe_unit")?)?;
+    if [
+        "capture_plan_schema",
+        "terminal_display_kind",
+        "capture_tool",
+        "stdout_ack",
+    ]
+    .iter()
+    .any(|key| v.get(*key).is_some())
+    {
+        collected_probe::validate(
+            &v,
+            &probe,
+            &probe_plan_binding,
+            &probe_plan,
+            &terminal,
+            &result,
+        )?;
+        return Ok(v);
+    }
     ensure!(
         terminal["LoadState"] == "loaded"
             && terminal["Type"] == "exec"
