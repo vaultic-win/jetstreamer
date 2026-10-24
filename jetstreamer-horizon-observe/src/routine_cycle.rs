@@ -24,6 +24,8 @@ const BUCKET: &str = "solana-archive-with-accounts-data";
 
 #[path = "routine_failed1046_next.rs"]
 mod failed1046_next;
+#[path = "routine_missed_cadence.rs"]
+mod missed_cadence;
 #[path = "routine_next.rs"]
 mod next_preparation;
 #[path = "routine_publication144_recover.rs"]
@@ -147,6 +149,8 @@ struct Plan {
     // All derived metadata uses sample_target_utc (the actual observation time).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     delayed_schedule_utc: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    missed_cadence: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     repair183_handoff: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -803,12 +807,13 @@ fn validate_templates(
         .as_str()
         .context("old observer time missing")?;
     let scheduled = scheduled_target(p)?;
-    let qualified_interval =
+    let qualified_interval = missed_cadence::interval(p, old_time)?.unwrap_or(
         memory152::interval(p)?.unwrap_or(cohort191_delivery::interval(p, old_time)?.unwrap_or(
             terminal185::interval(p, old_time)?.unwrap_or(
                 original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?),
             ),
-        ));
+        )),
+    );
     ensure!(
         utc_seconds(scheduled)?.checked_sub(utc_seconds(old_time)?) == Some(qualified_interval),
         "routine target must follow its qualified predecessor interval"
@@ -2002,6 +2007,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-missed-cadence"
                             | "--prepare-next-memory152-rebind"
                             | "--prepare-next-delivery191"
                             | "--recover-native191-tail"
@@ -2087,6 +2093,20 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--prepare-missed-cadence")
+        {
+            return missed_cadence::prepare(
+                &plan,
+                &bound,
+                &Bound {
+                    path: args[7].clone().into(),
+                    sha256: args[9].clone(),
+                },
+                &args[5],
+            );
+        }
         if args
             .get(6)
             .is_some_and(|a| a == "--prepare-raw0546-native191")
