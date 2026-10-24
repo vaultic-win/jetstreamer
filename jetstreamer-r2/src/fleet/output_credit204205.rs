@@ -76,7 +76,7 @@ impl Metadata {
                 && self.uid == 1000
                 && self.mode == libc::S_IFREG | 0o600
                 && self.nlink == 1
-                && self.allocated_bytes % 512 == 0
+                && self.allocated_bytes.is_multiple_of(512)
                 && self.allocated_bytes <= CAP,
             "sampled output metadata identity, ownership or cap differs"
         );
@@ -269,7 +269,10 @@ fn current_owner(owner: Owner, expected: &Value) -> Result<Value> {
     }
     ensure!(
         diagnostic_stage_running(&result)
-            && result["MainPID"] == owner.pid.to_string()
+            && result["MainPID"]
+                .as_str()
+                .and_then(|v| v.parse::<u64>().ok())
+                == Some(owner.pid)
             && result["InvocationID"] == owner.iid
             && pipeline_status::same_exec_start(
                 expected["ExecStart"]
@@ -440,7 +443,10 @@ pub(super) fn apply(
         ensure!(
             expected["Id"] == owner.unit
                 && expected["InvocationID"] == owner.iid
-                && expected["MainPID"] == owner.pid.to_string()
+                && expected["MainPID"]
+                    .as_str()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    == Some(owner.pid)
                 && expected["NRestarts"] == "0",
             "output owner differs from closed producer profile"
         );
