@@ -811,6 +811,16 @@ fn no_replacement(f: &Value, owner: &Value) -> Result<()> {
     }
     Ok(())
 }
+fn validate_estimate_path(path: &Path, sample: &str) -> Result<()> {
+    fleet::utc_seconds(sample)?;
+    let digits: String = sample.chars().filter(char::is_ascii_digit).collect();
+    let expected = Path::new(ROOT).join(format!("estimate-{digits}.json"));
+    ensure!(
+        path.as_os_str() == expected.as_os_str(),
+        "141 estimate receipt must use its exact private sample filename"
+    );
+    Ok(())
+}
 fn prior_owned(old: &StatusPublicationReceipt, binding: &pipeline_status::Binding) -> bool {
     old.epoch == 141
         && old.status.epoch == 141
@@ -860,14 +870,14 @@ pub(super) async fn publish() -> Result<()> {
             && p.exclusive_local_epoch_ownership
             && p.authenticated_other_host_handoffs.is_empty()
             && p.receipt_directory
-                == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts")
-            && p.estimate_receipt.starts_with(ROOT),
+                == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
         "141 repair publisher scope/ownership differs"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let o = read(&p.observer, false)?;
     let f = read(&p.fleet, false)?;
     let sample = o["recorded_at_utc"].as_str().context("141 repair sample")?;
+    validate_estimate_path(&p.estimate_receipt, sample)?;
     let cutoff = fleet::utc_seconds(sample)?;
     ensure!(
         o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
@@ -1092,6 +1102,27 @@ mod tests {
             fleet_path: "/fleet".into(),
             fleet_sha256: "c".repeat(64),
         }
+    }
+    #[test]
+    fn estimate_receipt_cannot_escape_or_alias_its_exact_sample_path() {
+        let sample = "2026-10-24T00:26:00Z";
+        let correct = Path::new(ROOT).join("estimate-20261024002600.json");
+        validate_estimate_path(&correct, sample).unwrap();
+        for bad in [
+            Path::new(ROOT).join("../epoch-141.jet"),
+            Path::new(ROOT).join("nested/estimate-20261024002600.json"),
+            Path::new(ROOT).join("estimate-20261024005600.json"),
+            Path::new(ROOT).join("epoch-141.jet.sha256"),
+            PathBuf::from(format!("{ROOT}/./estimate-20261024002600.json")),
+            PathBuf::from(format!("{ROOT}-other/estimate-20261024002600.json")),
+        ] {
+            assert!(
+                validate_estimate_path(&bad, sample).is_err(),
+                "{}",
+                bad.display()
+            );
+        }
+        assert!(validate_estimate_path(&correct, "invalid").is_err());
     }
     #[test]
     fn repair_wire_binding_is_exact_epoch_phase_and_actual_new_owner() {
