@@ -968,7 +968,14 @@ mod tests {
         ]);
         let valid = json!({"type":"a(usssoo)","data":[[row]]});
         let decoded = decode_native_jobs(&valid).unwrap();
-        no_queued_entry_jobs(&decoded).unwrap();
+        // Even this sterile captured probe contains185 in a Horizon name and
+        // correctly hits the existing conservative entry fence.
+        assert!(no_queued_entry_jobs(&decoded).is_err());
+        let mut benign = valid.clone();
+        benign["data"][0][0][1] = json!("jetstreamer-holding-check.service");
+        benign["data"][0][0][5] =
+            json!("/org/freedesktop/systemd1/unit/jetstreamer_2dholding_2dcheck_2eservice");
+        no_queued_entry_jobs(&decode_native_jobs(&benign).unwrap()).unwrap();
         let mut entry = valid.clone();
         entry["data"][0][0][1] = json!("jetstreamer-root-sweep-e185-replacement.service");
         entry["data"][0][0][5] = json!(
