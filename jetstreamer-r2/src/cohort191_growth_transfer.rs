@@ -3,7 +3,7 @@
 use super::*;
 use std::os::fd::AsRawFd;
 
-const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-node02-original191-growth-transfer-20261024-v2/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-node02-original191-growth-transfer-20261024-v3/jetstreamer-r2";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-original191-growth-transfer-20261024-v1";
 const FLEETS: &str = "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1";
 const AUTHORITY: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-full-admission-20261023-v2/admission-manifest.json";
@@ -44,6 +44,7 @@ struct Plan {
     public_batch: Bound,
     fleet: Bound,
     delivery_event: Bound,
+    coordinator_completion: Bound,
     delivery_policy: Bound,
     census: Bound,
     transfer_authorized: bool,
@@ -435,12 +436,102 @@ fn no_queued_entries(v: &Value, names: &BTreeSet<String>) -> Result<()> {
     }
     Ok(())
 }
+fn completed_coordinator(p: &Plan, f: &Value) -> Result<(String, String)> {
+    let completion = bound(&p.coordinator_completion, false)?;
+    let cycle = p
+        .coordinator_completion
+        .path
+        .parent()
+        .context("missing cycle directory")?;
+    ensure!(
+        cycle.parent()
+            == Some(Path::new(
+                "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2"
+            ))
+            && p.coordinator_completion
+                .path
+                .file_name()
+                .is_some_and(|s| s == "completion.json")
+            && Path::new(f["plan"].as_str().context("missing fleet plan")?)
+                == cycle.join("sealed/fleet-plan.json")
+            && completion["fleet"] == json!(p.fleet)
+            && completion["observer"]
+                == json!({"path": f["observer_receipt"], "sha256": f["observer_sha256"]})
+            && completion["sampled_at_utc"] == f["sampled_at_utc"],
+        "original 191 coordinator completion does not bind the accepted fleet"
+    );
+    let suffix = cycle
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("invalid cycle name")?;
+    let name = format!("horizon-routine-cycle-101-200-{suffix}.service");
+    let iid = completion["invocation_id"]
+        .as_str()
+        .context("missing coordinator invocation")?;
+    ensure!(is_lower_hex(iid, 32), "invalid coordinator invocation");
+    Ok((name, iid.into()))
+}
+
+fn successful_coordinator_exit(
+    name: &str,
+    old: &Value,
+    current: &Value,
+    coordinator: &(String, String),
+) -> bool {
+    name == coordinator.0
+        && old["Id"] == name
+        && current["Id"] == name
+        && old["InvocationID"] == coordinator.1
+        && current["InvocationID"] == coordinator.1
+        && old["Type"] == "oneshot"
+        && current["Type"] == "oneshot"
+        && old["LoadState"] == "loaded"
+        && current["LoadState"] == "loaded"
+        && old["NRestarts"] == "0"
+        && current["NRestarts"] == "0"
+        && old["ActiveState"] == "activating"
+        && old["SubState"] == "start"
+        && old["MainPID"]
+            .as_str()
+            .and_then(|s| s.parse::<u64>().ok())
+            .is_some_and(|n| n > 0)
+        && current["MainPID"] == "0"
+        && current["ControlGroup"] == ""
+        && current["Result"] == "success"
+        && current["ExecMainStatus"] == "0"
+        && current["ActiveState"] == "active"
+        && current["SubState"] == "exited"
+}
+
+fn stable_owner(name: &str, old: &Value, current: &Value) -> Result<()> {
+    for key in [
+        "Id",
+        "LoadState",
+        "InvocationID",
+        "MainPID",
+        "NRestarts",
+        "ActiveState",
+        "SubState",
+    ] {
+        ensure!(
+            old[key] == current[key],
+            "original 191 full live owner changed: {name}/{key}"
+        );
+    }
+    ensure!(
+        current["NRestarts"] == "0",
+        "original 191 live owner restarted"
+    );
+    Ok(())
+}
+
 fn fresh(p: &Plan) -> Result<Value> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let f = bound(&p.fleet, false)?;
     let c = bound(&p.census, true)?;
     let rows = census_shape(&c, &f, p, now)?;
     latest_fleet(&p.fleet, &f)?;
+    let coordinator = completed_coordinator(p, &f)?;
     for item in c["other_claim_evidence"].as_array().unwrap() {
         bound(&serde_json::from_value::<Bound>(item.clone())?, false)?;
     }
@@ -533,6 +624,11 @@ fn fresh(p: &Plan) -> Result<Value> {
     let mut stable = BTreeMap::new();
     for (name, u) in &current {
         let old = &f["unit_census"][name];
+        // Only this accepted sample's successfully completed metadata coordinator
+        // may leave its running state. Replay and delivery owners remain strict.
+        if successful_coordinator_exit(name, old, u, &coordinator) {
+            continue;
+        }
         if old["MainPID"]
             .as_str()
             .and_then(|s| s.parse::<u64>().ok())
@@ -544,21 +640,7 @@ fn fresh(p: &Plan) -> Result<Value> {
                 .is_some_and(|n| n > 0)
             || u["ActiveState"] == "activating"
         {
-            for key in [
-                "Id",
-                "LoadState",
-                "InvocationID",
-                "MainPID",
-                "NRestarts",
-                "ActiveState",
-                "SubState",
-            ] {
-                ensure!(
-                    old[key] == u[key],
-                    "191 full live owner changed:{name}/{key}"
-                );
-            }
-            ensure!(u["NRestarts"] == "0", "191 live owner restarted");
+            stable_owner(name, old, u)?;
             stable.insert(name.clone(), u.clone());
         }
     }
@@ -669,6 +751,7 @@ fn relocated_archives(source: &Value, public: &Value) -> Result<Vec<Value>> {
 fn descriptor(p: &Plan) -> Value {
     json!({"subject":subject(),"original_reservation":p.original_reservation,"terminal":p.terminal,
         "source_batch":p.source_batch,"public_batch":p.public_batch,"delivery_policy":p.delivery_policy,
+        "coordinator_completion":p.coordinator_completion,
         "controller_rebind":{"path":REBIND,"sha256":REBIND_SHA}})
 }
 fn ledger_shape(v: &Value, desc: &Value) -> Result<()> {
@@ -1025,6 +1108,58 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_exact_successful_sample_coordinator_may_finish() {
+        let name = "horizon-routine-cycle-101-200-exact.service";
+        let coordinator = (name.into(), "a".repeat(32));
+        let old = json!({"Id":name,"InvocationID":coordinator.1,"Type":"oneshot","LoadState":"loaded",
+            "NRestarts":"0","ActiveState":"activating","SubState":"start","MainPID":"17"});
+        let mut current = old.clone();
+        current["MainPID"] = json!("0");
+        current["ActiveState"] = json!("active");
+        current["SubState"] = json!("exited");
+        current["ControlGroup"] = json!("");
+        current["Result"] = json!("success");
+        current["ExecMainStatus"] = json!("0");
+        assert!(successful_coordinator_exit(
+            name,
+            &old,
+            &current,
+            &coordinator
+        ));
+        assert!(stable_owner(name, &old, &current).is_err());
+        for (key, value) in [
+            ("InvocationID", "other"),
+            ("NRestarts", "1"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+            ("ControlGroup", "/nonempty"),
+            ("Type", "simple"),
+            ("ActiveState", "failed"),
+            ("SubState", "failed"),
+            ("MainPID", "18"),
+        ] {
+            let mut bad = current.clone();
+            bad[key] = json!(value);
+            assert!(
+                !successful_coordinator_exit(name, &old, &bad, &coordinator),
+                "{key}"
+            );
+        }
+        let unrelated = "horizon-plugin-verify-191.service";
+        let mut other_old = old.clone();
+        let mut other_current = current.clone();
+        other_old["Id"] = json!(unrelated);
+        other_current["Id"] = json!(unrelated);
+        assert!(!successful_coordinator_exit(
+            unrelated,
+            &other_old,
+            &other_current,
+            &coordinator
+        ));
+        assert!(stable_owner(unrelated, &other_old, &other_current).is_err());
+        assert!(stable_owner(unrelated, &other_old, &other_old).is_ok());
+    }
     fn row(key: &str, epoch: u64, iid: &str, n: u64) -> Row {
         Row {
             claim_key: key.into(),
