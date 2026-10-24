@@ -448,7 +448,7 @@ pub(super) fn run() -> Result<()> {
     names.insert(profile(epoch)?.0.into());
     names.extend(s.downstream_actors.iter().map(|a| a.unit.clone()));
     let before = census(&names, 201, 300)?;
-    capped204205_admission::original_idle(&before[profile(epoch)?.0], epoch)?;
+    original_capped204205::idle_for_plan(&before[profile(epoch)?.0], &p)?;
     let launched = launch(&s, &p, &a, &before)?;
     let l = evidence::bound(&launched, true)?;
     let registration = observer_registration(&p, &l)?;

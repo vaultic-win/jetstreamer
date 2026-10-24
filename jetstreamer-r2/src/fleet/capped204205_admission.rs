@@ -381,7 +381,7 @@ fn candidate_idle(p: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
             name,
         )?;
     }
-    original_idle(&census[old], number(p, "epoch")?)?;
+    original_capped204205::idle_for_plan(&census[old], p)?;
     output_credit204205::maintenance_current(census)
 }
 pub(super) fn original_idle(unit: &Value, epoch: u64) -> Result<()> {

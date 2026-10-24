@@ -272,9 +272,6 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
     if let Some(owner) = fleet::full209_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
-    if let Some(owner) = fleet::full210_status_inactive_owner(publication)? {
-        return Ok(vec![owner]);
-    }
     if let Some(owner) = fleet::prefix223_native20_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
@@ -360,22 +357,26 @@ pub(super) fn no_pending_owner_trigger(name: &str, collected: bool) -> Result<()
     ensure!(jobs.status.success(), "cannot inspect queued owner jobs");
     let jobs = queued_job_units(&jobs.stdout)?;
     ensure!(
-        !jobs.iter().any(|unit| *unit == name
-            || [
-                "horizon-controller-",
-                "jetstreamer-root-sweep-",
-                "horizon-qualify-",
-                "horizon-upload-",
-                "horizon-publish-",
-                "horizon-independent-",
-                "horizon-import-",
-                "horizon-recover-"
-            ]
-            .iter()
-            .any(|prefix| unit.starts_with(prefix))),
+        !jobs.iter().any(|unit| pending_owner_job(name, unit)),
         "owner has a queued systemd job"
     );
     Ok(())
+}
+fn pending_owner_job(owner: &str, unit: &str) -> bool {
+    owner == unit
+        || [
+            "horizon-controller-",
+            "jetstreamer-root-sweep-",
+            "horizon-qualify-",
+            "horizon-upload-",
+            "horizon-publish-",
+            "horizon-independent-",
+            "horizon-import-",
+            "horizon-recover-",
+        ]
+        .iter()
+        .any(|prefix| unit.starts_with(prefix))
+        || fleet::original_capped204205_repair_scope(unit, 201, 300)
 }
 
 fn fresh_census(
@@ -466,6 +467,12 @@ fn fresh_census(
         native227::validate(&current, terminal_fleet, owners)?;
     }
     let reserve = reserve_owner_evidence(terminal_fleet, owners)?;
+    let original_capped204205 = fleet::original_capped204205_terminal_current(
+        plan.epoch,
+        terminal_fleet,
+        &current,
+        owners,
+    )?;
     let capped204205 = fleet::capped204205_cleanup_current(fleet, plan.epoch, &current, owners)?;
     if let Some(stop) = &reserve {
         stop.validate(
@@ -496,6 +503,7 @@ fn fresh_census(
             && !warmup223
             && !native227
             && !capped204205
+            && !original_capped204205
             && reserve.is_none()
         {
             validate_terminal_owner(value, &terminal_fleet["unit_census"][name], invocation)?;
@@ -668,7 +676,10 @@ pub(super) async fn run() -> Result<()> {
     no_local_delivery(&plan)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
-    let history_time = if terminal185::recognized(&history) {
+    let original_capped_time = fleet::original_capped204205_terminal_time(plan.epoch, &history)?;
+    let history_time = if let Some(time) = original_capped_time {
+        time
+    } else if terminal185::recognized(&history) {
         terminal185::time(&plan, &history)?
     } else if capped141::recognized(&history) {
         ensure!(plan.epoch == 141, "foreign capped141 terminal evidence");
@@ -859,6 +870,22 @@ pub(super) async fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn queued_capped_probe_and_repair_jobs_cannot_hide_behind_original_inactivity() {
+        for name in [
+            "horizon-capped204205-resource-probe-204-e506-rss-v1.service",
+            "horizon-capped204205-resource-probe-205-e506-rss-v2-guard.service",
+            "horizon-capped204-e506-rss-probe-retention-pin-v1.service",
+            "horizon-guard-204-capped-continuation-new.service",
+            "horizon-repair-204-new.service",
+        ] {
+            assert!(pending_owner_job("original.service", name), "{name}");
+        }
+        assert!(!pending_owner_job(
+            "original.service",
+            "unrelated-metadata.service"
+        ));
+    }
     #[test]
     fn reserve_history_selects_only_the_exact_owner_pair_and_rejects_duplicates() {
         let stop = json!({"epoch":185,"controller_unit":"controller.service",

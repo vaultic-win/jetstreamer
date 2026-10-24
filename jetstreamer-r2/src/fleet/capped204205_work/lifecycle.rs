@@ -277,9 +277,9 @@ pub(super) fn cleanup_current(
         inactive_status::no_pending_owner_trigger(name, fresh["LoadState"] == "not-found")?;
         capture::group(name)?;
     }
-    capped204205_admission::original_idle(
+    original_capped204205::idle_for_plan(
         current.get(original).context("original owner missing")?,
-        epoch,
+        &p,
     )?;
     let references = jetstreamer_horizon_observe::process_references::scan(
         Path::new("/proc"),
