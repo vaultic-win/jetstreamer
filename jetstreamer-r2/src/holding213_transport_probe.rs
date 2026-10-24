@@ -294,6 +294,8 @@ pub(super) async fn run() -> Result<()> {
     );
     let report = serde_json::json!({"schema":"jetstreamer-private-holding213-transport-probe-v1",
         "object_key":KEY,"object_length":OBJECT_LENGTH,"object_etag":OBJECT_ETAG,
+        "local_source":SOURCE,"local_source_identity":before,
+        "local_window_sha256":format!("{:x}",Sha256::digest(&expected)),
         "expected_whole_object_sha256":OBJECT_SHA,"range_start":OFFSET,"range_bytes":WINDOW,
         "maximum_response_body_bytes":3*WINDOW,"sdk":sdk,"results":comparisons,"authority":authority()});
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
