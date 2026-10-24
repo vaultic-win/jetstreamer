@@ -989,6 +989,22 @@ fn ready(b: &Bound, epoch: u64, cutoff: u64) -> Result<Receipt> {
     );
     Ok(r)
 }
+fn ready_import_binding(r: &Receipt, public: &Value) -> Result<()> {
+    let rows = public["outcome"]["members"]
+        .as_array()
+        .context("191 ready import member census")?;
+    let matches = rows
+        .iter()
+        .filter(|m| m["epoch"] == r.epoch)
+        .collect::<Vec<_>>();
+    ensure!(
+        matches.len() == 1
+            && matches[0]["archive_sha256"] == r.archive_sha256
+            && matches[0]["committed_archive"]["length"] == r.archive_length,
+        "191 ready receipt does not match the native imported archive"
+    );
+    Ok(())
+}
 fn gate(b: &Bound, epoch: u64, stage: &str, tool: &GateTool, digest: &str) -> Result<()> {
     let qualified = match stage {
         "full" => Some((
@@ -1687,6 +1703,13 @@ fn capture(p: &Capture) -> Result<Value> {
                 true,
                 &working,
             )?;
+            // Once an epoch has actual ready evidence, its bytes may be
+            // absent only under a separately qualified retirement policy. Its
+            // durable proof must still match this exact original native import;
+            // a canonical receipt for another payload never substitutes for it.
+            for (epoch, receipt) in &p.ready_receipts {
+                ready_import_binding(&ready(receipt, *epoch, cutoff)?, &public)?;
+            }
             let complete = &s["completed"]["191-194"];
             ensure!(
                 complete["receipt"].as_str() == p.public_batch.as_ref().unwrap().path.to_str()
@@ -2124,5 +2147,29 @@ mod tests {
         assert_eq!(hash_bytes(&"1".repeat(32)).unwrap(), [0; 32]);
         assert!(hash_bytes(&"0".repeat(32)).is_err());
         assert!(hash_bytes(&"z".repeat(44)).is_err());
+    }
+    #[test]
+    fn durable_ready_proof_cannot_borrow_another_imported_payload_after_local_retirement() {
+        let r:Receipt=serde_json::from_value(json!({"schema":RECEIPT_SCHEMA,"bucket":"solana-archive-with-accounts-data","epoch":191,"archive_key":"epoch-191.jet","checksum_key":"epoch-191.jet.sha256","archive_length":123,"archive_sha256":"a".repeat(64),"archive_etag":"etag","r2_composite_sha256":null,"remote_sha256_readback":true,"multipart_part_size":64<<20,"verified_unix_seconds":1})).unwrap();
+        let public = json!({"outcome":{"members":[{"epoch":191,"archive_sha256":"a".repeat(64),"committed_archive":{"length":123}}]}});
+        // These are authenticated retained proof values, not paths to a local
+        // archive: ongoing epochs still independently require materialization.
+        ready_import_binding(&r, &public).unwrap();
+        for (pointer, value) in [
+            ("/outcome/members/0/archive_sha256", json!("b".repeat(64))),
+            ("/outcome/members/0/committed_archive/length", json!(124)),
+            ("/outcome/members/0/epoch", json!(192)),
+        ] {
+            let mut bad = public.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(ready_import_binding(&r, &bad).is_err());
+        }
+        let mut duplicate = public;
+        let row = duplicate["outcome"]["members"][0].clone();
+        duplicate["outcome"]["members"]
+            .as_array_mut()
+            .unwrap()
+            .push(row);
+        assert!(ready_import_binding(&r, &duplicate).is_err());
     }
 }
