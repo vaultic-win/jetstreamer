@@ -96,3 +96,15 @@ data, and live lanes keep allocating. Root must review a successful fresh check
 and exact plan before execution and measure actual free space independently.
 Prefer retiring unused debug incremental first so ongoing release helper builds
 retain their dependency cache; rebuilding a deleted cache consumes space again.
+
+The exact observed first-level Cargo incremental crate directories
+`jetstreamer_checkpoint_restore_probe-<13lowercasealphanumericID>` and
+`jetstreamer_epoch140_checkpoint_journal-<13lowercasealphanumericID>` are compiler
+output despite the word `checkpoint` in their crate names. Only those two
+directory layouts, only at the first level of the selected debug incremental
+tree, receive that name exception. Files, symlinks, nested or malformed versions,
+other checkpoint names and release/deps get no exception. Real checkpoint,
+snapshot, archive, sidecar and lock artifacts beneath either crate directory
+still refuse the census. Rejections identify the offending relative path and
+node type. The initial392a9checker correctly performed no deletion; its
+overbroad substring refusal is preserved as failed check evidence.

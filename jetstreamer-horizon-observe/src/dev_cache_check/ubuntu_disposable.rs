@@ -139,18 +139,41 @@ fn node(path: &Path) -> Result<Node> {
         },
     })
 }
-fn forbidden(path: &Path) -> bool {
+fn observed_incremental_crate_directory(root: &Path, path: &Path, kind: &str) -> bool {
+    root == Path::new(DEBUG_INCREMENTAL)
+        && path.parent() == Some(root)
+        && kind == "directory"
+        && path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(|name| {
+                name.rsplit_once('-').is_some_and(|(crate_name, id)| {
+                    matches!(
+                        crate_name,
+                        "jetstreamer_checkpoint_restore_probe"
+                            | "jetstreamer_epoch140_checkpoint_journal"
+                    ) && id.len() == 13
+                        && id
+                            .bytes()
+                            .all(|b| b.is_ascii_digit() || b.is_ascii_lowercase())
+                })
+            })
+}
+fn forbidden(root: &Path, path: &Path, kind: &str) -> bool {
     path.file_name().and_then(|s| s.to_str()).is_none_or(|s| {
         s.ends_with(".jet")
             || s.ends_with(".sha256")
             || s.starts_with("snapshot-")
             || s.ends_with(".tar.zst")
             || s.ends_with(".tar.bz2")
-            || s.contains("checkpoint")
+            || (s.contains("checkpoint") && !observed_incremental_crate_directory(root, path, kind))
             || matches!(s, "Cargo.lock" | ".cargo-lock")
     })
 }
 fn manifest(t: &Path) -> Result<Manifest> {
+    manifest_scoped(t, t)
+}
+fn manifest_scoped(t: &Path, policy_root: &Path) -> Result<Manifest> {
     ensure!(t.canonicalize()? == t, "cache path is redirected");
     let root = node(t)?;
     ensure!(root.kind == "directory", "cache root is not a directory");
@@ -169,9 +192,12 @@ fn manifest(t: &Path) -> Result<Manifest> {
             n.device == root.device,
             "cache crosses a filesystem boundary"
         );
+        let relative = p.strip_prefix(t)?;
         ensure!(
-            !forbidden(&p),
-            "archive/checkpoint/lock/source artifact found inside cache"
+            !forbidden(policy_root, &policy_root.join(relative), &n.kind),
+            "archive/checkpoint/lock/source artifact found inside cache: {} ({})",
+            relative.display(),
+            n.kind
         );
         let physical = fs::symlink_metadata(&p)?
             .blocks()
@@ -508,6 +534,68 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn observed_checkpoint_crate_directories_are_compiler_layout_not_checkpoint_files() {
+        if unsafe { libc::geteuid() } != 1000 {
+            return;
+        }
+        let root = tempfile::tempdir().unwrap();
+        let name = "jetstreamer_checkpoint_restore_probe-37xz68e1mux5p";
+        let session = root
+            .path()
+            .join(name)
+            .join("s-hnhp8erucp-09sl05n-dammbp2csl2sy4m2g983wd0r1");
+        fs::create_dir_all(&session).unwrap();
+        fs::write(session.join("dep-graph.bin"), b"compiler graph").unwrap();
+        fs::write(
+            root.path().join(name).join("s-hnhp8erucp-09sl05n.lock"),
+            b"",
+        )
+        .unwrap();
+        manifest_scoped(root.path(), Path::new(DEBUG_INCREMENTAL)).unwrap();
+        let other = "jetstreamer_epoch140_checkpoint_journal-3h1673a7vh2ri";
+        fs::create_dir(root.path().join(other)).unwrap();
+        manifest_scoped(root.path(), Path::new(DEBUG_INCREMENTAL)).unwrap();
+        for name in [
+            "native-checkpoint.json",
+            "epoch-223.jet",
+            "epoch-223.sha256",
+            "snapshot-42.tar.zst",
+            "Cargo.lock",
+            ".cargo-lock",
+        ] {
+            let path = session.join(name);
+            fs::write(&path, b"preserve").unwrap();
+            let error = manifest_scoped(root.path(), Path::new(DEBUG_INCREMENTAL))
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(name), "missing diagnostic path: {error}");
+            assert_eq!(fs::read(&path).unwrap(), b"preserve");
+            fs::remove_file(path).unwrap();
+        }
+        let base = Path::new(DEBUG_INCREMENTAL);
+        assert!(!forbidden(base, &base.join(name), "directory"));
+        assert!(forbidden(base, &base.join(name), "file"));
+        assert!(forbidden(base, &base.join(name), "symlink"));
+        assert!(forbidden(
+            base,
+            &base.join("nested").join(name),
+            "directory"
+        ));
+        assert!(forbidden(
+            Path::new(RELEASE_DEPS),
+            &Path::new(RELEASE_DEPS).join(name),
+            "directory"
+        ));
+        for bad in [
+            "native-checkpoint",
+            "checkpoint-state",
+            "unknown_checkpoint_crate-37xz68e1mux5p",
+            "jetstreamer_checkpoint_restore_probe-not-a-cargo-id",
+        ] {
+            assert!(forbidden(base, &base.join(bad), "directory"));
+        }
+    }
     fn plan(profile: &str) -> Plan {
         Plan {
             schema: profile.into(),
