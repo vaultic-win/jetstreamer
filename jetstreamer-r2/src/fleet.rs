@@ -56,7 +56,6 @@ mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
 mod native227_terminal_observation;
-mod native227_terminal_observation;
 mod native227_v1625;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
