@@ -38,6 +38,7 @@ mod native209_terminal;
 mod native228;
 mod native228_admission;
 mod native228_capture;
+mod native228_collected;
 mod native228_event;
 mod native228_full209;
 mod native228_peer209;

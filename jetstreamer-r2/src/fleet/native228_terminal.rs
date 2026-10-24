@@ -19,7 +19,7 @@ pub(super) fn terminal_shape(u: &Value, iid: &str) -> Result<()> {
     );
     Ok(())
 }
-fn journal(binding: &BoundFile, iid: &str, pid: u64) -> Result<(Value, u64)> {
+pub(super) fn journal(binding: &BoundFile, iid: &str, pid: u64) -> Result<(Value, u64)> {
     ensure!(
         binding
             .path
@@ -137,7 +137,15 @@ pub(super) fn validate(proof: &Value) -> Result<String> {
                 .is_some_and(|n| n >= clock / 1_000_000),
         "228 bounded terminal tuple/clock differs"
     );
-    terminal_shape(&proof["terminal_manager"], iid)?;
+    if proof["terminal_manager"]["LoadState"] == "not-found" {
+        super::native228_collected::validate(proof)?;
+    } else {
+        ensure!(
+            proof.get("collected_terminal").is_none(),
+            "228 collected proof cannot borrow a loaded unit"
+        );
+        terminal_shape(&proof["terminal_manager"], iid)?;
+    }
     Ok(iid.into())
 }
 pub(super) fn predecessor(
@@ -238,7 +246,12 @@ pub(super) fn census_check(p: &Plan, current: &BTreeMap<String, Value>) -> Resul
         return Ok(());
     }
     let iid = validate(&proof)?;
-    terminal_shape(current.get(c::UNIT).context("228 owner omitted")?, &iid)?;
+    let owner = current.get(c::UNIT).context("228 owner omitted")?;
+    if proof.get("collected_terminal").is_some() {
+        super::native228_collected::current(&proof, owner)?;
+    } else {
+        terminal_shape(owner, &iid)?;
+    }
     Ok(())
 }
 #[derive(Deserialize)]
@@ -277,6 +290,13 @@ pub(super) fn capture() -> Result<()> {
         validate(&old)?;
         return Ok(());
     }
+    let proof = checked_proof(&b, &self_sha, &s)?;
+    private157::immutable_receipt(&s.output, &proof)
+}
+
+// Shared by actual capture and the read-only host regression. No receipt or
+// runtime mutation occurs until capture explicitly persists the returned value.
+fn checked_proof(b: &BoundFile, self_sha: &str, s: &Spec) -> Result<Value> {
     let origin = c::immutable_json(&s.running_origin)?;
     let f = bound_json(&s.fleet)?;
     let o = bound_json(&s.observer)?;
@@ -311,7 +331,7 @@ pub(super) fn capture() -> Result<()> {
         "running_origin":private157::binding(&s.running_origin),"journal":private157::binding(&s.journal),
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"sampled_at_utc":f["sampled_at_utc"],
         "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"terminal_unix_microseconds":clock,
-        "native_marker":checkpoint,"terminal_manager":before,"capture_spec":private157::binding(&b),"capture_helper_sha256":self_sha,
+        "native_marker":checkpoint,"terminal_manager":before,"capture_spec":private157::binding(b),"capture_helper_sha256":self_sha,
         "native_input_qualified":true,"resource_samples_taken":0});
     for key in [
         "entry_replay",
@@ -325,17 +345,49 @@ pub(super) fn capture() -> Result<()> {
     ] {
         proof[key] = json!(false);
     }
+    if before["LoadState"] == "not-found" {
+        let witness = super::native228_collected::capture(&proof, &f, &p, &origin)?;
+        proof["recorded_unix_seconds"] = witness["checked_unix_seconds"].clone();
+        proof["collected_terminal"] = witness;
+    }
     validate(&proof)?;
     ensure!(
         unit(c::UNIT)? == before,
         "228 terminal owner changed during capture"
     );
-    private157::immutable_receipt(&s.output, &proof)
+    Ok(proof)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "root read-only actual337 collected228 capture-spec regression; no Bank, runtime mutation, proof write or R2"]
+    fn actual_collected337_capture_spec_passes_without_writing_the_proof() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let b = match (std::env::var("HORIZON_NATIVE228_CHECK_SPEC_PATH"),
+            std::env::var("HORIZON_NATIVE228_CHECK_SPEC_SHA256")) {
+            (Ok(path), Ok(sha256)) => BoundFile { path: path.into(), sha256 },
+            (Err(std::env::VarError::NotPresent), Err(std::env::VarError::NotPresent)) => BoundFile {
+                path: "/var/lib/jetstreamer/horizon-native228-terminal-spec-1b207be8-from337-v2/terminal-spec.json".into(),
+                sha256: "1d28b1cb06eb67d456a689c931f927e73c0a079a3698cf2f7dc2792e58c220ac".into(),
+            },
+            _ => panic!("supply both exact sealed spec path and SHA, or neither"),
+        };
+        let spec: Spec = serde_json::from_value(c::immutable_json(&b).unwrap()).unwrap();
+        assert!(!spec.output.try_exists().unwrap());
+        let self_sha = hex_lower(&Sha256::digest(fs::read("/proc/self/exe").unwrap()));
+        let proof = checked_proof(&b, &self_sha, &spec).unwrap();
+        assert_eq!(proof["terminal_manager"]["LoadState"], "not-found");
+        assert_eq!(
+            proof["native_marker"]["capitalization"],
+            "504915797589943503"
+        );
+        assert_eq!(proof["native_marker"]["accounts_hash"], c::ACCOUNTS_HASH);
+        assert_eq!(proof["resource_samples_taken"], 0);
+        assert_eq!(proof["publication_authorized"], false);
+        assert!(!spec.output.try_exists().unwrap());
+    }
     #[test]
     fn cleared_owner_is_not_a_replacement_restart_or_collected_unit() {
         let iid = "a".repeat(32);
