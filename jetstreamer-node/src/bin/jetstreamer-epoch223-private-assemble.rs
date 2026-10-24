@@ -374,6 +374,10 @@ fn run() -> Result<()> {
     let mut sources = Vec::new();
     let mut identities = Vec::new();
     for (path, manifest) in [(PREFIX, &prepared.prefix), (TAIL, &prepared.tail)] {
+        ensure!(
+            Path::new(path).canonicalize()? == Path::new(path),
+            "redirected private source"
+        );
         no_sidecar(Path::new(path))?;
         let file = open_regular_nofollow(Path::new(path))?;
         let m = file.metadata()?;
@@ -429,7 +433,8 @@ fn run() -> Result<()> {
     File::open(OUTPUT)?.sync_all()?;
     for (path, pin, identity) in &identities {
         ensure!(
-            archive_file_identity(pin)? == *identity
+            path.canonicalize()? == *path
+                && archive_file_identity(pin)? == *identity
                 && path_matches_archive_identity(path, *identity)?,
             "source changed during merge"
         );
@@ -445,7 +450,8 @@ fn run() -> Result<()> {
     );
     for (path, pin, identity) in &identities {
         ensure!(
-            archive_file_identity(pin)? == *identity
+            path.canonicalize()? == *path
+                && archive_file_identity(pin)? == *identity
                 && path_matches_archive_identity(path, *identity)?,
             "source changed during final output hash"
         );
