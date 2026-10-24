@@ -6,9 +6,9 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
-mod assembly223_capacity;
 mod assembly144_admission;
 mod assembly144_prepare;
+mod assembly223_capacity;
 mod bounded205;
 mod census141_poh;
 mod cold223_scan;
@@ -21,10 +21,12 @@ mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
 mod foundation_holding_capacity;
-mod maintenance_capacity;
 mod full209_status;
+mod full210_peer;
+mod full210_status;
 mod full227_failure;
 mod full227_status;
+mod maintenance_capacity;
 mod native141;
 mod native144;
 mod native203;
@@ -45,8 +47,8 @@ mod native210_capture;
 mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
-mod native227_v1625;
 mod native227_terminal_observation;
+mod native227_v1625;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
 mod native227_v1625_event;
@@ -97,6 +99,10 @@ mod singleton209_capture;
 mod singleton209_delivery;
 mod singleton209_peer223;
 mod singleton209_prepare;
+mod singleton210;
+mod singleton210_admission;
+mod singleton210_capability;
+mod singleton210_capture;
 mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
@@ -157,6 +163,23 @@ pub(super) fn capture_full227_failure() -> Result<()> {
 }
 pub(super) async fn publish_full209_status() -> Result<()> {
     full209_status::run().await
+}
+pub(super) async fn publish_full210_status() -> Result<()> {
+    full210_status::run().await
+}
+pub(super) fn full210_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    full210_status::inactive_owner(receipt)
+}
+pub(super) fn prepare_singleton210_inputs() -> Result<()> {
+    singleton210_capability::run()
+}
+pub(super) fn admit_singleton210() -> Result<()> {
+    singleton210_admission::run()
+}
+pub(super) fn capture_singleton210() -> Result<()> {
+    singleton210_capture::run()
 }
 pub(super) fn full209_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
@@ -315,7 +338,7 @@ pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(Strin
 }
 /// A derived accounting view only; raw observer/fleet bindings stay immutable.
 pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<Value> {
-    native227_terminal_observation::view(f,o)
+    native227_terminal_observation::view(f, o)
 }
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
@@ -595,6 +618,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     }
     if singleton209::namespace(claim) {
         singleton209::bindings(claim, &launch)?;
+    }
+    if singleton210::namespace(claim) {
+        singleton210::bindings(claim, &launch)?;
     }
     Ok(launch)
 }
@@ -1030,6 +1056,7 @@ fn validate_same_sample_admission(
         204 if prefix204::namespace(claim) => prefix204::GUARD_SHA,
         227 if singleton227::namespace(claim) => singleton227::SINGLETON_GUARD_SHA,
         209 if singleton209::namespace(claim) => singleton209::GUARD_SHA,
+        210 if singleton210::namespace(claim) => singleton210::GUARD_SHA,
         203 if native203::namespace(claim) => native203::GUARD_SHA,
         203 if continuation203::namespace(claim) => continuation203::GUARD_SHA,
         225 if claim
@@ -1251,6 +1278,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if singleton209::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| singleton209::guard_matches(claim, &r, plan))
+    } else if singleton210::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| singleton210::guard_matches(claim, &r, plan))
     } else if prefix223_native20::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|r| prefix223_native20::guard_matches(claim, &r, plan))
@@ -1402,6 +1432,11 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let prefix_204 = receipt["schema"] == prefix204::SCHEMA;
     let singleton_227 = receipt["schema"] == singleton227::SCHEMA;
     let singleton_209 = receipt["schema"] == singleton209::SCHEMA;
+    let singleton_210 = receipt["schema"] == singleton210::SCHEMA;
+    ensure!(
+        !singleton210::namespace(claim) || singleton_210,
+        "capped210 namespace requires its own full singleton schema"
+    );
     ensure!(
         !singleton209::namespace(claim) || singleton_209,
         "capped209 namespace requires its own full singleton schema"
@@ -1473,6 +1508,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || prefix_204
             || singleton_227
             || singleton_209
+            || singleton_210
             || shrink_budget_203
             || bounded_224
             || root_prefix_203
@@ -1488,6 +1524,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     );
     let scope_valid = if singleton_209 {
         singleton209::launch_matches(claim, receipt)
+    } else if singleton_210 {
+        singleton210::launch_matches(claim, receipt)
     } else if singleton_227 {
         singleton227::launch_matches(claim, receipt)
     } else if prefix_204 {
@@ -3132,6 +3170,14 @@ pub(super) async fn run() -> Result<()> {
                 );
                 singleton209::bindings(claim, &launch)?;
             }
+            if singleton210::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(
+                    singleton210::same_command(&current["ExecStart"]),
+                    "capped210 live command changed"
+                );
+                singleton210::bindings(claim, &launch)?;
+            }
             if shrink_budget225::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -3329,6 +3375,7 @@ pub(super) async fn run() -> Result<()> {
                     qualification_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
+                        || full210_status::matches(receipt, epoch, &observer, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
