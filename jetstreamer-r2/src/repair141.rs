@@ -318,6 +318,24 @@ fn state_budget(extra: u64) -> Result<()> {
     );
     Ok(())
 }
+fn protected_memory(c: &Value) -> Result<(u64, u64)> {
+    let target = &c["capacity_decision"]["memory_concurrency_target"];
+    ensure!(
+        target["valid"] == true,
+        "141 invalid protected memory target"
+    );
+    // Keep the reviewed protection when a fresh RSS measurement falls. Lower
+    // observed residency is not authority to release an existing reservation.
+    let resident = target["host_resident_planning_bytes"]
+        .as_u64()
+        .context("141 protected resident")?
+        .max(469_264_728_064);
+    let reserved = target["reservation_ceiling_bytes"]
+        .as_u64()
+        .context("141 protected reservations")?
+        .max(189_826_437_120);
+    Ok((resident, reserved))
+}
 fn bootstrap(p: &QueuePlan) -> Result<Value> {
     let o = read(&p.bootstrap_observer, false)?;
     let f = read(&p.bootstrap_fleet, false)?;
@@ -343,17 +361,7 @@ fn bootstrap(p: &QueuePlan) -> Result<Value> {
             && c["fleet"] == serde_json::to_value(&p.bootstrap_fleet)?,
         "141 queue bootstrap needs a current accepted coordinated cycle"
     );
-    let target = &c["capacity_decision"]["memory_target"];
-    let resident = target["host_resident_planning_bytes"]
-        .as_u64()
-        .context("141 protected resident")?;
-    let reserved = target["reservation_ceiling_bytes"]
-        .as_u64()
-        .context("141 protected reservations")?;
-    ensure!(
-        target["valid"] == true && resident >= 469_264_728_064 && reserved >= 189_826_437_120,
-        "141 queue cannot lower existing protected memory"
-    );
+    let (resident, reserved) = protected_memory(&c)?;
     let mem = fs::read_to_string("/proc/meminfo")?;
     let kib = |name: &str| -> Result<u64> {
         mem.lines()
@@ -1089,6 +1097,32 @@ pub(super) async fn publish() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_capacity_schema_retains_reviewed_memory_when_rss_falls() {
+        let mut c = json!({"capacity_decision":{"memory_concurrency_target":{
+            "valid":true,"host_resident_planning_bytes":460_000_000_000u64,
+            "reservation_ceiling_bytes":180_000_000_000u64}}});
+        assert_eq!(
+            protected_memory(&c).unwrap(),
+            (469_264_728_064, 189_826_437_120)
+        );
+        c["capacity_decision"]["memory_concurrency_target"]["host_resident_planning_bytes"] =
+            json!(500_000_000_000u64);
+        c["capacity_decision"]["memory_concurrency_target"]["reservation_ceiling_bytes"] =
+            json!(200_000_000_000u64);
+        assert_eq!(
+            protected_memory(&c).unwrap(),
+            (500_000_000_000, 200_000_000_000)
+        );
+        c["capacity_decision"]["memory_concurrency_target"]["valid"] = json!(false);
+        assert!(protected_memory(&c).is_err());
+        assert!(
+            protected_memory(&json!({"capacity_decision":{"memory_target":{
+            "valid":true,"host_resident_planning_bytes":500_000_000_000u64,
+            "reservation_ceiling_bytes":200_000_000_000u64}}}))
+            .is_err()
+        );
+    }
     fn binding() -> pipeline_status::Binding {
         pipeline_status::Binding {
             unit: UNIT.into(),
