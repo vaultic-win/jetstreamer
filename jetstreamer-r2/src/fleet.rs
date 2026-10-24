@@ -6,9 +6,9 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
-mod assembly223_capacity;
 mod assembly144_admission;
 mod assembly144_prepare;
+mod assembly223_capacity;
 mod bounded205;
 mod census141_poh;
 mod cold223_scan;
@@ -21,10 +21,10 @@ mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
 mod foundation_holding_capacity;
-mod maintenance_capacity;
 mod full209_status;
 mod full227_failure;
 mod full227_status;
+mod maintenance_capacity;
 mod native141;
 mod native144;
 mod native203;
@@ -45,8 +45,8 @@ mod native210_capture;
 mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
-mod native227_v1625;
 mod native227_terminal_observation;
+mod native227_v1625;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
 mod native227_v1625_event;
@@ -315,7 +315,7 @@ pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(Strin
 }
 /// A derived accounting view only; raw observer/fleet bindings stay immutable.
 pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<Value> {
-    native227_terminal_observation::view(f,o)
+    native227_terminal_observation::view(f, o)
 }
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
