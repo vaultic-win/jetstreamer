@@ -587,6 +587,9 @@ pub(super) fn pipeline_unit_range(
     if watch198::namespace(phase, unit) {
         return Ok(198..=198);
     }
+    if super::repair141::scope(phase, unit) {
+        return Ok(141..=141);
+    }
     if phase == "producer-finalization" {
         return super::cohort_finalization::scope(unit);
     }
@@ -771,6 +774,21 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
                     .is_some_and(|pid| pid > 0),
             "pipeline live identity or exact command changed"
         );
+        if super::repair141::scope(&claim.phase, &claim.unit) {
+            let evidence = claim
+                .evidence
+                .iter()
+                .map(bound_json)
+                .collect::<Result<Vec<_>>>()?;
+            super::repair141::validate_fleet_claim(
+                claim.epoch,
+                &claim.phase,
+                &claim.unit,
+                &claim.invocation_id,
+                &claim.expected_exec_start,
+                &evidence,
+            )?;
+        }
         if private144_scan::scope(&claim.phase, &claim.unit) {
             private144_scan::validate_live(claim, current)?;
         }
@@ -2761,7 +2779,8 @@ pub(super) async fn run() -> Result<()> {
         } else {
             Value::Null
         };
-        let private_scan = private144_scan::scope(&claim.phase, &claim.unit)
+        let private_scan = super::repair141::scope(&claim.phase, &claim.unit)
+            || private144_scan::scope(&claim.phase, &claim.unit)
             || native209::scope(&claim.phase, &claim.unit)
             || native228::scope(&claim.phase, &claim.unit)
             || native207::scope(&claim.phase, &claim.unit)
@@ -2783,7 +2802,8 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
-                        || ((tail223_scan::scope(&claim.phase, &claim.unit)
+                        || ((super::repair141::scope(&claim.phase, &claim.unit)
+                            || tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)
                             || native228::scope(&claim.phase, &claim.unit)
                             || native207::scope(&claim.phase, &claim.unit)
@@ -3160,6 +3180,7 @@ pub(super) async fn run() -> Result<()> {
             let private_qualification_binding =
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
+                        || super::repair141::matches(receipt, epoch, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)

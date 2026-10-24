@@ -159,6 +159,13 @@ fn policy141(b: &Bound) -> Result<Value> {
     );
     Ok(value)
 }
+pub(super) fn repair141_downstream(path: &Path, sha: &str) -> Result<u64> {
+    let v = policy141(&Bound {
+        path: path.into(),
+        sha256: sha.into(),
+    })?;
+    delivery141(&v)
+}
 fn plan_epochs(p: &Plan) -> Result<Vec<u64>> {
     let epochs = p
         .downstream_allowance_millis

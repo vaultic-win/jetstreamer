@@ -75,6 +75,8 @@ mod native223_status;
 mod pipeline_status;
 mod qualification_status;
 mod readback_progress;
+mod repair141;
+mod repair141_model;
 mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
@@ -1721,11 +1723,38 @@ async fn publish_epoch_status_inner(
     status: &EpochStatus,
     initial144_handoff: bool,
 ) -> Result<(String, Option<String>)> {
+    publish_epoch_status_checked(s3, r2, status, initial144_handoff, None).await
+}
+async fn publish_epoch_status_bound_previous(
+    s3: &Client,
+    r2: &R2Config,
+    status: &EpochStatus,
+    previous: Option<&str>,
+) -> Result<(String, Option<String>)> {
+    publish_epoch_status_checked(s3, r2, status, false, Some(previous)).await
+}
+async fn publish_epoch_status_checked(
+    s3: &Client,
+    r2: &R2Config,
+    status: &EpochStatus,
+    initial144_handoff: bool,
+    expected_previous: Option<Option<&str>>,
+) -> Result<(String, Option<String>)> {
     let epoch = status.epoch;
     validate_epoch_status(status, epoch)?;
     let status_bytes = epoch_status_bytes(status)?;
     let key = format!("epoch-{epoch}.epoch-status.json");
     let previous = get_mutable_object(s3, &r2.bucket, &key).await?;
+    if let Some(expected) = expected_previous {
+        ensure!(
+            repair141_model::same_owned_version(
+                expected,
+                previous.as_ref().map(|o| o.etag.as_str())
+            ),
+            "status owner/version changed after authenticated handoff preflight"
+        );
+    }
+
     let action = if let Some(previous) = &previous {
         let previous_status: EpochStatus =
             serde_json::from_slice(&previous.bytes).context("existing status JSON is invalid")?;
@@ -3463,6 +3492,15 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("repair-task-capture-141") {
+        return repair141::task_capture();
+    }
+    if env::args().nth(1).as_deref() == Some("repair-owner-141") {
+        return repair141::owner_run();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-repair141") {
+        return repair141::publish().await;
     }
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;

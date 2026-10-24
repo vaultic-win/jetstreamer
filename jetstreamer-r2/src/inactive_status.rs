@@ -15,6 +15,16 @@ mod natural144;
 mod preserved144;
 mod publication144;
 mod warmup223;
+pub(super) fn validate_capped141_repair_terminal(e: &Value) -> Result<()> {
+    capped141::time(e)?;
+    let unit = "horizon-qualify-141-original-entry-capped-root-20261023-v1.service";
+    let current = BTreeMap::from([(unit.to_string(), fleet::unit(unit)?)]);
+    capped141::validate_current(
+        &current,
+        e,
+        &[(unit.into(), "e639f007d482464f8a251455659d2ede".into())],
+    )
+}
 pub(super) fn prepare_publication144_preservation() -> Result<()> {
     publication144::prepare()
 }

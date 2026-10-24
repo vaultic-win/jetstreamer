@@ -93,6 +93,7 @@ impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
+            | ("epoch141-active-repair", "verification")
             | ("private-cold-snapshot-verification", "verification")
             | ("private-warmup-reproduction", "verification")
             | ("local-publication", "verification" | "publication")
@@ -114,6 +115,15 @@ impl Binding {
             ensure!(
                 self.origin_unit == self.unit && self.origin_invocation_id == self.invocation_id,
                 "producer finalization/native input must retain the original invocation clock"
+            );
+        }
+        if self.claim_phase == "epoch141-active-repair" {
+            ensure!(
+                epoch == 141
+                    && super::repair141::scope(&self.claim_phase, &self.unit)
+                    && self.origin_unit == self.unit
+                    && self.origin_invocation_id == self.invocation_id,
+                "141 repair must retain its real active task clock"
             );
         }
         if self.claim_phase == "controller-import-handoff" {
@@ -387,6 +397,8 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                         || (unit == super::cohort160_handoff::CONTROLLER
                             && invocation == super::cohort160_handoff::IID
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (unit == super::repair141::UNIT
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (matches!(
                             unit,
                             "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service"
@@ -407,7 +419,7 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
     ensure!(micros > 0, "manager start time is zero");
     Ok(micros / 1000)
 }
-fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
+pub(super) fn manager_start(unit: &str, invocation: &str) -> Result<u64> {
     ensure!(
         unit_name(unit) && hex_id(invocation, 32),
         "invalid manager start identity"
@@ -833,6 +845,22 @@ pub(super) fn native_input_matches_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn exact141_repair_uses_only_its_actual_pid1_started_clock() {
+        let unit = super::super::repair141::UNIT;
+        let invocation = "ad39f007d482464f8a251455659d2ede";
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started exact141 actual repair queue.","__REALTIME_TIMESTAMP":"1792787565383406"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1792787565383
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("wrong");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
     #[test]
     fn native20_warmup_simple_service_uses_its_exact_pid1_started_clock() {
         let unit = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";
