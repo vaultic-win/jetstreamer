@@ -242,6 +242,12 @@ pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> 
         matches!(candidate_epoch, 207 | 209 | 210 | 223 | 227 | 228),
         "unregistered native candidate century"
     );
+    century_inventory_floor(f, Some(candidate_epoch))
+}
+pub(super) fn century_floor_for_maintenance(f: &Value) -> Result<u64> {
+    century_inventory_floor(f, None)
+}
+fn century_inventory_floor(f: &Value, candidate_epoch: Option<u64>) -> Result<u64> {
     let inventory = &f["inventory"];
     ensure!(
         inventory["schema"] == "jetstreamer-horizon-r2-inventory-v1"
@@ -264,7 +270,7 @@ pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> 
             (201..=300).contains(&epoch) && seen.insert(epoch),
             "227 duplicate/foreign inventory epoch"
         );
-        if epoch == candidate_epoch {
+        if Some(epoch) == candidate_epoch {
             ensure!(
                 row["state"] == "missing",
                 "227 already has a remote object; do not start a duplicate lane"
@@ -1073,6 +1079,21 @@ mod tests {
         let mut completed = f.clone();
         completed["inventory"]["entries"][26] = json!({"epoch":227,"state":"ready-pair"});
         assert!(century_floor(&completed).is_err());
+    }
+    #[test]
+    fn maintenance_reuses_the_complete_century_floor_without_claiming_a_new_epoch() {
+        let f = inventory();
+        assert_eq!(century_floor_for_maintenance(&f).unwrap(), 2415);
+        assert!(century_floor_for(&f, 207).is_err());
+        let mut incomplete = f.clone();
+        incomplete["inventory"]["entries"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(century_floor_for_maintenance(&incomplete).is_err());
+        let mut staged = f;
+        staged["inventory"]["entries"][26]["state"] = json!("archive-only");
+        assert!(century_floor_for_maintenance(&staged).is_err());
     }
     #[test]
     fn shared_floor_checks_the_exact_registered_candidate_not_another_epoch() {

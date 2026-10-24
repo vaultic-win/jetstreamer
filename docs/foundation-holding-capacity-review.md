@@ -1,0 +1,270 @@
+# Foundation holding: retained artifact review
+
+This is a source and metadata review on 2026-10-24. It authorizes no remote write,
+local deletion, service change, replay launch, or runtime-state offload. No new
+replay/resource observation, process-reference scan, or whole-archive hash was run.
+
+## Existing host authorization
+
+The host is `horizon-vaultic` (`/etc/hostname`). The existing root-owned, sealed
+mapping is
+`/var/lib/jetstreamer/horizon-r2-holding-foundation-node-01-user-mapping-v1/mapping.json`,
+SHA-256 `50736c4c6633b4a97f4a717a1ba5f83374b4e2af4b7ef22c90ed4e007cad35b6`.
+It records the user's exact choice `foundation_node_01/` and append-only parking
+and authenticated restoration. Ownership checking, transport qualification and
+holding writes are recorded as not yet performed. This mapping is distinct from
+the `dev-samjohnson` / `node_02/` mapping accepted by existing `holding.rs`.
+
+## Epoch207 has no reclaimable retained archive
+
+A targeted filename census beneath the private root, excluding live scratch,
+AccountsDb, unpacked snapshot and cache trees, found only these epoch207 `.jet`
+files. Each has device66305, one link, UID/GID1000, mode0644, length0 and zero
+allocated blocks:
+
+| Path beneath `/home/ubuntu/.jetstreamer-private/qualification-207/` | Inode | Modified/changed Unix seconds | Reclaimable bytes |
+| --- | ---: | ---: | ---: |
+| `diagnostic-output-failed-v1/epoch-207-through-89855469.jet` | 9784386 | 1791079817 | 0 |
+| `diagnostic-output-failed-v2/epoch-207-through-89855469.jet` | 9784405 | 1791081711 | 0 |
+| `diagnostic-output-failed-v3/epoch-207-through-89855469.jet` | 9784403 | 1791083949 | 0 |
+
+The 2026-10-07 staging receipt mentions a manually stopped, 7.04%-complete v4
+output at `qualification-207/diagnostic-output/epoch-207-through-89855469.jet`.
+That path is now absent. Its mention does not establish a current source, digest,
+original terminal identity, or restoration set. Do not create eligibility from it.
+No archived replay output was found in the newer complete-span output directory.
+
+The 2026-10-05 scratch cleanup already reclaimed the old epoch207 scratch; its
+71,793,295,360-byte historical size is not current capacity. The 2026-10-07 compact
+index cleanup recovered 27,858,628,608 bytes and explicitly preserved `.jet` files.
+Neither receipt explains the absent v4 output; preserve that uncertainty.
+
+## Concrete alternate: the old epoch213 prefix
+
+`/home/ubuntu/.jetstreamer-private/qualification-213/diagnostic-output-selected-store8-v2/epoch-213-through-92447542.jet`
+is still present. Its current metadata matches the saved post-archive failure:
+length125,316,500,795; allocated125,316,632,576 bytes; device66305; inode18063496;
+one link; UID/GID1000; mode0600; mtime/ctime1791629969. The saved independent digest
+is `e9b0fa7bbad1fdbf86d9d564baa0c377003ec20e40709dae249fac8ba0cb91d9`;
+this review did not rehash it. The original producer was
+`horizon-qualify-213-selected-store8-v2.service`, invocation
+`331a5c69fd0a4f2e8dd35f7ace0f51a4`, stopped after its complete431543-slot prefix
+with a parent-reap timeout9 and no restart.
+
+The accepted fleet341 already records epoch213 as remote-ready, so the old
+continuation assessment's proposed repair is obsolete. Keep the original prefix
+and assembly provenance nonetheless. Offloading this source would recover about
+125.3GB only after fresh closure/reference review, qualified custody and separately
+reviewed local retirement. No current lane increase has been established.
+
+Two further epoch213 copies are different policy cases:
+
+- `/home/ubuntu/horizon/epoch-213.jet`:125,368,013,231 bytes, inode174110883;
+  canonical SHA-256 `953e8c9efbdfc0dc49e4f066d30046e3b44e1a13e065b340a5bcc7b093632261`.
+  Its full/plugin receipts exist, but the configured boundary receipt directory is
+  empty. Ordinary local retirement remains blocked; holding is no exception.
+- `checkpoint-continuation-213-ae43646-v1/output/epoch-213-checkpoint-restart-v4.jet`
+  beneath the private root:125,368,013,231 bytes, inode187156493, with that same
+  canonical digest in the saved verification receipt. Publication explicitly
+  preserves this original assembly and denies retirement. Do not label it a
+  failed disposable prefix or retire it through a holding shortcut.
+
+## Narrow adapter proposed for review
+
+Keep the existing node02 commands and mapping validator unchanged. Add separate
+Foundation entry points and an exact Foundation mapping type that accepts only
+the sealed mapping above, host `horizon-vaultic` and prefix `foundation_node_01/`.
+Do not silently translate the node02 schema or choose a prefix from the hostname.
+
+Extract transport primitives from the existing reviewed implementation instead
+of implementing another multipart protocol:
+
+1. Share the existing conditional owner create/readback logic after each host's
+   mapping validator. Identical existing owner bytes are idempotent; different
+   owner bytes, or a nonempty prefix without an owner, are hard failures. Use
+   content-addressed `objects/SHA.blob` and `manifests/SHA.json` keys, never root
+   canonical keys, overwrite, deletion or per-object ACLs.
+2. Reuse `upload_object`, independent multipart ETag/composite-checksum checking,
+   and `verify_remote_sha256`. Rehash and revalidate the same local inode after
+   complete authenticated remote readback, then create the manifest and fsync a
+   private custody receipt. An existing matching object still needs whole-byte
+   verification. Custody grants no canonical publication or local retirement.
+3. Reuse conditional authenticated `read_remote_sha256_resumable`, protected-floor
+   chunk writing, partial-file identity checks, fsync and `RENAME_NOREPLACE` for
+   restoration into a root-private directory. Bind exact original name, ownership,
+   mode, lineage and required metadata; content remains a holding blob until a
+   separate no-clobber consumer handoff. Neither restoration nor a byte round trip
+   grants replay/checkpoint/resume authority.
+
+The artifact adapter must validate the exact reviewed nonzero file, hash/length,
+stable single-link identity and public-chain content class; exclude credentials,
+configuration, logs, status objects, canonical files and deployment members. For
+the old213 prefix, bind the original producer failure, all later assembly/verifier
+owners, publication and accepted ready-pair evidence. Fresh terminal/no-replacement
+checks and before/after process-reference scans cover the source and its owning
+tree. Review staged services, manifests and future input references separately;
+an inactive process is not proof that an artifact is unused. Keep metadata needed
+to restore the exact bytes and prohibit consuming a parked path before restoration.
+
+Foundation restore admission needs its own reviewed201-300 resource adapter.
+Never reuse node02's101-200 fleet path, capped186 budget, or fixed reserve. Bind the
+latest accepted coordinated fleet/observer and all current invocation-bound guard
+claims, preserving their floors and complete remaining growth, then add the full
+restore requirement. Reject unknown/native peers until modeled. Resource evidence
+comes from the existing30-minute loop; metadata ownership checks are not another
+replay/resource polling loop.
+
+First qualify transport with a small, dedicated copy of known public genesis
+bytes, not an immutable deployment member. Exercise interruption after remote
+completion before receipt persistence, matching retries, conflicting owner/object/
+destination bytes and interrupted restore. Leave remote test objects append-only.
+Then qualify the exact retained-prefix path and restoration set. Local retirement
+is a separate exact-file operation after durable custody, complete restore
+qualification and fresh ownership/reference/staged-input checks; it preserves
+receipts and every original archive-specific gate. Never offload live/mmap-backed
+AccountsDb, SIGSTOP images, or unqualified resumable state.
+
+The candidate adapter below must pass root review, tests, sealing and actual
+transport qualification before operational use. It adds no retirement authority.
+
+## Follow-up: exact213 closure and staged consumers
+
+The saved accepted fleet342 (`2026-10-24T03:01:00Z`, SHA-256
+`ce0e99460a6099513e15af7704ee48896efc6cb996f32c52d23bb364b03745b8`)
+continues to show the canonical213 ready pair and no active213 job. No new
+replay/resource observation was taken for this review.
+
+An explicit read-only systemd metadata check found the original prefix producer
+still at invocation `331a5c69fd0a4f2e8dd35f7ace0f51a4`, failed/timeout/status9,
+PID0, Restart=no, NRestarts0 and no queued job. The later continuation, private
+verifier and uploader are also terminal. The exact raw segment and independent
+validation retain digests `1d74158c...e0581` and `e7adb91a...25b93`, respectively.
+
+These installed historical consumers still reference the source. They have no
+PID, queued job, restart, timer/socket trigger or OnFailure action. Their known
+OnSuccess chain cannot advance from the original failed producer on its own:
+
+| Unit (all `.service`) | Remaining dependency |
+| --- | --- |
+| `horizon-qualify-213-selected-store8-v2` | Writes the old prefix; OnSuccess still names the legacy validator. |
+| `horizon-independent-verify-213-selected-store8-v2` | Reads it; effective cleanup drop-in still has OnSuccess to the scratch-retirer. |
+| `horizon-independent-verify-213-selected-store8-v2-recovery-16384` | Can read it again; its positive segment-file condition still holds. |
+| `horizon-independent-verify-213-recovered-v1` | References it; currently condition-blocked by its existing success receipt. |
+| `horizon-independent-full-read-213-recovered-v1` | References the original source in its failed reader deployment. |
+| `horizon-independent-full-read-213-recovered-v2` | References it; currently condition-blocked because the segment exists. |
+| `horizon-retire-scratch-213-selected-store8-v2` | Uses it as retained-archive evidence before scratch retirement. |
+
+No staged service under the dedicated private `systemd-staging` directory matched
+the source in this text search. The completed ready213 work queue and terminal
+owners distinguish these old definitions from a new staged replay. Do not infer
+pending work merely from their continued presence. Immutable deployment copies and the
+completed continuation plan also reference it. They are restoration/provenance
+dependencies, not proof that another job is currently running. The continuation
+plan's exact digest remains
+`83eeb441502e39510ad7610ae6dac9165d9f5a6f32afaeab1f19205e9ab6f144`.
+Restoration must preserve the raw segment bytes, old file name/metadata, original
+lineage and validation bindings before any such consumer can run again.
+
+The candidate `jetstreamer-foundation-holding-review213` command records a bounded
+before/after scan using the existing Rust `process_references` library and a
+stable census of installed, transient and staged unit metadata. Known closed
+historical consumers become explicit restore-on-reuse dependencies; a new consumer,
+an enabling `.wants`/`.requires` link, a private staged unit or an unscanned directory
+alias is a blocker. It optionally rehashes the exact source; metadata-only mode
+cannot issue positive custody eligibility. It reports blockers, current source identity and zero
+reclaimable bytes, never grants retirement or transport authority, and does not
+take a replay/resource sample. Foundation mapping validation is separate from
+the existing node02 transport; the latter is unchanged.
+
+Until any actual staged-reference blockers are resolved and the custody/restore
+round trip is qualified, this remains125.3GB of retained input, not free capacity.
+All historical consumers require exact byte restoration before manual reuse.
+
+## Candidate Foundation implementation
+
+The new candidate commands are separate from node02:
+
+```text
+jetstreamer-r2 holding-foundation213-park SPEC --spec-sha256 SHA --self-sha256 SHA
+jetstreamer-r2 holding-foundation213-admit-restore SPEC --spec-sha256 SHA --self-sha256 SHA
+jetstreamer-r2 holding-foundation213-restore SPEC --spec-sha256 SHA --self-sha256 SHA
+```
+
+They accept only the exact old213 prefix or a dedicated immutable20,144-byte
+public-genesis transport probe at
+`/var/lib/jetstreamer/horizon-foundation-holding-probe-input-v1/genesis.tar.bz2`.
+The large prefix cannot park until a successful Foundation probe park/readback/
+restore receipt is bound. No artifact path, prefix, overwrite or deletion option
+is accepted. The authenticated bucket and mapping are fixed. The existing node02
+mapping validator, state directory, resource policy and command behavior remain.
+
+The adapters share extracted conditional owner creation, multipart upload/full
+readback and resumable protected-floor byte restoration with the reviewed holding
+implementation. Foundation state is root-private under
+`/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1`, with separate
+`receipts/`, `restores/` and an exclusive transition lock. All state must be on the
+admitted root filesystem. Create these exact root-owned0700 directories before
+qualification; the binary refuses another host, mapping, owner or unsafe state.
+
+An initial probe park plan is:
+
+```json
+{
+  "schema": "jetstreamer-foundation-holding-park-plan-v1",
+  "mapping": {"path": "/var/lib/jetstreamer/horizon-r2-holding-foundation-node-01-user-mapping-v1/mapping.json", "sha256": "50736c4c6633b4a97f4a717a1ba5f83374b4e2af4b7ef22c90ed4e007cad35b6"},
+  "artifact": "genesis-probe",
+  "accepted_fleet": null,
+  "transport_qualification": null
+}
+```
+
+For the prefix, use artifact `prefix213` and bind the current accepted201-300
+fleet plus the successful probe restore receipt. The exact source must still
+match its original identity; the common read-only policy rechecks lineage,
+closed owners, process references and staged metadata before and after transport.
+The uploader independently hashes the actual source before upload and again
+after full remote SHA-256 readback. The holding manifest preserves the raw1,809-byte
+segment bytes verbatim (base64 with exact digest), not a reserialized substitute.
+
+A restore-admission plan has schema
+`jetstreamer-foundation-holding-restore-admission-plan-v1`, `mapping`, `custody`
+and `resource_basis`. The latter contains only bound `observer`, `fleet` and
+`protected_guards`. The Foundation maintenance adapter reuses the complete
+century inventory and reviewed current peer/guard growth calculations. It does
+not claim a missing epoch, inherit node02's reserve, lower an existing guard
+floor, or credit an unmodeled owner. Native owners outside the qualified peer
+model are a refusal until separately modeled or terminally reconciled. Partial
+restore credit is the smaller of logical and allocated bytes, never sparse holes.
+Admission adds two1MiB metadata allowances: one may cover admission publication,
+and one remains above the protected floor during byte restoration for the raw
+segment and bounded final receipt. Metadata publication checks free space before
+and after the writes; archive bytes cannot consume that final allowance.
+
+Restoration must be an exclusive campaign maintenance reservation: root must
+serialize new lane admissions until it completes or is deliberately stopped.
+This is an operator integration requirement, not a claim that the new private
+transition lock fences every pre-existing campaign launcher. Keep routine status
+observations running. Use a bounded transfer process (two network parts; an
+appropriate small process memory cap), and re-admit from the existing next
+coordinated observation if the900-second admission or1800-second sample expires.
+An interrupted transfer retains one private partial; no second full copy is
+created. The floor writer continues to preserve protected free space.
+
+A restore plan has schema `jetstreamer-foundation-holding-restore-plan-v1` and
+binds `mapping`, `custody`, and `admission`. The destination is the private,
+content-addressed `.blob`, with the original raw segment restored separately.
+Every byte and remote identity is checked before a durable staging-only restore
+receipt is produced. Original file names, permissions and lineage remain in its
+manifest for a separately qualified no-clobber restoration to the historical
+consumer path. No job is resumed, no source is removed, and no canonical sidecar
+or local retirement permission is produced. A successful full-prefix byte restore
+is required before proposing any exact-file retirement; the original archive,
+canonical public copy and V4 assembly remain in place throughout qualification.
+
+Source validation passed seven exact Foundation observer tests, the full R2
+suite (618 passed,47 host-specific tests ignored), and strict production
+R2/observer Clippy. Independent read-only review covered the host/prefix and
+manifest bindings, shared node02 transport behavior, retry preservation and the
+metadata floor. Immutable candidate sealing and actual authenticated probe/prefix
+custody and restoration remain separate operational gates. No such R2 operation
+has been performed by the review agent.

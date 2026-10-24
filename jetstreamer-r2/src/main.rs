@@ -3351,6 +3351,9 @@ async fn main() -> Result<()> {
                 | "holding-admit-restore"
                 | "holding-restore-genesis-probe"
                 | "holding-inspect136"
+                | "holding-foundation213-park"
+                | "holding-foundation213-admit-restore"
+                | "holding-foundation213-restore"
         )
     ) {
         return holding::run().await;
