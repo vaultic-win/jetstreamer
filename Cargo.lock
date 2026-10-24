@@ -5000,6 +5000,7 @@ dependencies = [
  "tar",
  "tempfile",
  "tokio",
+ "zstd",
 ]
 
 [[package]]

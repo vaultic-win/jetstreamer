@@ -105,6 +105,10 @@ name = "jetstreamer-focused-package-attest"
 path = "src/focused_package_attest_bin.rs"
 
 [[bin]]
+name = "jetstreamer-native-snapshot-census"
+path = "src/native_snapshot_census_bin.rs"
+
+[[bin]]
 name = "jetstreamer-epoch223-tail-attest"
 path = "src/epoch223_tail_attest_bin.rs"
 
@@ -354,6 +358,7 @@ base64.workspace = true
 crc.workspace = true
 anyhow.workspace = true
 tar.workspace = true
+zstd.workspace = true
 bzip2 = "=0.4.4"
 rocksdb = { version = "0.23", default-features = false, features = ["lz4"], optional = true }
 
