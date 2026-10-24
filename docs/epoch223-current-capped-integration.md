@@ -41,33 +41,31 @@ source tuple are explicitly bound. No future digest is invented here.
 
 ## Actual V3 delivery bindings
 
-`scripts/prepare_epoch223_v3_delivery.py` prepares an unarmed wrapper from an
-actual committed local V3 publication receipt and its exact publication plan.
-Its closed request schema is
-`jetstreamer-epoch223-v3-delivery-binding-request-v1`. It contains bound
-`publication`, `private_verifier`, `progressive`, `uploader`,
-`boundary_verifier`, and `boundary_script` files, plus an existing
-`boundary_receipt_directory`. Every binding has an absolute canonical `path`
-and the actual lowercase `sha256`. Executables must be root-owned,
-non-writable, single-link files with the exact tool basename. Publication and
-gate sinks may retain the actual root-only writable writer mode; all reads
-are bounded and check stable identity and namespace.
+`scripts/prepare_epoch223_v3_delivery.py` only renders an offline wrapper
+proposal from supplied metadata. Its closed template grammar is
+`jetstreamer-epoch223-v3-delivery-template-input-v1`. Inputs contain references
+for `publication_evidence`, `private_verifier`, `progressive`, `uploader`,
+`boundary_verifier`, and `boundary_script`, plus the three receipt-directory
+paths. References carry supplied absolute paths and lowercase digests. The
+renderer does not open, hash, stat or qualify any referenced file. Its JSON
+output is explicitly an unverified template, never an authoritative receipt.
 
-The preparer authenticates the publication's full/current-plugin/scan-runner
-tuple and both actual `.ok` gate contents. The resulting epoch 223-only
-configuration binds `067ca312` for full verification, `167954ad` for the
-current plugin, and the actual independent private scan runner as both third
-gate digests. It uses the publication plan's actual gate directories. The old
-220-223 wrapper's verifier, plugin and script allowlists are not reused.
+The proposed epoch 223-only arguments select full verifier `067ca312`, current
+plugin `167954ad`, and the supplied private scan runner digest in both third
+gate fields. The old 220-223 wrapper's full/plugin/script allowlists are not
+reused. Actual receipt contents, original publication/verification authority,
+source integrity and remote decisions remain with the Rust publisher and
+uploader. No Python policy or operational admission is introduced.
 
-The script reads no archive or snapshot, invokes no subprocess, changes no
-service and accesses no remote endpoint. Explicit `--output-wrapper` and
-`--output-evidence` paths receive no-clobber proposal files. Root must audit
-the exact resulting wrapper with the existing wrapper auditor and seal it
-before arming the ordinary uploader. The proposal defers local retirement
-and contains no `--delete-local`. Both adjacent boundary receipts remain
-mandatory for later local retirement; independent authenticated upload,
-whole-object readback and remote sidecar commit retain their normal gates.
+The script reads only its explicit input metadata and writes no-clobber local
+`--output-wrapper` and `--output-proposal` files. It invokes no subprocess,
+changes no service, samples no resources and contacts no remote endpoint. Root
+must audit the exact actual wrapper and bindings with the existing wrapper
+auditor, then seal them before arming the ordinary Rust uploader. Templates
+defer local retirement and contain no `--delete-local`. Both adjacent boundary
+receipts remain mandatory for later local retirement; independent authenticated
+upload, whole-object readback and remote sidecar commit retain their normal
+Rust gates.
 
 Qualification remains pending until the shared Cargo lease is returned.
 Focused tests precede any broad matrix or production build. Successful private
