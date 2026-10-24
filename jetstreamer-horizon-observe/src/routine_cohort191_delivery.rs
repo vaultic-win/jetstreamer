@@ -149,7 +149,17 @@ fn remove_replay(
     config: &Value,
     epochs: &[u64],
 ) -> Result<(Value, Value, Vec<u64>)> {
-    let expected: BTreeSet<String> = RANGES.into_iter().map(str::to_owned).collect();
+    let expected: BTreeSet<String> = range_set(model, "ranges")?;
+    ensure!(
+        expected == RANGES.into_iter().map(str::to_owned).collect()
+            || expected
+                == RANGES
+                    .into_iter()
+                    .filter(|r| *r != "185-185")
+                    .map(str::to_owned)
+                    .collect(),
+        "191 transition must retain every surviving original owner"
+    );
     ensure!(
         range_set(model, "ranges")? == expected && range_set(config, "replays")? == expected,
         "191 first transition requires exact five-owner predecessor"
@@ -212,7 +222,7 @@ pub(super) fn next_config(p: &Plan, config: &mut Value) -> Result<()> {
         range_set(config, "replays")?
             == RANGES
                 .into_iter()
-                .filter(|s| *s != "191-194")
+                .filter(|s| *s != "191-194" && (!terminal185::enabled(p) || *s != "185-185"))
                 .map(str::to_owned)
                 .collect(),
         "191 successor must retain exactly the other four observer owners"
@@ -314,7 +324,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
         range_set(&next, "ranges")?
             == RANGES
                 .into_iter()
-                .filter(|s| *s != "191-194")
+                .filter(|s| *s != "191-194" && (!terminal185::enabled(p) || *s != "185-185"))
                 .map(str::to_owned)
                 .collect(),
         "191 effective model lost another original replay"

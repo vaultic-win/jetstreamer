@@ -179,6 +179,7 @@ pub(super) fn derive_next(
     let mut next_config = config.clone();
     terminal141::next_config(p, &mut next_config)?;
     cohort191_delivery::next_config(p, &mut next_config)?;
+    terminal185::config(p, &mut next_config)?;
     next_config["not_before_utc"] = json!(next_time);
     next_config["previous_sample"] = json!(p.observer);
     next_config["output"] = json!(next_observer);
@@ -330,6 +331,7 @@ pub(super) fn prepare(
         || mode == "--prepare-next-publication144"
         || mode == "--prepare-next-original141"
         || mode == "--prepare-next-repair141"
+        || mode == "--prepare-next-terminal185"
     {
         None
     } else {
@@ -383,6 +385,14 @@ pub(super) fn prepare(
             &mut next_config,
             &model,
             handoff_spec.context("191 transition needs its actual sealed handoff spec")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
+    if mode == "--prepare-next-terminal185" {
+        terminal185::enable(
+            &mut next,
+            &mut next_config,
+            handoff_spec.context("185 terminal handoff required")?,
         )?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
     }
