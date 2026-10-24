@@ -1,6 +1,7 @@
 //! Independent full209 verification receipts and serialized authenticated delivery.
 use super::{singleton209 as c, *};
 use std::os::fd::AsRawFd;
+pub(super) mod admission;
 const SCHEMA: &str = "jetstreamer-private-epoch209-singleton-delivery-receipt-v1";
 const TOOLS: &str = "/var/lib/jetstreamer/horizon-full209-verification-tools-v1";
 const FULL_SHA: &str = "6b757a5549bb6ae5dfb0c880274b54c7fa6e2fd2980c10af3455556a1c174260";

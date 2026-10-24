@@ -245,6 +245,9 @@ pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
 pub(super) fn deliver_singleton209_output() -> Result<()> {
     singleton209_delivery::run()
 }
+pub(super) fn admit_singleton209_delivery() -> Result<()> {
+    singleton209_delivery::admission::run()
+}
 pub(super) fn admit_singleton209() -> Result<()> {
     singleton209_admission::run()
 }
