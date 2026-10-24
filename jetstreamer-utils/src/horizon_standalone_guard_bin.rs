@@ -1143,12 +1143,8 @@ mod tests {
             json!({"executable":"/sealed/native","sha256":"a".repeat(64),"main_pid":2});
         assert!(validate_plan(&serde_json::from_value(bad).unwrap()).is_err());
         let mut bad = value;
-        bad["bounded_measurement"] =
-            json!({"expected_uid":1000,"maximum_drainage_seconds":120,"stop_intent":"/some/path"});
-        match serde_json::from_value::<Plan>(bad) {
-            Ok(bad) => assert!(validate_plan(&bad).is_err()),
-            Err(_) => {}
-        }
+        bad["bounded_measurement"] = json!({"intent_path":"/some/path","producer_uid":1000,"target_slot":98091122,"maximum_drain_seconds":120});
+        assert!(validate_plan(&serde_json::from_value::<Plan>(bad).unwrap()).is_err());
         assert!(canary_scope("horizon-qualify-227-v1625-bounded-resource-.service").is_err());
     }
     #[test]
