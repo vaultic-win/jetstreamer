@@ -162,7 +162,9 @@ pub(super) fn origin(epoch: u64, unit: &str, iid: &str) -> bool {
 pub(super) fn archives(epoch: u64, phase: &str) -> PathBuf {
     match phase {
         "producer-finalization" => Path::new(RUN).join(format!("archives/epoch-{epoch}.jet")),
-        "controller-import-handoff" => Path::new(LANE).join(format!("output/epoch-{epoch}.jet")),
+        "controller-import-handoff" | "local-publication" => {
+            Path::new(LANE).join(format!("output/epoch-{epoch}.jet"))
+        }
         _ => Path::new("/home/sol/horizon").join(format!("epoch-{epoch}.jet")),
     }
 }
@@ -2028,6 +2030,28 @@ mod tests {
         let mut bad = good;
         bad.swap(0, 1);
         assert!(validate_claim_set(&bad, &eta).is_err());
+    }
+    #[test]
+    fn unfinished_native_import_tracks_retained_source_without_claiming_public_custody() {
+        for e in 191..=194 {
+            assert_eq!(
+                archives(e, "local-publication"),
+                archives(e, "controller-import-handoff")
+            );
+            assert!(archives(e, "local-publication").starts_with(LANE));
+            assert_ne!(
+                archives(e, "local-publication"),
+                archives(e, "full-verification")
+            );
+            assert_eq!(
+                archives(e, "full-verification"),
+                Path::new("/home/sol/horizon").join(format!("epoch-{e}.jet"))
+            );
+            assert_eq!(
+                archives(e, "upload-readback"),
+                archives(e, "full-verification")
+            );
+        }
     }
     #[test]
     fn a_failed_legacy_watcher_is_not_a_native191_verifier() {
