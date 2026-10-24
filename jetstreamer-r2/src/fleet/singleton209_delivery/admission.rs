@@ -225,7 +225,7 @@ fn pending() -> Result<()> {
     Ok(())
 }
 
-pub(super) fn run() -> Result<()> {
+pub(in crate::fleet) fn run() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("admit-singleton209-delivery")?;
     let a: AdmissionSpec = serde_json::from_value(native209::immutable_json(&binding)?)?;
     ensure!(
