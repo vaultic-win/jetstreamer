@@ -97,6 +97,9 @@ fn bound(b: &Bound) -> Result<Value> {
     evidence(b, true)
 }
 fn evidence(b: &Bound, immutable: bool) -> Result<Value> {
+    evidence_with_limit(b, immutable, 1 << 20)
+}
+fn evidence_with_limit(b: &Bound, immutable: bool, maximum: u64) -> Result<Value> {
     ensure!(
         digest(&b.sha256) && b.path.is_absolute() && b.path.canonicalize()? == b.path,
         "invalid holding evidence binding"
@@ -107,7 +110,7 @@ fn evidence(b: &Bound, immutable: bool) -> Result<Value> {
             && metadata.nlink() == 1
             && metadata.uid() == 0
             && metadata.mode() & if immutable { 0o222 } else { 0o022 } == 0
-            && metadata.len() <= 1 << 20,
+            && metadata.len() <= maximum,
         "holding evidence must be sealed root-owned regular bytes"
     );
     let before = regular_identity(&b.path)?;
@@ -131,12 +134,15 @@ fn private(path: &Path) -> Result<()> {
     Ok(())
 }
 fn persist(path: &Path, v: &Value) -> Result<()> {
+    persist_with_limit(path, v, 1 << 20)
+}
+fn persist_with_limit(path: &Path, v: &Value, maximum: u64) -> Result<()> {
     let parent = path.parent().context("holding receipt parent")?;
     private(parent)?;
     if fs::symlink_metadata(path).is_ok() {
         let before = regular_identity(path)?;
         ensure!(
-            before.length <= 1 << 20,
+            before.length <= maximum,
             "oversized existing custody receipt"
         );
         let old: Value = serde_json::from_slice(&fs::read(path)?)?;

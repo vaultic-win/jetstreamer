@@ -567,6 +567,21 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, rehash_source: bool) -> Resul
     let fleet: Value = serde_json::from_slice(&small(fleet_path, fleet_sha, true)?)?;
     review_data(&fleet, fleet_path, fleet_sha, rehash_source)
 }
+/// Fresh exact213 lineage/owner/process/staged-consumer closure, including after
+/// a separately journaled quarantine or unlink. This deliberately authenticates
+/// no source bytes or local identity and grants no retirement authority.
+pub fn inspect_retirement_closure(fleet_path: &Path, fleet_sha: &str) -> Result<Value> {
+    validate_host_mapping()?;
+    ensure!(
+        fleet_path.starts_with("/var/lib/jetstreamer/horizon-campaign-fleet")
+            && fleet_path
+                .file_name()
+                .is_some_and(|n| n == "fleet-ledger.json"),
+        "foreign accepted fleet"
+    );
+    let fleet: Value = serde_json::from_slice(&small(fleet_path, fleet_sha, true)?)?;
+    review_data_inner(&fleet, fleet_path, fleet_sha, false, false)
+}
 pub fn run_cli() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
@@ -623,6 +638,15 @@ fn review_data(
     fleet_sha: &str,
     rehash_source: bool,
 ) -> Result<Value> {
+    review_data_inner(fleet, fleet_path, fleet_sha, rehash_source, true)
+}
+fn review_data_inner(
+    fleet: &Value,
+    fleet_path: &Path,
+    fleet_sha: &str,
+    rehash_source: bool,
+    inspect_source: bool,
+) -> Result<Value> {
     let failure = fixed(
         "/home/ubuntu/.jetstreamer-private/epoch213-postarchive-shutdown-failure-corrected-20261010T1124Z.json",
         "9ec83e6dbd570d2e7ae21f372404d924c9ba6d6faa333f29fa744de32cc72c97",
@@ -642,7 +666,9 @@ fn review_data(
     lineage(&failure, &validation, &segment, &publication, fleet)?;
     continuation(&fixed(CONTINUATION, CONTINUATION_SHA)?)?;
     segment_bytes()?;
-    let before = source(Path::new(SOURCE))?;
+    let before = inspect_source
+        .then(|| source(Path::new(SOURCE)))
+        .transpose()?;
     let owner_before = units()?;
     let references_before =
         crate::process_references::scan(Path::new("/proc"), Path::new(SOURCE).parent().unwrap())?;
@@ -651,7 +677,11 @@ fn review_data(
         .map(|r| Ok((r.to_string(), staged(Path::new(r), 1000)?)))
         .collect::<Result<BTreeMap<_, _>>>()?;
     let rehashed = if rehash_source {
-        Some(digest_source(&before)?)
+        Some(digest_source(
+            before
+                .as_ref()
+                .context("source hashing requires original identity")?,
+        )?)
     } else {
         None
     };
@@ -664,7 +694,11 @@ fn review_data(
     ensure!(
         staged_before == staged_after
             && units()? == owner_before
-            && same(&before, &source(Path::new(SOURCE))?),
+            && before
+                .as_ref()
+                .map(|m| source(Path::new(SOURCE)).map(|after| same(m, &after)))
+                .transpose()?
+                .unwrap_or(true),
         "source/owner/staged metadata changed during review"
     );
     let mut blockers = Vec::new();
@@ -686,9 +720,10 @@ fn review_data(
         "mapping":{"path":MAPPING,"sha256":MAPPING_SHA},"accepted_fleet":{"path":fleet_path,"sha256":fleet_sha},
         "inventory_sampled_at_utc":fleet["sampled_at_utc"],
         "source":SOURCE,"expected_sha256":SOURCE_SHA,"source_sha256":rehashed,"source_body_rehashed":rehash_source,
-        "length":before.len(),"physical_bytes":before.blocks().checked_mul(512).context("block overflow")?,"device":before.dev(),"inode":before.ino(),
-        "uid":before.uid(),"gid":before.gid(),"mode":before.mode()&0o7777,"mtime":before.mtime(),"mtime_ns":before.mtime_nsec(),
-        "ctime":before.ctime(),"ctime_ns":before.ctime_nsec(),"closed_reference_census_passed":closed,"owners":owner_before,
+        "length":LENGTH,"source_identity_checked":inspect_source,
+        "physical_bytes":before.as_ref().and_then(|m|m.blocks().checked_mul(512)),"device":before.as_ref().map(MetadataExt::dev),"inode":before.as_ref().map(MetadataExt::ino),
+        "uid":before.as_ref().map(MetadataExt::uid),"gid":before.as_ref().map(MetadataExt::gid),"mode":before.as_ref().map(|m|m.mode()&0o7777),"mtime":before.as_ref().map(MetadataExt::mtime),"mtime_ns":before.as_ref().map(MetadataExt::mtime_nsec),
+        "ctime":before.as_ref().map(MetadataExt::ctime),"ctime_ns":before.as_ref().map(MetadataExt::ctime_nsec),"closed_reference_census_passed":closed,"owners":owner_before,
         "reference_census_before":references_before,"reference_census_after":references_after,
         "staged_metadata_files":staged_after.values().map(|tree|tree.len()).sum::<usize>(),"staged_reference_blockers":blockers,
         "closed_historical_references":historical,"historical_references_require_restore_before_reuse":true});

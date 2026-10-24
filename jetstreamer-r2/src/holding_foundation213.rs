@@ -1,15 +1,22 @@
-//! Exact Foundation custody/byte restoration, never local retirement or resume.
+//! Exact Foundation custody/byte restoration and separately gated local retirement.
 use super::*;
 use jetstreamer_horizon_observe::foundation_holding213_review as review;
 use std::os::fd::AsRawFd;
+#[path = "holding_foundation213_maintenance.rs"]
+mod maintenance;
+#[path = "holding_foundation213_retire.rs"]
+mod retirement;
 
 const STATE: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1";
 const PROBE: &str =
     "/var/lib/jetstreamer/horizon-foundation-holding-probe-input-v1/genesis.tar.bz2";
 const PROBE_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const METADATA_RESERVE: u64 = 1024 * 1024;
-const MAX_RECEIPT_BYTES: usize = 512 * 1024;
+const METADATA_RESERVE: u64 = 16 * 1024 * 1024;
+const MAX_RECEIPT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_ADDITIONAL: u64 = review::LENGTH + 2 * METADATA_RESERVE;
+const QUALIFIED_PROBE_RESTORE: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1/receipts/restore-79e0c1c7fa31c580f57890d5692e46c685ccb5441679cb55d00ff1cc99c9460b.json";
+const QUALIFIED_PROBE_RESTORE_SHA: &str =
+    "a913fce8eb00ffb2dfa69f87272b041e4703ee9590118898f5a841e2cbe9bff6";
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -75,6 +82,9 @@ pub(super) fn command(s: &str) -> bool {
         "holding-foundation213-park"
             | "holding-foundation213-admit-restore"
             | "holding-foundation213-restore"
+            | "holding-foundation213-retire"
+            | "holding-foundation213-maintain"
+            | "holding-foundation213-maintenance-finalize"
     )
 }
 fn key(sha: &str) -> Result<String> {
@@ -93,16 +103,34 @@ fn clock() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
 fn durable_receipt(path: &Path, value: &Value) -> Result<()> {
-    ensure!(
-        serde_json::to_vec_pretty(value)?.len() < MAX_RECEIPT_BYTES,
-        "Foundation receipt exceeds its reserved metadata allowance"
+    let serialized = serialized_receipt_length(value)?;
+    eprintln!(
+        "Foundation receipt serialized_bytes={serialized} maximum_receipt_bytes={MAX_RECEIPT_BYTES} metadata_reserve_per_phase_bytes={METADATA_RESERVE}"
     );
-    persist(path, value)?;
+    persist_with_limit(path, value, MAX_RECEIPT_BYTES as u64)?;
     // The shared no-clobber helper syncs bytes before publishing. Complete
     // this adapter's durability contract after its final chmod and rename.
     fs::File::open(path)?.sync_all()?;
     fs::File::open(path.parent().context("Foundation receipt parent")?)?.sync_all()?;
     Ok(())
+}
+fn serialized_receipt_length(value: &Value) -> Result<u64> {
+    let length = serde_json::to_vec_pretty(value)?
+        .len()
+        .checked_add(1)
+        .context("Foundation receipt size overflow")?;
+    ensure!(
+        length <= MAX_RECEIPT_BYTES,
+        "Foundation receipt serialized bytes {length} exceed its reserved maximum {MAX_RECEIPT_BYTES}"
+    );
+    Ok(length as u64)
+}
+fn receipt_bound(b: &Bound) -> Result<Value> {
+    evidence_with_limit(b, true, MAX_RECEIPT_BYTES as u64)
+}
+fn metadata_budget() -> Value {
+    json!({"per_phase_reservation_bytes":METADATA_RESERVE,"total_reservation_bytes":2*METADATA_RESERVE,
+        "maximum_receipt_bytes":MAX_RECEIPT_BYTES,"full_before_after_censuses_preserved":true})
 }
 fn source_identity(a: Artifact) -> Result<FileIdentity> {
     let path = a.source();
@@ -183,7 +211,12 @@ fn review_for_park(p: &ParkSpec) -> Result<Value> {
                 .transport_qualification
                 .as_ref()
                 .context("Foundation transport not qualified")?;
-            qualification(&bound(q)?)?;
+            ensure!(
+                q.path == Path::new(QUALIFIED_PROBE_RESTORE)
+                    && q.sha256 == QUALIFIED_PROBE_RESTORE_SHA,
+                "Foundation prefix must bind the actual qualified full genesis round trip"
+            );
+            qualification(&receipt_bound(q)?)?;
             let f = p
                 .accepted_fleet
                 .as_ref()
@@ -435,6 +468,10 @@ fn admission(v: &Value, custody_binding: &Bound, a: Artifact) -> Result<()> {
             && v["admissions_must_be_serialized_until_restore_complete"] == true,
         "stale/foreign Foundation restore admission"
     );
+    ensure!(
+        v["metadata_budget"] == metadata_budget(),
+        "Foundation admission uses a foreign metadata budget"
+    );
     let current = fleet::foundation_holding_capacity(&v["resource_basis"], 0)?;
     ensure!(
         current["minimum_free_bytes"]
@@ -451,7 +488,7 @@ fn admit(p: &AdmitSpec, spec: &Bound) -> Result<()> {
         "foreign Foundation restoration plan"
     );
     mapping_binding(&p.mapping)?;
-    let c = bound(&p.custody)?;
+    let c = receipt_bound(&p.custody)?;
     let a = custody(&c)?;
     let data_remaining = restore_credit(a)?;
     let remaining = restore_reservation(data_remaining)?;
@@ -463,7 +500,8 @@ fn admit(p: &AdmitSpec, spec: &Bound) -> Result<()> {
     let receipt = json!({"schema":"jetstreamer-foundation-holding-restore-admission-v1","host":review::HOST,"prefix":review::PREFIX,
         "mapping":p.mapping,"artifact":a,"custody":p.custody,"spec":spec,"resource_basis":p.resource_basis,"capacity":capacity,
         "recorded_unix_seconds":clock()?,"restore_only":true,"admissions_must_be_serialized_until_restore_complete":true,
-        "local_retirement_authorized":false,"replay_launch_authorized":false,"r2_mutations":false});
+        "local_retirement_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"metadata_budget":metadata_budget()});
+    serialized_receipt_length(&receipt)?;
     admission(&receipt, &p.custody, a)?;
     let path = Path::new(STATE)
         .join("receipts")
@@ -471,7 +509,7 @@ fn admit(p: &AdmitSpec, spec: &Bound) -> Result<()> {
     if path.try_exists()? {
         let old: Value = serde_json::from_slice(&read_stable_bounded(
             &path,
-            1 << 20,
+            MAX_RECEIPT_BYTES as u64,
             "Foundation existing admission",
         )?)?;
         ensure!(
@@ -537,9 +575,9 @@ async fn restore(client: &Client, p: &RestoreSpec, spec: &Bound) -> Result<()> {
         "foreign Foundation restore plan"
     );
     mapping_binding(&p.mapping)?;
-    let c = bound(&p.custody)?;
+    let c = receipt_bound(&p.custody)?;
     let a = custody(&c)?;
-    let admitted = bound(&p.admission)?;
+    let admitted = receipt_bound(&p.admission)?;
     admission(&admitted, &p.custody, a)?;
     let expected_owner = owner()?;
     ensure!(
@@ -636,7 +674,7 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
-        .create(true)
+        .create(action == "holding-foundation213-park")
         .truncate(false)
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -653,6 +691,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     if action == "holding-foundation213-admit-restore" {
         return admit(&serde_json::from_value(v)?, spec);
     }
+    if action == "holding-foundation213-maintenance-finalize" {
+        return maintenance::finalize(v, spec);
+    }
     let r2 = r2_config_from_env()?;
     ensure!(r2.bucket == BUCKET, "foreign Foundation bucket");
     let client = s3_client(&r2);
@@ -661,6 +702,8 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
         "holding-foundation213-restore" => {
             restore(&client, &serde_json::from_value(v)?, spec).await
         }
+        "holding-foundation213-retire" => retirement::run(&client, v, spec).await,
+        "holding-foundation213-maintain" => maintenance::run(&client, v, spec).await,
         _ => bail!("unsupported Foundation operation"),
     }
 }
@@ -801,8 +844,63 @@ mod tests {
         metadata_space(floor, after_segment).unwrap();
         assert!(after_segment - MAX_RECEIPT_BYTES as u64 > floor);
         assert!(metadata_space(floor, floor + 16384).is_err());
+        let threshold = floor + MAX_RECEIPT_BYTES as u64 + 65536;
+        metadata_space(floor, threshold).unwrap();
+        assert!(metadata_space(floor, threshold - 1).is_err());
         assert!(write_floor(u64::MAX).is_err());
         assert!(restore_reservation(u64::MAX).is_err());
+    }
+    #[test]
+    fn full_257_owner_before_after_censuses_fit_without_discarding_evidence() {
+        let census = (0..257).map(|n| (format!("historical-owner-{n}.service"),
+            json!({"Id":format!("historical-owner-{n}.service"),"InvocationID":format!("{n:032x}"),
+                "MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead",
+                "ExecStart":format!("{{ path=/var/lib/jetstreamer/retained-owner-{n}/runner ; argv[]={}; ignore_errors=no }}","x".repeat(2048))})))
+            .collect::<serde_json::Map<_,_>>();
+        let value = json!({"schema":"real-scale-evidence-fixture","metadata_budget":metadata_budget(),
+            "capacity":{"unit_census_before":census,"unit_census_after":census}});
+        let length = serialized_receipt_length(&value).unwrap();
+        assert!(length > 1 << 20);
+        assert!(length < MAX_RECEIPT_BYTES as u64);
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let path = directory.path().join("full-census.json");
+        durable_receipt(&path, &value).unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().len(), length);
+        let read: Value = serde_json::from_slice(
+            &read_stable_bounded(&path, MAX_RECEIPT_BYTES as u64, "full-census fixture").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(read, value);
+        assert_eq!(
+            read["capacity"]["unit_census_before"]
+                .as_object()
+                .unwrap()
+                .len(),
+            257
+        );
+        assert_eq!(
+            read["capacity"]["unit_census_after"]
+                .as_object()
+                .unwrap()
+                .len(),
+            257
+        );
+        durable_receipt(&path, &value).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&fs::read(path).unwrap()).unwrap(),
+            value
+        );
+    }
+    #[test]
+    fn oversized_receipt_fails_before_creating_any_publication_or_staging_file() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let path = directory.path().join("oversized.json");
+        let oversized = json!({"full_evidence":"x".repeat(MAX_RECEIPT_BYTES)});
+        assert!(durable_receipt(&path, &oversized).is_err());
+        assert!(!path.exists());
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
     }
     #[test]
     fn foundation_probe_qualification_cannot_grant_checkpoint_or_park_another_host() {
