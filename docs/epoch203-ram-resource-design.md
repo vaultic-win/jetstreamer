@@ -219,7 +219,7 @@ The strict plan has these fields, with no others:
 
 The mount must be a separately managed active `tmpfs` mount with
 `StopWhenUnneeded=no`, empty `BindsTo=`/`PartOf=`, 768-GiB capacity,
-`rw,nosuid,nodev` and executable files, root mode0700/UID1000/GID1000, and
+`rw,nosuid,nodev` and executable files, root mode 0700/UID 1000/GID 1000, and
 empty mode 0700 `scratch`, `output`, `ledger`, `tmp` and `receipts` children
 on the same device. Do not substitute a bind-mounted subtree or a service's
 `TemporaryFileSystem=` namespace. Probe plans bind its actual current
@@ -232,7 +232,7 @@ For the future exact probe service require `Type=oneshot`, `Restart=no`,
 `ProtectSystem=strict`, `ProtectHome=read-only`, `ProtectControlGroups=yes`,
 `PrivateDevices=yes`, `RestrictSUIDSGID=yes`, `UMask=0077`, `PrivateNetwork=no`,
 empty `TemporaryFileSystem=`, and only the exact RAM root in `ReadWritePaths=`.
-The actual cgroup must have memory.high304 GiB, memory.max320 GiB, swap 0,
+The actual cgroup must have memory.high 304 GiB, memory.max 320 GiB, swap 0,
 group OOM 1, pids 512 and an exact 16-core CPU quota. The probe makes no claim
 that this CPU budget is available: stopped 225 allocation and fresh fleet
 admission remain separate gates before **any replay**.
@@ -267,7 +267,7 @@ The second sealed attempt (`horizon-203-ram-storage-probe-v2`, invocation
 `7e9921fd148546a289137be90d43bde9`) successfully crossed the privilege-drop
 gate, then rejected the host mount ID inside the service mount namespace.
 A read-only same-sandbox mountinfo diagnostic confirmed the reason: host
-mount322/device0:67/shared357 appears as mount471/device0:67/shared392/master357
+mount 322/device 0:67/shared 357 appears as mount 471/device 0:67/shared 392/master 357
 inside the protected namespace. Preserve the failure. The v2 **plan schema**
 separately records the host ID, binds device and propagation master, and requires
 the service's actual mount ID/peer to remain stable before/after. This is an
@@ -328,7 +328,7 @@ complete admission path remain independently required.
 
 `start` authenticates the invocation's own cgroup and private RAM device/inode,
 the immutable parent path, 768-GiB tmpfs geometry, actual320/304-GiB memory
-limits, swap0/groupOOM, pids 512 and CPU 16, startup864-GiB available memory and
+limits, swap 0/groupOOM, pids 512 and CPU 16, startup 864-GiB available memory and
 host VMA limit. A no-clobber private start receipt prevents reopening the same
 run to renew the at-most60-second initial zero-worker grace. This grace is not
 a successful worker/maps capability proof. Before unattended replay require
@@ -336,9 +336,9 @@ an actual positive worker observation under the sealed supervisor.
 
 `check` performs at most one owned-canary safety sample per 15 seconds, on calls
 from that supervisor; it creates no loop and never samples another replay.
-It preserves the544-GiB host reserve, century tmpfs floor,320-GiB total charged
-memory, zero max/OOM events,224-GiB aggregate RAM-file ceiling and16-GiB private
-archive budget. The192-GiB scratch component is independently enforced by the
+It preserves the 544-GiB host reserve, century tmpfs floor,320-GiB total charged
+memory, zero max/OOM events,224-GiB aggregate RAM-file ceiling and 16-GiB private
+archive budget. The 192-GiB scratch component is independently enforced by the
 shared runner's frozen target capture, not falsely described as a periodic
 full-tree hard bound. The aggregate file ceiling includes scratch, archive and
 file/metadata overhead; it is not an evidence-backed full-prefix peak.
@@ -351,7 +351,7 @@ worker, unreadable state, replacement RAM root, changed limits, memory pressure
 at the hard bound and oversized/unexpected output fail closed.
 
 A zero-worker post-target drain requires the exact existing epoch 203 target
-stop receipt, same invocation and child, 87720000target, bounded overshoot,
+stop receipt, same invocation and child, 87720000 target, bounded overshoot,
 no external signal and no more than 180 seconds age. The matching retained
 capture must have the exact canonical JSON hash, private path, bounded scratch
 and accounts-state/cgroup contents. The guard pins that receipt digest and its
@@ -393,7 +393,7 @@ snapshot, 16 threads, 87720000measurement target, 88127580underlying root,
 192-GiB target scratch,16-GiB output and six-hour maximum. Baseline and
 candidate must run sequentially in equivalent fresh RAM environments. The
 retained baseline output was inspected read-only: its partial archive is
-5,893,849,884 bytes, below the proposed16-GiB output ceiling. That diagnostic
+5,893,849,884 bytes, below the proposed 16-GiB output ceiling. That diagnostic
 file size is not a canonical century sample or proof of a full-epoch peak.
 
 The CLI keeps the shared runner syntax:
@@ -409,13 +409,13 @@ plan/self identities still pass the shared runner's independent hash gates.
 
 The supervisor uses the proven target-stop/capture/result path with RAM storage
 hooks. Missing prerequisite evidence is rejected before expensive input hashes
-and revalidated immediately before fork. It binds a no-more-than30-minute-old
+and revalidated immediately before fork. It binds a no-more-than 30-minute-old
 routine v2observation, matching complete fleet, exact three primary invocations,
 nine claims, unchanged six canonical floor samples, the actual real snapshot
-success and exact stopped225/released16-core chain. It additionally performs
+success and exact stopped 225/released 16-core chain. It additionally performs
 before/after live systemd discovery: any unbound/fifth entry owner, competing
 snapshot/auxiliary diagnostic or active delivery stage rejects admission.
-The three primary identities and stopped 225unit are freshly checked. This
+The three primary identities and stopped 225 unit are freshly checked. This
 is admission inspection, not an additional routine resource poll.
 
 Preparation and pre-fork authenticate the actual RAM sandbox. The child gets
@@ -427,8 +427,8 @@ cannot import an archive, create a canonical checksum, publish or retire data.
 
 This implementation remains **unlaunched and unqualified**. In particular no
 qualified `auxiliary_contract` exists yet. It requires the exact RAM/private
-comparison scope, unchanged ordinary/diagnostic overlap rejection, max4entries/
-1auxiliary and independently qualified artifact lifecycle. A boolean alone is
+comparison scope, unchanged ordinary/diagnostic overlap rejection, max 4 entries/
+1 auxiliary and independently qualified artifact lifecycle. A boolean alone is
 insufficient: all three observer/fleet/retention attestation receipts must bind
 the actual immutable verifier executable hashes, exact profile and worker,
 real passing non-simulated capability outcomes and denial of unrelated authority.
@@ -478,7 +478,7 @@ with `replay` (the existing invocation-bound replay config), `supervisor_profile
 `worker_sha256`, `target_slot` and `terminal_root_slot`. It admits only the
 bounded87720000/88127580private epoch 203 baseline or shrink comparison, with
 the exact pinned worker, matching supervisor/root namespace and isolated scratch.
-It requires the primary203root-prefix diagnostic to remain explicitly configured.
+It requires the primary 203root-prefix diagnostic to remain explicitly configured.
 Ordinary replay and existing diagnostic overlap rejection is unchanged; this
 separate role cannot serve as an ordinary publication claim or sidecar ETA.
 
@@ -492,7 +492,7 @@ recognizes the RAM supervisor namespace and rejects an unbound owner. Complete
 auxiliary fleet/launch evidence and real observer/fleet/retention capability
 qualification are still required; neither source tests nor this documentation
 are an attestation. Keep deployed observer and R2 binaries unchanged until the
-full contract is qualified, and retain the single30-minute control cadence.
+full contract is qualified, and retain the single 30-minute control cadence.
 
 The fleet plan now has its own optional `epoch203_ram_auxiliary` object with
 `unit`, `invocation_id`, `run_root` and hash-bound `launch_receipt`. Its separate
@@ -521,7 +521,7 @@ The fleet binary remains undeployed until those independent qualifications pass.
 It accepts a separately hash-bound root-owned immutable plan and executable,
 requires the original terminal baseline/shrink owner with no live process,
 restart or trigger, authenticates its outcome's exact invocation/root/mount
-generation, and binds the persistent768-GiB tmpfs device/inode before and after
+generation, and binds the persistent 768-GiB tmpfs device/inode before and after
 inspection. It scans process commands, maps, cwd/root/exe and descriptors for
 references to the exact RAM tree, inventories its private same-device files,
 hashes every explicitly planned non-scratch artifact and fsyncs only a bounded
@@ -529,7 +529,7 @@ root-private `retention.json` on durable storage. Scratch is counted, not hashed
 or declared resumable. Any unknown artifact, sidecar, link, wrong owner/mode,
 changed digest, reference or unreadable process state fails closed.
 
-The shared reference scanner streams mmap-heavy maps in64-KiB chunks with a
+The shared reference scanner streams mmap-heavy maps in 64-KiB chunks with a
 1-GiB per-source ceiling and preserves matches spanning chunks. It distinguishes
 real descendants from similarly named siblings and never treats a permissions
 failure as absence. Both the scanner and retention policy have component tests;
@@ -581,7 +581,7 @@ the exact retirement executable/plan, fixed worker and private evidence output.
 Fixture creation is permitted only for an already terminal **no-entry**
 supervisor capability, with the original empty scratch inode and preserved
 artifact/mount/reference gates passing. It records a durable intent before
-creating one4096-byte disposable marker, never an archive or replay cursor.
+creating one 4096-byte disposable marker, never an archive or replay cursor.
 
 The qualifier closes all fixture descriptors before starting the independent
 retirement child, so the child's process-reference census must genuinely pass.

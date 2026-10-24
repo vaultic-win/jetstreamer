@@ -154,7 +154,7 @@ No new poll was taken. The coordinated observer at
 `/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T182600Z.json`
 has SHA-256
 `dde879bd02d342a9879eb21b82766880257c2442a39fa692f56d1f1f7eb67ff8`.
-Its last slot 60926156 and rate1.0021996518807004slots/s leave 402609 slots to
+Its last slot 60926156 and rate 1.0021996518807004 slots/s leave 402609 slots to
 root 61328765. The matching `qualification141-estimate.json` under the
 `20261023T182600Z-controller-rebind-capped141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1`
 routine-cycle directory binds that observer and records elapsed 13936388 ms,
@@ -163,10 +163,10 @@ Its SHA-256 is
 `b1734ae57f99d311005eb265168b206ce82da2b3c14593ec66f20cb63c3b884e`.
 
 The 5 day runtime cap is 432000000 ms. At that sample, its remaining execution
-window was 418063612 ms (4days20hours7minutes43.612 seconds). Root replay at the
-observed rate projects 401725345 ms (4days15hours35minutes25.345 seconds), leaving
-only 16338267 ms (4hours32minutes18.267 seconds), before any extra terminal work.
-The minimum sustained remaining rate is0.963032870slots/s: about 3.91% below
+window was 418063612 ms (4 days 20 hours 7 minutes 43.612 seconds). Root replay at the
+observed rate projects 401725345 ms (4 days 15 hours 35 minutes 25.345 seconds), leaving
+only 16338267 ms (4 hours 32 minutes 18.267 seconds), before any extra terminal work.
+The minimum sustained remaining rate is 0.963032870 slots/s: about 3.91% below
 the observed rate. The projection currently fits, but has a tight deadline
 margin and is not a guaranteed bound. Do not silently extend that cap.
 

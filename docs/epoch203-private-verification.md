@@ -16,14 +16,14 @@ the actual compiled anchor hashes. RPC metadata remains candidate input: the
 complete strict full scan must independently recompute the assembled archive's
 PoH chain and match both anchors and the exact source-derived provenance digest.
 
-Wait for the original producer's natural success and exact completion/PID1
+Wait for the original producer's natural success and exact completion/PID 1
 journal. Seal its real completed outcome, make a fresh resource admission that
 protects every then-active lane and the recomputed century floor, and create a
 new empty root-private direct child named`horizon-203-private-scan-UNIQUE`.
 Account for the additional complete private archive copy and verifier/plugin
-working sets. The fixed baseline protects the known 225and205growth claims and
+working sets. The fixed baseline protects the known 225and205 growth claims and
 century floor; it is a rejection minimum, not authority to omit later admissions.
-The128-GiB archive cap and8-thread scan setting require separate review if changed.
+The 128-GiB archive cap and 8-thread scan setting require separate review if changed.
 
 The 203 runner also performs fresh scan-only admission before opening the assembled
 archive. It requires the exact 225/205 invocations and their current caps, a complete
@@ -52,7 +52,7 @@ retains the proven absence-only transaction and Landlock confinement mechanics
 from the 213 publisher, with independently supplied 203 producer, snapshot, native
 comparison, source provenance, RPC anchors and private-runner bindings. The 213
 publisher, sealed binaries and receipts remain untouched. The 203 gate additionally
-requires the actual scan admission and exact scanner invocation's clean PID1
+requires the actual scan admission and exact scanner invocation's clean PID 1
 completion, and rehashes all four raw RPC boundary responses. Its fixture-only
 `--capability-probe` does not open any campaign archive.
 
@@ -68,14 +68,14 @@ delivery, sidecar commit and adjacent-boundary retirement remain separate stages
 
 `jetstreamer-r2 admit-publication203` issues the separate fresh resource admission
 and prepares `publication-plan.json` after the actual final verification receipt
-and exact scanner PID1 completion exist. Its sealed spec binds the accepted
+and exact scanner PID 1 completion exist. Its sealed spec binds the accepted
 observer/fleet, recomputed century floor, all three replay guard receipts, exact
 publisher and filesystem capability. It preserves 225/205/204 by invocation,
 authoritative PID and immutable command identity, and allows only a rename of the
 additional verified copy, 64 MiB metadata growth and a16 GiB publisher (the retained 213
-publication used an 8 GiB high/16GiB hard limit and peaked at 8 GiB). It reserves a
+publication used an 8 GiB high/16 GiB hard limit and peaked at 8 GiB). It reserves a
 32 GiB maximum across the strictly serial publication and upload phases; delivery
-uses the proven 24 GiB high/32GiB hard envelope with 512 tasks. It neither
+uses the proven 24 GiB high/32 GiB hard envelope with 512 tasks. It neither
 opens archive bytes nor starts a job. Seal its exact generated plan with the
 native deployment sealer before publication. Repeated matching admissions reuse
 the original record and deadline; they do not renew permission or replay work.
@@ -89,5 +89,5 @@ event clock. A matching `metadata_event` permits immediate fleet reconciliation
 without an extra resource poll, while preserving every earlier pipeline and
 diagnostic claim. Its complete census rejects a live or failed prior stage.
 It does not authorize publication, upload or any remote mutation. Remove the
-event selector when constructing the next normal30-minute fleet plan; keep its
+event selector when constructing the next normal 30-minute fleet plan; keep its
 evidence and pipeline history. These events never fabricate a new resource sample.

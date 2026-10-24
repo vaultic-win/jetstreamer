@@ -5,13 +5,13 @@ after the native bootstrap proof passes. The missing 89523820 MD5 remains a sepa
 authenticated-generation metadata gate.
 
 The retained complete-span focused plan enters epoch 208 through slot 90,287,519.
-That route includes the known missing source boundaries at89,856,117/89,856,121.
+That route includes the known missing source boundaries at 89,856,117/89,856,121.
 Its failure to qualify does not require epoch 207 itself to include that interval.
 
 The separate `epoch207-singleton-qualification` node build admits only a private,
 explicitly verified, candidate-opted-in root cohort for epoch 207. It starts from
 the retained canonical snapshot 89,423,444, preserves both canonical root checks
-at 89,523,820 and 89,855,469, records all 432,000epoch slots 89,424,000–89,855,999,
+at 89,523,820 and 89,855,469, records all 432,000 epoch slots 89,424,000–89,855,999,
 and uses the existing native terminal/ordered-chain/cohort publication gates for
 the final 530 slots after the second root. There is no epoch 208 input, prefix
 assembly or checkpoint restart in this route. The normal compatibility registry
@@ -28,14 +28,14 @@ authority.
 ## Immutable metadata preparation
 
 The Rust `jetstreamer-epoch207-singleton-prepare` tool reads only the exact sealed
-v2preflight and207snapshot-bindings file in
+v2 preflight and 207 snapshot-bindings file in
 `/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2`.
 It rechecks both file digests and the independently recorded old manifest
-fingerprint. It preserves the 207cohort's bootstrap and both root identities,
+fingerprint. It preserves the 207 cohort's bootstrap and both root identities,
 including generation, CRC32C and size, in a fresh v4 singleton report. Known
 bootstrap/terminal MD5s come from the separately bound snapshot-binding receipt.
-The first root's v2 metadata has no MD5 field; its explicit v4null follows the
-existing offline v2conversion convention and is recorded as unobserved legacy
+The first root's v2 metadata has no MD5 field; its explicit v4 null follows the
+existing offline v2 conversion convention and is recorded as unobserved legacy
 MD5, not a claim that the current GCS object is composite. Re-observe that exact
 generation before admitting the full singleton cohort restore or replay; never
 invent a digest. This unresolved first-root metadata does not block the separate
@@ -50,7 +50,7 @@ whose canonical parent is precreated root 0700:
 ```
 
 It takes no resource observation, starts no worker, performs no network access,
-and fsyncs a no-clobber mode 0400report and its parent. Seal the report into a
+and fsyncs a no-clobber mode 0400 report and its parent. Seal the report into a
 readable immutable deployment before supplying it to the unprivileged node.
 Do not feed JavaScript-rounded consensus numbers or a hand-edited fingerprint
 to the node.
@@ -65,7 +65,7 @@ sha256 4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc
 ```
 
 The full command is a single epoch 207 `--verify --root-checkpoint-cohort` with
-the newly sealed v4report/fingerprint and exact retained snapshot override.
+the newly sealed v4 report/fingerprint and exact retained snapshot override.
 Set the candidate opt-in and that exact worker override; pin
 `JETSTREAMER_PRIVATE_RUN_ROOT` beneath the same new owner-private
 `/home/ubuntu/.jetstreamer-private/qualification-207-singleton-*` run root.
@@ -91,7 +91,7 @@ test uses the unchanged capped v1.6.16 runtime and exact rustc 1.51.0 release
 profile. It accepts only an empty owner-private
 `/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-*/scratch`,
 passed as `JETSTREAMER_EPOCH207_V1616_TEST_SCRATCH`. It hashes the exact retained
-8,474,139,490-byte bootstrap and20,144-byte genesis before loading, restores into
+8,474,139,490-byte bootstrap and 20,144-byte genesis before loading, restores into
 that private scratch and freezes only bootstrap slot 89,423,444. It requires the
 canonical accounts hash, no bootstrap writes, and unchanged write cursor,
 capitalization and transaction count. No entry replay occurs.
@@ -102,16 +102,16 @@ Capture the compiler artifact's optimized test executable and list the exact
 ignored test with `--exact --ignored --list` before any execution. A listed
 test is not a native input proof. Do not substitute an old debug harness.
 
-Native cold planning uses 128 GiB hard/112GiB high memory, 300 GB decimal disk
-planning, 8explicitly bound CPUs, 2700 seconds, no restart/network and zero entries.
+Native cold planning uses 128 GiB hard/112 GiB high memory, 300 GB decimal disk
+planning, 8 explicitly bound CPUs, 2700 seconds, no restart/network and zero entries.
 Root must coordinate fresh complete-fleet admission before the actual job,
-including any live native227disk-growth and 128 GiB memory claim. Use a separately
-sealed closed 207profile of the shared exact MainPID/executable/VMA native guard;
+including any live native227 disk-growth and 128 GiB memory claim. Use a separately
+sealed closed 207 profile of the shared exact MainPID/executable/VMA native guard;
 never rename this executable to `historical-worker` or borrow 227's sealed guard.
 The approved-native pipeline status origin must bind the exact unit/invocation,
 canonical matching UTC/Unix clocks, sealed inputs and current guard/admission
 evidence. Its dashboard phase is `verification`; every qualification/publication
-gate remains closed. The89523820MD5/auth incident remains separate from this
+gate remains closed. The 89523820 MD5/auth incident remains separate from this
 bootstrap-only check.
 
 ### Dormant admission and registry contract
@@ -159,7 +159,7 @@ The private pipeline claim phase is `private-cold-snapshot-verification`.
 The status model sets `origin_launch` to the immutable origin, `peer_units` to
 an empty list and `expected_jet_size_bytes` to zero; its unit, invocation and
 expected `ExecStart` must match the actual launch exactly. Elapsed time comes
-from the unique PID1 producer start, not the later intent capture. The dedicated
+from the unique PID 1 producer start, not the later intent capture. The dedicated
 `fleet::native207` registry binds the exact harness, bootstrap, guard, schema
 and bootstrap-only scope. Do not borrow another epoch's validator or infer
 approval from the generic reader accepting JSON.
@@ -212,7 +212,7 @@ service, bind its actual invocation/MainPID into the guard plan, and arm
 uses the separately sealed 207 guard, a 1 GiB memory cap, 256 tasks, one CPU,
 no network/restarts, and writes only its private receipt directory. Capture
 requires its first actual sandboxed no-trip fire, the exact plan digest, and
-one successful PID1 completion. The old `ab66` guard package is retained as
+one successful PID 1 completion. The old `ab66` guard package is retained as
 superseded evidence: its generic namespace gate rejected native jobs before
 the specific profile check. Use only the separately sealed corrected guard
 bound by the current `native207` registry; never alter an older sealed package.
@@ -224,7 +224,7 @@ Fields are `mode`, `admission`, `guard`, `guard_plan`, and `output`.
 writes a fresh `native.json` there after clean termination. Capture binds the
 effective native and guard sandboxes, exact owner, invocation and original
 start clock. Qualification additionally requires the ordered exact-IID
-canonical accounts marker, one passed test, and successful PID1 completion;
+canonical accounts marker, one passed test, and successful PID 1 completion;
 large consensus integers remain exact strings in the marker. Both receipts
 retain every full replay, metadata and publication gate.
 

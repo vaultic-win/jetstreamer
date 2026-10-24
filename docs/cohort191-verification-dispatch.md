@@ -33,14 +33,14 @@ root 0700 on the OS volume, plus an existing root 0600 singly linked
 authority. Each task's output/state leaf must be absent. The dispatcher uses
 an inode-bound exclusive lease, checks all eight exact native 191 service names
 for active/queued work, fsyncs a no-clobber intent, repeats custody/admission and
-the service census, then invokes PID1 once. It captures the real new IID/PID,
+the service census, then invokes PID 1 once. It captures the real new IID/PID,
 executable, cgroup and process start ticks. A manager timeout or unobserved
 start preserves intent and requires reconciliation; it never causes a restart.
 The lease serializes only these native 191 dispatchers. It does not claim to
 mediate unrelated host allocations or old launchers.
 
 Only one of these full/plugin services runs at a time. Each is Restart=no,
-Type=exec, RemainAfterExit=yes, RuntimeMaxSec 43200, CPU 400%, memory high48GiB/
+Type=exec, RemainAfterExit=yes, RuntimeMaxSec 43200, CPU 400%, memory high 48 GiB/
 max 64 GiB, swap 0,512 tasks, UMask 0077, PrivateNetwork, source/home read-only and
 no R2 credentials. Writable paths are the exact OS state leaf and the matching
 existing gate-receipt directory. Two full-check logs are individually limited
@@ -54,7 +54,7 @@ reservation ceiling, one 64 GiB verifier, a possible 16 GiB modern compiler,
 2 GiB for the queue and its short dispatcher, and a possible 2 GiB uploader. It
 uses the independently computed memory target; an invalid
 capped 186 replay budget must not be substituted or weakened. It retains the
-exact old228833779142-byte OS budget and reserves 520 MiB for all eight bounded
+exact old 228833779142-byte OS budget and reserves 520 MiB for all eight bounded
 verification tasks/dispatcher evidence. The coordinator must explicitly include
 every additional outstanding OS claim in `other_pending_os_growth_bytes` and
 review that census before sealing the plan. This scalar is an operator-owned
@@ -63,7 +63,7 @@ Fresh statfs must fit the full sum. No compiler, fixture, floor or claim is
 released by the dispatcher.
 
 Run the dispatcher itself in a separate nonrestarting root sandbox: CPU 100%,
-memory high512MiB/max1GiB, swap 0,512 tasks, UMask 0077, PrivateNetwork,
+memory high 512 MiB/max 1 GiB, swap 0,512 tasks, UMask 0077, PrivateNetwork,
 TOKIO_WORKER_THREADS=2, TimeoutStartSec 600, LimitFSIZE 16 MiB, source/home read-only,
 minimal DAC/ptrace capabilities, and only the dispatcher/state roots and exact
 gate receipt directories writable. Manager-client temporary files stay under

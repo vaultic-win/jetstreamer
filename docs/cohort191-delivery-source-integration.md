@@ -31,7 +31,7 @@ The old `e0946ae7` was only an unwired custody draft. Subsequent changes now:
   implementation still isolates a historical active verifier that has already
   become terminal after cutoff instead of inventing its old process liveness.
 - Authenticate the uploader's actual same-PID/start/executable transition from
-  `sync-verified191` to the exact normal64MiB/concurrency2 sync argv. Its real
+  `sync-verified191` to the exact normal 64 MiB/concurrency 2 sync argv. Its real
   prelaunch and pre-exec admission proofs bind the same observer/completion,
   queue plan/IID, native inputs, full/plugin receipts and capacity claims.
 - Compute upload and readback from their own PID/IID-bound journals at cutoff.
@@ -58,7 +58,7 @@ policy evidence, and qualify exact sandbox/receipt/readback routes. Fresh event
 production and forecasts must use the existing single coordinated cadence.
 
 Actual verification task completion, source/public native batches, queue history,
-capacity receipts and R2 ready receipts must come from their real Rust/PID1
+capacity receipts and R2 ready receipts must come from their real Rust/PID 1
 writers. These documents and schemas are not permission to handwrite them.
 Boundary 190–191 through 194–195 dispatch stays separate from publication and must
 use qualified modern readers before guarded retirement. Growth claims are not
@@ -80,7 +80,7 @@ Source `9e523697` includes parent `ce5aaf79` through merge `053cbf18`, preservin
 all native 191/141/209/227 module and CLI registrations. Its follow-ups are
 `b9460aaf` (custody/PID-pipeline imports and identity serialization), `35eaa5e6`
 (verifier borrow and anonymous PrivateTmp client capture) and `9e523697`
-(strict Clippy fixes with explicit parsing of string PID1/journal PIDs).
+(strict Clippy fixes with explicit parsing of string PID 1/journal PIDs).
 
 Four default suites passed 942 tests with 64 ignored: observer library 110/2,
 R2 executable 613/46, routine executable 203/16, native verify-pair 16/0.
@@ -129,7 +129,7 @@ observer configuration cannot survive 191 natural completion, while the existing
 runtime profile requires a later observer-bound custody event. A terminal-only
 collector and offline four-owner preparation route are required before operational
 readiness. Work on that repair is source-only until a separately coordinated build
-slot; the942-test baseline does not qualify that later change. No owner census is
+slot; the 942-test baseline does not qualify that later change. No owner census is
 weakened, and full/plugin/sync remain dependent on real fresh four-owner resources.
 
 ## First post 191 transition repair, source-only
@@ -140,12 +140,12 @@ The follow-up source adds `capture-terminal191 PLAN --plan-sha256 SHA
 source_batch and public_batch after the native writers have produced them, and
 output `/var/lib/jetstreamer/horizon-cohort191-terminal-transition-20261023-v1/terminal.json`.
 It has no observer, forecast, speculative resource hash or task admission.
-The collector requires the original producer's actual PID1 natural success,
+The collector requires the original producer's actual PID 1 natural success,
 trusted 84239250 root and four archive closes, a naturally terminal original
 rebound controller, and native root-controller import attestation with all four
 materialized archives. It checks native close lengths against imported members,
 rechecks original identities and import custody, and publishes a no-clobber
-root-private proof with every authority flag false. If PID1 has collected the
+root-private proof with every authority flag false. If PID 1 has collected the
 controller, its separately captured real exit 0 receipt remains mandatory.
 
 The offline routine entry is:
@@ -198,7 +198,7 @@ and large counters. One test exercises the real observer-config gate: the stale
 five-owner config fails against the four-owner model and the precise transformed
 config passes. These new tests and this follow-up source have not been compiled
 or run; only rustfmt parsing and whitespace checks have run while 141 status holds
-the shared target. The successful942-test/release baseline above remains separate.
+the shared target. The successful 942-test/release baseline above remains separate.
 
 ## Guarded local retirement audit, source-only
 
@@ -220,7 +220,7 @@ The source obligation is more precise than an unconditional four-file hold:
   canonical durable whole-object R2 receipt. The follow-up now explicitly matches
   each such receipt's epoch, digest and length to its native public-batch member;
   a historical receipt for a different payload cannot replace local custody.
-- Native batch receipts, sealed root manifest, original root/four-close and PID1
+- Native batch receipts, sealed root manifest, original root/four-close and PID 1
   terminal evidence, collected-controller exit capture if needed, root-controller
   state/receipt attestation, queue history/intents/launches, full/plugin receipts,
   ready receipts and original status provenance must remain. Local payload

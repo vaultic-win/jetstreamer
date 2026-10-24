@@ -72,7 +72,7 @@ preserved; other epoch features remain explicit build choices.
 The [persistent service template](epoch210-native-input-service.service) is
 intended for `/etc/systemd/system/` under that exact unit name. Preparation does
 not install, enable or start it. Do not substitute an ephemeral `systemd-run`
-unit: terminal capture needs the original PID1 invocation properties and journal
+unit: terminal capture needs the original PID 1 invocation properties and journal
 after exit. Do not use `RemainAfterExit`, which changes the expected terminal
 shape. Precreate its empty owner 0700 run root and scratch for the admission
 checks; do not start the unit before admission succeeds.
@@ -112,15 +112,15 @@ replay, runtime-promotion and publication authority remains false.
    their remaining whole-root growth and hard memory growth. Preserve the
    largest bound guard minimum-free baseline, current century floor and all
    remaining reservations. No capacity claim follows from this document.
-3. Keep the installed persistent file inactive until admission succeeds. Bind original PID1
+3. Keep the installed persistent file inactive until admission succeeds. Bind original PID 1
    invocation/MainPID and prove the guard's first actual sandboxed no-trip
    fire. Register the exact origin promptly through an authenticated lifecycle
    event that permits the epoch 210 blocked-qualification transition. Publish
    `verification` status with the original start time through that lifecycle.
    Keep the single 1800-second observation cadence; no separate poll loop.
-4. Preserve the original journal and PID1 properties. A typed terminal proof
+4. Preserve the original journal and PID 1 properties. A typed terminal proof
    must check exact epoch 210 marker, one successful native test, canonical
-   bootstrap commitment, zero entries/writes and PID1 success. Capture that
+   bootstrap commitment, zero entries/writes and PID 1 success. Capture that
    evidence before any unit collection; retire only the owned status through
    the authenticated inactive-status protocol.
 

@@ -29,7 +29,7 @@ binds the already registered intent; `terminal_fleet` binds the current accepted
 fleet. Output is `/var/lib/jetstreamer/horizon-227-capture-native-terminal-v2/native.json`.
 Seal the spec before execution. The admission's900-second window applies to
 the original producer start and initial guard/capture, not terminal capture.
-PID 1's successful terminal journal outcome must still fall within the2700-second
+PID 1's successful terminal journal outcome must still fall within the 2700-second
 bounded attempt. Preserve the exact original start and terminal elapsed time
 when systemd clears current invocation/PID fields.
 
@@ -40,14 +40,14 @@ Then capture the lifecycle event using schema
 and `output: /var/lib/jetstreamer/horizon-227-terminal-native-v2/event.json`.
 The output parent must be root-private and precreated. Seal the spec; execute
 `capture-native227-terminal`. The tool preserves a bound `journal.json`,
-requires the exact child IID/PID and unique PID1 terminal outcome, and brackets
+requires the exact child IID/PID and unique PID 1 terminal outcome, and brackets
 the complete owner census without taking a resource sample.
 
 For the same-sample terminal fleet, copy the current accepted plan, replace only
-its previous-fleet/event bindings, event output path and 227gate next action/
+its previous-fleet/event bindings, event output path and 227 gate next action/
 append-only evidence. Retain every claim, tracked unit, unrelated gate and
-diagnostic. The 227completion state remains unchanged. The event binds that
-exact previous fleet and observer. On success, epoch 227evidence may append the
+diagnostic. The 227 completion state remains unchanged. The event binds that
+exact previous fleet and observer. On success, epoch 227 evidence may append the
 event and native qualification bindings. On failure, append the event and leave
 repair open. Reconcile and then use the accepted terminal fleet for inactive
 status cleanup if no active replacement/downstream owner exists.

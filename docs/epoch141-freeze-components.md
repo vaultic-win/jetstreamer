@@ -35,7 +35,7 @@ worker does not install a general logger. This narrow diagnostic emits only
 the two selected frozen-Bank records.
 
 Qualification on dev-samjohnson used exact Rust 1.46.0, offline locked builds,
-jobs 2, debug 0, the existing legacy build-cache child, CPU 200%, MemoryHigh12GiB/
+jobs 2, debug 0, the existing legacy build-cache child, CPU 200%, MemoryHigh 12 GiB/
 Max 16 GiB, no swap, 512 tasks, read-only source and PrivateNetwork. The full
 initial candidate suite passed 51 tests with 2 ignored; four refined diagnostic
 tests passed, including read-only observation, real hard-fork hash
@@ -54,15 +54,15 @@ its fixed advertised qualification end 61328765; the worker's earlier 60912004
 stop must be separately explicit in every freeze-component plan, admission and
 launch. This package cannot complete that parent qualification or produce a
 canonical epoch 141 sidecar. Its preparation/guard/fleet namespace must be
-distinct from both failed 141roots. Fresh protected-growth/floor admission,
+distinct from both failed 141 roots. Fresh protected-growth/floor admission,
 actual invocation-bound guard and first timer proof, and full census handoff
 remain separate requirements before an unattended diagnostic run.
 
 The first actual run on dev-samjohnson used invocation
-`412f43b5db1046a2822efe3aeff95162` from 13:10:25 to 13:20:35 UTC on2026-10-23.
+`412f43b5db1046a2822efe3aeff95162` from 13:10:25 to 13:20:35 UTC on 2026-10-23.
 It terminated with the explicit bounded-stop error before constructing a
 Bank after 60912004. Parent prefetch advertised 60912045; that was not executed
-progress. The pre-boundary60911999 Bank hash was
+progress. The pre-boundary 60911999 Bank hash was
 `AYzJ6h8BcyraPHeypjd4uhj4L99y7WdMkmeb1L93id7L`, matching that parent in the
 earlier failed trace. The frozen 60912004 Bank hash was
 `GtE6AijvzVgK1UKQ5HyVEZMGisDddVWRQkBnM74sjABf`, matching the later vote's
@@ -77,7 +77,7 @@ retains exact response bytes, and computes the same legacy reward digest.
 RPC uses PascalCase reward types; the first collector retained its successful
 response but rejected those types. The corrected collector analyzed a sealed
 copy of that response in a PrivateNetwork sandbox without another RPC request.
-All 2640rewards, including exact signed lamports and unsigned post-balances,
+All 2640 rewards, including exact signed lamports and unsigned post-balances,
 matched the diagnostic digest
 `23o38tWzJYjLEqcwtGeKRRC1HmeBqGqMHcAHQWDb4AGL`. Totals were fee485000,
 staking 226821948373 and voting 40720061049lamports. RPC does not supply a Bank
@@ -109,8 +109,8 @@ the old table or the causal difference in execution.
 A distinct opt-in follow-up feature`epoch141-vote-prefix-diagnostic` depends
 on the frozen-component diagnostic, retains bootstrap 60911751, and stops
 after freezing 60912005. It therefore includes the formerly failing vote at
-60912005entry388transaction378, but creates no later Bank. It records the
-pre-boundary60911999, transition 60912004, and terminal 60912005 components;
+60912005entry388 transaction 378, but creates no later Bank. It records the
+pre-boundary 60911999, transition 60912004, and terminal 60912005 components;
 each record names its worker terminal and whether this follow-up feature is
 enabled. Existing sealed 60912004deployments are unchanged. Four targeted
 diagnostic tests passed under exact Rust 1.46.0 with one sealed-release probe
@@ -123,16 +123,16 @@ The follow-up release worker is
 sealed in`horizon-epoch141-vote-prefix-worker-20261023-v1`; its cohesive parent
 is`horizon-epoch141-vote-prefix-parent-20261023-v1`. A separately built and
 sealed test harness selected that exact worker path and digest and passed
-actual HELLO/PING/SHUTDOWN without loading a Bank. The original 60912004profile
+actual HELLO/PING/SHUTDOWN without loading a Bank. The original 60912004 profile
 also passed its four targeted tests after the optional follow-up was added.
 
 Its separately closed R2 profile uses the unit
 `horizon-qualify-141-original-entry-vote-prefix-20261023-v1.service` and root
 `/home/sol/.jetstreamer-private/epoch141-original-entry-vote-prefix-20261023-v1`.
 It retains the 256 GiB whole-root stop, 1800 second runtime bound, CPU 2,
-MemoryHigh 128 GiB / Max 192 GiB, zero swap, and3500000worker-VMA stop. The plan,
+MemoryHigh 128 GiB / Max 192 GiB, zero swap, and 3500000 worker-VMA stop. The plan,
 admission and launch explicitly bind worker terminal 60912005, while the parent
 retains advertised end 61328765. Every runtime/publication authority stays false.
-The routine handoff replaces only the authenticated terminal 60912004observer
+The routine handoff replaces only the authenticated terminal 60912004 observer
 owner, retains 144 and all historical fleet claims, and includes the separately
 sealed predecessor result in subsequent repair evidence.

@@ -106,5 +106,5 @@ tree, receive that name exception. Files, symlinks, nested or malformed versions
 other checkpoint names and release/deps get no exception. Real checkpoint,
 snapshot, archive, sidecar and lock artifacts beneath either crate directory
 still refuse the census. Rejections identify the offending relative path and
-node type. The initial 392a9checker correctly performed no deletion; its
+node type. The initial 392a9 checker correctly performed no deletion; its
 overbroad substring refusal is preserved as failed check evidence.

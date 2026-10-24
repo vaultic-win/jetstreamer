@@ -16,7 +16,7 @@ Use each sealed binary with `--plan PATH --plan-sha256 HEX --self-sha256 HEX`.
 The snapshot metadata plan has schema
 `jetstreamer-epoch140-snapshot-metadata-plan-v1`, `gcloud_sha256`, and a
 root-private no-clobber `output` receipt path. Its read-only generation lookup
-runs through `/home/sol/.config/gcloud` as UID1001/GID1003, account
+runs through `/home/sol/.config/gcloud` as UID 1001/GID 1003, account
 `sam.johnson@anza.xyz`, billing project `principal-lane-200702`. It writes a
 `jetstreamer-epoch140-snapshot-metadata-receipt-v1` observation, not admission.
 
@@ -27,7 +27,7 @@ same strict fields as the ledger download plan: `gcloud_sha256`, bound
 `stop_completion`, `initial_guard_receipt`, `minimum_free_bytes`, and bounded
 `maximum_runtime_seconds`. Paths must satisfy the existing canonical private
 directory and no-overlap gates. The SDK staging parent is root-owned 0711;
-the new attempt is initially UID1001-owned0700 and frozen root-owned after
+the new attempt is initially UID 1001-owned 0700 and frozen root-owned after
 the owned SDK group has stopped. Credential refresh may write the exact GCloud
 configuration, so the systemd sandbox must permit that while granting only
 the separate attempt/receipt paths other write access.

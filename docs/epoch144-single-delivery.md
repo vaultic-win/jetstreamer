@@ -21,7 +21,7 @@ by the unchanged global uploader, then revalidates all terminal/canonical gates
 after acquisition. The lock spans the existing Rust client's144-only sync and
 owned-status cleanup. Both uploaders therefore serialize even if the global
 coordinator independently becomes eligible for 144. No live 160 upload is stopped
-or restarted. The archive-sync child permanently changes to UID1001/GID1003, replaces its
+or restarted. The archive-sync child permanently changes to UID 1001/GID 1003, replaces its
 supplementary groups, clears ambient/effective/permitted/inheritable capabilities,
 and verifies the drop before exec. The distinct fixed completion-only status
 command retains root because publication receipts are root-owned 0600. No
@@ -60,7 +60,7 @@ invoke its client. A separate root-private metadata mutex prevents concurrent
 capture writers; canonical complete JSON, fsync, owner-only final permissions
 and no-clobber writes prevent partial or foreign receipts from being adopted.
 Existing genuine captures are revalidated without overwriting their bytes.
-No actual 144capture or terminal event is claimed until a real worker exists.
+No actual 144 capture or terminal event is claimed until a real worker exists.
 
 The candidate archive client emits `r2-upload-start`, `r2-upload-progress` and
 `r2-upload-committed` JSON events. Progress counts distinct successful part
@@ -118,7 +118,7 @@ and its prior lock receipt; a different worker requires separate qualification.
 The reader checks the coordinated v2 sample time, exact live zero-restart
 oneshot, historical capture and archive child command. Before and after its
 bounded journald read it requires the actual child PID/start ticks, parent,
-executable, exact sync argv, cgroup, permanent UID1001/GID1003 and empty
+executable, exact sync argv, cgroup, permanent UID 1001/GID 1003 and empty
 capabilities to agree. Progress messages must have trusted journald PID, UID,
 executable, unit and invocation metadata, and timestamps inside that child and
 sample interval. Missing executable metadata fails closed. A sandbox probe

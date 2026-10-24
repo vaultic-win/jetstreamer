@@ -44,17 +44,17 @@ namespaces before a capability invocation. The no-worker invocation uses
 and emit the new prerequisite bindings without restoring a Bank or replaying an
 entry. Compilation is not that capability proof.
 
-The proposed production envelope is225,000,000,000-byte MemoryMax,
+The proposed production envelope is 225,000,000,000-byte MemoryMax,
 150,000,000,000-byte MemoryHigh, swap 0, CPU 800%, two Rayon threads, Tasks 512,
 and a72-hour hard execution bound. Kernel limits must equal host-page-floor
 values while systemd requested strings remain exactly the sealed requested
 values. Preserve those layers separately. The supervisor enforces a2-TB
-filesystem floor and480-GiB available-memory reserve every 15 seconds as a safety
+filesystem floor and 480-GiB available-memory reserve every 15 seconds as a safety
 guard, not a new routine campaign observer. Starting memory must also cover the
-candidate's entire225-GB cap.
+candidate's entire 225-GB cap.
 
 Scratch 300 GB is planning evidence, not a measured full-prefix peak. Reserve an
-additional 160 GiB for output and overhead: whole-root471,798,691,840 bytes.
+additional 160 GiB for output and overhead: whole-root 471,798,691,840 bytes.
 Starting free disk therefore must be at least 2,471,798,691,840 bytes even before
 fresh complete-fleet arithmetic raises that requirement. The supervisor checks
 that conservative start threshold; a favorable target-only warmup capture is
@@ -73,7 +73,7 @@ admission/capture/observer/status adapter remains a required next gate.**
 2. Run the existing independent `jetstreamer-qualification-verify` native 20
    known-root prefix rereader against the new private root. Bind full
    workera 651b7a6, runtime `solana-v1.6.20`, revision
-   `77bdb45d4af61fc687161ec06cc0178ff79726d5`, the431,523-slot span, both known
+   `77bdb45d4af61fc687161ec06cc0178ff79726d5`, the 431,523-slot span, both known
    accounts/Bank hashes and source archive digest. Its namespace-specific
    validation deliberately rejects the first 16 worker and native 25 substitutes.
 3. Independently qualify the native restart at 96767522. Its canonical account
@@ -93,7 +93,7 @@ admission/capture/observer/status adapter remains a required next gate.**
    condition; prove their separate contiguous emitted ranges and checked
    normalization instead. The dormant native 25 restart-test candidate remains
    a contingency for a genuinely missing obligation, not required extra replay.
-4. Qualify the477-slot suffix 96767523..96767999 and an explicit cursor/event
+4. Qualify the 477-slot suffix 96767523..96767999 and an explicit cursor/event
    mapping. Assemble only with proven ordered, non-overlapping coverage of all
    432,000 epoch slots and all existing cross-runtime boundary requirements.
    Until this exists, prefix and suffix stay private segments without canonical
@@ -133,7 +133,7 @@ The sealed spec schema is
 receipt directory
 `/var/lib/jetstreamer/horizon-warmup223-58ab-scratch-retirement-v1`.
 It binds the actual terminal proof/resource, checks current terminal owner and
-unchanged PID1 history, rejects pending jobs, requires its guard and timer
+unchanged PID 1 history, rejects pending jobs, requires its guard and timer
 inactive, rehashes the retained cold source, and rejects any archive, sidecar,
 snapshot or checkpoint anywhere in scratch. It reuses the reviewed no-mount,
 same-device, uid 1000, no-hardlink/special-file tree census and complete streaming

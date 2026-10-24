@@ -19,19 +19,19 @@ fn apply_controller(
     manifest: &Value,
     controller: &str,
 ) -> Result<Value> {
-    let ranges = model["ranges"].as_array().context("cohort191 ranges")?;
+    let ranges = model["ranges"].as_array().context("cohort 191 ranges")?;
     let indices: Vec<_> = ranges
         .iter()
         .enumerate()
         .filter(|(_, r)| r["range"] == "191-194")
         .map(|(i, _)| i)
         .collect();
-    ensure!(indices.len() == 1, "cohort191 missing/duplicate range");
+    ensure!(indices.len() == 1, "cohort 191 missing/duplicate range");
     let index = indices[0];
     let r = &ranges[index];
     let old = r["terminal_slot"]
         .as_u64()
-        .context("cohort191 model terminal")?;
+        .context("cohort 191 model terminal")?;
     ensure!(
         model["schema"] == "jetstreamer-horizon-r2-status-eta-model-v5"
             && model["phase"] == "replay"
@@ -46,53 +46,55 @@ fn apply_controller(
             && manifest["manifest"]["last_epoch"] == 194
             && manifest["manifest"]["publication_boundary_epoch"] == 194
             && manifest["manifest"]["epoch_slots"] == 432000,
-        "cohort191 model/manifest scope differs"
+        "cohort 191 model/manifest scope differs"
     );
     let offsets = &r["epoch_additional_replay_slots"];
     let allowances = &r["epoch_downstream_allowance_seconds"];
     ensure!(
         offsets.as_object().is_some_and(|o| o.len() == 4)
             && allowances.as_object().is_some_and(|o| o.len() == 4),
-        "cohort191 map census differs"
+        "cohort 191 map census differs"
     );
     for epoch in 191..=194 {
         let key = epoch.to_string();
         ensure!(
             offsets[&key] == NEW - old && allowances[&key] == (epoch - 190) * 43200,
-            "cohort191 lost queued work or delivery allowance"
+            "cohort 191 lost queued work or delivery allowance"
         );
     }
     let matches: Vec<_> = observed["replays"]
         .as_array()
-        .context("cohort191 observations")?
+        .context("cohort 191 observations")?
         .iter()
         .filter(|o| o["range"] == "191-194")
         .collect();
     ensure!(
         matches.len() == 1,
-        "cohort191 missing/duplicate observation"
+        "cohort 191 missing/duplicate observation"
     );
     let o = matches[0];
     let w = &o["useful_work"];
     let terminal = w["last"]["terminal_slot"]
         .as_u64()
-        .context("cohort191 observed terminal")?;
+        .context("cohort 191 observed terminal")?;
     ensure!(
         matches!(terminal, OLD | NEW) && terminal >= old,
-        "cohort191 unknown/backward terminal"
+        "cohort 191 unknown/backward terminal"
     );
     if terminal == old {
         return Ok(model.clone());
     }
     let first = w["first"]["slot"]
         .as_u64()
-        .context("cohort191 first slot")?;
-    let last = w["last"]["slot"].as_u64().context("cohort191 last slot")?;
+        .context("cohort 191 first slot")?;
+    let last = w["last"]["slot"].as_u64().context("cohort 191 last slot")?;
     let first_terminal = w["first"]["terminal_slot"]
         .as_u64()
-        .context("cohort191 first terminal")?;
-    let elapsed = w["elapsed_seconds"].as_f64().context("cohort191 elapsed")?;
-    let rate = w["slots_per_second"].as_f64().context("cohort191 rate")?;
+        .context("cohort 191 first terminal")?;
+    let elapsed = w["elapsed_seconds"]
+        .as_f64()
+        .context("cohort 191 elapsed")?;
+    let rate = w["slots_per_second"].as_f64().context("cohort 191 rate")?;
     ensure!(
         first >= OLD + 1 - 432000
             && first < last
@@ -106,7 +108,7 @@ fn apply_controller(
             && rate.is_finite()
             && rate > 0.0
             && (rate - (last - first) as f64 / elapsed).abs() <= rate.abs() * 1e-12,
-        "cohort191 reset/inconsistent rate or progress"
+        "cohort 191 reset/inconsistent rate or progress"
     );
     let before = &o["worker_before"];
     let after = &o["worker_after"];
@@ -124,7 +126,7 @@ fn apply_controller(
             && before["executable"] == after["executable"]
             && before["executable_beneath_bound_scratch"] == true
             && after["executable_beneath_bound_scratch"] == true,
-        "cohort191 owner/worker changed"
+        "cohort 191 owner/worker changed"
     );
     let mut result = model.clone();
     let next = &mut result["ranges"][index];
@@ -139,7 +141,7 @@ fn apply_controller(
     }
     let evidence = result["evidence"]
         .as_array_mut()
-        .context("cohort191 model evidence")?;
+        .context("cohort 191 model evidence")?;
     let binding = json!({"path":MANIFEST,"sha256":MANIFEST_SHA});
     if !evidence.contains(&binding) {
         evidence.push(binding);
@@ -152,7 +154,7 @@ pub(super) fn for_observation(p: &Plan, model: &Value, observer: &Value) -> Resu
     if !ranges.iter().any(|r| r["range"] == "191-194") {
         return Ok(model.clone());
     }
-    ensure!(is_101(p)?, "cohort191 unsupported campaign");
+    ensure!(is_101(p)?, "cohort 191 unsupported campaign");
     let manifest = bound_json(
         &Bound {
             path: MANIFEST.into(),

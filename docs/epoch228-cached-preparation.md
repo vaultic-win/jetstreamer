@@ -18,7 +18,7 @@ drop the gate, or call the focused output a canonical epoch archive.
 The existing `--qualification-end-slot=98928278` mechanism can describe that
 bounded verification tail, but produces a432279-slot focused artifact. A reviewed
 extractor/assembly and full/plugin qualification route is still needed to obtain
-the canonical432000-slot epoch 228 output while preserving the279-slot proof.
+the canonical 432000-slot epoch 228 output while preserving the 279-slot proof.
 
 The sealed capped 227 worker is also inapplicable: it accepts only snapshot
 98063464 and entries 98063465–98495999. Epoch 228's bootstrap is 98495291 and its

@@ -2,10 +2,10 @@
 
 The bounded vote-prefix run completed through 60912005 and stopped before a
 later Bank. Its strict parent entered the subsequent batch beginning at
-60912005entry452, after the previously failing entry 388transaction378. The
+60912005entry452, after the previously failing entry 388 transaction 378. The
 worker froze 60912005 with Bank hash
 `6KxEDBFrwyVfuGxqkG8SgYmdncoRUw7xSzCSbCx7qagy`. Its parent 60912004again
-matched the later vote's expected hash and all 2640finalized RPC rewards.
+matched the later vote's expected hash and all 2640 finalized RPC rewards.
 The sealed result is
 `horizon-epoch141-vote-prefix-result-20261023-v1/result.json`, SHA256
 `2947b49f24aaeb731cb7ea102c55726bb065545ffba5e1c585bbddd7dcd06972`.
@@ -45,7 +45,7 @@ It has a512 GiB whole-root physical stop, including scratch, compact indices,
 and private archive output, plus a5 day runtime stop. This is a bounded
 qualification envelope, not an adopted full-cold-epoch peak. The 200–300
 century's 300 GB scratch seed is not applied. The service uses 8CPU cores,
-MemoryHigh 128 GiB / Max 192 GiB, zero swap, 512 tasks and the3500000worker-VMA stop.
+MemoryHigh 128 GiB / Max 192 GiB, zero swap, 512 tasks and the 3500000 worker-VMA stop.
 Compact-index download threads are limited to 32 within the same task budget.
 The separate scheduling memory allowance remains 128 GiB with one 64 GiB host
 reserve; existing invocation-bound growth and the verified century floor
@@ -54,7 +54,7 @@ must survive fresh admission independently.
 The bootstrap remains 60911751 and the canonical target 61328765, with expected
 accounts hash`8LfMXtdKmPEvMcBzEz2XZ56HZ8pUPGSaWGA6mYG4dAFY`. This worker has
 no 60912004or60912005 diagnostic stop. Root success would cover the 416766 slot
-prefix beginning 60912000; 15234epoch141 suffix slots remain outside that
+prefix beginning 60912000; 15234 epoch 141 suffix slots remain outside that
 qualification. Complete-span provenance, full/current-plugin checks, and
 normal publication gates remain mandatory. No canonical sidecar, runtime
 promotion or R2 archive mutation is authorized by preparation, protocol
@@ -62,7 +62,7 @@ tests, admission, resource measurements, or private root success.
 
 The closed reader and routine handoff require the exact terminal vote-prefix
 invocation and sealed result, retain all earlier roots and ledger claims,
-and preserve the 144observer. Fresh protected admission, immediate actual
+and preserve the 144 observer. Fresh protected admission, immediate actual
 invocation guard, a real sandboxed one-worker timer fire, launch capture and
 authenticated fleet handoff remain separate requirements before leaving a
 new run unattended.

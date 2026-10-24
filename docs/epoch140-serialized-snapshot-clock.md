@@ -38,7 +38,7 @@ cannot lower its retained minimum 5153080892870 byte stop floor. Reserve bounded
 receipt/log space independently above that sum. Use a persistent non-restarting
 private-network oneshot with CPU/memory/task ceilings, read-only home/system
 mounts, only required traversal capability and the exact root-private output
-directory writable. The internal900-second/runtime/free-space guard runs on
+directory writable. The internal 900-second/runtime/free-space guard runs on
 every compressed read, including the full digest pass. Bind and verify the
 actual `initial-guard.json` invocation/digest before leaving the job unattended.
 Never reuse an output directory after a failed initial-guard/final write.
@@ -62,13 +62,13 @@ cannot prove a native checkpoint match or authorize suffix replay, PoH runtime
 input promotion, assembly, import, sidecars, publication or local retirement.
 Those gates stay independent, including the actual executing suffix worker's
 native tuple comparison and a complete retained-prefix reread/hash. Preserve
-the snapshot, original 140archive and all 141repair evidence on diagnostic failure.
+the snapshot, original 140 archive and all 141 repair evidence on diagnostic failure.
 
 ## Original failed-cohort bootstrap comparison
 
 The distinct `epoch140-original-bootstrap-clock-diagnostic` feature builds only
 `jetstreamer-epoch140-original-bootstrap-clock` for the retained 60479583 bootstrap
-used by the original 140–143cohort. Its compile-bound input is a separate sealed
+used by the original 140–143 cohort. Its compile-bound input is a separate sealed
 root 0400 copy, not the user-owned original. It pins size 3238609546, SHA256
 `350464cd9a2341c94edde7544fcb8958a968ea9f322d38a8daec145e1a2bb48b`, device 2304
 and inode 6322697. The source's MD5/CRC32C match the original sealed generation

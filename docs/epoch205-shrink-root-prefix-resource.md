@@ -6,14 +6,14 @@ natural-completion runner, original parent 025757b9 and capped worker 4aeca563,
 epoch 205's pinned bootstrap 88559361, and independently known root 88991050.
 It requires all 431051 output slots 88560000–88991050 and the exact bootstrap
 and terminal accounts hashes. It cannot accept the earlier24000-slot probe,
-an epoch 203 manifest or a complete432000-slot claim. The parent must finish
+an epoch 203 manifest or a complete 432000-slot claim. The parent must finish
 naturally with its verified manifest; observing the checkpoint is insufficient.
 
 The new profile adopts the user's 300 GB decimal scratch planning allowance for
 this century, plus separate 128 GiB output and 32 GiB margin. Its fixed minimum free
 space adds the current thirteen-sample century floor, but is only a rejection
 baseline. Fresh admission must also protect all actual older growth claims and
-memory/CPU/VMA/I/O capacity. The72-hour time bound and terminal scratch cap do
+memory/CPU/VMA/I/O capacity. The 72-hour time bound and terminal scratch cap do
 not prove a full-epoch peak; an invocation-bound live physical-size/reserve/VMA
 guard must protect the experiment throughout. No live producer or guard changes
 merely because this feature exists.
@@ -29,7 +29,7 @@ separate empty attempt with its own matching unit/plan; never reuse that attempt
 for replay. This input proof does not establish native checkpoint equivalence,
 resource fit, producer admission or compatibility/publication success.
 Keep all output private and sidecar-free. Independent prefix reread and exact
-native checkpoint comparison remain separate requirements. The949-slot suffix,
+native checkpoint comparison remain separate requirements. The 949-slot suffix,
 checkpoint restart, V4 assembly, full/current-plugin verification and reviewed
 publication route still need qualification before this can produce a ready pair.
 
@@ -63,7 +63,7 @@ its sandbox and its first real timer fire remain separate deployment steps.
 `jetstreamer-r2 capture-prefix205 SPEC --spec-sha256 HEX --self-sha256 HEX`
 records that separate deployment only after the original protected owners remain
 unchanged, the real new unit matches its exact command/sandbox, and its new guard
-timer has produced a no-trip one-worker receipt with matching PID1 completion.
+timer has produced a no-trip one-worker receipt with matching PID 1 completion.
 It binds the admission, resource plan, actual worker/guard identity, guard plan,
 service sandbox and timer evidence before writing the private launch receipt.
 Exact repeated capture is a no-op; a conflicting prior receipt is preserved and

@@ -7,7 +7,7 @@ with the independently publishable epoch 185 singleton. It binds the exact
 `e185-full-20261023-v1-r2` producer, staged controller, original 185 capability,
 fresh full 768 GiB admission and actual timer-fired guard proof. Its guard floor
 is 3503746342342 bytes (the century floor plus four older full 768 GiB claims), with
-the unchanged 800000VMA stop. The fifth model has terminal 80351999, zero queued
+the unchanged 800000 VMA stop. The fifth model has terminal 80351999, zero queued
 replay slots and 12h downstream allowance. Retain the original 185 reserve-stop
 repair history until a verified ready pair; launch is not recovery.
 
@@ -69,7 +69,7 @@ The first-fire receipt schema is
 `jetstreamer-horizon-repair183-guard-first-fire-v1`. Require the actual timer-fired
 service invocation, zero exit/restarts, absent stop intent/completion and its
 original JSON `sample`: armed/no-trip, exact live owner IDs, one readable worker
-at or below 800000VMAs, and minimum-free3332894621696bytes. The coordinator also
+at or below 800000 VMAs, and minimum-free 3332894621696 bytes. The coordinator also
 checks the still-active exact guard timer, healthy service, pinned unchanged
 guard script and live guard command bindings. This guard protects the existing
 live guards without lowering any of their floors.
@@ -84,7 +84,7 @@ Never edit a sealed three-range plan or arm a second observer for its timestamp.
 
 Both epochs remain behind the epoch 184 import gate. While 183 is observed, add
 432000 queued slots to each ETA; after a stable, identity-matching transition to
-184, remove that offset and keep the12h/24h downstream allowances. Reject backward
+184, remove that offset and keep the 12h/24h downstream allowances. Reject backward
 or unknown terminals, owner changes, partial/overlapping claims and reset clocks.
 The fleet retains the failed-repair gate/history and tracks the actual new
 controller, producer and guard; recovery closes only at verified ready pairs.

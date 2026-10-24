@@ -49,7 +49,7 @@ erasing preserved failed 223v1 evidence. Source preparation performs no resource
 
 After fresh admission, the main controller owns producer start, fresh actual IID/PID
 binding, separately sealed guard plan and protective service/timer. Capture requires
-`horizon-native228-protective-v1.service` to have completed a genuine PID1 success with
+`horizon-native228-protective-v1.service` to have completed a genuine PID 1 success with
 its matching guard invocation and its timer active/waiting. The first guard must fire
 within 900s of admission. Running capture writes the exact
 `/var/lib/jetstreamer/horizon-228-native-capture-actual-v1/intent.json` origin; the central
@@ -61,7 +61,7 @@ Perform authenticated readback and bind that receipt. Later updates share the no
 30-minute observation cadence. Internal qualification work is never hidden.
 
 Terminal capture binds that immutable original start, the exact sealed journal, raw
-integer commitment fields, successful test result, original child PID and PID1 terminal
+integer commitment fields, successful test result, original child PID and PID 1 terminal
 success in order. The test's 2700s execution bound is checked against its original start,
 not against when the operator later captures the journal. Central terminal events and
 status-only cleanup preserve unrelated owners and require real loaded inactive state;
@@ -100,5 +100,5 @@ capture and launch-event carry-forward are qualified end to end. The 334 arithme
 regression above is metadata validation only. Its prepared 334 specs are review
 artifacts, not launchable inputs. Use a new accepted observation/fleet that already
 reconciles terminal 223, omit `terminal223`, and bind every spec field to that new
-observation. Never rebind 334 evidence to 335 or another sample. The335-only initial
+observation. Never rebind 334 evidence to 335 or another sample. The 335-only initial
 sealed helper handoff must likewise use a spec with `terminal223` omitted.

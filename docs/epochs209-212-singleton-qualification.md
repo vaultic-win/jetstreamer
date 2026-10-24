@@ -168,7 +168,7 @@ schema `jetstreamer-native209-terminal-capture-spec-v1` binds `running_origin`,
 root-owned evidence. Output is
 `/var/lib/jetstreamer/horizon-native209-terminal-proof-*/proof.json`.
 Terminal validation rechecks that exact immutable spec and original registered
-owner, child PID, ordered canonical marker/test/PID1 success and bounded run
+owner, child PID, ordered canonical marker/test/PID 1 success and bounded run
 clock. Preserve the proof in a fleet terminal event, then conditionally retire
 only its exact owned status using the existing inactive-status protocol.
 Never reuse epoch 207's origin/journal hashes or rerun an already successful Bank.

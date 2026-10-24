@@ -66,9 +66,9 @@ rejects cross-runtime, wrong-epoch or diagnostic-runner telemetry.
 
 Publish the real active native phase as dashboard `verification` using the
 existing gated pipeline publisher and authenticated readback. Refresh on the
-single normal30-minute cadence; the capture event supplies initial status.
+single normal 30-minute cadence; the capture event supplies initial status.
 Actual terminal proof independently binds the original running origin, full
-raw journal, ordered canonical marker/test/PID1-success, exact zero-restart
+raw journal, ordered canonical marker/test/PID 1-success, exact zero-restart
 loaded terminal owner, and fresh complete unchanged census. Never rerun a Bank
 to reconstruct its outcome or borrow the v1.6.20 qualification.
 After an accepted terminal fleet event, the existing gated inactive-status

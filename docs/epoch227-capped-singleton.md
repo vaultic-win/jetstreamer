@@ -84,7 +84,7 @@ protective guard identities and all auxiliary jobs. Account for native 223 while
 active; afterward bind its terminal result and retained scratch. Recheck protected
 identities and actual resources before and after admission. Reserve 1.5 times the
 maximum observed aggregate lane RSS for this century, using the user's 150 GB seed
-only while actual evidence has not superseded it. The service's 150 GB high/225GB
+only while actual evidence has not superseded it. The service's 150 GB high/225 GB
 maximum are cgroup ceilings, not observed RSS. Check CPU, VMA and I/O separately;
 do not borrow another host's lane count or another century's resource model.
 
@@ -110,7 +110,7 @@ admit this singleton by substituting its inputs. The campaign owner must add the
 exact 227 admission/launch contract to the Rust fleet tools, binding current
 observation, native proof, capability, guard and service sandbox. Keep the service
 dormant until integration and first-fire proof pass; then register epoch 227 in
-the single30-minute status-publication and downstream handoff cycle.
+the single 30-minute status-publication and downstream handoff cycle.
 
 The separate `singleton227`, `singleton227_admission` and
 `singleton227_capture` Rust fleet modules implement that closed contract.
@@ -161,7 +161,7 @@ Use persistent safety services/timers named
 `horizon-singleton227-protective-v1.service/.timer` for entry replay. They run
 the reviewed immutable own-tree guard, with only its private receipt directory
 writable, root UID, private network, 1 GiB hard memory, one CPU and 256 tasks.
-Capture requires the exact guard invocation's PID1 successful completion and
+Capture requires the exact guard invocation's PID 1 successful completion and
 an active waiting safety timer. Native qualification never authorizes entry
 replay or archive publication. Register active native input verification in the
 campaign fleet and publish its dashboard status through the generic reviewed

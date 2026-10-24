@@ -15,8 +15,8 @@ original observation time. Sample 338 or a later normal sample is accepted; do
 not refresh the observation clock to make a stale sample fit.
 
 Capture proves the registered original diagnostic, exact immutable launch,
-raw mismatch at slot98091122/entry232/transaction223/signature3f6m… with expected
-None and actual InstructionError 0 Custom(2), unique PID1 exit 1 and failed
+raw mismatch at slot 98091122/entry 232/transaction 223/signature 3f6m… with expected
+None and actual InstructionError 0 Custom(2), unique PID 1 exit 1 and failed
 exit-code events, and current loadedfailed same-IID owner with MainPID 0 and no
 restart. Its command must match the original launch. Complete fresh unit
 censuses before and after may differ from the accepted census only in 227's
@@ -40,7 +40,7 @@ resource counters; the event is not an admission or fresh capacity sample.
 Reassess capacity only through the normal fresh-observation/admission gates.
 
 Root can then use the existing `status-retire-inactive` workflow with this fresh
-terminal fleet, the original 227publication receipt and the exact open repair
+terminal fleet, the original 227 publication receipt and the exact open repair
 record. The existing full 227 status owner adapter identifies the original
 unit/IID, and generic inactive-status checks authenticate its durable failed
 terminal state, no replacement/active owner and conditional object identity.

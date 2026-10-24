@@ -71,7 +71,7 @@ and observed pressure. A stale owner or capacity change is a hard rejection.
 ## Launch, protect and register
 
 Only the campaign owner may start the exact installed native service after
-admission succeeds. Bind its actual MainPID greater than one and original PID1
+admission succeeds. Bind its actual MainPID greater than one and original PID 1
 invocation into an immutable guard plan using the prepared exact native tuple,
 300 GB whole-root and 3500000 VMA ceilings, and the admitted protected floor.
 Arm `horizon-native210-protective-v1.service` and its timer using the ordinary
@@ -83,7 +83,7 @@ Run `capture-native210-input` with schema
 `admission`, `guard`, `guard_plan`, and exact output
 `/var/lib/jetstreamer/horizon-210-native-capture-actual-v1/intent.json`.
 Capture checks the exact installed static file, effective sandbox/environment,
-guard manager/PID1 success, unchanged complete peer census and canonical clocks.
+guard manager/PID 1 success, unchanged complete peer census and canonical clocks.
 It records the producer's original start time. The old `qualified` shortcut is
 not admitted; terminal qualification uses the independent command below.
 
@@ -123,7 +123,7 @@ Run `capture-native210-terminal` with schema
 
 Qualification requires original child PID and invocation, the exact canonical
 slot 90719638/accounts commitment, zero entries/bootstrap writes, one successful
-test and ordered PID1 success within the 2700-second run bound. The loaded unit
+test and ordered PID 1 success within the 2700-second run bound. The loaded unit
 must be inactive/dead, successful, restart-free and unreplaced. A missing or
 collected manager, failed native test or guard stop grants no qualification;
 retain its evidence and repair history instead of restarting automatically.

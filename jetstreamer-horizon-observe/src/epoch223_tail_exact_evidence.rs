@@ -337,7 +337,7 @@ fn validate(
             {"field":"terminal.capitalization","preserved":504095067970690000u64,"exact":504095067970689961u64}],
         "correction_basis":"Exact u64 raw producer markers agree with the sealed segment; rounded historical summary is retained unchanged.",
         "source_evidence":SOURCES.iter().map(|(path,sha)|json!({"path":path,"sha256":sha})).collect::<Vec<_>>(),
-        "raw_cursor_scope":"Local to this independently restored native25 validator; never equate with a native20 prefix cursor. Normalize emitted ranges separately during checked assembly.",
+        "raw_cursor_scope":"Local to this independently restored native 25 validator; never equate with a native 20 prefix cursor. Normalize emitted ranges separately during checked assembly.",
         "tail_comparison_only":true,"bank_rerun_performed":false,"current_host_observation_performed":false,
         "archive_reread_performed":false,"source_modified":false,"rounded_summary_modified":false,
         "canonical_prefix_qualified":false,"native20_prefix_independently_verified":false,

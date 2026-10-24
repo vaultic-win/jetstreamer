@@ -432,7 +432,7 @@ mod tests {
         assert!(scope(&s).is_err());
     }
     #[test]
-    #[ignore = "root exact finalized18283target census metadata only; no native open, resource sample, archive read or remote access"]
+    #[ignore = "root exact finalized 18283-target census metadata only; no native open, resource sample, archive read or remote access"]
     fn actual_finalized_census_ends_at_last_gap_not_interval_end() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let targets = finalized::validate_complete_collection(

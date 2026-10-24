@@ -20,10 +20,10 @@ is a root, sealed, self-authenticating Rust preparer with these modes:
   Actual inventory/reconciliation remains a separate read-only command.
 - `--routine-spec`:bind the durable event and emit its normal-cycle fold spec.
   The qualified routine helper uses `--prepare-next-prefix144` to consume the
-  genuine predecessor and event head, preserve 157history and all ETA formulae,
+  genuine predecessor and event head, preserve 157 history and all ETA formulae,
   clear the one-time admission marker and prepare a distinct namespace.
 - `--completed-proof`:after the actual verifier has exited successfully, bind
-  its exact retained invocation/command,immutable launch and independent pass
+  its exact retained invocation/command, immutable launch and independent pass
   receipt. Write completed private history and a separately sealable routine
   spec without refreshing admission, rehashing the archive or observing resources.
   The qualified helper's `--prepare-next-completed144` consumes the genuine
@@ -33,9 +33,9 @@ is a root, sealed, self-authenticating Rust preparer with these modes:
 
 Qualify/seal both writer and helper before launch; cancel obsolete pending
 observer/metadata schedules before migration and check all canonical outputs
-absent. No new resource sample, healthy replay restart,archive/sidecar mutation,
+absent. No new resource sample, healthy replay restart, archive/sidecar mutation,
 runtime promotion or retained-data retirement is authorized by preparation.
-The verifier may pass only its focused span;509epoch-end slots,restart/assembly,
+The verifier may pass only its focused span;509 epoch-end slots, restart/assembly,
 independent final/plugin gates and R2 readiness remain separate obligations.
 
 ## October 21 result and admission-tool incidents
@@ -51,18 +51,18 @@ census name; all old producers are still reauthenticated. The later event ledger
 failed closed because the old private 144 observer rejected any overlapping 144
 diagnostic, including an independent verifier after clean producer termination.
 The correction permits only this exact verifier, requires the old owner's clean
-terminal properties plus authenticated PID1 start/deactivation,and preserves
+terminal properties plus authenticated PID 1 start/deactivation, and preserves
 the old observation as history. A private-network root fixture exercises the
 real sealed plan, journal and manifest, and rejects active or foreign owners.
 
 No admission event was accepted. The verifier is now terminal, so do not restart
-it or retry the expired 17:38admission spec. The genuine 18:08normal cycle passed
+it or retry the expired 17:38 admission spec. The genuine 18:08 normal cycle passed
 with the unchanged older reader/helper. Reconcile the successful audit as
 completed private history in a separately qualified normal-plan transition;
 do not fabricate a successful event ledger or a new live admission.
 
 The completed-history fold is idempotent and separately names its namespace.
-It refuses a conflicting144claim,live-admission marker, newer repair action or
+It refuses a conflicting144claim, live-admission marker, newer repair action or
 production eligibility. The old action is hash-bound at preparation; unrelated
 gates and all old diagnostics remain intact. No existing producer or verifier is
 restarted, and completed verification is never relabeled full epoch readiness.
@@ -77,7 +77,7 @@ It requires a sealed root-owned plan with schema
 `jetstreamer-epoch144-snapshot-metadata-plan-v1`, the current gcloud executable
 SHA-256 and an exact no-clobber private output path. Invocation is
 `--plan PATH --plan-sha256 HEX --self-sha256 HEX` under persistent systemd.
-The engine drops the CLI to uid1001/gid1003,uses the interactive
+The engine drops the CLI to uid 1001/gid 1003, uses the interactive
 `/home/sol/.config/gcloud`, and authenticates exact generation, size and hashes.
 Keep that config writable for SDK token refresh without changing live lanes.
 
@@ -106,6 +106,6 @@ floor and binds its independent full/plugin/ready-pair proofs, then protects all
 fresh actual free bytes, memory reserve and host VMA checks remain mandatory.
 The private no-clobber receipt uses
 `jetstreamer-epoch144-snapshot-admission-receipt-v1`, not borrowed legacy admission.
-The 144downloader rejects that receipt if stale, foreign, replay-authorizing or
+The 144 downloader rejects that receipt if stale, foreign, replay-authorizing or
 underprotecting the retained claims. Other source profiles retain their existing
 admission contracts. Do not replace any active reader/controller with this build.

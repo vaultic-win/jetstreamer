@@ -1,8 +1,8 @@
 # First-target raw-byte diagnostic
 
-The genuine native acquisition completed for target60911776/parent60911771
-with778present1228-byte data shreds and the original `is_connected=false`.
-That is not connected recovery, a complete18283-target acquisition, or a PoH
+The genuine native acquisition completed for target 60911776/parent 60911771
+with 778 present 1228-byte data shreds and the original `is_connected=false`.
+That is not connected recovery, a complete 18283-target acquisition, or a PoH
 boundary set. Its native-close/full retained-census rehash receipt remains the
 input authority for one bounded diagnostic only.
 

@@ -23,7 +23,7 @@ standard full/plugin gate descriptors become parseable. It acknowledges the
 transaction only after those private gates are durable. An interrupted local
 transaction requires explicit recovery, not another attempt over the same stage.
 
-The fixed target is `/home/sol/horizon`, exact owner/group/mode1001/1003/3770.
+The fixed target is `/home/sol/horizon`, exact owner/group/mode 1001/1003/3770.
 No R2 client is called. The full/plugin gates use the original private scan runner
 SHA as script identity; a future uploader must explicitly qualify those exact
 binary/runner hashes and receipt directories, not reuse an unrelated allowlist.
@@ -32,9 +32,9 @@ Both boundary receipts are still required before normal local retirement.
 ## Resource and filesystem gates
 
 The initial profile deliberately retains 4740696923590 bytes of inherited
-protection and adds the complete109177480876-byte copy plus 1 GiB of margin. This
+protection and adds the complete 109177480876-byte copy plus 1 GiB of margin. This
 is **not** a4.74 TB century floor: the bound verified 201 sample is separately
-rehash-validated and its205211459014-byte floor is recomputed. No running guard
+rehash-validated and its 205211459014-byte floor is recomputed. No running guard
 is changed. The initial profile requires at least 4850948146290 bytes available
 in both a fresh coordinated v2 sample and actual admission. Every copy iteration
 requires the remaining copy debt above the same protection. It also checks the
@@ -54,7 +54,7 @@ transition remains necessary if a later accepted sample still fails.
 Plan schema `jetstreamer-exact144-v4-publication-plan-v2` requires a
 `refreshed_capacity` object with schema
 `jetstreamer-exact144-delivery-capacity-refresh-v1` and four hash-bound
-`growth_claims`, ordered152-153,155-156,160,191-194. The original v1 profile
+`growth_claims`, ordered 152-153,155-156,160,191-194. The original v1 profile
 continues unchanged and rejects this additional authority-bearing input.
 
 The refresh is specific to the exact nine active claims and four unchanged
@@ -70,7 +70,7 @@ margin. This covers all nine downstream archive debts, not just four workers.
 Protection is the larger of that complete sum and every unchanged live guard
 threshold. Exact current guard commands, immutable script digests, successful
 actual fires within 180 seconds, zero restarts, hardened settings, live timers,
-controller/producer identities, 800000VMA bounds and absence of trip receipts
+controller/producer identities, 800000 VMA bounds and absence of trip receipts
 are required. The highest guard remains 3984782679494 bytes. The nine-epoch
 fleet census must match the observer and have no other live delivery pipeline;
 an extra/restarted/changed claim requires a new qualification, not a smaller
@@ -126,14 +126,14 @@ ROOT must be an empty root-owned mode 0755 direct child of the private root name
 `epoch144-publication-capability-UNIQUE`. The sealed executable creates only fake
 bytes, a local destination and root-private receipt sinks beneath that root.
 It exercises the real write confinement, denial of an outside write, permanent
-UID1001/GID1003 drop, checksum-last absence-only transaction, retained root
+UID 1001/GID 1003 drop, checksum-last absence-only transaction, retained root
 receipt FD and transaction acknowledgement. It never opens the campaign source
 or public directory. The resulting receipt explicitly denies campaign import,
 registry promotion and R2 authority.
 
 Mode 0755 is required on these fresh non-sensitive work roots because the
 transaction writer lock opens every ancestor with O_RDONLY|O_DIRECTORY, not
-O_PATH. Traverse-only0711 fails after the permanent privilege drop. Do not
+O_PATH. Traverse-only 0711 fails after the permanent privilege drop. Do not
 relax an existing root-private evidence tree; the receipt children stay 0700.
 Set copy permissions while root still owns the new copy, then hand ownership
 to sol. The real publisher and capability probe share that checked helper and

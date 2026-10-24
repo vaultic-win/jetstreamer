@@ -69,7 +69,7 @@ schema `jetstreamer-private-epoch209-singleton-admission-preparation-spec-v1`
 and fields `observer, fleet, capability, native_input, terminal223` (nullable),
 `output_directory, admission_output`. The precreated root-private output
 directory must be `/var/lib/jetstreamer/horizon-209-singleton-admission-specs-*`.
-It selects each of the four protected guards from exact completed PID1 history,
+It selects each of the four protected guards from exact completed PID 1 history,
 without firing a guard, and runs the reviewed protected-growth calculation
 twice using only saved observations/guards and bounded 204/205 output-file
 metadata. It performs no scratch scan, host resource observation, admission or
@@ -85,7 +85,7 @@ is 51791640576 bytes short. Keep this blocked budget explicit until safe reclaim
 or later authoritative evidence establishes headroom; never lower an existing
 guard or substitute imaginary output/reclaim credit.
 
-The historical terminal-from333 fleet contains four owners. It is not current
+The historical terminal-from 333 fleet contains four owners. It is not current
 launch authority after another owner starts. In particular, a live 223v2 repair
 is rejected until its exact registered envelope/guard/memory model is supported
 or its independently validated terminal proof is bound through optional
@@ -125,7 +125,7 @@ After actual start, bind its actual IID in a
 a private root-owned `receipt_directory`. No native, bounded-canary or
 bounded-measurement exception is permitted. Use the sealed guard's
 `--plan-sha256` and `--self-sha256` checks. Require an actual sandboxed no-trip
-first fire, one real worker and exact PID1 successful completion.
+first fire, one real worker and exact PID 1 successful completion.
 
 The guard service/timer names are
 `horizon-singleton209-protective-v1.service/.timer`. Capture requires root
@@ -188,9 +188,9 @@ Rust `deliver-singleton209-output` helper takes the same exact immutable
 Preserve the actual completed node's v2 cohort-publication receipt into a
 root-owned immutable file and bind its digest as `cohort_publication`.
 The helper revalidates the original launch/native/first-guard evidence, exact
-successful terminal producer and PID1 history, original canonical root and
+successful terminal producer and PID 1 history, original canonical root and
 accounts hash, native bootstrap/terminal summaries, durable cohort context,
-committed archive path/inode/digest and complete432000-slot output. It rejects
+committed archive path/inode/digest and complete 432000-slot output. It rejects
 a successor checkpoint, prefix-only artifact, failed/replaced producer or
 unbound native terminal. A capacity probe or launch never substitutes for this
 actual completed cohort receipt.

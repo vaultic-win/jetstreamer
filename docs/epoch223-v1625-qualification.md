@@ -87,7 +87,7 @@ complete conservative 1,536-GiB incremental envelope (scratch plus archive and
 buffers), all older live growth, and the current century floor. Its startup
 minimum of 2,584,751,391,635 bytes is only a rejection baseline: thirteen-sample
 floor 248,289,182,611 + unchanged 225 growth 640 GiB + candidate 1536 GiB. It does
-not account for a still-live203 owner; do not launch before fresh full-fleet
+not account for a still-live 203 owner; do not launch before fresh full-fleet
 admission proves every claim fits. Bind the exact producer to a proven actual
 free-space/VMA guard, protecting older claims. No new launch, guard or automatic
 admission trigger is installed merely by adding this utility. Preserve the
@@ -103,15 +103,15 @@ incident state and labels live work `private-known-root-prefix`, without a
 sidecar countdown or complete-epoch authority. Its same-observation admission
 requires the exact nested scratch path and the real one-worker first-fire guard.
 
-For the first prefix attempt, the original 203producer's clean natural terminal
+For the first prefix attempt, the original 203 producer's clean natural terminal
 and independently reread prefix are preserved in
 `horizon-prefix203-terminal-independent-evidence-v1`. The fleet authenticates
 that exact terminal handoff receipt before accepting release of its old 960 GiB
-remaining-growth claim; this does not qualify 203's suffix or any new 203work.
+remaining-growth claim; this does not qualify 203's suffix or any new 203 work.
 Admission still reserves the unchanged 225640 GiB, the full 2231536 GiB trial and
 the thirteen-sample century floor: 2,584,751,391,635 bytes. The 223 guard protects
 225 plus a64 GiB buffer and that floor: 1,004,203,426,707 bytes. No entry launch
-is granted by registration, capability, cache cleanup or terminal 203evidence
+is granted by registration, capability, cache cleanup or terminal 203 evidence
 alone: require fresh full-fleet/resource admission and a proved invocation guard.
 
 The independent reader has a separate closed prefix profile for
@@ -167,7 +167,7 @@ the complete native-sealed package before and after the real no-worker probe,
 including the unchanged cold snapshot and worker, and validates one exact
 prefix preflight report with every non-authorizing field. It creates a fresh
 private prefix-capability root, preseeds and rehashes genesis in ledger/output,
-drops supplementary groups then GID/UID1000 before executing the parent, and
+drops supplementary groups then GID/UID 1000 before executing the parent, and
 rejects any archive or sidecar in its bounded artifact census. Run only as a
 persistent root oneshot with the minimal DAC_OVERRIDE/CHOWN/SETUID/SETGID
 capabilities, a private network, read-only home/package and exact writable
@@ -239,7 +239,7 @@ Run its capability mode under the same actual sandbox before snapshot mode.
 The supervisor requires private 512-GiB tmpfs with 1,048,576 inodes, 128-GiB
 memory maximum, 112-GiB memory high, no swap, eight-core CPU quota and 512
 tasks. Only its exact root-private receipt directory is host-writable.
-The child drops to UID/GID1000 with no supplementary groups/capabilities,
+The child drops to UID/GID 1000 with no supplementary groups/capabilities,
 has no network, and runs exactly the two ignored load/initialize tests with
 anchor 96,767,522, 128-MiB test stack and two Solana Rayon threads. Its
 prebuilt harness was compiled in the historical workspace with Rust 1.51;

@@ -37,7 +37,7 @@ directory and use the actual service/timer sandbox shown by the templates.
 
 First actual protective completion must occur within 900 seconds of admission.
 Bind its exact receipt (including current PID/IID, root budget, maps and executable
-proof), hash and PID1 success. Before capture the protective timer must be
+proof), hash and PID 1 success. Before capture the protective timer must be
 active/waiting and the oneshot inactive/dead with success/exit0. A planned timer,
 static validation, an older guard invocation or an unsuccessful attempt supplies
 none of that evidence. Protective checks are safety enforcement, not a second
@@ -86,7 +86,7 @@ publication, then publish with the same plan and require authenticated readback
 and durable status receipt. Use the supported verification phase, zero .jet bytes
 and the origin's original start clock. A check-only success is not an upload.
 Initial launch-event metadata must be accepted/published promptly (the initial
-event path allows 300 seconds). Continue through the sole normal30-minute cycle.
+event path allows 300 seconds). Continue through the sole normal 30-minute cycle.
 The observer supporting the exact 228 tuple is
 `/var/lib/jetstreamer/horizon-native228-observer-aceb6514-v1/jetstreamer-horizon-observe`,
 SHA256 `aceb6514c60e1cd61ea2ee4ad5012d6c103ff92e926e1dd4ff199433d0b3f2db`.
@@ -100,14 +100,14 @@ running origin and a separately sealed raw journal at
 Bind the actual current accepted observer/fleet. Output belongs at
 `/var/lib/jetstreamer/horizon-native228-terminal-proof-ATTEMPT/proof.json`.
 Root executes capture-native228-terminal with separately supplied spec and helper
-SHA values. It validates the exact original child PID/IID, canonical98495291/Gfi
-marker, all raw integer fields, successful exact test and PID1 success in order,
-plus loaded inactive/dead zero-restart state. The2700-second execution bound uses
+SHA values. It validates the exact original child PID/IID, canonical 98495291/Gfi
+marker, all raw integer fields, successful exact test and PID 1 success in order,
+plus loaded inactive/dead zero-restart state. The 2700-second execution bound uses
 the original captured start, even when terminal capture happens later.
 
 Register that proved terminal event before using the reviewed inactive-status
 cleanup path. A missing/collected unit is never synthetic terminal success. This
-qualifies native input only: focused replay, the279-slot checkpoint-bearing tail,
-432279-to432000 extraction, independent full/plugin checks and publication remain
+qualifies native input only: focused replay, the 279-slot checkpoint-bearing tail,
+432279-to 432000 extraction, independent full/plugin checks and publication remain
 separate later gates. Retain the actual tail source and never fabricate a terminal
 Bank manifest at 98927999.

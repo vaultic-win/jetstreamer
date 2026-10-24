@@ -1,6 +1,6 @@
 # Epoch 191–194 post-replay status audit
 
-This audit uses the accepted2026-10-23 21:56 sample and immutable deployed
+This audit uses the accepted 2026-10-23 21:56 sample and immutable deployed
 source/receipts only. It makes no new resource/replay observation, launch,
 runtime change, R2 mutation or archive-readiness claim. The 22:26 refresh is
 outside this source task and remains the parent's responsibility.
@@ -29,7 +29,7 @@ The original producer and clock were preserved when that controller changed.
 
 At 21:56 the producer was at 84205000, with terminal 84239999 and a qualified
 2.822306096289095 slots/second rate:34999 slots remain. The accepted model
-adds a common 12,401,000 ms replay projection to12/24/36/48hour downstream
+adds a common 12,401,000 ms replay projection to 12/24/36/48 hour downstream
 allowances, yielding 55,601,000 /98,801,000 /142,001,000 /185,201,000ms for
 191/192/193/194. These are the *existing accepted planning estimates*, not a
 new sample or measured downstream stage durations. All four objects were
@@ -66,13 +66,13 @@ The manifest fingerprint is
 
 ## Current support stops at replay
 
-`routine_cohort191.rs` qualifies only the193-terminal-to194-terminal replay
+`routine_cohort191.rs` qualifies only the 193-terminal-to 194-terminal replay
 model change. Ordinary routine validation and v5 estimation still require a
 live, stable zero-restart producer/worker and a qualified replay rate. Worker
 exit, finalization or producer collection cannot be repaired by retaining an
 old rate or relabeling the old ordinary status.
 
-There is **no currently tested/pinned191 post-replay status route**:
+There is **no currently tested/pinned 191 post-replay status route**:
 
 - `cohort_finalization::{scope,handoff_scope}` has exact 216–219,160 and 198
   profiles, not 191–194.
@@ -167,7 +167,7 @@ For each epoch, after shared close/import work, verification availability is
 any truly required boundary gate. Sync starts at the later of verification
 availability and preceding committed whole sync, then adds upload, independent
 readback and final revalidation/sidecar work. This is a critical-path estimate,
-not mechanical countdown of the old12/24/36/48hour allowance. Active stages use
+not mechanical countdown of the old 12/24/36/48 hour allowance. Active stages use
 fresh measured remaining work; queued budgets are explicitly provisional
 planning policy and must be revised for dispatch or contention changes.
 
@@ -246,7 +246,7 @@ all four source/public archive-digest and checkpoint semantics, current requeste
 public archive identities/checksums, public transaction-marker absence, and the
 current root controller's exact completion attestation. It rechecks state and
 controller before returning. It grants no launch, publication, R2 mutation or
-retirement authority and requires no imagined live verifier before PID1 launches
+retirement authority and requires no imagined live verifier before PID 1 launches
 one. Its returned receipt binds the actual source/public paths and digests.
 
 The independent runner profile is
@@ -297,7 +297,7 @@ released until the parent authenticates the completed-cohort transition.
 The import controller is allowed to return naturally once `all_complete()` has
 rehash-verified the public cohort. Both custody capture and dispatch admission
 now accept its exact retained inactive/dead exit 0 lifecycle, requiring the same
-CID/command, zero restarts, no job/cgroup, real manager start, one trusted PID1
+CID/command, zero restarts, no job/cgroup, real manager start, one trusted PID 1
 successful-deactivation event, and the exact original controller's native
 `all sealed cohorts 191-194 are public` message before that event. Pending import
 still requires a live original controller. This does not fabricate an active
@@ -305,7 +305,7 @@ controller claim after import.
 
 Before systemd clears or collects terminal fields, the new exact Rust command
 `capture-controller-terminal-191 --self-sha256 SHA` can preserve the actual retained
-manager properties and those native/PID1 events no-clobber at
+manager properties and those native/PID 1 events no-clobber at
 `/var/lib/jetstreamer/horizon-cohort191-controller-terminal-20261023-v1/terminal.json`.
 It also binds the root controller state digest and qualified deployed reader.
 A later collected or terminal-fields-cleared state requires that real prior

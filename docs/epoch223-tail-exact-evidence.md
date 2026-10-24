@@ -1,7 +1,7 @@
 # Exact historical native 25 input for epoch 223
 
 `jetstreamer-epoch223-tail-exact-evidence` captures metadata from the already
-successful isolated477-slot tail at 96767523..96767999. It does not restore a
+successful isolated 477-slot tail at 96767523..96767999. It does not restore a
 Bank, replay entries, observe current producers, scan an archive, contact R2,
 promote a runtime, qualify a handoff or close the 223 repair.
 
@@ -28,13 +28,13 @@ its SHA256, and the executable SHA256. Compilation does not create evidence;
 root owns the actual capture and later operational use.
 
 The receipt checks a unique initialized marker, bootstrap checkpoint, terminal
-checkpoint and PID1 clean-success event for invocation
+checkpoint and PID 1 clean-success event for invocation
 `20dc145d1e8c41fdbc682046b6fe4289`, producer PID 3452507 and exact tail unit. It
 requires ordered line numbers and realtime clocks, the initialized slot/hash,
 ticks_per_slot64 and initialized cursor 107266983592. All checkpoint numbers are
 parsed directly as u64, never float or JavaScript numbers. Bootstrap writes 0,
 slot-complete status, the full consensus tuple and both cursors must match the
-sealed segment. The independent reread binds the477-slot span, archive digest,
+sealed segment. The independent reread binds the 477-slot span, archive digest,
 worker, native 25 revision and normalized manifest digest. Fork metadata binds
 the exact 96767522 snapshot and all four required fork markers with count 1;
 metadata alone remains no Bank-restore or replay qualification.

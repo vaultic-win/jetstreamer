@@ -132,7 +132,7 @@ uses schema `jetstreamer-epoch136-capped-root-launch-capture-spec-v2` with bound
 `sample-INVOCATION.json` below the distinct guard receipt directory; its identical
 bytes are pinned no-clobber to the private root's `receipts/first-guard.json`.
 The command verifies the exact live process command, complete sandbox, actual
-PID1 start timestamp, admission freshness, zero restarts, timer provenance,
+PID 1 start timestamp, admission freshness, zero restarts, timer provenance,
 worker census and root/reserve/VMA protection, then rechecks identity before
 writing `receipts/launch.json`. It never creates or starts a replay.
 

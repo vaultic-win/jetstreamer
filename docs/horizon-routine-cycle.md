@@ -8,7 +8,7 @@ same allowance, clamp the countdown to zero or call an archive-only object ready
 The qualified revision binds the exact original uploader invocation and child,
 the actual 17:59:31 readback event, four stable child-owned TCP socket inodes and
 receive counters from the same normal metadata cycle. It estimates outstanding
-bytes at the observed since-readback average after deducting1MiB/socket and a
+bytes at the observed since-readback average after deducting1 MiB/socket and a
 10 percent transport margin, plus the independently calibrated local whole-file
 rehash and 10 minute sidecar allowance. Omitted closed sockets bias this estimate
 later. These counters are approximate transport evidence, never authenticated
@@ -70,7 +70,7 @@ The reader pins the new candidate, exact unit, source/census, v2 immutable plan
 and admission manifest, inherited protected reserve and unchanged hard sandbox.
 Only this first-target profile uses its reviewed 1 GiB admission allowance and
 256 MiB native-output guard; neither full-census profile changes. Native success
-is raw diagnostic acquisition, not complete18,283-target recovery or PoH/root
+is raw diagnostic acquisition, not complete 18,283-target recovery or PoH/root
 qualification. Epoch 141 remains failed-needs-repair with no public ETA.
 
 The distinct `native141-acquisition-assembly144-scans-…` namespace avoids pending
@@ -100,7 +100,7 @@ owner; seal and sandbox-preflight the adopted successor before arming it. Reader
 source support, unit tests and an offline successor do not authorize a launch.
 
 `--prepare-next-native141-all-retry SPEC --handoff-sha256 HEX` adopts only the
-correctedv 2attempt under strict schema
+corrected v2 attempt under strict schema
 `jetstreamer-native141-all-retry-monitor-handoff-v1`. It requires an accepted
 original all-target profile, the exact retained failedv 1 guard and actual
 zero-restart failed parent invocation. The new real initial guard binds distinct
@@ -275,7 +275,7 @@ verified sandboxed first fires. No replay was restarted.
 
 `--prepare-package-recovery` is a separately pinned one-time recovery from the
 genuine accepted 14:08 cycle to 15:08. It accepts only the exact immutable recovery
-and first-fire receipts. It records the real3600-second predecessor gap rather
+and first-fire receipts. It records the real 3600-second predecessor gap rather
 than fabricating a missed sample, and replaces only the six old controller IDs
 with those in the sealed incident. Every producer ID, original elapsed clock,
 formula, queued slot, allowance, archive path and predecessor hash is retained.
@@ -283,7 +283,7 @@ The same transition isolates the already-private144 observer as described below.
 It performs no service/resource/R2 observations, stops, launches or mutations.
 
 The resulting cycle has an explicit `package_controller_recovery` binding.
-Only its exact 15:08 target and 14:08 predecessor permit the3600-second gap; all
+Only its exact 15:08 target and 14:08 predecessor permit the 3600-second gap; all
 ordinary cycles still require 1800 seconds. The live observer independently
 requires stable exact new owners and the original producers, and the estimator
 derives original producer elapsed time from systemd, never controller start.
@@ -331,7 +331,7 @@ The independent full fleet census retains the actual diagnostic identity and
 open repair. Diagnostic failure cannot suppress healthy production samples;
 ordinary replay failures still fail closed. Successors preserve this mode.
 Seal, test and preflight both actual observer and cycle packages before arming
-the next normal1800-second sample. No resource polling, replay restart,
+the next normal 1800-second sample. No resource polling, replay restart,
 publication or cleanup authority is granted by this migration.
 
 `jetstreamer-horizon-routine-cycle` consumes one already-completed, pinned v2
@@ -397,7 +397,7 @@ SHA-256 are allowlisted; no other epoch, runtime or deployment is accepted.
 The original predecessor model and estimate bindings remain intact. The derived
 model moves the 115,823 queued slots into the successor terminal, leaving zero
 additional slots, the same invocation identities, authoritative producer-start
-clock and43,200-second downstream allowance. No remaining replay is discarded.
+clock and 43,200-second downstream allowance. No remaining replay is discarded.
 Only a clean global-slot rate window and one stable worker across the physical
 scans can consume the transition. A window crossing the known boundary includes
 handoff latency; transaction/update counter resets do not change its slot rate.
@@ -454,7 +454,7 @@ remaining replay statuses. It then seals and produces a private provisional
 full-range fleet receipt inside the cycle directory, authenticating the actual
 live 198 finalization claim. A separately sealed pipeline plan binds this fleet,
 the original producer clock, exact complete archive length and true archive-close
-time plus the already-qualified43,200second downstream budget. The executor runs
+time plus the already-qualified43,200 second downstream budget. The executor runs
 pipeline check-only before conditional status publication and authenticated
 readback. It finally produces the normal authoritative fleet receipt, which now
 sees the fresh pipeline status. These are two read-only inventories in one

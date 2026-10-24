@@ -87,7 +87,7 @@ an ETA nor qualifies a downstream uploader.
 The revised routine source uses the already-generated coordinated provisional
 fleet from the same control cycle; it does not take another resource sample or
 inventory loop for 144. A live publisher gets phase `publication`, the retained
-complete109177480876-byte original as the measured current archive, and the
+complete 109177480876-byte original as the measured current archive, and the
 calibrated4979863-millisecond total deadline anchored to its unique root manager
 start event. The model and publication receipt are independently bound and
 authenticated. A pre-launch sample, overdue deadline, changed owner, invalid

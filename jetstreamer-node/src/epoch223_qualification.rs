@@ -444,7 +444,7 @@ pub(crate) fn validate_launch(
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch223-v1-6-25-qualification requires private focused epoch 223, exact cold-to-known-root prefix or cold/tail-to96767999 span; no ordinary replay, cohorts, recovery, inherited leases or publication".into());
+        return Err("epoch223-v1-6-25-qualification requires private focused epoch 223, exact cold-to-known-root prefix or cold or tail start through slot 96767999; no ordinary replay, cohorts, recovery, inherited leases or publication".into());
     }
     let (ledger, output, scratch) =
         paths.ok_or("epoch 223 qualification requires explicit private paths")?;

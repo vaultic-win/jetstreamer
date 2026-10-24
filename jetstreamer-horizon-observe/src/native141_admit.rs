@@ -33,7 +33,7 @@ const ALL_RETRY_NATIVE_SHA: &str =
     "153a0d1302369f7ff1272d8b62ca9e777d4d1e3bd5a172e5edec5fe3ad28c295";
 const FLOOR: u64 = 4_740_696_923_590;
 const RESERVATION: u64 = 32 << 30;
-// First-target output is capped at 192 MiB; native logging rolls at4MiB/two logs.
+// First-target output is capped at 192 MiB; native logging rolls at 4 MiB/two logs.
 // One GiB includes slack, without reducing the protected reserve or old profiles.
 const ACQUISITION_RESERVATION: u64 = 1 << 30;
 const MEMORY: u64 = 144 << 30;

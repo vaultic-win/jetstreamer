@@ -116,7 +116,7 @@ loads the exact hash-bound immutable cold snapshot through this native worker,
 restores the independently audited hard-fork markers, freezes at the bootstrap,
 and checks its canonical accounts commitment, unchanged write cursor and zero
 bootstrap writes. It prints the native tuple with integer formatting. Run it
-only in a separately admitted, sealed128-GiB sandbox with an owner-only fresh
+only in a separately admitted, sealed 128-GiB sandbox with an owner-only fresh
 `native-input223-v1620-*/scratch` directory supplied through
 `JETSTREAMER_EPOCH223_V1620_TEST_SCRATCH`. The separately built
 `epoch223-v1620-native-input` observer supervisor may instead pass the literal
@@ -130,7 +130,7 @@ not native input qualification. The exact test executable, source/input hashes,
 terminal journal and result still need durable evidence before an entry replay.
 
 The separate `jetstreamer-epoch223-v1620-warmup-resource` binary pins the
-v1.6.20 parent and first16-entry worker, its own plan/result/stop namespaces and
+v1.6.20 parent and first 16-entry worker, its own plan/result/stop namespaces and
 the `qualification-223-v1620-prefix-warmup-*` scratch prefix. Both warmup
 binaries share storage guards and entry-bounded command construction; each
 retains independent runtime, revision, executable hashes and worker override
@@ -138,7 +138,7 @@ checks in the actual planning preflight. The v1.6.20 warmup cannot qualify the
 known root or borrow v1.6.25 evidence. Its compilation and unit tests do not
 replace fresh coordinated admission and invocation-bound VMA protection.
 
-The first16-entry v1.6.20 diagnostic also requires the hash-bound cooperative
+The first 16-entry v1.6.20 diagnostic also requires the hash-bound cooperative
 parent stop. Only the exact sealed narrow worker enables this stop; the full
 prefix worker does not. The parent splits its transport batch after 96,335,554,
 without adding that slot to the canonical checkpoint set. After SourceExact
@@ -155,7 +155,7 @@ full native 20 prefix using the exact long worker and both canonical roots. Its
 other owners' growth; it does not inherit the older 25 worker's shrink-debt
 reservation. A planning-only `--storage-capability` requires the actual parent
 pre-worker barrier. The independent prefix rereader binds the native 20 private
-namespace to that full worker and revision and rejects the first16-slot worker
+namespace to that full worker and revision and rejects the first 16-slot worker
 and native 25 substitutions. Neither profile can claim restart, suffix,
 assembly, full-epoch verification or publication. Keep the full prefix dormant
 until the bounded warmup and fresh full-fleet admission/guards pass.
@@ -163,7 +163,7 @@ until the bounded warmup and fresh full-fleet admission/guards pass.
 ## Native 20 bounded warmup registration and dashboard lifecycle
 
 The sealed `horizon-223-v1620-warmup-envelope480-v1` package pins the
-cooperative parent and first16-entry worker. It reserves a 300-GB scratch
+cooperative parent and first 16-entry worker. It reserves a 300-GB scratch
 increment, starts only above 2.3-TB free disk and 608-GiB MemAvailable, and stops
 its own group below the protected 2-TB/480-GiB floors. The actual systemd owner
 requires 128-GiB maximum/112-GiB high memory, zero swap, no restart and the exact
@@ -187,7 +187,7 @@ Immediately reconcile that captured launch into the existing accepted resource
 sample, then publish one generic pipeline status model through
 `status-publish-pipeline`. Its wire phase is `verification`, its claim phase is
 `private-warmup-reproduction`, its origin is the immutable native 20 launch, and
-its elapsed clock is the actual PID1 invocation start. Measure the exact
+its elapsed clock is the actual PID 1 invocation start. Measure the exact
 `output/epoch-223.jet`: absent means zero bytes; an actual empty or partially
 written regular file is measured as such. Do not fabricate a zero-entry native
 test receipt. Include evidence and a positive current best estimate through
@@ -195,7 +195,7 @@ prefix, suffix/restart, assembly, full/plugin verification, upload and readback
 to the canonical sidecar.
 
 Guard admission and native 20 capture select the latest completed oneshot from
-its PID1 manager history. A guard's current `InvocationID` may name a newly
+its PID 1 manager history. A guard's current `InvocationID` may name a newly
 started invocation whose `sample-IID.json` is not written yet, or may already
 be cleared. Require the exact start, printed receipt, successful deactivation
 and completed job events for the selected invocation, with matching unit,
@@ -204,7 +204,7 @@ Bind PID 1's full finished-job command to the immutable executable hash and
 current exact `ExecStart`; any available kernel `_EXE`/`_CMDLINE` must agree.
 Those optional kernel fields can disappear when a short guard exits before
 journald reads `/proc`. Keep the default `systemd-run` command description for
-this guard so PID1 preserves its full command. Preserve that history in
+this guard so PID 1 preserves its full command. Preserve that history in
 admission/launch evidence.
 An incomplete newer invocation does not hide the latest completed success; a
 later failure or protective stop prevents fallback to an older success. The
@@ -246,7 +246,7 @@ The metadata event keeps the accepted observer sample and all existing owner
 claims. Only epoch 223's next action/evidence may advance; its repair gate stays
 `failed-needs-repair`. The inactive adapter authenticates that event and the
 original status owner even if systemd cleared its IID, rejects live/restarted/
-replacement owners, and rechecks latest PID1 history for a later invocation.
+replacement owners, and rechecks latest PID 1 history for a later invocation.
 Ordinary conditional status deletion, authenticated absence, repair-backlog and
 no-active-handoff checks remain mandatory. Terminal metadata never counts as
 archive or sidecar completion.
@@ -292,7 +292,7 @@ readback and canonical sidecar gates remain independent.
 Unit and preflight checks are preparation. Actual native cold-input proof,
 fresh full-fleet admission, invocation-bound memory/free-space/VMA protection,
 the bounded warmup comparison and eventual canonical-prefix completion remain
-outstanding until their respective invocations succeed. A16-slot result is not
+outstanding until their respective invocations succeed. A 16-slot result is not
 a measured full-prefix peak or an epoch archive.
 
 ## Cooperative native 20 v2 retry preparation
@@ -319,9 +319,9 @@ state. The accepted census must contain exactly the three unchanged old owners
 and registered full 227 invocation `a10f37b57711425a81633c62c66438d5`.
 Admission validates its original launch, current command/caps and a freshly
 completed protective guard, then reserves its full remaining hard-memory
-headroom and its entire471,798,691,840-byte disk envelope without scratch credit.
+headroom and its entire 471,798,691,840-byte disk envelope without scratch credit.
 The existing reviewed old-three growth calculation and current century floor
-are added independently. If that exceeds the sealed2-TB protected floor or the
+are added independently. If that exceeds the sealed 2-TB protected floor or the
 sampled expanded memory envelope, admission fails; raise/requalify the generation
 instead of hiding a peer or reducing a healthy guard. Root owns the fresh
 observation/admission and any actual dispatch.
@@ -332,7 +332,7 @@ V2 uses `horizon-warmup223-native20-admission-v2`,
 `horizon-warmup223-native20-protective-v2.service`/`.timer` namespaces.
 The guard plan requires the actual new IID and must be sealed after start; keep
 the default full-command systemd-run description. Status lookup selects the
-jet root by exact approved unit, and PID1 Started-clock support is constrained
+jet root by exact approved unit, and PID 1 Started-clock support is constrained
 to the two native 20 owners. V2 terminal capture uses
 `jetstreamer-warmup223-native20-terminal-spec-v2` and preserves the previous
 failed 13a5 terminal proof alongside its own exact journal/output. V1 launch,

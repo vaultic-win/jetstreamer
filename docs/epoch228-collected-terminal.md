@@ -10,14 +10,14 @@ and sealed canonical journal SHA256
 `5894b7b9c0e612f8e10d984fe22a8d4087b3cca522d076f2d7ecd3b690325710`
 are eligible. Existing terminal verification still independently checks the real
 98495291/Gfi marker, all raw consensus integers, the exact test success, original
-PID/IID, PID1 success, immutable input bindings and2700-second execution bound.
+PID/IID, PID 1 success, immutable input bindings and 2700-second execution bound.
 
 Capture additionally requires a fresh accepted observer/fleet containing exactly
-this registered 228 pipeline claim, no other staged/live228 owner and the existing
+this registered 228 pipeline claim, no other staged/live 228 owner and the existing
 blocked-qualification gate. It brackets the complete producer census, preserves
 all other owners (including full 209), checks the original cgroup is absent, reads
 the complete discovered service/job tables, and validates fresh original-unit
-PID1/child history from before the original start. Missing starts, later starts,
+PID 1/child history from before the original start. Missing starts, later starts,
 foreign IIDs/PIDs, queued 228 work, loaded replacement units, any retained cgroup,
 or a changing census fail closed. No additional replay/resource sample is made.
 

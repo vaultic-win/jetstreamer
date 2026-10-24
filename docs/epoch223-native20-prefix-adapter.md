@@ -4,7 +4,7 @@ This adapter covers only the already sealed `d18fd429` supervisor, actual plan
 `c293ceb8`, and unit
 `horizon-qualify-223-v1620-root-prefix-resource-full-v1.service`. Its private root
 is `/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1`.
-It retains the431,523-slot prefix and477-slot uncovered suffix. The production
+It retains the 431,523-slot prefix and 477-slot uncovered suffix. The production
 runner, worker, parent, input snapshots and previously armed jobs are unchanged.
 
 The actual no-worker capability succeeded. Its root-owned immutable copy is
@@ -18,7 +18,7 @@ The separate guard is sealed at
 SHA256 `044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f`.
 Its opt-in feature admits only the exact full-prefix unit, whole private root,
 471,798,691,840-byte root envelope, 3.5M VMA bound, and floor at least 2 TB.
-It rejects the capability owner and scratch-only300-GB substitution, native-main,
+It rejects the capability owner and scratch-only 300-GB substitution, native-main,
 bounded-stop and measurement exemptions. Existing sealed guards remain intact.
 
 ## Admission and capture
@@ -33,24 +33,24 @@ The complete accepted census may contain only the exact unchanged 204,205,225
 and full 227 invocations, plus the already authenticated full 209 and native 228
 profiles. It refuses another active 223, an unknown owner, a restarted/replaced
 old owner, missing observations or guards, and observed owners omitted from the
-fleet. It selects each current completed protective fire through PID1 history,
+fleet. It selects each current completed protective fire through PID 1 history,
 requires the corresponding timer active, and preserves every existing guard's
 floor. No derived arithmetic subcensus is published as an accepted fleet.
 
 The optional 228 adapter reuses its native origin, exact live sandbox and guard
-contracts, reserves remaining hard memory, and credits none of its300-GB scratch
+contracts, reserves remaining hard memory, and credits none of its 300-GB scratch
 cap. Reviewed existing 228 admission helpers account for the four old owners and
 an optional full 209, including its exact whole-root allocation and raw-systemd
 versus kernel-page-rounded memory gates. All input owners survive both live
 censuses. Fresh free disk and memory bracket the repeated growth calculations.
 
 The actual plan is fixed:225-GB memory max,150-GB high, swap 0, two Rayon threads,
-CPU800%,480-GiB available-memory reserve,471.7987-GB whole-root envelope,2-TB
-protected floor and2.4718-TB initial free disk. Admission also enforces the 90%
+CPU 800%,480-GiB available-memory reserve,471.7987-GB whole-root envelope,2-TB
+protected floor and 2.4718-TB initial free disk. Admission also enforces the 90%
 host target, 1.5x century RSS policy and existing pressure limits. If the sum of
 century floor plus protected growth or any unchanged guard floor exceeds 2 TB,
 this generation is refused. It does not lower a healthy guard, alter the sealed
-plan or reuse an old observer after its30-minute validity expires.
+plan or reuse an old observer after its 30-minute validity expires.
 
 `plan-prefix223-native20 SPEC --spec-sha256 SHA --self-sha256 SHA` is a separate
 read-only admission-control entrypoint. Its sealed spec uses schema
@@ -69,7 +69,7 @@ poll, replace the accepted fleet sample, or change the routine polling cadence.
 The report gives the minimum proposed protected floor, initial free-space
 requirement, and actual and sample-inclusive disk/memory shortfalls. It takes
 the larger of both growth brackets, preserves every inherited guard floor and
-the original2-TB baseline, and retains the whole candidate envelope. Capacity
+the original 2-TB baseline, and retains the whole candidate envelope. Capacity
 failures are reported as numbers; identity, freshness, pressure and evidence
 failures still refuse planning. Reporting above 2 TB never changes the actual
 admission command's sealed 2 TB refusal.
@@ -119,7 +119,7 @@ sample for its launch event.
 
 `status-publish-prefix223-native20 PLAN --plan-sha256 SHA --self-sha256 SHA`
 uses schema `jetstreamer-native223-prefix-status-plan-v1`. It supports an exact
-`launch-event` followed by normal `observation` models on the shared30-minute
+`launch-event` followed by normal `observation` models on the shared 30-minute
 cadence. It authenticates the real registered diagnostic and original monotonic
 start, measures only its direct private `output/epoch-223.jet`, and publishes
 legal `verification`/`replay` phases through the reviewed authenticated publisher.

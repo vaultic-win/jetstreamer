@@ -53,7 +53,7 @@ status-publish-full227 MODEL --plan-sha256 SHA --self-sha256 SHA [--check-only]
 ```
 
 The initial event is at the actual launch capture clock, requires a registered
-full 227 diagnostic and its exact first real protective guard/PID1 completion,
+full 227 diagnostic and its exact first real protective guard/PID 1 completion,
 and reads the invocation journal once at that cutoff. The adapter emits
 `verification` while initializing and `replay` once real progress markers prove
 slot execution; a reached replay terminal returns to `verification` for the
@@ -63,7 +63,7 @@ An explicit user-requested observation uses the same path. Upload/readback
 handoffs use the existing separately qualified delivery publisher when their
 actual downstream owner takes over.
 
-Elapsed time derives from the real PID1 monotonic start, checked against the
+Elapsed time derives from the real PID 1 monotonic start, checked against the
 captured launch. During replay, bytes come from this producer's private
 `archives/epoch-227.jet` before cohort import. The reader derives the exact
 destination namespace from the canonical output path, selects only the run
@@ -77,7 +77,7 @@ the measured path, source and cohort-state digest.
 Observed slots between the pinned bootstrap and epoch 227 remain `verification`.
 They retain the full epoch estimate and provisional rate until epoch recording
 begins; a fast pre-epoch warmup does not shorten the estimate for 432000 slots.
-ETA includes the complete432000-slot
+ETA includes the complete 432000-slot
 epoch, its suffix and every declared downstream stage through verified sidecar
 commit. A sufficient measured rate replaces the provisional rate. If transaction
 or account counters reset, retain their raw reset count and accept a slot rate

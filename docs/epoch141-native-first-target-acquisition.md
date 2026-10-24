@@ -5,14 +5,14 @@ distinct native plan schema is
 `jetstreamer-epoch141-ledger-native-first-target-acquisition-plan-v1`; its unit
 must use the separate `horizon-epoch141-native-full-census-acquisition-` namespace.
 It requires the complete existing 18,283-target finalized census but acquires
-only its first exact target, slot60911776/parent60911771. Neither one-target
+only its first exact target, slot 60911776/parent 60911771. Neither one-target
 acquisition nor the older eleven-target proof is full recovery.
 
 The pinned complete SlotMeta decoder retains `is_connected=false`. A separate
 raw-acquisition planner requests target and parent `meta`, `root`, `dead_slots`
 and `orphans` keys, followed by every target `data_shred` index. Slot and shred
 keys follow the independently hashed 893cc764 `blockstore_db.rs` layout. The
-observed last index 777 requires 778data shreds and786second-batch queries. The
+observed last index 777 requires 778 data shreds and 786 second-batch queries. The
 strict recovery planner and connected SlotMeta assembler remain unchanged and
 continue to reject the disconnected target.
 

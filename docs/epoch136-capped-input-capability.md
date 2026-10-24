@@ -2,14 +2,14 @@
 
 The original 136–139 cohort stopped at epoch 136 slot 59,183,097, entry 197,
 transaction 113: canonical `ProgramFailedToComplete` versus the deployed worker's
-`ComputationalBudgetExceeded`. Preserve its99,718,944,924-byte partial archive.
+`ComputationalBudgetExceeded`. Preserve its 99,718,944,924-byte partial archive.
 Its old `abe395…` worker lacks the corrected builtin table, as did the old 141
 worker. That provenance is a lead, not proof that corrected 136 execution passes.
 
 The sealed host package
 `/usr/local/lib/jetstreamer/horizon-epoch136-capped-inputs-20261023-v1` binds the
 corrected parent, capped v1.4.25 worker `fce05d55…`, genesis, original failure,
-source manifest, checkpoint names and retained bootstrap. The1,930,905,776-byte
+source manifest, checkpoint names and retained bootstrap. The 1,930,905,776-byte
 bootstrap at 58,751,483 has SHA-256
 `0d78ac8daa69790f984ccfaddb01b6a497eb05cc7222533b94b4353dd8abc767`.
 Its MD5 matches the original manifest's generation 1634786431177741.

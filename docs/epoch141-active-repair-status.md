@@ -23,7 +23,7 @@ a canonical checksum or verifier receipt.
 The exact sealed native owner is
 `/usr/local/lib/jetstreamer/horizon-epoch141-repair-status-tools-20261024-v1/jetstreamer-r2`
 and its exact unit is `horizon-repair-141-floor-20261024-v1.service`.
-Use `Type=simple` for this owner. Its clock validator accepts the trusted PID1
+Use `Type=simple` for this owner. Its clock validator accepts the trusted PID 1
 `Started` event; `Type=exec` emits both `Starting` and `Started`, which this
 profile rejects as an ambiguous start. Preserve a rejected attempt's native
 journal and prove launch/state receipts absent before explicitly reconciling it.
@@ -39,7 +39,7 @@ root-only `task-admissions` subdirectory. Existing launch/state prohibits retry.
 
 Launch requires one accepted coordinated v2 observer/fleet/completion, no more
 than 1800s old, authenticated no-anomaly inventory and all sample/digest links.
-Actual OS free space must preserve228833779142B baseline, the existing 256 MiB
+Actual OS free space must preserve 228833779142B baseline, the existing 256 MiB
 bootstrap claim and a separate 64 MiB queue claim. Existing protected resident and
 reservation ceilings cannot be lowered. Total and currently available memory must
 fit the separate 2 GiB queue bound. Independently launch with CPUQuota 100%,
@@ -57,7 +57,7 @@ admitted and launched through each reviewed task's exact sandbox and resource
 budget. The queue does not launch or admit them.
 
 `repair-task-capture-141 PLAN --plan-sha256 SHA --self-sha256 SHA` captures an
-already-running task from PID1 and `/proc`, rechecks owner and task identity, then
+already-running task from PID 1 and `/proc`, rechecks owner and task identity, then
 writes its immutable intake. Capture plan schema
 `jetstreamer-epoch141-repair-task-capture-plan-v2` requires `epoch:141`, `task_id`,
 `owner_capture`, `queue_plan`, `work_plan`, `program`, `unit`, `expected_exec_start`,
@@ -84,7 +84,7 @@ A first planning example uses 24h engineering, 48h capacity in explicitly review
 parallel, 6h bootstrap and 12h checkpoint close/export/restore. All are planning
 assumptions, not measured bounds. Export/restore is not yet mainnet qualified;
 build, API and segment/parent qualification remain real engineering obligations.
-The initial254-slot candidate does not establish continuation or restore capability.
+The initial 254-slot candidate does not establish continuation or restore capability.
 
 At historical 1694 slots /1749194714 microseconds (0.9684456433 slots/s), this
 example gives root replay 430601349 ms, suffix 15730362 ms, and total 813531711 ms
@@ -108,7 +108,7 @@ while each publisher plan binds its current assessment without restarting the ow
 Refresh once within the normal coordinated30-minute observation, with no extra
 resource sampling loop. Require fresh same-sample fleet, the exact live repair owner,
 no alternate replay/downstream handoff, and an open failed-needs-repair entry.
-Elapsed time uses the new queue's actual PID1 manager-start event, never the old
+Elapsed time uses the new queue's actual PID 1 manager-start event, never the old
 stopped replay or latest poll. Report zero current jet bytes during repair; retained
 failed-attempt size remains only in private estimate evidence.
 
@@ -127,8 +127,8 @@ The reviewed routine coordinator adds
 `--prepare-next-repair141 HANDOFF --handoff-sha256 SHA` using its normal
 prepare-next argument shape. The immutable handoff schema is
 `jetstreamer-epoch141-repair-routine-handoff-v2`, with `publisher` bound to the
-same newly sealed native r2 program, `active_repair:{queue_plan,owner_capture,
-planning_policy,invocation_id}`, and explicit false `replay_launch_authorized`,
+same newly sealed native r2 program, `active_repair:{queue_plan, owner_capture,
+planning_policy, invocation_id}`, and explicit false `replay_launch_authorized`,
 `publication_authorized`, `r2_mutations`. This requires an actual queue capture;
 there are no future or fabricated IIDs. It preserves the existing historical
 original 141 profile and diagnostic input, leaves ordinary replay publisher pins

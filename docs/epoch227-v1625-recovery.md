@@ -55,7 +55,7 @@ independently reproduce the successful canonical vote at 98091122 and the
 parent 98091121 Bank hash above. The profiles print actual freeze diagnostics
 for 98091119–98091122. This local match does not authorize full replay or publication.
 Full qualification must also reproduce root 98495291 and canonical accounts hash
-`GfiRSgpC1qvH3uxVd9VAtYZ6qKM8fcdkyoyAkhF7izLq`, retain the708-slot tail,
+`GfiRSgpC1qvH3uxVd9VAtYZ6qKM8fcdkyoyAkhF7izLq`, retain the 708-slot tail,
 and pass all complete-archive/current-plugin/boundary gates.
 
 Any actual replay requires new exact parent/worker/capability/native-proof,

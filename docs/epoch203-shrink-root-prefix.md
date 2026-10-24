@@ -32,7 +32,7 @@ natural successful parent completion and validates the complete producer manifes
 for 431,581 output slots, the exact worker, and canonical terminal accounts hash.
 It preserves independent checkpoint, manifest and resource evidence and denies
 ordinary replay, complete-epoch qualification, publication, sidecars and R2
-mutations. No419-slot suffix is authorized merely because this prefix completes.
+mutations. No 419-slot suffix is authorized merely because this prefix completes.
 
 Before launch: seal the package and exact plan, capability-probe the actual parent
 and worker, obtain a fresh complete routine observer/fleet admission, and bind and
@@ -52,7 +52,7 @@ files are mandatory. It does not scan or qualify the archive itself.
 The dispatch plan binds a fresh routine observer and complete fleet, including
 the unchanged 225 owner, thirteen canonical size samples, and optional exact
 cold 223 snapshot verifier. It reserves the complete 128 GiB cold-test cap plus
-8 GiB reader/4GiB dispatcher above the 448 GiB host reserve, and protects 225's
+8 GiB reader/4 GiB dispatcher above the 448 GiB host reserve, and protects 225's
 640 GiB remaining growth plus the century floor on disk. Live producer, stale
 observation, changed ownership or any failed gate stops the handoff; it never
 restarts or stops a producer, edits guards, retires scratch or touches R2.
@@ -66,7 +66,7 @@ reader launch and that the watcher stops; afterward rearm only with a separately
 sealed fresh plan, preserving the failed probe journal.
 
 The distinct v2 dispatcher also accepts the observer's exact zero-worker
-diagnostic for this 203producer during its post-worker segment reread, but only
+diagnostic for this 203 producer during its post-worker segment reread, but only
 after independently reproving current clean natural terminal state and the
 exact manager success event. It does not turn that unavailable worker sample
 into replay progress, a valid ETA or terminal proof. Complete fleet bindings,

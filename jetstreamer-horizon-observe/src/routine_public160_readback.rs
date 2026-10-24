@@ -204,7 +204,7 @@ pub(super) fn estimate(sample: u64, calibration: &Value) -> Result<(u64, Value)>
         "local_revalidation_millis":hash,"dispatch_margin_millis":600000,"estimated_remaining_millis":eta,
         "estimated_remaining_at_measurement_millis":at_measurement,"sample_to_measurement_millis":sample_age,
         "superseded_historical_total_millis":total,"verified_readback_progress_proven":false,"archive_completion_proven":false,
-        "method":"Current exact child four-socket TCP receive counters minus1MiB/socket and10percent transport margin; estimate outstanding bytes at measured since-readback average. Add calibrated whole-file source hash and10minutes sidecar margin. No deadline reset or integrity gate bypass.",
+        "method":"Current exact child four-socket TCP receive counters minus 1 MiB/socket and 10 percent transport margin; estimate outstanding bytes at measured since-readback average. Add calibrated whole-file source hash and 10 minutes sidecar margin. No deadline reset or integrity gate bypass.",
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     ))
 }

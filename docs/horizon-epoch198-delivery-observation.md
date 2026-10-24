@@ -11,7 +11,7 @@ zero restarts, immutable node digest and immutable preflight report. Four unique
 original-user journal events must precede the coordinated observation and be
 strictly ordered: trusted root checkpoint 85,967,282 with its manifest accounts
 hash, complete terminal checkpoint 85,967,999, snapshot-verification completion,
-and complete432,000-slot singleton archive close. Numeric fields are parsed as
+and complete 432,000-slot singleton archive close. Numeric fields are parsed as
 checked u64 integers. These events are observational evidence, never independent
 full/plugin verification or a ready-pair receipt.
 
@@ -34,7 +34,7 @@ claim. Preserve all terminal and failed states in the full-range repair ledger.
 
 Keep the current replay and its existing observer/timers unchanged during this
 preparation. A later deployment must consume genuine terminal events, not the
-synthetic unit-test fixtures, and must retain the normal30-minute resource
+synthetic unit-test fixtures, and must retain the normal 30-minute resource
 cadence. A mixed or failed sample is not authority for an early retry.
 
 ## Event evidence capture
@@ -94,9 +94,9 @@ plan or vice versa. Check-only validates the exact active controller, immutable
 parent/manifest/controller script and sealed controller-recovery receipt. It
 reads no terminal events and claims no actual handoff.
 
-Actual observation accepts only controller02c5ac25/PID2939002 and the complete
+Actual observation accepts only controller02c5ac25/PID 2939002 and the complete
 deployed argv digest, script 62592209 and state configuration 0929b892. The original
-e5612ef0producer must remain loaded with authoritative clean terminal success,
+e5612ef0 producer must remain loaded with authoritative clean terminal success,
 exit 0, zero restarts and no process. A collected/missing unit is not clean
 terminal proof for this profile. The state must retain exactly lane-a/198/attempt1
 and the original producer PID/start identity, phase `producer` or `staged`, no

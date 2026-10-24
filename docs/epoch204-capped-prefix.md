@@ -9,7 +9,7 @@ and 4aeca563… v1.6.16 capped-shrink worker. Its two checkpoint names cover onl
 
 The 300 GB decimal scratch limit is the user's current century allowance. Fresh
 admission must also protect existing invocation-bound growth, current scans and
-the century archive-size floor. The72-hour bound, exact known-root manifest and
+the century archive-size floor. The 72-hour bound, exact known-root manifest and
 natural zero-exit completion are mandatory. A progress marker cannot qualify
 the prefix. No checksum, import, R2 mutation or runtime promotion is authorized.
 
@@ -35,5 +35,5 @@ or handoff requires reconciliation before this exact admission can be reused.
 
 `capture-prefix204` separately verifies the actual new invocation, exact command,
 live sandbox, 300 GB own-root/VMA guard and the first real protective timer fire's
-PID1 success. Fleet registration is observational and grants no new replay or
+PID 1 success. Fleet registration is observational and grants no new replay or
 publication authority. Neither command can borrow 205's capability or receipts.

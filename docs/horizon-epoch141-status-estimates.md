@@ -1,7 +1,7 @@
 # Epoch 141 operational status
 
 The separate `jetstreamer-qualification141-status-plan-v2` route in
-`status-publish-qualification` covers only the exact capped original-entry141
+`status-publish-qualification` covers only the exact capped original-entry 141
 invocation `e639f007d482464f8a251455659d2ede`. It uses the observed `141` row,
 actual `output/private.jet` size and real manager start. Its wire phase is
 `replay`; private qualification and every publication gate remain unchanged.
@@ -84,10 +84,10 @@ deployment, terminal event handling, R2 mutation and the next routine plan.
    `jetstreamer-capped141-terminal-capture-plan-v2`, `launch` (exact original
    launch path/SHA), and an absent `output` beneath the root-owned private
    `receipts` directory. It validates the exact native launch/command, zero
-   restarts, disabled restart policy, PID 0 and a matching latest trusted PID1
+   restarts, disabled restart policy, PID 0 and a matching latest trusted PID 1
    manager start/terminal lifecycle twice before fsyncing no-clobber evidence.
    A collected transient unit requires the exact authenticated launch and latest
-   trusted PID1 terminal lifecycle; disappearance alone cannot pass. Loaded
+   trusted PID 1 terminal lifecycle; disappearance alone cannot pass. Loaded
    terminal units additionally require their retained native command and disabled
    restart policy. A missing rate, unavailable observer or timeout of a metadata
    command cannot pass. Captured process failure from an actual manager timeout
