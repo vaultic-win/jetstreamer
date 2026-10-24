@@ -3,7 +3,7 @@
 use super::*;
 use std::os::fd::AsRawFd;
 
-const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-node02-original191-growth-transfer-20261024-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-node02-original191-growth-transfer-20261024-v2/jetstreamer-r2";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-original191-growth-transfer-20261024-v1";
 const FLEETS: &str = "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1";
 const AUTHORITY: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-full-admission-20261023-v2/admission-manifest.json";
@@ -482,12 +482,17 @@ fn fresh(p: &Plan) -> Result<Value> {
     let old_controller = routes(CONTROLLER)?;
     let members = BTreeSet::from([191, 192, 193, 194]);
     let import = dispatch_import_check(&p.source_batch, &p.public_batch, &members)?;
-    let source = batch(&p.source_batch, false, &members)?;
+    // Native import relocated each committed source archive into the public
+    // destination. Authenticate the original inode there; do not require a
+    // second copy at the historical source path or a stale run directory.
+    let source = batch(&p.source_batch, false, &BTreeSet::new())?;
+    let public = batch(&p.public_batch, true, &members)?;
+    let relocation = relocated_archives(&source, &public)?;
     let mut retained_layout = Vec::new();
     for path in [
-        PathBuf::from(RUN),
-        Path::new(RUN).join("scratch"),
-        Path::new(RUN).join("inputs"),
+        PathBuf::from(LANE),
+        Path::new(LANE).join("private"),
+        Path::new(LANE).join("config"),
         Path::new(LANE).join("output"),
         PathBuf::from(IMPORT_ROOT),
         PathBuf::from("/home/sol/horizon"),
@@ -617,13 +622,49 @@ fn fresh(p: &Plan) -> Result<Value> {
     Ok(
         json!({"fleet":p.fleet,"census":p.census,"event":p.delivery_event,"stable_live_owners":stable,
         "original_producer_routes":old_producer,"original_controller_routes":old_controller,
-        "terminal":terminal,"import":import,"source_members":source["outcome"]["members"],
-        "retained_top_level_layout":retained_layout,"retention_scope":"committed source/public archive identity and top-level scratch/input presence, not whole-tree rehash",
+        "terminal":terminal,"import":import,"source_members":source["outcome"]["members"],"archive_relocation_lineage":relocation,
+        "retained_top_level_layout":retained_layout,"retention_scope":"original archive inodes authenticated at current public destination; all existing lane/private/output/config and import namespaces retained read-only; no historical run existence or whole-tree rehash claimed",
         "private_reference_census":private_refs,
         "delivery_policy":p.delivery_policy,"delivery_budget":budget,"rows_before":rows,"rows_after":projected,
         "original191_disposition_bytes":delta,"data_metadata_allowance_bytes":policy["data_metadata_allowance_bytes"],
         "retained_physical_bytes_credited":0,"new_resource_samples":0}),
     )
+}
+fn relocated_archives(source: &Value, public: &Value) -> Result<Vec<Value>> {
+    let before = source["outcome"]["members"]
+        .as_array()
+        .context("191 original committed members")?;
+    let after = public["outcome"]["members"]
+        .as_array()
+        .context("191 public committed members")?;
+    ensure!(
+        before.len() == 4 && after.len() == 4,
+        "191 relocation lost a cohort member"
+    );
+    let mut lineage = Vec::new();
+    for ((old, current), epoch) in before.iter().zip(after).zip(191..=194) {
+        ensure!(
+            old["epoch"] == epoch
+                && current["epoch"] == epoch
+                && old["archive_sha256"] == current["archive_sha256"]
+                && [
+                    "device",
+                    "inode",
+                    "length",
+                    "modified_seconds",
+                    "modified_nanoseconds"
+                ]
+                .iter()
+                .all(|key| old["committed_archive"][*key].is_number()
+                    && old["committed_archive"][*key] == current["committed_archive"][*key]),
+            "191 import did not retain the original archive inode/content identity"
+        );
+        lineage.push(json!({"epoch":epoch,"source_historical_path_base64":old["archive_path_base64"],
+            "current_public_path_base64":current["archive_path_base64"],"original_archive_identity":old["committed_archive"],
+            "public_archive_identity":current["committed_archive"],"archive_sha256":old["archive_sha256"],
+            "same_retained_archive_inode":true,"duplicate_private_copy_required":false,"physical_free_space_credit_bytes":0}));
+    }
+    Ok(lineage)
 }
 fn descriptor(p: &Plan) -> Value {
     json!({"subject":subject(),"original_reservation":p.original_reservation,"terminal":p.terminal,
@@ -720,6 +761,7 @@ fn same_frontier(a: &Value, b: &Value) -> bool {
         "terminal",
         "import",
         "source_members",
+        "archive_relocation_lineage",
         "retained_top_level_layout",
         "delivery_policy",
         "delivery_budget",
@@ -1104,6 +1146,37 @@ mod tests {
         }
         terminal["Id"] = json!(UNIT);
         assert!(routes_shape(&terminal, UNIT).is_err());
+    }
+    #[test]
+    fn relocated_source_archives_keep_the_original_inode_without_a_duplicate_copy() {
+        let rows: Vec<_> = (191..=194).map(|epoch|json!({"epoch":epoch,"archive_path_base64":"historical-path",
+            "archive_sha256":"a".repeat(64),"committed_archive":{"device":10,"inode":epoch,"length":100,
+            "modified_seconds":20,"modified_nanoseconds":30,"changed_seconds":40}})).collect();
+        let source = json!({"outcome":{"members":rows}});
+        let mut public = source.clone();
+        for row in public["outcome"]["members"].as_array_mut().unwrap() {
+            row["archive_path_base64"] = json!("current-public-path");
+            row["committed_archive"]["changed_seconds"] = json!(99);
+        }
+        let proof = relocated_archives(&source, &public).unwrap();
+        assert_eq!(proof.len(), 4);
+        for key in [
+            "inode",
+            "length",
+            "device",
+            "modified_seconds",
+            "modified_nanoseconds",
+        ] {
+            let mut bad = public.clone();
+            bad["outcome"]["members"][0]["committed_archive"][key] = json!(999);
+            assert!(relocated_archives(&source, &bad).is_err());
+        }
+        let mut changed = public.clone();
+        changed["outcome"]["members"][0]["archive_sha256"] = json!("b".repeat(64));
+        assert!(relocated_archives(&source, &changed).is_err());
+        changed = public;
+        changed["outcome"]["members"].as_array_mut().unwrap().pop();
+        assert!(relocated_archives(&source, &changed).is_err());
     }
     fn policy() -> Value {
         json!({"schema":"jetstreamer-original191-readonly-delivery-policy-v2","host":"dev-samjohnson",
