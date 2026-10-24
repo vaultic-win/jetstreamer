@@ -10,16 +10,16 @@ mod assembly144_admission;
 mod assembly144_prepare;
 mod bounded205;
 mod canary227;
-mod canary227_allocation;
-mod capped204205_admission;
-mod canary227_peer;
-mod canary227_capability;
 mod canary227_admission;
-mod output_credit204205;
+mod canary227_allocation;
+mod canary227_capability;
 mod canary227_capture;
 mod canary227_event;
-mod canary227_terminal;
+mod canary227_peer;
 mod canary227_status;
+mod canary227_terminal;
+mod capped204205_admission;
+mod capped204205_work;
 mod census141_poh;
 mod cold223_scan;
 mod continuation144;
@@ -54,8 +54,8 @@ mod native210_capture;
 mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
-mod native227_v1625;
 mod native227_terminal_observation;
+mod native227_v1625;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
 mod native227_v1625_event;
@@ -73,6 +73,7 @@ mod original141_capped;
 mod original141_freeze;
 mod original141_trace;
 mod original141_vote_prefix;
+mod output_credit204205;
 mod ownroot203_rebase;
 mod prefix144;
 mod prefix204;
@@ -167,8 +168,14 @@ pub(super) fn warmup223_terminal_status_identity(proof: &Value) -> Result<(Strin
 pub(super) fn warmup223_terminal_not_replaced(proof: &Value) -> Result<()> {
     warmup223::terminal_not_replaced(proof)
 }
-pub(super) async fn publish_canary227_status()->Result<()> {canary227_status::run().await}
-pub(super) fn canary227_status_inactive_owner(receipt:&StatusPublicationReceipt)->Result<Option<(String,String)>> {canary227_status::inactive_owner(receipt)}
+pub(super) async fn publish_canary227_status() -> Result<()> {
+    canary227_status::run().await
+}
+pub(super) fn canary227_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    canary227_status::inactive_owner(receipt)
+}
 pub(super) async fn publish_full227_status() -> Result<()> {
     full227_status::run().await
 }
@@ -329,14 +336,47 @@ pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(Strin
 }
 /// A derived accounting view only; raw observer/fleet bindings stay immutable.
 pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<Value> {
-    native227_terminal_observation::view(f,o)
+    native227_terminal_observation::view(f, o)
 }
-pub(super) fn capture_canary227_v1625_terminal()->Result<()> {canary227_terminal::capture()}
-pub(super) fn canary227_terminal_status_identity(proof:&Value)->Result<(String,String,u64)> {Ok((canary227::UNIT.into(),canary227_terminal::validate(proof)?,proof["main_pid"].as_u64().context("227 canary terminal PID")?))}
-pub(super) fn admit_canary227_v1625() -> Result<()> { canary227_admission::run() }
-pub(super) fn admit_capped204205_continuation() -> Result<()> { capped204205_admission::run() }
-pub(super) fn admit_canary227_v1625_output_metadata() -> Result<()> { canary227_admission::run_output_metadata() }
-pub(super) fn capture_canary227_v1625() -> Result<()> { canary227_capture::run() }
+pub(super) fn capture_canary227_v1625_terminal() -> Result<()> {
+    canary227_terminal::capture()
+}
+pub(super) fn canary227_terminal_status_identity(proof: &Value) -> Result<(String, String, u64)> {
+    Ok((
+        canary227::UNIT.into(),
+        canary227_terminal::validate(proof)?,
+        proof["main_pid"]
+            .as_u64()
+            .context("227 canary terminal PID")?,
+    ))
+}
+pub(super) fn admit_canary227_v1625() -> Result<()> {
+    canary227_admission::run()
+}
+pub(super) fn admit_capped204205_continuation() -> Result<()> {
+    capped204205_admission::run()
+}
+pub(super) fn capture_capped204205_work() -> Result<()> {
+    capped204205_work::capture()
+}
+pub(super) fn prepare_capped204205_work() -> Result<()> {
+    capped204205_work::prepare()
+}
+pub(super) async fn publish_capped204205_status() -> Result<()> {
+    capped204205_work::publish().await
+}
+pub(super) fn capped204205_binding_scope(epoch: u64, unit: &str, phase: &str) -> Result<()> {
+    capped204205_work::binding_scope(epoch, unit, phase)
+}
+pub(super) fn capped204205_origin_scope(epoch: u64, unit: &str) -> Result<()> {
+    capped204205_work::origin_scope(epoch, unit)
+}
+pub(super) fn admit_canary227_v1625_output_metadata() -> Result<()> {
+    canary227_admission::run_output_metadata()
+}
+pub(super) fn capture_canary227_v1625() -> Result<()> {
+    canary227_capture::run()
+}
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
 }
@@ -974,6 +1014,10 @@ struct Plan {
     metadata_event: Option<BoundFile>,
     #[serde(default)]
     continuation203_runtime_extension: Option<BoundFile>,
+    #[serde(default)]
+    capped204205_work: Vec<capped204205_work::Claim>,
+    #[serde(default)]
+    capped204205_history: Vec<Value>,
 }
 
 fn validate_same_sample_admission(
@@ -1454,7 +1498,10 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
     let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
     let canary_227 = receipt["schema"] == canary227::SCHEMA;
-    ensure!(!canary227::namespace(claim) || canary_227, "227 canary namespace requires its exact launch schema");
+    ensure!(
+        !canary227::namespace(claim) || canary_227,
+        "227 canary namespace requires its exact launch schema"
+    );
     let tail_223 = receipt["schema"] == tail223::SCHEMA;
     let prefix_223 = receipt["schema"] == prefix223::SCHEMA;
     let prefix_223_native20 = receipt["schema"] == prefix223_native20::SCHEMA;
@@ -2522,7 +2569,16 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == warmup223::TERMINAL_SCHEMA
+            if event["schema"] == capped204205_work::EVENT_SCHEMA {
+                capped204205_work::event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == warmup223::TERMINAL_SCHEMA
                 || event["schema"] == warmup223::TERMINAL_SCHEMA_V2
             {
                 warmup223::terminal_predecessor(&previous, &plan, &event, sample, started_seconds)?;
@@ -2575,9 +2631,15 @@ pub(super) async fn run() -> Result<()> {
                     started_seconds,
                 )?;
             } else if event["schema"] == canary227_terminal::SCHEMA {
-                canary227_terminal::predecessor(&previous,&plan,&event,sample,started_seconds)?;
+                canary227_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == canary227::SCHEMA {
-                canary227_event::event_predecessor(&previous, &plan, &event, sample, started_seconds)?;
+                canary227_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == native227_v1625::SCHEMA {
                 native227_v1625_event::event_predecessor(
                     &previous,
@@ -2688,6 +2750,9 @@ pub(super) async fn run() -> Result<()> {
         }
     }
     let mut diagnostic_units = BTreeSet::new();
+    for claim in &plan.capped204205_work {
+        names.extend(capped204205_work::names(claim)?);
+    }
     for claim in &plan.diagnostics {
         if epoch136::namespace(claim) {
             ensure!(
@@ -2818,14 +2883,26 @@ pub(super) async fn run() -> Result<()> {
     native209_terminal::census_check(&plan, &before)?;
     native210_terminal::census_check(&plan, &before)?;
     native227_v1625_terminal::census_check(&plan, &before)?;
-    canary227_terminal::census_check(&plan,&before)?;
+    canary227_terminal::census_check(&plan, &before)?;
     native228_terminal::census_check(&plan, &before)?;
     if let Some(binding) = &plan.metadata_event
-        && bound_json(binding)?["schema"] == canary227::SCHEMA {
-        let previous=bound_json(plan.previous_fleet.as_ref().context("227 canary prior fleet missing")?)?;
-        let claims=plan.diagnostics.iter().filter(|c|canary227::namespace(c) && &c.launch_receipt==binding).collect::<Vec<_>>();
-        ensure!(claims.len()==1,"227 canary event requires one exact new diagnostic");
-        canary227_event::event_census(&previous,&before,claims[0])?;
+        && bound_json(binding)?["schema"] == canary227::SCHEMA
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("227 canary prior fleet missing")?,
+        )?;
+        let claims = plan
+            .diagnostics
+            .iter()
+            .filter(|c| canary227::namespace(c) && &c.launch_receipt == binding)
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "227 canary event requires one exact new diagnostic"
+        );
+        canary227_event::event_census(&previous, &before, claims[0])?;
     }
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native209::SCHEMA
@@ -3241,7 +3318,10 @@ pub(super) async fn run() -> Result<()> {
             }
             if canary227::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
-                ensure!(canary227::same_command(&current["ExecStart"], &launch["expected_exec_start"]), "227 canary live command changed");
+                ensure!(
+                    canary227::same_command(&current["ExecStart"], &launch["expected_exec_start"]),
+                    "227 canary live command changed"
+                );
             }
             if bounded205::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
@@ -3353,6 +3433,25 @@ pub(super) async fn run() -> Result<()> {
             "launch_invocation_id":claim.invocation_id,"launch_receipt":claim.launch_receipt.path,
             "launch_receipt_sha256":claim.launch_receipt.sha256,
             "terminal_outcome_requires_canary_receipt":!is_active}));
+    }
+    let capped_work =
+        capped204205_work::rows(&plan.capped204205_work, &observer, &before, started_seconds)?;
+    for row in &capped_work {
+        if row["live"] == true {
+            let epoch = row["epoch"].as_u64().context("capped row epoch missing")?;
+            ensure!(
+                !live_diagnostic_epochs.contains(&epoch)
+                    && !pipelines
+                        .iter()
+                        .any(|v| v["epoch"] == epoch && v["live"] == true)
+                    && !replays.iter().any(|r| r["range"]
+                        .as_str()
+                        .and_then(|s| parse_observer_claim_range(s).ok())
+                        .is_some_and(|r| r.contains(&epoch))),
+                "capped work overlaps another live epoch owner"
+            );
+            active.push(row.clone());
+        }
     }
     let mut remote_entries = Vec::new();
     let requested_epochs = (plan.first_epoch..=plan.last_epoch).collect::<Vec<_>>();
@@ -3485,6 +3584,7 @@ pub(super) async fn run() -> Result<()> {
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
+                        || capped204205_work::status_matches(receipt, epoch, &capped_work)
                 });
             // Missing local publication history is explicitly unbound, never current.
             let matches = publication.as_ref().is_ok_and(|(receipt, _, _)| {
@@ -3510,7 +3610,10 @@ pub(super) async fn run() -> Result<()> {
             });
             let production_matches = production_status_binding_matches(matches, state)
                 || (matches && private_qualification_binding);
-            json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && status.sampled_at_utc == sample})
+            let capped_current = publication
+                .as_ref()
+                .is_ok_and(|(r, _, _)| capped204205_work::status_matches(r, epoch, &capped_work));
+            json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && (status.sampled_at_utc == sample || capped_current)})
         } else {
             Value::Null
         };
@@ -3539,6 +3642,8 @@ pub(super) async fn run() -> Result<()> {
     let changes = transitions(&previous_fleet, &after, &entries);
     let receipt = json!({"schema":SCHEMA,"first_epoch":plan.first_epoch,"last_epoch":plan.last_epoch,"sampled_at_utc":sample,"observer_receipt":plan.observer.path,"observer_sha256":plan.observer.sha256,"previous_fleet":plan.previous_fleet.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"plan":plan_bound.path,"plan_sha256":plan_bound.sha256,"admission_transition_guard":plan.admission_transition_guard.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"inventory":inventory,"unit_census":after,"active":active,"diagnostics":diagnostics,"transitions":changes,"epochs":entries,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"remote_mutations":false,"producer_mutations":false,"publication_authorized":false});
     let mut receipt = receipt;
+    receipt["capped204205_work"] = json!(capped_work);
+    receipt["capped204205_history"] = json!(plan.capped204205_history);
     if let Some(event) = &plan.metadata_event {
         let proof = bound_json(event)?;
         receipt["metadata_event"] = json!({"path":event.path,"sha256":event.sha256});

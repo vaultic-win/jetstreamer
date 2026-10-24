@@ -3631,6 +3631,15 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-capped204205-continuation") {
         return fleet::admit_capped204205_continuation();
     }
+    if env::args().nth(1).as_deref() == Some("capture-capped204205-work") {
+        return fleet::capture_capped204205_work();
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-capped204205-fleet-status") {
+        return fleet::prepare_capped204205_work();
+    }
+    if env::args().nth(1).as_deref() == Some("publish-capped204205-status") {
+        return fleet::publish_capped204205_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("admit-canary227-v1625-output-metadata-v1") {
         return fleet::admit_canary227_v1625_output_metadata();
     }

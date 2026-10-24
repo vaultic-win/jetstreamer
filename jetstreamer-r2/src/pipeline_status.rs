@@ -92,6 +92,23 @@ fn same_unit_census(expected: &Value, current: &Value) -> bool {
 
 impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
+        if self.claim_phase == "capped204205-continuation" {
+            fleet::capped204205_binding_scope(epoch, &self.unit, phase)?;
+            fleet::capped204205_origin_scope(epoch, &self.origin_unit)?;
+            ensure!(
+                unit_name(&self.unit)
+                    && unit_name(&self.origin_unit)
+                    && hex_id(&self.invocation_id, 32)
+                    && hex_id(&self.origin_invocation_id, 32)
+                    && !self.expected_exec_start.trim().is_empty()
+                    && self.model_path.is_absolute()
+                    && self.fleet_path.is_absolute()
+                    && hex_id(&self.model_sha256, 64)
+                    && hex_id(&self.fleet_sha256, 64),
+                "invalid exact capped continuation status binding"
+            );
+            return Ok(());
+        }
         match (self.claim_phase.as_str(), phase) {
             ("full-verification" | "plugin-verification", "verification")
             | ("epoch141-active-repair", "verification")
