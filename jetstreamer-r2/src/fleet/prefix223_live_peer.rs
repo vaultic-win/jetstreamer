@@ -559,7 +559,7 @@ mod tests {
             "ControlGroup",
         ] {
             let mut changed = props.clone();
-            changed.insert(key.into(), "0".into());
+            changed.insert(key.into(), "changed".into());
             assert!(protected_caps(&row, &launch, &changed).is_err(), "{key}");
             changed.remove(key);
             assert!(
