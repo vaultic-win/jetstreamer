@@ -49,6 +49,10 @@ epoch225-v1-6-25-diagnostic = []
 epoch225-v1-6-25-qualification = []
 
 [[bin]]
+name = "jetstreamer-capped204205-native-input"
+path = "src/bin/jetstreamer-capped204205-native-input.rs"
+
+[[bin]]
 name = "jetstreamer-epoch203-native-restore-probe"
 path = "src/bin/jetstreamer-epoch203-native-restore-probe.rs"
 required-features = ["epoch203-native-restore-diagnostic"]

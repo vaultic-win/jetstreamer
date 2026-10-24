@@ -210,3 +210,78 @@ with these current producer identities and is not silently repurposed.
 
 The source reader integration and future operational path remain unsealed;
 there is no claim that these two prefixes are ready for publication.
+
+## Closed native-input and V4 adapters
+
+The isolated `epoch204205-native-completion` source adds the metadata-only
+`jetstreamer-capped204205-native-input` CLI and the
+`jetstreamer_node::capped_prefix204205` library. Existing 203 continuation,
+older 205 restore-only preparation, workers, readers and producers are unchanged.
+
+The CLI accepts a separately hash-bound root-owned immutable plan and its own
+executable SHA-256. Its explicit `--check-only` mode validates only the static
+plan, without reading primary evidence, inspecting a snapshot or writing output.
+Normal preparation requires the exact original launch path and raw launch hash
+above, original runner natural-success result, captured terminal properties,
+preserved PID1 manager history, full typed prefix manifest and actual independent
+reader receipt. Every small evidence input is individually hash bound and
+immutable; no prefix archive body is opened. The reader must bind the complete
+typed manifest's semantic digest, original archive path/hash/size, candidate
+runtime and prefix coverage. A rewritten tuple cannot borrow an old archive SHA
+or the incompatible older 205 reader/preparation.
+
+Both loaded clean-terminal and genuinely collected-unit property shapes are
+supported, with exact original PID/IID/command and original PID1 start/success
+history as applicable. Manager stop, failure or replacement history fails closed.
+The original runner must report natural child exit zero, no external signal,
+the exact typed manifest and raw manifest digest, and no independently qualified
+or publication authority. A normalized target-stop benchmark cannot satisfy it.
+
+The tool rehashes the fixed worker and genesis, and inspects the exact cached
+snapshot's canonical readonly root-owned file metadata and compressed size. It
+does **not** reread the 8-GB snapshot body: the future actual native worker must
+still hash and bind the complete snapshot immediately before initialization.
+It writes only an owner-read-only, no-clobber, idempotent private
+`native-input-policy.json` below
+`/var/lib/jetstreamer/horizon-capped-native-input-EPOCH-UNIQUE/`. Plan/source
+inputs may not overlap that output namespace. Prepared metadata explicitly
+denies current source-idleness proof, fresh resource admission, native
+initialization, suffix execution, assembly, sidecar, publication and R2 authority.
+
+`InputPolicy::native_barrier` is the actual-worker adapter: call it with the
+executing worker's initialize/freeze result before sending any entry. It checks
+the exact capped worker, legacy accounts-hash kind, slot, Bank/accounts/last-block
+hashes, capitalization, transaction count, tick height and complete-slot state.
+Bootstrap writes must be zero, ticks per slot 64, and the actual raw cursor must
+equal the worker's initialized cursor. It deliberately does not force the native
+cursor to equal the prefix cursor. There is no deserializer that converts an
+older restore-only JSON result into this barrier token.
+
+`NativeBarrier::provenance` builds only the exact same-worker 204/205 V4 scopes,
+with the real 638/949 slots, original prefix generation and independently
+recorded suffix generation. It binds the exact snapshot handoff, full native
+tuple and raw initialized cursor, preserves both raw write intervals, and uses
+checked normalization arithmetic. It rejects foreign workers/runtimes, a
+different bootstrap cursor, omitted slots and overflow. `assemble` supplies
+the actual handles, authenticated source digests and observed terminal block
+hashes to the existing `merge_checkpoint_restart_segments` algorithm, which
+independently verifies source bytes, dense coverage, PoH, source metadata and
+raw writes. The caller supplies an already admitted guarded sink and the actual
+source metadata policy; a different metadata policy cannot pass the merger.
+No source file is opened, appended, replaced or retired by this adapter.
+
+The persistent suffix controller and its exact actual-worker pre-entry hook
+remain a separate source integration gate. It must reauthenticate these inputs,
+prove complete current process/cgroup/reference closure, admit and protect all
+restore/suffix/assembly overlap, fully rehash the snapshot, and invoke the native
+barrier before any replay entry. Known-root reader completion or prepared input
+metadata does not authorize that run. Final boundary/full/current-plugin,
+exact V4 import/publication and authenticated R2/sidecar gates remain unchanged.
+
+Initial targeted qualification passed all nine library adapter cases, including
+in-memory real-width V4 merges for both complete 432000-slot epochs, full native
+tuple rejection, independent cursors above JavaScript's exact-integer range and
+normalization overflow. The initial two CLI scope/argument tests passed. Final
+CLI fixture lifecycle tests, the full library suite, strict Clippy and a review
+binary build are pending the shared Cargo lease after agent 227. No live source
+read, host poll, Bank run, service action or R2 mutation occurred.
