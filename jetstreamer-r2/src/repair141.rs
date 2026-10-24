@@ -810,6 +810,30 @@ fn no_replacement(f: &Value, owner: &Value) -> Result<()> {
     }
     Ok(())
 }
+fn prior_owned(old: &StatusPublicationReceipt, binding: &pipeline_status::Binding) -> bool {
+    old.epoch == 141
+        && old.status.epoch == 141
+        && (old.pipeline_binding.as_ref().is_some_and(|b| {
+            (scope(&b.claim_phase, &b.unit) && b.invocation_id == binding.invocation_id)
+                || (b.unit == OLD
+                    && b.invocation_id == OLD_IID
+                    && b.origin_unit == OLD
+                    && b.origin_invocation_id == OLD_IID)
+        }) || old.pipeline_binding.is_none()
+            && old.controller_invocation_id == OLD_IID
+            && old.producer_invocation_id == OLD_IID)
+}
+fn same_publication(
+    existing: &StatusPublicationReceipt,
+    expected: &StatusPublicationReceipt,
+) -> bool {
+    // A prior authenticated receipt's capture clock and previous ETag remain
+    // historical; an idempotent retry must preserve those original bytes.
+    let mut normalized = expected.clone();
+    normalized.verified_unix_seconds = existing.verified_unix_seconds;
+    normalized.previous_object_etag = existing.previous_object_etag.clone();
+    existing == &normalized
+}
 pub(super) async fn publish() -> Result<()> {
     let a: Vec<_> = env::args().collect();
     ensure!(
@@ -929,35 +953,37 @@ pub(super) async fn publish() -> Result<()> {
     let r2 = r2_config_from_env()?;
     let s3 = s3_client(&r2);
     let before = get_mutable_object(&s3, &r2.bucket, "epoch-141.epoch-status.json").await?;
+    let pending = if p.estimate_receipt.try_exists()? {
+        let (_, old) = current(&p.estimate_receipt)?;
+        ensure!(old == estimate, "141 same-sample durable estimate changed");
+        true
+    } else {
+        false
+    };
     if let Some(object) = &before {
-        let previous = p
-            .previous_publication
-            .as_ref()
-            .context("141 existing status requires exact authenticated prior ownership")?;
-        let value = read(previous, false)?;
-        let bytes = serde_json::to_vec(&value)?;
-        let old = validate_status_publication_receipt_bytes(
-            previous.path.parent().context("141 prior receipt parent")?,
-            &previous.path,
-            &bytes,
-            &r2.bucket,
-            141,
-        )?;
-        let old_owned = old.pipeline_binding.as_ref().is_some_and(|b| {
-            (scope(&b.claim_phase, &b.unit) && b.invocation_id == binding.invocation_id)
-                || (b.unit == OLD
-                    && b.invocation_id == OLD_IID
-                    && b.origin_unit == OLD
-                    && b.origin_invocation_id == OLD_IID)
-        }) || old.pipeline_binding.is_none()
-            && old.controller_invocation_id == OLD_IID
-            && old.producer_invocation_id == OLD_IID;
-        ensure!(
-            old_owned
-                && old.object_etag == object.etag
-                && serde_json::from_slice::<EpochStatus>(&object.bytes)? == old.status,
-            "141 current R2 status belongs to another or newer owner"
-        );
+        // Only a durable estimate written before PUT permits recovery when
+        // publication/readback succeeded but the local status receipt failed.
+        let recovering = pending && object.bytes == epoch_status_bytes(&status)?;
+        if !recovering {
+            let previous = p
+                .previous_publication
+                .as_ref()
+                .context("141 existing status requires exact authenticated prior ownership")?;
+            let value = read(previous, false)?;
+            let old = validate_status_publication_receipt_bytes(
+                previous.path.parent().context("141 prior receipt parent")?,
+                &previous.path,
+                &serde_json::to_vec(&value)?,
+                &r2.bucket,
+                141,
+            )?;
+            ensure!(
+                prior_owned(&old, &binding)
+                    && old.object_etag == object.etag
+                    && serde_json::from_slice::<EpochStatus>(&object.bytes)? == old.status,
+                "141 current R2 status belongs to another or newer owner"
+            );
+        }
     }
     ensure!(
         inventory_epoch(&s3, &r2, 141).await?.state != InventoryState::ReadyPair,
@@ -996,7 +1022,23 @@ pub(super) async fn publish() -> Result<()> {
         verified_unix_seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         pipeline_binding: Some(binding),
     };
-    write_status_receipt(&p.receipt_directory, &receipt)?;
+    let final_path = status_receipt_path(&p.receipt_directory, &receipt.status);
+    if final_path.try_exists()? {
+        let (_, value) = current(&final_path)?;
+        let existing = validate_status_publication_receipt_bytes(
+            &p.receipt_directory,
+            &final_path,
+            &serde_json::to_vec(&value)?,
+            &receipt.bucket,
+            141,
+        )?;
+        ensure!(
+            same_publication(&existing, &receipt),
+            "141 existing same-sample publication belongs to another model/owner"
+        );
+    } else {
+        write_status_receipt(&p.receipt_directory, &receipt)?;
+    }
     let (_, _, after) = owner_evidence(
         &capture,
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
@@ -1010,4 +1052,65 @@ pub(super) async fn publish() -> Result<()> {
         status_receipt_path(&p.receipt_directory, &receipt.status).display()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn binding() -> pipeline_status::Binding {
+        pipeline_status::Binding {
+            unit: UNIT.into(),
+            invocation_id: "a".repeat(32),
+            expected_exec_start: "actual-command".into(),
+            claim_phase: PHASE.into(),
+            origin_unit: UNIT.into(),
+            origin_invocation_id: "a".repeat(32),
+            model_path: "/model".into(),
+            model_sha256: "b".repeat(64),
+            fleet_path: "/fleet".into(),
+            fleet_sha256: "c".repeat(64),
+        }
+    }
+    #[test]
+    fn repair_wire_binding_is_exact_epoch_phase_and_actual_new_owner() {
+        let mut b = binding();
+        assert!(b.validate(141, "verification").is_ok());
+        assert!(b.validate(142, "verification").is_err());
+        assert!(b.validate(141, "replay").is_err());
+        b.origin_invocation_id = OLD_IID.into();
+        assert!(b.validate(141, "verification").is_err());
+    }
+    #[test]
+    fn prior_publication_handoff_cannot_borrow_another_epoch_or_replacement_owner() {
+        let mut r = crate::tests::status_publication_receipt(141);
+        r.controller_invocation_id = OLD_IID.into();
+        r.producer_invocation_id = OLD_IID.into();
+        let b = binding();
+        assert!(prior_owned(&r, &b));
+        r.epoch = 142;
+        assert!(!prior_owned(&r, &b));
+        r.epoch = 141;
+        r.pipeline_binding = Some(b.clone());
+        assert!(prior_owned(&r, &b));
+        r.pipeline_binding.as_mut().unwrap().invocation_id = "d".repeat(32);
+        assert!(!prior_owned(&r, &b));
+    }
+    #[test]
+    fn receipt_retry_preserves_old_capture_clock_but_rejects_new_model_payload_or_etag() {
+        let r = crate::tests::status_publication_receipt(141);
+        let mut retry = r.clone();
+        retry.verified_unix_seconds += 1;
+        retry.previous_object_etag = Some("current".into());
+        assert!(same_publication(&r, &retry));
+        for field in ["etag", "eta", "observer", "owner"] {
+            let mut bad = retry.clone();
+            match field {
+                "etag" => bad.object_etag = "changed".into(),
+                "eta" => bad.status.estimated_remaining_millis += 1,
+                "observer" => bad.observer_receipt_sha256 = "f".repeat(64),
+                _ => bad.pipeline_binding = Some(binding()),
+            }
+            assert!(!same_publication(&r, &bad), "{field}");
+        }
+    }
 }
