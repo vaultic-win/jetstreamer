@@ -301,6 +301,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if p.cohort191_delivery.is_some() {
+        return "cohort191-terminal-four-owner-delivery-v1";
+    }
     if p.controller_rebind.is_some() && original141::capped_enabled(p) {
         return "controller-rebind-capped141-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
     }
@@ -1932,6 +1935,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-delivery191"
                             | "--prepare-next-native141-all-acquisition"
                             | "--prepare-next-native141-all-retry"
                             | "--prepare-next-census141-poh"
@@ -1990,7 +1994,7 @@ fn main() {
                     )))
                 && args[2] == "--plan-sha256"
                 && args[4] == "--self-sha256",
-            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-package-recovery|--prepare-next-delivery198 SPEC --handoff-sha256 HEX]"
+            "usage: jetstreamer-horizon-routine-cycle PLAN --plan-sha256 HEX --self-sha256 HEX [--check-only|--prepare-next|--prepare-next-terminal157|--prepare-next-private144|--prepare-package-recovery|--prepare-next-delivery198 SPEC --handoff-sha256 HEX|--prepare-next-delivery191 SPEC --handoff-sha256 HEX]"
         );
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -2172,6 +2176,7 @@ mod tests {
         ));
         assert!(super::preparation_mode("--prepare-next"));
         assert!(super::preparation_mode("--prepare-next-original141"));
+        assert!(super::preparation_mode("--prepare-next-delivery191"));
         assert!(super::preparation_mode("--prepare-package-recovery"));
         for mode in [
             "--check-only",
@@ -2634,7 +2639,7 @@ mod tests {
         assert!(verify_estimates(&p, &model, &observer, &estimates).is_err());
     }
 
-    fn fixture() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
+    pub(super) fn fixture() -> (Plan, Value, Value, Value, Value, Value, Value, Value) {
         let b = |name: &str| json!({"path":format!("/sealed/{name}"),"sha256":"a".repeat(64)});
         let p:Plan=serde_json::from_value(json!({"schema":PLAN_SCHEMA,"sample_target_utc":"2026-10-20T10:34:42Z",
             "endpoint_sha256":"a".repeat(64),"bucket":BUCKET,"observer":"/private/next-observer.json",

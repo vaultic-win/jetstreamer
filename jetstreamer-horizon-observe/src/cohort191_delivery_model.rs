@@ -417,6 +417,194 @@ pub fn validate_native_terminal(v: &serde_json::Value, cutoff: u64) -> Result<()
     Ok(())
 }
 
+/// Observer-independent terminal handoff collected by the exact native reader.
+/// This authenticates shape/provenance after the caller hash/owner-binds the
+/// root-only receipt and its sealed collection plan. It never admits a task.
+pub fn validate_terminal_transition(v: &serde_json::Value, cutoff: u64) -> Result<()> {
+    use serde_json::{Value, json};
+    const UNIT: &str =
+        "jetstreamer-root-sweep-e191-194-t5-20261016-v2-r2-e191-194-lane-a-1.service";
+    const IID: &str = "ea93199ed2fa470d99de248c2a10b246";
+    const CTRL: &str = "jetstreamer-epochs191-194-target5-controller-v2-r2.service";
+    const CID: &str = "c741f57764384e07a08484e6451f8f0c";
+    fn ended(row: &Value, unit: &str, iid: &str, limit: u64) -> Result<u64> {
+        ensure!(
+            row["UNIT"] == unit
+                && row["INVOCATION_ID"] == iid
+                && row["_PID"] == "1"
+                && row["_UID"] == "0"
+                && row["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+                && row["MESSAGE"] == format!("{unit}: Deactivated successfully."),
+            "191 terminal transition lacks original natural PID1 exit"
+        );
+        let t = row["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("191 natural exit clock")?
+            .parse::<u64>()?;
+        ensure!(
+            t > 0 && t <= limit,
+            "191 terminal transition backdates natural completion"
+        );
+        Ok(t)
+    }
+    let at = v["recorded_unix_seconds"]
+        .as_u64()
+        .context("191 terminal transition clock")?;
+    ensure!(
+        v["schema"] == "jetstreamer-cohort191-terminal-transition-v1"
+            && v["first_epoch"] == 191
+            && v["last_epoch"] == 194
+            && at > 0
+            && at <= cutoff
+            && v.get("observer").is_none()
+            && v["resource_samples"] == 0,
+        "191 terminal transition scope/time/future observer differs"
+    );
+    for key in [
+        "publication_authorized",
+        "replay_launch_authorized",
+        "archive_readiness_claimed",
+        "r2_mutations",
+    ] {
+        ensure!(
+            v[key] == false,
+            "191 terminal transition acquired authority:{key}"
+        );
+    }
+    validate_native_terminal(&v["native_events"], at)?;
+    let limit = at
+        .checked_mul(1_000_000)
+        .context("191 terminal clock overflow")?;
+    let producer_end = ended(&v["producer_terminal"], UNIT, IID, limit)?;
+    let last_close = v["native_events"]["closes"][3]["__REALTIME_TIMESTAMP"]
+        .as_str()
+        .context("191 close clock")?
+        .parse::<u64>()?;
+    ensure!(
+        producer_end >= last_close,
+        "191 producer ended before final archive close"
+    );
+    let p = &v["producer"];
+    ensure!(
+        p["Id"] == UNIT
+            && p["MainPID"] == "0"
+            && p["NRestarts"] == "0"
+            && p["ActiveState"] == "inactive"
+            && p["SubState"] == "dead"
+            && p["ControlGroup"] == ""
+            && matches!(p["Job"].as_str(), Some("" | "0"))
+            && ((p["LoadState"] == "loaded"
+                && p["InvocationID"] == IID
+                && p["Result"] == "success"
+                && p["ExecMainStatus"] == "0")
+                || (p["LoadState"] == "not-found" && p["InvocationID"] == "")),
+        "191 producer remains active/replaced/ambiguous"
+    );
+    let c = &v["controller_lifecycle"];
+    ensure!(
+        matches!(
+            c["kind"].as_str(),
+            Some("retained-natural-terminal-controller" | "collected-natural-terminal-controller")
+        ) && c["unit"]["Id"] == CTRL
+            && c["unit"]["MainPID"] == "0"
+            && c["unit"]["NRestarts"] == "0"
+            && c["unit"]["ActiveState"] == "inactive"
+            && c["unit"]["SubState"] == "dead"
+            && c["unit"]["ControlGroup"] == ""
+            && matches!(c["unit"]["Job"].as_str(), Some("" | "0")),
+        "191 import controller is not proven naturally terminal"
+    );
+    ensure!(
+        (c["unit"]["LoadState"] == "loaded"
+            && c["unit"]["InvocationID"] == CID
+            && c["unit"]["Result"] == "success"
+            && c["unit"]["ExecMainStatus"] == "0")
+            || (c["kind"] == "collected-natural-terminal-controller"
+                && c["unit"]["LoadState"] == "not-found"
+                && c["unit"]["InvocationID"] == ""),
+        "191 current controller is a foreign or failed terminal actor"
+    );
+    if c["kind"] == "collected-natural-terminal-controller" {
+        ensure!(
+            c["terminal_capture"]["path"]
+                == "/var/lib/jetstreamer/horizon-cohort191-controller-terminal-20261023-v1/terminal.json"
+                && c["terminal_capture"]["sha256"]
+                    .as_str()
+                    .is_some_and(|s| s.len() == 64
+                        && s.bytes()
+                            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
+            "191 collected controller lacks retained real exit capture"
+        );
+    }
+    let controller_end = ended(&c["events"]["terminal"], CTRL, CID, limit)?;
+    ensure!(
+        controller_end >= producer_end
+            && c["events"]["all_public"]["_SYSTEMD_UNIT"] == CTRL
+            && c["events"]["all_public"]["_SYSTEMD_INVOCATION_ID"] == CID
+            && c["events"]["all_public"]["_UID"] == "0"
+            && c["events"]["all_public"]["MESSAGE"] == "all sealed cohorts 191-194 are public",
+        "191 controller/import completion lacks original provenance"
+    );
+    let public_time = c["events"]["all_public"]["__REALTIME_TIMESTAMP"]
+        .as_str()
+        .context("191 controller public clock")?
+        .parse::<u64>()?;
+    ensure!(
+        public_time >= producer_end
+            && public_time <= controller_end
+            && c["events"]["all_public"]["_PID"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .is_some_and(|p| p > 1),
+        "191 natural controller public message clock/PID differs"
+    );
+    let import = &v["native_import"];
+    ensure!(
+        import["schema"] == "jetstreamer-cohort191-import-custody-v2"
+            && import["source_batch"] == v["source_batch"]
+            && import["public_batch"] == v["public_batch"]
+            && import["controller_lifecycle"] == *c
+            && import["materialized_epochs"] == json!([191, 192, 193, 194])
+            && import["native_import_attestation"]["epochs"] == json!([191, 192, 193, 194])
+            && import["native_import_attestation"]["receipt"] == v["public_batch"]["path"]
+            && import["native_import_attestation"]["receipt_sha256"] == v["public_batch"]["sha256"],
+        "191 transition lacks exact native import attestation"
+    );
+    let members = import["public_members"]
+        .as_array()
+        .context("191 terminal import census")?;
+    ensure!(members.len() == 4, "191 terminal import census differs");
+    for (index, (m, epoch)) in members.iter().zip(191..=194).enumerate() {
+        let message = v["native_events"]["closes"][index]["MESSAGE"]
+            .as_str()
+            .context("191 archive-close message")?;
+        let lengths = message
+            .split_whitespace()
+            .filter_map(|word| word.strip_prefix("bytes="))
+            .collect::<Vec<_>>();
+        ensure!(
+            lengths.len() == 1
+                && m["committed_archive"]["length"].as_u64() == Some(lengths[0].parse::<u64>()?),
+            "191 imported archive length differs from its native close"
+        );
+        let sha = m["archive_sha256"]
+            .as_str()
+            .context("191 imported digest")?;
+        ensure!(
+            m["epoch"] == epoch
+                && sha.len() == 64
+                && sha
+                    .bytes()
+                    .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+                && m["committed_archive"]["length"]
+                    .as_u64()
+                    .is_some_and(|n| n > 0),
+            "191 terminal imported archive scope/digest/length differs"
+        );
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod native_terminal_tests {
     use super::*;
@@ -472,5 +660,66 @@ mod native_terminal_tests {
                 .replace("slot=84239250", "slot=84239999")
         );
         assert!(validate_native_terminal(&bad, 5).is_err());
+    }
+    fn transition_fixture() -> Value {
+        let unit = "jetstreamer-root-sweep-e191-194-t5-20261016-v2-r2-e191-194-lane-a-1.service";
+        let ctrl = "jetstreamer-epochs191-194-target5-controller-v2-r2.service";
+        let iid = "ea93199ed2fa470d99de248c2a10b246";
+        let cid = "c741f57764384e07a08484e6451f8f0c";
+        let end = |name: &str, id: &str, time: &str| json!({"UNIT":name,"INVOCATION_ID":id,"_PID":"1","_UID":"0","MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448","MESSAGE":format!("{name}: Deactivated successfully."),"__REALTIME_TIMESTAMP":time});
+        let snapshot = |name: &str, id: &str| json!({"Id":name,"LoadState":"loaded","InvocationID":id,"MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead","ControlGroup":"","Job":"","Result":"success","ExecMainStatus":"0"});
+        let source = json!({"path":"/native/source","sha256":"a".repeat(64)});
+        let public = json!({"path":"/native/public","sha256":"b".repeat(64)});
+        let lifecycle = json!({"kind":"retained-natural-terminal-controller","unit":snapshot(ctrl,cid),"events":{"terminal":end(ctrl,cid,"8000000"),"all_public":{"_SYSTEMD_UNIT":ctrl,"_SYSTEMD_INVOCATION_ID":cid,"_UID":"0","_PID":"123","MESSAGE":"all sealed cohorts 191-194 are public","__REALTIME_TIMESTAMP":"7000000"}}});
+        json!({"schema":"jetstreamer-cohort191-terminal-transition-v1","first_epoch":191,"last_epoch":194,"recorded_unix_seconds":9,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"archive_readiness_claimed":false,"r2_mutations":false,"source_batch":source,"public_batch":public,"native_events":fixture(),"producer":snapshot(unit,iid),"producer_terminal":end(unit,iid,"6000000"),"controller_lifecycle":lifecycle,"native_import":{"schema":"jetstreamer-cohort191-import-custody-v2","source_batch":source,"public_batch":public,"controller_lifecycle":lifecycle,"materialized_epochs":[191,192,193,194],"native_import_attestation":{"epochs":[191,192,193,194],"receipt":public["path"],"receipt_sha256":public["sha256"]},"public_members":(191..=194).map(|e|json!({"epoch":e,"archive_sha256":"c".repeat(64),"committed_archive":{"length":e-190}})).collect::<Vec<_>>()}})
+    }
+    #[test]
+    fn first_transition_needs_no_future_observer_but_requires_real_natural_end_and_import() {
+        let v = transition_fixture();
+        validate_terminal_transition(&v, 9).unwrap();
+        assert!(v.get("observer").is_none());
+        for (pointer, value) in [
+            ("/producer/MainPID", json!("123")),
+            ("/producer/InvocationID", json!("f".repeat(32))),
+            ("/producer_terminal/INVOCATION_ID", json!("f".repeat(32))),
+            (
+                "/controller_lifecycle/kind",
+                json!("live-original-controller"),
+            ),
+            ("/native_import/materialized_epochs", json!([191, 192, 193])),
+            ("/native_import/public_members/2/epoch", json!(195)),
+            (
+                "/native_import/public_members/0/committed_archive/length",
+                json!(99),
+            ),
+            ("/publication_authorized", json!(true)),
+            ("/recorded_unix_seconds", json!(10)),
+        ] {
+            let mut bad = v.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            if pointer.starts_with("/controller_lifecycle/") {
+                bad["native_import"]["controller_lifecycle"] = bad["controller_lifecycle"].clone();
+            }
+            assert!(validate_terminal_transition(&bad, 9).is_err(), "{pointer}");
+        }
+        let mut future = v;
+        future["observer"] = json!({"sha256":"future"});
+        assert!(validate_terminal_transition(&future, 9).is_err());
+    }
+    #[test]
+    fn collected_controller_requires_the_real_retained_terminal_capture_binding() {
+        let mut v = transition_fixture();
+        v["controller_lifecycle"]["kind"] = json!("collected-natural-terminal-controller");
+        v["controller_lifecycle"]["unit"]["LoadState"] = json!("not-found");
+        v["controller_lifecycle"]["unit"]["InvocationID"] = json!("");
+        v["controller_lifecycle"]["terminal_capture"] = json!({"path":"/var/lib/jetstreamer/horizon-cohort191-controller-terminal-20261023-v1/terminal.json","sha256":"d".repeat(64)});
+        v["native_import"]["controller_lifecycle"] = v["controller_lifecycle"].clone();
+        validate_terminal_transition(&v, 9).unwrap();
+        v["controller_lifecycle"]
+            .as_object_mut()
+            .unwrap()
+            .remove("terminal_capture");
+        v["native_import"]["controller_lifecycle"] = v["controller_lifecycle"].clone();
+        assert!(validate_terminal_transition(&v, 9).is_err());
     }
 }

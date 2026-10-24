@@ -131,3 +131,68 @@ collector and offline four-owner preparation route are required before operation
 readiness. Work on that repair is source-only until a separately coordinated build
 slot; the942-test baseline does not qualify that later change. No owner census is
 weakened, and full/plugin/sync remain dependent on real fresh four-owner resources.
+
+## First post191 transition repair, source-only
+
+The follow-up source adds `capture-terminal191 PLAN --plan-sha256 SHA
+--self-sha256 SHA` to the fixed native R2 tool. Its immutable
+`jetstreamer-cohort191-terminal-collection-plan-v1` binds the actual program,
+source_batch and public_batch after the native writers have produced them, and
+output `/var/lib/jetstreamer/horizon-cohort191-terminal-transition-20261023-v1/terminal.json`.
+It has no observer, forecast, speculative resource hash or task admission.
+The collector requires the original producer's actual PID1 natural success,
+trusted84239250 root and four archive closes, a naturally terminal original
+rebound controller, and native root-controller import attestation with all four
+materialized archives. It checks native close lengths against imported members,
+rechecks original identities and import custody, and publishes a no-clobber
+root-private proof with every authority flag false. If PID1 has collected the
+controller, its separately captured real exit0 receipt remains mandatory.
+
+The offline routine entry is:
+
+```text
+jetstreamer-horizon-routine-cycle CURRENT_PLAN --plan-sha256 ACTUAL_SHA --self-sha256 ACTUAL_SHA --prepare-next-delivery191 HANDOFF_SPEC --handoff-sha256 ACTUAL_SPEC_SHA
+```
+
+The separately sealed `jetstreamer-cohort191-routine-handoff-spec-v1` contains
+`profile` with the actual publisher Bound, terminal_event Bound returned by the
+collector, and the fixed event-directory namespace; publication_authorized,
+replay_launch_authorized and r2_mutations are all false. This deliberately uses
+the observer-independent terminal-transition proof, not a future complete
+queue/status event. The normal plan/receipt readers enforce root ownership,
+actual SHA binding and immutable handoff/collection plans.
+
+The preparation consumes the last accepted completed five-owner cycle. It
+requires exactly152–153,155–156,191–194,183–184,185, unchanged paired owner IDs,
+the original191 producer and rebound controller IDs, and the exact four191
+members. Only191–194 is removed from observer replay rows, model ranges and
+expected epochs. Every surviving row, diagnostic, predecessor, clock and other
+profile is retained. A distinct four-owner namespace avoids overwriting the
+already prepared five-owner successor. The regular Rust preparation writer
+produces the observer/cycle sources and normal sealer plans; it does not seal,
+adopt, observe, launch or publish anything itself.
+
+The parent must run the existing native sealer on both generated plans, run the
+new sealed routine's normal `--check-only`, then adopt that exact successor
+through the existing coordinator/timer lifecycle. Do not leave an already armed
+five-owner plan to run after191 has naturally stopped. The genuine queue owner
+must exist before any observer cutoff used to publish that ownership; queue task
+admissions are supplied only after the actual first four-owner resource and cycle
+receipts. No later-born manager or task may be backdated into that cutoff.
+
+Successor preparation now retains the four-owner observer configuration and
+applies the same191 effective model before exact census validation. Historical
+five-owner rebind evidence remains unchanged; its existing four-owner transform
+and current owner checks retain the other four bindings. Dispatcher fresh_owners
+is unchanged and continues to require every actor actually present in the fresh
+four-owner resource receipt to remain live.
+
+New adversarial tests cover observer-independent terminal proof, foreign or live
+owners, absent/partial imports, mismatched native close lengths, collected
+controllers lacking their real terminal capture, future-observer injection,
+missing/duplicate or rebound survivor rows and exact preservation of diagnostics
+and large counters. One test exercises the real observer-config gate: the stale
+five-owner config fails against the four-owner model and the precise transformed
+config passes. These new tests and this follow-up source have not been compiled
+or run; only rustfmt parsing and whitespace checks have run while141 status holds
+the shared target. The successful942-test/release baseline above remains separate.

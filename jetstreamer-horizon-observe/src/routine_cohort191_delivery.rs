@@ -11,6 +11,15 @@ pub(super) struct Profile {
     pub terminal_event: Bound,
     pub event_directory: PathBuf,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HandoffSpec {
+    schema: String,
+    profile: Profile,
+    publication_authorized: bool,
+    replay_launch_authorized: bool,
+    r2_mutations: bool,
+}
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     let bytes = read_checked(&path, LIMIT, 0, immutable)?;
     Ok(Bound {
@@ -76,7 +85,14 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     );
     tool_ok(&s.publisher)?;
     let v = bound_json(&s.terminal_event, false)?;
-    terminal(&v, utc_seconds(&p.sample_target_utc)?)?;
+    if v["schema"] == "jetstreamer-cohort191-terminal-transition-v1" {
+        jetstreamer_horizon_observe::cohort191_delivery_model::validate_terminal_transition(
+            &v,
+            utc_seconds(&p.sample_target_utc)?,
+        )?;
+    } else {
+        terminal(&v, utc_seconds(&p.sample_target_utc)?)?;
+    }
     ensure!(
         v["capture_self_sha256"] == s.publisher.sha256
             && v["capture_program"].as_str() == s.publisher.path.to_str(),
@@ -86,14 +102,153 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     // does not reuse a mutable controller state as historical terminal proof.
     let capture: Bound = serde_json::from_value(v["capture_plan"].clone())?;
     let c = bound_json(&capture, true)?;
+    if v["schema"] == "jetstreamer-cohort191-terminal-transition-v1" {
+        ensure!(
+            c["schema"] == "jetstreamer-cohort191-terminal-collection-plan-v1"
+                && c["program"] == serde_json::to_value(&s.publisher)?
+                && c["source_batch"] == v["source_batch"]
+                && c["public_batch"] == v["public_batch"]
+                && c["output"].as_str() == s.terminal_event.path.to_str()
+                && c.get("observer").is_none(),
+            "191 terminal-only collector plan/program/import differs"
+        );
+    } else {
+        ensure!(
+            c["schema"] == "jetstreamer-cohort191-delivery-capture-plan-v2"
+                && c["claims"] == v["claims"]
+                && c["observer"] == v["observer"]
+                && c["origins"] == v["origins"]
+                && c["forecast"] == v["forecast"],
+            "191 transition/capture provenance differs"
+        );
+    }
+    Ok(())
+}
+const RANGES: [&str; 5] = ["152-153", "155-156", "191-194", "183-184", "185-185"];
+const CID: &str = "c741f57764384e07a08484e6451f8f0c";
+fn range_set(v: &Value, field: &str) -> Result<BTreeSet<String>> {
+    let rows = v[field].as_array().context("191 closed replay census")?;
+    let names = rows
+        .iter()
+        .map(|r| {
+            r["range"]
+                .as_str()
+                .map(str::to_owned)
+                .context("191 range name")
+        })
+        .collect::<Result<BTreeSet<_>>>()?;
+    ensure!(names.len() == rows.len(), "191 duplicate replay range");
+    Ok(names)
+}
+/// Pure bounded edit shared by the first offline preparation and its tests.
+/// Only the terminal original cohort is removed; all remaining JSON is retained.
+fn remove_replay(
+    model: &Value,
+    config: &Value,
+    epochs: &[u64],
+) -> Result<(Value, Value, Vec<u64>)> {
+    let expected: BTreeSet<String> = RANGES.into_iter().map(str::to_owned).collect();
     ensure!(
-        c["schema"] == "jetstreamer-cohort191-delivery-capture-plan-v2"
-            && c["claims"] == v["claims"]
-            && c["observer"] == v["observer"]
-            && c["origins"] == v["origins"]
-            && c["forecast"] == v["forecast"],
-        "191 transition/capture provenance differs"
+        range_set(model, "ranges")? == expected && range_set(config, "replays")? == expected,
+        "191 first transition requires exact five-owner predecessor"
     );
+    let ranges = model["ranges"].as_array().unwrap();
+    let target = ranges.iter().find(|r| r["range"] == "191-194").unwrap();
+    ensure!(
+        target["epochs"] == json!([191, 192, 193, 194])
+            && target["expected_producer_invocation_id"] == IID
+            && target["expected_controller_invocation_id"] == CID
+            && target["terminal_slot"] == 84239999u64,
+        "191 predecessor geometry/original binding differs"
+    );
+    for row in config["replays"].as_array().unwrap() {
+        let m = ranges.iter().find(|m| m["range"] == row["range"]).unwrap();
+        for key in [
+            "expected_controller_invocation_id",
+            "expected_producer_invocation_id",
+        ] {
+            ensure!(
+                row[key] == m[key],
+                "191 transition cannot change another current owner"
+            );
+        }
+    }
+    ensure!(
+        epochs.iter().copied().collect::<BTreeSet<_>>().len() == epochs.len()
+            && (191..=194).all(|e| epochs.contains(&e)),
+        "191 predecessor must still own each exact epoch once"
+    );
+    let mut m = model.clone();
+    m["ranges"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|r| r["range"] != "191-194");
+    if let Some(names) = m["expected_observer_ranges"].as_array_mut() {
+        names.retain(|r| r != "191-194");
+    }
+    let mut c = config.clone();
+    c["replays"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|r| r["range"] != "191-194");
+    Ok((
+        m,
+        c,
+        epochs
+            .iter()
+            .copied()
+            .filter(|e| !(191..=194).contains(e))
+            .collect(),
+    ))
+}
+pub(super) fn next_config(p: &Plan, config: &mut Value) -> Result<()> {
+    if p.cohort191_delivery.is_none() {
+        return Ok(());
+    }
+    validate(p)?;
+    ensure!(
+        range_set(config, "replays")?
+            == RANGES
+                .into_iter()
+                .filter(|s| *s != "191-194")
+                .map(str::to_owned)
+                .collect(),
+        "191 successor must retain exactly the other four observer owners"
+    );
+    Ok(())
+}
+/// Consumes only a real already-written root-only terminal proof and sealed
+/// handoff spec. It takes no new observation and writes no operational receipt.
+pub(super) fn enable(
+    next: &mut Plan,
+    config: &mut Value,
+    model: &Value,
+    spec: &Bound,
+) -> Result<()> {
+    ensure!(
+        is_101(next)? && next.cohort191_delivery.is_none(),
+        "191 transition is already enabled/foreign"
+    );
+    let value: HandoffSpec = serde_json::from_value(bound_json(spec, true)?)?;
+    ensure!(
+        value.schema == "jetstreamer-cohort191-routine-handoff-spec-v1"
+            && !value.publication_authorized
+            && !value.replay_launch_authorized
+            && !value.r2_mutations,
+        "191 handoff spec acquired authority"
+    );
+    let profile = value.profile;
+    let proof = bound_json(&profile.terminal_event, false)?;
+    ensure!(
+        proof["schema"] == "jetstreamer-cohort191-terminal-transition-v1",
+        "191 first transition requires observer-independent native terminal proof"
+    );
+    let (_model, edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
+    next.cohort191_delivery = Some(profile);
+    next.expected_epochs = epochs;
+    validate(next)?;
+    *config = edited;
+    next.observer_config.sha256 = sha(&next_preparation::encoded(config)?);
     Ok(())
 }
 pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
@@ -115,6 +270,15 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
         "191 ordinary source scope differs"
     );
     ranges.retain(|r| r["range"] != "191-194");
+    ensure!(
+        range_set(&next, "ranges")?
+            == RANGES
+                .into_iter()
+                .filter(|s| *s != "191-194")
+                .map(str::to_owned)
+                .collect(),
+        "191 effective model lost another original replay"
+    );
     if let Some(expected) = next["expected_observer_ranges"].as_array_mut() {
         expected.retain(|r| r != "191-194");
     }
@@ -360,4 +524,97 @@ pub(super) fn completion(p: &Plan, c: &Value) -> Result<()> {
         "191 completion omitted publications or durable incident"
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn predecessor() -> (Value, Value, Vec<u64>) {
+        let rows=RANGES.iter().enumerate().map(|(i,name)| {
+            let (controller,producer,epochs)=if *name=="191-194" {(CID.into(),IID.into(),vec![191,192,193,194])} else {(format!("{:032x}",i+1),format!("{:032x}",i+16),vec![152+i as u64])};
+            json!({"range":name,"epochs":epochs,"terminal_slot":84239999,"expected_controller_invocation_id":controller,"expected_producer_invocation_id":producer,"preserved_large_counter":u64::MAX})
+        }).collect::<Vec<_>>();
+        let model = json!({"ranges":rows,"expected_observer_ranges":RANGES,"evidence":[{"historical":"unchanged"}]});
+        let config = json!({"replays":rows,"diagnostic_replays":[{"range":"141","owner":"unchanged"}],"minimum_interval_seconds":1800});
+        (
+            model,
+            config,
+            vec![152, 153, 155, 156, 183, 184, 185, 191, 192, 193, 194],
+        )
+    }
+    #[test]
+    fn exact_first_transition_preserves_all_survivors_diagnostics_and_large_counters() {
+        let (m, c, e) = predecessor();
+        let (next, config, epochs) = remove_replay(&m, &c, &e).unwrap();
+        assert_eq!(
+            next["ranges"],
+            json!(
+                m["ranges"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|r| r["range"] != "191-194")
+                    .collect::<Vec<_>>()
+            )
+        );
+        assert_eq!(config["replays"], next["ranges"]);
+        assert_eq!(config["diagnostic_replays"], c["diagnostic_replays"]);
+        assert_eq!(config["minimum_interval_seconds"], 1800);
+        assert_eq!(next["evidence"], m["evidence"]);
+        assert_eq!(epochs, vec![152, 153, 155, 156, 183, 184, 185]);
+        assert!(remove_replay(&next, &config, &epochs).is_err());
+    }
+    #[test]
+    fn first_transition_rejects_missing_duplicate_foreign_or_rebound_owners() {
+        let (m, c, e) = predecessor();
+        for key in [
+            "expected_controller_invocation_id",
+            "expected_producer_invocation_id",
+        ] {
+            let mut bad = c.clone();
+            bad["replays"][0][key] = json!("f".repeat(32));
+            assert!(remove_replay(&m, &bad, &e).is_err());
+        }
+        let mut missing = c.clone();
+        missing["replays"].as_array_mut().unwrap().pop();
+        assert!(remove_replay(&m, &missing, &e).is_err());
+        let mut duplicate = c.clone();
+        duplicate["replays"][0] = duplicate["replays"][1].clone();
+        assert!(remove_replay(&m, &duplicate, &e).is_err());
+        let mut bad = m.clone();
+        bad["ranges"][2]["epochs"] = json!([191, 192, 193]);
+        assert!(remove_replay(&bad, &c, &e).is_err());
+        let mut missing_epoch = e.clone();
+        missing_epoch.pop();
+        assert!(remove_replay(&m, &c, &missing_epoch).is_err());
+        let mut duplicated_epoch = e;
+        duplicated_epoch.push(191);
+        assert!(remove_replay(&m, &c, &duplicated_epoch).is_err());
+    }
+    #[test]
+    fn corrected_four_owner_config_passes_actual_gate_while_unmodified_five_owner_config_fails() {
+        let (p, _, _, _, _, _, mut config, _) = super::super::tests::fixture();
+        let (model, mut predecessor, epochs) = predecessor();
+        predecessor["schema"] = config["schema"].clone();
+        for key in [
+            "output",
+            "not_before_utc",
+            "minimum_interval_seconds",
+            "previous_sample",
+        ] {
+            predecessor[key] = config[key].clone();
+        }
+        // This fixture is an ordinary host profile; diagnostics are validated
+        // separately and are deliberately not promoted to ordinary owners.
+        predecessor
+            .as_object_mut()
+            .unwrap()
+            .remove("diagnostic_replays");
+        validate_observer_config(&p, &model, &predecessor).unwrap();
+        let (four, corrected, _) = remove_replay(&model, &predecessor, &epochs).unwrap();
+        assert!(validate_observer_config(&p, &four, &predecessor).is_err());
+        validate_observer_config(&p, &four, &corrected).unwrap();
+        config["replays"] = corrected["replays"].clone();
+        assert_eq!(range_set(&config, "replays").unwrap().len(), 4);
+    }
 }

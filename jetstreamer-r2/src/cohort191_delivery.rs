@@ -1,5 +1,7 @@
 //! Closed191–194 native metadata custody. Never creates a ready/archive receipt.
 use super::*;
+#[path = "cohort191_terminal.rs"]
+mod terminal_transition;
 use serde_json::json;
 mod queue;
 use std::{
@@ -1917,6 +1919,9 @@ pub(super) fn dispatch_import_check(
     )
 }
 
+pub(super) fn capture_terminal_transition() -> Result<()> {
+    terminal_transition::run()
+}
 pub(super) fn queue_scope(phase: &str, unit: &str) -> bool {
     queue::scope(phase, unit)
 }

@@ -178,6 +178,7 @@ pub(super) fn derive_next(
     );
     let mut next_config = config.clone();
     terminal141::next_config(p, &mut next_config)?;
+    cohort191_delivery::next_config(p, &mut next_config)?;
     next_config["not_before_utc"] = json!(next_time);
     next_config["previous_sample"] = json!(p.observer);
     next_config["output"] = json!(next_observer);
@@ -319,7 +320,9 @@ pub(super) fn prepare(
     } else {
         None
     };
-    let delivery_spec = if prefix_spec.is_some()
+    let transition191 = mode == "--prepare-next-delivery191";
+    let delivery_spec = if transition191
+        || prefix_spec.is_some()
         || native_spec.is_some()
         || rejection_spec.is_some()
         || scans_spec.is_some()
@@ -373,6 +376,15 @@ pub(super) fn prepare(
         delivery198::consume_recovery(&mut next)?;
     }
     let model = bound_json(&next.model_template, true)?;
+    if transition191 {
+        cohort191_delivery::enable(
+            &mut next,
+            &mut next_config,
+            &model,
+            handoff_spec.context("191 transition needs its actual sealed handoff spec")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
     controller_recovery::consume(&mut next, &model)?;
     if enable_terminal157 {
         terminal_handoff::enable(&mut next, &model)?;
@@ -394,6 +406,7 @@ pub(super) fn prepare(
     )?;
     let effective = repair183::effective_model(&next, &effective)?;
     let effective = repair185::effective_model(&next, &effective)?;
+    let effective = cohort191_delivery::effective_model(&next, &effective)?;
     validate_observer_config(&next, &effective, &next_config)?;
     let entries = verify_estimates(p, &model, &next.previous_observer, &estimates)?;
     if (prefix_spec.is_none() && mode != "--prepare-next-original141")
