@@ -153,3 +153,26 @@ qualified/sealed matching helper generation, exact plan/proposal/admission,
 actual canary first-fire capture and an explicit policy for any later competing
 admission until its peer accounting is qualified. No fresh proposal numbers or
 future observer/admission/canary hashes are invented here.
+
+## Final source qualification
+
+Final consumer code, including the post-bracket namespace/reference tightening
+and lint corrections, passed the full release R2 suite: **754 passed, 0 failed,
+48 ignored**. This includes the six dedicated allocation/reference/park tests
+and the new strict-vs-legacy admission selector regression. Strict release
+Clippy passed for both production and test targets with `-D warnings`.
+Rustfmt and `git diff --check` passed. Existing ignored operational tests were
+not enabled. No production helper was built, sealed, deployed or executed.
+
+Commands used the coordinated shared target with `CARGO_INCREMENTAL=0`,
+`CARGO_BUILD_JOBS=2`, empty `RUSTC_WRAPPER`, and locked/offline release mode:
+
+```
+cargo test --locked --offline --release -j2 -p jetstreamer-r2
+cargo clippy --locked --offline --release -j2 -p jetstreamer-r2 --bin jetstreamer-r2 --tests -- -D warnings
+```
+
+Cargo is released after those completed checks. The matching producer source
+and this consumer remain distinct separately qualified generations; preserving
+the wire contract does not permit replacing the corrected producer with its
+superseded candidate or mixing unrelated admission/helper runtime identities.
