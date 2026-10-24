@@ -18,6 +18,7 @@ const TARGET: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tool
 const SOURCE: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-build-artifacts-20261023-v1/jetstreamer-horizon-verify-pair";
 const STATE: &str = "/var/lib/jetstreamer/horizon-cohort191-wrapper-augmentation-20261024-v1";
 const WRAPPER: &str = "jetstreamer-horizon-verify-pair";
+const STAGE: &str = ".jetstreamer-horizon-verify-pair.partial";
 const SHA: &str = "b89641f4bfe5cdd141652cd32905233937439725ca523ec18b66a411460e436a";
 const R2_SHA: &str = "0f0f7c9475b69b3371098dfb0b7702a772de989189d0974359c2569020caab1f";
 const NAMES: [&str; 4] = [
@@ -136,7 +137,7 @@ fn originals(p: &Plan, owner: u32) -> Result<()> {
         let n = e?.file_name();
         let n = n.to_str().context("nonUTF8 package entry")?;
         ensure!(
-            NAMES.contains(&n) || n == WRAPPER,
+            NAMES.contains(&n) || n == WRAPPER || n == STAGE,
             "unexpected package entry"
         );
     }
@@ -323,6 +324,10 @@ fn execute(p: &Plan, plan_sha: &str, owner: u32, check_only: bool) -> Result<()>
     let target = p.target_directory.join(WRAPPER);
     if target.try_exists()? {
         ensure!(
+            !p.target_directory.join(STAGE).try_exists()?,
+            "preserve unexplained simultaneous wrapper stage"
+        );
+        ensure!(
             ip.try_exists()?
                 && serde_json::from_slice::<serde_json::Value>(&fs::read(&ip)?)? == intent,
             "unexplained existing wrapper"
@@ -337,7 +342,9 @@ fn execute(p: &Plan, plan_sha: &str, owner: u32, check_only: bool) -> Result<()>
             return Ok(());
         }
         record(&ip, &intent)?;
-        let stage = p.state_directory.join("wrapper.partial");
+        // Keep rename within one sandbox bind mount. Equal st_dev alone does not
+        // permit rename between separately mounted ReadWritePaths.
+        let stage = p.target_directory.join(STAGE);
         prepare_stage(&p.wrapper_source, &stage, owner, &p.wrapper_sha256)?;
         originals(p, owner)?;
         no_replace(&stage, &target)?;
