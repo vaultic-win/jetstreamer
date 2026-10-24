@@ -15,14 +15,34 @@ const TEST: &str =
 const TEST_SHA: &str = "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-227-v1625-qualification-7a831420-v1/jetstreamer-historical-worker-v1-6-25";
 const WORKER_SHA: &str = "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a";
-const GUARD: &str = "/var/lib/jetstreamer/horizon-227-v1625-native-main-guard-v1/jetstreamer-horizon-standalone-guard";
+const GUARD: &str = if cfg!(feature = "epoch227-v1625-native-small") {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-small-main-guard-v2/jetstreamer-horizon-standalone-guard"
+} else {
+    "/var/lib/jetstreamer/horizon-227-v1625-native-main-guard-v1/jetstreamer-horizon-standalone-guard"
+};
 const INPUT: &str = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1";
 const PREFLIGHT_SHA: &str = "6a7f2ec35ded81d3577a062db0b4ddddf64b8a812856173c7600fb75ce7dcf53";
 const SNAPSHOT: &str = "snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst";
 const SNAPSHOT_SHA: &str = "77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07";
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1";
-const UNIT: &str = "horizon-native-input-227-v1625-7a831420-v1.service";
+const ROOT: &str = if cfg!(feature = "epoch227-v1625-native-small") {
+    "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2"
+} else {
+    "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-v1"
+};
+const UNIT: &str = if cfg!(feature = "epoch227-v1625-native-small") {
+    "horizon-native-input-227-v1625-small-v2.service"
+} else {
+    "horizon-native-input-227-v1625-7a831420-v1.service"
+};
+const SCRATCH_BYTES: u64 = if cfg!(feature = "epoch227-v1625-native-small") {
+    96_000_000_000
+} else {
+    300_000_000_000
+};
+const CENSUS: &str = "/var/lib/jetstreamer/horizon-native227-snapshot-census-actual-v1/census.json";
+const CENSUS_SHA: &str = "6f5ec8b8f384bfb3531689fb0654b076c1febc1aad35058abf9398153bcd1a1f";
+const CENSUS_BOUND: u64 = 77_949_771_776;
 const SELECTOR: &str =
     "runtime::tests::native_epoch227_v1625_cold_input_matches_canonical_accounts_commitment";
 #[derive(Deserialize)]
@@ -62,7 +82,7 @@ fn spec_scope(s: &Spec) -> Result<()> {
     Ok(())
 }
 fn cold(guard: &Bound) -> Value {
-    json!({"schema":"jetstreamer-private-epoch227-v1625-dormant-native-cold-plan-v1","epoch":227,
+    let mut value = json!({"schema":"jetstreamer-private-epoch227-v1625-dormant-native-cold-plan-v1","epoch":227,
         "unit":UNIT,"run_root":ROOT,"runtime":"solana-v1.6.25",
         "runtime_revision":"7de8a55b54d3e11058b82f9483bb405d143b455c",
         "native_main":{"executable":TEST,"sha256":TEST_SHA,"actual_main_pid_binding_required_before_guard_seal":true},
@@ -74,7 +94,7 @@ fn cold(guard: &Bound) -> Value {
             "slot":98063464u64,"expected_accounts_hash":"4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR"},
         "genesis":{"path":Path::new(INPUT).join("genesis.tar.bz2"),"bytes":20144,"sha256":GENESIS_SHA},
         "envelope":{"memory_high_bytes":112u64<<30,"memory_max_bytes":128u64<<30,"swap_max_bytes":0,
-            "maximum_root_physical_bytes":300000000000u64,"maximum_worker_vmas":3500000,
+            "maximum_root_physical_bytes":SCRATCH_BYTES,"maximum_worker_vmas":3500000,
             "cpu_quota_cores":8,"cpu_affinity":"0-7","tasks_max":512,"runtime_max_seconds":2700,
             "restart":"no","uid":1000,"gid":1000,"network":"AF_UNIX only"},
         "persistent_unit_file_required":true,"transient_systemd_run_is_not_the_deployment":true,
@@ -85,7 +105,14 @@ fn cold(guard: &Bound) -> Value {
         "routine_minimum_interval_seconds":1800,"replay_entries":0,"entry_replay":false,
         "native_input_qualified":false,"host_job_launch_authorized":false,"replay_launch_authorized":false,
         "runtime_promotion_authorized":false,"full_epoch_qualified":false,"canonical_sidecar_authorized":false,
-        "publication_authorized":false,"remote_mutations":false,"r2_mutations":false})
+        "publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    if cfg!(feature = "epoch227-v1625-native-small") {
+        value["snapshot_census"] = json!({"path":CENSUS,"sha256":CENSUS_SHA});
+        value["disk_envelope_model"] = json!({"formula":"2*dense_4096_rounded_file_bytes+metadata_allowance_bytes+1073741824",
+            "modeled_bytes":CENSUS_BOUND,"maximum_root_physical_bytes":SCRATCH_BYTES,
+            "bounded_experiment_only":true,"original_300gb_generation_preserved":true});
+    }
+    value
 }
 fn run() -> Result<()> {
     let a = env::args().collect::<Vec<_>>();
@@ -98,6 +125,25 @@ fn run() -> Result<()> {
     let s: Spec =
         serde_json::from_slice(&common::bound_file(Path::new(&a[1]), &a[3], 65536, true)?)?;
     spec_scope(&s)?;
+    if cfg!(feature = "epoch227-v1625-native-small") {
+        let census: Value = serde_json::from_slice(&common::bound_file(
+            Path::new(CENSUS),
+            CENSUS_SHA,
+            16384,
+            true,
+        )?)?;
+        ensure!(
+            census["schema"] == "jetstreamer-native-readonly-snapshot-census-v1"
+                && census["epoch"] == 227
+                && census["snapshot_sha256"] == SNAPSHOT_SHA
+                && census["census"]["twice_dense_plus_metadata_plus_one_gib_bytes"] == CENSUS_BOUND
+                && census["snapshot_extracted"] == false
+                && census["bank_constructed"] == false
+                && census["native_execution_authorized"] == false
+                && CENSUS_BOUND < SCRATCH_BYTES,
+            "227 smaller generation lacks its exact snapshot envelope census"
+        );
+    }
     for b in [&s.harness, &s.guard, &s.worker, &s.preflight] {
         common::bound_file(&b.path, &b.sha256, 128 << 20, true)?;
     }
@@ -171,6 +217,15 @@ mod tests {
         assert_eq!(p["native_main"]["sha256"], TEST_SHA);
         assert_eq!(p["full_worker"]["sha256"], WORKER_SHA);
         assert_eq!(p["replay_entries"], 0);
+        assert_eq!(p["envelope"]["memory_max_bytes"], 128u64 << 30);
+        assert_eq!(p["envelope"]["maximum_root_physical_bytes"], SCRATCH_BYTES);
+        if cfg!(feature = "epoch227-v1625-native-small") {
+            assert_eq!(p["snapshot_census"]["sha256"], CENSUS_SHA);
+            assert_eq!(p["disk_envelope_model"]["modeled_bytes"], CENSUS_BOUND);
+            assert!(CENSUS_BOUND < SCRATCH_BYTES);
+        } else {
+            assert!(p.get("snapshot_census").is_none());
+        }
         for flag in [
             "entry_replay",
             "native_input_qualified",
