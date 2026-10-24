@@ -520,6 +520,7 @@ fn child(
                 && a["observer"] == s["observer"]
                 && a["routine_completion"] == s["routine_completion"]
                 && a["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && a["os_claim_transfer"] == s["os_claim_transfer"]
                 && a["observer"].is_object()
                 && a["routine_completion"].is_object()
                 && a["other_pending_os_growth_bytes"].is_u64()
@@ -527,6 +528,7 @@ fn child(
                 && l["observer"] == s["observer"]
                 && l["routine_completion"] == s["routine_completion"]
                 && l["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && l["os_claim_transfer"] == s["os_claim_transfer"]
                 && s["source_revalidation_policy"]
                     == serde_json::to_value(
                         p.source_revalidation_policy
@@ -555,6 +557,7 @@ fn child(
                 && before["observer"] == s["observer"]
                 && before["routine_completion"] == s["routine_completion"]
                 && before["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && before["os_claim_transfer"] == s["os_claim_transfer"]
                 && before["resource_admission"].is_object(),
             "191 sync prelaunch resources differ from admitted native step"
         );
