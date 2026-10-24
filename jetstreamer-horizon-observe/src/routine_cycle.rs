@@ -310,7 +310,7 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
 }
 fn generation_101(p: &Plan) -> &'static str {
     if cohort191_import::enabled(p) {
-        return "guard-stopped185-import-pending191-repair141-v1";
+        return "guard-stopped185-import-pending191-repair141-v2";
     }
     if terminal185::enabled(p) {
         return if p.cohort191_delivery.is_some() {

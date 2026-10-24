@@ -115,16 +115,28 @@ pub(super) fn validate(p: &Plan, v: &Value) -> Result<()> {
         "191 pending transition must retain185terminal/141repair profiles"
     );
     shape(v, utc_seconds(&p.sample_target_utc)?)?;
+    let capture_program = Bound {
+        path: serde_json::from_value(v["capture_program"].clone())?,
+        sha256: v["capture_self_sha256"]
+            .as_str()
+            .context("191 capture digest absent")?
+            .into(),
+    };
     ensure!(
-        v["capture_program"].as_str() == s.publisher.path.to_str()
-            && v["capture_self_sha256"] == s.publisher.sha256,
-        "191 pending native capture program differs"
+        capture_program.path
+            == Path::new(
+                "/usr/local/lib/jetstreamer/horizon-cohort191-import-pending-tools-20261024-v1/jetstreamer-r2"
+            )
+            && capture_program.sha256
+                == "c6f935db66dc71873f79111cf5311981ea85446dd64b85d712749f48a1d6f306",
+        "191 pending native capture writer differs"
     );
+    tool_ok(&capture_program)?;
     let cb: Bound = serde_json::from_value(v["capture_plan"].clone())?;
     let c = bound_json(&cb, true)?;
     ensure!(
         c["schema"] == "jetstreamer-cohort191-import-pending-capture-plan-v1"
-            && c["program"] == serde_json::to_value(&s.publisher)?
+            && c["program"] == serde_json::to_value(&capture_program)?
             && c["source_batch"] == v["source_batch"]
             && c["origins"] == v["origins"]
             && c["estimate_evidence"] == v["estimate_evidence"]

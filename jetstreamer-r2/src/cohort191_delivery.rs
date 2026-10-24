@@ -69,6 +69,8 @@ struct Capture {
     queue: Option<queue::Binding>,
     #[serde(default)]
     source_revalidation_policy: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native_pending_proof: Option<Bound>,
     output: PathBuf,
 }
 pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
@@ -1574,7 +1576,11 @@ fn capture(p: &Capture) -> Result<Value> {
         "191 capture scope/staleness"
     );
     let history = inputs()?;
-    let events = native_events(cutoff)?;
+    let events = if let Some(proof) = &p.native_pending_proof {
+        import_pending::retained_events(proof, p, cutoff)?
+    } else {
+        native_events(cutoff)?
+    };
     let forecast: jetstreamer_horizon_observe::cohort191_delivery_model::Plan =
         serde_json::from_value(bound(&p.forecast, true)?)?;
     let eta = jetstreamer_horizon_observe::cohort191_delivery_model::forecast(&forecast)?;

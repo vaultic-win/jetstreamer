@@ -4,6 +4,10 @@ use super::*;
 const SCHEMA: &str = "jetstreamer-cohort191-import-pending-transition-v1";
 const IMPORT_UNIT: &str = "jetstreamer-root-import-e191-194-t5-20261016-v2-r2-e191-194-2.service";
 const IMPORT_IID: &str = "611c55c179654410a5dddce41fd6c019";
+const ORIGINAL_CAPTURE_PROGRAM: &str =
+    "/usr/local/lib/jetstreamer/horizon-cohort191-import-pending-tools-20261024-v1/jetstreamer-r2";
+const ORIGINAL_CAPTURE_SHA: &str =
+    "c6f935db66dc71873f79111cf5311981ea85446dd64b85d712749f48a1d6f306";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Bootstrap {
@@ -208,6 +212,63 @@ fn ratio(e: &Value, name: &str, bytes: u64) -> Result<u64> {
     u64::try_from((u128::from(bytes) * u128::from(n)).div_ceil(u128::from(d)))
         .context("191 rate overflow")
 }
+fn captured_program(v: &Value) -> Result<()> {
+    ensure!(
+        v["capture_program"] == ORIGINAL_CAPTURE_PROGRAM
+            && v["capture_self_sha256"] == ORIGINAL_CAPTURE_SHA,
+        "191 retained native writer differs"
+    );
+    member(Path::new(ORIGINAL_CAPTURE_PROGRAM), ORIGINAL_CAPTURE_SHA)
+}
+pub(super) fn retained_events(proof: &Bound, p: &Capture, cutoff: u64) -> Result<Value> {
+    let v = bound(proof, false)?;
+    shape(&v)?;
+    captured_program(&v)?;
+    ensure!(
+        v["recorded_unix_seconds"]
+            .as_u64()
+            .is_some_and(|t| t <= cutoff)
+            && p.public_batch.is_none()
+            && p.source_batch
+                .as_ref()
+                .is_some_and(|b| serde_json::to_value(b).is_ok_and(|x| x == v["source_batch"]))
+            && serde_json::to_value(&p.origins)? == v["origins"]
+            && !p.claims.is_empty()
+            && p.claims.iter().all(|c| c.phase == "local-publication"
+                && c.unit == IMPORT_UNIT
+                && c.invocation_id == IMPORT_IID),
+        "191 cached proof borrowed by another phase/source/origin"
+    );
+    let plan: Bound = serde_json::from_value(v["capture_plan"].clone())?;
+    let plan = bound(&plan, true)?;
+    ensure!(
+        plan["schema"] == "jetstreamer-cohort191-import-pending-capture-plan-v1"
+            && plan["program"]["path"] == ORIGINAL_CAPTURE_PROGRAM
+            && plan["program"]["sha256"] == ORIGINAL_CAPTURE_SHA
+            && plan["source_batch"] == v["source_batch"]
+            && plan["origins"] == v["origins"]
+            && plan["output"].as_str() == proof.path.to_str(),
+        "191 retained native capture provenance differs"
+    );
+    ensure!(
+        manager_terminal(cutoff)? == v["producer_terminal"],
+        "191 latest producer terminal lifecycle changed"
+    );
+    let mut rows = vec![v["native_events"]["root"].clone()];
+    rows.extend(
+        v["native_events"]["closes"]
+            .as_array()
+            .context("191 cached closes")?
+            .iter()
+            .cloned(),
+    );
+    let actual = roots(&rows, cutoff)?;
+    ensure!(
+        actual == v["native_events"],
+        "191 cached native root/four-close fields differ"
+    );
+    Ok(actual)
+}
 fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
     ensure!(
         p.schema == "jetstreamer-cohort191-import-pending-observation-plan-v1",
@@ -215,11 +276,7 @@ fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
     );
     let b = bound(&p.bootstrap, false)?;
     shape(&b)?;
-    ensure!(
-        b["capture_program"] == json!(fs::read_link("/proc/self/exe")?)
-            && b["capture_self_sha256"] == self_sha,
-        "191 pending bootstrap program changed"
-    );
+    captured_program(&b)?;
     ensure!(
         p.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
             && p.output
@@ -308,6 +365,7 @@ fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
         ready_receipts: BTreeMap::new(),
         queue: None,
         source_revalidation_policy: None,
+        native_pending_proof: Some(p.bootstrap.clone()),
         output: p.output.clone(),
     };
     let cp_path = p.output.with_extension("capture-plan.json");
@@ -433,5 +491,31 @@ mod tests {
             bad[key] = b.clone();
             assert!(serde_json::from_value::<Bootstrap>(bad).is_err());
         }
+    }
+    #[test]
+    #[ignore = "root-only exact retained191 native proof and latest PID1 producer terminal; no replay/resource/R2 observation or mutation"]
+    fn retained_native_proof_cannot_be_borrowed_by_public_or_foreign_phase() {
+        let proof = Bound {
+            path:
+                "/var/lib/jetstreamer/horizon-cohort191-import-pending-20261024-v1/bootstrap.json"
+                    .into(),
+            sha256: "6b930ce0c0c162ae81e1f1d86edd7cb134cbd2370d1dc7b6e0f19cfef15afe8e".into(),
+        };
+        let v = bound(&proof, false).unwrap();
+        let dummy = json!({"path":"/unused","sha256":"a".repeat(64)});
+        let mut p:Capture=serde_json::from_value(json!({"schema":"jetstreamer-cohort191-delivery-capture-plan-v2","observer":dummy,"forecast":dummy,"origins":v["origins"],"claims":v["claims"],"source_batch":v["source_batch"],"public_batch":null,"gate_receipts":{},"gate_tools":{},"ready_receipts":{},"output":"/unused"})).unwrap();
+        let cutoff = v["recorded_unix_seconds"].as_u64().unwrap();
+        assert_eq!(
+            retained_events(&proof, &p, cutoff).unwrap(),
+            v["native_events"]
+        );
+        p.public_batch = Some(proof.clone());
+        assert!(retained_events(&proof, &p, cutoff).is_err());
+        p.public_batch = None;
+        p.claims[0].phase = "full-verification".into();
+        assert!(retained_events(&proof, &p, cutoff).is_err());
+        p.claims[0].phase = "local-publication".into();
+        p.origins.get_mut(&191).unwrap().sha256 = "b".repeat(64);
+        assert!(retained_events(&proof, &p, cutoff).is_err());
     }
 }
