@@ -98,6 +98,33 @@ pub(super) fn annotate(a: &Arguments, receipt: &mut serde_json::Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_full_prefix_reader_argument_route_uses_positional_archive_and_native20_scope() {
+        let root = "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1";
+        let arguments = vec![
+            format!("{root}/output/epoch-223.jet"),
+            format!("--private-root={root}"),
+            "--expected-epoch=223".into(),
+            "--expected-output-start-slot=96336000".into(),
+            "--expected-bootstrap-slot=96335538".into(),
+            "--expected-terminal-slot=96767522".into(),
+            "--expected-runtime-profile=solana-v1.6.20".into(),
+            format!("--expected-worker-sha256={WORKER20}"),
+            format!("--receipt={root}/receipts/epoch-223.native20-prefix.validation.json"),
+        ];
+        let parsed = parse_arguments(arguments.clone()).unwrap();
+        assert!(matches(&parsed));
+        validate_archive_name(&parsed, &parsed.archive).unwrap();
+        assert_eq!(
+            parsed.receipt,
+            Some(PathBuf::from(format!(
+                "{root}/receipts/epoch-223.native20-prefix.validation.json"
+            )))
+        );
+        let mut wrong = arguments;
+        wrong[0] = format!("--archive={root}/output/epoch-223.jet");
+        assert!(parse_arguments(wrong).is_err());
+    }
     fn args() -> Arguments {
         let root =
             PathBuf::from("/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-test");

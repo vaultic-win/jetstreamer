@@ -4875,6 +4875,7 @@ dependencies = [
  "jetstreamer-firehose",
  "jetstreamer-historical-protocol-current",
  "jetstreamer-horizon",
+ "jetstreamer-horizon-observe",
  "jetstreamer-utils",
  "lencode",
  "libc",

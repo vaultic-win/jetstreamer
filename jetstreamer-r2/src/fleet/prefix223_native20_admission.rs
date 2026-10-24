@@ -111,6 +111,7 @@ fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
             "horizon-singleton227-protective-v1.service",
             "/var/lib/jetstreamer/horizon-singleton227-guard-receipts-v1",
         ),
+        c::UNIT => (c::PROTECTIVE, c::GUARD_RECEIPTS),
         singleton209::UNIT => (
             "horizon-singleton209-protective-v1.service",
             "/var/lib/jetstreamer/horizon-singleton209-guard-receipts-v1",
@@ -122,15 +123,22 @@ fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
         _ => anyhow::bail!("unmodeled protective selector:{name}"),
     })
 }
-fn completed_guards(
+pub(super) fn completed_guards(
     f: &Value,
     guards: &BTreeMap<String, BoundFile>,
     sample: u64,
     now: u64,
 ) -> Result<Value> {
-    let expected = roster(f)?;
+    completed_guards_for(&roster(f)?, guards, sample, now)
+}
+pub(super) fn completed_guards_for(
+    expected: &BTreeSet<String>,
+    guards: &BTreeMap<String, BoundFile>,
+    sample: u64,
+    now: u64,
+) -> Result<Value> {
     ensure!(
-        expected == guards.keys().cloned().collect(),
+        *expected == guards.keys().cloned().collect(),
         "prefix guard set must cover the whole active census exactly"
     );
     let mut history = BTreeMap::new();
@@ -517,6 +525,20 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn maintenance_guard_selector_keeps_exact_live223_without_weakening_own_roster() {
+        assert_eq!(
+            guard_selector(c::UNIT).unwrap(),
+            (c::PROTECTIVE, c::GUARD_RECEIPTS)
+        );
+        assert!(guard_selector("another223.service").is_err());
+        let f = json!({"active":[super::super::prefix223_live_peer::fixture_row()]});
+        assert!(
+            roster(&f).is_err(),
+            "prefix self-overlap must still be refused"
+        );
+        assert!(super::super::prefix223_live_peer::roster(&f).is_ok());
+    }
     #[test]
     fn sealed_floor_preserves_larger_live_guard_baselines_and_checked_math() {
         assert_eq!(

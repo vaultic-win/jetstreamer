@@ -98,6 +98,12 @@ admission/capture/observer/status adapter remains a required next gate.**
    432,000 epoch slots and all existing cross-runtime boundary requirements.
    Until this exists, prefix and suffix stay private segments without canonical
    sidecars. No unimplemented assembler or unsupported resume path is implied.
+   See `epoch223-cross-runtime-handoff-plan.md` for the prepared metadata-only
+   gate requiring this actual prefix's completion, independent reread, sealed
+   manifest and original terminal/manager journal. This is a V3 cross-runtime
+   pair; the203 same-runtime V4 route must continue rejecting it. Planned
+   cursor arithmetic does not establish event coverage until the existing V3
+   merger decodes and checks both actual sources.
 5. Independently full-verify the assembled archive, run the current plugin
    checks, and retain both adjacent boundary receipts for eventual local
    retirement. Only then pass the archive through the normal Rust uploader:
