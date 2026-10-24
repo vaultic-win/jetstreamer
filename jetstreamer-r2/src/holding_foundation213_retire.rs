@@ -3,7 +3,10 @@
 use super::*;
 use std::{
     ffi::CString,
-    os::{fd::AsRawFd, unix::ffi::OsStrExt},
+    os::{
+        fd::{AsRawFd, FromRawFd},
+        unix::ffi::OsStrExt,
+    },
 };
 
 const SCHEMA: &str = "jetstreamer-foundation-holding-retirement-plan-v1";
@@ -73,19 +76,138 @@ fn absence(path: &Path) -> Result<bool> {
         Err(e) => Err(e.into()),
     }
 }
-fn read_record(path: &Path) -> Result<Value> {
-    ensure!(path.canonicalize()? == path, "aliased retirement record");
-    let m = fs::symlink_metadata(path)?;
+fn record_file_policy(m: &fs::Metadata, owner: u32, group: u32) -> Result<()> {
     ensure!(
-        m.is_file() && m.uid() == 0 && m.gid() == 0 && m.nlink() == 1 && m.mode() & 0o7777 == 0o400,
+        m.is_file()
+            && m.uid() == owner
+            && m.gid() == group
+            && m.nlink() == 1
+            && matches!(m.mode() & 0o7777, 0o400 | 0o440)
+            && m.len() <= MAX_RECEIPT_BYTES as u64,
         "unsafe retirement record"
     );
-    let bytes = read_stable_bounded(path, MAX_RECEIPT_BYTES as u64, "retirement record")?;
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(())
+}
+fn record_stamp(m: &fs::Metadata) -> Value {
+    json!({"identity":id(m),"ctime":m.ctime(),"ctime_ns":m.ctime_nsec()})
+}
+fn record_directory_policy(m: &fs::Metadata, owner: u32, group: u32) -> Result<()> {
+    ensure!(
+        m.is_dir() && m.uid() == owner && m.gid() == group && m.mode() & 0o7777 == 0o700,
+        "retirement record ancestry is not private"
+    );
+    Ok(())
+}
+fn record_directory_same(a: &fs::Metadata, b: &fs::Metadata) -> bool {
+    a.dev() == b.dev()
+        && a.ino() == b.ino()
+        && a.uid() == b.uid()
+        && a.gid() == b.gid()
+        && a.mode() == b.mode()
+}
+fn open_record_child(parent: &File, name: &Path, directory: bool) -> Result<File> {
+    let name = child(name)?;
+    let flags = libc::O_RDONLY
+        | libc::O_NOFOLLOW
+        | libc::O_CLOEXEC
+        | if directory { libc::O_DIRECTORY } else { 0 };
+    let fd = unsafe { libc::openat(parent.as_raw_fd(), name.as_ptr(), flags) };
+    ensure!(
+        fd >= 0,
+        "cannot open pinned retirement record child: {}",
+        std::io::Error::last_os_error()
+    );
+    Ok(unsafe { File::from_raw_fd(fd) })
+}
+fn record_namespace(
+    root: &Path,
+    path: &Path,
+    root_fd: &File,
+    parent_fd: &File,
+    file: &File,
+    owner: u32,
+    group: u32,
+) -> Result<()> {
+    ensure!(
+        root.canonicalize()? == root && path.canonicalize()? == path,
+        "aliased retirement record ancestry"
+    );
+    let parent = path.parent().context("retirement record parent")?;
+    let root_now = fs::symlink_metadata(root)?;
+    let parent_now = fs::symlink_metadata(parent)?;
+    record_directory_policy(&root_now, owner, group)?;
+    record_directory_policy(&parent_now, owner, group)?;
+    ensure!(
+        record_directory_same(&root_now, &root_fd.metadata()?)
+            && record_directory_same(&parent_now, &parent_fd.metadata()?),
+        "retirement record ancestry changed"
+    );
+    let entry = fs::symlink_metadata(path)?;
+    let opened = file.metadata()?;
+    record_file_policy(&entry, owner, group)?;
+    record_file_policy(&opened, owner, group)?;
+    ensure!(
+        record_stamp(&entry) == record_stamp(&opened),
+        "retirement record namespace changed"
+    );
+    Ok(())
+}
+fn record_bytes_in(root: &Path, path: &Path, owner: u32, group: u32) -> Result<Vec<u8>> {
+    let parent = path.parent().context("retirement record parent")?;
+    let parent_name = parent
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("retirement record directory name")?;
+    let suffix = parent_name
+        .strip_prefix("retirement-")
+        .context("foreign retirement record directory")?;
+    ensure!(
+        root.is_absolute()
+            && parent.parent() == Some(root)
+            && suffix.len() == 64
+            && suffix
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "foreign retirement record ancestry"
+    );
+    let root_fd = pinned_directory(root, Some(owner), true)?;
+    record_directory_policy(&root_fd.metadata()?, owner, group)?;
+    let parent_fd = open_record_child(&root_fd, Path::new(parent_name), true)?;
+    record_directory_policy(&parent_fd.metadata()?, owner, group)?;
+    let mut file = open_record_child(
+        &parent_fd,
+        Path::new(path.file_name().context("retirement record basename")?),
+        false,
+    )?;
+    record_namespace(root, path, &root_fd, &parent_fd, &file, owner, group)?;
+    let before = file.metadata()?;
+    record_file_policy(&before, owner, group)?;
+    let mut bytes = Vec::with_capacity(usize::try_from(before.len())?);
+    std::io::Read::by_ref(&mut file)
+        .take(MAX_RECEIPT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    let after = file.metadata()?;
+    record_file_policy(&after, owner, group)?;
+    ensure!(
+        bytes.len() as u64 == before.len() && record_stamp(&before) == record_stamp(&after),
+        "retirement record changed while read"
+    );
+    record_namespace(root, path, &root_fd, &parent_fd, &file, owner, group)?;
+    Ok(bytes)
+}
+fn read_record(path: &Path) -> Result<Value> {
+    // Production ownership remains exact root:root; fixture owner parameters
+    // are private to the shared implementation and never command inputs.
+    Ok(serde_json::from_slice(&record_bytes_in(
+        Path::new(STATE),
+        path,
+        0,
+        0,
+    )?)?)
 }
 fn binding(path: &Path) -> Result<Value> {
-    read_record(path)?;
-    let bytes = read_stable_bounded(path, MAX_RECEIPT_BYTES as u64, "retirement evidence")?;
+    let bytes = record_bytes_in(Path::new(STATE), path, 0, 0)?;
+    let _: Value = serde_json::from_slice(&bytes)?;
     Ok(json!({"path":path,"sha256":hex_lower(&Sha256::digest(bytes))}))
 }
 fn closed(p: &Spec) -> Result<Value> {
@@ -576,6 +698,137 @@ pub(super) async fn run(client: &Client, v: Value, spec: &Bound) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn record_fixture() -> (tempfile::TempDir, PathBuf, PathBuf, u32, u32) {
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let parent = root.path().join(format!("retirement-{}", "a".repeat(64)));
+        fs::DirBuilder::new().mode(0o700).create(&parent).unwrap();
+        let path = parent.join("terminal.json");
+        (root, parent, path, unsafe { libc::geteuid() }, unsafe {
+            libc::getegid()
+        })
+    }
+    #[test]
+    fn actual_receipt_writer_and_retirement_reader_are_idempotent_for_0440_and_historical_0400() {
+        use std::os::unix::fs::PermissionsExt;
+        let (root, _parent, path, owner, group) = record_fixture();
+        let value =
+            json!({"schema":"fixture-retirement-record-v1","operation":"exact immutable set"});
+        durable_receipt(&path, &value).unwrap();
+        let first = fs::symlink_metadata(&path).unwrap();
+        assert_eq!(first.mode() & 0o7777, 0o440);
+        assert_eq!(first.nlink(), 1);
+        let bytes = record_bytes_in(root.path(), &path, owner, group).unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), value);
+        durable_receipt(&path, &value).unwrap();
+        assert_eq!(fs::symlink_metadata(&path).unwrap().ino(), first.ino());
+        assert_eq!(
+            record_bytes_in(root.path(), &path, owner, group).unwrap(),
+            bytes
+        );
+        assert!(durable_receipt(&path, &json!({"conflicting":"must not replace"})).is_err());
+        assert_eq!(
+            record_bytes_in(root.path(), &path, owner, group).unwrap(),
+            bytes
+        );
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+        assert_eq!(
+            record_bytes_in(root.path(), &path, owner, group).unwrap(),
+            bytes
+        );
+        durable_receipt(&path, &value).unwrap();
+        assert_eq!(fs::symlink_metadata(&path).unwrap().mode() & 0o7777, 0o400);
+        assert_eq!(
+            record_bytes_in(root.path(), &path, owner, group).unwrap(),
+            bytes
+        );
+    }
+    #[test]
+    fn record_reader_rejects_other_modes_links_aliases_owners_and_nonprivate_ancestry() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let (root, parent, path, owner, group) = record_fixture();
+        durable_receipt(&path, &json!({"fixture":true})).unwrap();
+        for mode in [0o600, 0o640, 0o444, 0o404, 0o460] {
+            fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+            assert!(
+                record_bytes_in(root.path(), &path, owner, group).is_err(),
+                "{mode:o}"
+            );
+        }
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o440)).unwrap();
+        let linked = parent.join("linked.json");
+        fs::hard_link(&path, &linked).unwrap();
+        assert!(record_bytes_in(root.path(), &path, owner, group).is_err());
+        fs::remove_file(linked).unwrap();
+        let saved = parent.join("saved.json");
+        fs::rename(&path, &saved).unwrap();
+        symlink(&saved, &path).unwrap();
+        assert!(record_bytes_in(root.path(), &path, owner, group).is_err());
+        fs::remove_file(&path).unwrap();
+        fs::rename(saved, &path).unwrap();
+        let m = fs::symlink_metadata(&path).unwrap();
+        assert!(record_file_policy(&m, owner.wrapping_add(1), group).is_err());
+        assert!(record_file_policy(&m, owner, group.wrapping_add(1)).is_err());
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o750)).unwrap();
+        assert!(record_bytes_in(root.path(), &path, owner, group).is_err());
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(record_bytes_in(root.path(), &path, owner, group).is_err());
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(
+            record_bytes_in(
+                root.path(),
+                &root.path().join("foreign/terminal.json"),
+                owner,
+                group
+            )
+            .is_err()
+        );
+        record_bytes_in(root.path(), &path, owner, group).unwrap();
+    }
+    #[test]
+    fn pinned_record_reader_rejects_same_bytes_under_replaced_file_or_ancestor() {
+        use std::os::unix::fs::DirBuilderExt;
+        for ancestor in [false, true] {
+            let (root, parent, path, owner, group) = record_fixture();
+            let value = json!({"same":"bytes do not excuse replacement"});
+            durable_receipt(&path, &value).unwrap();
+            let root_fd = pinned_directory(root.path(), Some(owner), true).unwrap();
+            let parent_fd =
+                open_record_child(&root_fd, Path::new(parent.file_name().unwrap()), true).unwrap();
+            let file = open_record_child(&parent_fd, Path::new("terminal.json"), false).unwrap();
+            record_namespace(
+                root.path(),
+                &path,
+                &root_fd,
+                &parent_fd,
+                &file,
+                owner,
+                group,
+            )
+            .unwrap();
+            if ancestor {
+                fs::rename(&parent, root.path().join("moved")).unwrap();
+                fs::DirBuilder::new().mode(0o700).create(&parent).unwrap();
+            } else {
+                fs::rename(&path, parent.join("old.json")).unwrap();
+            }
+            durable_receipt(&path, &value).unwrap();
+            assert!(
+                record_namespace(
+                    root.path(),
+                    &path,
+                    &root_fd,
+                    &parent_fd,
+                    &file,
+                    owner,
+                    group
+                )
+                .is_err()
+            );
+        }
+    }
     #[test]
     fn resumable_restoration_requires_exact_complete_proof_without_relabeling_network_reads() {
         let good = json!({"schema":"jetstreamer-foundation-holding-resumable-restore-v1","artifact":"prefix213",
