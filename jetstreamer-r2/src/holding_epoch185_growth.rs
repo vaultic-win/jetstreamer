@@ -405,16 +405,20 @@ fn decode_native_jobs(v: &Value) -> Result<Value> {
                         .any(|b| b.is_ascii_control() || b.is_ascii_whitespace())
             })
             .context("185 native ListJobs unit")?;
+        let mut unit_object = String::from("/org/freedesktop/systemd1/unit/");
+        for b in unit.bytes() {
+            if b.is_ascii_alphanumeric() {
+                unit_object.push(char::from(b));
+            } else {
+                unit_object.push_str(&format!("_{b:02x}"));
+            }
+        }
         ensure!(
             ids.insert(id)
                 && job[2].as_str().is_some_and(|s| !s.is_empty())
                 && matches!(job[3].as_str(), Some("waiting" | "running"))
                 && job[4] == format!("/org/freedesktop/systemd1/job/{id}")
-                && job[5]
-                    .as_str()
-                    .and_then(|s| s.strip_prefix("/org/freedesktop/systemd1/unit/"))
-                    .is_some_and(|s| !s.is_empty()
-                        && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')),
+                && job[5] == unit_object,
             "185 native ListJobs identity, state or object path differs"
         );
         rows.push(json!({"unit":unit}));
@@ -967,6 +971,9 @@ mod tests {
         no_queued_entry_jobs(&decoded).unwrap();
         let mut entry = valid.clone();
         entry["data"][0][0][1] = json!("jetstreamer-root-sweep-e185-replacement.service");
+        entry["data"][0][0][5] = json!(
+            "/org/freedesktop/systemd1/unit/jetstreamer_2droot_2dsweep_2de185_2dreplacement_2eservice"
+        );
         assert!(no_queued_entry_jobs(&decode_native_jobs(&entry).unwrap()).is_err());
         for bad in [
             json!({"type":"a(usssoo)","data":[]}),
