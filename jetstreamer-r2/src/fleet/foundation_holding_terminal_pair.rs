@@ -701,4 +701,5 @@ pub(super) fn check(
 }
 
 #[cfg(test)]
+#[path = "foundation_holding_terminal_pair/tests.rs"]
 mod tests;
