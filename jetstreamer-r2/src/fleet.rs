@@ -20,6 +20,7 @@ mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
 mod full209_status;
+mod full227_failure;
 mod full227_status;
 mod native141;
 mod native144;
@@ -134,6 +135,9 @@ pub(super) fn warmup223_terminal_not_replaced(proof: &Value) -> Result<()> {
 }
 pub(super) async fn publish_full227_status() -> Result<()> {
     full227_status::run().await
+}
+pub(super) fn capture_full227_failure() -> Result<()> {
+    full227_failure::capture()
 }
 pub(super) async fn publish_full209_status() -> Result<()> {
     full209_status::run().await
@@ -2411,6 +2415,8 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == full227_failure::SCHEMA {
+                full227_failure::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native207_terminal::SCHEMA {
                 native207_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native209_terminal::SCHEMA {
@@ -2622,6 +2628,7 @@ pub(super) async fn run() -> Result<()> {
     cold223_scan::native20_event_census(&plan, &before)?;
     cold223_scan::native20_terminal_census(&plan, &before)?;
     singleton227_terminal::terminal_census(&plan, &before)?;
+    full227_failure::census_check(&plan, &before)?;
     native207_terminal::census_check(&plan, &before)?;
     native209_terminal::census_check(&plan, &before)?;
     native228_terminal::census_check(&plan, &before)?;
