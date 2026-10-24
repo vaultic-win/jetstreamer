@@ -319,7 +319,7 @@ pub(crate) fn validate_tail_mode(
                 !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
             })
     {
-        return Err("epoch223 tail comparison accepts only its exact477-slot tail and private tail namespace; never a cold qualification".into());
+        return Err("epoch 223 tail comparison accepts only its exact 477-slot tail and private tail namespace; never a cold qualification".into());
     }
     Ok(())
 }

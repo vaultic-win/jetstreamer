@@ -385,7 +385,7 @@ pub(super) fn enable(p: &mut Plan, c: &mut Value, b: &Bound) -> Result<()> {
             && failed["MainPID"] == "0"
             && failed["NRestarts"] == "0"
             && failed["ExecMainStatus"] == "1",
-        "152 recovery lacks exact failed 03:46observer"
+        "152 recovery lacks exact failed 03:46 observer"
     );
     p.memory152_rebind = Some(b.clone());
     let v = proof(p)?.context("152 proof")?;

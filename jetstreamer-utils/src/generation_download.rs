@@ -114,7 +114,7 @@ fn validate_admission_receipt(admission: &Value, now: u64) -> Result<()> {
                 && admission["recorded_unix_seconds"]
                     .as_u64()
                     .is_some_and(|n| n <= now && now - n <= 1800),
-            "wrong or stale snapshot-only144 admission authority"
+            "wrong or stale snapshot-only 144 admission authority"
         );
     } else {
         ensure!(

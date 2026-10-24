@@ -124,7 +124,7 @@ pub(super) fn derive_next(
                     || p.observer_config.path == prepared_config
                     || terminal141::matches(p)
                     || provisional141::candidate(p)),
-            "101observer/config is outside its exact manual or prepared namespace"
+            "101 observer/config is outside its exact manual or prepared namespace"
         );
         (
             Path::new("/var/lib/jetstreamer").join(format!(
@@ -1049,7 +1049,7 @@ mod tests {
             derive_next(&p, &pb, &c, &config)
                 .unwrap_err()
                 .to_string()
-                .contains("101observer/config")
+                .contains("101 observer/config")
         );
         let (mut p, _, _, _) = fixture_101();
         p.observer =
@@ -1060,7 +1060,7 @@ mod tests {
             derive_next(&p, &pb, &c, &config)
                 .unwrap_err()
                 .to_string()
-                .contains("101observer/config")
+                .contains("101 observer/config")
         );
         let (mut p, _, c, config) = fixture_101();
         p.scope_101_200 = None;

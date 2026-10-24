@@ -203,7 +203,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "exact root-only144 sealed evidence and real manager journal; read-only, no remote calls"]
+    #[ignore = "exact root-only 144 sealed evidence and real manager journal; read-only, no remote calls"]
     fn exact144_manager_and_manifest_match_without_archive_completion_claim() {
         let bytes=fs::read("/usr/local/lib/jetstreamer/horizon-epoch144-terminal-evidence-20261021-v1/terminal.json").unwrap();
         let e: Value = serde_json::from_slice(&bytes).unwrap();

@@ -472,7 +472,7 @@ fn run() -> Result<()> {
     }
     admission(&read(&p.observer, false)?)?;
     if check {
-        println!("private144 scan preflight passed; no archive hash,child scan or writes");
+        println!("private 144 scan preflight passed; no archive hash, child scan or writes");
         return Ok(());
     }
     let before = measured(Path::new(source_path(&p)))?;
