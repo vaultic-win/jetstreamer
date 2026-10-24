@@ -918,6 +918,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let owner = unsafe { libc::geteuid() };
         let root = dir.path().canonicalize().unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
         let path = root.join("receipt.json");
         atomic_json(&path, &json!({"counter":u64::MAX}), owner, false).unwrap();
         let bytes = stable_read(&path, 1024, owner, true).unwrap();
