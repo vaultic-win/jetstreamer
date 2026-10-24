@@ -285,10 +285,10 @@ pub(super) fn model(p: &Plan, m: &Value) -> Result<Value> {
         a.retain(|r| r != 185);
     }
     let b = serde_json::to_value(&p.terminal185.as_ref().unwrap().proof)?;
-    if let Some(a) = v["evidence"].as_array_mut() {
-        if !a.contains(&b) {
-            a.push(b);
-        }
+    if let Some(a) = v["evidence"].as_array_mut()
+        && !a.contains(&b)
+    {
+        a.push(b);
     }
     Ok(v)
 }
@@ -402,7 +402,7 @@ mod tests {
         stop["JOB_TYPE"] = json!("stop");
         stop["JOB_RESULT"] = json!("done");
         lifecycle(&[start.clone(), stop.clone()], PRODUCER, PID).unwrap();
-        assert!(lifecycle(&[start.clone()], PRODUCER, PID).is_err());
+        assert!(lifecycle(std::slice::from_ref(&start), PRODUCER, PID).is_err());
         let mut foreign = start.clone();
         foreign["INVOCATION_ID"] = json!("foreign");
         foreign["__REALTIME_TIMESTAMP"] = json!("102");
