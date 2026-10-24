@@ -24,6 +24,7 @@ mod canary227_status;
 mod canary227_terminal;
 mod capped204205_admission;
 mod capped204205_work;
+mod original_capped204205;
 mod census141_poh;
 mod cold223_scan;
 mod continuation144;
@@ -447,6 +448,15 @@ pub(super) fn capped204205_origin_scope(epoch: u64, unit: &str) -> Result<()> {
 }
 pub(super) fn capped204205_cleanup_allowed(f: &Value, epoch: u64) -> bool {
     capped204205_work::cleanup_allowed(f, epoch)
+}
+pub(super) fn original_capped204205_terminal_time(epoch:u64,e:&Value)->Result<Option<u64>> {
+    original_capped204205::terminal_time(epoch,e)
+}
+pub(super) fn original_capped204205_terminal_current(epoch:u64,e:&Value,current:&BTreeMap<String,Value>,owners:&[(String,String)])->Result<bool> {
+    original_capped204205::terminal_current(epoch,e,current,owners)
+}
+pub(super) fn original_capped204205_repair_scope(name:&str,first:u64,last:u64)->bool {
+    original_capped204205::repair_unit(name,first,last)
 }
 pub(super) fn capped204205_cleanup_current(
     f: &Value,
@@ -2371,6 +2381,7 @@ pub(super) fn census(
             || name.starts_with("horizon-controller-")
             || name.starts_with("horizon-qualify-")
             || assigned_singleton_owner(name, first_epoch, last_epoch)
+            || original_capped204205::repair_unit(name, first_epoch, last_epoch)
             // Private RAM supervisors are entry owners too. Until the explicit
             // auxiliary claim contract is integrated, fail closed rather than
             // silently omit one from the complete campaign census.

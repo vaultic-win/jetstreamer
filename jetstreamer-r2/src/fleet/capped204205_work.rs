@@ -363,11 +363,11 @@ fn evaluate(
     );
     let unit = string(p, "producer_unit")?;
     let (original, _, _, _) = profile(c.epoch)?;
-    capped204205_admission::original_idle(
+    original_capped204205::idle_for_plan(
         census
             .get(original)
             .context("original capped owner omitted")?,
-        c.epoch,
+        p,
     )?;
     lifecycle::policy(c, &i.policy)?;
     let producer = census

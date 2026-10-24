@@ -29,7 +29,7 @@ pub(super) fn validate(
     let old_owner = f["unit_census"]
         .get(old)
         .context("capped original owner absent from raw accepted census")?;
-    original_idle(old_owner, epoch)?;
+    original_capped204205::idle_for_plan(old_owner, p)?;
     ensure!(
         !f["active"]
             .as_array()
