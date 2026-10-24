@@ -360,6 +360,17 @@ struct Process {
     cmdline: Vec<u8>,
     cgroup: Vec<u8>,
 }
+fn sole_process(bytes: &[u8], pid: u32) -> Result<()> {
+    let ids = std::str::from_utf8(bytes)?
+        .split_whitespace()
+        .map(str::parse::<u32>)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        !ids.is_empty() && ids.iter().all(|n| *n == pid),
+        "185 holding unit has an additional or missing process"
+    );
+    Ok(())
+}
 fn process(a: &Admission, v: &Value, pid: u32) -> Result<Process> {
     let root = PathBuf::from(format!("/proc/{pid}"));
     let stat = proc_bytes(&root.join("stat"), 8192)?;
@@ -403,6 +414,10 @@ fn process(a: &Admission, v: &Value, pid: u32) -> Result<Process> {
             .any(|l| l == format!("0::{group}")),
         "185 holding PID is outside the exact unit cgroup"
     );
+    let members = Path::new("/sys/fs/cgroup")
+        .join(group.trim_start_matches('/'))
+        .join("cgroup.procs");
+    sole_process(&proc_bytes(&members, 65536)?, pid)?;
     Ok(Process {
         pid,
         start,
@@ -600,6 +615,18 @@ mod tests {
         let mut changed = owner.clone();
         changed["MainPID"] = json!("1235");
         assert!(same_owner(&owner, &changed).is_err());
+    }
+    #[test]
+    fn admitted_unit_cannot_hide_a_second_replay_or_transport_process() {
+        sole_process(b"1234\n", 1234).unwrap();
+        for bytes in [
+            b"".as_slice(),
+            b"1234\n4321\n".as_slice(),
+            b"4321\n".as_slice(),
+            b"unknown\n".as_slice(),
+        ] {
+            assert!(sole_process(bytes, 1234).is_err());
+        }
     }
     #[test]
     fn process_stat_binds_start_identity_and_rejects_zombies() {
