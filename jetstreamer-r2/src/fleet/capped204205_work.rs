@@ -15,6 +15,14 @@ mod tests;
 pub(super) const EVENT_SCHEMA: &str = "jetstreamer-capped204205-fleet-transition-v1";
 pub(super) const OBSERVER_SHA: &str =
     "78dc39c3b8cf3e4198e6d2b35348ba764fe1c2ceecbd12cc536090ae8315facd";
+// New observer generations enter this closed tuple only after their actual
+// executable and source have passed qualification and been captured.
+fn observer_revision(sha: &str) -> Option<&'static str> {
+    match sha {
+        OBSERVER_SHA => Some("3e9326815cf46d03ac9423d5bcf4c637774b7260"),
+        _ => None,
+    }
+}
 const WORKER_SHA: &str = "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc";
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
@@ -328,8 +336,8 @@ fn evaluate(
     let observed: BoundFile = serde_json::from_value(f["observer"].clone())?;
     let executable: BoundFile = serde_json::from_value(f["observer_executable"].clone())?;
     ensure!(
-        executable.sha256 == OBSERVER_SHA
-            && f["observer_source_revision"] == "3e9326815cf46d03ac9423d5bcf4c637774b7260"
+        observer_revision(&executable.sha256)
+            .is_some_and(|revision| f["observer_source_revision"] == revision)
             && evidence::bound(&observed, false)? == *observer,
         "capped work detached from deployed corrected observer provenance"
     );
@@ -339,7 +347,7 @@ fn evaluate(
             && f["epoch"] == c.epoch
             && f["producer_plan_sha256"] == c.producer_plan.sha256
             && f["launch"] == private157::binding(&c.launch)
-            && f["observer_executable_sha256"] == OBSERVER_SHA
+            && f["observer_executable_sha256"] == executable.sha256
             && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && resource_ms <= sample_ms
             && resource_ms / 1000 <= now

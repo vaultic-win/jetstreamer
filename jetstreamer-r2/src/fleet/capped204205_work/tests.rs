@@ -452,3 +452,16 @@ fn derive_plan_preserves_every_unrelated_owner_and_failure_history() {
     assert_eq!(event["replay_launch_authorized"], false);
     assert_eq!(event["resource_samples_taken"], 0);
 }
+
+#[test]
+fn observer_generation_needs_the_exact_qualified_source_tuple() {
+    assert_eq!(
+        observer_revision(OBSERVER_SHA),
+        Some("3e9326815cf46d03ac9423d5bcf4c637774b7260")
+    );
+    assert!(
+        observer_revision("21bd97c29d9789719ef852428ed52d3e676e5a9ee3e26e855f26966c21e123bf")
+            .is_none()
+    );
+    assert!(observer_revision(&"a".repeat(64)).is_none());
+}

@@ -423,10 +423,8 @@ pub(super) fn run() -> Result<()> {
     profile(epoch)?;
     let observer = evidence::bound(&s.observer, false)?;
     let prior = evidence::bound(&s.previous_fleet, false)?;
-    ensure!(
-        s.observer_executable.sha256 == OBSERVER_SHA,
-        "observer executable is not the deployed corrected generation"
-    );
+    let observer_source_revision = observer_revision(&s.observer_executable.sha256)
+        .context("observer executable is not a qualified corrected generation")?;
     evidence::executable(&s.observer_executable)?;
     ensure!(
         prior["schema"] == SCHEMA
@@ -615,8 +613,8 @@ pub(super) fn run() -> Result<()> {
         "capped metadata census changed; preserve artifacts and retry next permitted observation"
     );
     let frame = json!({"schema":"jetstreamer-capped204205-work-frame-v1","epoch":epoch,"sampled_at_utc":stamp,"sampled_unix_millis":ms,
-        "observer":private157::binding(&s.observer),"observer_executable_sha256":OBSERVER_SHA,"producer_plan_sha256":s.producer_plan.sha256,
-        "observer_executable":private157::binding(&s.observer_executable),"observer_source_revision":"3e9326815cf46d03ac9423d5bcf4c637774b7260",
+        "observer":private157::binding(&s.observer),"observer_executable_sha256":s.observer_executable.sha256,"producer_plan_sha256":s.producer_plan.sha256,
+        "observer_executable":private157::binding(&s.observer_executable),"observer_source_revision":observer_source_revision,
         "launch":private157::binding(&launched),"unit_census_before":before,"unit_census_after":after,
         "previous_fleet":private157::binding(&s.previous_fleet),
         "next_observer_registration":private157::binding(&binding(&registration_path)?),
