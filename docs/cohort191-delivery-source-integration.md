@@ -160,7 +160,10 @@ collector, and the fixed event-directory namespace; publication_authorized,
 replay_launch_authorized and r2_mutations are all false. This deliberately uses
 the observer-independent terminal-transition proof, not a future complete
 queue/status event. The normal plan/receipt readers enforce root ownership,
-actual SHA binding and immutable handoff/collection plans.
+actual SHA binding and immutable handoff/collection plans. An optional explicit sample_target_utc may postpone a
+missed successor only on the original30minute grid; the actual predecessor and
+minimum1800seconds remain unchanged. No timestamp is guessed from wall time and
+no extra resource observation is taken.
 
 The preparation consumes the last accepted completed five-owner cycle. It
 requires exactly152–153,155–156,191–194,183–184,185, unchanged paired owner IDs,
@@ -196,3 +199,75 @@ five-owner config fails against the four-owner model and the precise transformed
 config passes. These new tests and this follow-up source have not been compiled
 or run; only rustfmt parsing and whitespace checks have run while141 status holds
 the shared target. The successful942-test/release baseline above remains separate.
+
+## Guarded local retirement audit, source-only
+
+Keep the current191–194 defer and retain all four canonical pairs until the
+whole cohort is ready and a separate boundary/retirement route is qualified.
+No early191 retirement or physical capacity relief is claimed by this branch.
+The normal boundary watcher currently covers101–181; its existence is not proof
+of any190–191 through194–195 boundary.
+
+The source obligation is more precise than an unconditional four-file hold:
+
+- Initial queue admission and the new terminal collector require all four actual
+  canonical archive/sidecar pairs and the complete native import attestation.
+  Preserve that actual terminal proof; recollecting it after retirement would
+  fail its all-four materialization gate.
+- Later dispatcher/sync custody checks materialize their selected epoch. Current
+  metadata capture materializes exactly the working/non-ready epochs and records
+  local identity only for current claims. Ready members instead require their
+  canonical durable whole-object R2 receipt. The follow-up now explicitly matches
+  each such receipt's epoch, digest and length to its native public-batch member;
+  a historical receipt for a different payload cannot replace local custody.
+- Native batch receipts, sealed root manifest, original root/four-close and PID1
+  terminal evidence, collected-controller exit capture if needed, root-controller
+  state/receipt attestation, queue history/intents/launches, full/plugin receipts,
+  ready receipts and original status provenance must remain. Local payload
+  retirement does not authorize deleting any of those proofs or changing the
+  terminal controller's retained evidence. No automatic queue restart/replay is
+  permitted; startup intentionally insists on its original all-four custody.
+- Once all four are ready, the real queue naturally completes. A later all-ready
+  capture must omit the now-terminal manager as a live claim and bind the four
+  real ready receipts; it must not retain an invented live queue owner merely to
+  keep an old capture plan usable. Normal authenticated status cleanup remains
+  separate. All-ready custody can then validate retained import metadata without
+  opening a retired canonical payload, but that route still needs qualification
+  with actual retired-file fixtures before any early-retirement exception.
+
+The required boundary set is190–191,191–192,192–193,193–194,194–195. The current
+native `jetstreamer-horizon-verify-pair` profile covers independent full/plugin
+verification only and cannot be relabeled a boundary verifier. The relevant edge
+reader is `archive_boundaries --verify-pair LEFT RIGHT`, whose source checks
+contiguous epoch/slot ranges, parent slot/hash and the initial anchor. Its actual
+newly built sealed executable and large-update decoding compatibility must be
+qualified independently; no future boundary SHA is supplied here.
+
+The next implementation after the current terminal-transition tests is a narrow
+Rust five-pair boundary dispatcher/receipt writer. It must authenticate exact
+left/right files or separately authenticated restore scratch copies, both
+matching full receipts and actual compatible reader/wrapper hashes, real native
+service identity and successful edge result, unchanged identity/digest afterward,
+and fsynced no-clobber four-word receipts. Each receipt is
+`LEFT_SHA RIGHT_SHA BOUNDARY_READER_SHA NATIVE_BOUNDARY_WRITER_SHA` at
+`boundary-L-R.ok`, matching the normal progressive retirement parser. Neighbors
+190 and195 require their own real full evidence;191-only full profiles cannot be
+borrowed for them. If a neighbor is absent, use separately admitted authenticated
+restore into exact scratch, preserve that receipt and prove the restored digest.
+Do not infer a missing neighbor or cross-host boundary from a canonical sidecar.
+
+Run those boundary scans serially after the cohort's full/plugin tasks are
+terminal, or qualify an explicit additional concurrency/resource claim; the84GiB
+queue/verifier/compiler/uploader envelope is not spare boundary capacity. Keep
+credentials/network out of the boundary reader. No watcher range is broadened by
+this audit. Boundary receipts must exist before removing either local member
+needed to produce them.
+
+Whole-cohort retirement then requires four independently matched full/plugin and
+canonical authenticated R2 ready receipts, all five adjacent-boundary receipts,
+normal current remote archive/sidecar re-observation, exact gate-tool allowlists,
+and the existing shared local-mutation lock. Use the normal Rust progressive
+`--check-retirement-only` policy preflight for each explicit epoch before the
+separately authorized `retire-local` path; preserve normal defer handling until
+that exact guarded transition is approved. The preflight performs no child/R2 or
+local removal. None of these boundary/retirement actions has been run here.

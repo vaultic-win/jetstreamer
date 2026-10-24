@@ -15,6 +15,8 @@ pub(super) struct Profile {
 #[serde(deny_unknown_fields)]
 struct HandoffSpec {
     schema: String,
+    #[serde(default)]
+    sample_target_utc: Option<String>,
     profile: Profile,
     publication_authorized: bool,
     replay_launch_authorized: bool,
@@ -217,6 +219,41 @@ pub(super) fn next_config(p: &Plan, config: &mut Value) -> Result<()> {
     );
     Ok(())
 }
+fn cadence_target(old: &str, new: &str) -> Result<()> {
+    let gap = utc_seconds(new)?
+        .checked_sub(utc_seconds(old)?)
+        .context("191 transition cannot backdate its successor")?;
+    ensure!(
+        gap % 1800 == 0,
+        "191 transition retime must retain the original30minute cadence grid"
+    );
+    Ok(())
+}
+fn retime(next: &mut Plan, config: &mut Value, target: &str) -> Result<()> {
+    cadence_target(&next.sample_target_utc, target)?;
+    let new = stamp(target);
+    next.observer = next
+        .observer
+        .parent()
+        .context("191 observer parent")?
+        .join(format!("sample-{new}.json"));
+    next.estimate_output = next
+        .estimate_output
+        .parent()
+        .context("191 estimate parent")?
+        .join(format!(
+            "horizon-r2-status-estimates-{new}-cohort-gated-v5.json"
+        ));
+    next.fleet_output = next
+        .fleet_output
+        .parent()
+        .context("191 fleet parent")?
+        .join(format!("fleet-{new}.json"));
+    next.sample_target_utc = target.into();
+    config["not_before_utc"] = json!(target);
+    config["output"] = json!(next.observer);
+    Ok(())
+}
 /// Consumes only a real already-written root-only terminal proof and sealed
 /// handoff spec. It takes no new observation and writes no operational receipt.
 pub(super) fn enable(
@@ -243,7 +280,10 @@ pub(super) fn enable(
         proof["schema"] == "jetstreamer-cohort191-terminal-transition-v1",
         "191 first transition requires observer-independent native terminal proof"
     );
-    let (_model, edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
+    let (_model, mut edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
+    if let Some(target) = value.sample_target_utc {
+        retime(next, &mut edited, &target)?;
+    }
     next.cohort191_delivery = Some(profile);
     next.expected_epochs = epochs;
     validate(next)?;
@@ -619,5 +659,17 @@ mod tests {
         validate_observer_config(&p, &four, &corrected).unwrap();
         config["replays"] = corrected["replays"].clone();
         assert_eq!(range_set(&config, "replays").unwrap().len(), 4);
+    }
+    #[test]
+    fn explicit_missed_slot_retime_never_backdates_or_adds_short_observation_cadence() {
+        cadence_target("2026-10-24T00:26:00Z", "2026-10-24T00:56:00Z").unwrap();
+        cadence_target("2026-10-24T00:26:00Z", "2026-10-24T00:26:00Z").unwrap();
+        for target in [
+            "2026-10-23T23:56:00Z",
+            "2026-10-24T00:27:00Z",
+            "2026-10-24T00:55:59Z",
+        ] {
+            assert!(cadence_target("2026-10-24T00:26:00Z", target).is_err());
+        }
     }
 }
