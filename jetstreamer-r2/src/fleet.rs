@@ -10,6 +10,8 @@ mod assembly144_admission;
 mod assembly144_prepare;
 mod bounded205;
 mod canary227;
+mod canary227_allocation;
+mod canary227_peer;
 mod canary227_capability;
 mod canary227_admission;
 mod output_credit204205;

@@ -360,10 +360,25 @@ fn run_profile(sampled: bool) -> Result<()> {
         .context("227 free overflow")?;
     candidate(&p, &canary, &s.canary_plan, protected, required)?;
     let (_, memory_required) = sample(&s, &o, &f, now, required)?;
+    let total = o["host_memory"]["total_kib"]
+        .as_u64()
+        .and_then(|n| n.checked_mul(1024))
+        .context("227 floor host memory overflow")?;
+    let memory_floor_policy = canary227_peer::memory_floor(&f, total)?;
+    ensure!(
+        sampled || memory_floor_policy["native223_live"] == false,
+        "legacy canary profile cannot protect the live native223 runtime memory floor"
+    );
+    let floor_top_up = if sampled {
+        memory_floor_policy["memory_floor_top_up_bytes"]
+            .as_u64()
+            .context("227 memory floor top-up")?
+    } else {
+        0
+    };
     let (auxiliary_growth, auxiliary_measurements) = prefix223_live_peer::memory(&f)?;
-    let memory_required = memory_required
-        .checked_add(auxiliary_growth)
-        .context("227 memory claim overflow")?;
+    let memory_required =
+        canary227_peer::add_memory(memory_required, floor_top_up, auxiliary_growth)?;
     ensure!(
         o["host_memory"]["conservative_available_kib"]
             .as_u64()
@@ -447,6 +462,8 @@ fn run_profile(sampled: bool) -> Result<()> {
         r["output_credit_evidence_before"] = output_credit_before;
         r["output_credit_evidence_after"] = output_credit_after;
         r["park_maintenance_idle_required"] = json!(true);
+        r["memory_floor_policy"] = memory_floor_policy;
+        r["required_available_memory_bytes"] = json!(memory_required);
     }
     r["input_capability"] = private157::binding(&s.input_capability);
     r["capability_origin"] = capability_origin;

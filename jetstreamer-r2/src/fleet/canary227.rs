@@ -3,7 +3,8 @@
 use super::*;
 
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch227-v1625-comparison-launch-v1";
-pub(super) const UNIT: &str = "horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service";
+pub(super) const UNIT: &str =
+    "horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service";
 pub(super) const ROOT: &str =
     "/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-selection-v2";
 pub(super) const NODE: &str =
@@ -249,6 +250,11 @@ pub(super) fn guard_matches(c: &DiagnosticClaim, r: &Value, p: &Value) -> bool {
 }
 
 #[cfg(test)]
+pub(super) fn peer_fixture() -> (DiagnosticClaim, Value) {
+    tests::fixture()
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -256,7 +262,7 @@ mod tests {
         json!({"path":path,"sha256":sha})
     }
 
-    fn fixture() -> (DiagnosticClaim, Value) {
+    pub(super) fn fixture() -> (DiagnosticClaim, Value) {
         let c = DiagnosticClaim {
             epoch: 227,
             unit: UNIT.into(),
@@ -332,7 +338,10 @@ mod tests {
             "/var/lib/jetstreamer/horizon-227-v1625-canary-admission-test/admission.json",
             &"d".repeat(64),
         );
-        r["input_capability"]=binding("/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-capability-test/receipts/capability.json",&"e".repeat(64));
+        r["input_capability"] = binding(
+            "/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-capability-test/receipts/capability.json",
+            &"e".repeat(64),
+        );
         r["expected_exec_start"] = json!(format!(
             "{} ; ignore_errors=no ; pid=123 }}",
             expected_command(&r).unwrap()
@@ -400,13 +409,32 @@ mod tests {
         c.scratch_path = "/tmp/canary227".into();
         assert!(!launch_matches(&c, &r));
         let (c, r) = fixture();
-        for (key,path) in [
-            ("resource_plan","/var/lib/jetstreamer/horizon-227-v1625-canary-resource-x/../resource-plan.json"),
-            ("resource_plan","/var/lib/jetstreamer/horizon-227-v1625-canary-resource-x extra/resource-plan.json"),
-            ("fresh_resource_admission","/tmp/horizon-227-v1625-canary-admission-test/admission.json"),
-            ("input_capability","/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-selection-v2/receipts/capability.json"),
-            ("input_capability","/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test/./receipts/capability.json"),
-        ] {let mut bad=r.clone();bad[key]["path"]=json!(path);assert!(!launch_matches(&c,&bad),"{path}");}
+        for (key, path) in [
+            (
+                "resource_plan",
+                "/var/lib/jetstreamer/horizon-227-v1625-canary-resource-x/../resource-plan.json",
+            ),
+            (
+                "resource_plan",
+                "/var/lib/jetstreamer/horizon-227-v1625-canary-resource-x extra/resource-plan.json",
+            ),
+            (
+                "fresh_resource_admission",
+                "/tmp/horizon-227-v1625-canary-admission-test/admission.json",
+            ),
+            (
+                "input_capability",
+                "/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-d01adb19-selection-v2/receipts/capability.json",
+            ),
+            (
+                "input_capability",
+                "/home/ubuntu/.jetstreamer-private/bounded-resource-227-v1625-test/./receipts/capability.json",
+            ),
+        ] {
+            let mut bad = r.clone();
+            bad[key]["path"] = json!(path);
+            assert!(!launch_matches(&c, &bad), "{path}");
+        }
         assert!(same_command(
             &r["expected_exec_start"],
             &json!(format!(

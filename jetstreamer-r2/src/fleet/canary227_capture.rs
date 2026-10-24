@@ -2,7 +2,8 @@
 use super::canary227 as c;
 use super::singleton227_capture::{journal, properties, require};
 use super::*;
-const OUTPUT: &str = "/var/lib/jetstreamer/horizon-227-v1625-canary-capture-selection-v2/launch.json";
+const OUTPUT: &str =
+    "/var/lib/jetstreamer/horizon-227-v1625-canary-capture-selection-v2/launch.json";
 const UNIT_FILE: &str =
     "/etc/systemd/system/horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service";
 const PROTECTIVE: &str = "horizon-canary227-v1625-protective-selection-v2.service";
@@ -19,7 +20,7 @@ struct Spec {
     unit_file: BoundFile,
     output: PathBuf,
 }
-fn sandbox(p: &BTreeMap<String, String>, command: &str) -> Result<()> {
+pub(super) fn sandbox(p: &BTreeMap<String, String>, command: &str) -> Result<()> {
     // systemd exposes requested decimal caps; the runner checks rounded cgroup limits.
     require(
         p,
@@ -144,8 +145,11 @@ fn protection(
     );
     native227_v1625::no_authority(a)
 }
-fn manager(g: &Value, plan: &BoundFile, now: u64) -> Result<Value> {
-    let p=properties(PROTECTIVE,"Type,User,Restart,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,Result,ExecMainStatus,ActiveState,SubState")?;
+pub(super) fn manager(g: &Value, plan: &BoundFile, now: u64) -> Result<Value> {
+    let p = properties(
+        PROTECTIVE,
+        "Type,User,Restart,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,Result,ExecMainStatus,ActiveState,SubState",
+    )?;
     require(
         &p,
         &[
@@ -241,7 +245,10 @@ fn bindings(s: &Spec) -> Result<()> {
     );
     native209_admission::sealed_file(&s.unit_file.path, &s.unit_file.sha256, None)?;
     let m = fs::symlink_metadata(&s.unit_file.path)?;
-    ensure!(m.mode() & 0o7777 == 0o444, "227 unit must be owned by root with mode 0444");
+    ensure!(
+        m.mode() & 0o7777 == 0o444,
+        "227 unit must be owned by root with mode 0444"
+    );
     for b in [
         &s.resource_plan,
         &s.resource_proposal,
@@ -394,7 +401,10 @@ pub(super) fn run() -> Result<()> {
             && u["NRestarts"] == "0",
         "227 actual guarded PID/restarts differ"
     );
-    let p=properties(c::UNIT,"Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,ExecMainPID,ExecMainStartTimestampMonotonic,Result,ActiveState,SubState,NRestarts,ExecStart,Transient,FragmentPath,RemainAfterExit")?;
+    let p = properties(
+        c::UNIT,
+        "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,ExecMainPID,ExecMainStartTimestampMonotonic,Result,ActiveState,SubState,NRestarts,ExecStart,Transient,FragmentPath,RemainAfterExit",
+    )?;
     sandbox(
         &p,
         r["expected_exec_start"]

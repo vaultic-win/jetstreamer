@@ -173,8 +173,7 @@ fn native207_guard(
     Ok(())
 }
 pub(super) fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
-    let mut total = 0u64;
-    let mut evidence = Vec::new();
+    let (mut total, mut evidence) = canary227_peer::memory(f)?;
     for row in f["active"]
         .as_array()
         .context("227 auxiliary owner census")?
@@ -299,6 +298,23 @@ pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> 
         .div_ceil(count))
 }
 pub(super) fn protected_growth(
+    f: &Value,
+    observer: &Value,
+    guards: &BTreeMap<String, BoundFile>,
+    sample: u64,
+    now: u64,
+) -> Result<(u64, Vec<Value>)> {
+    let (view, guards, extra, mut evidence) =
+        canary227_peer::split(f, observer, guards, sample, now)?;
+    let (base, rest) = protected_growth_base(&view, observer, &guards, sample, now)?;
+    evidence.extend(rest);
+    Ok((
+        base.checked_add(extra)
+            .context("canary peer total protected growth overflow")?,
+        evidence,
+    ))
+}
+fn protected_growth_base(
     f: &Value,
     observer: &Value,
     guards: &BTreeMap<String, BoundFile>,
@@ -568,6 +584,7 @@ pub(super) fn disk_free() -> Result<u64> {
         .context("227 disk overflow")
 }
 pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+    canary227_peer::current(f, current)?;
     let old = f["unit_census"]
         .as_object()
         .context("227 predecessor census")?;
@@ -616,10 +633,25 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()>
     Ok(())
 }
 pub(super) fn limits(f: &Value) -> Result<Value> {
+    let canary_caps = canary227_peer::limits(f)?;
     let mut result = serde_json::Map::new();
     for row in f["active"].as_array().context("227 active cap census")? {
         let owner = active_owner(row)?;
         let name = owner["Id"].as_str().context("227 cap owner")?;
+        if name == canary227::UNIT {
+            ensure!(
+                result
+                    .insert(
+                        name.to_owned(),
+                        canary_caps
+                            .clone()
+                            .context("missing authenticated canary caps")?
+                    )
+                    .is_none(),
+                "duplicate canary cap owner"
+            );
+            continue;
+        }
         let output=ProcessCommand::new("/usr/bin/systemctl").args(["show",name,"--no-pager","--property=MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ControlGroup"]).output()?;
         ensure!(
             output.status.success() && output.stdout.len() < 16384,
