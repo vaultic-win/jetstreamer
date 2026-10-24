@@ -2073,6 +2073,16 @@ fn ram_entry_owner(name: &str) -> bool {
     name.starts_with("horizon-203-ram-resource-")
 }
 
+// Singleton producers use a separate namespace from horizon-qualify. Discover
+// every assigned singleton, including profiles this helper cannot yet interpret,
+// so an old reader must reject an omitted new owner rather than hide its growth.
+fn assigned_singleton_owner(name: &str, first_epoch: u64, last_epoch: u64) -> bool {
+    name.strip_prefix("horizon-singleton-")
+        .and_then(|tail| tail.split_once('-'))
+        .and_then(|(epoch, _)| epoch.parse::<u64>().ok())
+        .is_some_and(|epoch| (first_epoch..=last_epoch).contains(&epoch))
+}
+
 pub(super) fn census(
     names: &BTreeSet<String>,
     first_epoch: u64,
@@ -2129,6 +2139,7 @@ pub(super) fn census(
         if name.starts_with("jetstreamer-root-sweep-")
             || name.starts_with("horizon-controller-")
             || name.starts_with("horizon-qualify-")
+            || assigned_singleton_owner(name, first_epoch, last_epoch)
             // Private RAM supervisors are entry owners too. Until the explicit
             // auxiliary claim contract is integrated, fail closed rather than
             // silently omit one from the complete campaign census.
@@ -5731,5 +5742,29 @@ mod tests {
         symlink(root.path(), &parent_link).unwrap();
         assert!(validate_output_destination(&parent_link.join("new.json")).is_err());
         assert_eq!(fs::read(&path).unwrap(), b"retained receipt");
+    }
+}
+
+#[cfg(test)]
+mod singleton_discovery_tests {
+    use super::assigned_singleton_owner;
+    #[test]
+    fn assigned_singletons_cannot_hide_from_an_older_fleet_reader() {
+        for unit in [
+            "horizon-singleton-209-capped-4aeca563-v1.service",
+            "horizon-singleton-210-capped-4aeca563-v1.service",
+            "horizon-singleton-227-capped-710f6523-v1.service",
+            "horizon-singleton-210-unknown-future-profile.service",
+        ] {
+            assert!(assigned_singleton_owner(unit, 201, 300), "{unit}");
+            assert!(!assigned_singleton_owner(unit, 101, 200), "{unit}");
+        }
+        for unit in [
+            "horizon-singleton210-protective-v1.service",
+            "horizon-qualify-227-v1625-bounded-resource-d01adb19-selection-v2.service",
+            "unrelated.service",
+        ] {
+            assert!(!assigned_singleton_owner(unit, 201, 300), "{unit}");
+        }
     }
 }
