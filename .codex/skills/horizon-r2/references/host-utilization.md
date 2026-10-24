@@ -241,6 +241,11 @@ the normal work-conserving backfill path rather than waiting for another status 
 - Overlap independent full verification, plugin verification, authenticated R2 upload, and remote
   readback with replay. Keep their receipt gates independent, and account for their measured I/O,
   CPU, and memory pressure when admitting another replay lane.
+  Before the real verifier launch, prepare every directory required by its sealed wrapper,
+  including nested receipt directories, with the exact owner and private modes. Run the wrapper's
+  non-executing preflight in the actual sandbox. Creating only the state root can pass dispatcher
+  preparation and still fail before the first archive hash. Preserve that failed invocation;
+  reconcile a qualified replacement into the queue without restarting a healthy verifier.
   A completed private assembly releases its producer claim even while its independent scan is
   being prepared. Record the real terminal event and the pending delivery action; count only an
   actually launched scanner as active. Admit that scan against the current producer census and
@@ -259,6 +264,12 @@ latest accepted resource sample. Preserve that sample's original clock, bind the
 clean terminal proof and the new live command/invocation, and retain the complete fleet history.
 The event clock is not a new resource observation or launch permission. Clear an event selector
 when constructing the next normal-cycle plan, while retaining its evidence and owner history.
+
+Validate native queue-census framing on the actual systemd version before using it as an admission
+gate. On systemd255, `systemctl list-jobs --output=json` can still emit text. Use the reviewed typed
+`Manager.ListJobs` D-Bus adapter where that occurs; validate its signature, return nesting, job and
+unit identities, and preserve the existing queued-entry denials. Never treat a parse failure as an
+empty queue or bypass the census to unblock admission.
 
 ## Prioritize time to verified sidecar
 
