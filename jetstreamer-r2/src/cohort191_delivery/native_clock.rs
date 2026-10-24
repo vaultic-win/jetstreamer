@@ -16,6 +16,16 @@ pub(super) fn sample(p: &Capture, observer: &Value) -> Result<String> {
         .as_str()
         .context("191 native event UTC")?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    if proof["schema"] == readback_handoff::SCHEMA {
+        readback_handoff::validate(p, observer, &proof)?;
+        clocks(
+            fleet::utc_seconds(resource)?,
+            event,
+            fleet::utc_seconds(sample)?,
+            now,
+        )?;
+        return Ok(sample.into());
+    }
     let anchor_binding: Bound = serde_json::from_value(proof["recovery_anchor"].clone())?;
     ensure!(
         anchor_binding.path

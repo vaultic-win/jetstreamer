@@ -472,7 +472,7 @@ fn completed_coordinator(p: &Plan, f: &Value) -> Result<(String, String)> {
     Ok((name, iid.into()))
 }
 
-fn successful_coordinator_exit(
+pub(super) fn successful_coordinator_exit(
     name: &str,
     old: &Value,
     current: &Value,

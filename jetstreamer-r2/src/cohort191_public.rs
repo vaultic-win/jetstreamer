@@ -21,6 +21,8 @@ struct Observe {
     output: PathBuf,
     #[serde(default)]
     native_handoff_event: bool,
+    #[serde(default)]
+    same_owner_readback: Option<readback_handoff::Config>,
 }
 fn queued(n: u64) -> Value {
     json!({"state":"queued","remaining_millis":n})
@@ -115,6 +117,10 @@ pub(super) fn run() -> Result<()> {
         "191 public context/self differs"
     );
     member(&ctx.publisher.path, &ctx.publisher.sha256)?;
+    ensure!(
+        p.same_owner_readback.is_none() || p.native_handoff_event,
+        "same-owner readback requires a distinct native event clock"
+    );
     let observer = bound(&p.observer, false)?;
     let resource_time = fleet::utc_seconds(
         observer["recorded_at_utc"]
@@ -133,10 +139,14 @@ pub(super) fn run() -> Result<()> {
             sha256: head.sha256,
         };
         bound(&immutable_state, true)?;
-        let clock = json!({"schema":"jetstreamer-cohort191-native-handoff-clock-v2","observer":p.observer,
+        let mut clock = json!({"schema":"jetstreamer-cohort191-native-handoff-clock-v2","observer":p.observer,
             "recorded_unix_seconds":event,"sampled_at_utc":native_clock::utc(event)?,
             "queue_state":immutable_state,"recovery_anchor":{"path":"/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1/history/state-000003.json","sha256":"3e3d7ee6f52fdfca86504c1125e1d7d790a4277636d89e0fe1b4c4886acc2a7a"},"queue_plan":ctx.queue_plan,"queue_invocation_id":state["invocation_id"],
             "terminal":ctx.terminal,"resource_samples_taken":0,"publication_authorized":false,"r2_mutations":false});
+        if let Some(config) = &p.same_owner_readback {
+            clock["schema"] = json!(readback_handoff::SCHEMA);
+            clock["same_owner_readback"] = json!(config);
+        }
         let path = p.output.with_extension("native-clock.json");
         fleet::persist(&path, &clock)?;
         fs::set_permissions(&path, fs::Permissions::from_mode(0o400))?;

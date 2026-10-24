@@ -716,10 +716,32 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             )?,
         )?;
     }
+    let readback_clock = if let Some(event) = plan
+        .phase_handoff_event
+        .as_ref()
+        .filter(|_| (191..=194).contains(&plan.epoch))
+    {
+        let event = bound_json(event)?;
+        let clock: Bound = serde_json::from_value(event["native_event_clock"].clone())?;
+        Some(bound_json(&clock)?)
+    } else {
+        None
+    };
     for (name, prior) in previous {
         if name != &plan.binding.unit && !peers.contains(name) {
+            let completed_coordinator = if let Some(clock) = &readback_clock {
+                super::cohort191_delivery::readback_handoff::completed_coordinator(
+                    clock,
+                    fleet,
+                    name,
+                    prior,
+                    &current[name],
+                )?
+            } else {
+                false
+            };
             ensure!(
-                same_unit_census(prior, &current[name]),
+                completed_coordinator || same_unit_census(prior, &current[name]),
                 "fleet changed outside the explicit delivery handoff: {name}"
             );
         }

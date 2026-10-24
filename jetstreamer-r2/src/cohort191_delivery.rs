@@ -15,6 +15,7 @@ pub(super) fn original_growth_transfer() -> Result<()> {
 }
 use serde_json::json;
 mod queue;
+pub(super) mod readback_handoff;
 use std::{
     collections::{BTreeMap, BTreeSet},
     os::unix::fs::PermissionsExt,
