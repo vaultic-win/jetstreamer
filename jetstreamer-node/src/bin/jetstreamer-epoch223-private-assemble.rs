@@ -9,6 +9,7 @@ mod handoff;
 use anyhow::{Context, Result, ensure};
 use handoff::Bound;
 use jetstreamer_horizon::archive::{ArchiveWriterConfig, merge_runtime_segments};
+use jetstreamer_horizon_observe::source_idle223::{self, Source};
 use jetstreamer_node::{archive_checksum::*, segment_manifest::sha256_hex_string};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -26,10 +27,6 @@ const PREFIX: &str = "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-
 const TAIL: &str = "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-tail-1743245a-v3/output/epoch-223.jet";
 const OUTPUT: &str = "/var/lib/jetstreamer/horizon-223-native20-native25-private-assembly-v1";
 const UNIT: &str = "horizon-assemble-223-native20-native25-v1.service";
-const OLD_UNIT: &str = "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service";
-const OLD_IID: &str = "e70aaf097e7c4583b216aba454145910";
-const TAIL_UNIT: &str = "horizon-qualify-223-v1625-tail-1743245a-v3.service";
-const TAIL_IID: &str = "20dc145d1e8c41fdbc682046b6fe4289";
 const GATE_SHA: &str = "137b5a3a767604ea4c9f7405dd0af7af0eb860f30e5ece52ce49017825d35c22";
 const MAX_OUTPUT: u64 = 160 << 30;
 const MEMORY_MAX: u64 = 64 << 30;
@@ -68,7 +65,7 @@ fn seconds() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
 fn properties(unit: &str) -> Result<Value> {
-    let result=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=InvocationID,MainPID,NRestarts,Restart,Result,ActiveState,SubState,Type,RuntimeMaxUSec,MemoryMax,MemoryHigh,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,User,UMask,PrivateNetwork,ProtectHome,ProtectSystem,ReadWritePaths,NoNewPrivileges,Job"]).output()?;
+    let result=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=InvocationID,MainPID,NRestarts,Restart,Result,ActiveState,SubState,Type,RuntimeMaxUSec,MemoryMax,MemoryHigh,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,User,UMask,PrivateNetwork,ProtectHome,ProtectSystem,ReadWritePaths,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,Job"]).output()?;
     ensure!(result.status.success(), "systemd property query failed");
     Ok(Value::Object(
         std::str::from_utf8(&result.stdout)?
@@ -77,20 +74,6 @@ fn properties(unit: &str) -> Result<Value> {
             .map(|(k, v)| (k.into(), json!(v)))
             .collect(),
     ))
-}
-fn terminal(p: &Value, iid: &str) -> Result<()> {
-    ensure!(
-        p["MainPID"] == "0"
-            && p["NRestarts"] == "0"
-            && p["Restart"] == "no"
-            && p["Result"] == "success"
-            && p["ActiveState"] == "inactive"
-            && p["SubState"] == "dead"
-            && p["Job"] == ""
-            && (p["InvocationID"] == "" || p["InvocationID"] == iid),
-        "original prefix is not idle after exact success"
-    );
-    Ok(())
 }
 fn owner(p: &Value, iid: &str) -> Result<()> {
     ensure!(
@@ -127,7 +110,23 @@ fn owner(p: &Value, iid: &str) -> Result<()> {
         p["MainPID"].as_str().and_then(|s| s.parse::<u32>().ok()) == Some(std::process::id()),
         "not current persistent assembly process"
     );
+    for key in ["CapabilityBoundingSet", "AmbientCapabilities"] {
+        let caps = p[key]
+            .as_str()
+            .context("missing source-reference traversal capabilities")?
+            .split_whitespace()
+            .collect::<std::collections::BTreeSet<_>>();
+        ensure!(
+            caps == std::collections::BTreeSet::from(["cap_dac_override", "cap_sys_ptrace"]),
+            "assembly source-reference capability set differs: {key}"
+        );
+    }
     Ok(())
+}
+fn idle_sources() -> Result<Value> {
+    Ok(
+        json!({"prefix":source_idle223::observe(Source::Prefix)?,"tail":source_idle223::observe(Source::Tail)?}),
+    )
 }
 fn gate(plan: &Plan) -> Result<handoff::Prepared> {
     let request: handoff::Plan = serde_json::from_slice(&evidence::bound_file(
@@ -339,10 +338,7 @@ fn run() -> Result<()> {
         let binding: Bound = serde_json::from_value(admitted[key].clone())?;
         read(&binding)?;
     }
-    let old = properties(OLD_UNIT)?;
-    terminal(&old, OLD_IID)?;
-    let old_tail = properties(TAIL_UNIT)?;
-    terminal(&old_tail, TAIL_IID)?;
+    let source_idle_before = idle_sources()?;
     let iid = env::var("INVOCATION_ID").context("persistent bounded assembly owner required")?;
     let own = properties(UNIT)?;
     owner(&own, &iid)?;
@@ -398,17 +394,14 @@ fn run() -> Result<()> {
         ));
     }
     admission(&plan, &admitted, &prepared, &args[2], seconds()?)?;
-    ensure!(
-        properties(OLD_UNIT)? == old
-            && properties(TAIL_UNIT)? == old_tail
-            && properties(UNIT)? == own,
-        "owner changed before assembly"
-    );
+    let source_idle_precommit = idle_sources()?;
+    ensure!(properties(UNIT)? == own, "owner changed before assembly");
     evidence::write_receipt(
         &Path::new(OUTPUT).join("intent.json"),
         &json!({"schema":"jetstreamer-private223-v3-assembly-intent-v1",
         "unit":UNIT,"invocation_id":iid,"plan":{"path":args[0],"sha256":args[1]},"self_sha256":args[2],
         "handoff_request":plan.handoff_request,"handoff_receipt":plan.handoff_receipt,"admission":plan.admission,
+        "source_idle_before":source_idle_before,"source_idle_precommit":source_idle_precommit,
         "publication_authorized":false,"r2_mutations":false}),
     )?;
     let target = Path::new(OUTPUT).join("epoch-223-private-v3.jet");
@@ -457,12 +450,8 @@ fn run() -> Result<()> {
         );
         no_sidecar(path)?;
     }
-    ensure!(
-        properties(OLD_UNIT)? == old
-            && properties(TAIL_UNIT)? == old_tail
-            && properties(UNIT)? == own,
-        "owner changed before completion"
-    );
+    let source_idle_after = idle_sources()?;
+    ensure!(properties(UNIT)? == own, "owner changed before completion");
     no_sidecar(&target)?;
     let expected_updates = provenance
         .runtime_segments
@@ -482,6 +471,7 @@ fn run() -> Result<()> {
         &json!({"schema":"jetstreamer-private223-v3-assembly-v1","epoch":223,
         "unit":UNIT,"invocation_id":iid,"plan":{"path":args[0],"sha256":args[1]},"self_sha256":args[2],
         "handoff_request":plan.handoff_request,"handoff_receipt":plan.handoff_receipt,"admission":plan.admission,
+        "source_idle_after":source_idle_after,
         "private_output":target,"archive_sha256":sha256_hex_string(&measured.sha256),"archive_bytes":output.bytes,
         "source_archives":stats.source_archives,"slots_merged":stats.slots_merged,"account_updates_rebased":stats.account_updates_rebased,
         "provenance_version":3,"planned_mappings":prepared.receipt["planned_mappings"],"elapsed_millis":u64::try_from(started.elapsed().as_millis())?,
@@ -548,25 +538,6 @@ mod tests {
         }
     }
     #[test]
-    fn live_restarted_foreign_failed_or_queued_producer_forbids_assembly() {
-        let good = json!({"MainPID":"0","NRestarts":"0","Restart":"no","Result":"success","ActiveState":"inactive","SubState":"dead","Job":"","InvocationID":OLD_IID});
-        terminal(&good, OLD_IID).unwrap();
-        for (key, value) in [
-            ("MainPID", "10"),
-            ("NRestarts", "1"),
-            ("Restart", "on-failure"),
-            ("Result", "exit-code"),
-            ("ActiveState", "active"),
-            ("SubState", "running"),
-            ("Job", "19"),
-            ("InvocationID", TAIL_IID),
-        ] {
-            let mut bad = good.clone();
-            bad[key] = json!(value);
-            assert!(terminal(&bad, OLD_IID).is_err(), "{key}");
-        }
-    }
-    #[test]
     fn admission_requires_actual_pair_fresh_fleet_and_protected_capacity() {
         let p = plan();
         let prepared = handoff::test_prepared();
@@ -624,7 +595,8 @@ mod tests {
             "Restart":"no","NRestarts":"0","ActiveState":"active","SubState":"running","Type":"exec","RuntimeMaxUSec":"1d",
             "MemoryMax":"68719476736","MemoryHigh":"51539607552","MemorySwapMax":"0","CPUQuotaPerSecUSec":"4s","TasksMax":"512",
             "User":"root","UMask":"0077","PrivateNetwork":"yes","ProtectHome":"read-only","ProtectSystem":"strict",
-            "ReadWritePaths":OUTPUT,"NoNewPrivileges":"yes"});
+            "ReadWritePaths":OUTPUT,"NoNewPrivileges":"yes","CapabilityBoundingSet":"cap_dac_override cap_sys_ptrace",
+            "AmbientCapabilities":"cap_dac_override cap_sys_ptrace"});
         owner(&good, &iid).unwrap();
         for key in [
             "Type",
