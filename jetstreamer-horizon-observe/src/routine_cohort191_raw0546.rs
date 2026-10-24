@@ -1,6 +1,7 @@
 //! Exact bridge from the real successful 05:16 provisional inventory to the
 //! already recorded 05:46 resource sample. No synthetic final 05:16 receipt.
 use super::*;
+const OBSERVERS_101: &str = "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261024T051600Z-memory152-rebind-guard-stopped185-import-pending191-repair141-v2";
 const LEDGER_SHA: &str = "264ff27d8c2f6662d9ddab228ec2a7c97ae908a3b76cd3b55e45c354d5be21e9";
 const RAW_SHA: &str = "ab43f79a41d4b252fdc5c6850c89315c0d95324c88de0c1274f821b3473633bc";
