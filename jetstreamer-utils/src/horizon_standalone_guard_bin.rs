@@ -611,6 +611,19 @@ fn supported_unit(plan: &Plan) -> bool {
             && plan.bounded_measurement.is_none()
             && plan.bounded_canary.is_none();
     }
+    if plan.unit == "horizon-singleton-210-capped-4aeca563-v1.service" {
+        return cfg!(feature = "epoch210-singleton-guard")
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-210-singleton-capped-v1",
+                )
+            && plan.minimum_free_bytes > 32 << 20
+            && plan.maximum_root_physical_bytes == Some(471_798_691_840)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -1233,6 +1246,40 @@ mod tests {
             ),
             ("/maximum_root_physical_bytes", json!(300_000_000_000u64)),
             ("/maximum_worker_vmas", json!(3_500_001)),
+            ("/filesystem", json!("/tmp")),
+        ] {
+            let mut bad = value.clone();
+            *bad.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{pointer}"
+            );
+        }
+    }
+    #[test]
+    fn full210_guard_cannot_borrow_209_native_or_a_smaller_whole_root_envelope() {
+        let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon-singleton-210-capped-4aeca563-v1.service","invocation_id":"a".repeat(32),
+            "filesystem":"/","minimum_free_bytes":2000033554432u64,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/qualification-210-singleton-capped-v1",
+            "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":471798691840u64,
+            "receipt_directory":"/sealed/receipts"});
+        assert_eq!(
+            validate_plan(&serde_json::from_value(value.clone()).unwrap()).is_ok(),
+            cfg!(feature = "epoch210-singleton-guard")
+        );
+        for (pointer, replacement) in [
+            (
+                "/unit",
+                json!("horizon-singleton-209-capped-4aeca563-v1.service"),
+            ),
+            (
+                "/worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2"),
+            ),
+            ("/maximum_root_physical_bytes", json!(300000000000u64)),
+            ("/maximum_worker_vmas", json!(3500001)),
+            ("/minimum_free_bytes", json!(32 << 20)),
             ("/filesystem", json!("/tmp")),
         ] {
             let mut bad = value.clone();

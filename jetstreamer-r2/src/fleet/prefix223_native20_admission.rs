@@ -116,6 +116,10 @@ fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
             "horizon-singleton209-protective-v1.service",
             "/var/lib/jetstreamer/horizon-singleton209-guard-receipts-v1",
         ),
+        singleton210::UNIT => (
+            "horizon-singleton210-protective-v1.service",
+            "/var/lib/jetstreamer/horizon-singleton210-guard-receipts-v1",
+        ),
         native228::UNIT => (
             "horizon-native228-protective-v1.service",
             "/var/lib/jetstreamer/horizon-native228-guard-receipts-v1",

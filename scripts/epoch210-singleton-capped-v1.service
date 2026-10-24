@@ -1,0 +1,35 @@
+# Dormant candidate: exact immutable capability/admission and real guard fire required.
+[Unit]
+Description=Horizon epoch210 private capped full singleton candidate
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=259200
+TimeoutStopSec=300
+MemoryHigh=150000000000
+MemoryMax=225000000000
+MemorySwapMax=0
+CPUQuota=1600%
+TasksMax=512
+Nice=10
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/qualification-210-singleton-capped-v1
+Environment=RUST_MIN_STACK=134217728
+Environment=SOLANA_RAYON_THREADS=16
+Environment=JETSTREAMER_HISTORICAL_POH_THREADS=8
+Environment=TOKIO_WORKER_THREADS=8
+Environment=JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1
+Environment=JETSTREAMER_PRIVATE_RUN_ROOT=/home/ubuntu/.jetstreamer-private/qualification-210-singleton-capped-v1/private
+Environment=JETSTREAMER_HISTORICAL_WORKER_V1_6_16=/var/lib/jetstreamer/horizon-v1616-shrink-budget-worker-003fe15-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget
+ExecStart=/var/lib/jetstreamer/horizon-singletons209-212-node-0d2856e7-v1/jetstreamer-node 210 /home/ubuntu/.jetstreamer-private/qualification-210-singleton-capped-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-singletons209-212-metadata-0d2856e7-v1/preflight210-singleton.json --cohort-manifest-fingerprint=sha256:723578e0e7eef4daa09b68bb2a45263f61bcb19ce49daef094d3174ee1f65b6b --snapshot-archive=/var/lib/jetstreamer/horizon-focused-210-complete-span-store8-ca2e38b-v1/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst
+
+# No Install section. Source presence never grants host launch permission.

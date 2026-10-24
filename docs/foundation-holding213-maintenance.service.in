@@ -25,8 +25,10 @@ IOSchedulingPriority=7
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1
-ReadWritePaths=/home/ubuntu/.jetstreamer-private/qualification-213/diagnostic-output-selected-store8-v2
+# One common writable bind is required: separate source/state binds make the
+# otherwise same-filesystem atomic quarantine rename fail with EXDEV. The Rust
+# adapter restricts mutations to its exact two files and private holding state.
+ReadWritePaths=/home/ubuntu/.jetstreamer-private
 PrivateTmp=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes

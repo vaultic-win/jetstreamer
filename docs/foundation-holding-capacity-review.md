@@ -32,6 +32,15 @@ serialize admissions through its terminal, seal the exact helper/plans/unit, and
 prove the equivalent sandbox before launch. Maintenance of the already-ready213
 epoch creates no public epoch-status object or canonical sidecar.
 
+The unit uses one writable bind of `/home/ubuntu/.jetstreamer-private`.
+Separate source/state `ReadWritePaths` binds are distinct mount instances and
+can make an atomic quarantine rename fail with `EXDEV` despite equal device
+numbers. The common bind preserves atomic rename while the reviewed Rust
+adapter still permits only the exact original/qualification-copy mutations and
+its private state. The public canonical archive and sealed deployments remain
+outside this writable mount. Validate this actual namespace before launch;
+do not replace atomic rename with copy-and-unlink after an `EXDEV` refusal.
+
 Fresh restoration admission reserves all125,316,500,795 potential restoration
 bytes plus the existing metadata budget, all current live growth, the century
 floor and existing guard floors. Its900s lifetime and1800s observer freshness
@@ -59,10 +68,14 @@ recovering125.3GB relative to the pre-operation host only after both complete.
 The small transport probe is never counted as replay capacity.
 
 Each file has a durable initial identity/hash/reference intent before any move.
-`RENAME_NOREPLACE` moves it into an exact root-private quarantine; the body and
+`renameat2(RENAME_NOREPLACE)` between pinned directory descriptors moves it into
+an exact root-private quarantine; the body and
 metadata are checked again, with another full hash and fresh closed-reference
 review before a durable deletion intent permits the exact quarantine unlink.
-Parent directories are individually fsynced after rename/unlink. Recovery
+The final `fstatat(AT_SYMLINK_NOFOLLOW)` and `unlinkat` use that pinned quarantine
+descriptor and one exact child basename. A renamed user-owned ancestor cannot
+redirect deletion onto a replacement path. Parent descriptors are individually
+fsynced after rename/unlink. Recovery
 distinguishes pre-move, quarantined, unlink-before-receipt and complete states;
 conflicting/reappeared paths or absence without intent fail closed. The durable
 operation identity binds custody+restoration rather than a stale resource plan,
@@ -87,8 +100,12 @@ does not authorize their retirement:
   not a full epoch or reusable runtime checkpoint.
 - 227: unit `horizon-native-input-227-v1625-small-v2.service`, scratch
   `/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2/scratch`.
-  Bind the independently accepted actual small-generation terminal proof before
-  preparing any retirement profile; its96GB cap is not a current byte census.
+  The independently accepted small-generation terminal proof is
+  `/var/lib/jetstreamer/horizon-native227-v1625-terminal-proof-small-v2/proof.json`,
+  SHA256 `da6e00906c266f5993e0332b2abb864558db4ab4c0786d765d1828e658675d7b`,
+  invocation `36b96647e20e41a4a82c92b77b1bb290`, original PID456026.
+  Revalidate that exact proof and unchanged owner before preparing any
+  retirement profile; its96GB cap is not a current byte census.
   Preserve the entire immutable `horizon-stage227-bootstrap-dcaafc6-v1` package,
   snapshot `77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07`,
   genesis, worker/test deployments, origins, journals and typed proof.

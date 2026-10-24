@@ -424,7 +424,14 @@ pub(super) fn limits(f: &Value) -> Result<Value> {
 }
 pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
     let view = without_peer(f)?;
-    let mut names = prefix223_native20_admission::roster(&view)?;
+    let base = full210_peer::without_peer(&view)?;
+    let mut names = prefix223_native20_admission::roster(&base)?;
+    if view["active"].as_array().unwrap().len() != base["active"].as_array().unwrap().len() {
+        ensure!(
+            names.insert(singleton210::UNIT.into()),
+            "duplicate full210 roster owner"
+        );
+    }
     if f["active"]
         .as_array()
         .context("peer223 full active roster")?
@@ -447,10 +454,14 @@ pub(super) fn disk(
 ) -> Result<(u64, Vec<Value>)> {
     roster(f)?;
     let (view, remaining, extra, mut evidence) = split(f, o, guards, sample, now)?;
+    let (view, remaining, extra210, proof210) =
+        full210_peer::split(&view, o, &remaining, sample, now)?;
+    evidence.extend(proof210);
     let (base, rest) = prefix223_native20_peer228::disk(&view, o, &remaining, sample, now)?;
     evidence.extend(rest);
     Ok((
         base.checked_add(extra)
+            .and_then(|n| n.checked_add(extra210))
             .context("peer223 total disk overflow")?,
         evidence,
     ))
@@ -458,10 +469,14 @@ pub(super) fn disk(
 pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     roster(f)?;
     let (extra, mut evidence) = peer_memory(f)?;
-    let (base, rest) = prefix223_native20_peer228::memory(&without_peer(f)?)?;
+    let view = without_peer(f)?;
+    let (extra210, proof210) = full210_peer::memory(&view)?;
+    evidence.extend(proof210);
+    let (base, rest) = prefix223_native20_peer228::memory(&full210_peer::without_peer(&view)?)?;
     evidence.extend(rest);
     Ok((
         base.checked_add(extra)
+            .and_then(|n| n.checked_add(extra210))
             .context("peer223 total memory overflow")?,
         evidence,
     ))
@@ -490,6 +505,7 @@ fn current_shape(expected: &Value, observed: &Value) -> Result<()> {
 }
 pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     roster(f)?;
+    full210_peer::current(f, current)?;
     for row in f["active"]
         .as_array()
         .context("peer223 current census")?
@@ -529,6 +545,28 @@ pub(super) fn fixture_row() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn full210_is_retained_as_one_typed_peer_and_never_hidden_as_a_native_or_foreign_owner() {
+        let row = json!({"epoch":210,"phase":"diagnostic-qualification","ordinary_replay_claim":false,
+            "unit":{"Id":singleton210::UNIT,"InvocationID":"a".repeat(32),"NRestarts":"0"}});
+        let f = json!({"active":[row]});
+        let original = f.clone();
+        assert_eq!(
+            roster(&f).unwrap(),
+            [singleton210::UNIT.to_owned()].into_iter().collect()
+        );
+        assert_eq!(f, original);
+        for (pointer, value) in [
+            ("/active/0/epoch", json!(209)),
+            ("/active/0/phase", json!("replay")),
+            ("/active/0/ordinary_replay_claim", json!(true)),
+            ("/active/0/unit/Id", json!("unknown210.service")),
+        ] {
+            let mut bad = f.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(roster(&bad).is_err(), "{pointer}");
+        }
+    }
     fn launch() -> Value {
         serde_json::from_slice(include_bytes!(
             "../../tests/fixtures/prefix223-peer/launch.json"
