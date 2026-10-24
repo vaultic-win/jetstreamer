@@ -75,6 +75,21 @@ continuation PID 1 start history, current guard, complete before/after unit
 censuses, generated archive metadata, terminal history and downstream history.
 The continuation's actual PID/IID, command, producer plan, complete-path
 admission, source capture and original successful invocation are revalidated.
+The immutable first guard must describe the workerless `waiting_for_guard`
+phase, within 90 seconds of that phase's start and within the manager-start
+window. Its independent executable, command and invocation must match the
+admission before any stage entry is accepted.
+
+Capture may bind the last accepted pre-launch resource observation as context;
+it does not claim that observation measured the newcomer. It also emits
+`next-observer-registration.json`, containing the actual captured producer IID,
+same controller/producer unit, exact single-epoch range and scratch path. Apply
+that row to the next sole 30-minute observer config, replacing an overlapping
+old diagnostic row while preserving unrelated config fields. Capture itself
+does not edit that config. Every subsequent frame requires the registration;
+the next post-launch observation must explicitly report that producer, even
+when its workerless phase makes replay telemetry unavailable. An unavailable
+diagnostic is never measured RSS, owner inactivity or zero resource usage.
 Original natural inactivity remains mandatory at every evaluation. An unknown,
 replaced, pending or unavailable owner cannot become inactive from a diagnostic
 error. Unresolved ownership is preserved privately and blocks status replacement
@@ -125,6 +140,21 @@ race check before its conditional status-only delete, authenticated absence and
 durable receipt. It rechecks downstream terminal history and protects newer
 owners. A stale model, missing worker or disappeared unit is insufficient.
 The existing verified-ready-pair cleanup remains the separate completion path.
+
+Later capped sibling admission authenticates the current capped peer's accepted
+claim, actual producer command and invocation, original first guard, fresh
+persistent guard heartbeat, requested limits and effective cgroup limits.
+Only a derived legacy accounting view removes that producer; the accepted raw
+fleet, complete census and history remain intact. The generic owner race check
+removes only the separately authenticated auxiliary guard and still checks the
+producer against the full active roster. Memory reserves remaining hard limits
+for both producer and guard rather than RSS. Disk conservatively reserves the
+entire admitted root and external metadata envelope with zero allocation credit.
+The existing floor remains the maximum of century floor plus all growth and
+every existing guard's minimum free space. Each before/after admission bracket
+includes both legacy and capped resources. An active downstream capped actor
+without a separately qualified resource envelope explicitly blocks sibling
+admission; it is never silently omitted as an unmodeled or zero-growth lane.
 
 This is source preparation. No positive launch, admission, capability, manager,
 guard or future invocation evidence is supplied by this document. Cargo tests,

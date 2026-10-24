@@ -411,16 +411,31 @@ pub(super) fn original_idle(unit: &Value, epoch: u64) -> Result<()> {
 fn current(p: &Value, f: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
     candidate_idle(p, census)?;
     native210_peer_history::current(f, census)?;
-    prefix223_live_peer::current(f, census)?;
-    singleton227_admission::owners(f, census)
+    let legacy = capped204205_work::peer_legacy_view(f)?;
+    prefix223_live_peer::current(&legacy, census)?;
+    let owners = capped204205_work::peer_current(f, census)?;
+    singleton227_admission::owners(f, &owners)
 }
-fn guards(f: &Value, bounds: &BTreeMap<String, BoundFile>, sample: u64, now: u64) -> Result<Value> {
+fn guards(
+    f: &Value,
+    bounds: &BTreeMap<String, BoundFile>,
+    census: &BTreeMap<String, Value>,
+    sample: u64,
+    now: u64,
+) -> Result<Value> {
+    let legacy = capped204205_work::peer_legacy_view(f)?;
+    let peers = capped204205_work::peer_names(f)?;
+    let mut names = prefix223_live_peer::roster(&legacy)?;
     ensure!(
-        prefix223_live_peer::roster(f)? == bounds.keys().cloned().collect(),
+        peers.iter().all(|name| names.insert(name.clone())),
+        "capped protected owner counted twice"
+    );
+    ensure!(
+        names == bounds.keys().cloned().collect(),
         "capped guard set omits or adds a protected owner"
     );
     let mut evidence = BTreeMap::new();
-    for (name, b) in bounds {
+    for (name, b) in &capped204205_work::peer_legacy_guards(f, bounds)? {
         let (unit, dir) = if name == prefix223_native20::UNIT {
             (
                 prefix223_native20::PROTECTIVE,
@@ -455,7 +470,45 @@ fn guards(f: &Value, bounds: &BTreeMap<String, BoundFile>, sample: u64, now: u64
         );
         evidence.insert(name.clone(), json!({"completed":completed,"timer":timer}));
     }
-    Ok(json!(evidence))
+    Ok(json!({"legacy":evidence,"capped":capped204205_work::peer_limits(f,bounds,census,now)?}))
+}
+fn combined_limits(
+    f: &Value,
+    bounds: &BTreeMap<String, BoundFile>,
+    census: &BTreeMap<String, Value>,
+    now: u64,
+) -> Result<Value> {
+    Ok(
+        json!({"legacy":prefix223_live_peer::limits(&capped204205_work::peer_legacy_view(f)?)?,"capped":capped204205_work::peer_limits(f,bounds,census,now)?}),
+    )
+}
+fn combined_resources(
+    f: &Value,
+    o: &Value,
+    bounds: &BTreeMap<String, BoundFile>,
+    census: &BTreeMap<String, Value>,
+    sample: u64,
+    now: u64,
+) -> Result<(u64, Vec<Value>, u64, Vec<Value>)> {
+    let legacy = capped204205_work::peer_legacy_view(f)?;
+    let legacy_guards = capped204205_work::peer_legacy_guards(f, bounds)?;
+    let (disk, mut disk_evidence) =
+        prefix223_live_peer::disk(&legacy, o, &legacy_guards, sample, now)?;
+    let (peer_disk, peer_disk_evidence) = capped204205_work::peer_disk(f, bounds, census, now)?;
+    disk_evidence.extend(peer_disk_evidence);
+    let (memory, mut memory_evidence) = prefix223_live_peer::memory(&legacy)?;
+    let (peer_memory, peer_memory_evidence) =
+        capped204205_work::peer_memory(f, bounds, census, now)?;
+    memory_evidence.extend(peer_memory_evidence);
+    Ok((
+        disk.checked_add(peer_disk)
+            .context("capped complete peer disk overflow")?,
+        disk_evidence,
+        memory
+            .checked_add(peer_memory)
+            .context("capped complete peer memory overflow")?,
+        memory_evidence,
+    ))
 }
 fn memory_requirement(
     f: &Value,
@@ -581,16 +634,16 @@ pub(super) fn run() -> Result<()> {
     }
     let before = census(&names, 201, 300)?;
     current(&p, &f, &before)?;
-    let caps = prefix223_live_peer::limits(&f)?;
+    let caps = combined_limits(&f, &s.protected_guards, &before, now)?;
     let free_before = singleton227_admission::disk_free()?;
     let memory_before = actual_memory(&o)?;
-    let guard_before = guards(&f, &s.protected_guards, t, now)?;
-    let (growth, growth_evidence) = prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
+    let guard_before = guards(&f, &s.protected_guards, &before, t, now)?;
+    let (growth, growth_evidence, auxiliary, memory_evidence) =
+        combined_resources(&f, &o, &s.protected_guards, &before, t, now)?;
     let century = singleton227_admission::century_floor_for(&f, number(&p, "epoch")?)?;
     let (protected, existing_guard_floor) =
         native228_admission::protected_floor(century, growth, &s.protected_guards)?;
     let required = disk_requirement(&p, protected)?;
-    let (auxiliary, memory_evidence) = prefix223_live_peer::memory(&f)?;
     let (required_memory, memory_policy) =
         memory_requirement(&f, &o, &proposal, auxiliary, &memory_evidence)?;
     let sampled_free = number(&o["filesystem"], "conservative_available_bytes")?;
@@ -615,17 +668,16 @@ pub(super) fn run() -> Result<()> {
     sample::validate(&s, &p, &proposal, &o, &f, now)?;
     let after = census(&names, 201, 300)?;
     current(&p, &f, &after)?;
-    let after_guard = guards(&f, &s.protected_guards, t, now)?;
-    let (after_growth, after_growth_evidence) =
-        prefix223_live_peer::disk(&f, &o, &s.protected_guards, t, now)?;
-    let (after_auxiliary, after_memory_evidence) = prefix223_live_peer::memory(&f)?;
+    let after_guard = guards(&f, &s.protected_guards, &after, t, now)?;
+    let (after_growth, after_growth_evidence, after_auxiliary, after_memory_evidence) =
+        combined_resources(&f, &o, &s.protected_guards, &after, t, now)?;
     let (after_required_memory, after_memory_policy) =
         memory_requirement(&f, &o, &proposal, after_auxiliary, &after_memory_evidence)?;
     let free = free_before.min(singleton227_admission::disk_free()?);
     let memory = memory_before.min(actual_memory(&o)?);
     ensure!(
         before == after
-            && caps == prefix223_live_peer::limits(&f)?
+            && caps == combined_limits(&f, &s.protected_guards, &after, now)?
             && after_growth <= growth
             && after_auxiliary <= auxiliary
             && after_required_memory <= required_memory

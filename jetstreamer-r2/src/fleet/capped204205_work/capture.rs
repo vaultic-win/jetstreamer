@@ -331,12 +331,30 @@ fn launch(s: &Spec, p: &Value, a: &Value, before: &BTreeMap<String, Value>) -> R
     write_raw(&first_copy, &raw)?;
     let name = string(p, "producer_unit")?;
     let launch_journal = journal(name)?;
-    manager_history(
+    let actual_start = manager_history(
         &launch_journal,
         name,
         string(current, "InvocationID")?,
         false,
     )?;
+    lifecycle::first_guard_entry(&first, actual_start)?;
+    let guard_owner = before
+        .get(string(p, "guard_unit")?)
+        .context("launch omitted independent guard")?;
+    ensure!(
+        live(guard_owner)
+            && guard_owner["InvocationID"] == first["guard_invocation_id"]
+            && evidence::command_matches(
+                &evidence::expected_guard_command(
+                    p,
+                    a,
+                    &s.producer_plan,
+                    string(current, "InvocationID")?
+                )?,
+                string(guard_owner, "ExecStart")?
+            ),
+        "first launch guard has another executable, command or invocation"
+    );
     let launch_manager = s.output_directory.join("launch-manager.jsonl");
     write_raw(&launch_manager, &launch_journal)?;
     let value = json!({"schema":"jetstreamer-capped204205-continuation-launch-v1","epoch":epoch,"unit":p["producer_unit"],
@@ -347,10 +365,28 @@ fn launch(s: &Spec, p: &Value, a: &Value, before: &BTreeMap<String, Value>) -> R
         "main_pid":string(current,"MainPID")?.parse::<u64>()?,"unit_census":before,
         "first_guard":private157::binding(&binding(&first_copy)?),"manager_journal":private157::binding(&binding(&launch_manager)?),
         "first_fire_source":{"path":first_path,"sha256":hex_lower(&Sha256::digest(raw))},
+        "accepted_observer_context":private157::binding(&s.observer),"accepted_fleet_context":private157::binding(&s.previous_fleet),
+        "accepted_observer_context_does_not_assert_new_producer_was_sampled":true,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
     let path = s.output_directory.join("launch.json");
     write_sealed(&path, &value)?;
     binding(&path)
+}
+
+pub(super) fn observer_registration(p: &Value, l: &Value) -> Result<Value> {
+    let epoch = number(p, "epoch")?;
+    profile(epoch)?;
+    let name = string(p, "producer_unit")?;
+    let iid = string(l, "invocation_id")?;
+    ensure!(
+        namespace(epoch, name) && id(iid),
+        "observer registration needs exact captured producer identity"
+    );
+    Ok(
+        json!({"range":format!("{epoch}-{epoch}"),"controller_unit":name,"expected_controller_invocation_id":iid,
+        "producer_unit":name,"expected_producer_invocation_id":iid,
+        "scratch_path":Path::new(string(p,"run_root")?).join("scratch"),"worker_executable_basename":"historical-worker"}),
+    )
 }
 
 pub(super) fn run() -> Result<()> {
@@ -415,6 +451,16 @@ pub(super) fn run() -> Result<()> {
     capped204205_admission::original_idle(&before[profile(epoch)?.0], epoch)?;
     let launched = launch(&s, &p, &a, &before)?;
     let l = evidence::bound(&launched, true)?;
+    let registration = observer_registration(&p, &l)?;
+    let registration_path = s.output_directory.join("next-observer-registration.json");
+    write_sealed(
+        &registration_path,
+        &json!({"schema":"jetstreamer-capped204205-next-observer-registration-v1",
+        "epoch":epoch,"origin_launch":private157::binding(&launched),"diagnostic_replay":registration,
+        "replace_overlapping_epoch_diagnostic":true,"preserve_all_other_config_fields":true,
+        "next_sole_30_minute_observer_must_include_producer":true,"observer_config_modified":false,
+        "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
+    )?;
     let mut actors = s.downstream_actors;
     for actor in &mut actors {
         if actor.evidence.is_empty() {
@@ -573,6 +619,8 @@ pub(super) fn run() -> Result<()> {
         "observer_executable":private157::binding(&s.observer_executable),"observer_source_revision":"3e9326815cf46d03ac9423d5bcf4c637774b7260",
         "launch":private157::binding(&launched),"unit_census_before":before,"unit_census_after":after,
         "previous_fleet":private157::binding(&s.previous_fleet),
+        "next_observer_registration":private157::binding(&binding(&registration_path)?),
+        "accepted_observer_is_context_not_new_producer_measurement":true,
         "guard_snapshot":guard_binding,"downstream_actors":actors,"generated_archives":artifacts,"inactivity_snapshot":inactivity,
         "terminal_snapshot":terminal_binding,
         "authenticated_other_host_handoffs":s.authenticated_other_host_handoffs,

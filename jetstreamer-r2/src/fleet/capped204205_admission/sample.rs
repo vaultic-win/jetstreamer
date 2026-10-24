@@ -38,13 +38,21 @@ pub(super) fn validate(
             .any(|row| row["epoch"] == epoch),
         "capped epoch already has a live accepted owner"
     );
-    let names = prefix223_live_peer::roster(f)?;
+    let legacy = capped204205_work::peer_legacy_view(f)?;
+    let names = prefix223_live_peer::roster(&legacy)?;
+    let peers = capped204205_work::peer_names(f)?;
+    capped204205_work::peer_observation(f, o)?;
     let mut seen = BTreeSet::new();
     for row in o["diagnostic_replays"]
         .as_array()
         .context("capped diagnostic observation census missing")?
     {
         let name = string(row, "producer_unit")?;
+        if peers.contains(name) {
+            // Authenticated actual launch, explicit observer registration and
+            // independent fresh guard protect this separately accounted owner.
+            continue;
+        }
         if row["status"] != "observed" {
             ensure!(
                 !names.contains(name),

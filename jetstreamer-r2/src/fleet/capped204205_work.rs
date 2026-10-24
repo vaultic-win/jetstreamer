@@ -4,6 +4,11 @@ use super::*;
 mod capture;
 mod evidence;
 mod lifecycle;
+mod peer;
+pub(super) use peer::{
+    peer_current, peer_disk, peer_legacy_guards, peer_legacy_view, peer_limits, peer_memory,
+    peer_names, peer_observation,
+};
 #[cfg(test)]
 mod tests;
 
@@ -346,6 +351,7 @@ fn evaluate(
         "capped work frame is stale, changed, or detached from the coordinated complete census"
     );
     denied(f)?;
+    peer::registration(c, i, observer)?;
     let handoffs: Vec<BoundFile> =
         serde_json::from_value(f["authenticated_other_host_handoffs"].clone())?;
     for handoff in &handoffs {

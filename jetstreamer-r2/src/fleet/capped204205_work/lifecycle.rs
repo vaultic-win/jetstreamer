@@ -91,6 +91,18 @@ pub(super) fn origin(c: &Claim, i: &Inputs) -> Result<()> {
     let first_ms = number(&first, "recorded_unix_millis")?;
     evidence::guard(p, l, &first, &census, first_ms)?;
     ensure!(
+        evidence::command_matches(
+            &evidence::expected_guard_command(p, a, &c.producer_plan, string(l, "invocation_id")?)?,
+            string(
+                census
+                    .get(string(p, "guard_unit")?)
+                    .context("first guard owner missing")?,
+                "ExecStart"
+            )?
+        ),
+        "first guard command differs from the admitted independent executable"
+    );
+    ensure!(
         l["main_pid"].as_u64().is_some_and(|pid| pid > 1)
             && l["main_pid"] == first["processes"]["main_pid"],
         "launch PID differs from the independently observed first guard"
@@ -102,9 +114,23 @@ pub(super) fn origin(c: &Claim, i: &Inputs) -> Result<()> {
         string(l, "invocation_id")?,
         false,
     )?;
+    first_guard_entry(&first, start)?;
+    Ok(())
+}
+
+pub(super) fn first_guard_entry(first: &Value, manager_start: u64) -> Result<()> {
+    let at = number(first, "recorded_unix_millis")?;
+    let waiting = number(&first["phase"], "started_unix_millis")?;
     ensure!(
-        start <= first_ms && first_ms - start <= 900_000,
-        "first guard is detached from actual continuation start"
+        first["phase"]["stage"] == "waiting_for_guard"
+            && first["processes"]["workers"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+            && manager_start <= waiting
+            && waiting <= at
+            && at - waiting <= 90_000
+            && at - manager_start <= 900_000,
+        "first guard did not protect the actual waiting phase before stage entry"
     );
     Ok(())
 }

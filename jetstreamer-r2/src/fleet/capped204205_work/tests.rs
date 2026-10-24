@@ -2,6 +2,49 @@
 //! admission, service observation or publication receipt for either epoch.
 use super::*;
 
+#[test]
+fn first_guard_must_precede_stage_entry_within_actual_wait_window() {
+    let first = json!({"recorded_unix_millis":91_000,"phase":{"stage":"waiting_for_guard","started_unix_millis":1000},"processes":{"workers":[]}});
+    lifecycle::first_guard_entry(&first, 500).unwrap();
+    for (pointer, value) in [
+        ("/phase/stage", json!("prefix_validation")),
+        ("/processes/workers", json!([{"pid":42}])),
+        ("/recorded_unix_millis", json!(91_001)),
+        ("/phase/started_unix_millis", json!(499)),
+        ("/phase/started_unix_millis", json!(91_001)),
+    ] {
+        let mut bad = first.clone();
+        *bad.pointer_mut(pointer).unwrap() = value;
+        assert!(
+            lifecycle::first_guard_entry(&bad, 500).is_err(),
+            "{pointer}"
+        );
+    }
+    let late = json!({"recorded_unix_millis":901_001,"phase":{"stage":"waiting_for_guard","started_unix_millis":900_000},"processes":{"workers":[]}});
+    assert!(lifecycle::first_guard_entry(&late, 1000).is_err());
+}
+
+#[test]
+fn next_observer_registration_uses_captured_pid1_identity_and_exact_epoch() {
+    let mut p = plan();
+    p["run_root"] = json!("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-204-fixture");
+    let l = launch();
+    let row = capture::observer_registration(&p, &l).unwrap();
+    assert_eq!(row["range"], "204-204");
+    assert_eq!(row["controller_unit"], p["producer_unit"]);
+    assert_eq!(row["producer_unit"], p["producer_unit"]);
+    assert_eq!(row["expected_controller_invocation_id"], l["invocation_id"]);
+    assert_eq!(row["expected_producer_invocation_id"], l["invocation_id"]);
+    assert_eq!(row["worker_executable_basename"], "historical-worker");
+    assert_eq!(
+        row["scratch_path"],
+        "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-204-fixture/scratch"
+    );
+    let mut foreign = l;
+    foreign["invocation_id"] = json!("0".repeat(32));
+    assert!(capture::observer_registration(&p, &foreign).is_err());
+}
+
 fn b(name: &str) -> BoundFile {
     BoundFile {
         path: Path::new("/fixture").join(name),

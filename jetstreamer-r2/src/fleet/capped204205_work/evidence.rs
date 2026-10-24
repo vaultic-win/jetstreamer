@@ -53,6 +53,24 @@ pub(super) fn expected_command(p: &Value, a: &Value, plan: &BoundFile) -> Result
 pub(super) fn command_matches(expected: &str, current: &str) -> bool {
     exec_identity(current) == Some(expected)
 }
+pub(super) fn expected_guard_command(
+    p: &Value,
+    a: &Value,
+    plan: &BoundFile,
+    iid: &str,
+) -> Result<String> {
+    let control = string(&a["capability_evidence"]["control"], "path")?;
+    ensure!(
+        a["capability_evidence"]["control"]["sha256"] == p["guard_sha256"],
+        "admitted guard executable differs"
+    );
+    Ok(format!(
+        "{{ path={control} ; argv[]={control} guard {} --plan-sha256 {} --self-sha256 {} --producer-iid {iid}",
+        plan.path.display(),
+        plan.sha256,
+        string(p, "guard_sha256")?
+    ))
+}
 
 fn worker_start_ticks(worker: &Value) -> Result<u64> {
     // guard_core::start_time reads procfs field 22 and serializes its decimal
