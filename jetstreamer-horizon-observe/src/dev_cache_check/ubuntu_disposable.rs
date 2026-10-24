@@ -438,7 +438,7 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
             &json!({"binding":binding,"checks":evidence,"retirement_performed":false}),
         )?;
     }
-    let second_check_sha256 = hash_file(&p.output, 1 << 20)?.0;
+    let second_check_sha256 = hash_file(&p.output, LEDGER_BOUND)?.0;
     if completion.try_exists()? {
         let done = read_record(&completion)?;
         let started = read_record(&intent)?;
