@@ -3522,6 +3522,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-prefix223-native20") {
         return fleet::admit_prefix223_native20();
     }
+    if env::args().nth(1).as_deref() == Some("plan-prefix223-native20") {
+        return fleet::plan_prefix223_native20();
+    }
     if env::args().nth(1).as_deref() == Some("capture-prefix223-native20") {
         return fleet::capture_prefix223_native20();
     }

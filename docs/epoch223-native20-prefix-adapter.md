@@ -52,6 +52,41 @@ century floor plus protected growth or any unchanged guard floor exceeds2 TB,
 this generation is refused. It does not lower a healthy guard, alter the sealed
 plan or reuse an old observer after its30-minute validity expires.
 
+`plan-prefix223-native20 SPEC --spec-sha256 SHA --self-sha256 SHA` is a separate
+read-only admission-control entrypoint. Its sealed spec uses schema
+`jetstreamer-private-epoch223-native20-prefix-planning-spec-v1` and only
+`observer`, `fleet`, and `protected_guards`; there is no output-file field.
+It prints a JSON report to stdout and performs no writes, starts, stops, or R2
+requests. Root may preserve that stdout separately as private planning evidence.
+The helper and spec must be root-owned, immutable, and SHA-bound as usual.
+
+Planning reuses an existing accepted coordinated observation within its original
+30-minute validity. It authenticates the complete owner roster and latest
+completed protective receipts, then brackets the actual protected output-file
+credits, whole-root guard credits, free disk, available memory, and complete live
+unit census. These are admission-control checks; they do not run a new replay
+poll, replace the accepted fleet sample, or change the routine polling cadence.
+The report gives the minimum proposed protected floor, initial free-space
+requirement, and actual and sample-inclusive disk/memory shortfalls. It takes
+the larger of both growth brackets, preserves every inherited guard floor and
+the original2-TB baseline, and retains the whole candidate envelope. Capacity
+failures are reported as numbers; identity, freshness, pressure and evidence
+failures still refuse planning. Reporting above2TB never changes the actual
+admission command's sealed2TB refusal.
+
+Saved337 alone establishes bounds, not a current admission: even maximum legal
+128-GiB output credit for each204/205 and full observed whole-root credit for
+227/209 require a protected floor of2,087,041,699,031 bytes. Taking no unproven
+current output or guard credit instead gives2,523,170,868,439 bytes. The exact
+entrypoint resolves this range using authenticated current receipts and actual
+output allocations. It does not choose a new floor generation, edit a sealed
+plan, or lower an existing healthy guard. If its computed floor exceeds2TB,
+root must separately seal a new higher-floor plan, rebind the adapter's exact
+plan path/hash and floor constants, and qualify that generation before launch.
+The runner already accepts a plan's higher initial-free minimum; its internal
+2-TB floor remains an additional baseline check and the separately sealed
+whole-root protective guard must enforce the new higher floor.
+
 After root separately launches an admitted owner and its protective service,
 `capture-prefix223-native20` accepts schema
 `jetstreamer-private-epoch223-native20-prefix-capture-spec-v1` with exact bound

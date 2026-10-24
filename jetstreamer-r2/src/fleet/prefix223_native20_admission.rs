@@ -1,5 +1,9 @@
 //! Admit a cold native20 prefix without hiding another running repair owner.
 use super::{prefix223_native20 as c, *};
+mod planning;
+pub(super) fn plan() -> Result<()> {
+    planning::run()
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
@@ -160,6 +164,15 @@ fn completed_guards(
     Ok(json!(history))
 }
 fn sample(s: &Spec, o: &Value, f: &Value, now: u64) -> Result<(u64, u64, u64)> {
+    sample_for_plan(s, o, f, now, true)
+}
+fn sample_for_plan(
+    s: &Spec,
+    o: &Value,
+    f: &Value,
+    now: u64,
+    require_memory_fit: bool,
+) -> Result<(u64, u64, u64)> {
     let t = utc_seconds(
         o["recorded_at_utc"]
             .as_str()
@@ -256,7 +269,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64) -> Result<(u64, u64, u64)> {
         "prefix sample is not complete private owner census"
     );
     ensure!(
-        available >= total / 10 + c::MEMORY,
+        !require_memory_fit || available >= total / 10 + c::MEMORY,
         "prefix candidate exceeds90percent memory target"
     );
     Ok((t, floor, available))

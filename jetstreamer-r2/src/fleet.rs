@@ -108,6 +108,9 @@ pub(super) fn capture_warmup223_terminal() -> Result<()> {
 pub(super) fn admit_prefix223_native20() -> Result<()> {
     prefix223_native20_admission::run()
 }
+pub(super) fn plan_prefix223_native20() -> Result<()> {
+    prefix223_native20_admission::plan()
+}
 pub(super) fn capture_prefix223_native20() -> Result<()> {
     prefix223_native20_capture::run()
 }
