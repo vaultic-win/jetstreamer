@@ -205,9 +205,12 @@ pub(super) fn prepare(p: &Plan, pb: &Bound, self_sha: &str) -> Result<()> {
                 && child["tool"] == serde_json::to_value(&p.tools.r2)?,
             "status child failed or changed"
         );
-        let path = p
-            .status_receipt_directory
-            .join(format!("epoch-{epoch}.status-20261024104600.json"));
+        let path = Path::new(
+            m["status_receipt_directory"]
+                .as_str()
+                .context("status receipt directory")?,
+        )
+        .join(format!("epoch-{epoch}.status-20261024104600.json"));
         let bytes = bound_bytes(&b(path, digest), false)?;
         next_preparation::validate_status(
             &serde_json::from_slice(&bytes)?,
