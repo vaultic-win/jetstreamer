@@ -257,7 +257,10 @@ fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
         .collect::<Result<Vec<_>>>()?
         .iter()
         .try_fold(0u64, |a, n| a.checked_add(*n).context("191 byte overflow"))?;
-    let allowance = ratio(&evidence, "plugin_millis", total)?
+    // Native recovery performs full bucket decode/chain validation without
+    // plugin semantic-stream hashing, then a whole-file digest. Use comparable
+    // measured full scans plus two padded hash passes as a provisional budget.
+    let allowance = ratio(&evidence, "full_millis", total)?
         .checked_add(
             ratio(&evidence, "source_hash_millis", total)?
                 .checked_mul(2)
