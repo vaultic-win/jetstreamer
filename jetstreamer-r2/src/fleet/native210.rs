@@ -1,16 +1,33 @@
 //! Closed bootstrap-only 210 owner. Never an epoch replay/publication gate.
+//! The additive `native210-small` build selects the separately sealed96GB
+//! generation for every lifecycle operation. Default retains the original300GB
+//! tuple; neither generation may borrow the other's origin, guard or terminal.
 use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch210-native-input-running-v1";
-pub(super) const UNIT: &str = "archive-210-v1616-native-input-actual-v1.service";
-pub(super) const ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1";
+pub(super) const UNIT: &str = if cfg!(feature = "native210-small") {
+    "archive-210-v1616-native-input-small-v2.service"
+} else {
+    "archive-210-v1616-native-input-actual-v1.service"
+};
+pub(super) const ROOT: &str = if cfg!(feature = "native210-small") {
+    "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2"
+} else {
+    "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1"
+};
 pub(super) const TEST: &str =
     "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test";
 pub(super) const TEST_SHA: &str =
     "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6";
-pub(super) const GUARD: &str =
-    "/var/lib/jetstreamer/horizon-210-native-main-guard-v1/jetstreamer-horizon-standalone-guard";
-pub(super) const GUARD_SHA: &str =
-    "646c08e3f528672675532a16501414257d5fd2e7a49e273a45b50287df10a4c7";
+pub(super) const GUARD: &str = if cfg!(feature = "native210-small") {
+    "/var/lib/jetstreamer/horizon-210-native-small-main-guard-v2/jetstreamer-horizon-standalone-guard"
+} else {
+    "/var/lib/jetstreamer/horizon-210-native-main-guard-v1/jetstreamer-horizon-standalone-guard"
+};
+pub(super) const GUARD_SHA: &str = if cfg!(feature = "native210-small") {
+    "2f4f33097a90579d4433a7e9ab0aaeb4e7d3a422b5ff36b188b0e6c5d1a8e38d"
+} else {
+    "646c08e3f528672675532a16501414257d5fd2e7a49e273a45b50287df10a4c7"
+};
 pub(super) const INPUT: &str =
     "/var/lib/jetstreamer/horizon-focused-210-complete-span-store8-ca2e38b-v1";
 pub(super) const SNAPSHOT: &str =
@@ -20,20 +37,86 @@ pub(super) const SNAPSHOT_SHA: &str =
 pub(super) const GENESIS_SHA: &str =
     "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 pub(super) const ACCOUNTS_HASH: &str = "3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ";
-pub(super) const PLAN: &str =
-    "/var/lib/jetstreamer/horizon-210-native-cold-plan-v1/native-cold-plan.json";
-pub(super) const PLAN_SHA: &str =
-    "9d693ef2c3a8c3c967cd1a1cd1ff6534db86203325c25b2e53c2fd8534e56b46";
-pub(super) const SCRATCH: u64 = 300_000_000_000;
+pub(super) const PLAN: &str = if cfg!(feature = "native210-small") {
+    "/var/lib/jetstreamer/horizon-210-native-small-cold-plan-v2/native-cold-plan.json"
+} else {
+    "/var/lib/jetstreamer/horizon-210-native-cold-plan-v1/native-cold-plan.json"
+};
+pub(super) const PLAN_SHA: &str = if cfg!(feature = "native210-small") {
+    "dafaa24dabacedbf6d11a2d61127313f1186e802c80941872f436313cf41383b"
+} else {
+    "9d693ef2c3a8c3c967cd1a1cd1ff6534db86203325c25b2e53c2fd8534e56b46"
+};
+pub(super) const SCRATCH: u64 = if cfg!(feature = "native210-small") {
+    96_000_000_000
+} else {
+    300_000_000_000
+};
 pub(super) const MEMORY: u64 = 128u64 << 30;
-pub(super) const UNIT_FILE: &str =
-    "/etc/systemd/system/archive-210-v1616-native-input-actual-v1.service";
-pub(super) const UNIT_FILE_SHA: &str =
-    "474e889f9d40294654f52a3f2ce0f3d3d06b89fc5f19cd97695f5aa5f42ccb24";
-pub(super) const ORIGIN: &str =
-    "/var/lib/jetstreamer/horizon-210-native-capture-actual-v1/intent.json";
+pub(super) const UNIT_FILE: &str = if cfg!(feature = "native210-small") {
+    "/etc/systemd/system/archive-210-v1616-native-input-small-v2.service"
+} else {
+    "/etc/systemd/system/archive-210-v1616-native-input-actual-v1.service"
+};
+pub(super) const UNIT_FILE_SHA: &str = if cfg!(feature = "native210-small") {
+    "3532f2cf94e07aca3ab6db33a9e659e4837eaec50ccc55ef5f4e3119a99aedd8"
+} else {
+    "474e889f9d40294654f52a3f2ce0f3d3d06b89fc5f19cd97695f5aa5f42ccb24"
+};
+pub(super) const ORIGIN: &str = if cfg!(feature = "native210-small") {
+    "/var/lib/jetstreamer/horizon-210-native-capture-small-v2/intent.json"
+} else {
+    "/var/lib/jetstreamer/horizon-210-native-capture-actual-v1/intent.json"
+};
+pub(super) fn small_envelope(cold: &Value) -> Result<()> {
+    if !cfg!(feature = "native210-small") {
+        return Ok(());
+    }
+    let binding = small_model(cold)?;
+    small_census(&immutable_json(&binding)?)
+}
+fn small_model(cold: &Value) -> Result<BoundFile> {
+    let binding: BoundFile = serde_json::from_value(cold["snapshot_census"].clone())?;
+    ensure!(
+        binding.path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-native210-snapshot-census-actual-v1/census.json"
+            )
+            && binding.sha256 == "8a012e925c15ee5a8471e882c64873efcdd67b76d00e6ecc75875fc2f38216c6"
+            && cold["disk_envelope_model"]
+                == json!({"formula":"2*dense_4096_rounded_file_bytes+metadata_allowance_bytes+1073741824",
+            "modeled_bytes":64_835_780_608u64,"maximum_root_physical_bytes":SCRATCH,"bounded_experiment_only":true,
+            "original_300gb_generation_preserved":true}),
+        "210 small census/model binding differs"
+    );
+    Ok(binding)
+}
+fn small_census(census: &Value) -> Result<()> {
+    ensure!(
+        census["schema"] == "jetstreamer-native-readonly-snapshot-census-v1"
+            && census["epoch"] == 210
+            && census["snapshot_sha256"] == SNAPSHOT_SHA
+            && census["census"]["dense_4096_rounded_file_bytes"] == 28_689_416_192u64
+            && census["census"]["metadata_allowance_bytes"] == 6_383_206_400u64
+            && census["census"]["twice_dense_plus_metadata_plus_one_gib_bytes"]
+                == 64_835_780_608u64
+            && census["snapshot_extracted"] == false
+            && census["bank_constructed"] == false
+            && census["native_execution_authorized"] == false
+            && 64_835_780_608u64 < SCRATCH,
+        "210 small census scope differs"
+    );
+    Ok(())
+}
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
     phase == "private-cold-snapshot-verification" && unit == UNIT
+}
+pub(super) fn unit_name(unit: &str) -> bool {
+    matches!(
+        unit,
+        "archive-210-v1616-native-input-actual-v1.service"
+            | "archive-210-v1616-native-input-small-v2.service"
+    )
 }
 pub(super) fn command() -> String {
     format!(
@@ -180,6 +263,48 @@ pub(super) fn live(c: &PipelineClaim, current: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn small_generation_model_and_census_cannot_borrow_or_expand_authority() {
+        let mut cold = json!({"snapshot_census":{
+            "path":"/var/lib/jetstreamer/horizon-native210-snapshot-census-actual-v1/census.json",
+            "sha256":"8a012e925c15ee5a8471e882c64873efcdd67b76d00e6ecc75875fc2f38216c6"},
+            "disk_envelope_model":{"formula":"2*dense_4096_rounded_file_bytes+metadata_allowance_bytes+1073741824",
+                "modeled_bytes":64_835_780_608u64,"maximum_root_physical_bytes":SCRATCH,"bounded_experiment_only":true,
+                "original_300gb_generation_preserved":true}});
+        small_model(&cold).unwrap();
+        let mut receipt = json!({"schema":"jetstreamer-native-readonly-snapshot-census-v1","epoch":210,
+            "snapshot_sha256":SNAPSHOT_SHA,"census":{"dense_4096_rounded_file_bytes":28_689_416_192u64,
+                "metadata_allowance_bytes":6_383_206_400u64,"twice_dense_plus_metadata_plus_one_gib_bytes":64_835_780_608u64},
+            "snapshot_extracted":false,"bank_constructed":false,"native_execution_authorized":false});
+        small_census(&receipt).unwrap();
+        for pointer in [
+            "/snapshot_census/path",
+            "/snapshot_census/sha256",
+            "/disk_envelope_model/modeled_bytes",
+            "/disk_envelope_model/maximum_root_physical_bytes",
+            "/disk_envelope_model/bounded_experiment_only",
+        ] {
+            let mut bad = cold.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(small_model(&bad).is_err(), "{pointer}");
+        }
+        for pointer in [
+            "/epoch",
+            "/snapshot_sha256",
+            "/census/twice_dense_plus_metadata_plus_one_gib_bytes",
+            "/snapshot_extracted",
+            "/bank_constructed",
+            "/native_execution_authorized",
+        ] {
+            let mut bad = receipt.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(small_census(&bad).is_err(), "{pointer}");
+        }
+        cold["disk_envelope_model"]["maximum_root_physical_bytes"] = json!(64_000_000_000u64);
+        receipt["epoch"] = json!(227);
+        assert!(small_model(&cold).is_err());
+        assert!(small_census(&receipt).is_err());
+    }
     fn fixture() -> (PipelineClaim, Value) {
         let c = PipelineClaim {
             epoch: 210,
@@ -210,6 +335,20 @@ mod tests {
     }
     #[test]
     fn native210_owner_fingerprints_and_mode_are_closed() {
+        assert!(unit_name(
+            "archive-210-v1616-native-input-actual-v1.service"
+        ));
+        assert!(unit_name("archive-210-v1616-native-input-small-v2.service"));
+        assert!(!unit_name("archive-210-v1616-native-input-other.service"));
+        let other_generation = if cfg!(feature = "native210-small") {
+            "archive-210-v1616-native-input-actual-v1.service"
+        } else {
+            "archive-210-v1616-native-input-small-v2.service"
+        };
+        assert!(!scope(
+            "private-cold-snapshot-verification",
+            other_generation
+        ));
         let (c, r) = fixture();
         checked(&c, &r).unwrap();
         assert_eq!(pipeline_unit_range(&c.phase, &c.unit).unwrap(), 210..=210);

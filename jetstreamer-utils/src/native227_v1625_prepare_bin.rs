@@ -222,7 +222,12 @@ mod tests {
         if cfg!(feature = "epoch227-v1625-native-small") {
             assert_eq!(p["snapshot_census"]["sha256"], CENSUS_SHA);
             assert_eq!(p["disk_envelope_model"]["modeled_bytes"], CENSUS_BOUND);
-            assert!(CENSUS_BOUND < SCRATCH_BYTES);
+            assert!(
+                p["disk_envelope_model"]["modeled_bytes"].as_u64().unwrap()
+                    < p["envelope"]["maximum_root_physical_bytes"]
+                        .as_u64()
+                        .unwrap()
+            );
         } else {
             assert!(p.get("snapshot_census").is_none());
         }

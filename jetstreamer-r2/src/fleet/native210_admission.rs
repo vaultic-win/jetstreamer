@@ -188,6 +188,7 @@ pub(super) fn run() -> Result<()> {
     validate_output_destination(&s.output)?;
     let cold = c::immutable_json(&s.cold_plan)?;
     c::no_authority(&cold)?;
+    c::small_envelope(&cold)?;
     ensure!(
         cold["native_main"]["sha256"] == c::TEST_SHA
             && cold["snapshot"]["sha256"] == c::SNAPSHOT_SHA

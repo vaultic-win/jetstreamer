@@ -2068,6 +2068,7 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
+            || ((first_epoch..=last_epoch).contains(&210) && native210::unit_name(name))
         {
             ensure!(
                 names.contains(name),
