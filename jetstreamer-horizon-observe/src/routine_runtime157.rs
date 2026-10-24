@@ -73,7 +73,7 @@ fn exclude(model: &Value) -> Result<Value> {
     rows.retain(|r| r["range"] != "157");
     out["expected_observer_ranges"]
         .as_array_mut()
-        .context("157observer ranges")?
+        .context("157 observer ranges")?
         .retain(|r| r != "157");
     Ok(out)
 }

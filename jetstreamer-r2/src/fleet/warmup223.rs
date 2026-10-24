@@ -1,4 +1,4 @@
-//! Closed admission/ownership for the first16-slot failure-context experiment.
+//! Closed admission/ownership for the first 16-slot failure-context experiment.
 use super::*;
 mod full227_peer;
 mod guard_receipt;

@@ -314,7 +314,9 @@ pub(super) fn capability() -> Result<()> {
         "native_bank_restored":false,"replay_entries_sent":0,"private_source_permissions_changed":false,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     )?;
-    println!("203 exact inputs fully hashed/readable asUID1000; no worker/replay/launch authority");
+    println!(
+        "203 exact inputs fully hashed/readable as UID 1000; no worker/replay/launch authority"
+    );
     Ok(())
 }
 fn capability_matches(p: &Value, v: &Value, helper: &str) -> Result<()> {

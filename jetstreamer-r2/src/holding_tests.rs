@@ -380,7 +380,7 @@ fn admission_owner_derivation_deduplicates_cohorts_and_keeps_private_diagnostics
 }
 
 #[test]
-#[ignore = "root exact accepted1626 fleet; read-only native evidence, no sampling or remote access"]
+#[ignore = "root exact accepted 16:26 fleet; read-only native evidence, no sampling or remote access"]
 fn actual_accepted_fleet_includes_all_five_controllers_producers_and_private141() {
     let fleet = Bound {
         path: "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261023T162600Z.json"

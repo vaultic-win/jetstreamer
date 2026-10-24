@@ -262,13 +262,13 @@ pub(super) fn publish(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Va
             .push(serde_json::to_value(timing)?);
         (
             eta,
-            "Actual160 upload dispatch anchored once to verified198 byte-scaled hash/upload/readback/source-revalidation timings plus10minutes margin; completed replay/import/full/plugin debt excluded; original producer elapsed clock and all independent integrity gates unchanged.",
+            "Actual 160 upload dispatch anchored once to verified 198 byte-scaled hash/upload/readback/source-revalidation timings plus 10 minutes margin; completed replay/import/full/plugin debt excluded; original producer elapsed clock and all independent integrity gates unchanged.",
         )
     } else {
         let old = bound_json(&profile.proof, false)?;
         (
             delivery160::remaining(&old, &p.sample_target_utc)?,
-            "Canonical160 committed import and actual epoch-specific watcher child; retained43200second downstream deadline anchored to original archive close, no clock reset or watcher-as-child substitution; independent full/plugin/R2readback/sidecar gates remain separate.",
+            "Canonical 160 committed import and actual epoch-specific watcher child; retained 43200 second downstream deadline anchored to original archive close, no clock reset or watcher-as-child substitution; independent full/plugin/R2 readback/sidecar gates remain separate.",
         )
     };
     let target = p

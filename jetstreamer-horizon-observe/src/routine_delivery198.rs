@@ -689,7 +689,7 @@ fn apply_fleet(profile: &Profile, proof: &Value, fleet: &mut Value) -> Result<()
     );
     gate["state"] = json!("post-replay-pipeline");
     gate["next_action"] = json!(if !proof["terminal_evidence"]["importer"].is_null() {
-        "Preserve authenticated live importer526647 and owning controller, committed source receipt and original producer clock; dispatch independent full/current-plugin/upload/readback stages as canonical archive appears; no downstream allowance reset"
+        "Preserve authenticated live importer 526647 and owning controller, committed source receipt and original producer clock; dispatch independent full/current-plugin/upload/readback stages as canonical archive appears; no downstream allowance reset"
     } else if profile.controller_handoff {
         "Preserve exact pending controller import and original producer clock; retain independent full/plugin/import/upload/readback gates and authenticate the actual importer when ownership moves"
     } else {

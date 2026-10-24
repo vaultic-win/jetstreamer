@@ -112,7 +112,7 @@ pub(super) fn validate_current(
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "requires exact root-only157 incident and stopped controller; read-only, no R2 calls"]
+    #[ignore = "requires exact root-only 157 incident and stopped controller; read-only, no R2 calls"]
     fn exact_collected157_failure_has_authenticated_stopped_manager() {
         let b = Bound {
             path: "/var/lib/jetstreamer/horizon-epoch157-incident-20261021-v1/incident.json".into(),

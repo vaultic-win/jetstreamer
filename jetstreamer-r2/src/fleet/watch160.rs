@@ -115,9 +115,9 @@ pub(crate) fn child_start(phase: &str, current: &Value) -> Result<Option<u64>> {
     let legacy = phase == "plugin-verification";
     if legacy {
         // Observe the unchanged, already-running legacy deployment without
-        //chmod/restart. A new immutable byte-identical witness plus stable
-        //root-owned0755 source hashes bracket the process-identity scan. This
-        //is metadata ownership evidence, never runtime/publication promotion.
+        // chmod/restart. A new immutable byte-identical witness plus stable
+        // root-owned 0755 source hashes bracket the process-identity scan. This
+        // is metadata ownership evidence, never runtime/publication promotion.
         watch198::immutable(
             "/usr/local/lib/jetstreamer/horizon-epoch160-public-fleet-reader-20261022-v2/legacy-horizon-pipeline",
             worker_sha,

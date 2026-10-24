@@ -226,7 +226,7 @@ fn admission_value(v: &serde_json::Value, now: u64) -> Result<()> {
     Ok(())
 }
 
-// A191 verifier makes two independent scans with the already qualified large-
+// A 191 verifier makes two independent scans with the already qualified large-
 // frame reader. This is a fresh verifier envelope, never replay admission or
 // evidence that any 191 archive has passed either check.
 // The 1 TiB scalar below is only the read-only service floor. It does not

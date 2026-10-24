@@ -191,7 +191,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact accepted0639 evidence; immutable reads only, no resource observation"]
+    #[ignore = "root exact accepted 06:39 evidence; immutable reads only, no resource observation"]
     fn actual_five_lane_capacity_is_explicit_and_not_admission() {
         let (p, ..) = crate::tests::fixture101();
         let o = bound_json(&Bound { path:"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T063958Z.json".into(),sha256:"87d714a3652649a2bcf2bd0f0629d3638785e76e45c9286bfd62fb7aeb0d1b99".into() },false).unwrap();

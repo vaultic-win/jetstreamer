@@ -323,8 +323,8 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
             "expected_controller_invocation_id":h.controller_invocation_id,"expected_producer_invocation_id":h.producer_invocation_id,
             "terminal_slot":FIRST_END,"epoch_additional_replay_slots":{"183":432000,"184":432000},
             "epoch_downstream_allowance_seconds":{"183":43200,"184":86400},
-            "formula":{"183":"remaining observed epoch183 slots plus432000 queued epoch184 slots / observed rate +12h downstream; shared cohort import gate is184",
-                "184":"remaining observed epoch183 slots plus432000 queued epoch184 slots / observed rate +24h downstream; shared cohort import gate is184"}}));
+            "formula":{"183":"remaining observed epoch 183 slots plus 432000 queued epoch 184 slots / observed rate +12h downstream; shared cohort import gate is 184",
+                "184":"remaining observed epoch 183 slots plus 432000 queued epoch 184 slots / observed rate +24h downstream; shared cohort import gate is 184"}}));
     } else {
         ensure!(indices.len() == 1, "overlapping repair 183 claims");
         let r = &ranges[indices[0]];
@@ -508,7 +508,7 @@ fn observation(model: &Value, h: &Handoff, observed: &Value) -> Result<Value> {
     for (epoch, allowance) in [("183", 43200), ("184", 86400)] {
         r["epoch_additional_replay_slots"][epoch] = json!(FINAL_END - terminal);
         r["formula"][epoch] = json!(format!(
-            "remaining observed slots plus{} queued gated slots / observed rate +{allowance}s downstream; shared import gate184",
+            "remaining observed slots plus {} queued gated slots / observed rate +{allowance}s downstream; shared import gate 184",
             FINAL_END - terminal
         ));
     }

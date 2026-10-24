@@ -206,7 +206,7 @@ pub(super) fn extend(s: &Spec) -> Result<Value> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact fourteen-window growth bases and controller-rebound0639 sample; evidence reads only"]
+    #[ignore = "root exact fourteen-window growth bases and controller-rebound 06:39 sample; evidence reads only"]
     fn actual_growth_bridge_retains_all_prior_maxima() {
         let (mut s, ..) = super::super::tests::fixture();
         s.observer=BoundFile{path:"/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261023T063958Z.json".into(),sha256:"87d714a3652649a2bcf2bd0f0629d3638785e76e45c9286bfd62fb7aeb0d1b99".into()};

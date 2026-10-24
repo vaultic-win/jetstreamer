@@ -188,7 +188,7 @@ pub(super) fn run() -> Result<()> {
                 && m.nlink() == 1
                 && m.mode() & 0o222 == 0
                 && p.canonicalize()? == p,
-            "unsealed 160observer input"
+            "unsealed 160 observer input"
         );
         ensure!(
             hex_lower(&Sha256::digest(read_stable_bounded(
