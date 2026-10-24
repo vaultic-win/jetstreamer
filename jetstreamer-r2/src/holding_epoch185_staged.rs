@@ -265,12 +265,17 @@ fn job_shape(v: &Value, j: Job, collected: bool) -> Result<()> {
         return collected_shape(v, j.unit);
     }
     quiet(v, j.unit)?;
+    let expected_status = match j.status {
+        0 => "0",
+        1 => "1",
+        _ => bail!("foreign185 terminal status"),
+    };
     ensure!(
         v["LoadState"] == "loaded"
             && v["InvocationID"] == j.iid
             && v["Type"] == "oneshot"
             && v["RemainAfterExit"] == "yes"
-            && v["ExecMainStatus"] == j.status.to_string()
+            && v["ExecMainStatus"] == expected_status
             && v["Result"]
                 == if j.status == 0 {
                     "success"
