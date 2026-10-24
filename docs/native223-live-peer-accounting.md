@@ -50,3 +50,14 @@ Regression fixtures preserve the actual immutable launch, first guard and guard
 plan. Tests exercise those static bytes, exact tuple rejection, complete owner
 and failed-history preservation, whole-root observation credit and kernel memory
 rounding without reading host resources or executing either replay.
+
+The native210/native227 protected-cap snapshots also pass through the exact
+full-prefix223 adapter. The original generic cap validator still checks every
+other owner unchanged, including its strict128/112GiB native-auxiliary contract.
+Only the authenticated original223 claim is split into the existing full223
+sandbox validator, retaining its225GB maximum,150GB high watermark, zero swap,
+8CPU quota,512tasks and exact control group. Its requested manager caps must
+also match the immutable launch; kernel-rounded growth remains independently
+validated by the existing memory adapter. The six-field cap snapshot includes
+this owner and remains exactly equal before/after admission. A derived view
+never replaces the accepted fleet or drops a healthy producer/history record.
