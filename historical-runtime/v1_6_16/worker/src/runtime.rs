@@ -3122,3 +3122,10 @@ mod tests {
         assert_eq!(checkpoint.accounts_hash, expected_accounts_hash);
     }
 }
+
+#[cfg(test)]
+#[path = "native_cold_common.rs"]
+mod native_cold_common;
+#[cfg(test)]
+#[path = "native210_input.rs"]
+mod native210_input;

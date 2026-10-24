@@ -26,6 +26,13 @@ arguments and `ignore_errors`, alongside unchanged invocation ID, `MainPID`, sta
 count. Preserve raw observations. Do not treat display metadata loss as a restart, or normalize
 away an actual command or owner change.
 
+Match a new job's systemd lifetime to its terminal verifier. If that verifier requires
+`LoadState=loaded`, use its persistent service file; `systemd-run --wait` does not by itself
+retain a transient unit after completion. Preserve the actual running receipt and exact PID1
+start/completion journal. If systemd collects a completed unit, retain the real `not-found`
+state and qualify recovery from those original proofs before promoting its result. Recreating
+an idle unit does not restore the historical invocation or prove its execution.
+
 Choose the desired lane count from memory alone, targeting 90% of total host memory used. Estimate
 the marginal lane RSS from this century's observations, subtract measured non-lane usage once, and
 update the count from actual host usage at the regular observation. Track the difference between

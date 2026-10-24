@@ -1,0 +1,65 @@
+{
+  "assembly_qualified": false,
+  "bindings": {
+    "plan_path": "/var/lib/jetstreamer/horizon-native223-next-root-d18fd429-v2/capability-plan.json",
+    "plan_sha256": "50a3e62da82eac0f6a290fa7d912f9677e87ff4dbd5ce145496857e98eda1d65",
+    "self_sha256": "d18fd42956cafd34d6dccabeb2a47fbbca8c8d857ef8ed7adb39d8ad2a2b1d7d"
+  },
+  "canonical_prefix_independently_qualified": false,
+  "entry_replay": false,
+  "invocation_id": "601e879edd80481eb998b17805a27cc4",
+  "native_restart_qualified": false,
+  "node_sha256": "99f643ff0dbbcd37d1fbc524a1c1088d7273c7fc91330df059d30d51b8b0fcd4",
+  "parent_planning_report": {
+    "archive_created": false,
+    "bootstrap_slot": 96335538,
+    "canonical_bootstrap_bound": true,
+    "canonical_prefix_qualified": false,
+    "canonical_sidecar_authorized": false,
+    "canonical_terminal_required": true,
+    "complete_epoch_span_covered": false,
+    "epoch": 223,
+    "fresh_resource_admission_passed": false,
+    "full_cold_epoch_peak_qualified": false,
+    "known_root_prefix_planning_only": true,
+    "output_slot_count": 431523,
+    "output_slot_start": 96336000,
+    "pre_worker_barrier_reached": true,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "replay_launch_authorized": false,
+    "runtime_checkpoint_policy_validated": true,
+    "runtime_profile": "solana-v1.6.20",
+    "runtime_promotion_authorized": false,
+    "runtime_revision": "77bdb45d4af61fc687161ec06cc0178ff79726d5",
+    "schema": "jetstreamer-private-epoch223-prefix-planning-preflight-v1",
+    "snapshot_schema_or_contents_tested": false,
+    "tail_comparison_only": false,
+    "terminal_canonical_root_independently_known": true,
+    "terminal_slot": 96767522,
+    "worker_environment_override": "JETSTREAMER_HISTORICAL_WORKER_V1_6_20",
+    "worker_executable": "/var/lib/jetstreamer/horizon-223-v1620-long-prefix-80202938-v1/jetstreamer-historical-worker-v1-6-20",
+    "worker_identity": "jetstreamer-historical-worker-v1-6-20",
+    "worker_profile_validated": true,
+    "worker_spawned": false
+  },
+  "prerequisites": {
+    "native_input": {
+      "path": "/var/lib/jetstreamer/horizon-native223-input-proof-release-v1/input-proof.json",
+      "sha256": "a76a8e809e1c4fd102461620a45bf09021dd00a660b6a68834b0ec9086e7711a"
+    },
+    "warmup_terminal": {
+      "path": "/var/lib/jetstreamer/horizon-warmup223-native20-terminal-58ab-v2/proof.json",
+      "sha256": "6790592b9188e7c4a3d32171a326b743f84fc6c5b5ad07f94182c104876b7028"
+    }
+  },
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "replay_launch_authorized": false,
+  "resource_observation_performed": false,
+  "schema": "jetstreamer-private-epoch223-v1620-root-prefix-capability-v1",
+  "snapshot_sha256": "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665",
+  "worker_sha256": "a651b7a6ee3c0d4f8359e1ea6cfcb96becf259d440ee744beb173b264de6af20",
+  "worker_started": false
+}

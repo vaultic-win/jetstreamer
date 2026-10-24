@@ -77,6 +77,10 @@ publish status in the existing coordinated 30-minute cycle using only `replay`,
 
 ## Epoch 209 native input harness
 
+Epoch210 has its own [native preparation and integration plan](epoch210-native-preparation.md).
+Its build, preflight and non-native integrity checks do not borrow epoch209's
+native proof or qualify its 424-slot post-root tail.
+
 The test-only v1.6.16 module `worker/src/native209_input.rs` supplies the ignored
 `runtime::native209_input::native_epoch209_cold_input_matches_canonical_accounts_commitment`
 gate. It admits only the exact retained 8,543,246,873-byte bootstrap and

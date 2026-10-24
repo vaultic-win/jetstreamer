@@ -10,6 +10,7 @@ repository.workspace = true
 documentation.workspace = true
 
 [features]
+epoch210-native-main-guard = ["epoch227-native-main-guard"]
 epoch227-native-main-guard = []
 # Reuse the native observer, with one additional closed 207 tuple. Each plan
 # must match its full tuple; this remains compatible with utils --all-features.
@@ -357,3 +358,7 @@ rocksdb = { version = "0.23", default-features = false, features = ["lz4"], opti
 
 [dev-dependencies]
 bincode.workspace = true
+
+[[bin]]
+name = "jetstreamer-native210-prepare"
+path = "src/native210_prepare_bin.rs"
