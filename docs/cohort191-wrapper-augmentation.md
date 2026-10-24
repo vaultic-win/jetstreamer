@@ -20,13 +20,22 @@ mode, length, ownership, link count and timestamps. It rejects unexpected
 package entries and binds the plan's complete original-member map.
 
 The external root-only state directory holds the exclusive mutation lock,
-intent, temporary copy and completion. The package directory keeps mode 0555;
+intent and completion. The package directory keeps mode 0555;
 the root process uses its existing DAC override capability. The wrapper is
-copied and fsynced externally, its verified mode is set to 0555, and
+copied and fsynced under the one exact temporary name
+`.jetstreamer-horizon-verify-pair.partial` inside the destination directory,
+its verified mode is set to 0555, and
 `renameat2(RENAME_NOREPLACE)` publishes it on the same filesystem. Original
 member snapshots are rechecked before and after publication. The original
 deployment seal and `SHA256SUMS` are historical evidence and are not rewritten.
 The separate completion authenticates the additive transition.
+
+The first sandboxed production attempt preserved its external intent and
+verified temporary copy, then failed with `EXDEV`: separate systemd
+`ReadWritePaths` bind mounts prevent a cross-mount rename even with equal
+device IDs. No original package member or final wrapper was changed. The
+corrected helper stages inside the destination bind mount, retaining the
+external failed-attempt evidence and the original filesystem restrictions.
 
 Interrupted copies resume only after their exact retained prefix matches the
 qualified source. Intent and completion use fsynced temporary files and
