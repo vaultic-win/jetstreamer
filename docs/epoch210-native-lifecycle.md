@@ -101,6 +101,16 @@ a definite positive estimate including all later replay/verification/upload/
 readback work through the canonical sidecar. No archive placeholder is allowed.
 Refresh within the same 1800-second coordinated cycle, with no extra routine poll.
 
+Before that next cycle, deploy the separately qualified observer supporting
+numeric native profile 210. Add its exact unit, original invocation, actual
+MainPID, scratch path, harness path and harness SHA-256 to
+`native_input_diagnostics`; do not also add a generic `diagnostic_replays` or
+ordinary replay row for the same unit, scratch or epoch. The observer hashes the
+mapped harness inode, verifies its unique process/RSS/VMA identity and measures
+scratch in the normal sample. It reports resource-only evidence with no entry
+progress or native qualification. A terminated/replaced owner yields an explicit
+unavailable row rather than a manufactured replay sample.
+
 ## Capture terminal proof
 
 Preserve the original unit file and raw journal before unit collection. Seal
