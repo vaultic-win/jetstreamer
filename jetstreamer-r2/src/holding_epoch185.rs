@@ -3,6 +3,15 @@
 use super::*;
 #[path = "holding_epoch185_retire.rs"]
 mod retire;
+#[path = "holding_epoch185_staged.rs"]
+mod staged;
+
+pub(super) fn diagnose(m: &Mapping, p: &Inspect, spec: &Bound) -> Result<()> {
+    staged::diagnose(m, p, spec)
+}
+pub(super) fn reconcile(m: &Mapping, value: Value, spec: &Bound) -> Result<()> {
+    staged::reconcile(m, &serde_json::from_value(value)?, spec)
+}
 
 pub(super) async fn retire_local(
     client: &Client,

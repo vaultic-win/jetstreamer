@@ -3382,6 +3382,8 @@ async fn main() -> Result<()> {
                 | "holding-restore"
                 | "holding-admit-restore"
                 | "holding-restore-genesis-probe"
+                | "holding-diagnose185-references"
+                | "holding-reconcile185-staged"
                 | "holding-inspect185"
                 | "holding-check-retire185"
                 | "holding-retire185"
