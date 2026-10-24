@@ -624,6 +624,68 @@ fn collect_job(j: Job, p: &Reconcile, preserved: &Value) -> Result<()> {
     }
     Ok(())
 }
+// Read-only closure gate; no manager/config mutation and no replay-data read.
+pub(super) fn fenced_for_growth() -> Result<Value> {
+    let before = old_gate()?;
+    ensure!(
+        before["LoadState"] == "masked" && fs::read_link(ORIGINAL)? == Path::new("/dev/null"),
+        "old185 controller is launchable"
+    );
+    checked_bytes(Path::new(RETAINED), OLD_SHA, 0)?;
+    let completion = state_record(&Path::new(ROOT).join("completion.json"), 0)?
+        .context("185 reconciliation completion missing")?;
+    ensure!(
+        completion["schema"] == "jetstreamer-terminal185-staged-reconciliation-v2"
+            && completion["all8metadata_jobs_collected"] == true
+            && completion["original_controller_masked"] == true
+            && completion["staged_after"]["references"] == json!([])
+            && completion["growth_claims_released"] == false,
+        "185 reconciliation not complete"
+    );
+    let mut jobs = serde_json::Map::new();
+    for j in JOBS {
+        let v = manager(j.unit)?;
+        job_shape(&v, j, true)?;
+        ensure!(
+            v["LoadState"] == "not-found" && absent(&config_path(j.unit))?,
+            "185 metadata owner reappeared"
+        );
+        let intent = state_record(&Path::new(ROOT).join(format!("{}.intent.json", j.unit)), 0)?
+            .context("185 metadata intent missing")?;
+        let done = state_record(
+            &Path::new(ROOT).join(format!("{}.completed.json", j.unit)),
+            0,
+        )?
+        .context("185 metadata completion missing")?;
+        ensure!(
+            intent["unit"] == j.unit
+                && intent["invocation_id"] == j.iid
+                && intent["config_sha256"] == j.sha
+                && done["intent"] == intent
+                && done["manager_collected"] == true
+                && done["fragment_absent"] == true,
+            "185 metadata collection lineage differs"
+        );
+        jobs.insert(j.unit.into(), v);
+    }
+    for name in [CONTROLLER, PRODUCER] {
+        terminal_unit(name)?;
+        no_job(&property(name, "org.freedesktop.systemd1.Unit", "Job")?)?;
+    }
+    let references = current_refs()?;
+    ensure!(
+        references["references"] == json!([]),
+        "185 old namespace still has staged consumers"
+    );
+    ensure!(
+        old_gate()? == before,
+        "185 old mask owner changed across closure proof"
+    );
+    Ok(
+        json!({"old_controller":before,"metadata_jobs":jobs,"references":references,
+        "replay_data_removed":false,"native_manager_mutations":false}),
+    )
+}
 pub(super) fn reconcile(m: &Mapping, p: &Reconcile, spec: &Bound) -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-horizon-holding185-staged-reconcile-plan-v2",

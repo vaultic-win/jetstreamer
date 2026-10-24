@@ -3378,7 +3378,12 @@ async fn main() -> Result<()> {
     if matches!(
         env::args().nth(1).as_deref(),
         Some(
-            "holding-park"
+            "holding-capture185-survivor-guards"
+                | "holding-plan185-guard-handoff"
+                | "holding-check185-attempt-growth"
+                | "holding-close185-attempt-growth"
+                | "holding-read185-attempt-growth"
+                | "holding-park"
                 | "holding-restore"
                 | "holding-admit-restore"
                 | "holding-restore-genesis-probe"

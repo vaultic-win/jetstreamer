@@ -1103,7 +1103,7 @@ pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -1126,6 +1126,15 @@ pub(super) async fn run() -> Result<()> {
     let map: Bound = serde_json::from_value(v["mapping"].clone())?;
     let m: Mapping = serde_json::from_value(bound(&map)?)?;
     mapping(&m)?; // Must pass before credentials, listing or first remote write.
+    if args[1] == "holding-plan185-guard-handoff" {
+        return epoch185::plan_guard_handoff(&m, v, &spec);
+    }
+    if args[1] == "holding-capture185-survivor-guards" {
+        return epoch185::capture_growth_guards(&m, v, &spec);
+    }
+    if args[1] == "holding-read185-attempt-growth" {
+        return epoch185::growth_read(&m, v);
+    }
     private(Path::new(STATE))?;
     private(&Path::new(STATE).join("receipts"))?;
     let mut lock = OpenOptions::new()
@@ -1147,6 +1156,12 @@ pub(super) async fn run() -> Result<()> {
     );
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
+    if matches!(
+        args[1].as_str(),
+        "holding-check185-attempt-growth" | "holding-close185-attempt-growth"
+    ) {
+        return epoch185::growth_close(&m, v, &spec, args[1] == "holding-check185-attempt-growth");
+    }
     if args[1] == "holding-diagnose185-references" {
         return epoch185::diagnose(&m, &serde_json::from_value(v)?, &spec);
     }

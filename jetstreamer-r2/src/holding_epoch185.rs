@@ -1,10 +1,26 @@
 //! Exact failed185 inspection, collected-controller closure and separately gated
 //! authenticated-custody local retirement. No canonical publication or job resume.
 use super::*;
+#[path = "holding_epoch185_growth.rs"]
+mod growth;
+#[path = "holding_epoch185_guard_profiles.rs"]
+mod guards;
+pub(super) fn plan_guard_handoff(m: &Mapping, v: Value, spec: &Bound) -> Result<()> {
+    guards::plan_handoff(m, &serde_json::from_value(v)?, spec)
+}
+pub(super) fn capture_growth_guards(m: &Mapping, v: Value, spec: &Bound) -> Result<()> {
+    guards::capture(m, &serde_json::from_value(v)?, spec)
+}
 #[path = "holding_epoch185_retire.rs"]
 mod retire;
 #[path = "holding_epoch185_staged.rs"]
 mod staged;
+pub(super) fn growth_close(m: &Mapping, v: Value, spec: &Bound, check: bool) -> Result<()> {
+    growth::run(m, &serde_json::from_value(v)?, spec, check)
+}
+pub(super) fn growth_read(m: &Mapping, v: Value) -> Result<()> {
+    growth::read(m, &serde_json::from_value(v)?)
+}
 
 pub(super) fn diagnose(m: &Mapping, p: &Inspect, spec: &Bound) -> Result<()> {
     staged::diagnose(m, p, spec)
