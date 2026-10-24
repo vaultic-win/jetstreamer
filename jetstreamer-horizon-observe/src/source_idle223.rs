@@ -440,6 +440,90 @@ mod tests {
         assert!(verification_owner(&"0".repeat(32), good).is_err());
     }
     #[test]
+    fn moved_verifier_copy_does_not_require_old_path_presence_or_replace_owner_proof() {
+        use std::os::unix::fs::symlink;
+        let t = tempfile::tempdir().unwrap();
+        let original = t.path().join("epoch-223.jet");
+        fs::write(&original, b"disposable verified-copy fixture").unwrap();
+        let iid = "1".repeat(32);
+        // Only the path is a disposable filesystem fixture here. The public
+        // verification_owner namespace remains closed and is tested separately.
+        let source = Owner {
+            unit: "horizon-verify-223-native20-native25-private-v3-v1.service",
+            invocation: &iid,
+            archive: &original,
+        };
+        let line = format!("{} loaded inactive dead Exact verifier\n", source.unit());
+        let before =
+            validate_snapshot(source, line.as_bytes(), b"", Some(terminal(source))).unwrap();
+        let procroot = t.path().join("proc");
+        let process = procroot.join("99123");
+        fs::create_dir_all(process.join("fd")).unwrap();
+        fs::write(process.join("cmdline"), b"unrelated-reader\0").unwrap();
+        let cgroup = t.path().join("cgroup");
+        fs::create_dir_all(cgroup.join("system.slice").join(source.unit())).unwrap();
+        fs::write(
+            cgroup
+                .join("system.slice")
+                .join(source.unit())
+                .join("cgroup.events"),
+            b"populated 0\nfrozen 0\n",
+        )
+        .unwrap();
+        for role in ["stage", "public"] {
+            let directory = t.path().join(role);
+            fs::create_dir(&directory).unwrap();
+            let moved = directory.join("epoch-223.jet");
+            let from = if role == "stage" {
+                original.clone()
+            } else {
+                t.path().join("stage/epoch-223.jet")
+            };
+            fs::rename(from, &moved).unwrap();
+            assert!(!original.exists());
+            fs::write(process.join("maps"), format!("000 {}\n", moved.display())).unwrap();
+            let fd = process.join("fd/7");
+            if fd.symlink_metadata().is_ok() {
+                fs::remove_file(&fd).unwrap();
+            }
+            symlink(&moved, &fd).unwrap();
+            let references = crate::process_references::scan(&procroot, source.archive()).unwrap();
+            assert!(references.references.is_empty());
+            assert!(
+                !crate::process_references::scan(&procroot, &moved)
+                    .unwrap()
+                    .references
+                    .is_empty()
+            );
+            assert_eq!(group(&cgroup, source).unwrap()["state"], "unpopulated");
+            let after =
+                validate_snapshot(source, line.as_bytes(), b"", Some(terminal(source))).unwrap();
+            stable(&before, &after).unwrap();
+            for (field, value) in [
+                ("MainPID", "42"),
+                ("InvocationID", "22222222222222222222222222222222"),
+                ("ActiveState", "active"),
+            ] {
+                let mut wrong = terminal(source);
+                wrong[field] = json!(value);
+                assert!(
+                    validate_snapshot(source, line.as_bytes(), b"", Some(wrong)).is_err(),
+                    "{field}"
+                );
+            }
+            let queued = format!("7 {} start waiting\n", source.unit());
+            assert!(
+                validate_snapshot(
+                    source,
+                    line.as_bytes(),
+                    queued.as_bytes(),
+                    Some(terminal(source))
+                )
+                .is_err()
+            );
+        }
+    }
+    #[test]
     fn complete_unloaded_census_is_distinct_from_failed_show_or_missing_properties() {
         let source = Owner::from(Source::Tail);
         let units = b"unrelated.service loaded active running Example\n";

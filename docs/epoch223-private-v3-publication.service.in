@@ -1,0 +1,27 @@
+# Source template only. Prove this exact capability/write scope before launch.
+[Unit]
+Description=Publish independently verified private epoch 223 V3 archive locally
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=@SEALED_V3_PUBLISHER@ @ACTUAL_PUBLICATION_PLAN@ --plan-sha256 @ACTUAL_PLAN_SHA256@ --self-sha256 @ACTUAL_PUBLISHER_SHA256@
+Restart=no
+TimeoutStartSec=24h
+TimeoutStopSec=90s
+KillMode=control-group
+Delegate=no
+MemoryMax=64G
+MemoryHigh=48G
+MemorySwapMax=0
+CPUQuota=200%
+TasksMax=512
+UMask=0077
+PrivateNetwork=yes
+ProtectHome=read-only
+ProtectSystem=strict
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE CAP_CHOWN CAP_FOWNER CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE CAP_CHOWN CAP_FOWNER CAP_SETUID CAP_SETGID
+ReadWritePaths=@ACTUAL_PRIVATE_SCAN_DIRECTORY@ @ACTUAL_PUBLICATION_WORK_PARENT@ @ACTUAL_ROOT_PUBLICATION_RECEIPT_DIRECTORY@ @ACTUAL_FULL_RECEIPT_DIRECTORY@ @ACTUAL_PLUGIN_RECEIPT_DIRECTORY@ /home/ubuntu/horizon
+OOMPolicy=stop

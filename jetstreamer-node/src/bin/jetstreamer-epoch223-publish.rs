@@ -6,6 +6,8 @@
 //! then uses the existing recoverable absence-only transaction. Original
 //! assembly/prefix/suffix and all verification logs remain untouched.
 
+#[path = "epoch223_assembly/publication_recover.rs"]
+mod recovery;
 #[path = "epoch213_publish/write_scope.rs"]
 mod write_scope;
 
@@ -34,7 +36,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
-    io::{BufReader, Read, Write},
+    io::{BufReader, Read, Seek, SeekFrom, Write},
     os::unix::{
         fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
         io::AsRawFd,
@@ -434,6 +436,22 @@ fn validate_archive(file: &File, expected: &str) -> Result<()> {
     Ok(())
 }
 
+// Byte policy shared by validation and writing. Root ownership/privacy checks
+// remain in Sink; tests exercise truncation through disposable file descriptors.
+fn validate_sink_contents(file: &mut File, metadata: &fs::Metadata, expected: &[u8]) -> Result<()> {
+    if metadata.len() > 0 {
+        file.seek(SeekFrom::Start(0))?;
+        let mut existing = Vec::new();
+        (&mut *file)
+            .take((8 << 20) + 1)
+            .read_to_end(&mut existing)?;
+        ensure!(
+            existing == expected && identity(&file.metadata()?) == identity(metadata),
+            "nonempty receipt/gate bytes differ (possibly truncated); preserve evidence for operator handoff"
+        );
+    }
+    Ok(())
+}
 struct Sink {
     file: File,
     parent: File,
@@ -442,6 +460,7 @@ impl Sink {
     fn create(directory: &Path, name: &str) -> Result<Self> {
         let parent = private_root_directory(directory)?;
         let file = OpenOptions::new()
+            .read(true)
             .write(true)
             .create_new(true)
             .mode(0o600)
@@ -451,6 +470,49 @@ impl Sink {
         parent.sync_all()?;
         Ok(Self { file, parent })
     }
+    fn resume(directory: &Path, name: &str) -> Result<Self> {
+        let parent = private_root_directory(directory)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(directory.join(name))?;
+        let m = file.metadata()?;
+        ensure!(
+            m.is_file()
+                && m.uid() == 0
+                && m.nlink() == 1
+                && m.mode() & 0o777 == 0o600
+                && m.len() <= 8 << 20,
+            "unsafe existing root receipt sink"
+        );
+        Ok(Self { file, parent })
+    }
+    fn resume_or_create(directory: &Path, name: &str) -> Result<Self> {
+        match Self::resume(directory, name) {
+            Ok(value) => Ok(value),
+            Err(e)
+                if e.downcast_ref::<std::io::Error>()
+                    .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
+            {
+                Self::create(directory, name)
+            }
+            Err(e) => Err(e),
+        }
+    }
+    fn validate_existing(&mut self, bytes: &[u8]) -> Result<()> {
+        let m = self.file.metadata()?;
+        ensure!(
+            m.is_file()
+                && m.uid() == 0
+                && m.nlink() == 1
+                && m.mode() & 0o777 == 0o600
+                && m.len() <= 8 << 20,
+            "existing receipt sink metadata differs"
+        );
+        validate_sink_contents(&mut self.file, &m, bytes)?;
+        Ok(())
+    }
     fn write(&mut self, bytes: &[u8]) -> Result<()> {
         let metadata = self.file.metadata()?;
         ensure!(
@@ -458,10 +520,13 @@ impl Sink {
                 && metadata.uid() == 0
                 && metadata.nlink() == 1
                 && metadata.mode() & 0o777 == 0o600
-                && metadata.len() == 0,
+                && metadata.len() <= 8 << 20,
             "receipt sink changed or already written"
         );
-        self.file.write_all(bytes)?;
+        validate_sink_contents(&mut self.file, &metadata, bytes)?;
+        if metadata.len() == 0 {
+            self.file.write_all(bytes)?;
+        }
         self.file.sync_all()?;
         self.parent.sync_all()?;
         Ok(())
@@ -605,14 +670,14 @@ fn run(binding: Evidence, self_sha: &str) -> Result<()> {
         &plan.plugin_receipt_directory,
         destination,
     ])?;
-    // Open root-only durable sinks before permanently dropping privileges.
-    // No later pathname access can grant the archive user these permissions.
-    let mut intent = Sink::create(&plan.receipt_directory, "intent.json")?;
+    let context = json!({"schema":"jetstreamer-exact-epoch223-v3-publication-context-v1","epoch":223,"plan":binding,"publisher_sha256":self_sha,"verification":plan.verification,"scanner_terminal":accepted.terminal,"scanner_idle":accepted.idle,"verifier_launch":plan.verifier_launch,"canonical_boundary_metadata":accepted.inputs.boundary_metadata,"archive_sha256":plan.archive_sha256,"archive_bytes":plan.archive_bytes,"expected_provenance_sha256":accepted.prepared.provenance_sha256,"private_runner_sha256":plan.verifier.sha256,"rename_mount_id":rename_mount_id,"write_scope":write_scope,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    // Publish a complete no-clobber intent before allocating gate sinks. Its
+    // inode lock survives privilege drop and excludes a live duplicate retry.
+    let _intent_owner = recovery::create_intent(&plan.receipt_directory, &context)?;
     let mut receipt = Sink::create(&plan.receipt_directory, "publication.json")?;
     let mut full_gate = Sink::create(&plan.full_receipt_directory, "epoch-223.full.ok")?;
     let mut plugin_gate = Sink::create(&plan.plugin_receipt_directory, "epoch-223.plugin.ok")?;
-    let context = json!({"schema":"jetstreamer-exact-epoch223-v3-publication-context-v1","epoch":223,"plan":binding,"publisher_sha256":self_sha,"verification":plan.verification,"scanner_terminal":accepted.terminal,"scanner_idle":accepted.idle,"verifier_launch":plan.verifier_launch,"canonical_boundary_metadata":accepted.inputs.boundary_metadata,"archive_sha256":plan.archive_sha256,"archive_bytes":plan.archive_bytes,"expected_provenance_sha256":accepted.prepared.provenance_sha256,"private_runner_sha256":plan.verifier.sha256,"rename_mount_id":rename_mount_id,"write_scope":write_scope,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false});
-    intent.json(&context)?;
+
     fs::DirBuilder::new()
         .mode(0o700)
         .create(&plan.publication_stage)?;
@@ -731,6 +796,26 @@ fn capability_probe(root: &Path, self_sha: &str) -> Result<()> {
     let receipts = root.join("receipts");
     fs::DirBuilder::new().mode(0o700).create(&receipts)?;
     let mut sink = Sink::create(&receipts, "capability.json")?;
+    let resumed_bytes = b"durable private receipt capability fixture\n";
+    let mut complete_sink = Sink::create(&receipts, "already-complete.json")?;
+    complete_sink.write(resumed_bytes)?;
+    let _empty_sink = Sink::create(&receipts, "resume-empty.json")?;
+    let mut resumed_complete = Sink::resume(&receipts, "already-complete.json")?;
+    let mut resumed_empty = Sink::resume(&receipts, "resume-empty.json")?;
+    let fixture_intent =
+        json!({"diagnostic_fixture":true,"publication_authorized":false,"r2_mutations":false});
+    let intent_owner = recovery::create_intent(&receipts, &fixture_intent)?;
+    let original_intent = fs::read(receipts.join("intent.json"))?;
+    ensure!(
+        recovery::create_intent(&receipts, &json!({"must_not_replace":true})).is_err()
+            && fs::read(receipts.join("intent.json"))? == original_intent,
+        "atomic intent publication clobbered an existing context"
+    );
+    let intent_contender = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(receipts.join("intent.json"))?;
     let stage = root.join("stage");
     let destination = root.join("destination");
     for (path, mode) in [(&stage, 0o700), (&destination, 0o3770)] {
@@ -771,6 +856,12 @@ fn capability_probe(root: &Path, self_sha: &str) -> Result<()> {
         "write scope did not deny an out-of-scope write"
     );
     drop_to_archive_owner()?;
+    ensure!(
+        recovery::lock_descriptor(&intent_contender).is_err(),
+        "live intent lock was lost across privilege drop"
+    );
+    drop(intent_owner);
+    recovery::lock_descriptor(&intent_contender)?;
     preflight_archive_publication(&stage, &destination)?;
     let context = b"epoch223 private filesystem capability only; no archive admission";
     let publication = publish_verified_archive_batch_if_absent_with_context_and_lock_timeout(
@@ -785,7 +876,46 @@ fn capability_probe(root: &Path, self_sha: &str) -> Result<()> {
         context,
         Duration::from_secs(5),
     )?;
-    sink.json(&json!({"schema":"jetstreamer-private-epoch223-publication-capability-v1","publisher_sha256":self_sha,"diagnostic_fixture":true,"rename_mount_id":rename_mount_id,"write_scope":write_scope,"outside_write_denied":true,"filesystem_transaction_passed":true,"root_receipt_fd_survives_permanent_privilege_drop":true,"effective_uid":unsafe{libc::geteuid()},"archive_sha256":sha256_hex_string(&evidence.sha256),"transaction_id":sha256_hex_string(&publication.transaction_id),"archive_publication_authorized":false,"runtime_registry_promotion_authorized":false,"r2_mutations":false}))?;
+    let dm = fs::metadata(&destination)?;
+    let destination_id = jetstreamer_node::archive_publish::ArchiveBatchDestinationIdentity {
+        device: dm.dev(),
+        inode: dm.ino(),
+    };
+    ensure!(
+        jetstreamer_node::archive_publish::recover_archive_publication_batch_with_expected_context(
+            &destination,
+            destination_id,
+            Sha256::digest(context).into(),
+            &[223],
+            b"foreign private fixture context"
+        )
+        .is_err(),
+        "scoped capability recovery accepted a foreign context"
+    );
+    let jetstreamer_node::archive_publish::ArchiveBatchRecovery::Committed(recovered) =
+        jetstreamer_node::archive_publish::recover_archive_publication_batch_with_expected_context(
+            &destination,
+            destination_id,
+            Sha256::digest(context).into(),
+            &[223],
+            context,
+        )?
+    else {
+        anyhow::bail!("scoped capability recovery did not return the exact committed fixture");
+    };
+    ensure!(
+        recovered.transaction_id == publication.transaction_id,
+        "scoped fixture recovered another transaction"
+    );
+    resumed_empty.write(resumed_bytes)?;
+    resumed_complete.write(resumed_bytes)?;
+    ensure!(
+        resumed_complete
+            .write(b"must never replace the prior receipt")
+            .is_err(),
+        "resumed root receipt accepted different bytes"
+    );
+    sink.json(&json!({"schema":"jetstreamer-private-epoch223-publication-capability-v1","publisher_sha256":self_sha,"diagnostic_fixture":true,"rename_mount_id":rename_mount_id,"write_scope":write_scope,"outside_write_denied":true,"filesystem_transaction_passed":true,"root_receipt_fd_survives_permanent_privilege_drop":true,"resumed_receipt_fds_survive_permanent_privilege_drop":true,"different_existing_receipt_bytes_rejected":true,"scoped_recovery_context_checked_before_mutation":true,"atomic_no_clobber_intent_proven":true,"intent_lock_survives_permanent_privilege_drop":true,"effective_uid":unsafe{libc::geteuid()},"archive_sha256":sha256_hex_string(&evidence.sha256),"transaction_id":sha256_hex_string(&publication.transaction_id),"archive_publication_authorized":false,"runtime_registry_promotion_authorized":false,"r2_mutations":false}))?;
     acknowledge_archive_publication_batch(&destination, publication.transaction_id)?;
     println!("private publication filesystem capability passed; no campaign archive touched");
     Ok(())
@@ -793,6 +923,20 @@ fn capability_probe(root: &Path, self_sha: &str) -> Result<()> {
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.len() == 6
+        && args[0] == "--recover"
+        && args[2] == "--plan-sha256"
+        && args[4] == "--self-sha256"
+    {
+        digest(&args[5])?;
+        return recovery::run(
+            Evidence {
+                path: args[1].clone().into(),
+                sha256: args[3].clone(),
+            },
+            &args[5],
+        );
+    }
     if args.len() == 4 && args[0] == "--capability-probe" && args[2] == "--self-sha256" {
         digest(&args[3])?;
         return capability_probe(Path::new(&args[1]), &args[3]);
@@ -822,6 +966,30 @@ mod tests {
         "publication_stage":"/var/lib/jetstreamer/horizon-223-publication-work-test/stage",
         "receipt_directory":"/private/import","full_receipt_directory":"/private/full","plugin_receipt_directory":"/private/plugin",
         "artifact_publication_authorized":true,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false})
+    }
+    #[test]
+    fn truncated_nonempty_root_sink_content_is_never_replaced_or_completed() {
+        let t = tempfile::tempdir().unwrap();
+        for (name, expected) in [
+            ("publication.json", b"{\"committed\":true}\n".as_slice()),
+            ("epoch-223.full.ok", b"archive full runner\n".as_slice()),
+            ("epoch-223.plugin.ok", b"archive plugin runner\n".as_slice()),
+        ] {
+            for cut in [1, expected.len() - 1] {
+                let path = t.path().join(name);
+                fs::write(&path, &expected[..cut]).unwrap();
+                let mut f = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&path)
+                    .unwrap();
+                let before = f.metadata().unwrap();
+                let error = validate_sink_contents(&mut f, &before, expected).unwrap_err();
+                assert!(error.to_string().contains("operator handoff"));
+                assert_eq!(fs::read(&path).unwrap(), &expected[..cut]);
+                assert_eq!(identity(&f.metadata().unwrap()), identity(&before));
+            }
+        }
     }
     #[test]
     fn publication_authority_is_explicit_local_and_epoch_scoped() {

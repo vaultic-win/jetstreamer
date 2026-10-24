@@ -289,8 +289,8 @@ recovery must not run before authenticating the pending batch's exact context;
 the shared library now provides an expected-context recovery API that checks
 manifest fingerprint, exact epoch census and exact original publication context
 under the destination writer lock before changing any namespace. Foreign and
-unarmed pending batches remain untouched. Its separate publisher retry/receipt
-adapter still needs implementation and qualification before idempotent deployment.
+unarmed pending batches remain untouched. Its separate publisher retry/receipt adapter is prepared in the follow-up
+source below and still requires qualification before deployment.
 
 Verification capture/guard/fleet/peer and normal pipeline-status bindings are now
 prepared as source. The verifier capture authenticates the actual sealed runner,
@@ -316,3 +316,82 @@ status publication can use genuine elapsed time. Neither stage adds a polling
 loop. Status phase remains `verification`, with an inclusive definite estimate
 through authenticated R2 sidecar commit; the metadata stays until that commit
 or independently proved inactive ownership.
+
+## Follow-up scoped publication recovery candidate
+
+The publisher now has an explicit recovery CLI:
+
+```text
+jetstreamer-epoch223-publish --recover PLAN --plan-sha256 HEX --self-sha256 HEX
+```
+
+It requires the same actual immutable publication plan and the same publisher
+binary as the original operation. The complete, atomically published root-only `intent.json` must bind
+that exact self digest, plan, verifier, independent V3 provenance, canonical
+boundary metadata and actual verifier completion. Missing or conflicting intent
+never authorizes a retry. A new publisher cannot silently recover a different
+binary's historical context. An inode-bound, nonblocking advisory lock survives
+the privilege drop and excludes a duplicate recovery while the actual publisher
+is still alive. An interrupted intent publication cannot expose an empty
+canonical intent. Once the complete context is durable, missing gate sinks can
+be created during its exact recovery; existing ones are never replaced. The original 30ee2d72 candidates remain preserved
+and unsealed; this follow-up is a separate source revision.
+
+Recovery reauthenticates the real verification receipt, full/plugin arguments
+and logs, canonical metadata, original assembly identity and current verifier
+idle state. It may finish its own interrupted private ownership/rename handoff,
+then hash the one retained verified-copy inode. It preserves the source assembly,
+checks write scope and same-mount constraints, and opens the existing root-only
+publication/full/plugin sinks before the permanent UID/GID 1000 drop.
+
+Public recovery uses only the expected-context batch API: manifest fingerprint,
+exact `[223]` epoch census and original context bytes must match under the writer
+lock before any recovery mutation. Foreign and unarmed batches remain untouched.
+A proved rollback gets its own durable private recovery record before outcome
+acknowledgement and an absence-only retry of the same staged inode. The existing
+controlled-rename helper refreshes only ctime while preserving the original full
+hash, inode, size and mtime. Committed batches can finish their private receipt
+and missing gates. An already acknowledged retry additionally requires the exact
+prior durable publication receipt and matching actual local archive/checksum.
+No retry overwrites an archive or a different receipt; an existing receipt/gate
+must be empty or byte-for-byte identical to its independently derived result.
+
+The private publication receipt remains durable before either uploader gate is
+made parseable. All paths still deny registry promotion, local retirement and R2
+mutation. These operations perform no Bank replay. The extended capability probe
+uses separate fake bytes and exercises resumed root receipt descriptors after
+privilege drop, identical-only writes and foreign-context rejection; it grants
+no archive/content or operational admission authority. Root must prove the actual
+sandbox before launch. The publication service template retains exactly the
+traversal/process-census, ownership, chmod and permanent-identity-drop capabilities
+needed by this sequence and uses a bounded oneshot start timeout.
+
+The 30ee2d72 observer candidate is blocked from deployment: its baseline predates
+the deployed 42bac936 RSS final-identity recheck and three-attempt host-churn
+safeguards. Preserve that original candidate and its separate blocking note.
+Reapply the typed 223 parent/archive telemetry to the corrected observer baseline,
+retain those RSS safeguards and qualify the result before sealing. This bin-local
+observer correction does not invalidate the separately preserved node/R2 bytes.
+
+A nonempty truncated private publication receipt or `.ok` gate is intentionally
+an operator handoff. Recovery preserves those exact bytes and refuses to finish,
+truncate or replace them; it cannot infer the missing suffix from a plausible
+prefix. Only an empty sink or a byte-for-byte complete match is automatic.
+Offline descriptor-policy tests exercise truncated JSON/full/plugin fixture
+contents without bypassing production root-ownership checks. The root capability
+probe remains separate before operational use. The current verifier-idle path
+never stats the old archive name: it keeps exact unit/invocation/job/cgroup and
+process-reference checks even after that name has moved to stage or public.
+Disposable proc/cgroup/rename fixtures cover this path and reject live, changed
+or queued verifier owners despite the old filename being absent.
+
+Source review moved prior-publication-receipt validation ahead of private
+ownership/rename handoff and public transaction recovery. Nonempty JSON must
+already equal the complete canonical pretty-JSON bytes plus final newline.
+A syntactically valid file missing only that newline is still preserved as an
+operator handoff. The existing descriptor policy independently checks that the
+held root receipt contains those same bytes before any handoff mutation.
+
+Recovery also checks same-mount/write confinement before creating any missing
+receipt/gate sink, matching fresh publication's rejection order. These source
+changes remain unqualified until the coordinated Cargo lease is granted.
