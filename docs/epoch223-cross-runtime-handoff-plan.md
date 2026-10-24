@@ -93,3 +93,8 @@ nor a merger success alone creates a canonical sidecar. Fresh resource/guard
 admission, a private no-clobber output, independent assembled full/current-plugin
 checks, adjacent-boundary obligations and authenticated upload/readback remain
 separate requirements. Keep223 open through the ready verified R2pair.
+
+The prepared executable link and exact independent-prefix-reader arguments are
+in `epoch223-private-v3-assembly-route.md`. Its source preparation does not
+qualify the separate223 resource admission/fleet or final verification adapters;
+those explicit gaps prevent an operational launch now.
