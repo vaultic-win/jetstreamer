@@ -1502,7 +1502,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "read-only, root-only proof for this host's sealed epoch206 historical origin"]
+    #[ignore = "read-only, root-only proof for this host's sealed epoch 206 historical origin"]
     fn host_206_legacy_origin_uses_authenticated_replay_and_manager_start() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let origin = Bound {

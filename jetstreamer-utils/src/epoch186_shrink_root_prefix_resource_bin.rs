@@ -195,7 +195,7 @@ fn main() {
         bounded_resource_runner::input_capability();
     } else {
         eprintln!(
-            "epoch186 replay requires separate qualified admission and guard handoff; only --storage-capability is enabled"
+            "epoch 186 replay requires separate qualified admission and guard handoff; only --storage-capability is enabled"
         );
         std::process::exit(2);
     }

@@ -63,7 +63,7 @@ fn shape(v: &Value, c: &DiagnosticClaim) -> Result<()> {
             && v["memory_admission"]["available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= 130u64 << 30),
-        "foreign full-census141PoH launch"
+        "foreign full-census 141 PoH launch"
     );
     for flag in [
         "publication_authorized",
@@ -168,7 +168,7 @@ pub(super) fn validate_live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root actual live census141PoH owner/sandbox proof only; no resource sample,remote request or output"]
+    #[ignore = "root actual live census 141 PoH owner/sandbox proof only; no resource sample, remote request or output"]
     fn actual_live_owner_has_exact_private_sandbox_and_closed_source() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let path = Path::new(ROOT).join("intent.json");

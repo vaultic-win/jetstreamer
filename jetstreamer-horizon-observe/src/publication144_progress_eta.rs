@@ -82,7 +82,7 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
             (
                 deadline(entered, sample, SOURCE_HASH + MARGIN)?,
                 UPLOAD + debt,
-                "initial source-hash deadline anchored to exact client marker,plus full upload/readback/revalidation/sidecar debt",
+                "initial source-hash deadline anchored to exact client marker, plus full upload/readback/revalidation/sidecar debt",
             )
         }
         "upload" => {
@@ -109,7 +109,7 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
             (
                 rate.max(historical),
                 debt,
-                "max(observed wall-time rate,historical byte-scaled upload),plus complete readback/source revalidation/sidecar debt",
+                "max(observed wall-time rate, historical byte-scaled upload), plus complete readback/source revalidation/sidecar debt",
             )
         }
         "awaiting-readback" => {
@@ -122,7 +122,7 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
             (
                 deadline(entered, sample, debt)?,
                 0,
-                "fixed downstream deadline anchored to actual multipart commit;never reset at observation",
+                "fixed downstream deadline anchored to actual multipart commit; never reset at observation",
             )
         }
         "readback" => {
@@ -146,7 +146,7 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
             (
                 rate.max(historical),
                 SOURCE_HASH + MARGIN,
-                "max(observed ordered-hashed wall-time rate,historical byte-scaled readback),plus source revalidation/sidecar debt",
+                "max(observed ordered-hashed wall-time rate, historical byte-scaled readback), plus source revalidation/sidecar debt",
             )
         }
         "source-revalidation-sidecar" => {
@@ -157,7 +157,7 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
             (
                 deadline(entered, sample, SOURCE_HASH + MARGIN)?,
                 0,
-                "fixed source-revalidation/sidecar deadline anchored to actual verified readback;never reset at observation",
+                "fixed source-revalidation/sidecar deadline anchored to actual verified readback; never reset at observation",
             )
         }
         "sidecar-commit" => {
@@ -168,7 +168,7 @@ pub(crate) fn estimate(progress: &Value, calibration: &Value) -> Result<Value> {
             (
                 deadline(entered, sample, MARGIN)?,
                 0,
-                "sidecar allowance anchored to exact source-revalidation completion;not remote readiness",
+                "sidecar allowance anchored to exact source-revalidation completion; not remote readiness",
             )
         }
         _ => {

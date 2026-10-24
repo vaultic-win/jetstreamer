@@ -231,7 +231,7 @@ pub fn run() -> Result<()> {
         "self_sha256":args[5],"package":PACKAGE}),
     );
     write_receipt(&p.run_root.join("receipts/capability.json"), &value)?;
-    println!("epoch136 exact immutable inputs verified; no worker spawn, restore or replay");
+    println!("epoch 136 exact immutable inputs verified; no worker spawn, restore or replay");
     Ok(())
 }
 

@@ -204,7 +204,7 @@ fn main() -> Result<()> {
     let bytes = encode_archive_provenance(&provenance::derive_pair(&prefix, &suffix, true)?)?;
     if check {
         println!(
-            "assembly-only source expectation preflight passed; no outcome,service,target,remote observation or writes; real terminal outcome still required"
+            "assembly-only source expectation preflight passed; no outcome, service, target, remote observation or writes; real terminal outcome still required"
         );
         return Ok(());
     }

@@ -2,7 +2,7 @@
 use super::*;
 const UNIT: &str = "horizon-qualify-144-private-verification-20261021-v1.service";
 const IID: &str = "0def5bbebbbc4d6aa8b7f6fe33d08365";
-const ACTION: &str = "Private 144 retained prefix independently passed through 62639490; original producer and verifier are terminal and stale status was conditionally removed. Preserve validated109GBprefix. Qualify final 509 slots and exact native restart/assembly,complete epoch/full-plugin and R2 gates; no production ETA or cold prefix restart.";
+const ACTION: &str = "Private 144 retained prefix independently passed through 62639490; original producer and verifier are terminal and stale status was conditionally removed. Preserve validated 109 GB prefix. Qualify final 509 slots and exact native restart/assembly, complete epoch/full-plugin and R2 gates; no production ETA or cold prefix restart.";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Profile {

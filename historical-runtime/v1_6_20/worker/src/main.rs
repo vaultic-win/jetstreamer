@@ -8,7 +8,7 @@ mod snapshot;
     feature = "epoch223-prefix-qualification",
     feature = "diagnostic-singleton"
 ))]
-compile_error!("epoch223 prefix cannot combine singleton execution diagnostics");
+compile_error!("epoch 223 prefix cannot combine singleton execution diagnostics");
 
 #[cfg(all(
     feature = "epoch227-capped-qualification",
@@ -17,10 +17,10 @@ compile_error!("epoch223 prefix cannot combine singleton execution diagnostics")
         feature = "diagnostic-singleton"
     )
 ))]
-compile_error!("epoch227 capped requires an exclusive qualification build");
+compile_error!("epoch 227 capped requires an exclusive qualification build");
 
 #[cfg(all(feature = "epoch228-capped-qualification", any(feature = "epoch227-capped-qualification", feature = "epoch223-prefix-qualification", feature = "diagnostic-singleton")))]
-compile_error!("epoch228 capped requires an exclusive qualification build");
+compile_error!("epoch 228 capped requires an exclusive qualification build");
 
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,

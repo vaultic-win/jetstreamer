@@ -8,7 +8,7 @@ compile_error!("v1.6.20 native input cannot combine the v1.6.25 warmup profile")
     feature = "epoch223-tail-snapshot-tests",
     feature = "epoch223-cold-snapshot-tests"
 ))]
-compile_error!("epoch223 cold and tail snapshot profiles cannot be combined");
+compile_error!("epoch 223 cold and tail snapshot profiles cannot be combined");
 #[cfg(all(
     any(
         feature = "epoch223-tail-snapshot-tests",
@@ -19,7 +19,7 @@ compile_error!("epoch223 cold and tail snapshot profiles cannot be combined");
         feature = "ram-snapshot-eight-core-stopped225"
     )
 ))]
-compile_error!("epoch223 snapshot profile cannot be combined with another profile");
+compile_error!("epoch 223 snapshot profile cannot be combined with another profile");
 #[cfg(any(
     feature = "epoch223-tail-snapshot-tests",
     feature = "epoch223-cold-snapshot-tests"

@@ -397,7 +397,7 @@ impl Audit {
         for &raw in &self.writes {
             if raw != self.next_write || raw >= RAW_END {
                 self.error =
-                    Some("prefix raw write range has a gap,duplicate or out-of-bound value".into());
+                    Some("prefix raw write range has a gap, duplicate or out-of-bound value".into());
                 return;
             }
             self.next_write += 1;

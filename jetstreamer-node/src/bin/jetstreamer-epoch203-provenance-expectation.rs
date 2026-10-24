@@ -32,7 +32,7 @@ const START: u64 = 87_696_000;
 fn metadata_policy() -> Result<TransactionMetadataPolicy, String> {
     require(
         START >= STATUS_REQUIRED_START && START >= UNTRUSTED_ASSOCIATION_END,
-        "epoch203 does not fall wholly in independently checked observed-metadata era",
+        "epoch 203 does not fall wholly in independently checked observed-metadata era",
     )?;
     Ok(TransactionMetadataPolicy::observed())
 }

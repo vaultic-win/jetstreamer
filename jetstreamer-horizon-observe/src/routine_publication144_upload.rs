@@ -366,7 +366,7 @@ fn publish_inner(p: &Plan, pipeline: &Value, observer: &Bound) -> Result<Value> 
         "binding":{"unit":UPLOAD,"invocation_id":u["InvocationID"],"expected_exec_start":u["ExecStart"],"claim_phase":"upload-readback",
             "origin_unit":UNIT,"origin_invocation_id":l["claim"]["origin_invocation_id"],"model_path":target,"model_sha256":"","fleet_path":provisional.path,"fleet_sha256":provisional.sha256},
         "observer":observer,"fleet":provisional,"origin_launch":s.launch,"estimate_evidence":[progress,s.upload,s.launch],
-        "estimate_basis":"Authenticated exact live 144 child progress/forecast;original publisher invocation clock retained; no queued time or replay ETA fabricated",
+        "estimate_basis":"Authenticated exact live 144 child progress/forecast; original publisher invocation clock retained; no queued time or replay ETA fabricated",
         "estimated_remaining_millis":forecast["estimated_remaining_millis"],"jet_path":"/home/sol/horizon/epoch-144.jet","expected_jet_size_bytes":LENGTH,
         "peer_units":[],"receipt_directory":"/home/sol/.jetstreamer-private/r2-status-receipts","receipt_directory_uid":1001});
     let package =

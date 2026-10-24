@@ -17,7 +17,7 @@ pub(crate) fn validate_launch(
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch225-v1-6-25-diagnostic requires exact private focused epoch 225, snapshot 97199617 and underlying canonicalroot 97631459; ordinary replay, root cohorts, inherited leases, recovery and publication are unavailable".into());
+        return Err("epoch225-v1-6-25-diagnostic requires exact private focused epoch 225, snapshot 97199617 and underlying canonical root 97631459; ordinary replay, root cohorts, inherited leases, recovery and publication are unavailable".into());
     }
     let (ledger, output, scratch) =
         paths.ok_or("epoch 225 comparison requires private ledger/output/scratch paths")?;

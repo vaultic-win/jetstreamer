@@ -271,7 +271,7 @@ fn split(
             "launch":private157::binding(&d.launch_receipt),"guard":private157::binding(&b),
             "remaining_growth_bytes":growth,"scratch_growth_credit_bytes":credit,
             "sampled_whole_root_physical_bytes":sampled,"guarded_whole_root_physical_bytes":guarded,
-            "accounting":"whole-root envelope less min(coordinated same-IID whole-root allocation,current whole-root guard allocation); actual free space bracketed by admission"}));
+            "accounting":"whole-root envelope less min(coordinated same-IID whole-root allocation, current whole-root guard allocation); actual free space bracketed by admission"}));
     }
     reduced["active"]
         .as_array_mut()

@@ -134,7 +134,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         && o["vm_max_map_count"].as_u64().is_some_and(|v| v >= 4194304);
     let (gate, action) = if expanded && window["qualified"] == true {
         (
-            "expanded operating-point guard/floor review and epoch186 fresh guarded admission",
+            "expanded operating-point guard/floor review and epoch 186 fresh guarded admission",
             "The complete expanded fleet has a clean comparable observation window. Bind current no-trip guards and century-floor/growth evidence to an explicit operating-point promotion, then freshly admit the staged disjoint capped186 candidate. Do not repeat the awaiting-window hold or grant launch authority from this receipt.",
         )
     } else if expanded {
@@ -159,18 +159,18 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
         )
     } else if terminal_repair {
         (
-            "epoch186 runtime/input readiness and fresh guarded admission; epoch141 execution mismatch remains a priority repair",
+            "epoch 186 runtime/input readiness and fresh guarded admission; epoch 141 execution mismatch remains a priority repair",
             "Extract and diagnose the sealed failed 141 transaction/account evidence. Freshly qualify/admit the disjoint compatible 186 singleton while repairing 141; do not blindly rerun the failed 141 worker or scale another experimental lane before a clean expanded sample.",
         )
     } else {
         (
-            "private141 fresh admission, actual one-worker guard fire, and fleet handoff",
-            "Finish and test the Rust growth-adoption/guard-capture path, seal it, run fresh admission, then launch the guarded private141 root experiment; no seventh lane before a clean expanded sample.",
+            "private 141 fresh admission, actual one-worker guard fire, and fleet handoff",
+            "Finish and test the Rust growth-adoption/guard-capture path, seal it, run fresh admission, then launch the guarded private 141 root experiment; no seventh lane before a clean expanded sample.",
         )
     };
     Ok(
         json!({"schema":"jetstreamer-horizon-capacity-decision-v2","question":"Can I fit another disjoint lane now?",
-        "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
+        "sampled_at_utc":p.sample_target_utc,"candidate":if expanded {"next disjoint qualified repair/singleton"} else if terminal_repair {"epoch 186 compatible disjoint singleton, subject to fresh claim census"} else {"private epoch141 original-entry partial-root qualification"},
         "memory_concurrency_target":memory_report,"expanded_fleet_window":window,
         "capped186_budget":candidate186::report(p,o),
         "live_production_lanes":live.len(),"proven_production_lanes":PROVEN,"live_owners":live,

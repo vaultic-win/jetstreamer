@@ -103,7 +103,7 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root-only read-only exact launch and live command qualification for retained220-222"]
+    #[ignore = "root-only read-only exact launch and live command qualification for retained 220-222"]
     fn root_exact_sealed_launches_match_current_private_readers() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         for (epoch, id, digest) in [

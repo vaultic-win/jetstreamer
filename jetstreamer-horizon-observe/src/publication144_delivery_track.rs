@@ -390,7 +390,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, is_terminal: bool) -> Re
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root disposable durable ownership receipt proof only; no real publisher,worker,archive or R2 access"]
+    #[ignore = "root disposable durable ownership receipt proof only; no real publisher, worker, archive or R2 access"]
     fn root_capture_receipts_are_private_durable_and_no_clobber() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let d = tempfile::tempdir().unwrap();

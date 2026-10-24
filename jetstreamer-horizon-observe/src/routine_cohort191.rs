@@ -133,7 +133,7 @@ fn apply_controller(
         let key = epoch.to_string();
         next["epoch_additional_replay_slots"][&key] = json!(0);
         next["formula"][&key] = json!(format!(
-            "round((84239999-last_slot)/observed_slots_per_second+{}); shared cohort import gate remains epoch194",
+            "round((84239999-last_slot)/observed_slots_per_second+{}); shared cohort import gate remains epoch 194",
             (epoch - 190) * 43200
         ));
     }

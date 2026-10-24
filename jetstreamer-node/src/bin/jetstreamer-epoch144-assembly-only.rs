@@ -221,7 +221,7 @@ fn run() -> Result<()> {
     let expected = provenance::derive_pair(&prefix, &suffix, true)?;
     if check {
         println!(
-            "assembly-only source/plan preflight passed; no source scan,admission,service observation,replay or writes; original terminal timeout and fresh admission still required"
+            "assembly-only source/plan preflight passed; no source scan, admission, service observation, replay or writes; original terminal timeout and fresh admission still required"
         );
         return Ok(());
     }

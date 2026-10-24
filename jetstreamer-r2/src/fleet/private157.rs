@@ -457,7 +457,7 @@ pub(super) fn prepare() -> Result<()> {
             && original["observer"] == binding(&s.observer)
             && previous["admission_transition_guard"].is_null()
             && original["admission_transition_guard"].is_null(),
-        "prefix157 preparation does not consume accepted fullfleet"
+        "prefix 157 preparation does not consume accepted full fleet"
     );
     let plan_path = s.destination.join("fleet-plan.json");
     if a.len() == 8 {

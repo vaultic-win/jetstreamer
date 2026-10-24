@@ -302,7 +302,7 @@ pub(super) async fn run() -> Result<()> {
     );
     if check {
         println!(
-            "assembly-only admission preflight passed; no service/resource/remote observation,writes or launch; actual original timeout remains required"
+            "assembly-only admission preflight passed; no service/resource/remote observation, writes or launch; actual original timeout remains required"
         );
         return Ok(());
     }

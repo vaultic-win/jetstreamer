@@ -417,7 +417,7 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
             evidence.push(e);
         }
         gate["next_action"] = json!(
-            "Track freshly admitted and guard-protected183-184 repair replay under its exact controller/producer identities. Shared import gate is epoch 184; preserve queued work and downstream allowances in both ETAs. Keep source incident open through canonical/full/plugin/publication and authenticated ready pairs; launch or unit tests alone are not recovery."
+            "Track freshly admitted and guard-protected 183-184 repair replay under its exact controller/producer identities. Shared import gate is epoch 184; preserve queued work and downstream allowances in both ETAs. Keep source incident open through canonical/full/plugin/publication and authenticated ready pairs; launch or unit tests alone are not recovery."
         );
     }
     Ok(())

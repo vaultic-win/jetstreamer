@@ -19,7 +19,7 @@
         feature = "epoch225-v1-6-25-qualification"
     )
 ))]
-compile_error!("epoch207 singleton qualification is an exclusive node build");
+compile_error!("epoch 207 singleton qualification is an exclusive node build");
 use std::{ops::Range, path::Path};
 
 pub(crate) const BOOTSTRAP: u64 = 89_423_444;

@@ -190,7 +190,7 @@ pub(crate) fn validate_prefix_expectations(
     plan: QualificationPlan,
 ) -> Result<(), String> {
     if !is_known_root_prefix(plan) {
-        return Err("epoch223 prefix requires its exact cold bootstrap, epoch output start and known terminal root".into());
+        return Err("epoch 223 prefix requires its exact cold bootstrap, epoch output start and known terminal root".into());
     }
     for (slot, hash) in [
         (
@@ -208,7 +208,7 @@ pub(crate) fn validate_prefix_expectations(
         );
         if expected.get(&slot) != Some(&known) {
             return Err(format!(
-                "epoch223 prefix requires the independently known accounts checkpoint at slot {slot}"
+                "epoch 223 prefix requires the independently known accounts checkpoint at slot {slot}"
             ));
         }
     }
@@ -230,7 +230,7 @@ pub(crate) fn validate_prefix_preflight(
     plan: Option<QualificationPlan>,
 ) -> Result<(), String> {
     if enabled && (tail_comparison || tail_preflight || !plan.is_some_and(is_known_root_prefix)) {
-        return Err("epoch223 prefix preflight requires only the exact cold-to-known-root prefix; tail flags and full-epoch terminals are forbidden".into());
+        return Err("epoch 223 prefix preflight requires only the exact cold-to-known-root prefix; tail flags and full-epoch terminals are forbidden".into());
     }
     Ok(())
 }
@@ -299,7 +299,7 @@ pub(crate) fn validate_tail_mode(
     ledger: &Path,
 ) -> Result<(), String> {
     if preflight && !enabled {
-        return Err("epoch223 tail preflight requires explicit tail comparison".into());
+        return Err("epoch 223 tail preflight requires explicit tail comparison".into());
     }
     if !enabled {
         return Ok(());
@@ -353,7 +353,7 @@ pub(crate) fn validate_tail_runtime(
             .is_some_and(|w| w.identity == identity && w.environment_override == environment)
     {
         return Err(
-            "epoch223 comparison requires its exact build-selected candidate descriptor and worker"
+            "epoch 223 comparison requires its exact build-selected candidate descriptor and worker"
                 .into(),
         );
     }
@@ -405,7 +405,7 @@ pub(crate) fn validate_filesystem(ledger: &Path) -> Result<(), String> {
     for name in ["epoch-223.jet", "epoch-223.jet.sha256"] {
         let path = root.join("output").join(name);
         match std::fs::symlink_metadata(&path) {
-            Ok(_) => return Err("epoch223 candidate requires fresh absent output and sidecar; preserve the existing generation".into()),
+            Ok(_) => return Err("epoch 223 candidate requires fresh absent output and sidecar; preserve the existing generation".into()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
             Err(e) => return Err(format!("epoch223 output identity: {e}")),
         }
@@ -417,7 +417,7 @@ pub(crate) fn validate_filesystem(ledger: &Path) -> Result<(), String> {
 /// focused validator below still owns all parsed epoch/path/span checks.
 pub(crate) fn validate_entrypoint(args: &[String]) -> Result<(), String> {
     if !matches!(args.first().map(String::as_str), Some("223" | "223-223")) {
-        return Err("epoch223 private build accepts only focused epoch223; maintenance/recovery entrypoints are disabled".into());
+        return Err("epoch 223 private build accepts only focused epoch 223; maintenance/recovery entrypoints are disabled".into());
     }
     Ok(())
 }
@@ -444,10 +444,10 @@ pub(crate) fn validate_launch(
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch223-v1-6-25-qualification requires private focused epoch223, exact cold-to-known-root prefix or cold/tail-to96767999 span; no ordinary replay, cohorts, recovery, inherited leases or publication".into());
+        return Err("epoch223-v1-6-25-qualification requires private focused epoch 223, exact cold-to-known-root prefix or cold/tail-to96767999 span; no ordinary replay, cohorts, recovery, inherited leases or publication".into());
     }
     let (ledger, output, scratch) =
-        paths.ok_or("epoch223 qualification requires explicit private paths")?;
+        paths.ok_or("epoch 223 qualification requires explicit private paths")?;
     let root = ledger
         .parent()
         .ok_or("missing private qualification root")?;
@@ -468,7 +468,7 @@ pub(crate) fn validate_launch(
     if (prefix_reserved && !is_prefix_namespace)
         || is_prefix_namespace != (focused == Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP)))
     {
-        return Err("epoch223 known-root prefix requires its exclusive private prefix namespace and exact span".into());
+        return Err("epoch 223 known-root prefix requires its exclusive private prefix namespace and exact span".into());
     }
     if root.parent() != Some(Path::new("/home/ubuntu/.jetstreamer-private"))
         || !root.file_name().and_then(|s| s.to_str()).is_some_and(|s| {
@@ -481,7 +481,7 @@ pub(crate) fn validate_launch(
         || scratch != root.join("scratch")
     {
         return Err(
-            "epoch223 paths require one isolated qualification-223-v1625 private root".into(),
+            "epoch 223 paths require one isolated qualification-223-v1625 private root".into(),
         );
     }
     Ok(())
@@ -584,7 +584,7 @@ mod tests {
     async fn actual_default_replay_barrier_rejects_private_tail_mode_without_worker() {
         assert!(
             matches!(actual_worker_barrier(TailMode::PlanningPreflight, None).await,
-            Err(e) if e.contains("explicit epoch223 tail execution cannot borrow ordinary"))
+            Err(e) if e.contains("explicit epoch 223 tail execution cannot borrow ordinary"))
         );
     }
     fn tail_plan() -> QualificationPlan {

@@ -30,7 +30,7 @@ mod singletons209_212_profile;
         feature = "epoch225-v1-6-25-qualification"
     )
 ))]
-compile_error!("epoch223 v1.6.20 prefix requires its own exclusive qualification build");
+compile_error!("epoch 223 v1.6.20 prefix requires its own exclusive qualification build");
 
 #[cfg(all(
     feature = "epoch141-original-entry-qualification",
@@ -50,7 +50,7 @@ compile_error!("epoch223 v1.6.20 prefix requires its own exclusive qualification
         feature = "epoch225-v1-6-25-qualification"
     )
 ))]
-compile_error!("epoch141 original-entry qualification requires its own exclusive build");
+compile_error!("epoch 141 original-entry qualification requires its own exclusive build");
 
 #[cfg(all(
     feature = "epoch203-checkpoint-continuation-diagnostic",
@@ -69,7 +69,7 @@ compile_error!("epoch141 original-entry qualification requires its own exclusive
         feature = "epoch205-native-restore-diagnostic"
     )
 ))]
-compile_error!("epoch203 continuation requires its own exclusive diagnostic build");
+compile_error!("epoch 203 continuation requires its own exclusive diagnostic build");
 
 #[cfg(all(
     feature = "epoch144-checkpoint-continuation-diagnostic",
@@ -82,7 +82,7 @@ compile_error!("epoch203 continuation requires its own exclusive diagnostic buil
         feature = "epoch225-v1-6-25-qualification"
     )
 ))]
-compile_error!("epoch144 continuation cannot combine unrelated diagnostic modes");
+compile_error!("epoch 144 continuation cannot combine unrelated diagnostic modes");
 
 #[cfg(all(
     feature = "epoch225-v1-6-25-qualification",
@@ -94,7 +94,7 @@ compile_error!("epoch144 continuation cannot combine unrelated diagnostic modes"
         feature = "epoch213-checkpoint-continuation-diagnostic"
     )
 ))]
-compile_error!("epoch225 full-span qualification cannot combine other diagnostic modes");
+compile_error!("epoch 225 full-span qualification cannot combine other diagnostic modes");
 
 #[cfg(all(
     feature = "epoch225-v1-6-25-diagnostic",
@@ -105,7 +105,7 @@ compile_error!("epoch225 full-span qualification cannot combine other diagnostic
         feature = "epoch213-checkpoint-continuation-diagnostic"
     )
 ))]
-compile_error!("epoch225 comparison cannot combine unrelated qualification modes");
+compile_error!("epoch 225 comparison cannot combine unrelated qualification modes");
 
 #[cfg(all(
     feature = "epoch223-v1-6-25-qualification",
@@ -123,7 +123,7 @@ compile_error!("epoch225 comparison cannot combine unrelated qualification modes
         feature = "epoch205-native-restore-diagnostic"
     )
 ))]
-compile_error!("epoch223 qualification cannot combine unrelated diagnostic modes");
+compile_error!("epoch 223 qualification cannot combine unrelated diagnostic modes");
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
@@ -11835,7 +11835,7 @@ async fn run_geyser_replay(
             || retain_runtime_state
             || checkpoint_restart.is_some()
         {
-            return Err("explicit epoch223 tail execution cannot borrow ordinary, carried, cohort, handoff or restart authority".into());
+            return Err("explicit epoch 223 tail execution cannot borrow ordinary, carried, cohort, handoff or restart authority".into());
         }
         let focused = qualification.map(|p| (p.bootstrap_slot, p.end_inclusive));
         epoch223_qualification::validate_launch(
@@ -19392,7 +19392,7 @@ async fn main() {
         let epoch = epoch.parse::<u64>();
         if probe_args.len() != 1 || !epoch.as_ref().is_ok_and(|e| (220..=222).contains(e)) {
             eprintln!(
-                "--failed-prefix220-artifact-probe requires exactly one epoch220-222 and no other arguments"
+                "--failed-prefix220-artifact-probe requires exactly one epoch 220-222 and no other arguments"
             );
             exit(2);
         }
@@ -19551,7 +19551,7 @@ async fn main() {
         {
             if !epoch223_qualification::private_build_enabled() {
                 eprintln!(
-                    "epoch223 planning flags require an isolated epoch223 qualification build"
+                    "epoch 223 planning flags require an isolated epoch 223 qualification build"
                 );
                 exit(2);
             }
@@ -19630,7 +19630,7 @@ async fn main() {
         } else if arg == "--epoch207-singleton-preflight" {
             if !cfg!(feature = "epoch207-singleton-qualification") || epoch207_singleton_preflight {
                 eprintln!(
-                    "epoch207 singleton preflight requires the exclusive qualification build and may appear only once"
+                    "epoch 207 singleton preflight requires the exclusive qualification build and may appear only once"
                 );
                 exit(2);
             }
@@ -24666,7 +24666,7 @@ mod early_snapshot_tests {
         assert_eq!(range.end, terminal + 1);
         assert!(
             compatibility::plan_runtime_spans(range.clone(), true).is_err(),
-            "a focused prefix must not promote epoch203 into ordinary replay"
+            "a focused prefix must not promote epoch 203 into ordinary replay"
         );
         let spans = plan_runtime_spans_for_invocation(range, true, true).unwrap();
         assert_eq!(spans.len(), 1);

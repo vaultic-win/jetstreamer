@@ -725,7 +725,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "requires exact immutable epoch198 host deployment and active original producer"]
+    #[ignore = "requires exact immutable epoch 198 host deployment and active original producer"]
     fn actual_owner_and_immutable_inputs_preflight() {
         let current = super::super::fleet::unit(UNIT).unwrap();
         validate_owner(&current).unwrap();

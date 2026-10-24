@@ -361,8 +361,8 @@ fn output_gate(code: Option<i32>, text: &str, mode: usize, missing: &Path) -> Re
         return planning_preflight(text).map(|_| ());
     }
     let marker = match mode {
-        0 => "epoch223 private build accepts only focused epoch223".to_string(),
-        1 => "epoch223-v1-6-25-qualification requires private focused epoch223".to_string(),
+        0 => "epoch 223 private build accepts only focused epoch 223".to_string(),
+        1 => "epoch223-v1-6-25-qualification requires private focused epoch 223".to_string(),
         2 => format!("failed to read snapshot {}", missing.display()),
         _ => anyhow::bail!("unknown probe mode"),
     };
@@ -619,7 +619,7 @@ fn run() -> Result<()> {
     let value = json!({"schema":"jetstreamer-private-epoch223-tail-package-capability-v2","epoch":223,
         "plan_path":a[1],"plan_sha256":a[3],"self_sha256":a[5],"package":p.package,"members":before,"probes":probes,
         "invocation_id":invocation,"recorded_unix_seconds":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),
-        "snapshot_source_role":"generation-bound source only; original epoch224 plan is not launch authority",
+        "snapshot_source_role":"generation-bound source only; original epoch 224 plan is not launch authority",
         "output_slot_start":96767523u64,"terminal_slot":96767999u64,"slot_count":477,
         "tail_comparison_only":true,"complete_epoch_span_covered":false,"snapshot_schema_or_contents_tested":false,
         "canonical_prefix_qualified":false,"full_cold_epoch_peak_qualified":false,
@@ -842,7 +842,7 @@ mod tests {
         assert!(
             output_gate(
                 Some(2),
-                "epoch223 private build accepts only focused epoch223",
+                "epoch 223 private build accepts only focused epoch 223",
                 0,
                 missing
             )
@@ -851,7 +851,7 @@ mod tests {
         assert!(
             output_gate(
                 Some(0),
-                "epoch223 private build accepts only focused epoch223",
+                "epoch 223 private build accepts only focused epoch 223",
                 0,
                 missing
             )

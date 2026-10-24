@@ -197,7 +197,7 @@ pub(crate) fn validate_cli(
             && verify_count == 1
             && explicit_destination
             && !forbidden_override,
-        "checkpoint continuation requires only epoch213, one explicit --verify, an explicit private destination, and its plan/hash options",
+        "checkpoint continuation requires only epoch 213, one explicit --verify, an explicit private destination, and its plan/hash options",
     )
 }
 

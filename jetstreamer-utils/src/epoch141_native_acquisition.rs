@@ -168,7 +168,7 @@ pub(super) fn run(
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact retained epoch141 rejection bytes; read-only no native open or sampling"]
+    #[ignore = "root exact retained epoch 141 rejection bytes; read-only no native open or sampling"]
     fn actual_rejected_metadata_plans778_raw_shreds_without_recovery_authority() {
         let bytes=bound_file(Path::new("/home/sol/.jetstreamer-private/epoch141-native-rejection-20261022-v1/results/metadata-rejection.json"),"635a30409eb977732b141c76b915f8416db2f5e32280ccbb209af69743cb836e",16*1024*1024,false).unwrap();
         let receipt: Value = serde_json::from_slice(&bytes).unwrap();

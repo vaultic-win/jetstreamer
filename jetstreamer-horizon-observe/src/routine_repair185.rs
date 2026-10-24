@@ -337,7 +337,7 @@ fn apply(model: &Value, h: &Handoff) -> Result<Value> {
             "expected_controller_invocation_id":h.controller_invocation_id,"expected_producer_invocation_id":h.producer_invocation_id,
             "terminal_slot":FIRST_END,"epoch_additional_replay_slots":{"185":0},
             "epoch_downstream_allowance_seconds":{"185":43200},
-            "formula":{"185":"remaining observed epoch185 slots / observed rate +12h independent import/full/plugin/upload/readback allowance"}}));
+            "formula":{"185":"remaining observed epoch 185 slots / observed rate + 12 h independent import/full/plugin/upload/readback allowance"}}));
     } else {
         ensure!(indices.len() == 1, "overlapping repair 185 claims");
         let r = &ranges[indices[0]];

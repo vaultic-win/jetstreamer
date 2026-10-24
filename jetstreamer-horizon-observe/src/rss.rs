@@ -354,7 +354,7 @@ pub(crate) fn host_resident() -> Value {
         let kernel = kernel_bytes(&fs::read_to_string("/proc/meminfo")?)?;
         Ok(serde_json::json!({"status":"observed","rss":report,
             "kernel_components_bytes":kernel,"scope":"entire visible cgroup hierarchy",
-            "accounting_basis":"process RSS plus Slab,KernelStack,PageTables,Percpu; unmapped file cache excluded",
+            "accounting_basis":"process RSS plus Slab, KernelStack, PageTables, Percpu; unmapped file cache excluded",
             "shared_pages_may_be_counted_per_process":true,"admission_authorized":false}))
     })
 }

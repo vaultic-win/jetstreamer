@@ -423,7 +423,7 @@ fn run() -> Result<()> {
             "replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false
         }),
     )?;
-    println!("frozen epoch141 generation independently reverified; no download or source mutation");
+    println!("frozen epoch 141 generation independently reverified; no download or source mutation");
     Ok(())
 }
 

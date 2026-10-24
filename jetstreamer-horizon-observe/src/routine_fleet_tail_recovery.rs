@@ -250,7 +250,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     tool_ok(&p.tools.r2)?;
     if check {
         println!(
-            "exact final-fleet recovery qualified; no resource sample,status write or remote request"
+            "exact final-fleet recovery qualified; no resource sample, status write or remote request"
         );
         return Ok(());
     }

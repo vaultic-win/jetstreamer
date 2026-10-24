@@ -10,7 +10,7 @@ pub const EPOCH_END: u64 = 98_927_999;
 
 pub fn validate_snapshot(slot: u64) -> Result<(), String> {
     if slot != BOOTSTRAP_SLOT {
-        return Err("epoch228 capped requires the exact cold snapshot 98495291".into());
+        return Err("epoch 228 capped requires the exact cold snapshot 98495291".into());
     }
     Ok(())
 }

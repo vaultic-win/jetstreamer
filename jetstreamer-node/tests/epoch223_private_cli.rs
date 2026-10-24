@@ -27,7 +27,7 @@ fn actual_entrypoint_rejects_maintenance_before_accessing_the_plan() {
             "invalid",
             "invalid",
         ],
-        "epoch223 private build accepts only focused epoch223",
+        "epoch 223 private build accepts only focused epoch 223",
     );
     rejected(
         &[
@@ -36,15 +36,15 @@ fn actual_entrypoint_rejects_maintenance_before_accessing_the_plan() {
             "invalid",
             "invalid",
         ],
-        "epoch223 private build accepts only focused epoch223",
+        "epoch 223 private build accepts only focused epoch 223",
     );
     rejected(
         &["--failed-prefix220-artifact-probe=220"],
-        "epoch223 private build accepts only focused epoch223",
+        "epoch 223 private build accepts only focused epoch 223",
     );
     rejected(
         &["224"],
-        "epoch223 private build accepts only focused epoch223",
+        "epoch 223 private build accepts only focused epoch 223",
     );
 }
 
@@ -78,7 +78,7 @@ fn actual_focused_gate_precedes_destination_creation_and_snapshot_access() {
             &output_arg,
             &scratch_arg,
         ],
-        "epoch223 paths require one isolated qualification-223-v1625 private root",
+        "epoch 223 paths require one isolated qualification-223-v1625 private root",
     );
     assert_eq!(std::fs::read_dir(t.path()).unwrap().count(), 0);
 }
@@ -96,7 +96,7 @@ fn default_binary_cannot_enable_comparison_or_preflight() {
     ] {
         rejected(
             &["223", flag],
-            "epoch223 planning flags require an isolated epoch223 qualification build",
+            "epoch 223 planning flags require an isolated epoch 223 qualification build",
         );
     }
 }

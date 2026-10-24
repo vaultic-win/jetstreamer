@@ -84,7 +84,7 @@ const EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE: u64 = EPOCH223_COLD_SNAPSHOT_SLOT 
         feature = "diagnostic-singleton"
     )
 ))]
-compile_error!("epoch223 qualification cannot combine unrelated diagnostic modes");
+compile_error!("epoch 223 qualification cannot combine unrelated diagnostic modes");
 const EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 96_767_522;
 const EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 97_199_617;
 const EPOCH225_DIAGNOSTIC_END_EXCLUSIVE: u64 = 97_202_600;
@@ -110,7 +110,7 @@ const EPOCH227_QUALIFICATION_END_EXCLUSIVE: u64 = 98_496_000;
         feature = "diagnostic-singleton"
     )
 ))]
-compile_error!("epoch227 comparison/qualification must be an exclusive build profile");
+compile_error!("epoch 227 comparison/qualification must be an exclusive build profile");
 #[cfg(all(
     feature = "epoch225-v1-6-25-qualification",
     any(
@@ -120,7 +120,7 @@ compile_error!("epoch227 comparison/qualification must be an exclusive build pro
         feature = "diagnostic-singleton"
     )
 ))]
-compile_error!("epoch225 full-span qualification cannot combine other diagnostic modes");
+compile_error!("epoch 225 full-span qualification cannot combine other diagnostic modes");
 #[cfg(all(
     feature = "epoch225-v1-6-25-diagnostic",
     any(
@@ -129,7 +129,7 @@ compile_error!("epoch225 full-span qualification cannot combine other diagnostic
         feature = "diagnostic-singleton"
     )
 ))]
-compile_error!("epoch225 comparison cannot combine other diagnostic/qualification modes");
+compile_error!("epoch 225 comparison cannot combine other diagnostic/qualification modes");
 // Complete epoch 224, then stop at the first compatible canonical root in
 // epoch 225. The suffix is qualification evidence only, never publication.
 const EPOCH224_V1_6_25_QUALIFICATION_END_EXCLUSIVE: u64 = 97_631_460;
@@ -990,12 +990,12 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
     }
     if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
     {
-        return Err("epoch223 fee/load diagnostic requires the exact cold snapshot".into());
+        return Err("epoch 223 fee/load diagnostic requires the exact cold snapshot".into());
     }
     if cfg!(feature = "epoch223-v1-6-25-qualification")
         && ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot)
     {
-        return Err("epoch223 qualification requires the exact cold or tail snapshot".into());
+        return Err("epoch 223 qualification requires the exact cold or tail snapshot".into());
     }
     if cfg!(any(
         feature = "epoch225-v1-6-25-diagnostic",
@@ -1042,7 +1042,7 @@ pub(crate) fn boundary_snapshot_test_slot() -> u64 {
                 .ok()
                 .as_deref(),
         )
-        .expect("epoch223 integration-test anchor must be one exact admitted snapshot")
+        .expect("epoch 223 integration-test anchor must be one exact admitted snapshot")
     } else if cfg!(any(
         feature = "epoch225-v1-6-25-diagnostic",
         feature = "epoch225-v1-6-25-qualification"

@@ -127,7 +127,7 @@ fn manifest(v: &Value) -> Result<()> {
                 .is_some_and(|a| a.len() == TARGETS)
             && v["acquisition"]["path"] == format!("{RAW_ROOT}/all-target-acquisition.json")
             && v["acquisition"]["sha256"] == RAW_SHA,
-        "not the complete exact 141PoH diagnostic"
+        "not the complete exact 141 PoH diagnostic"
     );
     deny(v)?;
     ensure!(
@@ -351,7 +351,7 @@ fn run() -> Result<()> {
     guard(&p.output_directory, start)?;
     if a[6] == "--check-only" {
         println!(
-            "complete closed PoH/source/clock/finalized scope bound; no boundary target reads,output or runtime authority"
+            "complete closed PoH/source/clock/finalized scope bound; no boundary target reads, output or runtime authority"
         );
         return Ok(());
     }
@@ -448,7 +448,7 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root retained first-target boundary fixture only; no full-census claim,output or live-owner access"]
+    #[ignore = "root retained first-target boundary fixture only; no full-census claim, output or live-owner access"]
     fn actual_retained_five_boundaries_match_finalized_metadata() {
         let p=read(&Bound {path:"/var/lib/jetstreamer/horizon-epoch141-first-target-poh-diagnostic-20261022-v1/poh.json".into(),sha256:"8594d2f391fa88f4a2b8f2936028e02dcad45769f614ff9de51c0c5db836ba1f".into()},1<<20,false).unwrap();
         assert_eq!(

@@ -1,4 +1,4 @@
-//! Exact private 141PoH handoff, no resource observation or archive mutation.
+//! Exact private 141 PoH handoff, no resource observation or archive mutation.
 use super::*;
 const UNIT: &str = "horizon-epoch141-census-poh-diagnostic-20261022-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch141-census-poh-diagnostic-20261022-v2";
@@ -121,7 +121,7 @@ fn claim(b: &Bound, v: &Value) -> Result<Value> {
             && v["memory_admission"]["available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= 130u64 << 30),
-        "foreign private 141PoH capture"
+        "foreign private 141 PoH capture"
     );
     let command = format!(
         "{{ path={TOOL} ; argv[]={TOOL} {PLAN} --plan-sha256 {PLAN_SHA} --self-sha256 {TOOL_SHA} --run"
@@ -285,7 +285,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
             e.push(b);
         }
         g["next_action"] = json!(
-            "Complete private 141PoH and independent boundary collection passed for18283groups/84597distinctboundaries,including66314hidden hashes. Preserve all originals and candidate readable bundle. Qualify the exact v1.4.25 source/boundary consumer and private canonical-root path before runtime input use, route promotion,full/plugin/publication or R2 delivery. Keep 141repair open until verified ready pair; collection is not ancestry/liveness/root or launch authority."
+            "Complete private 141 PoH and independent boundary collection passed for 18283 groups/84597 distinct boundaries, including 66314 hidden hashes. Preserve all originals and candidate readable bundle. Qualify the exact v1.4.25 source/boundary consumer and private canonical-root path before runtime input use, route promotion, full/plugin/publication or R2 delivery. Keep 141 repair open until verified ready pair; collection is not ancestry/liveness/root or launch authority."
         );
     }
     Ok(())
