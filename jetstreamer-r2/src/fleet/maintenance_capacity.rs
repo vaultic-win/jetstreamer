@@ -189,6 +189,38 @@ fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
         .and_then(|n| n.checked_add(candidate))
         .context("maintenance memory reservation overflow")
 }
+// The c7 canary adapter can include an explicit available-floor component.
+// Full stage policies add that same floor separately, so retain every hard
+// growth byte while accounting for this one authenticated component once.
+fn hard_growth(f: &Value, total: u64, reserve: u64, owners: &[Value]) -> Result<(u64, u64)> {
+    let expected = canary227_peer::memory_floor(f, total)?;
+    let mut accounted = None;
+    for row in owners {
+        if let Some(value) = row.get("memory_floor_top_up_bytes") {
+            ensure!(
+                row["unit"] == canary227::UNIT
+                    && accounted.is_none()
+                    && row["memory_floor_policy"] == expected,
+                "duplicate or inconsistent maintenance floor component"
+            );
+            let bytes = value
+                .as_u64()
+                .context("maintenance floor component is not an integer")?;
+            ensure!(
+                expected["memory_floor_top_up_bytes"] == bytes,
+                "maintenance floor component differs from exact policy"
+            );
+            accounted = Some(bytes);
+        }
+    }
+    let accounted = accounted.unwrap_or(0);
+    Ok((
+        reserve
+            .checked_sub(accounted)
+            .context("maintenance floor component exceeds protected total")?,
+        accounted,
+    ))
+}
 fn memory_sample(
     o: &Value,
     f: &Value,
@@ -205,6 +237,11 @@ fn memory_sample(
         .as_u64()
         .and_then(|n| n.checked_mul(1024))
         .context("maintenance sampled available memory")?;
+    let (reserve, accounted_floor) = if matches!(mode, MemoryMode::Existing) {
+        (reserve, 0)
+    } else {
+        hard_growth(f, total, reserve, &owners)?
+    };
     let (required, policy) = match mode {
         MemoryMode::Existing => (memory_required(reserve, total, candidate)?, None),
         MemoryMode::Full210 => {
@@ -224,7 +261,8 @@ fn memory_sample(
     let mut result = json!({"candidate_memory_max_bytes":candidate,"memory_target_percent":90,
         "host_total_memory_bytes":total,"protected_existing_memory_growth_bytes":reserve,
         "protected_memory_evidence":owners,"minimum_available_memory_bytes":required,
-        "sampled_available_memory_bytes":sampled,"actual_available_memory_bytes":actual});
+        "sampled_available_memory_bytes":sampled,"actual_available_memory_bytes":actual,
+        "available_floor_component_accounted_once_bytes":accounted_floor});
     if let Some((key, policy)) = policy {
         result[key] = policy;
     }
@@ -392,6 +430,40 @@ mod tests {
         let o = json!({"diagnostic_replays":[]});
         assert!(accounting_views(&f, &o).is_err());
         assert_eq!(f["active"].as_array().unwrap().len(), 1);
+    }
+    #[test]
+    fn full_stage_floor_component_never_removes_hard_growth_or_counts_floor_twice() {
+        let row = prefix223_live_peer::fixture_row();
+        let f = json!({"active":[row],"unit_census":{(prefix223_native20::UNIT):row["producer"]}});
+        let total = 1_024_000_000_000;
+        let policy = canary227_peer::memory_floor(&f, total).unwrap();
+        let top_up = policy["memory_floor_top_up_bytes"].as_u64().unwrap();
+        let evidence = json!({"unit":canary227::UNIT,"memory_floor_policy":policy,
+            "memory_floor_top_up_bytes":top_up,"remaining_hard_memory_growth_bytes":123});
+        assert_eq!(
+            hard_growth(&f, total, top_up + 123, &[evidence.clone()]).unwrap(),
+            (123, top_up)
+        );
+        assert_eq!(hard_growth(&f, total, 123, &[]).unwrap(), (123, 0));
+        assert!(
+            hard_growth(
+                &f,
+                total,
+                top_up + 123,
+                &[evidence.clone(), evidence.clone()]
+            )
+            .is_err()
+        );
+        assert!(hard_growth(&f, total, top_up - 1, &[evidence.clone()]).is_err());
+        let mut foreign = evidence.clone();
+        foreign["unit"] = json!("unqualified.service");
+        assert!(hard_growth(&f, total, top_up + 123, &[foreign]).is_err());
+        let mut wrong = evidence.clone();
+        wrong["memory_floor_top_up_bytes"] = json!(top_up - 1);
+        assert!(hard_growth(&f, total, top_up + 123, &[wrong]).is_err());
+        let mut wrong = evidence;
+        wrong["memory_floor_policy"] = Value::Null;
+        assert!(hard_growth(&f, total, top_up + 123, &[wrong]).is_err());
     }
     #[test]
     fn candidate_memory_preserves_remaining_owner_charge_and_ninety_percent_target() {
