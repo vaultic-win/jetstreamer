@@ -2,6 +2,13 @@
 use super::*;
 const IMPORTER: &str = "jetstreamer-root-import-e191-194-t5-20261016-v2-r2-e191-194-2.service";
 const IMPORT_IID: &str = "611c55c179654410a5dddce41fd6c019";
+fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
+    let bytes = read_checked(&path, LIMIT, 0, immutable)?;
+    Ok(Bound {
+        path,
+        sha256: sha(&bytes),
+    })
+}
 pub(super) fn enabled(p: &Plan) -> bool {
     p.cohort191_delivery
         .as_ref()
