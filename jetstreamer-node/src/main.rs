@@ -24684,6 +24684,57 @@ mod early_snapshot_tests {
         PathBuf::from(format!("snapshot-{slot}-{hash}.tar.bz2"))
     }
 
+    #[cfg(feature = "epoch227-v1-6-25-diagnostic")]
+    #[test]
+    fn epoch227_actual_focused_selection_matches_the_compiled_worker_before_spawn() {
+        // Reproduce both parent selection passes from the failed capability:
+        // output planning first, then the real snapshot-warmup replay selection.
+        let output = 98_064_000..98_495_292;
+        let replay = 98_063_465..98_495_292;
+        let assert_selection = |selection: compatibility::RuntimeSelection| {
+            assert_eq!(selection.descriptor.identity.name, "solana-v1.6.25");
+            assert_eq!(
+                selection.descriptor.identity.revision,
+                "7de8a55b54d3e11058b82f9483bb405d143b455c"
+            );
+            let worker = selection.descriptor.worker.unwrap();
+            assert_eq!(worker.identity, "jetstreamer-historical-worker-v1-6-25");
+            assert_eq!(
+                worker.environment_override,
+                "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
+            );
+            assert!(worker.default_manifest_relative_path.contains("/v1_6_25/"));
+            let profile = historical_worker_profile(selection.descriptor).unwrap();
+            assert_eq!(profile.backend_id, "solana-v1.6.25");
+            assert_eq!(
+                profile.solana_commit,
+                selection.descriptor.identity.revision
+            );
+        };
+        assert_selection(select_runtime_for_invocation(output.clone(), true, true).unwrap());
+        assert_selection(
+            select_runtime_with_snapshot_warmup_for_invocation(
+                replay.start,
+                output.clone(),
+                true,
+                true,
+            )
+            .unwrap(),
+        );
+        assert_selection(select_runtime_for_invocation(replay.clone(), true, true).unwrap());
+        for span in plan_runtime_spans_for_invocation(output.clone(), true, true).unwrap() {
+            assert_selection(runtime_span_selection(&span).unwrap());
+        }
+        for segment in plan_replay_for_invocation(replay, true, true).unwrap() {
+            let compatibility::EraBackend::Available(descriptor) = segment.execution.backend else {
+                panic!("unsupported private227 segment")
+            };
+            assert_eq!(descriptor.identity.name, "solana-v1.6.25");
+            historical_worker_profile(descriptor).unwrap();
+        }
+        assert!(select_runtime_for_invocation(output, false, true).is_err());
+    }
+
     #[test]
     fn focused_qualification_uses_only_the_post_bootstrap_span() {
         let snapshot = qualification_snapshot(515_912, Hash::new_unique());

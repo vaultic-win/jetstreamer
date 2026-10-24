@@ -1246,7 +1246,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch227-v1-6-25-diagnostic"
         )) {
             "solana-v1.6.25"
         } else {
@@ -1257,7 +1258,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch227-v1-6-25-diagnostic"
         )) {
             SOLANA_V1_6_25_REVISION
         } else {
@@ -1279,7 +1281,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch227-v1-6-25-diagnostic"
         )) {
             "jetstreamer-historical-worker-v1-6-25"
         } else {
@@ -1290,7 +1293,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch227-v1-6-25-diagnostic"
         )) {
             "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
         } else {
@@ -1301,7 +1305,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch227-v1-6-25-diagnostic"
         )) {
             "../historical-runtime/v1_6_25/target/release/jetstreamer-historical-worker-v1-6-25"
         } else {
@@ -2910,7 +2915,8 @@ mod tests {
                     feature = "epoch224-v1-6-25-diagnostic",
                     feature = "epoch224-v1-6-25-qualification",
                     feature = "epoch225-v1-6-25-diagnostic",
-                    feature = "epoch225-v1-6-25-qualification"
+                    feature = "epoch225-v1-6-25-qualification",
+                    feature = "epoch227-v1-6-25-diagnostic"
                 )) {
                     SOLANA_V1_6_25_REVISION
                 } else {
@@ -2921,7 +2927,8 @@ mod tests {
                     feature = "epoch224-v1-6-25-diagnostic",
                     feature = "epoch224-v1-6-25-qualification",
                     feature = "epoch225-v1-6-25-diagnostic",
-                    feature = "epoch225-v1-6-25-qualification"
+                    feature = "epoch225-v1-6-25-qualification",
+                    feature = "epoch227-v1-6-25-diagnostic"
                 )) {
                     "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
                 } else {
@@ -2932,7 +2939,8 @@ mod tests {
                     feature = "epoch224-v1-6-25-diagnostic",
                     feature = "epoch224-v1-6-25-qualification",
                     feature = "epoch225-v1-6-25-diagnostic",
-                    feature = "epoch225-v1-6-25-qualification"
+                    feature = "epoch225-v1-6-25-qualification",
+                    feature = "epoch227-v1-6-25-diagnostic"
                 )) {
                     "../historical-runtime/v1_6_25/target/release/jetstreamer-historical-worker-v1-6-25"
                 } else {
