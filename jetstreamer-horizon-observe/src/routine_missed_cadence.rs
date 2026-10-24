@@ -174,11 +174,15 @@ pub(super) fn prepare(p: &Plan, pb: &Bound, proof_bound: &Bound, self_sha: &str)
 mod tests {
     use super::*;
     fn fixture() -> (Plan, Bound, Value, Value, Proof, Bound) {
-        let p: Plan =
+        let mut p: Plan =
             serde_json::from_str(include_str!("fixtures/missed-cadence-plan.json")).unwrap();
         let pb=Bound{path:"/var/lib/jetstreamer/horizon-routine-notes-plan-101-200-20261024T114600Z-v1/cycle-plan.json".into(),sha256:"519a016047742f0709328c1a5807e2b66ff9e91bfdcf92cabb57fa548f95b6bc".into()};
-        let c: Value =
+        let mut c: Value =
             serde_json::from_str(include_str!("fixtures/missed-cadence-completion.json")).unwrap();
+        // This fixture tests cadence derivation without private host receipts.
+        // The enabled status profile still requires its authenticated receipt.
+        p.qualification141_status = None;
+        c["qualification141_status"] = Value::Null;
         let cfg =
             serde_json::from_str(include_str!("fixtures/missed-cadence-config.json")).unwrap();
         let proof=Proof{schema:"jetstreamer-horizon-missed-cadence-proof-v1".into(),previous_plan:pb.clone(),completion:Bound{path:p.cycle_directory.join("completion.json"),sha256:sha(include_bytes!("fixtures/missed-cadence-completion.json"))},observer_config:Bound{path:"/var/lib/jetstreamer/horizon-observer-capacity-recovery-20261024T143400Z-v1/observer.json".into(),sha256:"6380173bf6ee9ad7e3a29763e070667fb403959e5e000e071c5836d886f9b42e".into()},target_utc:"2026-10-24T14:34:00Z".into()};
@@ -237,6 +241,23 @@ mod tests {
         scope["additional_tracked_units"] =
             new["scope_101_200"]["additional_tracked_units"].clone();
         assert_eq!(scope, new["scope_101_200"]);
+    }
+    #[test]
+    fn enabled_status_profile_still_requires_its_authenticated_receipt() {
+        let (mut p, pb, mut c, cfg, proof, binding) = fixture();
+        let host: Plan =
+            serde_json::from_str(include_str!("fixtures/missed-cadence-plan.json")).unwrap();
+        p.qualification141_status = host.qualification141_status;
+        c["qualification141_status"] = json!({
+            "enabled": true,
+            "new_resource_samples": 0,
+            "publication_authorized": false,
+            "publication": {
+                "path": "/nonexistent/missed-cadence-status-receipt.json",
+                "sha256": "0".repeat(64)
+            }
+        });
+        assert!(derive(&p, &pb, &c, &cfg, &proof, &binding).is_err());
     }
     #[test]
     fn rejects_fabricated_completion_foreign_predecessor_and_non_missed_interval() {
