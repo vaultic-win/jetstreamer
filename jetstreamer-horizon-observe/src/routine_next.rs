@@ -360,6 +360,7 @@ pub(super) fn prepare(
         || mode == "--prepare-next-original141"
         || mode == "--prepare-next-repair141"
         || mode == "--prepare-next-terminal185"
+        || mode == "--prepare-next-memory152-rebind"
     {
         None
     } else {
@@ -407,6 +408,14 @@ pub(super) fn prepare(
         delivery198::consume_recovery(&mut next)?;
     }
     let model = bound_json(&next.model_template, true)?;
+    if mode == "--prepare-next-memory152-rebind" {
+        memory152::enable(
+            &mut next,
+            &mut next_config,
+            handoff_spec.context("152 rebind proof required")?,
+        )?;
+        prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
+    }
     if transition191 {
         cohort191_delivery::enable(
             &mut next,

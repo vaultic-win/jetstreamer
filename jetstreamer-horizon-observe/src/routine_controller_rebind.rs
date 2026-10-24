@@ -237,6 +237,8 @@ fn transform_members(model: &Value, v: &Value, expected: usize) -> Result<Value>
     Ok(m)
 }
 pub(super) fn model(p: &Plan, m: &Value) -> Result<Value> {
+    let historical = memory152::historical_model(p, m)?;
+    let m = &historical;
     let Some(v) = evidence(p)? else {
         return Ok(m.clone());
     };
@@ -269,7 +271,7 @@ pub(super) fn model(p: &Plan, m: &Value) -> Result<Value> {
             es.push(x);
         }
     }
-    Ok(m)
+    memory152::model(p, &m)
 }
 fn properties(name: &str) -> Result<Value> {
     let out=Command::new("systemctl").args(["show",name,"--no-pager","--property=Id,InvocationID,MainPID,ActiveState,SubState,NRestarts,Result,ExecMainStatus,ExecStart"]).output()?;
@@ -300,6 +302,10 @@ pub(super) fn validate_live(p: &Plan) -> Result<()> {
         terminal185::validate(p)?;
     }
     for row in v["bindings"].as_array().unwrap() {
+        if memory152::enabled(p) && row["range"] == "152-153" {
+            memory152::validate_live(p)?;
+            continue;
+        }
         if terminal185::enabled(p) && row["range"] == "185-185" {
             continue;
         }

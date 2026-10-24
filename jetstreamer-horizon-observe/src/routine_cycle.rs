@@ -74,6 +74,8 @@ mod terminal141;
 mod controller_rebind;
 #[path = "routine_recovery.rs"]
 mod controller_recovery;
+#[path = "routine_memory152.rs"]
+mod memory152;
 
 #[path = "routine_runtime157.rs"]
 mod runtime157;
@@ -172,6 +174,8 @@ struct Plan {
     package_controller_recovery: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     controller_rebind: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    memory152_rebind: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     census141_poh: Option<census141_poh::Profile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -311,6 +315,9 @@ fn campaign_bounds(p: &Plan) -> Result<(u64, u64)> {
     Ok(if is_101(p)? { (101, 200) } else { (201, 300) })
 }
 fn generation_101(p: &Plan) -> &'static str {
+    if memory152::enabled(p) {
+        return "memory152-rebind-guard-stopped185-import-pending191-repair141-v2";
+    }
     if cohort191_import::enabled(p) {
         return "guard-stopped185-import-pending191-repair141-v2";
     }
@@ -776,11 +783,12 @@ fn validate_templates(
         .as_str()
         .context("old observer time missing")?;
     let scheduled = scheduled_target(p)?;
-    let qualified_interval = cohort191_delivery::interval(p, old_time)?.unwrap_or(
-        terminal185::interval(p, old_time)?.unwrap_or(
-            original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?),
-        ),
-    );
+    let qualified_interval =
+        memory152::interval(p)?.unwrap_or(cohort191_delivery::interval(p, old_time)?.unwrap_or(
+            terminal185::interval(p, old_time)?.unwrap_or(
+                original141::adoption_interval(p)?.unwrap_or(controller_recovery::interval(p)?),
+            ),
+        ));
     ensure!(
         utc_seconds(scheduled)?.checked_sub(utc_seconds(old_time)?) == Some(qualified_interval),
         "routine target must follow its qualified predecessor interval"
@@ -1972,6 +1980,7 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--prepare-next-delivery198"
+                            | "--prepare-next-memory152-rebind"
                             | "--prepare-next-delivery191"
                             | "--prepare-next-import191"
                             | "--prepare-next-repair141"
