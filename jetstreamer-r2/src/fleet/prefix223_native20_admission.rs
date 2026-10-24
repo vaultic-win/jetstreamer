@@ -96,7 +96,7 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>, candidate: bo
     }
     Ok(())
 }
-fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
+pub(super) fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
     Ok(match name {
         "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service" => (
             "horizon-ownroot225-protective-v1.service",

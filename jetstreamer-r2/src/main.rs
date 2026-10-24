@@ -3628,6 +3628,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-canary227-v1625-terminal") {
         return fleet::capture_canary227_v1625_terminal();
     }
+    if env::args().nth(1).as_deref() == Some("admit-capped204205-continuation") {
+        return fleet::admit_capped204205_continuation();
+    }
     if env::args().nth(1).as_deref() == Some("admit-canary227-v1625-output-metadata-v1") {
         return fleet::admit_canary227_v1625_output_metadata();
     }

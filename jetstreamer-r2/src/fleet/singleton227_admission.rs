@@ -238,7 +238,7 @@ fn century_floor(f: &Value) -> Result<u64> {
 }
 pub(super) fn century_floor_for(f: &Value, candidate_epoch: u64) -> Result<u64> {
     ensure!(
-        matches!(candidate_epoch, 207 | 209 | 210 | 223 | 227 | 228),
+        matches!(candidate_epoch, 204 | 205 | 207 | 209 | 210 | 223 | 227 | 228),
         "unregistered native candidate century"
     );
     let inventory = &f["inventory"];
