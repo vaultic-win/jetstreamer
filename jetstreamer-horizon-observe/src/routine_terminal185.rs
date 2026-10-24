@@ -1,6 +1,8 @@
 //! Exact guard-stopped185 terminal transition. Metadata only; retained bytes and
 //! every historical growth/floor obligation remain protected.
 use super::*;
+#[path = "routine_terminal185_holding.rs"]
+mod holding;
 const CONTROLLER: &str = "jetstreamer-epoch185-full-20261023-controller-v1-r2.service";
 const PRODUCER: &str = "jetstreamer-root-sweep-e185-full-20261023-v1-r2-e185-185-lane-a-1.service";
 const CID: &str = "fcc936d65490488aa95df0d1732bc40e";
@@ -14,6 +16,26 @@ pub(super) struct Profile {
     pub proof: Bound,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     recovery_predecessor: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    holding_admission: Option<Bound>,
+}
+// A static classification policy may be installed before the admitted transport starts.
+// Actual active ownership is independently verified each time the terminal proof is used.
+pub(super) fn admit_holding(p: &mut Plan, b: &Bound) -> Result<()> {
+    let _ = holding::load(b)?;
+    let profile = p
+        .terminal185
+        .as_mut()
+        .context("185 holding classification requires terminal185 profile")?;
+    if let Some(old) = &profile.holding_admission {
+        ensure!(
+            old.path == b.path && old.sha256 == b.sha256,
+            "185 holding classification is already bound differently"
+        );
+    } else {
+        profile.holding_admission = Some(b.clone());
+    }
+    Ok(())
 }
 pub(super) fn enabled(p: &Plan) -> bool {
     p.terminal185.is_some()
@@ -122,7 +144,8 @@ fn lifecycle(rows: &[Value], unit: &str, iid: &str) -> Result<()> {
     );
     Ok(())
 }
-fn no_live185() -> Result<()> {
+fn no_live185(admission: Option<&Bound>) -> Result<()> {
+    let holding = admission.map(holding::load).transpose()?;
     let out = Command::new("/usr/bin/systemctl")
         .args([
             "list-units",
@@ -146,14 +169,18 @@ fn no_live185() -> Result<()> {
             continue;
         }
         let v = manager(f[0])?;
-        ensure!(
-            v["MainPID"].as_str().and_then(|n| n.parse::<u32>().ok()) == Some(std::process::id()),
-            "185 has another live/activating replacement or downstream owner"
-        );
+        if v["MainPID"].as_str().and_then(|n| n.parse::<u32>().ok()) == Some(std::process::id()) {
+            continue;
+        }
+        let policy = holding
+            .as_ref()
+            .filter(|a| a.unit == f[0])
+            .context("185 has another live/activating replacement or downstream owner")?;
+        holding::verify_live(policy, &v)?;
     }
     Ok(())
 }
-fn proof_value(v: &Value, cutoff: u64) -> Result<()> {
+fn proof_value(v: &Value, cutoff: u64, admission: Option<&Bound>) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-guard-stopped185-terminal-v2"
             && v["epoch"] == 185
@@ -189,7 +216,7 @@ fn proof_value(v: &Value, cutoff: u64) -> Result<()> {
         )?;
         stopped(&manager(name)?, name, iid)?;
     }
-    no_live185()
+    no_live185(admission)
 }
 // Only the authenticated first transition may bridge a missed observation.
 // Its exact predecessor binding persists, so later successors regain the grid.
@@ -246,7 +273,11 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             )?,
         "185 historical launch lineage differs"
     );
-    proof_value(&v, utc_seconds(&p.sample_target_utc)?)
+    proof_value(
+        &v,
+        utc_seconds(&p.sample_target_utc)?,
+        profile.holding_admission.as_ref(),
+    )
 }
 pub(super) fn capture(p: &Plan, spec: &Bound, program: &Path, self_sha: &str) -> Result<()> {
     ensure!(
@@ -298,7 +329,7 @@ pub(super) fn capture(p: &Plan, spec: &Bound, program: &Path, self_sha: &str) ->
     }
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let v = json!({"schema":"jetstreamer-guard-stopped185-terminal-v2","epoch":185,"capture_program":program,"capture_self_sha256":self_sha,"capture_plan":spec,"historical_repair_handoff":p.repair185_handoff,"guard_intent":ib,"guard_completion":cb,"manager_journals":journals,"captured_unix_seconds":now,"last_observed_slot":80099168u64,"canonical_terminal_slot":80351999u64,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false,"remaining_growth_released":false,"scratch_retirement_authorized":false});
-    proof_value(&v, now)?;
+    proof_value(&v, now, None)?;
     let output = Path::new(ROOT).join("terminal.json");
     private_dir(Path::new(ROOT))?;
     write_new(&output, &v)?;
@@ -445,6 +476,14 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn holding_policy_defaults_absent_without_changing_old_profile_bytes() {
+        let b = json!({"path":"/proof.json","sha256":"a".repeat(64)});
+        let original = json!({"proof":b});
+        let p: Profile = serde_json::from_value(original.clone()).unwrap();
+        assert!(p.holding_admission.is_none());
+        assert_eq!(serde_json::to_value(&p).unwrap(), original);
+    }
     #[test]
     fn recovery_interval_requires_bounded_gap_and_between_sample_capture() {
         for gap in [1800, 2400, 3000, 3600] {

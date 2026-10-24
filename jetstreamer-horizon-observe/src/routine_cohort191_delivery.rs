@@ -10,6 +10,8 @@ pub(super) struct Profile {
     pub publisher: Bound,
     pub terminal_event: Bound,
     pub event_directory: PathBuf,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub import_pending: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     adoption_predecessor: Option<Bound>,
 }
@@ -23,6 +25,8 @@ struct HandoffSpec {
     publication_authorized: bool,
     replay_launch_authorized: bool,
     r2_mutations: bool,
+    #[serde(default)]
+    holding185_admission: Option<Bound>,
 }
 fn file(path: PathBuf, immutable: bool) -> Result<Bound> {
     let bytes = read_checked(&path, LIMIT, 0, immutable)?;
@@ -53,13 +57,22 @@ pub(super) fn interval(p: &Plan, old_time: &str) -> Result<Option<u64>> {
     let target = utc_seconds(scheduled_target(p)?)?;
     let event = bound_json(&profile.terminal_event, false)?;
     ensure!(
-        event["schema"] == "jetstreamer-cohort191-terminal-transition-v1",
+        event["schema"]
+            == (if profile.import_pending {
+                "jetstreamer-cohort191-import-pending-transition-v1"
+            } else {
+                "jetstreamer-cohort191-terminal-transition-v1"
+            }),
         "191 adoption interval requires native terminal capture"
     );
     let captured = event["recorded_unix_seconds"]
         .as_u64()
         .context("191 terminal capture clock absent")?;
-    adoption_clocks(old, target, captured)?;
+    if profile.import_pending {
+        cohort191_import::adoption_clocks(old, target, captured)?;
+    } else {
+        adoption_clocks(old, target, captured)?;
+    }
     Ok(Some(target - old))
 }
 fn adoption_clocks(old: u64, target: u64, captured: u64) -> Result<()> {
@@ -128,7 +141,10 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     );
     tool_ok(&s.publisher)?;
     let v = bound_json(&s.terminal_event, false)?;
-    if v["schema"] == "jetstreamer-cohort191-terminal-transition-v1" {
+    if s.import_pending {
+        cohort191_import::validate(p, &v)?;
+        return Ok(());
+    } else if v["schema"] == "jetstreamer-cohort191-terminal-transition-v1" {
         jetstreamer_horizon_observe::cohort191_delivery_model::validate_terminal_transition(
             &v,
             utc_seconds(&p.sample_target_utc)?,
@@ -312,6 +328,7 @@ pub(super) fn enable(
     config: &mut Value,
     model: &Value,
     spec: &Bound,
+    pending: bool,
 ) -> Result<()> {
     ensure!(
         is_101(next)? && next.cohort191_delivery.is_none(),
@@ -319,16 +336,33 @@ pub(super) fn enable(
     );
     let value: HandoffSpec = serde_json::from_value(bound_json(spec, true)?)?;
     ensure!(
-        value.schema == "jetstreamer-cohort191-routine-handoff-spec-v1"
+        value.schema
+            == (if pending {
+                "jetstreamer-cohort191-import-pending-routine-handoff-v1"
+            } else {
+                "jetstreamer-cohort191-routine-handoff-spec-v1"
+            })
             && !value.publication_authorized
             && !value.replay_launch_authorized
             && !value.r2_mutations,
         "191 handoff spec acquired authority"
     );
     let mut profile = value.profile;
+    if let Some(holding) = &value.holding185_admission {
+        terminal185::admit_holding(next, holding)?;
+    }
+    ensure!(
+        profile.import_pending == pending,
+        "191 handoff phase differs"
+    );
     let proof = bound_json(&profile.terminal_event, false)?;
     ensure!(
-        proof["schema"] == "jetstreamer-cohort191-terminal-transition-v1",
+        proof["schema"]
+            == (if pending {
+                "jetstreamer-cohort191-import-pending-transition-v1"
+            } else {
+                "jetstreamer-cohort191-terminal-transition-v1"
+            }),
         "191 first transition requires observer-independent native terminal proof"
     );
     let (_model, mut edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
@@ -377,6 +411,9 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
     Ok(next)
 }
 pub(super) fn fleet_reader(p: &Plan) -> &Bound {
+    if cohort191_import::enabled(p) {
+        return &p.cohort191_delivery.as_ref().unwrap().publisher;
+    }
     if repair141_status::enabled(p) {
         return qualification141_status::fleet_reader(p);
     }
@@ -408,6 +445,9 @@ pub(super) fn prepare(p: &Plan, observer: &Bound) -> Result<()> {
         return Ok(());
     };
     let result = (|| -> Result<Bound> {
+        if s.import_pending {
+            cohort191_import::capture(p, observer)?;
+        }
         let b = file(event_path(p).context("191 current event path")?, false)?;
         let v = bound_json(&b, false)?;
         terminal(&v, utc_seconds(&p.sample_target_utc)?)?;
@@ -752,6 +792,7 @@ mod tests {
             event_directory: "/var/lib/jetstreamer/horizon-cohort191-delivery-events-fixture"
                 .into(),
             adoption_predecessor: None,
+            import_pending: false,
         };
         p.cohort191_delivery = Some(profile());
         assert!(interval(&p, "2026-10-24T01:16:00Z").unwrap().is_none());

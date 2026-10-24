@@ -1,5 +1,7 @@
 //! Closed191–194 native metadata custody. Never creates a ready/archive receipt.
 use super::*;
+#[path = "cohort191_import_pending.rs"]
+mod import_pending;
 #[path = "cohort191_terminal.rs"]
 mod terminal_transition;
 use serde_json::json;
@@ -67,6 +69,8 @@ struct Capture {
     queue: Option<queue::Binding>,
     #[serde(default)]
     source_revalidation_policy: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native_pending_proof: Option<Bound>,
     output: PathBuf,
 }
 pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
@@ -160,7 +164,9 @@ pub(super) fn origin(epoch: u64, unit: &str, iid: &str) -> bool {
 pub(super) fn archives(epoch: u64, phase: &str) -> PathBuf {
     match phase {
         "producer-finalization" => Path::new(RUN).join(format!("archives/epoch-{epoch}.jet")),
-        "controller-import-handoff" => Path::new(LANE).join(format!("output/epoch-{epoch}.jet")),
+        "controller-import-handoff" | "local-publication" => {
+            Path::new(LANE).join(format!("output/epoch-{epoch}.jet"))
+        }
         _ => Path::new("/home/sol/horizon").join(format!("epoch-{epoch}.jet")),
     }
 }
@@ -1570,7 +1576,11 @@ fn capture(p: &Capture) -> Result<Value> {
         "191 capture scope/staleness"
     );
     let history = inputs()?;
-    let events = native_events(cutoff)?;
+    let events = if let Some(proof) = &p.native_pending_proof {
+        import_pending::retained_events(proof, p, cutoff)?
+    } else {
+        native_events(cutoff)?
+    };
     let forecast: jetstreamer_horizon_observe::cohort191_delivery_model::Plan =
         serde_json::from_value(bound(&p.forecast, true)?)?;
     let eta = jetstreamer_horizon_observe::cohort191_delivery_model::forecast(&forecast)?;
@@ -1945,6 +1955,12 @@ pub(super) fn dispatch_import_check(
 pub(super) fn capture_terminal_transition() -> Result<()> {
     terminal_transition::run()
 }
+pub(super) fn capture_import_pending() -> Result<()> {
+    import_pending::run(false)
+}
+pub(super) fn observe_import_pending() -> Result<()> {
+    import_pending::run(true)
+}
 pub(super) fn queue_scope(phase: &str, unit: &str) -> bool {
     queue::scope(phase, unit)
 }
@@ -2020,6 +2036,28 @@ mod tests {
         let mut bad = good;
         bad.swap(0, 1);
         assert!(validate_claim_set(&bad, &eta).is_err());
+    }
+    #[test]
+    fn unfinished_native_import_tracks_retained_source_without_claiming_public_custody() {
+        for e in 191..=194 {
+            assert_eq!(
+                archives(e, "local-publication"),
+                archives(e, "controller-import-handoff")
+            );
+            assert!(archives(e, "local-publication").starts_with(LANE));
+            assert_ne!(
+                archives(e, "local-publication"),
+                archives(e, "full-verification")
+            );
+            assert_eq!(
+                archives(e, "full-verification"),
+                Path::new("/home/sol/horizon").join(format!("epoch-{e}.jet"))
+            );
+            assert_eq!(
+                archives(e, "upload-readback"),
+                archives(e, "full-verification")
+            );
+        }
     }
     #[test]
     fn a_failed_legacy_watcher_is_not_a_native191_verifier() {

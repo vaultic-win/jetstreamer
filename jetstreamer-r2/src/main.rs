@@ -3516,6 +3516,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-terminal191") {
         return cohort191_delivery::capture_terminal_transition();
     }
+    if env::args().nth(1).as_deref() == Some("capture-import-pending191") {
+        return cohort191_delivery::capture_import_pending();
+    }
+    if env::args().nth(1).as_deref() == Some("observe-import-pending191") {
+        return cohort191_delivery::observe_import_pending();
+    }
     if env::args().nth(1).as_deref() == Some("capture-controller-terminal-191") {
         return cohort191_delivery::capture_controller_terminal();
     }

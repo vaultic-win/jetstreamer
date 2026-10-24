@@ -303,6 +303,18 @@ mod tests {
 pub fn validate_native_terminal(v: &serde_json::Value, cutoff: u64) -> Result<()> {
     use serde_json::Value;
     fn fields<'a>(message: &'a str, prefix: &str) -> Result<BTreeMap<&'a str, &'a str>> {
+        let message = if message.starts_with(prefix) {
+            message
+        } else {
+            let (logger, body) = message
+                .split_once("] ")
+                .context("191 native logger framing")?;
+            ensure!(
+                logger.starts_with('[') && logger.contains(" INFO  jetstreamer_node::"),
+                "191 native logger namespace"
+            );
+            body
+        };
         let text = message
             .strip_prefix(prefix)
             .context("191 native message prefix")?;
@@ -625,6 +637,45 @@ mod native_terminal_tests {
     #[test]
     fn accepts_trusted_root_and_skipped_tail_without_inventing_terminal_checkpoint() {
         validate_native_terminal(&fixture(), 5).unwrap();
+    }
+    #[test]
+    fn trusted_native_messages_accept_standard_node_logger_prefix_only() {
+        let mut v = fixture();
+        let root = v["root"]["MESSAGE"].as_str().unwrap().to_owned();
+        v["root"]["MESSAGE"] = json!(format!(
+            "[2026-10-24T01:17:33.314060380Z INFO  jetstreamer_node::historical_replay] {root}"
+        ));
+        for row in v["closes"].as_array_mut().unwrap() {
+            row["MESSAGE"] = json!(format!(
+                "[2026-10-24T01:47:17Z INFO  jetstreamer_node::horizon] {}",
+                row["MESSAGE"].as_str().unwrap()
+            ));
+        }
+        validate_native_terminal(&v, 5).unwrap();
+        for prefix in [
+            "arbitrary ",
+            "[time INFO  foreign::module] ",
+            "[time ERROR  jetstreamer_node::horizon] ",
+        ] {
+            let mut bad = fixture();
+            let text = bad["root"]["MESSAGE"].as_str().unwrap();
+            bad["root"]["MESSAGE"] = json!(format!("{prefix}{text}"));
+            assert!(validate_native_terminal(&bad, 5).is_err());
+        }
+    }
+    #[test]
+    #[ignore = "root-only real import-pending bootstrap; reads retained native records only, no resource sample or network"]
+    fn actual_import_pending_bootstrap_native_journals_pass_without_rewriting_messages() {
+        let bytes = std::fs::read(
+            "/var/lib/jetstreamer/horizon-cohort191-import-pending-20261024-v1/bootstrap.json",
+        )
+        .unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        validate_native_terminal(
+            &v["native_events"],
+            v["recorded_unix_seconds"].as_u64().unwrap(),
+        )
+        .unwrap();
     }
     #[test]
     fn rejects_foreign_invocation_pid_uid_and_backdated_cutoff() {

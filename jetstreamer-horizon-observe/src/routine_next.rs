@@ -282,6 +282,30 @@ pub(super) fn prepare(
     mode: &str,
     handoff_spec: Option<&Bound>,
 ) -> Result<()> {
+    // A newly admitted metadata-only park can already be active while deriving
+    // from an older accepted plan. Apply its separately sealed current-state
+    // classification locally before validating that predecessor; never rewrite
+    // the historical plan, observer, completion or growth obligations.
+    let classified_predecessor = if mode == "--prepare-next-import191" {
+        let v = bound_json(handoff_spec.context("191 import handoff absent")?, true)?;
+        if let Some(b) = v.get("holding185_admission").filter(|v| !v.is_null()) {
+            ensure!(
+                v["schema"] == "jetstreamer-cohort191-import-pending-routine-handoff-v1"
+                    && v["replay_launch_authorized"] == false
+                    && v["publication_authorized"] == false
+                    && v["r2_mutations"] == false,
+                "191 import classification handoff grants authority"
+            );
+            let mut q: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+            terminal185::admit_holding(&mut q, &serde_json::from_value(b.clone())?)?;
+            Some(q)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let p = classified_predecessor.as_ref().unwrap_or(p);
     let prefix_spec = if matches!(
         mode,
         "--prepare-next-prefix157"
@@ -321,7 +345,10 @@ pub(super) fn prepare(
     } else {
         None
     };
-    let transition191 = mode == "--prepare-next-delivery191";
+    let transition191 = matches!(
+        mode,
+        "--prepare-next-delivery191" | "--prepare-next-import191"
+    );
     let delivery_spec = if transition191
         || prefix_spec.is_some()
         || native_spec.is_some()
@@ -385,6 +412,7 @@ pub(super) fn prepare(
             &mut next_config,
             &model,
             handoff_spec.context("191 transition needs its actual sealed handoff spec")?,
+            mode == "--prepare-next-import191",
         )?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
     }
