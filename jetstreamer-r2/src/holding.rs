@@ -1165,6 +1165,12 @@ pub(super) async fn run() -> Result<()> {
     if args[1] == "holding-diagnose185-references" {
         return epoch185::diagnose(&m, &serde_json::from_value(v)?, &spec);
     }
+    if matches!(
+        args[1].as_str(),
+        "holding-check185-scratch" | "holding-retire185-scratch"
+    ) {
+        return epoch185::retire_scratch(&m, v, &spec, args[1] == "holding-check185-scratch");
+    }
     if args[1] == "holding-reconcile185-staged" {
         return epoch185::reconcile(&m, v, &spec);
     }

@@ -3392,6 +3392,8 @@ async fn main() -> Result<()> {
                 | "holding-inspect185"
                 | "holding-check-retire185"
                 | "holding-retire185"
+                | "holding-check185-scratch"
+                | "holding-retire185-scratch"
                 | "holding-inspect136"
                 | "holding-disable136-retry"
                 | "holding-check-retire136"

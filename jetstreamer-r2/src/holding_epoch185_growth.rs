@@ -351,7 +351,7 @@ fn no_queued_entry_jobs(jobs: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn queued_entry_check() -> Result<()> {
+pub(super) fn queued_entry_check() -> Result<()> {
     let out = std::process::Command::new("/usr/bin/busctl")
         .args([
             "--system",

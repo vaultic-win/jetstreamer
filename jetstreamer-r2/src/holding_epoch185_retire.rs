@@ -126,7 +126,7 @@ fn no_replacement(f: &Value) -> Result<()> {
     Ok(())
 }
 
-fn mutation_lock() -> Result<File> {
+pub(super) fn mutation_lock() -> Result<File> {
     use std::os::fd::AsRawFd;
     let path = Path::new("/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock");
     ensure!(path.canonicalize()? == path, "185 mutation lock alias");
@@ -438,6 +438,91 @@ fn no_sidecars() -> Result<()> {
     Ok(())
 }
 
+// Read-only authority for the separate contents-only scratch profile. This
+// never invokes the archive retirement state machine or contacts R2.
+pub(super) fn scratch_basis(m: &Mapping, value: Value) -> Result<(Value, Value, bool)> {
+    let p: Retire = serde_json::from_value(value)?;
+    let common = Inspect {
+        schema: "jetstreamer-horizon-holding-inspect185-plan-v2".into(),
+        mapping: p.mapping.clone(),
+        guard_intent: p.guard_intent.clone(),
+        guard_completion: p.guard_completion.clone(),
+        qualification: p.qualification.clone(),
+        deployment: p.deployment.clone(),
+    };
+    super::scope(
+        &common,
+        m,
+        &evidence(&p.guard_intent, false)?,
+        &evidence(&p.guard_completion, false)?,
+        &bound(&p.qualification)?,
+    )?;
+    let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
+    mapping(&supplied)?;
+    ensure!(
+        supplied.host == m.host && supplied.prefix == m.prefix,
+        "scratch mapping differs"
+    );
+    let _ = bound(&p.deployment)?;
+    let inspection = bound(&p.inspection)?;
+    let custody = bound(&p.custody)?;
+    let expected = scope(&p, m, &inspection, &custody)?;
+    let fresh = basis(&p, m)?;
+    no_sidecars()?;
+    let root = Path::new(STATE).join("retirements");
+    let intent = root.join("epoch185-intent.json");
+    let moved = root.join("epoch185-moved.json");
+    let unlink = root.join("epoch185-unlink-intent.json");
+    let completion = root.join("epoch185-completion.json");
+    if let Some(done) = read_record(&completion)? {
+        let descriptor = read_record(&intent)?.context("scratch archive intent missing")?;
+        ensure!(
+            descriptor == retirement_descriptor(&p, &inspection)
+                && maybe_identity(Path::new(SOURCE))?.is_none()
+                && maybe_identity(Path::new(QUARANTINE))?.is_none(),
+            "scratch archive disposition is foreign or files reappeared"
+        );
+        let moved_value = read_record(&moved)?.context("scratch moved receipt missing")?;
+        let _ = moved_proof(
+            &moved_value,
+            &descriptor,
+            expected,
+            inspection["sha256"]
+                .as_str()
+                .context("scratch archive digest")?,
+            inspection["multipart_etag"]
+                .as_str()
+                .context("scratch archive ETag")?,
+        )?;
+        let unlink_value = read_record(&unlink)?.context("scratch unlink receipt missing")?;
+        ensure!(
+            unlink_value == unlink_record(&descriptor, &record_sha(&moved)?)
+                && done == completed_record(&descriptor, &unlink_value, &inspection),
+            "scratch archive retirement chain differs"
+        );
+        Ok((
+            fresh,
+            json!({"retirement_completion":{"path":completion,"sha256":record_sha(&completion)?},
+            "custody":p.custody,"inspection":p.inspection,"local_partial_retired":true}),
+            true,
+        ))
+    } else {
+        ensure!(
+            read_record(&intent)?.is_none()
+                && read_record(&moved)?.is_none()
+                && read_record(&unlink)?.is_none()
+                && maybe_identity(Path::new(SOURCE))? == Some(expected)
+                && maybe_identity(Path::new(QUARANTINE))?.is_none(),
+            "scratch cannot overlap an incomplete archive retirement"
+        );
+        Ok((
+            fresh,
+            json!({"custody":p.custody,"inspection":p.inspection,"local_partial_retired":false}),
+            false,
+        ))
+    }
+}
+
 fn references(_p: &Retire) -> Result<Value> {
     let terminal = closed_references()?;
     no_sidecars()?;
@@ -722,6 +807,21 @@ fn original_permissions(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn retirement_descriptor(p: &Retire, inspection: &Value) -> Value {
+    let mut descriptor = json!({"schema":"jetstreamer-holding-retire185-intent-v2","host":HOST,
+        "epoch":185,"source":SOURCE,"quarantine":QUARANTINE,"sha256":inspection["sha256"],"length":LENGTH,
+        "multipart_etag":inspection["multipart_etag"],"source_identity":inspection["source_identity"],
+        "mapping":p.mapping,"custody":p.custody,"inspection":p.inspection,"guard_intent":p.guard_intent,"guard_completion":p.guard_completion,
+        "qualification":p.qualification,"deployment":p.deployment,
+        "canonical_archive":false,"failure_repaired":false,"runtime_checkpoint_qualified":false,
+        "job_resume_authorized":false,"replay_launch_authorized":false,"publication_authorized":false,
+        "remote_mutations":false,"r2_mutations":false});
+    if let Some(projection) = &p.closed_growth_disposition {
+        descriptor["closed_growth_disposition"] = json!(projection);
+    }
+    descriptor
+}
+
 pub(super) async fn run(
     client: &Client,
     m: &Mapping,
@@ -766,17 +866,7 @@ pub(super) async fn run(
         fs::metadata(&root)?.dev() == expected.device,
         "185 quarantine is on another filesystem"
     );
-    let mut descriptor = json!({"schema":"jetstreamer-holding-retire185-intent-v2","host":HOST,
-        "epoch":185,"source":SOURCE,"quarantine":QUARANTINE,"sha256":artifact_sha,"length":LENGTH,
-        "multipart_etag":artifact_etag,"source_identity":inspection["source_identity"],
-        "mapping":p.mapping,"custody":p.custody,"inspection":p.inspection,"guard_intent":p.guard_intent,"guard_completion":p.guard_completion,
-        "qualification":p.qualification,"deployment":p.deployment,
-        "canonical_archive":false,"failure_repaired":false,"runtime_checkpoint_qualified":false,
-        "job_resume_authorized":false,"replay_launch_authorized":false,"publication_authorized":false,
-        "remote_mutations":false,"r2_mutations":false});
-    if let Some(projection) = &p.closed_growth_disposition {
-        descriptor["closed_growth_disposition"] = serde_json::to_value(projection)?;
-    }
+    let descriptor = retirement_descriptor(p, &inspection);
     let intent = root.join("epoch185-intent.json");
     let moved = root.join("epoch185-moved.json");
     let unlink_intent = root.join("epoch185-unlink-intent.json");
