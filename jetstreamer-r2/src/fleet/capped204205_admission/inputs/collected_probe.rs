@@ -400,6 +400,12 @@ mod tests {
     fn collected_proof_rejects_absent_executable_wrong_boot_and_incomplete_lifecycle() {
         let (p, probe, _, result, _, rows, _) = fixture();
         collected_journal(&rows, &p, &probe, &result).unwrap();
+        let mut zero_pid_result = result.clone();
+        zero_pid_result["probe_main_pid"] = json!(0);
+        let mut zero_pid_rows = rows.clone();
+        zero_pid_rows[1]["_PID"] = json!("0");
+        zero_pid_rows[1]["MESSAGE"] = json!(serde_json::to_string(&zero_pid_result).unwrap());
+        assert!(collected_journal(&zero_pid_rows, &p, &probe, &zero_pid_result).is_err());
         for (index, key, value) in [
             (1, "_EXE", Value::Null),
             (1, "_EXE", json!("/other/probe")),
