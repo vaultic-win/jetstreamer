@@ -2,6 +2,7 @@
 use super::canary227 as c;
 use super::singleton227_capture::{journal, properties, require};
 use super::*;
+mod collected;
 fn scope(v: &Value, plan: &Value, b: &BoundFile) -> Result<(String, PathBuf)> {
     let unit = plan["unit"].as_str().context("227 capability unit")?;
     let root = PathBuf::from(plan["run_root"].as_str().context("227 capability root")?);
@@ -65,7 +66,10 @@ pub(super) fn validate(b: &BoundFile, v: &Value) -> Result<Value> {
         fs::symlink_metadata(&fragment)?.mode() & 0o7777 == 0o444,
         "227 capability unit not readonly"
     );
-    let fields="Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,TimeoutStartUSec,ProtectHome,ProtectSystem,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,InvocationID,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic,ExecMainPID,ExecMainCode,ExecMainStatus,Result,ActiveState,SubState,NRestarts,ExecStart,Transient,FragmentPath,RemainAfterExit";
+    if collected::applies(b) {
+        return collected::validate(b, v, &plan_binding, &unit_binding);
+    }
+    let fields = "Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,TimeoutStartUSec,ProtectHome,ProtectSystem,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,InvocationID,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic,ExecMainPID,ExecMainCode,ExecMainStatus,Result,ActiveState,SubState,NRestarts,ExecStart,Transient,FragmentPath,RemainAfterExit";
     let before = properties(&unit, fields)?;
     require(
         &before,
@@ -109,7 +113,14 @@ pub(super) fn validate(b: &BoundFile, v: &Value) -> Result<Value> {
         before["ExecMainPID"].parse::<u64>()? > 1,
         "227 capability actual PID missing"
     );
-    let expected=format!("{{ path={} ; argv[]={} {} --plan-sha256 {} --self-sha256 {} --storage-capability ; ignore_errors=no }}",c::RUNNER,c::RUNNER,plan_binding.path.display(),plan_binding.sha256,c::RUNNER_SHA);
+    let expected = format!(
+        "{{ path={} ; argv[]={} {} --plan-sha256 {} --self-sha256 {} --storage-capability ; ignore_errors=no }}",
+        c::RUNNER,
+        c::RUNNER,
+        plan_binding.path.display(),
+        plan_binding.sha256,
+        c::RUNNER_SHA
+    );
     ensure!(
         c::same_command(&json!(before["ExecStart"]), &json!(expected)),
         "227 capability actual command differs"
