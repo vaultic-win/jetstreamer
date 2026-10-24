@@ -71,3 +71,12 @@ Qualification remains pending until the shared Cargo lease is returned.
 Focused tests precede any broad matrix or production build. Successful private
 assembly, verification or local publication does not close the repair; epoch
 223 remains open until the authenticated matching remote ready pair.
+
+The integrated helper also preserves the exact bb5 retirement record reader
+source for 0400/0440 compatibility. This transplant does not qualify the
+combined c7 lineage for holding retirement. Later broad tests do not grant
+that eligibility. Actual holding retirement remains exclusive to the sealed
+bb5 executable with SHA-256
+`3cb5b02426ae72dbc2d12e32ec5ddb26fce86c5006a345ad0d3bbfdbf5d25840`
+and its separately captured eligible ancestry and provenance. The current
+retirement invocation and every frozen package remain unchanged.
