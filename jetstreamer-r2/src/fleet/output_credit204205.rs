@@ -373,32 +373,58 @@ fn replace(
         evidence,
     ))
 }
-// Explicit gate: output evidence does not model a live park/restore/retirement.
+// Explicit gate: both compiled owners need positive inactive/collected evidence.
+const PARK: &str = "horizon-foundation-prefix213-park348-v2.service";
+const MAINTENANCE: &str = "horizon-foundation-holding213-maintenance-v1.service";
+fn inactive_maintenance(name: &str, unit: &Value) -> Result<()> {
+    ensure!(
+        unit["Id"] == name
+            && unit["MainPID"] == "0"
+            && unit["NRestarts"] == "0"
+            && unit["ControlGroup"] == ""
+            && (unit["LoadState"] == "loaded" || unit["LoadState"] == "not-found")
+            && (unit["ActiveState"] == "inactive" || unit["ActiveState"] == "failed")
+            && (unit["SubState"] == "dead" || unit["SubState"] == "failed"),
+        "Foundation maintenance is live, stopping, malformed or not positively inactive:{name}"
+    );
+    Ok(())
+}
+fn maintenance_name(name: &str) -> bool {
+    name.starts_with("horizon-foundation-prefix213-")
+        || name.starts_with("horizon-foundation-holding")
+}
 pub(super) fn maintenance_idle(f: &Value) -> Result<()> {
     let units = f["unit_census"]
         .as_object()
         .context("new output profile requires complete unit census")?;
-    let park = "horizon-foundation-prefix213-park348-v2.service";
-    let recorded = units
-        .get(park)
-        .context("new output profile requires explicit park identity or terminal census entry")?;
-    ensure!(
-        recorded["Id"] == park
-            && recorded["MainPID"] == "0"
-            && recorded["NRestarts"] == "0"
-            && recorded["ControlGroup"] == ""
-            && (recorded["LoadState"] == "loaded" || recorded["LoadState"] == "not-found")
-            && (recorded["ActiveState"] == "inactive" || recorded["ActiveState"] == "failed")
-            && (recorded["SubState"] == "dead" || recorded["SubState"] == "failed"),
-        "park213 or its maintenance owner is live, malformed or requires separately qualified auxiliary accounting"
-    );
-    for (name, u) in units {
-        ensure!(
-            !(name.starts_with("horizon-foundation-prefix213-")
-                || name.starts_with("horizon-foundation-holding-"))
-                || !diagnostic_stage_running(u),
-            "unmodeled Foundation maintenance owner is live"
-        );
+    for name in [PARK, MAINTENANCE] {
+        inactive_maintenance(
+            name,
+            units.get(name).context(
+                "new output profile requires explicit park and compiled maintenance census entries",
+            )?,
+        )?;
+    }
+    for (name, unit) in units {
+        if maintenance_name(name) {
+            inactive_maintenance(name, unit)?;
+        }
+    }
+    Ok(())
+}
+pub(super) fn maintenance_current(current: &BTreeMap<String, Value>) -> Result<()> {
+    for name in [PARK, MAINTENANCE] {
+        inactive_maintenance(
+            name,
+            current
+                .get(name)
+                .context("live admission census omitted a required Foundation maintenance owner")?,
+        )?;
+    }
+    for (name, unit) in current {
+        if maintenance_name(name) {
+            inactive_maintenance(name, unit)?;
+        }
     }
     Ok(())
 }
@@ -651,22 +677,67 @@ mod tests {
         symlink(&directory, &parent).unwrap();
         assert!(handle(&parent.join("fixture")).is_err());
     }
+    fn idle(name: &str) -> Value {
+        json!({"Id":name,"LoadState":"not-found","ActiveState":"inactive","SubState":"dead",
+            "MainPID":"0","NRestarts":"0","ControlGroup":""})
+    }
     #[test]
-    fn live_or_missing_park_is_a_gate_not_an_unaccounted_auxiliary() {
-        let unit = "horizon-foundation-prefix213-park348-v2.service";
-        assert!(maintenance_idle(&json!({"unit_census":{}})).is_err());
-        let mut f = json!({"unit_census":{unit:{"ActiveState":"activating","SubState":"start"}}});
-        assert!(maintenance_idle(&f).is_err());
-        f["unit_census"][unit]["ActiveState"] = json!("inactive");
-        f["unit_census"][unit]["SubState"] = json!("dead");
-        f["unit_census"][unit]["Id"] = json!(unit);
-        f["unit_census"][unit]["MainPID"] = json!("0");
-        f["unit_census"][unit]["NRestarts"] = json!("0");
-        f["unit_census"][unit]["ControlGroup"] = json!("");
-        f["unit_census"][unit]["LoadState"] = json!("not-found");
+    fn exact_compiled_maintenance_name_and_missing_entries_are_not_inactivity() {
+        let good = json!({"unit_census":{PARK:idle(PARK),MAINTENANCE:idle(MAINTENANCE)}});
+        maintenance_idle(&good).unwrap();
+        for name in [PARK, MAINTENANCE] {
+            let mut missing = good.clone();
+            missing["unit_census"].as_object_mut().unwrap().remove(name);
+            assert!(maintenance_idle(&missing).is_err());
+        }
+        for (active, sub, pid, cgroup) in [
+            (
+                "activating",
+                "start",
+                "650856",
+                format!("/system.slice/{MAINTENANCE}"),
+            ),
+            ("deactivating", "stop-post", "0", String::new()),
+            (
+                "active",
+                "running",
+                "650856",
+                format!("/system.slice/{MAINTENANCE}"),
+            ),
+        ] {
+            let mut bad = good.clone();
+            let u = &mut bad["unit_census"][MAINTENANCE];
+            u["ActiveState"] = json!(active);
+            u["SubState"] = json!(sub);
+            u["MainPID"] = json!(pid);
+            u["ControlGroup"] = json!(cgroup);
+            assert!(maintenance_idle(&bad).is_err(), "{active}/{sub}");
+        }
+    }
+    #[test]
+    fn live_before_and_after_census_reject_post_sample_start_and_stop_post() {
+        let f = json!({"unit_census":{PARK:idle(PARK),MAINTENANCE:idle(MAINTENANCE)}});
         maintenance_idle(&f).unwrap();
-        f["unit_census"]["horizon-foundation-prefix213-restore-v1.service"] =
-            json!({"ActiveState":"active","SubState":"running"});
-        assert!(maintenance_idle(&f).is_err());
+        let before: BTreeMap<String, Value> =
+            serde_json::from_value(f["unit_census"].clone()).unwrap();
+        maintenance_current(&before).unwrap();
+        let mut missing = before.clone();
+        missing.remove(MAINTENANCE);
+        assert!(maintenance_current(&missing).is_err());
+        let mut after = before.clone();
+        after.get_mut(MAINTENANCE).unwrap()["ActiveState"] = json!("activating");
+        after.get_mut(MAINTENANCE).unwrap()["SubState"] = json!("start");
+        after.get_mut(MAINTENANCE).unwrap()["MainPID"] = json!("650856");
+        assert!(maintenance_current(&after).is_err());
+        after.get_mut(MAINTENANCE).unwrap()["ActiveState"] = json!("deactivating");
+        after.get_mut(MAINTENANCE).unwrap()["SubState"] = json!("stop-post");
+        after.get_mut(MAINTENANCE).unwrap()["MainPID"] = json!("0");
+        assert!(maintenance_current(&after).is_err());
+        let mut unknown = before;
+        unknown.insert(
+            "horizon-foundation-holding213-extra.service".into(),
+            json!({"ActiveState":"activating","SubState":"start"}),
+        );
+        assert!(maintenance_current(&unknown).is_err());
     }
 }

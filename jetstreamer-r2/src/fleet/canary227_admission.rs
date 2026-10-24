@@ -379,6 +379,9 @@ fn run_profile(sampled: bool) -> Result<()> {
         .collect::<BTreeSet<_>>();
     names.insert(c::UNIT.into());
     let before = census(&names, 201, 300)?;
+    if sampled {
+        output_credit204205::maintenance_current(&before)?;
+    }
     native210_peer_history::current(&f, &before)?;
     prefix223_live_peer::current(&f, &before)?;
     singleton227_admission::owners(&f, &before)?;
@@ -401,6 +404,9 @@ fn run_profile(sampled: bool) -> Result<()> {
         "227 actual envelope unavailable"
     );
     let after = census(&names, 201, 300)?;
+    if sampled {
+        output_credit204205::maintenance_current(&after)?;
+    }
     native210_peer_history::current(&f, &after)?;
     prefix223_live_peer::current(&f, &after)?;
     singleton227_admission::owners(&f, &after)?;
