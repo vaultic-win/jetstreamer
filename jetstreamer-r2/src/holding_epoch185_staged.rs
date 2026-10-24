@@ -1098,13 +1098,15 @@ mod tests {
         metadata_frontier(Some(&intent), Some(&done), &intent, &done).unwrap();
         assert!(metadata_frontier(None, Some(&done), &intent, &done).is_err());
         assert!(metadata_frontier(Some(&json!({"unit":"other"})), None, &intent, &done).is_err());
-        assert!(metadata_frontier(
-            Some(&intent),
-            Some(&json!({"intent":"other"})),
-            &intent,
-            &done
-        )
-        .is_err());
+        assert!(
+            metadata_frontier(
+                Some(&intent),
+                Some(&json!({"intent":"other"})),
+                &intent,
+                &done
+            )
+            .is_err()
+        );
     }
     #[test]
     fn command_arrays_require_typed_positive_empty_evidence() {
@@ -1266,11 +1268,13 @@ mod tests {
                 }
                 if frontier == 3 {
                     let mut calls = 0;
-                    assert!(retain_and_mask(&s, &r, &sha, uid, id, &x, || {
-                        calls += 1;
-                        bail!("fixture interruption before cleanup")
-                    })
-                    .is_err());
+                    assert!(
+                        retain_and_mask(&s, &r, &sha, uid, id, &x, || {
+                            calls += 1;
+                            bail!("fixture interruption before cleanup")
+                        })
+                        .is_err()
+                    );
                     assert_eq!(calls, 1);
                     assert!(temp.exists());
                 }
@@ -1319,10 +1323,12 @@ mod tests {
     fn failed_owner_gate_leaves_original_unmasked_and_retryable() {
         let (_d, s, r, x, sha, id) = fixture();
         let uid = unsafe { libc::geteuid() };
-        assert!(retain_and_mask(&s, &r, &sha, uid, id, &x, || {
-            bail!("fixture changed owner before exchange")
-        })
-        .is_err());
+        assert!(
+            retain_and_mask(&s, &r, &sha, uid, id, &x, || {
+                bail!("fixture changed owner before exchange")
+            })
+            .is_err()
+        );
         assert_eq!(OriginalId::from(regular_identity(&s).unwrap()), id);
         assert_eq!(fs::read(&s).unwrap(), fs::read(&r).unwrap());
         assert!(absent(&x).unwrap());
