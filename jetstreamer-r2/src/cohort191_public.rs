@@ -19,6 +19,8 @@ struct Observe {
     context: Bound,
     observer: Bound,
     output: PathBuf,
+    #[serde(default)]
+    native_handoff_event: bool,
 }
 fn queued(n: u64) -> Value {
     json!({"state":"queued","remaining_millis":n})
@@ -114,11 +116,38 @@ pub(super) fn run() -> Result<()> {
     );
     member(&ctx.publisher.path, &ctx.publisher.sha256)?;
     let observer = bound(&p.observer, false)?;
-    let cutoff = fleet::utc_seconds(
+    let resource_time = fleet::utc_seconds(
         observer["recorded_at_utc"]
             .as_str()
             .context("191 public sample time")?,
     )?;
+    let (cutoff, native_event_clock) = if p.native_handoff_event {
+        let event = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let (head, state) = queue::read_head()?;
+        let revision = state["revision"].as_u64().context("191 native revision")?;
+        let immutable_state = Bound {
+            path: Path::new(
+                "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1/history",
+            )
+            .join(format!("state-{revision:06}.json")),
+            sha256: head.sha256,
+        };
+        bound(&immutable_state, true)?;
+        let clock = json!({"schema":"jetstreamer-cohort191-native-handoff-clock-v2","observer":p.observer,
+            "recorded_unix_seconds":event,"sampled_at_utc":native_clock::utc(event)?,
+            "queue_state":immutable_state,"queue_plan":ctx.queue_plan,"queue_invocation_id":state["invocation_id"],
+            "terminal":ctx.terminal,"resource_samples_taken":0,"publication_authorized":false,"r2_mutations":false});
+        let path = p.output.with_extension("native-clock.json");
+        fleet::persist(&path, &clock)?;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o400))?;
+        let b = Bound {
+            sha256: hex_lower(&Sha256::digest(fs::read(&path)?)),
+            path,
+        };
+        (event, Some(b))
+    } else {
+        (resource_time, None)
+    };
     let terminal = bound(&ctx.terminal, false)?;
     jetstreamer_horizon_observe::cohort191_delivery_model::validate_terminal_transition(
         &terminal, cutoff,
@@ -276,6 +305,7 @@ pub(super) fn run() -> Result<()> {
         path: forecast_path,
     };
     let cp = Capture {
+        native_event_clock,
         schema: "jetstreamer-cohort191-delivery-capture-plan-v2".into(),
         observer: p.observer,
         forecast: forecast_bound,

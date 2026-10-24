@@ -3,6 +3,7 @@ use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command};
 mod event144;
+mod event191;
 mod native_input;
 mod origin203;
 mod warmup223;
@@ -475,6 +476,8 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
         (plan.schema == "jetstreamer-horizon-pipeline-status-plan-v1"
             && plan.phase_handoff_event.is_none())
             || (plan.schema == "jetstreamer-exact144-pipeline-handoff-event-plan-v1"
+                && plan.phase_handoff_event.is_some())
+            || (plan.schema == "jetstreamer-cohort191-native-handoff-status-plan-v2"
                 && plan.phase_handoff_event.is_some()),
         "unsupported pipeline status plan"
     );
@@ -580,7 +583,12 @@ fn validate_scope(plan: &Plan, observer: &Value, fleet: &Value, now: u64) -> Res
         "jet filename names another epoch"
     );
     if let Some(event) = &plan.phase_handoff_event {
-        return event144::sample(plan, observer, &bound_json(event)?, now);
+        let proof = bound_json(event)?;
+        return if (191..=194).contains(&plan.epoch) {
+            event191::sample(plan, observer, &proof, now)
+        } else {
+            event144::sample(plan, observer, &proof, now)
+        };
     }
     Ok(sample.into())
 }
@@ -613,6 +621,13 @@ fn census(plan: &Plan, fleet: &Value) -> Result<BTreeMap<String, Value>> {
             "pipeline peer is duplicate or names another epoch"
         );
         names.insert(peer.clone());
+    }
+    if (191..=194).contains(&plan.epoch) {
+        for binding in &plan.estimate_evidence {
+            names.extend(super::cohort191_delivery::fleet_peers(&bound_json(
+                binding,
+            )?)?);
+        }
     }
     let current = fleet::census(
         &names,
@@ -872,11 +887,12 @@ pub(super) async fn run() -> Result<()> {
         "canonical sidecar already exists; reconcile completion instead of publishing a countdown"
     );
     preflight_status_receipt_write(&plan.receipt_directory)?;
-    let (object_etag, previous_object_etag) = if plan.phase_handoff_event.is_some() {
-        publish_initial144_handoff_status(&s3, &r2, &status).await?
-    } else {
-        publish_epoch_status(&s3, &r2, &status).await?
-    };
+    let (object_etag, previous_object_etag) =
+        if plan.epoch == 144 && plan.phase_handoff_event.is_some() {
+            publish_initial144_handoff_status(&s3, &r2, &status).await?
+        } else {
+            publish_epoch_status(&s3, &r2, &status).await?
+        };
     let receipt = StatusPublicationReceipt {
         schema: PIPELINE_STATUS_RECEIPT_SCHEMA.into(),
         bucket: r2.bucket,

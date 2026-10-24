@@ -16,6 +16,9 @@ fn bootstrap() -> Bound {
 pub(super) fn is_program(p: &Path) -> bool {
     p == Path::new(PROGRAM)
         || p == Path::new(
+            "/usr/local/lib/jetstreamer/horizon-cohort191-native-event-tools-20261024-v1/jetstreamer-r2",
+        )
+        || p == Path::new(
             "/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2",
         )
 }

@@ -77,6 +77,8 @@ struct Capture {
     native_pending_proof: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     native_terminal_proof: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native_event_clock: Option<Bound>,
     output: PathBuf,
 }
 pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
@@ -1265,6 +1267,7 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
         ("ready_receipts", json!(p.ready_receipts)),
         ("queue", json!(p.queue)),
         ("native_terminal_proof", json!(p.native_terminal_proof)),
+        ("native_event_clock", json!(p.native_event_clock)),
         (
             "source_revalidation_policy",
             json!(p.source_revalidation_policy),
@@ -1277,7 +1280,7 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
     }
     let observer = bound(&p.observer, false)?;
     ensure!(
-        v["sampled_at_utc"] == observer["recorded_at_utc"]
+        v["sampled_at_utc"] == native_clock::sample(&p, &observer)?
             && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && fleet::utc_seconds(v["sampled_at_utc"].as_str().context("191 event time")?)?
                 == cutoff,
@@ -1586,10 +1589,8 @@ fn sync_progress(
 }
 fn capture(p: &Capture) -> Result<Value> {
     let o = bound(&p.observer, false)?;
-    let sample = o["recorded_at_utc"]
-        .as_str()
-        .context("191 coordinated sample")?;
-    let cutoff = fleet::utc_seconds(sample)?;
+    let sample = native_clock::sample(p, &o)?;
+    let cutoff = fleet::utc_seconds(&sample)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         p.schema == "jetstreamer-cohort191-delivery-capture-plan-v2"
@@ -1801,7 +1802,7 @@ fn capture(p: &Capture) -> Result<Value> {
         );
     }
     let v = json!({"schema":EVENT_SCHEMA,"first_epoch":191,"last_epoch":194,"sampled_at_utc":sample,"sample_unix_seconds":cutoff,
-        "observer":p.observer,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
+        "observer":p.observer,"native_event_clock":p.native_event_clock,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
         "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"native_terminal_proof":p.native_terminal_proof,"controller":controller,"controller_lifecycle":controller_history,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
         "gate_receipts":p.gate_receipts,"gate_tools":p.gate_tools,"ready_receipts":p.ready_receipts,
         "queue":p.queue,"queue_observation":queue_observation,"source_revalidation_policy":p.source_revalidation_policy,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
@@ -1860,7 +1861,8 @@ pub(super) fn fleet_proof(
     if !(191..=194).contains(&epoch) || evidence["schema"] != EVENT_SCHEMA {
         return Ok(None);
     }
-    validate_event(evidence, sample)?;
+    let event_sample = native_clock::fleet_sample(evidence, sample)?;
+    validate_event(evidence, event_sample)?;
     let claims: Vec<Claim> = serde_json::from_value(evidence["claims"].clone())?;
     let c = claims
         .iter()
@@ -2268,4 +2270,10 @@ mod tests {
             .push(row);
         assert!(ready_import_binding(&r, &duplicate).is_err());
     }
+}
+
+#[path = "cohort191_delivery/native_clock.rs"]
+mod native_clock;
+pub(super) fn fleet_peers(evidence: &Value) -> Result<Vec<String>> {
+    native_clock::fleet_peers(evidence)
 }

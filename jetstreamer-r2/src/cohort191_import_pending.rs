@@ -386,6 +386,7 @@ fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
     fs::set_permissions(&forecast_path, fs::Permissions::from_mode(0o400))?;
     let bytes = fs::read(&forecast_path)?;
     let cp = Capture {
+        native_event_clock: None,
         schema: "jetstreamer-cohort191-delivery-capture-plan-v2".into(),
         observer: p.observer.clone(),
         forecast: Bound {
