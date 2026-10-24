@@ -83,13 +83,13 @@ fn config_path(unit: &str) -> PathBuf {
         Path::new("/run/systemd/transient").join(unit)
     }
 }
-fn manager(name: &str) -> Result<Value> {
+fn manager_raw(name: &str) -> Result<Value> {
     ensure!(
         name == OLD_CONTROLLER || JOBS.iter().any(|j| j.unit == name),
         "foreign185 metadata owner"
     );
     let out=std::process::Command::new("/usr/bin/systemctl").args(["show",name,"--no-pager","--all",
-        "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,Triggers,TriggeredBy,OnFailure,OnSuccess,ExecStop,ExecStopPost,Restart,Type,RemainAfterExit,ExecMainStatus,Result,ControlGroup,FragmentPath"]).output()?;
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,InvocationID,Triggers,TriggeredBy,OnFailure,OnSuccess,ExecStop,ExecStopPost,Restart,Type,RemainAfterExit,ExecMainStatus,Result,ControlGroup,FragmentPath,Job,ControlPID"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 65536,
         "185 metadata manager read failed"
@@ -101,12 +101,151 @@ fn manager(name: &str) -> Result<Value> {
         .collect::<Result<_>>()?;
     Ok(Value::Object(fields))
 }
+fn object_path(name: &str) -> String {
+    let mut path = String::from("/org/freedesktop/systemd1/unit/");
+    for b in name.bytes() {
+        if b.is_ascii_alphanumeric() {
+            path.push(char::from(b));
+        } else {
+            path.push_str(&format!("_{b:02x}"));
+        }
+    }
+    path
+}
+fn property(name: &str, interface: &str, key: &str) -> Result<Value> {
+    let out = std::process::Command::new("/usr/bin/busctl")
+        .args([
+            "--system",
+            "--json=short",
+            "get-property",
+            "org.freedesktop.systemd1",
+            &object_path(name),
+            interface,
+            key,
+        ])
+        .output()?;
+    decode_property_output(out.status.success(), &out.stdout, key)
+}
+fn decode_property_output(success: bool, bytes: &[u8], key: &str) -> Result<Value> {
+    ensure!(
+        success && bytes.len() <= 1 << 20,
+        "185 native property unreadable: {key}"
+    );
+    Ok(serde_json::from_slice(bytes)?)
+}
+
+fn empty_command_array(v: &Value) -> Result<()> {
+    ensure!(
+        v["type"] == "a(sasbttttuii)" && v["data"].as_array().is_some_and(|a| a.is_empty()),
+        "185 stop commands lack positive recognized empty-array evidence"
+    );
+    Ok(())
+}
+fn zero_pid(v: &Value) -> Result<()> {
+    ensure!(
+        v["type"] == "u" && v["data"].as_u64() == Some(0),
+        "185 native service has live or unreadable PID"
+    );
+    Ok(())
+}
+fn no_job(v: &Value) -> Result<()> {
+    ensure!(
+        v["type"] == "(uo)" && v["data"] == json!([0, "/"]),
+        "185 owner has queued/running or unreadable job"
+    );
+    Ok(())
+}
+fn manager(name: &str) -> Result<Value> {
+    let before = manager_raw(name)?;
+    if before["LoadState"] == "not-found" {
+        let mut proof = serde_json::Map::new();
+        for (key, expected) in [
+            ("Id", name),
+            ("LoadState", "not-found"),
+            ("ActiveState", "inactive"),
+            ("SubState", "dead"),
+        ] {
+            let v = property(name, "org.freedesktop.systemd1.Unit", key)?;
+            ensure!(
+                v["type"] == "s" && v["data"] == expected,
+                "185 collected Unit property differs: {key}"
+            );
+            proof.insert(key.to_owned(), v);
+        }
+        let job = property(name, "org.freedesktop.systemd1.Unit", "Job")?;
+        no_job(&job)?;
+        let after = manager_raw(name)?;
+        ensure!(
+            before == after,
+            "185 collected owner changed across native absence proof"
+        );
+        let mut normalized = after;
+        normalized["Job"] = json!([0, "/"]);
+        normalized["native_collected_proof"] =
+            json!({"unit_properties":proof,"job":job,"raw_before":before});
+        return Ok(normalized);
+    }
+    let id = property(name, "org.freedesktop.systemd1.Unit", "Id")?;
+    ensure!(
+        id["type"] == "s" && id["data"] == name,
+        "185 native object identity differs"
+    );
+    let stop = property(name, "org.freedesktop.systemd1.Service", "ExecStop")?;
+    empty_command_array(&stop)?;
+    let post = property(name, "org.freedesktop.systemd1.Service", "ExecStopPost")?;
+    empty_command_array(&post)?;
+    let control = property(name, "org.freedesktop.systemd1.Service", "ControlPID")?;
+    zero_pid(&control)?;
+    let main = property(name, "org.freedesktop.systemd1.Service", "MainPID")?;
+    zero_pid(&main)?;
+    let job = property(name, "org.freedesktop.systemd1.Unit", "Job")?;
+    no_job(&job)?;
+    let after = manager_raw(name)?;
+    ensure!(
+        before == after,
+        "185 native owner changed across structured property proof"
+    );
+    let mut normalized = after;
+    // Normalize only fields with an independent recognized typed zero/empty proof.
+    normalized["ExecStop"] = json!("");
+    normalized["ExecStopPost"] = json!("");
+    normalized["ControlPID"] = json!("0");
+    normalized["MainPID"] = json!("0");
+    normalized["Job"] = json!([0, "/"]);
+    normalized["native_property_proof"] = json!({"identity":id,"exec_stop":stop,"exec_stop_post":post,
+        "control_pid":control,"main_pid":main,"job":job,"raw_before":before});
+    Ok(normalized)
+}
+fn collected_shape(v: &Value, name: &str) -> Result<()> {
+    ensure!(
+        v["Id"] == name
+            && v["LoadState"] == "not-found"
+            && v["ActiveState"] == "inactive"
+            && v["SubState"] == "dead"
+            && v["Job"] == json!([0, "/"]),
+        "185 native collected owner shape differs"
+    );
+    // This is a separate positive absence branch, never a normalization of missing Service fields.
+    for key in ["MainPID", "ControlPID", "NRestarts"] {
+        ensure!(
+            v[key].is_null() || v[key] == "0",
+            "185 collected owner retains live service metadata"
+        );
+    }
+    ensure!(
+        v["InvocationID"].is_null() || v["InvocationID"] == "",
+        "185 collected owner retains an invocation"
+    );
+    Ok(())
+}
 fn quiet(v: &Value, name: &str) -> Result<()> {
     ensure!(
         v["Id"] == name
             && v["MainPID"] == "0"
             && v["NRestarts"] == "0"
             && v["Restart"] == "no"
+            && v["ControlPID"] == "0"
+            && v["Job"] == json!([0, "/"])
             && [
                 "Triggers",
                 "TriggeredBy",
@@ -122,14 +261,10 @@ fn quiet(v: &Value, name: &str) -> Result<()> {
     Ok(())
 }
 fn job_shape(v: &Value, j: Job, collected: bool) -> Result<()> {
-    quiet(v, j.unit)?;
     if collected && v["LoadState"] == "not-found" {
-        ensure!(
-            v["ActiveState"] == "inactive" && v["SubState"] == "dead" && v["InvocationID"] == "",
-            "185 collected metadata shape differs"
-        );
-        return Ok(());
+        return collected_shape(v, j.unit);
     }
+    quiet(v, j.unit)?;
     ensure!(
         v["LoadState"] == "loaded"
             && v["InvocationID"] == j.iid
@@ -897,16 +1032,53 @@ fn retain_and_mask(
 mod tests {
     use super::*;
     #[test]
+    fn command_arrays_require_typed_positive_empty_evidence() {
+        empty_command_array(&json!({"type":"a(sasbttttuii)","data":[]})).unwrap();
+        let bytes = br#"{"type":"a(sasbttttuii)","data":[]}"#;
+        assert!(decode_property_output(false, bytes, "ExecStop").is_err());
+        empty_command_array(&decode_property_output(true, bytes, "ExecStop").unwrap()).unwrap();
+        assert!(decode_property_output(true, b"unreadable", "ExecStop").is_err());
+        for v in [
+            json!({}),
+            json!({"type":"a(sasbttttuii)"}),
+            json!({"type":"a(sasbttttuii)","data":null}),
+            json!({"type":"as","data":[]}),
+            json!({"type":"a(sasbttttuii)","data":[["/bin/action"]]}),
+        ] {
+            assert!(empty_command_array(&v).is_err());
+        }
+        assert!(zero_pid(&json!({})).is_err());
+        assert!(zero_pid(&json!({"type":"u","data":1})).is_err());
+        zero_pid(&json!({"type":"u","data":0})).unwrap();
+        no_job(&json!({"type":"(uo)","data":[0,"/"]})).unwrap();
+        assert!(no_job(&json!({})).is_err());
+        assert!(no_job(&json!({"type":"(uo)","data":[9,"/job/9"]})).is_err());
+    }
+    #[test]
+    fn collected_absence_does_not_require_or_invent_service_fields() {
+        let j = JOBS[0];
+        let v = json!({"Id":j.unit,"LoadState":"not-found","ActiveState":"inactive","SubState":"dead","Job":[0,"/"]});
+        assert!(job_shape(&v, j, false).is_err());
+        job_shape(&v, j, true).unwrap();
+        let mut live = v.clone();
+        live["MainPID"] = json!("12");
+        assert!(job_shape(&live, j, true).is_err());
+        let mut unknown = v;
+        unknown["LoadState"] = json!("error");
+        assert!(job_shape(&unknown, j, true).is_err());
+    }
+    #[test]
     fn only_original_terminal_metadata_without_stop_actions_can_collect() {
         let j = JOBS[0];
         let v = json!({"Id":j.unit,"MainPID":"0","NRestarts":"0","Restart":"no",
-            "Triggers":"","TriggeredBy":"","OnFailure":"","OnSuccess":"","ExecStop":"","ExecStopPost":"",
+            "Triggers":"","TriggeredBy":"","OnFailure":"","OnSuccess":"","ExecStop":"","ExecStopPost":"","ControlPID":"0","Job":[0,"/"],
             "LoadState":"loaded","InvocationID":j.iid,"Type":"oneshot","RemainAfterExit":"yes",
             "ExecMainStatus":j.status.to_string(),"Result":"exit-code","FragmentPath":config_path(j.unit),
             "ActiveState":"failed","SubState":"failed"});
         job_shape(&v, j, false).unwrap();
         for (k, x) in [
             ("MainPID", "12"),
+            ("ControlPID", "12"),
             ("InvocationID", "replacement"),
             ("NRestarts", "1"),
             ("ExecStop", "/bin/action"),
