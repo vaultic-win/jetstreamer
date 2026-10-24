@@ -89,11 +89,46 @@ fn sampled(o: &Value, f: &Value, now: u64) -> Result<u64> {
     );
     Ok(sampled)
 }
+#[derive(Clone, Copy)]
+pub(super) struct Candidate {
+    pub additional_bytes: u64,
+    pub memory_max_bytes: u64,
+    pub minimum_protected_disk_bytes: u64,
+}
 pub(super) fn check(value: &Value, additional: u64) -> Result<Value> {
     check_inner(value, additional, None)
 }
+pub(super) fn check_candidate(value: &Value, candidate: Candidate) -> Result<Value> {
+    ensure!(
+        candidate.additional_bytes > 0
+            && candidate.memory_max_bytes > 0
+            && candidate.minimum_protected_disk_bytes > 0,
+        "invalid bounded maintenance candidate"
+    );
+    check_inner(value, candidate.additional_bytes, Some(candidate))
+}
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
-    check_inner(value, (160 << 30) + (32 << 20), Some(64 << 30))
+    check_candidate(
+        value,
+        Candidate {
+            additional_bytes: (160 << 30) + (32 << 20),
+            memory_max_bytes: 64 << 30,
+            minimum_protected_disk_bytes: 2_000_000_000_000,
+        },
+    )
+}
+fn completed_guards(
+    f: &Value,
+    guards: &BTreeMap<String, BoundFile>,
+    sample: u64,
+    now: u64,
+) -> Result<Value> {
+    prefix223_native20_admission::completed_guards_for(
+        &prefix223_live_peer::roster(f)?,
+        guards,
+        sample,
+        now,
+    )
 }
 fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
     ensure!(
@@ -128,7 +163,7 @@ fn memory_sample(o: &Value, f: &Value, candidate: u64) -> Result<Value> {
         "sampled_available_memory_bytes":sampled,"actual_available_memory_bytes":actual}),
     )
 }
-fn check_inner(value: &Value, additional: u64, memory: Option<u64>) -> Result<Value> {
+fn check_inner(value: &Value, additional: u64, candidate: Option<Candidate>) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "Maintenance capacity requires root"
@@ -150,8 +185,8 @@ fn check_inner(value: &Value, additional: u64, memory: Option<u64>) -> Result<Va
     let accounting_o = native227_terminal_observer_view(&f, &o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = sampled(&accounting_o, &f, now)?;
-    let guard_history = memory
-        .map(|_| prefix223_native20_admission::completed_guards(&f, &s.protected_guards, t, now))
+    let guard_history = candidate
+        .map(|_| completed_guards(&f, &s.protected_guards, t, now))
         .transpose()?;
     // Reject unknown/native peers rather than invent a zero-growth reservation.
     prefix223_live_peer::roster(&f)?;
@@ -161,13 +196,9 @@ fn check_inner(value: &Value, additional: u64, memory: Option<u64>) -> Result<Va
         prefix223_live_peer::disk(&f, &accounting_o, &s.protected_guards, t, now)?;
     let (minimum, largest_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
-    // This prepared private223 assembler has an immutable 2TB minimum floor.
+    // A separately authenticated candidate may require a larger sealed floor.
     // Ordinary Foundation maintenance retains its existing dynamic floor.
-    let minimum = if memory.is_some() {
-        minimum.max(2_000_000_000_000)
-    } else {
-        minimum
-    };
+    let minimum = candidate.map_or(minimum, |c| minimum.max(c.minimum_protected_disk_bytes));
     let sampled_free = o["filesystem"]["conservative_available_bytes"]
         .as_u64()
         .context("Maintenance sampled disk")?;
@@ -183,8 +214,8 @@ fn check_inner(value: &Value, additional: u64, memory: Option<u64>) -> Result<Va
     prefix223_live_peer::current(&f, &before)?;
     singleton227_admission::owners(&f, &before)?;
     let caps = prefix223_live_peer::limits(&f)?;
-    let memory_before = memory
-        .map(|candidate| memory_sample(&accounting_o, &f, candidate))
+    let memory_before = candidate
+        .map(|c| memory_sample(&accounting_o, &f, c.memory_max_bytes))
         .transpose()?;
     let actual_free = singleton227_admission::disk_free()?;
     envelope(minimum, additional, actual_free)?;
@@ -211,11 +242,11 @@ fn check_inner(value: &Value, additional: u64, memory: Option<u64>) -> Result<Va
         "Maintenance protected growth increased during admission"
     );
     envelope(minimum, additional, singleton227_admission::disk_free()?)?;
-    let guard_history_after = memory
-        .map(|_| prefix223_native20_admission::completed_guards(&f, &s.protected_guards, t, now))
+    let guard_history_after = candidate
+        .map(|_| completed_guards(&f, &s.protected_guards, t, now))
         .transpose()?;
-    let memory_after = memory
-        .map(|candidate| memory_sample(&after_accounting_o, &f, candidate))
+    let memory_after = candidate
+        .map(|c| memory_sample(&after_accounting_o, &f, c.memory_max_bytes))
         .transpose()?;
     if let (Some(before), Some(after)) = (&memory_before, &memory_after) {
         ensure!(
@@ -226,7 +257,7 @@ fn check_inner(value: &Value, additional: u64, memory: Option<u64>) -> Result<Va
     }
     // Assembly's added memory/timer checks must be inside a complete manager
     // bracket too; leave Foundation's established two-census shape unchanged.
-    let final_census = if memory.is_some() {
+    let final_census = if candidate.is_some() {
         let current = census(&names, 201, 300)?;
         native210_peer_history::current(&f, &current)?;
         prefix223_live_peer::current(&f, &current)?;
