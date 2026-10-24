@@ -1,0 +1,139 @@
+[package]
+name = "jetstreamer-node"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+
+[features]
+default = []
+# Exact private 207cohort through its own final slot; never ordinary support.
+epoch207-singleton-qualification = []
+# Exact private singleton 209–212 profiles with their own canonical final root.
+epochs209-212-singleton-qualification = []
+# Complete original-entry source binding for one private 141 root qualification.
+epoch141-original-entry-qualification = ["dep:jetstreamer-utils"]
+# Fixed 60911751 native restore comparison; never sends replay entries.
+epoch140-native-restore-diagnostic = ["dep:chrono"]
+epoch144-native-restore-diagnostic = ["dep:chrono"]
+epoch203-native-restore-diagnostic = ["dep:chrono"]
+epoch205-native-restore-diagnostic = ["dep:chrono"]
+# Private epoch 213 prefix/checkpoint continuation. Never creates a canonical
+# checksum or enables ordinary archive reuse/publication.
+epoch213-checkpoint-continuation-diagnostic = []
+# Exact private epoch 144 prefix/native-checkpoint continuation, never publication.
+epoch144-checkpoint-continuation-diagnostic = []
+# Exact retained 203 prefix/native checkpoint plus 419 slots; private V4 only.
+epoch203-checkpoint-continuation-diagnostic = []
+# Private epoch 223 cold/tail comparison, never the ordinary runtime route.
+epoch223-v1-6-25-qualification = []
+# Independently checkpointed v1.6.20 cold prefix, ending before the known tail
+# incompatibility. Separate private namespace; no full epoch or tail execution.
+epoch223-v1-6-20-prefix-qualification = []
+# Build-bound, non-production epoch-224 diagnostic. It compares the historical
+# worker's transaction-attributed lamport writes with canonical source metadata
+# and records the exact freeze-time writes at the first divergent boundary.
+epoch224-account-delta-diagnostic = []
+# Build-bound comparison of exact upstream Solana v1.6.25 at the epoch-224
+# bootstrap divergence. This never changes the default v1.6.20 route.
+epoch224-v1-6-25-diagnostic = []
+# Private complete-span epoch-224 qualification after the bounded comparison.
+# The node requires the focused qualification CLI and never publishes a sidecar.
+epoch224-v1-6-25-qualification = []
+# Private epoch 225 bounded upstream comparison, never an ordinary era promotion.
+epoch225-v1-6-25-diagnostic = []
+# Complete private epoch 225 plus its first later-root verification suffix.
+epoch225-v1-6-25-qualification = []
+
+[[bin]]
+name = "jetstreamer-epoch203-native-restore-probe"
+path = "src/bin/jetstreamer-epoch203-native-restore-probe.rs"
+required-features = ["epoch203-native-restore-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch205-native-restore-probe"
+path = "src/bin/jetstreamer-epoch205-native-restore-probe.rs"
+required-features = ["epoch205-native-restore-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch140-native-restore-probe"
+path = "src/bin/jetstreamer-epoch140-native-restore-probe.rs"
+required-features = ["epoch140-native-restore-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch144-native-restore-probe"
+path = "src/bin/jetstreamer-epoch144-native-restore-probe.rs"
+required-features = ["epoch144-native-restore-diagnostic"]
+
+[dependencies]
+chrono = { version = "=0.4.44", default-features = false, features = ["std"], optional = true }
+anyhow.workspace = true
+agave-snapshots.workspace = true
+base64.workspace = true
+bincode.workspace = true
+cid.workspace = true
+# Global allocator (same choice as agave-validator): glibc malloc never returns
+# the accounts-db churn to the OS (anon RSS grew ~520 GiB per replayed epoch →
+# OOM); jemalloc's decay does. unprefixed_malloc routes rocksdb's C mallocs
+# through jemalloc too. Not compiled on msvc (see main.rs cfg).
+tikv-jemallocator = { version = "0.6", features = [
+    "unprefixed_malloc_on_supported_platforms",
+] }
+crossbeam-channel.workspace = true
+crc.workspace = true
+ctrlc.workspace = true
+dashmap.workspace = true
+env_logger.workspace = true
+jetstreamer-firehose.workspace = true
+jetstreamer-horizon.workspace = true
+jetstreamer-utils = { path = "../jetstreamer-utils", optional = true }
+jetstreamer-historical-protocol = { package = "jetstreamer-historical-protocol-current", path = "../historical-runtime/protocol-current" }
+solana-reward-info.workspace = true
+solana-message.workspace = true
+solana-runtime-transaction.workspace = true
+rayon.workspace = true
+log.workspace = true
+md-5.workspace = true
+bs58.workspace = true
+lencode.workspace = true
+libc.workspace = true
+reqwest.workspace = true
+serde_cbor.workspace = true
+ripget = "0.1"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+solana-account.workspace = true
+solana-accounts-db.workspace = true
+solana-address.workspace = true
+solana-clock.workspace = true
+solana-genesis-utils.workspace = true
+solana-geyser-plugin-manager.workspace = true
+solana-hash.workspace = true
+solana-ledger.workspace = true
+solana-logger.workspace = true
+solana-pubkey.workspace = true
+solana-rpc.workspace = true
+solana-runtime.workspace = true
+solana-unified-scheduler-pool.workspace = true
+solana-signature.workspace = true
+solana-entry.workspace = true
+solana-transaction = { workspace = true, features = ["verify"] }
+solana-transaction-status.workspace = true
+solana-svm.workspace = true
+solana-svm-timings.workspace = true
+tar.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+xxhash-rust.workspace = true
+zstd.workspace = true
+
+[dev-dependencies]
+solana-runtime = { workspace = true, features = ["dev-context-only-utils"] }
+
+[build-dependencies]
+sha2.workspace = true

@@ -1,0 +1,3436 @@
+use crate::{leader_schedule, poh_backend, snapshot};
+use jetstreamer_historical_protocol::{
+    AccountWrite, Checkpoint, EntryProcessed, EntryRequest, Initialized, InitializedSource,
+    InstructionError as WireInstructionError, TransactionError as WireTransactionError,
+    TransactionOutcome, MAX_ENTRIES_PER_BATCH,
+};
+use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
+use solana_merkle_tree::MerkleTree;
+use solana_rayon_threadlimit::get_thread_count;
+use solana_runtime::{
+    accounts_db::OwnedAccountWrite,
+    bank::{Bank, Builtin, Builtins, ExecuteTimings, NonceRollbackInfo},
+    builtins::ActivationType,
+};
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+use solana_sdk::hard_forks::HardForks;
+use solana_sdk::{
+    account::from_account,
+    clock::{MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES},
+    feature_set,
+    genesis_config::{ClusterType, GenesisConfig},
+    hash::Hash,
+    instruction::InstructionError,
+    pubkey::Pubkey,
+    system_program,
+    sysvar::{slot_hashes, slot_hashes::SlotHashes},
+    transaction::{Transaction, TransactionError},
+};
+use solana_vote_program::vote_instruction::VoteInstruction;
+use std::{cmp, collections::HashMap, env, ops::Range, path::Path, sync::Arc};
+use tempfile::TempDir;
+
+const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
+
+// Read-only diagnostics for an already-fatal native fee/load result. These are
+// post-commit observations, never a preimage or authority to skip a transaction.
+fn fee_load_diagnostics(
+    bank: &Bank,
+    transaction: &Transaction,
+    index: usize,
+    error: &TransactionError,
+) -> String {
+    use std::fmt::Write;
+    let mut text=format!("historical fee-load trace: bank_slot={} transaction_index={} signature={:?} error={:?} header={:?} account_observation=after_native_commit\n",
+        bank.slot(),index,transaction.signatures.first().map(|s|s.to_string()),error,transaction.message.header);
+    for (index, key) in transaction.message.account_keys.iter().enumerate() {
+        let called = transaction
+            .message
+            .instructions
+            .iter()
+            .any(|i| i.program_id_index as usize == index);
+        let account = bank.get_account(key);
+        let _=writeln!(&mut text,"historical fee-load account: index={} key={} effective_writable={} called_program={} passed_to_instruction={} non_loader_key={} present={} owner={:?} executable={:?} lamports={:?}",
+            index,key,transaction.message.is_writable(index),called,
+            transaction.message.is_key_passed_to_program(index),transaction.message.is_non_loader_key(key,index),account.is_some(),
+            account.as_ref().map(|a|a.owner.to_string()),account.as_ref().map(|a|a.executable),account.as_ref().map(|a|a.lamports));
+    }
+    text
+}
+// The epoch-215 terminal checkpoint is the bootstrap for this candidate.
+// Admit entries only through epoch 232 while later epochs remain independently
+// checkpoint-qualified.
+// Compatibility must be demonstrated by trusted checkpoints before the
+// parent may route or publish this candidate. Snapshot creator metadata alone
+// is not treated as evidence that v1.6.25 execution semantics apply out of era.
+const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 93_311_535;
+const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
+const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 100_656_000;
+// The build-bound epoch-224 singleton diagnostic needs only the first failing
+// vote in slot 96,767,526.  Refuse the following slot before accepting any of
+// its entries so this diagnostic can never turn into an unbounded epoch replay.
+const DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE: u64 = 96_767_527;
+const EPOCH223_COLD_SNAPSHOT_SLOT: u64 = 96_335_538;
+const EPOCH223_TAIL_SNAPSHOT_SLOT: u64 = 96_767_522;
+const EPOCH223_END_EXCLUSIVE: u64 = 96_768_000;
+const EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE: u64 = EPOCH223_COLD_SNAPSHOT_SLOT + 17;
+#[cfg(all(
+    feature = "epoch223-v1-6-25-qualification",
+    any(
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch223 qualification cannot combine unrelated diagnostic modes");
+const EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 96_767_522;
+const EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT: u64 = 97_199_617;
+const EPOCH225_DIAGNOSTIC_END_EXCLUSIVE: u64 = 97_202_600;
+const EPOCH225_QUALIFICATION_END_EXCLUSIVE: u64 = 98_063_465;
+const EPOCH227_SNAPSHOT_SLOT: u64 = 98_063_464;
+const EPOCH227_DIAGNOSTIC_END_EXCLUSIVE: u64 = 98_091_123;
+const EPOCH227_QUALIFICATION_END_EXCLUSIVE: u64 = 98_496_000;
+#[cfg(all(
+    any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    ),
+    any(
+        all(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        ),
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch227 comparison/qualification must be an exclusive build profile");
+#[cfg(all(
+    feature = "epoch225-v1-6-25-qualification",
+    any(
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch225 full-span qualification cannot combine other diagnostic modes");
+#[cfg(all(
+    feature = "epoch225-v1-6-25-diagnostic",
+    any(
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "diagnostic-singleton"
+    )
+))]
+compile_error!("epoch225 comparison cannot combine other diagnostic/qualification modes");
+// Complete epoch 224, then stop at the first compatible canonical root in
+// epoch 225. The suffix is qualification evidence only, never publication.
+const EPOCH224_V1_6_25_QUALIFICATION_END_EXCLUSIVE: u64 = 97_631_460;
+const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";
+const WAVE_METRICS_ENV: &str = "JETSTREAMER_HISTORICAL_WAVE_METRICS";
+const DIAGNOSTIC_SINGLETON_ENV: &str = "JETSTREAMER_HISTORICAL_DIAGNOSTIC_SINGLETON";
+const WAVE_METRICS_REPORT_INTERVAL_TRANSACTIONS: u64 = 1_000_000;
+const ABSOLUTE_MAX_POH_THREADS: usize = 256;
+// The validator runs AccountsBackgroundService alongside replay. This worker
+// has no BankForks service, so perform the same storage-only maintenance at
+// deterministic rooted-bank boundaries instead. At most one stale store is
+// considered per root; the recovery budget bounds how often another can run.
+const ACCOUNTS_CLEAN_INTERVAL_ROOTS: u64 = 100;
+const ACCOUNTS_SHRINK_RECOVERY_PER_ROOT: usize = 250;
+
+pub struct RuntimeState {
+    bank: Arc<Bank>,
+    stable_cluster: bool,
+    _source: InitializedSource,
+    _state_dir: TempDir,
+    write_cursor: u64,
+    next_entry_index: u64,
+    last_entry_hash: Hash,
+    tick_hash_count: u64,
+    leader_schedules: HashMap<u64, Vec<Pubkey>>,
+    poh_pool: ThreadPool,
+    enforce_candidate_range: bool,
+    last_accounts_clean_block_height: u64,
+    accounts_shrink_consumed_budget: usize,
+    execution_wave_metrics: ExecutionWaveMetrics,
+    diagnostic_singleton_execution: bool,
+}
+
+#[derive(Default)]
+struct ExecutionWaveMetrics {
+    enabled: bool,
+    transactions: u64,
+    waves: u64,
+    singleton_waves: u64,
+    maximum_wave_size: usize,
+    // Exact sizes 1 through 5, then 6-7 and 8+.
+    size_histogram: [u64; 7],
+    next_report_transactions: u64,
+}
+
+impl ExecutionWaveMetrics {
+    fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            next_report_transactions: WAVE_METRICS_REPORT_INTERVAL_TRANSACTIONS,
+            ..Self::default()
+        }
+    }
+
+    fn observe(&mut self, waves: &[Range<usize>]) {
+        if !self.enabled {
+            return;
+        }
+        for wave in waves {
+            let size = wave.end - wave.start;
+            self.transactions = self.transactions.saturating_add(size as u64);
+            self.waves = self.waves.saturating_add(1);
+            self.singleton_waves = self.singleton_waves.saturating_add(u64::from(size == 1));
+            self.maximum_wave_size = cmp::max(self.maximum_wave_size, size);
+            let bin = match size {
+                1..=5 => size - 1,
+                6..=7 => 5,
+                _ => 6,
+            };
+            self.size_histogram[bin] = self.size_histogram[bin].saturating_add(1);
+        }
+        if self.transactions >= self.next_report_transactions {
+            self.report("periodic");
+            self.next_report_transactions = self
+                .transactions
+                .saturating_add(WAVE_METRICS_REPORT_INTERVAL_TRANSACTIONS);
+        }
+    }
+
+    fn report(&self, reason: &str) {
+        if !self.enabled {
+            return;
+        }
+        eprintln!(
+            "historical execution wave metrics: reason={} transactions={} waves={} singleton_waves={} maximum_wave_size={} size1={} size2={} size3={} size4={} size5={} size6_7={} size8plus={}",
+            reason,
+            self.transactions,
+            self.waves,
+            self.singleton_waves,
+            self.maximum_wave_size,
+            self.size_histogram[0],
+            self.size_histogram[1],
+            self.size_histogram[2],
+            self.size_histogram[3],
+            self.size_histogram[4],
+            self.size_histogram[5],
+            self.size_histogram[6],
+        );
+    }
+}
+
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+const MAINNET_HARD_FORK_SLOTS: [u64; 4] = [13_334_463, 53_180_900, 96_542_804, 96_542_805];
+
+#[cfg(feature = "epoch223-v1-6-25-qualification")]
+fn restore_mainnet_hard_fork_markers(slot: u64, hard_forks: &mut HardForks) -> Result<(), String> {
+    // Validate everything before mutation, including missing already-applied
+    // markers. Such a snapshot cannot be repaired by registering its past fork.
+    for &(marker, count) in hard_forks.iter() {
+        if !MAINNET_HARD_FORK_SLOTS.contains(&marker) {
+            return Err(format!(
+                "snapshot contains unsupported mainnet hard fork {}",
+                marker
+            ));
+        }
+        if count != 1 {
+            return Err(format!(
+                "snapshot mainnet hard fork {} has count {}, expected 1",
+                marker, count
+            ));
+        }
+    }
+    for &marker in &MAINNET_HARD_FORK_SLOTS {
+        if slot >= marker && !hard_forks.iter().any(|&(present, _)| present == marker) {
+            return Err(format!(
+                "snapshot at slot {} is missing applied mainnet hard fork {}",
+                slot, marker
+            ));
+        }
+    }
+    for &marker in &MAINNET_HARD_FORK_SLOTS {
+        if !hard_forks.iter().any(|&(present, _)| present == marker) {
+            hard_forks.register(marker);
+        }
+    }
+    Ok(())
+}
+
+pub enum ProcessEntriesError<E> {
+    Runtime(String),
+    Emit(E),
+}
+
+impl RuntimeState {
+    pub fn initialize(
+        ledger_path: &str,
+        initial_state: &jetstreamer_historical_protocol::InitialState,
+        scratch_root: Option<&str>,
+    ) -> Result<(Self, Initialized), String> {
+        let diagnostic_singleton_execution =
+            diagnostic_singleton_execution_enabled(configured_diagnostic_singleton_execution()?);
+        if diagnostic_singleton_execution {
+            if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_none() {
+                return Err(format!(
+                    "{}=1 requires JETSTREAMER_HISTORICAL_TRACE for a diagnostic-only run",
+                    DIAGNOSTIC_SINGLETON_ENV
+                ));
+            }
+            eprintln!(
+                "historical diagnostic: forcing one transaction per execution wave; output is diagnostic-only"
+            );
+        }
+        let state_dir = snapshot::private_state_dir(scratch_root)?;
+        let genesis = snapshot::load_genesis(Path::new(ledger_path), &state_dir)?;
+        let genesis_hash = genesis.hash().to_string();
+        if genesis_hash != jetstreamer_historical_protocol::MAINNET_GENESIS_HASH {
+            return Err(format!(
+                "genesis hash {} does not match required mainnet hash {}",
+                genesis_hash,
+                jetstreamer_historical_protocol::MAINNET_GENESIS_HASH
+            ));
+        }
+        validate_mainnet_genesis_programs(&genesis)?;
+        let stable_cluster = genesis.cluster_type == ClusterType::MainnetBeta;
+        let poh_pool = build_poh_pool()?;
+        let additional_builtins = mainnet_additional_builtins();
+
+        let (bank, source) = match initial_state {
+            jetstreamer_historical_protocol::InitialState::SnapshotArchive { archive_path } => {
+                let archive_path_ref = Path::new(archive_path);
+                let (archive_slot, _, _) = snapshot::parse_archive_identity(archive_path_ref)?;
+                // Reject out-of-era archives from their committed filename
+                // before spending resources extracting or decoding them.
+                validate_candidate_snapshot_slot(archive_slot)?;
+                let loaded = snapshot::load_archive(
+                    archive_path_ref,
+                    &state_dir,
+                    &genesis,
+                    &additional_builtins,
+                )?;
+                validate_candidate_snapshot_slot(loaded.bank.slot())?;
+                let source = InitializedSource::SnapshotArchive {
+                    archive_path: archive_path.clone(),
+                    expected_accounts_hash: loaded.expected_accounts_hash.as_ref().to_vec(),
+                };
+                (loaded.bank, source)
+            }
+            jetstreamer_historical_protocol::InitialState::Genesis => {
+                return Err(format!(
+                    "Solana v1.6.25 candidate requires a snapshot in {}..{}",
+                    MIN_SUPPORTED_SNAPSHOT_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE
+                ));
+            }
+        };
+        #[cfg(feature = "epoch223-v1-6-25-qualification")]
+        restore_mainnet_hard_fork_markers(bank.slot(), &mut bank.hard_forks().write().unwrap())?;
+        let write_cursor = bank.accounts().accounts_db.next_write_version();
+        let last_entry_hash = bank.last_blockhash();
+        let initialized = Initialized {
+            genesis_hash,
+            source: source.clone(),
+            slot: bank.slot(),
+            last_blockhash: bank.last_blockhash().as_ref().to_vec(),
+            ticks_per_slot: bank.ticks_per_slot(),
+            next_write_version: write_cursor,
+        };
+        Ok((
+            Self {
+                bank: Arc::new(bank),
+                stable_cluster,
+                _source: source,
+                _state_dir: state_dir,
+                write_cursor,
+                next_entry_index: 0,
+                last_entry_hash,
+                tick_hash_count: 0,
+                leader_schedules: HashMap::new(),
+                poh_pool,
+                enforce_candidate_range: true,
+                last_accounts_clean_block_height: 0,
+                accounts_shrink_consumed_budget: 0,
+                execution_wave_metrics: ExecutionWaveMetrics::new(
+                    env::var_os(WAVE_METRICS_ENV).is_some(),
+                ),
+                diagnostic_singleton_execution,
+            },
+            initialized,
+        ))
+    }
+
+    /// Preserve the original one-entry request surface while sharing exactly
+    /// the same fail-closed preparation and commit path as a batch.
+    pub fn process_entry(&mut self, request: EntryRequest) -> Result<EntryProcessed, String> {
+        let mut processed = self.process_entries(vec![request])?;
+        Ok(processed.remove(0))
+    }
+
+    /// Validate the complete submitted batch before changing `Bank` state.
+    /// Transaction decoding and independent PoH segments run in parallel;
+    /// bank advances, transaction execution, results, and writes remain in
+    /// canonical entry order.
+    pub fn process_entries(
+        &mut self,
+        requests: Vec<EntryRequest>,
+    ) -> Result<Vec<EntryProcessed>, String> {
+        let mut processed = Vec::with_capacity(requests.len());
+        match self.process_entries_with(requests, |entry| {
+            processed.push(entry);
+            Ok::<(), ()>(())
+        }) {
+            Ok(()) => Ok(processed),
+            Err(ProcessEntriesError::Runtime(message)) => Err(message),
+            Err(ProcessEntriesError::Emit(())) => unreachable!(),
+        }
+    }
+
+    pub fn process_entries_with<E, F>(
+        &mut self,
+        requests: Vec<EntryRequest>,
+        mut emit: F,
+    ) -> Result<(), ProcessEntriesError<E>>
+    where
+        F: FnMut(EntryProcessed) -> Result<(), E>,
+    {
+        if requests.is_empty() {
+            return Err(ProcessEntriesError::Runtime(
+                "entry batch must contain at least one entry".to_string(),
+            ));
+        }
+        if requests.len() > MAX_ENTRIES_PER_BATCH {
+            return Err(ProcessEntriesError::Runtime(format!(
+                "entry batch contains {} entries, limit is {}",
+                requests.len(),
+                MAX_ENTRIES_PER_BATCH
+            )));
+        }
+
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) && self.enforce_candidate_range
+        {
+            for request in &requests {
+                validate_candidate_entry_slot(request.slot)
+                    .map_err(ProcessEntriesError::Runtime)?;
+            }
+        }
+        let prepared_results: Vec<Result<PreparedEntry, String>> = self
+            .poh_pool
+            .install(|| requests.into_par_iter().map(prepare_entry).collect());
+        // Inspect in wire order so a malformed batch has deterministic error
+        // precedence even though all independent decoding ran concurrently.
+        let mut prepared = Vec::with_capacity(prepared_results.len());
+        for result in prepared_results {
+            prepared.push(result.map_err(ProcessEntriesError::Runtime)?);
+        }
+        let validations = self
+            .validate_entry_batch(&prepared)
+            .map_err(ProcessEntriesError::Runtime)?;
+
+        // Nothing above this line mutates the Bank. From here onward each
+        // accepted entry is applied and reported in canonical wire order.
+        for (entry, validation) in prepared.into_iter().zip(validations) {
+            let processed = self
+                .commit_prevalidated_entry(entry, validation)
+                .map_err(ProcessEntriesError::Runtime)?;
+            emit(processed).map_err(ProcessEntriesError::Emit)?;
+        }
+        Ok(())
+    }
+
+    fn commit_prevalidated_entry(
+        &mut self,
+        prepared: PreparedEntry,
+        validation: EntryValidation,
+    ) -> Result<EntryProcessed, String> {
+        let PreparedEntry {
+            request,
+            transactions,
+            ..
+        } = prepared;
+        let mut writes = if request.slot > self.bank.slot() {
+            self.advance_to(request.slot)?
+        } else {
+            Vec::new()
+        };
+
+        let mut outcomes = Vec::new();
+        if transactions.is_empty() {
+            self.bank.register_tick(&validation.hash);
+            writes.extend(self.drain_writes(None)?);
+        } else {
+            let max_age = processing_max_age(self.stable_cluster, self.bank.epoch());
+            // Canonical entries can contain multiple successful transactions
+            // that write the same account. A whole-entry batch would turn the
+            // later transaction into AccountInUse. Preserve wire order by
+            // ending a wave immediately before its first lock conflict, then
+            // commit the largest conflict-free consecutive prefix together.
+            // Writable keys are unique inside a wave, so drained writes retain
+            // exact signature attribution without forcing every transaction
+            // through a separate AccountsDb store call.
+            let execution_waves = selected_transaction_waves(
+                &self.bank,
+                &transactions,
+                self.diagnostic_singleton_execution,
+            );
+            for wave in &execution_waves {
+                let wave_transactions = &transactions[wave.clone()];
+                let signatures_by_writable_key = writable_key_attribution(wave_transactions)?;
+                let batch = self.bank.prepare_batch(wave_transactions.iter());
+                let (results, _balances, _inner_instructions, _log_messages) =
+                    self.bank.load_execute_and_commit_transactions(
+                        &batch,
+                        max_age,
+                        false,
+                        false,
+                        false,
+                        &mut ExecuteTimings::default(),
+                    );
+                drop(batch);
+                if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
+                    for (transaction, result) in
+                        wave_transactions.iter().zip(&results.execution_results)
+                    {
+                        if !matches!(
+                            result.0,
+                            Err(TransactionError::InstructionError(
+                                _,
+                                InstructionError::Custom(2)
+                            ))
+                        ) {
+                            continue;
+                        }
+                        let slot_hashes = self
+                            .bank
+                            .get_account(&slot_hashes::id())
+                            .and_then(|account| from_account::<SlotHashes, _>(&account));
+                        let vote =
+                            transaction
+                                .message
+                                .instructions
+                                .get(0)
+                                .and_then(|instruction| {
+                                    bincode::deserialize::<VoteInstruction>(&instruction.data).ok()
+                                });
+                        eprintln!(
+                            "historical trace: bank_slot={} parent_slot={} parent_hash={:?} vote={:?} slot_hashes={:?}",
+                            self.bank.slot(),
+                            self.bank.parent_slot(),
+                            self.bank.parent().map(|parent| parent.hash()),
+                            vote,
+                            slot_hashes,
+                        );
+                    }
+                }
+                if let Some((wave_index, error)) = results
+                    .fee_collection_results
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, result)| result.as_ref().err().map(|error| (index, error)))
+                {
+                    if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
+                        eprint!(
+                            "{}",
+                            fee_load_diagnostics(
+                                &self.bank,
+                                &wave_transactions[wave_index],
+                                wave.start + wave_index,
+                                error
+                            )
+                        );
+                    }
+                    return Err(format!(
+                        "entry fee collection failed for transaction {}: {:?}",
+                        wave.start + wave_index,
+                        error
+                    ));
+                }
+                for (wave_index, transaction) in wave_transactions.iter().enumerate() {
+                    let index = wave.start + wave_index;
+                    let fee_calculator = results.execution_results[wave_index]
+                        .1
+                        .as_ref()
+                        .and_then(|nonce| nonce.fee_calculator())
+                        .or_else(|| {
+                            self.bank
+                                .get_fee_calculator(&transaction.message.recent_blockhash)
+                        })
+                        .ok_or_else(|| {
+                            format!("missing fee calculator for transaction {}", index)
+                        })?;
+                    outcomes.push(TransactionOutcome {
+                        signature: transaction
+                            .signatures
+                            .get(0)
+                            .map(|signature| signature.as_ref().to_vec()),
+                        error: results.execution_results[wave_index]
+                            .0
+                            .clone()
+                            .err()
+                            .map(normalize_transaction_error),
+                        fee: fee_calculator.calculate_fee(&transaction.message),
+                    });
+                }
+                let mut wave_writes = self.drain_writes(None)?;
+                for write in &mut wave_writes {
+                    write.transaction_signature = signatures_by_writable_key
+                        .get(write.pubkey.as_slice())
+                        .cloned()
+                        .unwrap_or(None);
+                }
+                writes.extend(wave_writes);
+            }
+            self.execution_wave_metrics.observe(&execution_waves);
+        }
+
+        self.next_entry_index = self
+            .next_entry_index
+            .checked_add(1)
+            .ok_or_else(|| "entry index overflowed u64".to_string())?;
+        self.last_entry_hash = validation.hash;
+        self.tick_hash_count = validation.next_tick_hash_count;
+        Ok(EntryProcessed {
+            slot: self.bank.slot(),
+            entry_index: request.entry_index,
+            outcomes,
+            writes,
+            tick_height: self.bank.tick_height(),
+            slot_complete: self.bank.is_complete(),
+            next_write_version: self.write_cursor,
+        })
+    }
+
+    fn validate_entry_batch(
+        &self,
+        prepared: &[PreparedEntry],
+    ) -> Result<Vec<EntryValidation>, String> {
+        let mut current_slot = self.bank.slot();
+        let mut next_entry_index = self.next_entry_index;
+        let mut tick_height = self.bank.tick_height();
+        let mut max_tick_height = self.bank.max_tick_height();
+        let mut slot_complete = self.bank.is_complete();
+        let mut bank_frozen = self.bank.is_frozen();
+        let mut tick_hash_count = self.tick_hash_count;
+        let mut previous_hash = self.last_entry_hash;
+        let hashes_per_tick = self.bank.hashes_per_tick().unwrap_or(0);
+        let ticks_per_slot = self.bank.ticks_per_slot();
+        let mut starts = Vec::with_capacity(prepared.len());
+        let mut validations = Vec::with_capacity(prepared.len());
+
+        for (batch_index, entry) in prepared.iter().enumerate() {
+            let request = &entry.request;
+            if self.enforce_candidate_range {
+                validate_candidate_entry_slot(request.slot)?;
+            }
+            if request.slot < current_slot {
+                return Err(format!(
+                    "entry slot {} precedes current bank slot {}",
+                    request.slot, current_slot
+                ));
+            }
+
+            let starts_new_slot = request.slot > current_slot;
+            if starts_new_slot {
+                if !slot_complete {
+                    return Err(format!(
+                        "cannot advance incomplete bank at slot {} (tick height {}, max {})",
+                        current_slot, tick_height, max_tick_height
+                    ));
+                }
+                current_slot = request.slot;
+                next_entry_index = 0;
+                max_tick_height = (current_slot + 1) * ticks_per_slot;
+                slot_complete = tick_height == max_tick_height;
+                bank_frozen = false;
+                tick_hash_count = 0;
+            }
+
+            if request.entry_index != next_entry_index {
+                return Err(format!(
+                    "entry index {} for slot {} does not match expected {}",
+                    request.entry_index, request.slot, next_entry_index
+                ));
+            }
+            if slot_complete {
+                return Err(format!(
+                    "entry follows the completion tick for slot {}",
+                    request.slot
+                ));
+            }
+            if bank_frozen {
+                return Err(format!("bank at slot {} is already frozen", request.slot));
+            }
+            if tick_height >= max_tick_height {
+                return Err(format!(
+                    "entry follows the completion tick for slot {}",
+                    request.slot
+                ));
+            }
+
+            let is_tick = entry.transactions.is_empty();
+            if is_tick && tick_height + 1 > max_tick_height {
+                return Err(format!(
+                    "tick entry would exceed max tick height {} in slot {}",
+                    max_tick_height, request.slot
+                ));
+            }
+
+            let mut next_tick_hash_count = tick_hash_count;
+            if hashes_per_tick != 0 {
+                next_tick_hash_count = next_tick_hash_count
+                    .checked_add(request.num_hashes)
+                    .ok_or_else(|| "entry PoH hash count overflowed u64".to_string())?;
+                if is_tick {
+                    if next_tick_hash_count != hashes_per_tick {
+                        return Err(format!(
+                            "tick entry has {} accumulated PoH hashes, expected {}",
+                            next_tick_hash_count, hashes_per_tick
+                        ));
+                    }
+                    next_tick_hash_count = 0;
+                } else if next_tick_hash_count >= hashes_per_tick {
+                    return Err(format!(
+                        "transaction entry reaches {} accumulated PoH hashes without a tick (limit {})",
+                        next_tick_hash_count, hashes_per_tick
+                    ));
+                }
+            }
+
+            let start_hash = if batch_index == 0 && starts_new_slot {
+                self.bank.last_blockhash()
+            } else {
+                previous_hash
+            };
+            starts.push(start_hash);
+            validations.push(EntryValidation {
+                hash: entry.hash,
+                next_tick_hash_count,
+            });
+
+            previous_hash = entry.hash;
+            tick_hash_count = next_tick_hash_count;
+            next_entry_index = next_entry_index
+                .checked_add(1)
+                .ok_or_else(|| "entry index overflowed u64".to_string())?;
+            if is_tick {
+                tick_height += 1;
+                slot_complete = tick_height == max_tick_height;
+            }
+        }
+
+        let expected_hash_groups: Vec<(Hash, Option<Hash>)> = self.poh_pool.install(|| {
+            prepared
+                .par_chunks(2)
+                .zip(starts.par_chunks(2))
+                .map(|(entries, start_hashes)| match (entries, start_hashes) {
+                    ([first, second], [first_start, second_start]) => {
+                        let hashes = next_entry_hash_pair(
+                            [first_start, second_start],
+                            [first.request.num_hashes, second.request.num_hashes],
+                            [&first.transactions, &second.transactions],
+                        );
+                        (hashes[0], Some(hashes[1]))
+                    }
+                    ([entry], [start_hash]) => (
+                        next_entry_hash(start_hash, entry.request.num_hashes, &entry.transactions),
+                        None,
+                    ),
+                    _ => unreachable!("matching chunks of two have equal lengths"),
+                })
+                .collect()
+        });
+        let mut expected_hashes = Vec::with_capacity(prepared.len());
+        for (first, second) in expected_hash_groups {
+            expected_hashes.push(first);
+            if let Some(second) = second {
+                expected_hashes.push(second);
+            }
+        }
+        for ((entry, validation), expected_hash) in
+            prepared.iter().zip(validations.iter()).zip(expected_hashes)
+        {
+            if validation.hash != expected_hash {
+                return Err(format!(
+                    "entry PoH hash mismatch at slot {} index {}: expected {}, got {}",
+                    entry.request.slot, entry.request.entry_index, expected_hash, validation.hash
+                ));
+            }
+        }
+        Ok(validations)
+    }
+
+    pub fn freeze_checkpoint(&mut self, expected_slot: u64) -> Result<Checkpoint, String> {
+        if expected_slot != self.bank.slot() {
+            return Err(format!(
+                "checkpoint requested for slot {}, current bank is {}",
+                expected_slot,
+                self.bank.slot()
+            ));
+        }
+        if !self.bank.is_complete() {
+            return Err(format!(
+                "cannot checkpoint incomplete bank at slot {} (tick height {}, max {})",
+                self.bank.slot(),
+                self.bank.tick_height(),
+                self.bank.max_tick_height()
+            ));
+        }
+        if self.bank.hashes_per_tick().unwrap_or(0) != 0 && self.tick_hash_count != 0 {
+            return Err(format!(
+                "cannot checkpoint slot {} with {} uncommitted PoH hashes",
+                self.bank.slot(),
+                self.tick_hash_count
+            ));
+        }
+        let writes = self.freeze_root_and_drain()?;
+        let accounts_hash = self.bank.update_accounts_hash();
+        self.execution_wave_metrics.report("checkpoint");
+        Ok(Checkpoint {
+            slot: self.bank.slot(),
+            bank_hash: self.bank.hash().as_ref().to_vec(),
+            accounts_hash: accounts_hash.as_ref().to_vec(),
+            last_blockhash: self.bank.last_blockhash().as_ref().to_vec(),
+            capitalization: self.bank.capitalization(),
+            transaction_count: self.bank.transaction_count(),
+            tick_height: self.bank.tick_height(),
+            slot_complete: self.bank.is_complete(),
+            writes,
+            next_write_version: self.write_cursor,
+        })
+    }
+
+    fn advance_to(&mut self, slot: u64) -> Result<Vec<AccountWrite>, String> {
+        if !self.bank.is_complete() {
+            return Err(format!(
+                "cannot advance incomplete bank at slot {} (tick height {}, max {})",
+                self.bank.slot(),
+                self.bank.tick_height(),
+                self.bank.max_tick_height()
+            ));
+        }
+        let mut writes = self.freeze_root_and_drain()?;
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) && (98_091_119..=98_091_122).contains(&self.bank.slot())
+        {
+            let delta = self.bank.accounts().bank_hash_info_at(self.bank.slot());
+            eprintln!("epoch227 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
+        }
+        if cfg!(feature = "epoch225-v1-6-25-diagnostic")
+            && (97_199_876..=97_199_878).contains(&self.bank.slot())
+        {
+            let delta = self.bank.accounts().bank_hash_info_at(self.bank.slot());
+            eprintln!("epoch225 v1.6.25 diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} account_delta_hash={} signature_count={} last_blockhash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",self.bank.slot(),slot,self.bank.hash(),delta.hash,self.bank.signature_count(),self.bank.last_blockhash(),self.bank.capitalization(),self.bank.transaction_count(),self.write_cursor,writes.len());
+        }
+        if self.diagnostic_singleton_execution {
+            eprintln!(
+                "historical diagnostic boundary: parent_slot={} next_slot={} parent_bank_hash={} capitalization={} transaction_count={} next_write_version={} freeze_writes={}",
+                self.bank.slot(),
+                slot,
+                self.bank.hash(),
+                self.bank.capitalization(),
+                self.bank.transaction_count(),
+                self.write_cursor,
+                writes.len(),
+            );
+        }
+        let child_poh_start = self.bank.last_blockhash();
+        let leader = leader_schedule::slot_leader(&self.bank, slot, &mut self.leader_schedules)?;
+        let child = Bank::new_from_parent(&self.bank, &leader, slot);
+        self.bank = Arc::new(child);
+        self.next_entry_index = 0;
+        self.last_entry_hash = child_poh_start;
+        self.tick_hash_count = 0;
+        writes.extend(self.drain_writes(None)?);
+        Ok(writes)
+    }
+
+    /// A completed bank is a canonical boundary in this linear replay. Drain
+    /// every freeze-time account write before rooting it, then squash its
+    /// ancestors so the next child retains only one parent Bank allocation.
+    fn freeze_root_and_drain(&mut self) -> Result<Vec<AccountWrite>, String> {
+        if !self.bank.is_complete() {
+            return Err(format!(
+                "cannot root incomplete bank at slot {} (tick height {}, max {})",
+                self.bank.slot(),
+                self.bank.tick_height(),
+                self.bank.max_tick_height()
+            ));
+        }
+        self.bank.freeze();
+        let mut writes = self.drain_writes(None)?;
+        self.bank.squash();
+        // Bank::squash does not currently store accounts, but draining again
+        // makes that implementation detail unable to silently lose a write.
+        writes.extend(self.drain_writes(None)?);
+        self.maintain_accounts_storage()?;
+        Ok(writes)
+    }
+
+    /// Mirror the pinned validator's AccountsBackgroundService without a
+    /// concurrent BankForks owner. These operations only reclaim physical
+    /// AppendVec state; preserving the global write cursor proves they did not
+    /// manufacture an account update that the archive would fail to observe.
+    fn maintain_accounts_storage(&mut self) -> Result<(), String> {
+        let write_version = self.bank.accounts().accounts_db.next_write_version();
+        // Match the pinned AccountsBackgroundService cap: a large shrink
+        // must not suppress storage cleanup for hundreds of later roots.
+        self.accounts_shrink_consumed_budget = self
+            .bank
+            .process_stale_slot_with_budget(
+                self.accounts_shrink_consumed_budget,
+                ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
+            )
+            .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
+
+        let block_height = self.bank.block_height();
+        if block_height.saturating_sub(self.last_accounts_clean_block_height)
+            > ACCOUNTS_CLEAN_INTERVAL_ROOTS
+        {
+            self.bank.clean_accounts(false);
+            self.last_accounts_clean_block_height = block_height;
+        }
+
+        let next_write_version = self.bank.accounts().accounts_db.next_write_version();
+        if next_write_version != write_version {
+            return Err(format!(
+                "accounts storage maintenance changed write version from {} to {} at slot {}",
+                write_version,
+                next_write_version,
+                self.bank.slot()
+            ));
+        }
+        Ok(())
+    }
+
+    fn drain_writes(&mut self, signature: Option<Vec<u8>>) -> Result<Vec<AccountWrite>, String> {
+        let (next, raw_writes) = self
+            .bank
+            .accounts()
+            .accounts_db
+            .ordered_account_writes_since(self.bank.slot(), self.write_cursor);
+        if let Some(first) = raw_writes.first() {
+            if first.write_version != self.write_cursor {
+                return Err(format!(
+                    "account write stream skipped version {} (first observed {})",
+                    self.write_cursor, first.write_version
+                ));
+            }
+        } else if next != self.write_cursor {
+            return Err(format!(
+                "account write stream advanced from {} to {} without records in slot {}",
+                self.write_cursor,
+                next,
+                self.bank.slot()
+            ));
+        }
+        if let Some(last) = raw_writes.last() {
+            if last.write_version + 1 != next {
+                return Err(format!(
+                    "account write stream ended at {} but next version is {}",
+                    last.write_version, next
+                ));
+            }
+        }
+        self.write_cursor = next;
+        Ok(raw_writes
+            .into_iter()
+            .map(|write| normalize_account_write(write, signature.clone()))
+            .collect())
+    }
+
+    #[cfg(test)]
+    fn from_test_bank(bank: Bank, stable_cluster: bool, state_dir: TempDir) -> Self {
+        let cursor = bank.accounts().accounts_db.next_write_version();
+        let last_entry_hash = bank.last_blockhash();
+        Self {
+            bank: Arc::new(bank),
+            stable_cluster,
+            _source: InitializedSource::Genesis,
+            _state_dir: state_dir,
+            write_cursor: cursor,
+            next_entry_index: 0,
+            last_entry_hash,
+            tick_hash_count: 0,
+            leader_schedules: HashMap::new(),
+            poh_pool: build_poh_pool().unwrap(),
+            enforce_candidate_range: false,
+            last_accounts_clean_block_height: 0,
+            accounts_shrink_consumed_budget: 0,
+            execution_wave_metrics: ExecutionWaveMetrics::new(false),
+            diagnostic_singleton_execution: false,
+        }
+    }
+}
+
+fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    )) && slot != EPOCH227_SNAPSHOT_SLOT
+    {
+        return Err(format!(
+            "epoch227 requires exact snapshot {}",
+            EPOCH227_SNAPSHOT_SLOT
+        ));
+    }
+    if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
+    {
+        return Err("epoch223 fee/load diagnostic requires the exact cold snapshot".into());
+    }
+    if cfg!(feature = "epoch223-v1-6-25-qualification")
+        && ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot)
+    {
+        return Err("epoch223 qualification requires the exact cold or tail snapshot".into());
+    }
+    if cfg!(any(
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )) && slot != EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT
+    {
+        return Err(format!(
+            "epoch225 diagnostic requires exact snapshot {}",
+            EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT
+        ));
+    }
+    if cfg!(any(
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification"
+    )) && slot != EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT
+    {
+        return Err(format!(
+            "build-bound epoch-224 v1.6.25 diagnostic requires snapshot slot {}",
+            EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT
+        ));
+    }
+    if !(MIN_SUPPORTED_SNAPSHOT_SLOT..MAX_SUPPORTED_SLOT_EXCLUSIVE).contains(&slot) {
+        return Err(format!(
+            "Solana v1.6.25 candidate snapshot slot {} is outside {}..{}",
+            slot, MIN_SUPPORTED_SNAPSHOT_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE
+        ));
+    }
+    Ok(())
+}
+
+// Ignored real-snapshot tests must exercise the exact build's bootstrap, not
+// always the original epoch-215 fixture. This helper exists only in tests and
+// does not extend any runtime snapshot or entry envelope.
+#[cfg(test)]
+pub(crate) fn boundary_snapshot_test_slot() -> u64 {
+    if cfg!(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    )) {
+        EPOCH227_SNAPSHOT_SLOT
+    } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        epoch223_snapshot_test_anchor(
+            env::var("JETSTREAMER_V1_6_25_EPOCH223_TEST_ANCHOR")
+                .ok()
+                .as_deref(),
+        )
+        .expect("epoch223 integration-test anchor must be one exact admitted snapshot")
+    } else if cfg!(any(
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )) {
+        EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT
+    } else if cfg!(any(
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification"
+    )) {
+        EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT
+    } else {
+        MIN_SUPPORTED_SNAPSHOT_SLOT
+    }
+}
+
+#[cfg(test)]
+fn epoch223_snapshot_test_anchor(value: Option<&str>) -> Result<u64, String> {
+    let slot = match value {
+        None => EPOCH223_COLD_SNAPSHOT_SLOT,
+        Some(text) => text
+            .parse::<u64>()
+            .map_err(|_| "invalid epoch223 test anchor")?,
+    };
+    if ![EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT].contains(&slot) {
+        return Err("unsupported epoch223 test anchor".into());
+    }
+    if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") && slot != EPOCH223_COLD_SNAPSHOT_SLOT
+    {
+        return Err("fee/load diagnostic test anchor must be the cold snapshot".into());
+    }
+    Ok(slot)
+}
+
+fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
+    let min_supported_entry_slot = effective_min_supported_entry_slot();
+    let max_supported_slot_exclusive = effective_max_supported_entry_slot_exclusive();
+    if slot < min_supported_entry_slot || slot >= max_supported_slot_exclusive {
+        return Err(format!(
+            "Solana v1.6.25 candidate entry slot {} is outside {}..{}",
+            slot, min_supported_entry_slot, max_supported_slot_exclusive
+        ));
+    }
+    Ok(())
+}
+
+fn effective_min_supported_entry_slot() -> u64 {
+    if cfg!(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    )) {
+        EPOCH227_SNAPSHOT_SLOT + 1
+    } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        EPOCH223_COLD_SNAPSHOT_SLOT + 1
+    } else if cfg!(any(
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )) {
+        EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT + 1
+    } else if cfg!(feature = "epoch224-v1-6-25-qualification") {
+        EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT + 1
+    } else {
+        MIN_SUPPORTED_ENTRY_SLOT
+    }
+}
+
+fn effective_max_supported_entry_slot_exclusive() -> u64 {
+    if cfg!(feature = "epoch227-v1-6-25-diagnostic") {
+        EPOCH227_DIAGNOSTIC_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch227-v1-6-25-qualification") {
+        EPOCH227_QUALIFICATION_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+        EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
+        EPOCH223_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch225-v1-6-25-qualification") {
+        EPOCH225_QUALIFICATION_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch225-v1-6-25-diagnostic") {
+        EPOCH225_DIAGNOSTIC_END_EXCLUSIVE
+    } else if cfg!(feature = "epoch224-v1-6-25-qualification") {
+        EPOCH224_V1_6_25_QUALIFICATION_END_EXCLUSIVE
+    } else if cfg!(any(
+        feature = "diagnostic-singleton",
+        feature = "epoch224-v1-6-25-diagnostic"
+    )) {
+        DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE
+    } else {
+        MAX_SUPPORTED_SLOT_EXCLUSIVE
+    }
+}
+
+fn build_poh_pool() -> Result<ThreadPool, String> {
+    let thread_count = configured_poh_thread_count()?;
+    ThreadPoolBuilder::new()
+        .num_threads(thread_count)
+        .thread_name(|index| format!("historical-poh-{}", index))
+        .build()
+        .map_err(|error| format!("failed to create historical PoH thread pool: {}", error))
+}
+
+fn configured_poh_thread_count() -> Result<usize, String> {
+    let logical_cpus = cmp::max(1, num_cpus::get());
+    let maximum = cmp::min(logical_cpus, ABSOLUTE_MAX_POH_THREADS);
+    match env::var_os(POH_THREADS_ENV) {
+        Some(value) => {
+            let value = value.into_string().map_err(|_| {
+                format!(
+                    "{} must contain a positive decimal integer",
+                    POH_THREADS_ENV
+                )
+            })?;
+            parse_poh_thread_count(&value, maximum)
+        }
+        // This old workspace configures unusually large test-thread stacks.
+        // A single pool thread keeps unit tests bounded; production retains
+        // Solana's conservative half-of-logical-CPU default.
+        None if cfg!(test) => Ok(1),
+        None => Ok(cmp::max(1, cmp::min(get_thread_count(), maximum))),
+    }
+}
+
+fn parse_poh_thread_count(value: &str, maximum: usize) -> Result<usize, String> {
+    let configured = value.parse::<usize>().map_err(|_| {
+        format!(
+            "{} value {:?} is not a positive decimal integer",
+            POH_THREADS_ENV, value
+        )
+    })?;
+    if configured == 0 || configured > maximum {
+        return Err(format!(
+            "{} value {} is outside the supported range 1..={} (logical CPUs capped at {})",
+            POH_THREADS_ENV, configured, maximum, ABSOLUTE_MAX_POH_THREADS
+        ));
+    }
+    Ok(configured)
+}
+
+struct PreparedEntry {
+    request: EntryRequest,
+    hash: Hash,
+    transactions: Vec<Transaction>,
+}
+
+fn prepare_entry(request: EntryRequest) -> Result<PreparedEntry, String> {
+    if request.hash.len() != 32 {
+        return Err(format!(
+            "entry hash has {} bytes, expected 32",
+            request.hash.len()
+        ));
+    }
+    let hash = Hash::new(&request.hash);
+    let transactions: Vec<Transaction> = request
+        .transactions
+        .iter()
+        .enumerate()
+        .map(|(index, wire)| {
+            bincode::deserialize(wire)
+                .map_err(|error| format!("failed to decode transaction {}: {}", index, error))
+        })
+        .collect::<Result<_, _>>()?;
+    for (index, transaction) in transactions.iter().enumerate() {
+        validate_transaction_structure(transaction)
+            .map_err(|message| format!("failed to decode transaction {}: {}", index, message))?;
+    }
+    Ok(PreparedEntry {
+        request,
+        hash,
+        transactions,
+    })
+}
+
+fn validate_transaction_structure(transaction: &Transaction) -> Result<(), String> {
+    let header = &transaction.message.header;
+    let required = header.num_required_signatures as usize;
+    let readonly_signed = header.num_readonly_signed_accounts as usize;
+    let key_count = transaction.message.account_keys.len();
+    if required > key_count {
+        return Err(format!(
+            "required signature count {} exceeds account-key count {}",
+            required, key_count
+        ));
+    }
+    if transaction.signatures.len() != required {
+        return Err(format!(
+            "signature count {} does not match required count {}",
+            transaction.signatures.len(),
+            required
+        ));
+    }
+    if readonly_signed > required {
+        return Err(format!(
+            "readonly signed count {} exceeds signed-key count {}",
+            readonly_signed, required
+        ));
+    }
+    let unsigned = key_count - required;
+    let readonly_unsigned = header.num_readonly_unsigned_accounts as usize;
+    if readonly_unsigned > unsigned {
+        return Err(format!(
+            "readonly unsigned count {} exceeds unsigned-key count {}",
+            readonly_unsigned, unsigned
+        ));
+    }
+    for (instruction_index, instruction) in transaction.message.instructions.iter().enumerate() {
+        if instruction.program_id_index as usize >= key_count {
+            return Err(format!(
+                "instruction {} program index {} exceeds account-key count {}",
+                instruction_index, instruction.program_id_index, key_count
+            ));
+        }
+        for account_index in &instruction.accounts {
+            if *account_index as usize >= key_count {
+                return Err(format!(
+                    "instruction {} account index {} exceeds account-key count {}",
+                    instruction_index, account_index, key_count
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+struct EntryValidation {
+    hash: Hash,
+    next_tick_hash_count: u64,
+}
+
+/// Exact equivalent of v1.6.25 ledger::entry::next_hash. Pulling in
+/// the full ledger crate would also pull RocksDB into the isolated worker.
+/// The fixed-width backend bypasses generic digest buffering and dispatches
+/// to SHA-NI at runtime while retaining a portable software fallback.
+fn next_entry_hash(start_hash: &Hash, num_hashes: u64, transactions: &[Transaction]) -> Hash {
+    let mut start = [0u8; 32];
+    start.copy_from_slice(start_hash.as_ref());
+    let transaction_mixin = transaction_mixin(transactions);
+    Hash::new(&poh_backend::next_hash(
+        start,
+        num_hashes,
+        transaction_mixin,
+    ))
+}
+
+fn next_entry_hash_pair(
+    start_hashes: [&Hash; 2],
+    num_hashes: [u64; 2],
+    transactions: [&[Transaction]; 2],
+) -> [Hash; 2] {
+    let mut starts = [[0u8; 32]; 2];
+    starts[0].copy_from_slice(start_hashes[0].as_ref());
+    starts[1].copy_from_slice(start_hashes[1].as_ref());
+    let hashes = poh_backend::next_hash_pair(
+        starts,
+        num_hashes,
+        [
+            transaction_mixin(transactions[0]),
+            transaction_mixin(transactions[1]),
+        ],
+    );
+    [Hash::new(&hashes[0]), Hash::new(&hashes[1])]
+}
+
+fn transaction_mixin(transactions: &[Transaction]) -> Option<poh_backend::PohHash> {
+    if transactions.is_empty() {
+        return None;
+    }
+    let transaction_hash = hash_transactions(transactions);
+    let mut mixin = [0u8; 32];
+    mixin.copy_from_slice(transaction_hash.as_ref());
+    Some(mixin)
+}
+
+fn hash_transactions(transactions: &[Transaction]) -> Hash {
+    let signatures: Vec<_> = transactions
+        .iter()
+        .flat_map(|transaction| transaction.signatures.iter())
+        .collect();
+    MerkleTree::new(&signatures)
+        .get_root()
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[derive(Clone, Copy)]
+enum MainnetNativeProgram {
+    Config = 0,
+    Stake = 1,
+    System = 2,
+    Vote = 3,
+}
+
+fn mainnet_native_program(name: &str, program_id: &Pubkey) -> Option<MainnetNativeProgram> {
+    if name == "solana_config_program" && *program_id == solana_config_program::id() {
+        Some(MainnetNativeProgram::Config)
+    } else if name == "solana_stake_program" && *program_id == solana_stake_program::id() {
+        Some(MainnetNativeProgram::Stake)
+    } else if name == "solana_system_program" && *program_id == system_program::id() {
+        Some(MainnetNativeProgram::System)
+    } else if name == "solana_vote_program" && *program_id == solana_vote_program::id() {
+        Some(MainnetNativeProgram::Vote)
+    } else {
+        None
+    }
+}
+
+fn validate_mainnet_genesis_programs(genesis: &GenesisConfig) -> Result<(), String> {
+    if genesis.cluster_type != ClusterType::MainnetBeta {
+        return Err(format!(
+            "mainnet historical runtime requires MainnetBeta cluster type, got {:?}",
+            genesis.cluster_type
+        ));
+    }
+
+    let mut seen = [false; 4];
+    for (name, program_id) in &genesis.native_instruction_processors {
+        let program = mainnet_native_program(name, program_id).ok_or_else(|| {
+            format!(
+                "unsupported mainnet native program {} ({:?})",
+                program_id, name
+            )
+        })?;
+        let index = program as usize;
+        if seen[index] {
+            return Err(format!(
+                "duplicate mainnet native program {} ({:?})",
+                program_id, name
+            ));
+        }
+        seen[index] = true;
+    }
+
+    let expected = [
+        "solana_config_program",
+        "solana_stake_program",
+        "solana_system_program",
+        "solana_vote_program",
+    ];
+    let missing: Vec<_> = expected
+        .iter()
+        .zip(seen.iter())
+        .filter_map(|(name, present)| if *present { None } else { Some(*name) })
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "mainnet genesis is missing native program(s): {}",
+            missing.join(", ")
+        ));
+    }
+    Ok(())
+}
+
+/// Exact additional loader table passed by the v1.6.25 ledger restore path on
+/// mainnet. Statically linked entrypoints keep replay independent of mutable
+/// deployment-adjacent shared objects.
+pub(crate) fn mainnet_additional_builtins() -> Builtins {
+    Builtins {
+        genesis_builtins: vec![
+            Builtin::new(
+                "solana_bpf_loader_deprecated_program",
+                solana_sdk::bpf_loader_deprecated::id(),
+                solana_bpf_loader_program::process_instruction,
+            ),
+            Builtin::new(
+                "solana_bpf_loader_program",
+                solana_sdk::bpf_loader::id(),
+                solana_bpf_loader_program::process_instruction,
+            ),
+        ],
+        feature_builtins: vec![(
+            Builtin::new(
+                "solana_bpf_loader_upgradeable_program",
+                solana_sdk::bpf_loader_upgradeable::id(),
+                solana_bpf_loader_program::process_instruction,
+            ),
+            feature_set::bpf_loader_upgradeable_program::id(),
+            ActivationType::NewProgram,
+        )],
+    }
+}
+
+fn processing_max_age(stable_cluster: bool, epoch: u64) -> usize {
+    if stable_cluster && epoch >= MAX_AGE_CORRECTION_EPOCH {
+        MAX_PROCESSING_AGE
+    } else {
+        MAX_RECENT_BLOCKHASHES
+    }
+}
+
+fn parse_diagnostic_singleton_execution(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        None => Ok(false),
+        Some("1") => Ok(true),
+        Some(other) => Err(format!(
+            "{} must be exactly 1 when set, got {:?}",
+            DIAGNOSTIC_SINGLETON_ENV, other
+        )),
+    }
+}
+
+fn configured_diagnostic_singleton_execution() -> Result<bool, String> {
+    match env::var(DIAGNOSTIC_SINGLETON_ENV) {
+        Ok(value) => parse_diagnostic_singleton_execution(Some(&value)),
+        Err(env::VarError::NotPresent) => parse_diagnostic_singleton_execution(None),
+        Err(env::VarError::NotUnicode(_)) => Err(format!(
+            "{} contains non-Unicode data",
+            DIAGNOSTIC_SINGLETON_ENV
+        )),
+    }
+}
+
+fn diagnostic_singleton_execution_enabled(environment_override: bool) -> bool {
+    cfg!(feature = "diagnostic-singleton") || environment_override
+}
+
+fn singleton_transaction_waves(transaction_count: usize) -> Vec<Range<usize>> {
+    (0..transaction_count)
+        .map(|index| index..index + 1)
+        .collect()
+}
+
+fn selected_transaction_waves(
+    bank: &Bank,
+    transactions: &[Transaction],
+    diagnostic_singleton_execution: bool,
+) -> Vec<Range<usize>> {
+    if diagnostic_singleton_execution {
+        singleton_transaction_waves(transactions.len())
+    } else {
+        transaction_waves(bank, transactions)
+    }
+}
+
+/// Partition transactions into the largest consecutive prefixes accepted by
+/// the Bank's own account-lock implementation. Probing acquires no lasting
+/// locks and mutates no Bank state; dropping each batch before execution makes
+/// the first conflicting transaction the start of the next canonical wave.
+fn transaction_waves(bank: &Bank, transactions: &[Transaction]) -> Vec<Range<usize>> {
+    let mut waves = Vec::new();
+    let mut start = 0;
+    while start < transactions.len() {
+        let probe = bank.prepare_batch(transactions[start..].iter());
+        let conflict = probe.lock_results().iter().position(Result::is_err);
+        drop(probe);
+        let wave_len = conflict.unwrap_or(transactions.len() - start).max(1);
+        let end = start + wave_len;
+        waves.push(start..end);
+        start = end;
+    }
+    waves
+}
+
+fn writable_key_attribution(
+    transactions: &[Transaction],
+) -> Result<HashMap<Vec<u8>, Option<Vec<u8>>>, String> {
+    let mut by_key = HashMap::new();
+    for (transaction_index, transaction) in transactions.iter().enumerate() {
+        let signature = transaction
+            .signatures
+            .get(0)
+            .map(|signature| signature.as_ref().to_vec());
+        for (index, pubkey) in transaction.message.account_keys.iter().enumerate() {
+            if transaction.message.is_writable(index) {
+                let key = pubkey.as_ref().to_vec();
+                match by_key.get(&key) {
+                    Some((existing_index, _)) if *existing_index != transaction_index => {
+                        return Err(format!(
+                            "multiple transactions in one execution wave write account {}",
+                            pubkey
+                        ));
+                    }
+                    Some(_) => {}
+                    None => {
+                        by_key.insert(key, (transaction_index, signature.clone()));
+                    }
+                }
+            }
+        }
+    }
+    Ok(by_key
+        .into_iter()
+        .map(|(key, (_transaction_index, signature))| (key, signature))
+        .collect())
+}
+
+fn normalize_account_write(write: OwnedAccountWrite, signature: Option<Vec<u8>>) -> AccountWrite {
+    AccountWrite {
+        slot: write.slot,
+        write_version: write.write_version,
+        transaction_signature: signature,
+        pubkey: write.pubkey.as_ref().to_vec(),
+        lamports: write.account.lamports,
+        owner: write.account.owner.as_ref().to_vec(),
+        executable: write.account.executable,
+        rent_epoch: write.account.rent_epoch,
+        data: write.account.data,
+        stored_hash: write.stored_hash.as_ref().to_vec(),
+    }
+}
+
+fn normalize_transaction_error(error: TransactionError) -> WireTransactionError {
+    match error {
+        TransactionError::AccountInUse => WireTransactionError::AccountInUse,
+        TransactionError::AccountLoadedTwice => WireTransactionError::AccountLoadedTwice,
+        TransactionError::AccountNotFound => WireTransactionError::AccountNotFound,
+        TransactionError::ProgramAccountNotFound => WireTransactionError::ProgramAccountNotFound,
+        TransactionError::InsufficientFundsForFee => WireTransactionError::InsufficientFundsForFee,
+        TransactionError::InvalidAccountForFee => WireTransactionError::InvalidAccountForFee,
+        // v1.5 renamed this status without changing its wire discriminant or
+        // meaning. Keep the shared historical spelling for existing readers.
+        TransactionError::AlreadyProcessed => WireTransactionError::DuplicateSignature,
+        TransactionError::BlockhashNotFound => WireTransactionError::BlockhashNotFound,
+        TransactionError::InstructionError(index, error) => {
+            WireTransactionError::InstructionError {
+                instruction_index: index,
+                error: normalize_instruction_error(error),
+            }
+        }
+        TransactionError::CallChainTooDeep => WireTransactionError::CallChainTooDeep,
+        TransactionError::MissingSignatureForFee => WireTransactionError::MissingSignatureForFee,
+        TransactionError::InvalidAccountIndex => WireTransactionError::InvalidAccountIndex,
+        TransactionError::SignatureFailure => WireTransactionError::SignatureFailure,
+        TransactionError::InvalidProgramForExecution => {
+            WireTransactionError::InvalidProgramForExecution
+        }
+        TransactionError::SanitizeFailure => WireTransactionError::SanitizeFailure,
+        TransactionError::ClusterMaintenance => WireTransactionError::ClusterMaintenance,
+        TransactionError::AccountBorrowOutstanding => {
+            WireTransactionError::AccountBorrowOutstanding
+        }
+        TransactionError::WouldExceedMaxBlockCostLimit => {
+            WireTransactionError::WouldExceedMaxBlockCostLimit
+        }
+        TransactionError::UnsupportedVersion => WireTransactionError::UnsupportedVersion,
+        TransactionError::InvalidWritableAccount => WireTransactionError::InvalidWritableAccount,
+    }
+}
+
+fn normalize_instruction_error(error: InstructionError) -> WireInstructionError {
+    match error {
+        InstructionError::GenericError => WireInstructionError::GenericError,
+        InstructionError::InvalidArgument => WireInstructionError::InvalidArgument,
+        InstructionError::InvalidInstructionData => WireInstructionError::InvalidInstructionData,
+        InstructionError::InvalidAccountData => WireInstructionError::InvalidAccountData,
+        InstructionError::AccountDataTooSmall => WireInstructionError::AccountDataTooSmall,
+        InstructionError::InsufficientFunds => WireInstructionError::InsufficientFunds,
+        InstructionError::IncorrectProgramId => WireInstructionError::IncorrectProgramId,
+        InstructionError::MissingRequiredSignature => {
+            WireInstructionError::MissingRequiredSignature
+        }
+        InstructionError::AccountAlreadyInitialized => {
+            WireInstructionError::AccountAlreadyInitialized
+        }
+        InstructionError::UninitializedAccount => WireInstructionError::UninitializedAccount,
+        InstructionError::UnbalancedInstruction => WireInstructionError::UnbalancedInstruction,
+        InstructionError::ModifiedProgramId => WireInstructionError::ModifiedProgramId,
+        InstructionError::ExternalAccountLamportSpend => {
+            WireInstructionError::ExternalAccountLamportSpend
+        }
+        InstructionError::ExternalAccountDataModified => {
+            WireInstructionError::ExternalAccountDataModified
+        }
+        InstructionError::ReadonlyLamportChange => WireInstructionError::ReadonlyLamportChange,
+        InstructionError::ReadonlyDataModified => WireInstructionError::ReadonlyDataModified,
+        InstructionError::DuplicateAccountIndex => WireInstructionError::DuplicateAccountIndex,
+        InstructionError::ExecutableModified => WireInstructionError::ExecutableModified,
+        InstructionError::RentEpochModified => WireInstructionError::RentEpochModified,
+        InstructionError::NotEnoughAccountKeys => WireInstructionError::NotEnoughAccountKeys,
+        InstructionError::AccountDataSizeChanged => WireInstructionError::AccountDataSizeChanged,
+        InstructionError::AccountNotExecutable => WireInstructionError::AccountNotExecutable,
+        InstructionError::AccountBorrowFailed => WireInstructionError::AccountBorrowFailed,
+        InstructionError::AccountBorrowOutstanding => {
+            WireInstructionError::AccountBorrowOutstanding
+        }
+        InstructionError::DuplicateAccountOutOfSync => {
+            WireInstructionError::DuplicateAccountOutOfSync
+        }
+        InstructionError::Custom(code) => WireInstructionError::Custom(code),
+        InstructionError::InvalidError => WireInstructionError::InvalidError,
+        InstructionError::ExecutableDataModified => WireInstructionError::ExecutableDataModified,
+        InstructionError::ExecutableLamportChange => WireInstructionError::ExecutableLamportChange,
+        InstructionError::ExecutableAccountNotRentExempt => {
+            WireInstructionError::ExecutableAccountNotRentExempt
+        }
+        InstructionError::UnsupportedProgramId => WireInstructionError::UnsupportedProgramId,
+        InstructionError::CallDepth => WireInstructionError::CallDepth,
+        InstructionError::MissingAccount => WireInstructionError::MissingAccount,
+        InstructionError::ReentrancyNotAllowed => WireInstructionError::ReentrancyNotAllowed,
+        InstructionError::MaxSeedLengthExceeded => WireInstructionError::MaxSeedLengthExceeded,
+        InstructionError::InvalidSeeds => WireInstructionError::InvalidSeeds,
+        InstructionError::InvalidRealloc => WireInstructionError::InvalidRealloc,
+        InstructionError::ComputationalBudgetExceeded => {
+            WireInstructionError::ComputationalBudgetExceeded
+        }
+        InstructionError::PrivilegeEscalation => WireInstructionError::PrivilegeEscalation,
+        InstructionError::ProgramEnvironmentSetupFailure => {
+            WireInstructionError::ProgramEnvironmentSetupFailure
+        }
+        InstructionError::ProgramFailedToComplete => WireInstructionError::ProgramFailedToComplete,
+        InstructionError::ProgramFailedToCompile => WireInstructionError::ProgramFailedToCompile,
+        InstructionError::Immutable => WireInstructionError::Immutable,
+        InstructionError::IncorrectAuthority => WireInstructionError::IncorrectAuthority,
+        InstructionError::BorshIoError(_) => WireInstructionError::BorshIoError,
+        InstructionError::AccountNotRentExempt => WireInstructionError::AccountNotRentExempt,
+        InstructionError::InvalidAccountOwner => WireInstructionError::InvalidAccountOwner,
+        InstructionError::ArithmeticOverflow => WireInstructionError::ArithmeticOverflow,
+        InstructionError::UnsupportedSysvar => WireInstructionError::UnsupportedSysvar,
+        InstructionError::IllegalOwner => WireInstructionError::IllegalOwner,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn epoch223_test_anchor_is_explicit_and_strict() {
+        assert_eq!(epoch223_snapshot_test_anchor(None).unwrap(), 96_335_538);
+        if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+            assert!(epoch223_snapshot_test_anchor(Some("96767522")).is_err());
+        } else {
+            assert_eq!(
+                epoch223_snapshot_test_anchor(Some("96767522")).unwrap(),
+                96_767_522
+            );
+        }
+        for value in &["", "96767521", "96767523", "97199617", "abc"] {
+            assert!(epoch223_snapshot_test_anchor(Some(value)).is_err());
+        }
+    }
+
+    #[cfg(feature = "epoch223-v1-6-25-qualification")]
+    #[test]
+    fn epoch223_restores_both_observed_restart_markers_exactly_once() {
+        let mut forks = HardForks::default();
+        forks.register(13_334_463);
+        forks.register(53_180_900);
+        restore_mainnet_hard_fork_markers(96_335_538, &mut forks).unwrap();
+        restore_mainnet_hard_fork_markers(96_335_538, &mut forks).unwrap();
+        assert_eq!(
+            forks.iter().copied().collect::<Vec<_>>(),
+            vec![
+                (13_334_463, 1),
+                (53_180_900, 1),
+                (96_542_804, 1),
+                (96_542_805, 1),
+            ]
+        );
+        assert_eq!(forks.get_hash_data(96_542_803, 96_542_802), None);
+        assert_eq!(
+            forks.get_hash_data(96_542_804, 96_542_803),
+            Some(1u64.to_le_bytes())
+        );
+        assert_eq!(
+            forks.get_hash_data(96_542_805, 96_542_804),
+            Some(1u64.to_le_bytes())
+        );
+        assert_eq!(
+            forks.get_hash_data(96_542_805, 96_542_803),
+            Some(2u64.to_le_bytes())
+        );
+        assert_eq!(forks.get_hash_data(96_542_806, 96_542_805), None);
+        let before = forks.clone();
+        restore_mainnet_hard_fork_markers(97_199_617, &mut forks).unwrap();
+        assert_eq!(forks, before);
+    }
+
+    #[cfg(feature = "epoch223-v1-6-25-qualification")]
+    #[test]
+    fn epoch223_rejects_bad_snapshot_markers_without_partial_mutation() {
+        for missing in &MAINNET_HARD_FORK_SLOTS {
+            let mut forks = HardForks::default();
+            for &slot in &MAINNET_HARD_FORK_SLOTS {
+                if slot != *missing {
+                    forks.register(slot);
+                }
+            }
+            let before = forks.clone();
+            assert!(restore_mainnet_hard_fork_markers(97_199_617, &mut forks)
+                .unwrap_err()
+                .contains("missing applied"));
+            assert_eq!(forks, before);
+        }
+        for duplicate in &MAINNET_HARD_FORK_SLOTS {
+            let mut forks = HardForks::default();
+            for &slot in &MAINNET_HARD_FORK_SLOTS {
+                forks.register(slot);
+            }
+            forks.register(*duplicate);
+            let before = forks.clone();
+            assert!(restore_mainnet_hard_fork_markers(96_335_538, &mut forks)
+                .unwrap_err()
+                .contains("count 2"));
+            assert_eq!(forks, before);
+        }
+        let mut forks = HardForks::default();
+        forks.register(42);
+        let before = forks.clone();
+        assert!(restore_mainnet_hard_fork_markers(96_335_538, &mut forks)
+            .unwrap_err()
+            .contains("unsupported"));
+        assert_eq!(forks, before);
+        // At the first boundary its applied marker is mandatory, whereas the
+        // following boundary may still be scheduled from this snapshot.
+        let mut forks = HardForks::default();
+        for &slot in &MAINNET_HARD_FORK_SLOTS[..3] {
+            forks.register(slot);
+        }
+        restore_mainnet_hard_fork_markers(96_542_804, &mut forks).unwrap();
+        assert_eq!(forks.iter().count(), 4);
+    }
+
+    #[test]
+    fn epoch227_wire_fixture_demotes_called_program_without_changing_wire_header() {
+        let transaction: Transaction = bincode::deserialize(include_bytes!(
+            "../../fixtures/epoch227-writable-token-program.bin"
+        ))
+        .unwrap();
+        assert_eq!(transaction.signatures[0].to_string(),
+            "5SZbyiFj1XnvQbE7AGdn8DK8JoWnVzsLzXP34gvRP4FUPvcYEKopyt3TdScfqCKN22BWDZwCXziRhTmYQvH5rpSU");
+        let message = &transaction.message;
+        assert_eq!(message.account_keys.len(), 15);
+        assert_eq!(message.header.num_readonly_unsigned_accounts, 4);
+        let key = message.account_keys[8];
+        assert_eq!(
+            key.to_string(),
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        );
+        assert!(
+            8 < message.account_keys.len() - message.header.num_readonly_unsigned_accounts as usize
+        );
+        assert!(message.is_key_called_as_program(8));
+        assert!(message.is_key_passed_to_program(8));
+        assert!(message.is_non_loader_key(&key, 8));
+        assert!(!message.is_writable(8));
+        let attribution = writable_key_attribution(&[transaction]).unwrap();
+        assert!(!attribution.contains_key(key.as_ref()));
+    }
+
+    #[test]
+    fn epoch225_wire_fixture_called_program_writability() {
+        let wire = bs58::decode(
+            include_str!("../../../fixtures/epoch225-writable-token-program.base58").trim(),
+        )
+        .into_vec()
+        .unwrap();
+        let transaction: Transaction = bincode::deserialize(&wire).unwrap();
+        assert_eq!(transaction.signatures[0].to_string(), "4tURm7ubHwvAth4yE8T87NRXh84akr9AhbDYWckdMsgoQVn4TQiBkkLvjBfcM78PVWzn7R4cboadPBgBduENRY7d");
+        let key = transaction.message.account_keys[6];
+        assert_eq!(
+            key.to_string(),
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        );
+        assert!(transaction
+            .message
+            .instructions
+            .iter()
+            .any(|i| i.program_id_index == 6));
+        assert!(transaction.message.is_key_passed_to_program(6));
+        assert!(transaction.message.is_non_loader_key(&key, 6));
+        assert_eq!(transaction.message.is_writable(6), false);
+        let attribution = writable_key_attribution(&[transaction]).unwrap();
+        assert_eq!(attribution.contains_key(key.as_ref()), false);
+    }
+
+    use solana_runtime::{
+        accounts_index::AccountSecondaryIndexes, genesis_utils::create_genesis_config_with_leader,
+    };
+    use solana_sdk::{
+        hash::hashv,
+        instruction::{AccountMeta, CompiledInstruction, Instruction},
+        message::{Message, MessageHeader},
+        signature::{Keypair, Signer},
+        system_instruction, system_program, system_transaction, sysvar,
+    };
+    use solana_vote_program::vote_state::{VoteInit, VoteState};
+
+    fn set_exact_mainnet_native_programs(genesis: &mut GenesisConfig) {
+        genesis.cluster_type = ClusterType::MainnetBeta;
+        genesis.native_instruction_processors = vec![
+            (
+                "solana_config_program".to_string(),
+                solana_config_program::id(),
+            ),
+            (
+                "solana_stake_program".to_string(),
+                solana_stake_program::id(),
+            ),
+            ("solana_system_program".to_string(), system_program::id()),
+            ("solana_vote_program".to_string(), solana_vote_program::id()),
+        ];
+    }
+
+    fn test_state(ticks_per_slot: u64, hashes_per_tick: Option<u64>) -> (RuntimeState, Keypair) {
+        let leader = Pubkey::new_from_array([7; 32]);
+        let mut genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
+        genesis.genesis_config.ticks_per_slot = ticks_per_slot;
+        genesis.genesis_config.poh_config.hashes_per_tick = hashes_per_tick;
+        let state_dir = snapshot::private_state_dir(None).unwrap();
+        let account_paths = snapshot::private_account_paths(&state_dir).unwrap();
+        let bank = Bank::new_with_paths(
+            &genesis.genesis_config,
+            account_paths,
+            &[],
+            None,
+            None,
+            AccountSecondaryIndexes::default(),
+            false,
+        );
+        (
+            RuntimeState::from_test_bank(bank, false, state_dir),
+            genesis.mint_keypair,
+        )
+    }
+
+    // An explicit, isolated portability probe. This exercises the pinned native
+    // serializer against our hardened loader; it does not enable ExportSnapshot
+    // on the worker protocol or qualify .jet continuation / mainnet recovery.
+    #[test]
+    #[ignore]
+    fn isolated_native_checkpoint_archive_restore_probe() {
+        use solana_runtime::{bank_forks::ArchiveFormat, snapshot_utils};
+        const CHILD: &str = "JETSTREAMER_ISOLATED_CHECKPOINT_PROBE_CHILD";
+        if let Some(path) = std::env::var_os(CHILD) {
+            let path = std::path::PathBuf::from(path);
+            let (genesis, archive, entry, tick): (
+                GenesisConfig,
+                std::path::PathBuf,
+                EntryRequest,
+                EntryRequest,
+            ) = bincode::deserialize(&std::fs::read(path.join("input.bin")).unwrap()).unwrap();
+            let directory = snapshot::private_state_dir(None).unwrap();
+            let loaded = snapshot::load_archive(
+                &archive,
+                &directory,
+                &genesis,
+                &Builtins {
+                    genesis_builtins: Vec::new(),
+                    feature_builtins: Vec::new(),
+                },
+            )
+            .unwrap();
+            let mut state = RuntimeState::from_test_bank(loaded.bank, false, directory);
+            let processed = state.process_entry(entry).unwrap();
+            let ticked = state.process_entry(tick).unwrap();
+            let checkpoint = state.freeze_checkpoint(2).unwrap();
+            std::fs::write(
+                path.join("output.bin"),
+                bincode::serialize(&(std::process::id(), processed, ticked, checkpoint)).unwrap(),
+            )
+            .unwrap();
+            return;
+        }
+        let leader = Pubkey::new_from_array([7; 32]);
+        let mut genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
+        genesis.genesis_config.ticks_per_slot = 1;
+        genesis.genesis_config.poh_config.hashes_per_tick = None;
+        let source_dir = snapshot::private_state_dir(None).unwrap();
+        let original_source_path = source_dir.path().to_path_buf();
+        let bank0 = Bank::new_with_paths(
+            &genesis.genesis_config,
+            snapshot::private_account_paths(&source_dir).unwrap(),
+            &[],
+            None,
+            None,
+            AccountSecondaryIndexes::default(),
+            false,
+        );
+        bank0.register_tick(&Hash::new_unique());
+        bank0.freeze();
+        let bank = Bank::new_from_parent(&Arc::new(bank0), &leader, 1);
+        bank.register_tick(&Hash::new_unique());
+        bank.freeze();
+        bank.squash();
+        bank.force_flush_accounts_cache();
+        bank.clean_accounts(true);
+        bank.update_accounts_hash();
+        bank.rehash();
+        let expected_bank_hash = bank.hash();
+        let expected_accounts_hash = bank.get_accounts_hash();
+        let expected_cursor = bank.accounts().accounts_db.next_write_version();
+        let staging = tempfile::tempdir().unwrap();
+        let archives = tempfile::tempdir().unwrap();
+        let archive = snapshot_utils::bank_to_snapshot_archive(
+            staging.path(),
+            &bank,
+            None,
+            archives.path(),
+            ArchiveFormat::TarBzip2,
+            None,
+        )
+        .unwrap();
+        assert_eq!(bank.hash(), expected_bank_hash);
+        assert_eq!(bank.get_accounts_hash(), expected_accounts_hash);
+        assert_eq!(
+            bank.accounts().accounts_db.next_write_version(),
+            expected_cursor
+        );
+        let restored_dir = snapshot::private_state_dir(None).unwrap();
+        let loaded = snapshot::load_archive(
+            &archive,
+            &restored_dir,
+            &genesis.genesis_config,
+            &Builtins {
+                genesis_builtins: Vec::new(),
+                feature_builtins: Vec::new(),
+            },
+        )
+        .unwrap();
+        assert_eq!(loaded.bank.slot(), bank.slot());
+        assert_eq!(loaded.bank.hash(), expected_bank_hash);
+        assert_eq!(loaded.bank.get_accounts_hash(), expected_accounts_hash);
+        assert_eq!(loaded.bank.capitalization(), bank.capitalization());
+        assert_eq!(loaded.bank.transaction_count(), bank.transaction_count());
+        assert_eq!(loaded.bank.last_blockhash(), bank.last_blockhash());
+        assert_eq!(
+            loaded.bank.accounts().accounts_db.next_write_version(),
+            expected_cursor
+        );
+        assert!(loaded.bank.verify_snapshot_bank());
+
+        // Compare the complete wire writes/outcomes/cursors, not merely the
+        // final balance: bank restoration can succeed while output attribution
+        // or write versions diverge after restart.
+        let mut uninterrupted = RuntimeState::from_test_bank(bank, false, source_dir);
+        let mut restored = RuntimeState::from_test_bank(loaded.bank, false, restored_dir);
+        let recipient = Keypair::new();
+        let transaction = system_transaction::transfer(
+            &genesis.mint_keypair,
+            &recipient.pubkey(),
+            123,
+            uninterrupted.bank.last_blockhash(),
+        );
+        let entry = request_for(&uninterrupted, 2, 0, 1, &[transaction]);
+        let restart_entry = entry.clone();
+        let expected = uninterrupted.process_entry(entry.clone()).unwrap();
+        let actual = restored.process_entry(entry).unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.outcomes[0].error, None);
+        let tick = request_for(&uninterrupted, 2, 1, 1, &[]);
+        let expected_tick = uninterrupted.process_entry(tick.clone()).unwrap();
+        assert_eq!(restored.process_entry(tick.clone()).unwrap(), expected_tick);
+        let expected_checkpoint = uninterrupted.freeze_checkpoint(2).unwrap();
+        assert_eq!(restored.freeze_checkpoint(2).unwrap(), expected_checkpoint);
+        assert_eq!(restored.bank.get_balance(&recipient.pubkey()), 123);
+
+        drop(uninterrupted);
+        drop(restored);
+        assert!(
+            !original_source_path.exists(),
+            "synthetic original storage still exists"
+        );
+
+        let fixture = tempfile::tempdir().unwrap();
+        std::fs::write(
+            fixture.path().join("input.bin"),
+            bincode::serialize(&(genesis.genesis_config, archive, restart_entry, tick)).unwrap(),
+        )
+        .unwrap();
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(&[
+                "--ignored",
+                "--exact",
+                "runtime::tests::isolated_native_checkpoint_archive_restore_probe",
+                "--nocapture",
+            ])
+            .env(CHILD, fixture.path())
+            .output()
+            .unwrap();
+        assert!(
+            child.status.success(),
+            "fresh-process restore failed: {} {}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr)
+        );
+        let (pid, processed, ticked, checkpoint): (
+            u32,
+            EntryProcessed,
+            EntryProcessed,
+            Checkpoint,
+        ) = bincode::deserialize(&std::fs::read(fixture.path().join("output.bin")).unwrap())
+            .unwrap();
+        assert_ne!(pid, std::process::id());
+        assert_eq!(processed, expected);
+        assert_eq!(ticked, expected_tick);
+        assert_eq!(checkpoint, expected_checkpoint);
+    }
+
+    #[test]
+    fn poh_thread_override_is_positive_and_bounded() {
+        assert_eq!(parse_poh_thread_count("1", 64).unwrap(), 1);
+        assert_eq!(parse_poh_thread_count("64", 64).unwrap(), 64);
+        assert!(parse_poh_thread_count("0", 64).is_err());
+        assert!(parse_poh_thread_count("65", 64).is_err());
+        assert!(parse_poh_thread_count("not-a-number", 64).is_err());
+    }
+
+    #[test]
+    fn execution_wave_metrics_count_stable_size_bins() {
+        let mut metrics = ExecutionWaveMetrics::new(true);
+        metrics.observe(&[0..1, 1..3, 3..6, 6..10, 10..15, 15..21, 21..29, 29..37]);
+        assert_eq!(metrics.transactions, 37);
+        assert_eq!(metrics.waves, 8);
+        assert_eq!(metrics.singleton_waves, 1);
+        assert_eq!(metrics.maximum_wave_size, 8);
+        assert_eq!(metrics.size_histogram, [1, 1, 1, 1, 1, 1, 2]);
+    }
+
+    #[test]
+    fn diagnostic_singleton_override_is_exact_and_fail_closed() {
+        assert!(!parse_diagnostic_singleton_execution(None).unwrap());
+        assert!(parse_diagnostic_singleton_execution(Some("1")).unwrap());
+        assert!(parse_diagnostic_singleton_execution(Some("0")).is_err());
+        assert!(parse_diagnostic_singleton_execution(Some("true")).is_err());
+        assert!(parse_diagnostic_singleton_execution(Some("")).is_err());
+    }
+
+    #[test]
+    fn diagnostic_singleton_build_mode_is_explicit() {
+        assert_eq!(
+            diagnostic_singleton_execution_enabled(false),
+            cfg!(feature = "diagnostic-singleton")
+        );
+        assert!(diagnostic_singleton_execution_enabled(true));
+    }
+
+    #[test]
+    fn diagnostic_singleton_waves_preserve_wire_order() {
+        assert!(singleton_transaction_waves(0).is_empty());
+        assert_eq!(singleton_transaction_waves(1), vec![0..1]);
+        assert_eq!(singleton_transaction_waves(4), vec![0..1, 1..2, 2..3, 3..4]);
+    }
+
+    #[test]
+    fn diagnostic_singleton_flag_cannot_silently_change_ordinary_execution() {
+        let (state, mint_keypair) = test_state(2, Some(4));
+        let first_recipient = Keypair::new();
+        let second_payer = Keypair::new();
+        let second_recipient = Keypair::new();
+        let recent_blockhash = state.bank.last_blockhash();
+        let transactions = vec![
+            system_transaction::transfer(
+                &mint_keypair,
+                &first_recipient.pubkey(),
+                1,
+                recent_blockhash,
+            ),
+            system_transaction::transfer(
+                &second_payer,
+                &second_recipient.pubkey(),
+                1,
+                recent_blockhash,
+            ),
+        ];
+
+        assert_eq!(
+            selected_transaction_waves(&state.bank, &transactions, false),
+            vec![0..2]
+        );
+        assert_eq!(
+            selected_transaction_waves(&state.bank, &transactions, true),
+            vec![0..1, 1..2]
+        );
+    }
+
+    #[test]
+    fn candidate_range_is_closed_at_both_ends() {
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) {
+            assert!(validate_candidate_snapshot_slot(EPOCH227_SNAPSHOT_SLOT).is_ok());
+            assert!(validate_candidate_snapshot_slot(EPOCH227_SNAPSHOT_SLOT - 1).is_err());
+            assert!(validate_candidate_snapshot_slot(EPOCH227_SNAPSHOT_SLOT + 1).is_err());
+        } else if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+            assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT).is_ok());
+            assert!(validate_candidate_snapshot_slot(EPOCH223_TAIL_SNAPSHOT_SLOT).is_err());
+            assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT - 1).is_err());
+            assert!(validate_candidate_snapshot_slot(EPOCH223_COLD_SNAPSHOT_SLOT + 1).is_err());
+        } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
+            for slot in &[EPOCH223_COLD_SNAPSHOT_SLOT, EPOCH223_TAIL_SNAPSHOT_SLOT] {
+                assert!(validate_candidate_snapshot_slot(*slot).is_ok());
+                assert!(validate_candidate_snapshot_slot(*slot - 1).is_err());
+                assert!(validate_candidate_snapshot_slot(*slot + 1).is_err());
+            }
+        } else if cfg!(any(
+            feature = "epoch225-v1-6-25-diagnostic",
+            feature = "epoch225-v1-6-25-qualification"
+        )) {
+            assert!(validate_candidate_snapshot_slot(EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT).is_ok());
+            assert!(
+                validate_candidate_snapshot_slot(EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT - 1).is_err()
+            );
+            assert!(
+                validate_candidate_snapshot_slot(EPOCH225_DIAGNOSTIC_SNAPSHOT_SLOT + 1).is_err()
+            );
+        } else if cfg!(any(
+            feature = "epoch224-v1-6-25-diagnostic",
+            feature = "epoch224-v1-6-25-qualification"
+        )) {
+            assert!(
+                validate_candidate_snapshot_slot(EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT).is_ok()
+            );
+            assert!(validate_candidate_snapshot_slot(
+                EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT - 1
+            )
+            .is_err());
+            assert!(validate_candidate_snapshot_slot(
+                EPOCH224_V1_6_25_DIAGNOSTIC_SNAPSHOT_SLOT + 1
+            )
+            .is_err());
+        } else {
+            assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT).is_ok());
+            assert!(validate_candidate_snapshot_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE - 1).is_ok());
+        }
+        assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT - 1).is_err());
+        assert!(validate_candidate_snapshot_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE).is_err());
+
+        let entry_end = effective_max_supported_entry_slot_exclusive();
+        let entry_start = effective_min_supported_entry_slot();
+        assert!(validate_candidate_entry_slot(entry_start).is_ok());
+        assert!(validate_candidate_entry_slot(entry_end - 1).is_ok());
+        assert!(validate_candidate_entry_slot(entry_start - 1).is_err());
+        assert!(validate_candidate_entry_slot(entry_end).is_err());
+        assert_eq!(
+            entry_end,
+            if cfg!(feature = "epoch227-v1-6-25-diagnostic") {
+                EPOCH227_DIAGNOSTIC_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch227-v1-6-25-qualification") {
+                EPOCH227_QUALIFICATION_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch223-fee-load-warmup-diagnostic") {
+                EPOCH223_FEE_LOAD_WARMUP_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
+                EPOCH223_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch225-v1-6-25-qualification") {
+                EPOCH225_QUALIFICATION_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch225-v1-6-25-diagnostic") {
+                EPOCH225_DIAGNOSTIC_END_EXCLUSIVE
+            } else if cfg!(feature = "epoch224-v1-6-25-qualification") {
+                EPOCH224_V1_6_25_QUALIFICATION_END_EXCLUSIVE
+            } else if cfg!(any(
+                feature = "diagnostic-singleton",
+                feature = "epoch224-v1-6-25-diagnostic"
+            )) {
+                DIAGNOSTIC_MAX_ENTRY_SLOT_EXCLUSIVE
+            } else {
+                MAX_SUPPORTED_SLOT_EXCLUSIVE
+            }
+        );
+    }
+
+    #[cfg(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    ))]
+    #[test]
+    fn epoch227_out_of_scope_batch_is_rejected_before_decode_or_bank_mutation() {
+        let (mut state, _) = test_state(2, Some(4));
+        state.enforce_candidate_range = true;
+        let cursor = state.write_cursor;
+        let ticks = state.bank.tick_height();
+        let slot = state.bank.slot();
+        for rejected in &[
+            EPOCH227_SNAPSHOT_SLOT,
+            effective_max_supported_entry_slot_exclusive(),
+        ] {
+            let mut request = request_for(&state, *rejected, 0, 1, &[]);
+            request.transactions = vec![vec![255]];
+            let error = state.process_entries(vec![request]).unwrap_err();
+            assert!(error.contains("outside"), "{}", error);
+            assert_eq!(state.write_cursor, cursor);
+            assert_eq!(state.bank.tick_height(), ticks);
+            assert_eq!(state.bank.slot(), slot);
+            assert_eq!(state.next_entry_index, 0);
+        }
+    }
+
+    #[cfg(feature = "epoch223-fee-load-warmup-diagnostic")]
+    #[test]
+    fn warmup_diagnostic_cannot_reach_recording_or_mutate_bank_after_its_bound() {
+        assert_eq!(effective_min_supported_entry_slot(), 96_335_539);
+        assert_eq!(effective_max_supported_entry_slot_exclusive(), 96_335_555);
+        assert!(validate_candidate_entry_slot(96_335_554).is_ok());
+        assert!(validate_candidate_entry_slot(96_335_555).is_err());
+        assert!(validate_candidate_entry_slot(96_336_000).is_err());
+        let (mut state, _) = test_state(1, Some(2));
+        state.enforce_candidate_range = true;
+        let before = (
+            state.bank.slot(),
+            state.bank.hash(),
+            state.bank.transaction_count(),
+            state.write_cursor,
+        );
+        let request = EntryRequest {
+            slot: 96_335_555,
+            entry_index: 0,
+            num_hashes: 0,
+            hash: state.last_entry_hash.as_ref().to_vec(),
+            transactions: Vec::new(),
+        };
+        assert!(state
+            .process_entry(request)
+            .unwrap_err()
+            .contains("outside"));
+        assert_eq!(
+            (
+                state.bank.slot(),
+                state.bank.hash(),
+                state.bank.transaction_count(),
+                state.write_cursor
+            ),
+            before
+        );
+    }
+
+    fn request_for(
+        state: &RuntimeState,
+        slot: u64,
+        entry_index: u64,
+        num_hashes: u64,
+        transactions: &[Transaction],
+    ) -> EntryRequest {
+        let start_hash = if slot > state.bank.slot() {
+            state.bank.last_blockhash()
+        } else {
+            state.last_entry_hash
+        };
+        let entry_hash = next_entry_hash(&start_hash, num_hashes, transactions);
+        EntryRequest {
+            slot,
+            entry_index,
+            num_hashes,
+            hash: entry_hash.as_ref().to_vec(),
+            transactions: transactions
+                .iter()
+                .map(|transaction| bincode::serialize(transaction).unwrap())
+                .collect(),
+        }
+    }
+
+    fn old_form_vote_initialize_transaction(
+        payer: &Keypair,
+        vote_account: &Keypair,
+        recent_blockhash: Hash,
+        lamports: u64,
+    ) -> Transaction {
+        let vote_init = VoteInit {
+            node_pubkey: payer.pubkey(),
+            authorized_voter: vote_account.pubkey(),
+            authorized_withdrawer: vote_account.pubkey(),
+            commission: 0,
+        };
+        let instructions = vec![
+            system_instruction::create_account(
+                &payer.pubkey(),
+                &vote_account.pubkey(),
+                lamports,
+                VoteState::size_of() as u64,
+                &solana_vote_program::id(),
+            ),
+            // This is the pre-v1.0.8 wire form observed on mainnet at slot
+            // 521850. The node identity signs the transaction as fee payer,
+            // but is deliberately absent from this instruction's account
+            // list. v1.0.7 accepted that form; v1.0.8 must reject it.
+            Instruction::new_with_bincode(
+                solana_vote_program::id(),
+                &VoteInstruction::InitializeAccount(vote_init),
+                vec![
+                    AccountMeta::new(vote_account.pubkey(), false),
+                    AccountMeta::new_readonly(sysvar::rent::id(), false),
+                    AccountMeta::new_readonly(sysvar::clock::id(), false),
+                ],
+            ),
+        ];
+        Transaction::new_signed_with_payer(
+            &instructions,
+            Some(&payer.pubkey()),
+            &[payer, vote_account],
+            recent_blockhash,
+        )
+    }
+
+    #[test]
+    fn v1_6_status_changes_normalize_without_changing_existing_wire_values() {
+        assert_eq!(
+            normalize_transaction_error(TransactionError::AlreadyProcessed),
+            WireTransactionError::DuplicateSignature
+        );
+        assert_eq!(
+            normalize_instruction_error(InstructionError::BorshIoError("detail".to_string())),
+            WireInstructionError::BorshIoError
+        );
+        assert_eq!(
+            normalize_instruction_error(InstructionError::AccountNotRentExempt),
+            WireInstructionError::AccountNotRentExempt
+        );
+        assert_eq!(
+            normalize_instruction_error(InstructionError::InvalidAccountOwner),
+            WireInstructionError::InvalidAccountOwner
+        );
+        assert_eq!(
+            normalize_transaction_error(TransactionError::AccountBorrowOutstanding),
+            WireTransactionError::AccountBorrowOutstanding
+        );
+        assert_eq!(
+            normalize_transaction_error(TransactionError::WouldExceedMaxBlockCostLimit),
+            WireTransactionError::WouldExceedMaxBlockCostLimit
+        );
+        assert_eq!(
+            normalize_transaction_error(TransactionError::UnsupportedVersion),
+            WireTransactionError::UnsupportedVersion
+        );
+        assert_eq!(
+            normalize_transaction_error(TransactionError::InvalidWritableAccount),
+            WireTransactionError::InvalidWritableAccount
+        );
+        assert_eq!(
+            normalize_instruction_error(InstructionError::ArithmeticOverflow),
+            WireInstructionError::ArithmeticOverflow
+        );
+        assert_eq!(
+            normalize_instruction_error(InstructionError::UnsupportedSysvar),
+            WireInstructionError::UnsupportedSysvar
+        );
+        assert_eq!(
+            normalize_instruction_error(InstructionError::IllegalOwner),
+            WireInstructionError::IllegalOwner
+        );
+    }
+
+    #[test]
+    fn exact_mainnet_native_program_set_is_required() {
+        let mut genesis = GenesisConfig::default();
+        set_exact_mainnet_native_programs(&mut genesis);
+        assert!(validate_mainnet_genesis_programs(&genesis).is_ok());
+
+        genesis.native_instruction_processors.pop();
+        assert!(validate_mainnet_genesis_programs(&genesis)
+            .unwrap_err()
+            .contains("missing native program"));
+
+        set_exact_mainnet_native_programs(&mut genesis);
+        genesis.native_instruction_processors.push((
+            "unknown_native_program".to_string(),
+            Pubkey::new_from_array([91; 32]),
+        ));
+        assert!(validate_mainnet_genesis_programs(&genesis)
+            .unwrap_err()
+            .contains("unsupported mainnet native program"));
+
+        set_exact_mainnet_native_programs(&mut genesis);
+        genesis
+            .native_instruction_processors
+            .push(genesis.native_instruction_processors[0].clone());
+        assert!(validate_mainnet_genesis_programs(&genesis)
+            .unwrap_err()
+            .contains("duplicate mainnet native program"));
+
+        set_exact_mainnet_native_programs(&mut genesis);
+        genesis.cluster_type = ClusterType::Development;
+        assert!(validate_mainnet_genesis_programs(&genesis)
+            .unwrap_err()
+            .contains("requires MainnetBeta cluster type"));
+    }
+
+    #[test]
+    fn v1_6_25_rejects_old_form_vote_initialization_without_node_instruction_account() {
+        let leader = Pubkey::new_from_array([7; 32]);
+        let mut genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
+        set_exact_mainnet_native_programs(&mut genesis.genesis_config);
+        let state_dir = snapshot::private_state_dir(None).unwrap();
+        let account_paths = snapshot::private_account_paths(&state_dir).unwrap();
+        let builtins = mainnet_additional_builtins();
+        let bank = Bank::new_with_paths(
+            &genesis.genesis_config,
+            account_paths,
+            &[],
+            None,
+            Some(&builtins),
+            AccountSecondaryIndexes::default(),
+            false,
+        );
+        let mut state = RuntimeState::from_test_bank(bank, true, state_dir);
+        let vote_account = Keypair::new();
+        let rent_exempt_lamports = state
+            .bank
+            .get_minimum_balance_for_rent_exemption(VoteState::size_of())
+            .max(1);
+        let transaction = old_form_vote_initialize_transaction(
+            &genesis.mint_keypair,
+            &vote_account,
+            state.bank.last_blockhash(),
+            rent_exempt_lamports,
+        );
+
+        let processed = state
+            .process_entry(request_for(&state, 0, 0, 1, &[transaction]))
+            .unwrap();
+        assert_eq!(
+            processed.outcomes[0].error,
+            Some(WireTransactionError::InstructionError {
+                instruction_index: 1,
+                error: WireInstructionError::MissingRequiredSignature,
+            })
+        );
+        assert!(state.bank.get_account(&vote_account.pubkey()).is_none());
+    }
+
+    #[test]
+    fn child_bank_restores_static_mainnet_native_dispatch() {
+        let leader = Pubkey::new_from_array([7; 32]);
+        let mut genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
+        set_exact_mainnet_native_programs(&mut genesis.genesis_config);
+        let state_dir = snapshot::private_state_dir(None).unwrap();
+        let account_paths = snapshot::private_account_paths(&state_dir).unwrap();
+        let builtins = mainnet_additional_builtins();
+        let bank0 = Bank::new_with_paths(
+            &genesis.genesis_config,
+            account_paths,
+            &[],
+            None,
+            Some(&builtins),
+            AccountSecondaryIndexes::default(),
+            false,
+        );
+        let tick_hash = bank0.last_blockhash();
+        for _ in 0..bank0.ticks_per_slot() {
+            bank0.register_tick(&tick_hash);
+        }
+        let mut state = RuntimeState::from_test_bank(bank0, true, state_dir);
+
+        let cases = [
+            (
+                solana_config_program::id(),
+                WireInstructionError::InvalidInstructionData,
+            ),
+            (
+                solana_stake_program::id(),
+                WireInstructionError::NotEnoughAccountKeys,
+            ),
+            (
+                solana_vote_program::id(),
+                WireInstructionError::NotEnoughAccountKeys,
+            ),
+        ];
+        for (entry_index, (program_id, expected_error)) in cases.iter().enumerate() {
+            let transaction = Transaction::new_signed_with_payer(
+                &[Instruction {
+                    program_id: *program_id,
+                    accounts: Vec::new(),
+                    data: Vec::new(),
+                }],
+                Some(&genesis.mint_keypair.pubkey()),
+                &[&genesis.mint_keypair],
+                state.bank.last_blockhash(),
+            );
+            let entry_hash = next_entry_hash(&state.last_entry_hash, 1, &[transaction.clone()]);
+            let processed = state
+                .process_entry(EntryRequest {
+                    slot: 1,
+                    entry_index: entry_index as u64,
+                    num_hashes: 1,
+                    hash: entry_hash.as_ref().to_vec(),
+                    transactions: vec![bincode::serialize(&transaction).unwrap()],
+                })
+                .unwrap();
+            assert_eq!(
+                processed.outcomes[0].error,
+                Some(WireTransactionError::InstructionError {
+                    instruction_index: 0,
+                    error: expected_error.clone(),
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn entry_with_shared_writable_payer_emits_ordered_attributed_writes() {
+        let leader = Pubkey::new_from_array([7; 32]);
+        let genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
+        let state_dir = snapshot::private_state_dir(None).unwrap();
+        let account_paths = snapshot::private_account_paths(&state_dir).unwrap();
+        let bank0 = Bank::new_with_paths(
+            &genesis.genesis_config,
+            account_paths,
+            &[],
+            None,
+            None,
+            AccountSecondaryIndexes::default(),
+            false,
+        );
+        let mut tick_hash = bank0.last_blockhash();
+        for tick in 0..bank0.ticks_per_slot() {
+            tick_hash = hashv(&[tick_hash.as_ref(), &tick.to_le_bytes()]);
+            bank0.register_tick(&tick_hash);
+        }
+        let mut state = RuntimeState::from_test_bank(bank0, false, state_dir);
+        let recipient = Keypair::new();
+        let transaction = system_transaction::transfer(
+            &genesis.mint_keypair,
+            &recipient.pubkey(),
+            123,
+            state.bank.last_blockhash(),
+        );
+        let second_recipient = Keypair::new();
+        let second_transaction = system_transaction::transfer(
+            &genesis.mint_keypair,
+            &second_recipient.pubkey(),
+            321,
+            state.bank.last_blockhash(),
+        );
+        let signature = transaction.signatures[0].as_ref().to_vec();
+        let second_signature = second_transaction.signatures[0].as_ref().to_vec();
+        let entry_transactions = vec![transaction.clone(), second_transaction.clone()];
+        assert_eq!(
+            transaction_waves(&state.bank, &entry_transactions),
+            vec![0..1, 1..2]
+        );
+        let entry_hash = next_entry_hash(&state.last_entry_hash, 1, &entry_transactions);
+        let processed = state
+            .process_entry(EntryRequest {
+                slot: 1,
+                entry_index: 0,
+                num_hashes: 1,
+                hash: entry_hash.as_ref().to_vec(),
+                transactions: vec![
+                    bincode::serialize(&transaction).unwrap(),
+                    bincode::serialize(&second_transaction).unwrap(),
+                ],
+            })
+            .unwrap();
+        assert_eq!(processed.outcomes.len(), 2);
+        assert_eq!(processed.outcomes[0].signature.as_ref(), Some(&signature));
+        assert_eq!(
+            processed.outcomes[1].signature.as_ref(),
+            Some(&second_signature)
+        );
+        assert_eq!(processed.outcomes[0].error, None);
+        assert_eq!(processed.outcomes[1].error, None);
+        assert!(processed.writes.iter().any(|write| {
+            write.pubkey == recipient.pubkey().as_ref()
+                && write.transaction_signature.as_ref() == Some(&signature)
+        }));
+        assert!(processed.writes.iter().any(|write| {
+            write.pubkey == second_recipient.pubkey().as_ref()
+                && write.transaction_signature.as_ref() == Some(&second_signature)
+        }));
+        assert!(processed.writes.iter().any(|write| {
+            write.pubkey == genesis.mint_keypair.pubkey().as_ref()
+                && write.transaction_signature.as_ref() == Some(&signature)
+        }));
+        assert!(processed.writes.iter().any(|write| {
+            write.pubkey == genesis.mint_keypair.pubkey().as_ref()
+                && write.transaction_signature.as_ref() == Some(&second_signature)
+        }));
+        let mut last_version = None;
+        for write in &processed.writes {
+            if let Some(previous) = last_version {
+                assert!(write.write_version > previous);
+            }
+            last_version = Some(write.write_version);
+        }
+
+        for index in 1..=state.bank.ticks_per_slot() {
+            let entry_hash = next_entry_hash(&state.last_entry_hash, 1, &[]);
+            state
+                .process_entry(EntryRequest {
+                    slot: 1,
+                    entry_index: index,
+                    num_hashes: 1,
+                    hash: entry_hash.as_ref().to_vec(),
+                    transactions: Vec::new(),
+                })
+                .unwrap();
+        }
+        let checkpoint = state.freeze_checkpoint(1).unwrap();
+        assert!(checkpoint.slot_complete);
+        assert_eq!(checkpoint.bank_hash.len(), 32);
+        assert_eq!(checkpoint.accounts_hash.len(), 32);
+        assert!(checkpoint
+            .writes
+            .iter()
+            .all(|write| write.transaction_signature.is_none()));
+    }
+
+    #[test]
+    fn independent_transactions_share_one_attributed_execution_wave() {
+        let leader = Pubkey::new_from_array([8; 32]);
+        let genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
+        let state_dir = snapshot::private_state_dir(None).unwrap();
+        let account_paths = snapshot::private_account_paths(&state_dir).unwrap();
+        let bank0 = Bank::new_with_paths(
+            &genesis.genesis_config,
+            account_paths,
+            &[],
+            None,
+            None,
+            AccountSecondaryIndexes::default(),
+            false,
+        );
+        let second_payer = Keypair::new();
+        bank0
+            .transfer(10_000, &genesis.mint_keypair, &second_payer.pubkey())
+            .unwrap();
+        let mut tick_hash = bank0.last_blockhash();
+        for tick in 0..bank0.ticks_per_slot() {
+            tick_hash = hashv(&[tick_hash.as_ref(), &tick.to_le_bytes()]);
+            bank0.register_tick(&tick_hash);
+        }
+        let mut state = RuntimeState::from_test_bank(bank0, false, state_dir);
+        let first_recipient = Keypair::new();
+        let second_recipient = Keypair::new();
+        let first = system_transaction::transfer(
+            &genesis.mint_keypair,
+            &first_recipient.pubkey(),
+            123,
+            state.bank.last_blockhash(),
+        );
+        let second = system_transaction::transfer(
+            &second_payer,
+            &second_recipient.pubkey(),
+            321,
+            state.bank.last_blockhash(),
+        );
+        let first_signature = first.signatures[0].as_ref().to_vec();
+        let second_signature = second.signatures[0].as_ref().to_vec();
+        let entry_transactions = vec![first.clone(), second.clone()];
+        assert_eq!(
+            transaction_waves(&state.bank, &entry_transactions),
+            vec![0..2]
+        );
+
+        let entry_hash = next_entry_hash(&state.last_entry_hash, 1, &entry_transactions);
+        let processed = state
+            .process_entry(EntryRequest {
+                slot: 1,
+                entry_index: 0,
+                num_hashes: 1,
+                hash: entry_hash.as_ref().to_vec(),
+                transactions: vec![
+                    bincode::serialize(&first).unwrap(),
+                    bincode::serialize(&second).unwrap(),
+                ],
+            })
+            .unwrap();
+        assert_eq!(processed.outcomes.len(), 2);
+        assert_eq!(processed.outcomes[0].error, None);
+        assert_eq!(processed.outcomes[1].error, None);
+        assert!(processed.writes.iter().any(|write| {
+            write.pubkey == first_recipient.pubkey().as_ref()
+                && write.transaction_signature.as_ref() == Some(&first_signature)
+        }));
+        assert!(processed.writes.iter().any(|write| {
+            write.pubkey == second_recipient.pubkey().as_ref()
+                && write.transaction_signature.as_ref() == Some(&second_signature)
+        }));
+        let first_write_version = processed
+            .writes
+            .iter()
+            .find(|write| write.pubkey == first_recipient.pubkey().as_ref())
+            .unwrap()
+            .write_version;
+        let second_write_version = processed
+            .writes
+            .iter()
+            .find(|write| write.pubkey == second_recipient.pubkey().as_ref())
+            .unwrap()
+            .write_version;
+        assert!(first_write_version < second_write_version);
+    }
+
+    #[test]
+    fn write_read_conflict_ends_the_current_execution_wave() {
+        let (state, mint_keypair) = test_state(2, Some(4));
+        let shared_account = Keypair::new();
+        let reader_payer = Keypair::new();
+        let independent_payer = Keypair::new();
+        let independent_recipient = Keypair::new();
+        let recent_blockhash = state.bank.last_blockhash();
+        let writer = system_transaction::transfer(
+            &mint_keypair,
+            &shared_account.pubkey(),
+            1,
+            recent_blockhash,
+        );
+        let reader = Transaction::new_signed_with_payer(
+            &[Instruction {
+                program_id: system_program::id(),
+                accounts: vec![AccountMeta::new_readonly(shared_account.pubkey(), false)],
+                data: vec![0xff],
+            }],
+            Some(&reader_payer.pubkey()),
+            &[&reader_payer],
+            recent_blockhash,
+        );
+        let independent = system_transaction::transfer(
+            &independent_payer,
+            &independent_recipient.pubkey(),
+            1,
+            recent_blockhash,
+        );
+
+        assert_eq!(
+            transaction_waves(&state.bank, &[writer, reader, independent]),
+            vec![0..1, 1..3]
+        );
+    }
+
+    #[test]
+    fn duplicate_writable_key_inside_one_transaction_is_not_an_attribution_conflict() {
+        let (mut state, mint_keypair) = test_state(2, Some(4));
+        let recipient = Keypair::new();
+        let mut duplicate = system_transaction::transfer(
+            &mint_keypair,
+            &recipient.pubkey(),
+            1,
+            state.bank.last_blockhash(),
+        );
+        let signature = duplicate.signatures[0].as_ref().to_vec();
+        duplicate.message.account_keys[1] = duplicate.message.account_keys[0];
+
+        assert_eq!(
+            transaction_waves(&state.bank, &[duplicate.clone()]),
+            vec![0..1]
+        );
+        let attribution = writable_key_attribution(&[duplicate.clone()]).unwrap();
+        assert_eq!(attribution.len(), 1);
+        assert_eq!(
+            attribution.get(mint_keypair.pubkey().as_ref()),
+            Some(&Some(signature))
+        );
+
+        let following_recipient = Keypair::new();
+        let following = system_transaction::transfer(
+            &mint_keypair,
+            &following_recipient.pubkey(),
+            1,
+            state.bank.last_blockhash(),
+        );
+        let probe_transactions = [duplicate.clone(), following];
+        let probe = state.bank.prepare_batch(probe_transactions.iter());
+        assert_eq!(
+            probe.lock_results(),
+            &[Err(TransactionError::AccountLoadedTwice), Ok(())]
+        );
+        drop(probe);
+        assert_eq!(
+            transaction_waves(&state.bank, &probe_transactions),
+            vec![0..1, 1..2]
+        );
+
+        let request = request_for(&state, 0, 0, 1, &[duplicate]);
+        assert_eq!(
+            state.process_entry(request).unwrap_err(),
+            "entry fee collection failed for transaction 0: AccountLoadedTwice"
+        );
+    }
+
+    #[test]
+    fn fee_failure_diagnostics_preserve_bank_state_and_mark_post_commit_observations() {
+        let (state, payer) = test_state(2, Some(4));
+        let recipient = Keypair::new();
+        let transaction = system_transaction::transfer(
+            &payer,
+            &recipient.pubkey(),
+            1,
+            state.bank.last_blockhash(),
+        );
+        let balance = state.bank.get_balance(&payer.pubkey());
+        let tick = state.bank.tick_height();
+        let diagnostic = fee_load_diagnostics(
+            &state.bank,
+            &transaction,
+            7,
+            &TransactionError::InvalidWritableAccount,
+        );
+        assert!(diagnostic.contains("transaction_index=7"));
+        assert!(diagnostic.contains("error=InvalidWritableAccount"));
+        assert!(diagnostic.contains("account_observation=after_native_commit"));
+        assert!(diagnostic.contains(&format!("key={}", payer.pubkey())));
+        assert!(diagnostic.contains("effective_writable=true"));
+        assert!(diagnostic.contains("called_program=true"));
+        assert_eq!(state.bank.get_balance(&payer.pubkey()), balance);
+        assert_eq!(state.bank.tick_height(), tick);
+    }
+
+    #[test]
+    fn called_program_is_demoted_from_raw_writable_header_for_attribution() {
+        let payer = Pubkey::new_unique();
+        let program = Pubkey::new_unique();
+        let transaction = Transaction::new_unsigned(Message {
+            header: MessageHeader {
+                num_required_signatures: 1,
+                num_readonly_signed_accounts: 0,
+                num_readonly_unsigned_accounts: 0,
+            },
+            account_keys: vec![payer, program],
+            recent_blockhash: Hash::default(),
+            instructions: vec![CompiledInstruction {
+                program_id_index: 1,
+                accounts: vec![0],
+                data: Vec::new(),
+            }],
+        });
+
+        assert!(transaction.message.is_writable(0));
+        assert!(!transaction.message.is_writable(1));
+        let attribution = writable_key_attribution(&[transaction]).unwrap();
+        assert!(attribution.contains_key(payer.as_ref()));
+        assert!(!attribution.contains_key(program.as_ref()));
+    }
+
+    #[test]
+    fn poh_and_tick_invariants_fail_before_mutating_the_bank() {
+        let (mut state, _mint_keypair) = test_state(2, Some(4));
+        let initial_hash = state.last_entry_hash;
+
+        let mut bad_hash = request_for(&state, 0, 0, 4, &[]);
+        bad_hash.hash[0] ^= 1;
+        assert!(state
+            .process_entry(bad_hash)
+            .unwrap_err()
+            .contains("entry PoH hash mismatch"));
+        assert_eq!(state.bank.tick_height(), 0);
+        assert_eq!(state.next_entry_index, 0);
+        assert_eq!(state.last_entry_hash, initial_hash);
+
+        let wrong_tick_count = request_for(&state, 0, 0, 3, &[]);
+        assert!(state
+            .process_entry(wrong_tick_count)
+            .unwrap_err()
+            .contains("accumulated PoH hashes"));
+        assert_eq!(state.bank.tick_height(), 0);
+
+        let first_tick = request_for(&state, 0, 0, 4, &[]);
+        state.process_entry(first_tick).unwrap();
+        let second_tick = request_for(&state, 0, 1, 4, &[]);
+        let completed = state.process_entry(second_tick).unwrap();
+        assert!(completed.slot_complete);
+
+        let trailing = request_for(&state, 0, 2, 1, &[]);
+        assert!(state
+            .process_entry(trailing)
+            .unwrap_err()
+            .contains("follows the completion tick"));
+        assert_eq!(state.bank.tick_height(), state.bank.max_tick_height());
+
+        let mut invalid_next_slot = request_for(&state, 1, 0, 4, &[]);
+        invalid_next_slot.hash[0] ^= 1;
+        assert!(state
+            .process_entry(invalid_next_slot)
+            .unwrap_err()
+            .contains("entry PoH hash mismatch"));
+        assert_eq!(state.bank.slot(), 0);
+        assert!(!state.bank.is_frozen());
+
+        let valid_next_slot = request_for(&state, 1, 0, 4, &[]);
+        assert_eq!(state.process_entry(valid_next_slot).unwrap().slot, 1);
+    }
+
+    #[test]
+    fn late_batch_validation_failure_leaves_bank_entirely_unmodified() {
+        let (mut state, _mint_keypair) = test_state(2, Some(4));
+        let initial_hash = state.last_entry_hash;
+        let initial_write_cursor = state.write_cursor;
+        let first_hash = next_entry_hash(&initial_hash, 4, &[]);
+        let second_hash = next_entry_hash(&first_hash, 4, &[]);
+        let first = EntryRequest {
+            slot: 0,
+            entry_index: 0,
+            num_hashes: 4,
+            hash: first_hash.as_ref().to_vec(),
+            transactions: Vec::new(),
+        };
+        let mut bad_poh = EntryRequest {
+            slot: 0,
+            entry_index: 1,
+            num_hashes: 4,
+            hash: second_hash.as_ref().to_vec(),
+            transactions: Vec::new(),
+        };
+        bad_poh.hash[0] ^= 1;
+
+        assert!(state
+            .process_entries(vec![first.clone(), bad_poh])
+            .unwrap_err()
+            .contains("entry PoH hash mismatch"));
+        assert_eq!(state.bank.tick_height(), 0);
+        assert_eq!(state.next_entry_index, 0);
+        assert_eq!(state.last_entry_hash, initial_hash);
+        assert_eq!(state.tick_hash_count, 0);
+        assert_eq!(state.write_cursor, initial_write_cursor);
+
+        let bad_order = EntryRequest {
+            entry_index: 2,
+            hash: second_hash.as_ref().to_vec(),
+            ..first.clone()
+        };
+        assert!(state
+            .process_entries(vec![first.clone(), bad_order])
+            .unwrap_err()
+            .contains("does not match expected 1"));
+        assert_eq!(state.bank.tick_height(), 0);
+        assert_eq!(state.next_entry_index, 0);
+        assert_eq!(state.last_entry_hash, initial_hash);
+
+        let undecodable = EntryRequest {
+            entry_index: 1,
+            num_hashes: 1,
+            hash: vec![0; 32],
+            transactions: vec![vec![0xff]],
+            ..first
+        };
+        assert!(state
+            .process_entries(vec![first, undecodable])
+            .unwrap_err()
+            .starts_with("failed to decode transaction"));
+        assert_eq!(state.bank.tick_height(), 0);
+        assert_eq!(state.next_entry_index, 0);
+        assert_eq!(state.last_entry_hash, initial_hash);
+    }
+
+    #[test]
+    fn malformed_legacy_transaction_structure_is_rejected_before_bank_mutation() {
+        let (mut state, mint_keypair) = test_state(2, Some(4));
+        let recipient = Pubkey::new_from_array([9; 32]);
+        let base =
+            system_transaction::transfer(&mint_keypair, &recipient, 1, state.bank.last_blockhash());
+        let initial_hash = state.last_entry_hash;
+
+        let mut bad_signatures = base.clone();
+        bad_signatures.signatures.clear();
+        let error = state
+            .process_entry(request_for(&state, 0, 0, 1, &[bad_signatures]))
+            .unwrap_err();
+        assert!(error.contains("signature count"));
+
+        let mut bad_readonly_signed = base.clone();
+        bad_readonly_signed
+            .message
+            .header
+            .num_readonly_signed_accounts = bad_readonly_signed
+            .message
+            .header
+            .num_required_signatures
+            .saturating_add(1);
+        let error = state
+            .process_entry(request_for(&state, 0, 0, 1, &[bad_readonly_signed]))
+            .unwrap_err();
+        assert!(error.contains("readonly signed count"));
+
+        let mut bad_program_index = base.clone();
+        bad_program_index.message.instructions[0].program_id_index = u8::max_value();
+        let error = state
+            .process_entry(request_for(&state, 0, 0, 1, &[bad_program_index]))
+            .unwrap_err();
+        assert!(error.contains("program index"));
+
+        let mut bad_account_index = base;
+        bad_account_index.message.instructions[0].accounts[0] = u8::max_value();
+        let error = state
+            .process_entry(request_for(&state, 0, 0, 1, &[bad_account_index]))
+            .unwrap_err();
+        assert!(error.contains("account index"));
+
+        assert_eq!(state.bank.tick_height(), 0);
+        assert_eq!(state.next_entry_index, 0);
+        assert_eq!(state.last_entry_hash, initial_hash);
+    }
+
+    #[test]
+    fn valid_batch_commits_and_reports_entries_in_wire_order() {
+        let (mut state, _mint_keypair) = test_state(2, Some(4));
+        let first_hash = next_entry_hash(&state.last_entry_hash, 4, &[]);
+        let second_hash = next_entry_hash(&first_hash, 4, &[]);
+        let processed = state
+            .process_entries(vec![
+                EntryRequest {
+                    slot: 0,
+                    entry_index: 0,
+                    num_hashes: 4,
+                    hash: first_hash.as_ref().to_vec(),
+                    transactions: Vec::new(),
+                },
+                EntryRequest {
+                    slot: 0,
+                    entry_index: 1,
+                    num_hashes: 4,
+                    hash: second_hash.as_ref().to_vec(),
+                    transactions: Vec::new(),
+                },
+            ])
+            .unwrap();
+        assert_eq!(processed.len(), 2);
+        assert_eq!(processed[0].entry_index, 0);
+        assert!(!processed[0].slot_complete);
+        assert_eq!(processed[1].entry_index, 1);
+        assert!(processed[1].slot_complete);
+        assert_eq!(state.bank.tick_height(), 2);
+        assert_eq!(state.next_entry_index, 2);
+        assert_eq!(state.last_entry_hash, second_hash);
+    }
+
+    #[test]
+    fn entry_batch_count_is_bounded_before_preparation() {
+        let (mut state, _mint_keypair) = test_state(2, Some(4));
+        let request = request_for(&state, 0, 0, 4, &[]);
+        let error = state
+            .process_entries(vec![request; MAX_ENTRIES_PER_BATCH + 1])
+            .unwrap_err();
+        assert!(error.contains("limit is"));
+        assert_eq!(state.bank.tick_height(), 0);
+        assert_eq!(state.next_entry_index, 0);
+    }
+
+    #[test]
+    fn transaction_hash_count_must_leave_room_for_the_tick() {
+        let (mut state, mint_keypair) = test_state(2, Some(4));
+        let recipient = Pubkey::new_from_array([9; 32]);
+        let transaction =
+            system_transaction::transfer(&mint_keypair, &recipient, 1, state.bank.last_blockhash());
+
+        let reaches_tick_boundary = request_for(&state, 0, 0, 4, &[transaction.clone()]);
+        assert!(state
+            .process_entry(reaches_tick_boundary)
+            .unwrap_err()
+            .contains("without a tick"));
+        assert_eq!(state.next_entry_index, 0);
+
+        let transaction_entry = request_for(&state, 0, 0, 3, &[transaction]);
+        state.process_entry(transaction_entry).unwrap();
+        assert_eq!(state.tick_hash_count, 3);
+        let tick = request_for(&state, 0, 1, 1, &[]);
+        state.process_entry(tick).unwrap();
+        assert_eq!(state.tick_hash_count, 0);
+        assert_eq!(state.bank.tick_height(), 1);
+    }
+
+    #[test]
+    fn incomplete_checkpoint_does_not_freeze_or_poison_replay() {
+        let (mut state, _mint_keypair) = test_state(2, Some(1));
+        assert!(state
+            .freeze_checkpoint(0)
+            .unwrap_err()
+            .contains("cannot checkpoint incomplete bank"));
+        assert!(!state.bank.is_frozen());
+
+        let first_tick = request_for(&state, 0, 0, 1, &[]);
+        state.process_entry(first_tick).unwrap();
+        let second_tick = request_for(&state, 0, 1, 1, &[]);
+        state.process_entry(second_tick).unwrap();
+        assert!(state.freeze_checkpoint(0).unwrap().slot_complete);
+    }
+
+    #[test]
+    fn storage_maintenance_caps_shrink_debt_like_pinned_background_service() {
+        let (mut state, mint_keypair) = test_state(1, Some(2));
+        let tick = request_for(&state, 0, 0, 2, &[]);
+        state.process_entry(tick).unwrap();
+        state.freeze_checkpoint(0).unwrap();
+        let original_cursor = state.bank.accounts().accounts_db.next_write_version();
+        let original_balance = state.bank.get_balance(&mint_keypair.pubkey());
+        let original_capitalization = state.bank.capitalization();
+        let original_blockhash = state.bank.last_blockhash();
+        let original_bank_hash = state.bank.hash();
+        for debt in &[251usize, 500, 25_000, usize::MAX] {
+            state.accounts_shrink_consumed_budget = *debt;
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(
+                state.accounts_shrink_consumed_budget,
+                debt.saturating_sub(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
+                    .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT),
+                "a large shrink must not defer cleanup for hundreds of roots"
+            );
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(state.accounts_shrink_consumed_budget, 0);
+            state.maintain_accounts_storage().unwrap();
+            assert!(state.accounts_shrink_consumed_budget <= ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
+            assert_eq!(
+                state.bank.accounts().accounts_db.next_write_version(),
+                original_cursor
+            );
+            assert_eq!(
+                state.bank.get_balance(&mint_keypair.pubkey()),
+                original_balance
+            );
+            assert_eq!(state.bank.capitalization(), original_capitalization);
+            assert_eq!(state.bank.last_blockhash(), original_blockhash);
+            assert_eq!(state.bank.hash(), original_bank_hash);
+        }
+    }
+
+    #[test]
+    fn completed_slots_are_squashed_without_losing_state_or_writes() {
+        let (mut state, mint_keypair) = test_state(1, Some(2));
+        let preserved_key = Pubkey::new_from_array([42; 32]);
+        let first_version = state.write_cursor;
+        let mut expected_write_version = first_version;
+
+        let transfer = system_transaction::transfer(
+            &mint_keypair,
+            &preserved_key,
+            777,
+            state.bank.last_blockhash(),
+        );
+        let transaction_entry = request_for(&state, 0, 0, 1, &[transfer]);
+        let transaction_processed = state.process_entry(transaction_entry).unwrap();
+        for write in transaction_processed.writes {
+            assert_eq!(write.write_version, expected_write_version);
+            expected_write_version += 1;
+        }
+        assert_eq!(
+            transaction_processed.next_write_version,
+            expected_write_version
+        );
+        let genesis_tick = request_for(&state, 0, 1, 1, &[]);
+        let tick_processed = state.process_entry(genesis_tick).unwrap();
+        for write in tick_processed.writes {
+            assert_eq!(write.write_version, expected_write_version);
+            expected_write_version += 1;
+        }
+        assert_eq!(tick_processed.next_write_version, expected_write_version);
+        assert_eq!(state.bank.get_balance(&preserved_key), 777);
+
+        for slot in 1..=101 {
+            let tick = request_for(&state, slot, 0, 2, &[]);
+            let processed = state.process_entry(tick).unwrap();
+            assert!(processed.slot_complete);
+            for write in processed.writes {
+                assert_eq!(write.write_version, expected_write_version);
+                expected_write_version += 1;
+            }
+            assert_eq!(processed.next_write_version, expected_write_version);
+            assert_eq!(state.bank.get_balance(&preserved_key), 777);
+            assert_eq!(state.bank.parents().len(), 1);
+            assert!(state.bank.parent().unwrap().parents().is_empty());
+        }
+
+        assert_eq!(state.last_accounts_clean_block_height, 0);
+        let storage_slots_before_clean = state.bank.accounts().accounts_db.storage.0.len();
+        let checkpoint = state.freeze_checkpoint(101).unwrap();
+        for write in checkpoint.writes {
+            assert_eq!(write.write_version, expected_write_version);
+            expected_write_version += 1;
+        }
+        assert_eq!(checkpoint.next_write_version, expected_write_version);
+        assert!(state.bank.parents().is_empty());
+        assert_eq!(state.bank.get_balance(&preserved_key), 777);
+        assert_eq!(state.last_accounts_clean_block_height, 101);
+        let storage_slots_after_clean = state.bank.accounts().accounts_db.storage.0.len();
+        assert!(storage_slots_after_clean < storage_slots_before_clean);
+    }
+
+    #[test]
+    fn stable_cluster_age_gate_matches_v1_blockstore_boundary() {
+        assert_eq!(processing_max_age(true, 13), MAX_RECENT_BLOCKHASHES);
+        assert_eq!(processing_max_age(true, 14), MAX_PROCESSING_AGE);
+        assert_eq!(processing_max_age(false, 14), MAX_RECENT_BLOCKHASHES);
+    }
+
+    #[test]
+    fn parent_legacy_transaction_fixture_decodes_exactly() {
+        let mut wire = Vec::with_capacity(134);
+        wire.push(1); // short-vec signature count
+        wire.extend_from_slice(&[7; 64]);
+        wire.extend_from_slice(&[1, 0, 0]); // MessageHeader
+        wire.push(1); // short-vec account-key count
+        wire.extend_from_slice(&[3; 32]);
+        wire.extend_from_slice(&[4; 32]);
+        wire.push(0); // short-vec instruction count
+        assert_eq!(wire.len(), 134);
+
+        let transaction: Transaction = bincode::deserialize(&wire).unwrap();
+        assert_eq!(transaction.signatures.len(), 1);
+        assert_eq!(transaction.signatures[0].as_ref().len(), 64);
+        assert!(transaction.signatures[0]
+            .as_ref()
+            .iter()
+            .all(|byte| *byte == 7));
+        assert_eq!(transaction.message.header.num_required_signatures, 1);
+        assert_eq!(transaction.message.header.num_readonly_signed_accounts, 0);
+        assert_eq!(transaction.message.header.num_readonly_unsigned_accounts, 0);
+        assert_eq!(transaction.message.account_keys.len(), 1);
+        assert_eq!(transaction.message.account_keys[0].as_ref(), &[3; 32]);
+        assert_eq!(transaction.message.recent_blockhash.as_ref(), &[4; 32]);
+        assert!(transaction.message.instructions.is_empty());
+        assert_eq!(bincode::serialize(&transaction).unwrap(), wire);
+    }
+
+    #[test]
+    fn epoch_224_mismatch_vote_fixture_decodes_exactly() {
+        let data = bs58::decode(
+            "2ZjTR1vUs2pHXyTLvTMD8QCMYFMWeoVf5YQso54cGotg2fhzMpFJoDSyyAXHHuuUsgoNuKfXguCbno2S8gw",
+        )
+        .into_vec()
+        .unwrap();
+        let instruction: VoteInstruction = bincode::deserialize(&data).unwrap();
+        match instruction {
+            VoteInstruction::Vote(vote) => {
+                assert_eq!(vote.slots, vec![96_767_525]);
+                assert_eq!(
+                    vote.hash.to_string(),
+                    "Gebqm3dzs8Lhwe3giMWH5wjLXzGd5z5ZoEoZKtnFDQCX"
+                );
+            }
+            other => panic!("unexpected vote instruction: {:?}", other),
+        }
+    }
+
+    #[test]
+    #[ignore]
+    #[cfg(any(
+        feature = "epoch227-v1-6-25-diagnostic",
+        feature = "epoch227-v1-6-25-qualification"
+    ))]
+    fn native_epoch227_v1625_cold_input_matches_canonical_accounts_commitment() {
+        use sha2::{Digest, Sha256};
+        use std::{
+            fs,
+            io::Read,
+            os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+        };
+        let snapshot = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst";
+        let ledger = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1";
+        let scratch = env::var("JETSTREAMER_EPOCH227_V1625_TEST_SCRATCH")
+            .expect("explicit isolated 227 native test scratch required");
+        let path = Path::new(&scratch);
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
+        let root = path.parent().unwrap();
+        assert_eq!(
+            root.parent(),
+            Some(Path::new("/home/ubuntu/.jetstreamer-private"))
+        );
+        assert!(root
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("native-input227-v1625-"));
+        let metadata = fs::symlink_metadata(path).unwrap();
+        assert!(
+            metadata.is_dir()
+                && metadata.uid() == unsafe { libc::geteuid() }
+                && metadata.permissions().mode() & 0o077 == 0
+        );
+        assert_eq!(fs::canonicalize(path).unwrap(), path);
+        assert!(fs::read_dir(path).unwrap().next().is_none());
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(snapshot)
+            .unwrap();
+        let before = file.metadata().unwrap();
+        assert!(
+            before.is_file()
+                && before.uid() == 0
+                && before.nlink() == 1
+                && before.permissions().mode() & 0o222 == 0
+        );
+        assert_eq!(before.len(), 10_261_480_487);
+        let mut digest = Sha256::new();
+        let mut buffer = vec![0u8; 1024 * 1024];
+        loop {
+            let n = file.read(&mut buffer).unwrap();
+            if n == 0 {
+                break;
+            }
+            digest.input(&buffer[..n]);
+        }
+        assert_eq!(
+            format!("{:x}", digest.result()),
+            "77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07"
+        );
+        let identity = |m: &fs::Metadata| {
+            (
+                m.dev(),
+                m.ino(),
+                m.len(),
+                m.mtime(),
+                m.mtime_nsec(),
+                m.ctime(),
+                m.ctime_nsec(),
+                m.mode(),
+                m.nlink(),
+            )
+        };
+        assert_eq!(identity(&before), identity(&file.metadata().unwrap()));
+        assert_eq!(
+            identity(&before),
+            identity(&fs::symlink_metadata(snapshot).unwrap())
+        );
+        let (mut state, initialized) = RuntimeState::initialize(
+            ledger,
+            &jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+                archive_path: snapshot.into(),
+            },
+            Some(&scratch),
+        )
+        .unwrap();
+        assert_eq!(initialized.slot, EPOCH227_SNAPSHOT_SLOT);
+        let original_transactions = state.bank.transaction_count();
+        let checkpoint = state.freeze_checkpoint(EPOCH227_SNAPSHOT_SLOT).unwrap();
+        assert!(checkpoint.slot_complete && checkpoint.writes.is_empty());
+        assert_eq!(
+            checkpoint.next_write_version,
+            initialized.next_write_version
+        );
+        assert_eq!(checkpoint.transaction_count, original_transactions);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR"
+        );
+        assert_eq!(
+            identity(&before),
+            identity(&fs::symlink_metadata(snapshot).unwrap())
+        );
+        println!("epoch227-v1625-native-input slot={} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transaction_count={} tick_height={} next_write_version={} replay_entries=0 bootstrap_writes=0",
+            checkpoint.slot, Hash::new(&checkpoint.bank_hash), Hash::new(&checkpoint.accounts_hash),
+            Hash::new(&checkpoint.last_blockhash), checkpoint.capitalization, checkpoint.transaction_count,
+            checkpoint.tick_height, checkpoint.next_write_version);
+    }
+
+    #[test]
+    #[ignore]
+    fn initializes_and_checkpoints_v1_6_25_boundary_snapshot() {
+        let archive = std::env::var("JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT")
+            .or_else(|_| std::env::var("JETSTREAMER_SNAPSHOT_93311535"))
+            .expect("set JETSTREAMER_V1_6_25_BOUNDARY_SNAPSHOT");
+        let ledger =
+            std::env::var("JETSTREAMER_MAINNET_LEDGER").expect("set JETSTREAMER_MAINNET_LEDGER");
+        let (mut state, initialized) = RuntimeState::initialize(
+            &ledger,
+            &jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+                archive_path: archive,
+            },
+            None,
+        )
+        .unwrap();
+        let expected_accounts_hash = match &initialized.source {
+            InitializedSource::SnapshotArchive {
+                expected_accounts_hash,
+                ..
+            } => expected_accounts_hash.clone(),
+            InitializedSource::Genesis => unreachable!(),
+        };
+        let expected_slot = boundary_snapshot_test_slot();
+        assert_eq!(initialized.slot, expected_slot);
+        let checkpoint = state.freeze_checkpoint(expected_slot).unwrap();
+        println!(
+            "initialized slot={} last_blockhash={} next_write_version={}",
+            initialized.slot,
+            Hash::new(&initialized.last_blockhash),
+            initialized.next_write_version
+        );
+        println!(
+            "checkpoint slot={} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transactions={} tick_height={} complete={}",
+            checkpoint.slot,
+            Hash::new(&checkpoint.bank_hash),
+            Hash::new(&checkpoint.accounts_hash),
+            Hash::new(&checkpoint.last_blockhash),
+            checkpoint.capitalization,
+            checkpoint.transaction_count,
+            checkpoint.tick_height,
+            checkpoint.slot_complete
+        );
+        assert_eq!(checkpoint.accounts_hash, expected_accounts_hash);
+    }
+
+    #[test]
+    fn boundary_snapshot_test_anchor_matches_the_strict_build_profile() {
+        let slot = boundary_snapshot_test_slot();
+        validate_candidate_snapshot_slot(slot).unwrap();
+        if cfg!(any(
+            feature = "epoch227-v1-6-25-diagnostic",
+            feature = "epoch227-v1-6-25-qualification"
+        )) {
+            assert_eq!(slot, EPOCH227_SNAPSHOT_SLOT);
+        } else if cfg!(feature = "epoch223-v1-6-25-qualification") {
+            assert_eq!(slot, 96_335_538);
+        } else if cfg!(any(
+            feature = "epoch225-v1-6-25-diagnostic",
+            feature = "epoch225-v1-6-25-qualification"
+        )) {
+            assert_eq!(slot, 97_199_617);
+        } else if cfg!(any(
+            feature = "epoch224-v1-6-25-diagnostic",
+            feature = "epoch224-v1-6-25-qualification"
+        )) {
+            assert_eq!(slot, 96_767_522);
+        } else {
+            assert_eq!(slot, 93_311_535);
+        }
+    }
+}

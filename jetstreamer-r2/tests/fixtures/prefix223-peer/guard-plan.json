@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+  "unit": "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+  "invocation_id": "e70aaf097e7c4583b216aba454145910",
+  "filesystem": "/",
+  "minimum_free_bytes": 2000000000000,
+  "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1",
+  "maximum_root_physical_bytes": 471798691840,
+  "maximum_worker_vmas": 3500000,
+  "receipt_directory": "/var/lib/jetstreamer/horizon-native223-prefix-guard-receipts-v1"
+}

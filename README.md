@@ -130,6 +130,217 @@ or an inclusive `<start>:<end>` slot range on the command line. See
 [`JetstreamerRunner::parse_cli_args`](https://docs.rs/jetstreamer/latest/jetstreamer/fn.parse_cli_args.html)
 for the precise rules.
 
+### Horizon plugin pipeline
+
+`horizon_pipeline` runs the zero-copy Horizon plugin interface over local `.jet` files or an
+HTTP base URL. Its verification plugin writes no database rows. It consumes every delivered
+block, transaction, entry, account update, and account-data byte, then checks complete slot
+coverage, per-worker ordering, transaction and entry counts, and epoch metadata before allowing
+the epoch to finish.
+
+```bash
+cargo run --release --bin horizon_pipeline -- \
+  0:100 /path/to/horizon --threads 16 --verify-only
+```
+
+This checks plugin compatibility and stream delivery. Archive acceptance also requires every
+`.sha256` sidecar, an ordered scan of every boundary inside the selected range, and the separate
+adjacent-edge receipts for its outer boundaries. Large ranges can recompute PoH in parallel by
+pairing one non-full segment scan with one internal full scan per archive:
+
+```bash
+verify_archive --chain /path/to/horizon/epoch-{214..215}.jet --segment --threads 8
+verify_archive /path/to/horizon/epoch-42.jet \
+  --full --internal-full --threads 12
+```
+
+The internal scan checks every within-archive link and recomputes every block's PoH. It is not an
+acceptance result by itself because it cannot prove the incoming boundary or trailing skipped slots
+without an adjacent archive. The successful segment scan proves every boundary inside its range;
+the progressive adjacent-boundary verifier supplies the two outer proofs.
+
+`scripts/verify_horizon_range.sh` starts the independent full scan for each archive as soon as its
+SHA-256 sidecar appears. After the complete range is present, it verifies the range manifest, runs
+an ordered `--segment` scan for a multi-archive range (or an independent non-full scan for a
+singleton, which has no internal archive boundary), and rehashes every archive before recording
+acceptance. Receipts include the archive, verifier, and script hashes, so a restart only repeats
+stale or unfinished work. During a pinned script transition, an explicit prior-script SHA-256
+allowlist may preserve already completed per-epoch full receipts; the new ordered-range receipt
+still binds the current script.
+
+Large ranges need not remain on local disk simultaneously. After both adjacent archives have exact
+full-verification receipts, `archive_boundaries --verify-pair` decodes the left archive's terminal
+bucket and the right archive's leading bucket(s). It requires contiguous epoch and slot ranges, the
+right initial PoH anchor to equal the left terminal blockhash, and the right first block's parent
+slot and hash to name that same terminal block. `scripts/verify_horizon_boundaries_progressive.sh`
+composes that edge proof with the two full receipts and writes an fsynced receipt bound to both
+archive SHA-256 values and the exact boundary verifier. This avoids redundantly decoding tens of
+gigabytes for every overlapping pair while retaining the same proof: the full receipts cover all
+within-archive structure and PoH, and the edge receipt covers the only cross-archive link. The two
+outer boundaries must still be proved by the neighboring epochs or explicit canonical anchors.
+The full-verifier and full-verifier-script arguments are explicit comma-separated SHA-256
+allowlists so a boundary spanning a verifier or wrapper upgrade can compose two independently
+approved full receipts without weakening either side of the proof.
+
+`scripts/verify_horizon_plugin_range.sh` is the corresponding progressive launcher for the
+consumer/API gate. It waits for every archive and well-formed sidecar in an inclusive epoch range,
+then runs a pinned `horizon_pipeline --verify-only` binary over the complete range. Run both scripts
+for final acceptance: the archive verifier proves integrity, boundaries, and PoH, while the plugin
+verifier proves that the current streaming interface can consume every record and account-data byte.
+
+`scripts/verify_horizon_plugin_progressive.sh` runs that consumer/API gate per epoch as soon as a
+complete archive pair appears. Its fsynced receipt binds the archive SHA-256, the exact
+`horizon_pipeline` binary, and the verification script. R2 work remains concurrent with replay, but
+upload is not eligible until this receipt and the full receipt exist for the exact archive digest.
+Local retirement additionally requires both adjacent-boundary receipts. This preserves the
+ordered-chain proof when a range is larger than available local disk; an epoch remains local until
+its predecessor and successor boundaries have both been checked against the exact archive digest.
+For a long-lived range, `scripts/watch_horizon_plugin_progressive.sh` checks the sidecar and exact
+receipt first, then dispatches that sealed verifier only for a newly available or stale epoch. It
+therefore does not repeatedly hash already verified archives while waiting for later epochs; the
+dispatched verifier still hashes before and after the plugin scan, and R2 independently hashes the
+local source before upload.
+
+### Horizon R2 delivery
+
+`jetstreamer-r2` delivers accepted Horizon archives to an append-only Cloudflare R2 bucket. The
+`HORIZON_S3_ENDPOINT` value is an HTTPS R2 endpoint whose path is the bucket name; credentials come
+from `HORIZON_ACCESS_KEY_ID` and `HORIZON_SECRET_ACCESS_KEY`. Credential values are never written to
+receipts or logs.
+
+The authenticated S3 endpoint is not a public object origin, and R2 does not support S3 object
+ACLs such as `public-read`. Public visibility is configured once at the bucket level through its
+managed `r2.dev` hostname or a custom domain; it applies to existing and future archive and sidecar
+objects without rewriting them. The Horizon delivery workflow does not require
+`HORIZON_PUBLIC_BASE_URL`, anonymous-origin checks, or per-object ACL changes. Authenticated R2
+readback and the durable private receipt are the storage-completion proof and must not be delayed by
+public-origin configuration.
+
+R2's S3 `UploadPart` currently rejects `x-amz-checksum-sha256` even though the R2 compatibility
+matrix advertises composite SHA-256. The uploader therefore sends R2-validated `Content-MD5` for
+every part, reconstructs and checks the final multipart ETag, and reads the completed archive back
+through R2 while recomputing its whole-file SHA-256. Only after those checks and local source
+revalidation does it upload and read back the canonical whole-file `.sha256` sidecar. The sidecar
+is therefore the remote completion marker; an archive key without its sidecar is staged and must
+not be consumed as complete. An orphan sidecar with no archive fails closed. If R2 exposes a native
+composite SHA-256 for an object, the uploader validates and uses it. A private, fsynced receipt is
+the prerequisite for optional local retirement. The binary intentionally has no completed-object
+delete operation and refuses to replace an existing remote object that does not match local
+evidence by default.
+`--overwrite-existing` is an explicit recovery mode: it replaces both remote objects, performs a
+fresh full-object SHA-256 readback, and atomically replaces the private receipt. Use it only with
+specific authorization to replace the affected keys.
+
+`jetstreamer-r2 inventory` is the mutation-free range census. It issues only
+archive HEAD and sidecar GET requests, requires an explicit epoch range, and
+prints one JSON report classifying every epoch as `missing`, `archive-only`,
+`sidecar-only`, `invalid-sidecar`, `metadata-mismatch`, or `ready-pair`.
+`ready-pair` means the archive and canonical readiness sidecar are both present
+and any whole-file SHA-256 object metadata agrees with the sidecar; it does not
+replace the private upload receipt or the original full/plugin verification
+gates. Sidecar-only, noncanonical-sidecar, and metadata-mismatch states make the
+command fail after emitting the complete report. The positional directory is
+retained for a consistent command-line shape but is not read:
+
+```bash
+jetstreamer-r2 inventory /absolute/horizon/directory --epochs 201-300
+```
+
+`jetstreamer-r2 restore` reconstructs a local archive pair from R2 for audits that need retired
+neighbors. It requires an explicit epoch range and the private R2 receipt directory, conditionally
+downloads the exact recorded ETag, recomputes the whole-file SHA-256 and multipart ETag, validates
+the canonical sidecar, and publishes with no-clobber semantics. Long downloads and remote
+SHA-256 readbacks resume with conditional ranged GETs after transient stalls or early EOFs:
+
+```bash
+jetstreamer-r2 restore /absolute/scratch/directory \
+  --epochs 101-107 \
+  --receipt-directory /absolute/private/r2-receipts
+```
+
+An existing destination is accepted only when it already matches the receipt. Partial restores
+can be resumed safely; unrelated or mismatching files are never overwritten.
+
+`jetstreamer-r2 retire-local` is the non-mutating-R2 retirement path for an archive that already
+has a durable private receipt. It requires that receipt to record either a completed whole-object
+SHA-256 readback or native composite SHA-256 evidence, rehashes the local archive and reconstructs
+its recorded multipart ETag, then re-observes the remote archive and canonical sidecar. Only after
+all evidence still agrees does it remove the local readiness sidecar followed by the archive. It
+never uploads, overwrites, or deletes an R2 object. This command intentionally does not evaluate
+plugin or adjacent-boundary policy; callers must establish that local retirement is authorized and
+must always select the range explicitly:
+
+```bash
+jetstreamer-r2 retire-local /absolute/horizon/directory \
+  --epochs 129-132 \
+  --receipt-directory /absolute/private/r2-receipts
+```
+
+`jetstreamer-r2-progressive` permits authenticated R2 storage after the full and current-plugin
+receipts agree with the archive. The matching authenticated archive/sidecar readback receipt makes
+the pair storage-complete. Local retirement remains stricter and additionally requires both
+adjacent-boundary receipts. It does not require an anonymous public-origin receipt. This allows
+disjoint producers to exchange a verified boundary neighbor through R2 without creating a circular
+upload dependency. Use the Rust coordinator for new deployments. The legacy
+`scripts/sync_horizon_r2_progressive.py` coordinator is retained only for already-sealed workflows
+whose evidence would be invalidated by an in-place implementation change.
+
+When a user has explicitly authorized local retirement at a filesystem floor,
+`scripts/retire_horizon_at_reserve.py` is the bounded emergency policy wrapper. Configure the
+progressive uploader and this wrapper with the same private `--local-mutation-lock`. Below the
+floor, the wrapper validates the entire public Horizon namespace, invokes `retire-local` for one
+explicit epoch at a time, and stops as soon as the floor is recovered. Above the floor it performs
+no hashing or mutation. It fails closed on a partial pair, an out-of-range file, missing durable R2
+evidence, or exhaustion of eligible local pairs. It never mutates R2. When this wrapper runs under
+systemd, set `TasksMax` to at least twice the service's visible logical-CPU count and no lower than
+256: the Tokio runtime uses one worker per visible CPU, while `retire-local` needs an additional
+blocking worker for its archive proof.
+
+`scripts/audit_horizon_receipts.py` is the local-file-independent completion gate. It requires the
+full, current-plugin, R2, and adjacent-boundary receipts to agree on every archive SHA-256, and
+requires the approved full, plugin, and boundary-verifier binary/script SHA-256 values explicitly. Add
+`--require-outer-boundaries` for a strict range publication audit that also proves the incoming
+predecessor boundary and the trailing successor boundary.
+
+```bash
+cargo build --release -p jetstreamer-r2 -p jetstreamer-r2-progressive
+
+# Sync every complete local pair. Omit --delete-local while an active historical
+# controller still uses this directory as its completion ledger.
+target/release/jetstreamer-r2 sync /path/to/horizon \
+  --receipt-directory /path/to/private/r2-receipts \
+  --legacy-part-size-mib 5
+
+# Restrict work to an inclusive range and retire proven local pairs.
+target/release/jetstreamer-r2 sync /path/to/horizon \
+  --epochs 0-100 \
+  --receipt-directory /path/to/private/r2-receipts \
+  --legacy-part-size-mib 5 \
+  --legacy-etag-only \
+  --delete-local
+```
+
+`--legacy-etag-only` is only for a pre-existing multipart object whose provenance is already
+trusted. It still rehashes the local archive, reconstructs the legacy multipart ETag, and reads the
+remote sidecar, but skips downloading the whole object. Newly uploaded objects always require native
+R2 SHA-256 evidence or a successful whole-object SHA-256 readback before a receipt can authorize
+local deletion.
+
+The checked-in `horizon-r2` Codex skill inventories R2 first, selects missing work, uses the
+historical compatibility pipeline, and invokes this binary after replay and plugin verification.
+With no requested range it starts at the lowest supported missing epoch; an explicit range bounds
+generation, verification, delivery, and cleanup.
+
+For an actively generated range, `jetstreamer-r2-progressive` watches for complete archive/sidecar
+pairs and invokes `jetstreamer-r2` serially. It checks whether an existing private receipt still
+describes the current local archive identity before skipping authenticated sync. Local retirement
+requires the authenticated R2 receipt, receipts from the exact approved full verifier/script,
+plugin binary/script, and boundary verifier/script, plus both adjacent archive boundaries. No
+anonymous-origin receipt is required. Use `--local-mutation-lock` when a reserve retirement wrapper
+is installed so upload and local retirement cannot inspect or mutate the same pair concurrently.
+The coordinator never deletes remote data; all R2 operations and optional local retirement remain
+delegated to `jetstreamer-r2`.
+
 ### TUI dashboard
 
 Add `--tui` to render a live terminal dashboard instead of plain log output:
@@ -301,7 +512,7 @@ S3-compatible storage. Configure the backend via the following environment varia
 
 - `JETSTREAMER_ARCHIVE_BACKEND` (default `http`): set to `s3` to force the S3 client.
 - `JETSTREAMER_HTTP_BASE_URL`: base URL or `s3://bucket/prefix` for CAR files.
-- `JETSTREAMER_COMPACT_INDEX_BASE_URL`: optional override for slot indexes (also accepts `s3://` URIs). Jetstreamer resolves slot offsets from the per-epoch `epoch-{N}-slot-ranges.raw` files (~5 MB each) and falls back to the deprecated legacy compactindex pair when a mirror does not serve them (`JETSTREAMER_FORCE_LEGACY_INDEX=1` forces the legacy path).
+- `JETSTREAMER_COMPACT_INDEX_BASE_URL`: optional override for slot indexes (also accepts `s3://` URIs). Jetstreamer resolves slot offsets from the per-epoch `epoch-{N}-slot-ranges.raw` files (~5 MB each) and falls back to the deprecated legacy compactindex pair when a mirror does not serve them or keeps returning HTTP 429/503 through the bounded retry policy (`JETSTREAMER_FORCE_LEGACY_INDEX=1` forces the legacy path). Authentication errors and malformed index data remain fatal.
 - `JETSTREAMER_ARCHIVE_BASE`: single knob that applies to both cars and indexes when the more specific variables are unset.
 - `JETSTREAMER_S3_BUCKET`, `JETSTREAMER_S3_PREFIX`, `JETSTREAMER_S3_INDEX_PREFIX`: bucket/prefix overrides when not encoded in the `s3://` URL.
 - `JETSTREAMER_S3_REGION` and `JETSTREAMER_S3_ENDPOINT`: region plus optional custom endpoint (e.g. `https://s3.eu-central-003.backblazeb2.com`).
@@ -337,22 +548,655 @@ transaction/block/reward/etc data on multiple threads in parallel.
 
 ## Epoch Feature Availability
 
-Old Faithful ledger snapshots vary in what metadata is available, because Solana as a
-blockchain has evolved significantly over time. Use the table below to decide which epochs fit
-your needs. In particular, note that early versions of the chain are no longer compatible with
-modern geyser but _do_ work with the current `firehose` interface and `JetstreamerRunner`.
-Furthermore, CU tracking was not always available historically so it is not available once you
-go back far enough.
+Old Faithful changed its transaction-status metadata encoding at epoch 157. The firehose
+selects the decoder from the slot and supports both encodings. Compute-unit metadata starts at
+slot 194,184,611, partway through epoch 449.
 
-| Epoch | Slot        | Comment |
-|-------|-------------|--------------------------------------------------|
-| 0-156 | 0-?         | Incompatible with modern Geyser plugins |
-| 157+  | ?           | Compatible with modern Geyser plugins |
-| 0-449 | 0-194184610 | CU tracking not available (reported as 0)        |
-| 450+  | 194184611+  | CU tracking available                            |
+| Epoch/range | Slot range        | Comment |
+|-------------|-------------------|-----------------------------------------------|
+| 0-155; early 156 | 0-67,681,335  | Historical bincode schemas with guarded protobuf fallback |
+| 156         | 67,681,336-67,823,999 | v1.5.13 bincode with guarded protobuf fallback |
+| 157+        | 67,824,000+       | Protobuf transaction metadata                 |
+| through 449 | 0-194,184,610     | CU tracking unavailable (reported as `0`)     |
+| from 449    | 194,184,611+      | CU tracking available                         |
 
-Epochs at or above 157 are compatible with the current Geyser plugin interface, while compute
-unit accounting first appears at epoch 450. Plan replay windows accordingly.
+The epoch-157 cutoff is an archive-input boundary, not a consensus-runtime boundary.
+Reconstructing historical account updates requires execution rules that match the requested
+slot range.
+
+### Historical replay compatibility
+
+`jetstreamer-node` selects execution semantics from the complete half-open slot range before it
+loads a snapshot or starts a worker. Snapshot extensions choose only the state loader; they do not
+select a runtime. The current registry is deliberately conservative:
+
+| Slots | Runtime | Boundary and range-specific handling | Admission |
+|---|---|---|---|
+| `0..619,849` | pinned Solana v1.0.7 worker | starts from genesis; preserves the old vote-initialization checks observed through slot 618,196 | candidate through the first proven-safe handoff |
+| `619,849..3,456,000` | pinned Solana v1.0.8 worker | canonical state handoff from snapshot slot 619,848; the newer vote checks are first required by observed execution at slot 630,648 | candidate through epoch 7 |
+| `3,456,000..3,888,000` | pinned Solana v1.0.13 worker | independently verified snapshot restart; epoch 8's predecessor snapshot uses the newer bank schema | candidate for epoch 8 |
+| `3,888,000..5,184,000` | pinned Solana v1.0.14 worker | independently verified snapshot restart | candidate for epochs 9-11 |
+| `5,184,000..12,960,000` | pinned Solana v1.0.23 worker | anchored at canonical snapshot slot 5,183,736, warms slots 5,183,737-5,183,999, then starts output at 5,184,000 | diagnostic candidate for epochs 12-29 |
+| `12,960,000..13,392,000` | pinned Solana v1.1.15 worker | independently verified snapshot restart; restores and strictly validates the mainnet hard-fork marker at slot 13,334,463 | diagnostic candidate for epoch 30 |
+| `13,392,000..26,352,000` | pinned Solana v1.1.23 worker | independently verified snapshot restart; retains the upstream epoch-34 BPF-loader and epoch-40 system-program transitions | diagnostic candidate for epochs 31-60 |
+| `26,352,000..29,327,576` | pinned Solana v1.2.32 worker | independently verified snapshot restart; source-lineage replay through slot 29,327,575 binds accounts hash `A286WmNJJ1r5F8G2cnBqykiDGbXgo7aphzJVJqX5ZwbR` | qualified first epoch-67 handoff |
+| `29,327,576..29,371,188` | pinned Solana v1.2.24 pre-CPI worker | starts at the first recorded transaction whose outcome requires CPI to remain disabled; source-lineage replay through slot 29,371,187 binds accounts hash `6ubQSWsXQ8dEtxTkZwgpB8vEVj4nAsQcSGmu9usxVSGR` | qualified second epoch-67 handoff |
+| `29,371,188..29,808,000` | pinned Solana v1.2.32 mainnet transition worker | generated state handoff after the last observed old-semantics transaction; reconstructs the CPI and vote-timestamp activation state | qualified by the terminal epoch-68 checkpoint |
+| `29,808,000..39,744,000` | pinned Solana v1.2.32 worker | independently verified snapshot restart | diagnostic candidate for epochs 69-91 |
+| `39,744,000..43,632,000` | pinned Solana v1.3.19 worker | independently verified snapshot restart; bounded extractor admits up to 131,072 members for the audited 104,267–106,520-member epoch-98 through epoch-100 snapshots | diagnostic candidate for epochs 92-100 |
+| `43,632,000..55,728,000` | pinned Solana v1.3.23 worker | independently verified snapshot restart; restores and strictly validates mainnet's second hard-fork marker at slot 53,180,900; mainnet still accepted a 4,008-byte stake initialization at slot 55,686,407; the extractor remains byte-bounded while admitting the later snapshot's 131,072+ members; every cohort must match all canonical post-bootstrap roots | unqualified diagnostic candidate for epochs 101-128 |
+| `55,728,000..56,592,000` | pinned Solana v1.4.17 worker | owns epoch 129's v1.4 feature boundary; reproduces the canonical successful vote at slot 55,728,002 where terminal v1.4.25 returns `SlotHashMismatch`, and the source-recorded BPF-loader custom error at slot 56,298,256 where v1.4.25 returns `ProgramFailedToComplete`; every canonical post-bootstrap root must still match before publication | source-status-selected, checkpoint-gated candidate for epochs 129-130 |
+| `56,592,000..58,320,000` | pinned Solana v1.4.19 worker | complete source-status scans found 7, 1, and 12 legacy loader custom errors in epochs 131, 132, and 133 respectively and no `ProgramFailedToComplete` status through epoch 134; v1.4.25 diverged at slot 58,011,466 by returning `ProgramFailedToComplete` for a canonical `ComputationalBudgetExceeded`; a 7,724-slot focused v1.4.19 replay reproduced that status and the canonical slot-58,019,044 accounts hash | source-status-selected, checkpoint-gated candidate for epochs 131-134 |
+| `58,320,000..63,936,000` | pinned Solana v1.4.25 worker | complete source-status scans across epochs 135-147 found no legacy loader custom errors; per-epoch `ProgramFailedToComplete` counts were `135:0, 136:1, 137:0, 138:0, 139:1, 140:1314, 141:0, 142:0, 143:0, 144:2, 145:204, 146:3, 147:2`, confirming the later error contract throughout this range; independently verified snapshot restart carries that vocabulary through the shared stream protocol, and every cohort must still match all canonical post-bootstrap roots | unqualified diagnostic candidate for epochs 135-147 |
+| `63,936,000..64,800,000` | pinned Solana v1.5.5 worker | exact v1.5.5 reproduces the trusted slot-63,948,761 accounts hash; normalizes v1.5 status variants for current plugins; every production cohort must still match all canonical post-bootstrap roots | bounded checkpoint-qualified candidate for epochs 148-149 |
+| `64,800,000..66,528,000` | pinned Solana v1.5.6 worker | exact v1.5.6 reproduces epoch 150's first canonical vote and the trusted slot-64,807,725 accounts hash; normalizes v1.5 status variants for current plugins | bounded checkpoint-qualified candidate for epochs 150-153 |
+| `66,528,000..66,960,000` | pinned Solana v1.5.8 worker | anchored at canonical snapshot slot 66,527,778, warms slots 66,527,779-66,527,999, reproduces the source-successful transaction at slot 66,528,004 that v1.5.6 rejects, and matches the canonical terminal accounts hash at slot 66,958,784; terminal v1.5.19 already diverges during warmup at slot 66,527,779 | source-status-selected, checkpoint-qualified candidate for epoch 154 |
+| `66,960,000..68,140,177` | pinned Solana v1.5.6 worker | independently verified snapshot restart after the epoch-154 v1.5.8 envelope; source-exact replay binds the frozen slot-68,140,176 handoff to accounts hash `3TNSv7MXDB4GxhyRyHJcuBNeXaumYC8W8vu5WrwCXhhZ` | checkpoint-gated candidate for epochs 155 through the epoch-157 prefix |
+| `68,140,177..68,256,000` | pinned Solana v1.5.8 worker | starts from the hash-bound v1.5.6 handoff immediately before the first transaction whose canonical `ProgramFailedToComplete` result differs from v1.5.6's `ComputationalBudgetExceeded`, then matches the canonical terminal accounts hash at slot 68,255,828 | source-status-selected, checkpoint-qualified candidate for the epoch-157 suffix |
+| `68,256,000..75,168,000` | pinned Solana v1.5.6 worker | independently verified snapshot restart at the epoch-158 boundary; later cohorts remain independently checkpoint-gated | checkpoint-gated candidate for epochs 158-173 |
+| `75,168,000..86,832,000` | pinned Solana v1.6.15 worker | independently verified snapshot restart; reproduces the v1.6 loader set, write-lock demotion, and expanded status vocabulary for current plugins; every cohort must match all canonical post-bootstrap roots | unqualified diagnostic candidate for epochs 174-200 |
+| `86,832,000..87,696,000` | pinned Solana v1.6.16 worker | epoch 201 is anchored at canonical snapshot slot 86,831,488; epoch 202 independently restarts at slot 87,263,434, reproduces the terminal root at slot 87,695,515, and passes both a complete archive reread and the independent qualification validator | bounded checkpoint-qualified candidate for epochs 201-202 |
+| `87,696,000..88,128,000` | pinned Solana v1.6.16 worker | focused-qualification-only search envelope; requires the explicit snapshot, checkpoint file, private output, `--verify`, and candidate opt-in; ordinary replay still fails closed | diagnostic-only epoch 203 |
+| `88,128,000..88,560,000` | pinned Solana v1.6.16 worker | independently restarted from canonical snapshot slot 88,127,580, reproduced the terminal root at slot 88,559,361, and passed both a complete archive reread and the independent qualification validator | bounded checkpoint-qualified candidate for epoch 204 |
+| `88,560,000..88,992,000` | pinned Solana v1.6.16 worker | focused-qualification-only search envelope; requires the explicit snapshot, checkpoint file, private output, `--verify`, and candidate opt-in; ordinary replay still fails closed | diagnostic-only epoch 205 |
+| `88,992,000..89,424,000` | pinned Solana v1.6.16 worker | independently restarted from canonical snapshot slot 88,991,050, recorded the complete epoch-206 span through canonical root 89,523,820, and passed both a recovered complete archive reread and the independently launched qualification validator; the verification suffix does not promote epoch 207 | bounded checkpoint-qualified candidate for epoch 206 |
+| `89,424,000..92,016,000` | pinned Solana v1.6.16 worker | focused-qualification-only search envelope; requires the explicit snapshot, checkpoint file, private output, `--verify`, and candidate opt-in; ordinary replay still fails closed. Epoch 208 also remains blocked on unavailable exact PoH boundary evidence, so no compatibility gate is inferred across this range | diagnostic-only epochs 207-212 |
+| `92,016,000..92,448,000` | pinned Solana v1.6.16 worker | independently restarted from canonical snapshot slot 92,015,419 and recorded through canonical root 92,447,542; the 431,543-slot private artifact passed a complete archive reread and the independently launched qualification validator. The v1.6.16 terminal post-phase count was 187, whose final freeze-root drain is excluded to reproduce the journal checkpoint write count of 186 and next-write-version cursor | bounded checkpoint-qualified candidate for epoch 213 |
+| `92,448,000..93,312,000` | pinned Solana v1.6.17 worker | independently restarted from canonical snapshot slot 92,447,542; that destination worker owns only the exact 457-slot pre-output warmup; exact upstream tag identity and terminal root at slot 93,311,535 remain checkpoint-gated | unqualified diagnostic candidate for epochs 214-215 |
+| `93,312,000..100,656,000` | pinned Solana v1.6.20 worker | independently restarted from canonical snapshot slot 93,311,535; that destination worker owns only the exact 464-slot pre-output warmup and every cohort remains canonical-root-gated | unqualified diagnostic candidate for epochs 216-232 |
+| `100,656,000..114,912,000` | pinned Solana v1.7.15 worker | independently restarted from canonical snapshot slot 100,655,540; owns the exact 459-slot pre-output warmup and remains canonical-root-gated | unqualified diagnostic candidate for epochs 233-265 |
+| `114,912,000..130,464,000` | pinned Solana v1.8.11 worker | independently restarted from canonical snapshot slot 114,910,768; owns the exact 1,231-slot pre-output warmup; epochs 266-300 are the publication range and epoch 301 is the private verification tail | unqualified diagnostic candidate for epochs 266-301 |
+| `130,464,000..406,080,000` | none | unsupported; replay fails closed | unsupported |
+| `406,080,000..` | in-process Agave v3 | independently verified modern snapshot bootstrap | verified |
+
+Verified epochs 0-100 use 12 execution envelopes backed by 11 historical worker variants. The
+11 runtime boundaries consist of one hash-bound canonical state handoff, two source-lineage-verified
+epoch-67 handoffs, and eight independently verified snapshot restarts. The
+v1.2.32 worker is used on both sides of the two specialized epoch-67 ranges. The v1.3.23,
+v1.4.17, v1.4.19, v1.4.25, v1.5.5, v1.5.6, v1.5.8, v1.6.15, and v1.6.16
+candidates add snapshot-isolated envelopes plus one hash-bound epoch-157
+handoff. The v1.6.17 envelope is
+independently bootstrapped across an unsupported gap rather than treated as an
+adjacent runtime handoff. The
+v1.4.19, v1.5.5, v1.5.6, and v1.6.16 envelopes have each passed their first bounded post-boundary checkpoint;
+every complete production cohort still requires all canonical roots before publication. The terminal
+v1.5.19 worker remains registered only as an unassigned comparison candidate. The v1.6.16
+worker advances one independently restarted epoch at a time and is currently limited to the
+checkpoint-gated epochs 201, 202, 204, 206, and 213 for ordinary replay. A separate focused-qualification-only
+planner may exercise the documented v1.6.16 diagnostic envelope for epoch 203, epoch 205, and epochs 207-212, but it cannot
+be used by normal epoch/range replay, archive reuse, or publication; every such diagnostic must
+still reproduce its explicit terminal checkpoint before its evidence can advance the ordinary
+registry. When the target epoch has no canonical root after its final slot, focused qualification
+may extend only through the immediate successor epoch to reach an exact canonical terminal root.
+That suffix is a private verification tail: it does not qualify the successor epoch, authorize a
+canonical sidecar, or permit publication. The independently restarted v1.6.17 worker is
+limited to epochs 214-215; the preceding gap remains unsupported.
+The independently restarted v1.6.20 worker is bounded to epochs 216-232.
+The separate `epoch224-v1-6-25-qualification` build is private and unqualified:
+it compares exact upstream v1.6.25 from snapshot 96,767,522 through canonical
+root 97,631,459, covering every epoch-224 slot plus a private epoch-225 verification
+suffix. It requires the focused qualification CLI, rejects ordinary replay,
+root cohorts and recovery, and creates no canonical sidecar. Its bounded predecessor
+passed the first v1.6.20 execution divergence before stopping at slot 96,767,527;
+that comparison alone does not promote either epoch. The default registry and the
+four-slot diagnostic feature are unchanged. See
+[`epoch224-complete-span-qualification.json`](historical-runtime/v1_6_25/epoch224-complete-span-qualification.json).
+The separate `epoch225-v1-6-25-qualification` build is also private and unqualified.
+It requires snapshot 97,199,617 and canonical roots 97,631,459 and 98,063,464,
+covering every epoch-225 slot plus a bounded private epoch-226 verification suffix.
+The earlier bounded epoch-225 comparison stops at 97,202,600 and cannot substitute
+for this full-span/root check. The full-span build rejects ordinary replay, root
+cohorts, inherited leases, recovery and public/mixed output paths; it writes no
+canonical sidecar and does not promote epoch 226 or alter the default runtime.
+See [`epoch225-complete-span-qualification.json`](historical-runtime/v1_6_25/epoch225-complete-span-qualification.json).
+The Rust package attester has a separate exact epoch-225 profile for the sealed
+`63a2717` complete-span parent/worker pair and the checked-in
+[`epoch225-complete-span-epoch-hashes.txt`](historical-runtime/v1_6_25/epoch225-complete-span-epoch-hashes.txt).
+This initial content attestation precedes the exact-package capability probe:
+its manifest must report that probe as not yet passed. Attestation still grants
+no replay, plugin, publication or R2 authority; fresh resource admission and
+independent complete-span qualification remain mandatory.
+Exact v1.7.13 remains an unassigned fallback comparison candidate. The primary
+v1.7.15 envelope covers epochs 233-265, and v1.8.11 covers the complete
+epoch-266-301 execution envelope, with publication ending at epoch 300 and epoch 301 retained as
+the private verification tail.
+
+The root-only `jetstreamer-epoch140-checkpoint-journal` also supports the explicit
+`capture_original_bootstrap: true` plan option for the original slot-60,479,583 checkpoint.
+It emits a distinct `jetstreamer-epoch140-bootstrap-journal-observation-v1` receipt, preserving
+the exact journal bytes and mechanically parsed u64 consensus fields. The two source records
+share a microsecond timestamp, so this scope additionally requires their strictly increasing
+journal sequence numbers and original sequence ID. The default restart/terminal capture is
+unchanged. Neither receipt constructs a manifest or authorizes replay/publication.
+
+`jetstreamer-epoch140-native-restore-probe` is a separate opt-in, private restore-only
+diagnostic for the exact slot-60,911,751 snapshot and retained v1.4.25 worker. Build with
+`cargo build --release -p jetstreamer-node --features epoch140-native-restore-diagnostic
+--bin jetstreamer-epoch140-native-restore-probe`; invoke only its sealed executable as host
+UID 1001 in a persistent, non-restarting sandbox using
+`PLAN --plan-sha256 HEX --self-sha256 HEX`.
+Its strict `jetstreamer-private-epoch140-native-restore-probe-plan-v1` plan contains `worker`,
+`snapshot`, `ledger_directory`, `scratch_directory`, `output`, `minimum_free_bytes`, and
+four `{path, sha256}` bindings: `original_journal`, `serialized_clock`, `admission_manifest`,
+and `admission_receipt`. The exact root-owned immutable snapshot must be a direct member of
+the sealed ledger with the pinned genesis archive and no shadowing `genesis.bin`; private,
+initially empty scratch and no-clobber receipt paths must use the campaign filesystem.
+The probe mechanically derives its expectations from the preserved original checkpoint journal,
+cross-checks the typed serialized clock, then uses only Initialize/FreezeCheckpoint/Shutdown.
+It compares Bank, accounts and PoH hashes, capitalization, transactions, tick height, complete-slot
+state and 64 ticks per slot, requires zero bootstrap writes, and records independent native and
+original write cursors without forcing equality between validators. The native cursor must not
+advance during bootstrap. A comparison failure preserves a private outcome, never an archive.
+Require the exact bounded environment `SOLANA_RAYON_THREADS=2` and
+`JETSTREAMER_HISTORICAL_{CONTROL,INITIALIZE,CHECKPOINT,REAP}_TIMEOUT_SECS` values
+`60`, `900`, `600`, `120`, respectively. Launch additionally requires a fresh complete fleet
+admission, a separately proven invocation-bound reserve/VMA guard, and qualified fleet recognition;
+source tests or a sealed binary alone grant no launch authority. Admission must protect all older
+growth claims, the century floor, restore/index/copy peak and output reservation.
+The fleet's separate `jetstreamer-private-epoch140-native-restore-launch-v1` observational
+contract binds that slot, worker, snapshot, journal, clock, private run root and exact live command.
+Its same-sample admission event requires the pinned host guard and one readable real worker;
+generic bootstrap/drainage allowance is not first-fire proof. Deploy the qualified fleet reader
+separately without replacing any live controller, guard or uploader.
+The separate Rust `jetstreamer-epoch140-native-launch-capture` writes that launch evidence
+only after observing the exact live probe and one readable worker in a fresh, clean first-fire
+guard sample. Its root-owned immutable `jetstreamer-epoch140-native-launch-capture-plan-v1`
+binds `unit`, `invocation_id`, `private_run_root`, `guard_unit`, `output`, and `{path, sha256}` objects for
+`probe`, `restore_plan`, `guard_sample` and `guard_plan`. Invoke the sealed capture tool as
+root with `PLAN --plan-sha256 HEX --self-sha256 HEX`; it rechecks the exact service command,
+running executable, zero-restart policy and guard identities before a no-clobber private receipt.
+The completed guard service must match the sample's actual systemd invocation and exact command,
+strict/read-only filesystem sandbox, private network, no-new-privileges and DAC/ptrace-only capabilities.
+The pinned `eca42993…` guard predates bounded-canary fields: omit `bounded_canary` entirely,
+even when null. Its generic samples contain `bounded_measurement: false` and null
+`target_handoff`/`target_handoff_error`; they do not contain `canary_target_error`.
+Capture/fleet readers must validate that actual schema rather than edit old samples or invent fields.
+It never starts or stops the probe and cannot replace fresh resource admission or native results.
+Success is only a native consensus comparison, not independent prefix validation, a segment
+manifest, proof of the original executed worker ELF, suffix execution, provenance/import promotion,
+publication, retirement or R2 authority. An eventual suffix worker must repeat this native check
+before sending entries. Shutdown acknowledgement does not prove that every worker or scratch
+reference has disappeared; retain the normal complete process-reference retirement gates.
+
+`jetstreamer-checkpoint-restore-probe` is a private, restore-only test for the retained
+epoch-213 prefix. It uses the unchanged pinned v1.6.16 worker and the existing bounded historical
+client to load the SHA-256-bound slot-92,447,542 snapshot, then compares every consensus checkpoint
+field with the prefix's sealed terminal manifest. Validator-local write cursors are recorded
+separately; bootstrap writes or any consensus mismatch fail closed. The hash-bound immutable plan
+requires explicit private scratch, a no-clobber receipt path, and a free-space bound protecting
+the century floor plus the diagnostic budget. Fresh fleet admission and an invocation-bound guard
+remain external launch prerequisites. Run only the sealed binary as the isolated replay user:
+`jetstreamer-checkpoint-restore-probe PLAN --plan-sha256 HEX --self-sha256 HEX`.
+The probe sends no replay entries, creates no archive or sidecar, and does not authorize a suffix,
+checkpoint substitution, assembly, compatibility promotion, publication, retirement, or R2 mutation.
+In particular, success does not remove focused replay's exact-terminal-checkpoint requirement.
+For a failed, guard-stopped restore-only probe, the Rust failed-diagnostic retirer's explicit
+`restore_only_probe` plan profile may retire only that isolated probe's `scratch` child. It requires
+a sealed zero-entry failure outcome, retained snapshot/worker inputs, terminal invocation evidence,
+no successful checkpoint receipt, a complete process-reference scan, and no-clobber retirement
+receipts. It preserves the run root, logs, receipts, prefix archive, and all remote objects.
+Only a collected transient guard may use the exact hash-bound stop-intent/completion chain as
+terminal evidence; the producer still requires a current matching terminal systemd identity.
+
+Horizon provenance V4 explicitly represents independently snapshot-restarted pieces of one exact
+historical runtime. `merge_checkpoint_restart_segments` retains each source generation and worker
+digest, checks native consensus-state equality and the full restart snapshot digest, and rebases
+independent raw write-version namespaces while verifying complete source hashes, PoH continuity,
+metadata and update ordering. A worker/runtime change, carried-state restart, bootstrap writes,
+coverage gap, missing snapshot digest or inconsistent write mapping fails closed. Existing V3
+cross-runtime behavior is unchanged, and V4 cannot be silently projected into uninterrupted V2
+provenance. Ordinary V4 archive-reuse and publication admission remain disabled.
+The independent readback verifier explicitly validates optional structured provenance before
+scanning slots; malformed or unknown envelopes fail closed. Structural V4 acceptance is not
+canonical checkpoint, current-plugin, runtime-route or publication admission.
+For an independently bound canonical endpoint, `verify_archive --full --anchor SLOT HASH
+--expected-terminal SLOT HASH` additionally checks the scanned final block's slot and hash.
+The terminal option rejects partial, internal-only and chain modes.
+Strict full verification may also bind `--expected-provenance-sha256 HEX`, the SHA-256 of
+`encode_archive_provenance` applied to an independently derived expected envelope. Derive that
+expectation from sealed source manifests, native checkpoint and snapshot evidence, never by
+copying the target archive's reported digest. This binds the complete envelope, including V4
+restart snapshot identities and both raw/normalized write-version namespaces. Missing or
+different provenance fails before the slot scan. The option rejects partial, internal-only and
+chain modes and grants no runtime, canonical-import or publication admission.
+For the exact private epoch-213 experiment, the read-only
+`jetstreamer-epoch213-provenance-expectation PREFIX_MANIFEST SUFFIX_MANIFEST OUTPUT
+--self-sha256 HEX` tool derives that commitment without opening the assembled target. It requires
+the two exact digest-bound, root-owned immutable source manifests and writes a no-clobber,
+fsynced receipt beneath a root-private parent. Its fixed coverage, runtime, source archive,
+restart snapshot, canonical terminal and raw-cursor mappings cannot admit another experiment.
+The receipt proves source-manifest scope only, not source archive hashes, final PoH, current-plugin
+output, runtime promotion or publication. Keep all those gates independent.
+
+The separate `jetstreamer-epoch225-bootstrap-resource` tool is a private restore-only resource
+measurement for the exact retained slot-97,199,617 snapshot and unchanged v1.6.20 worker. Its
+hash-bound `jetstreamer-private-epoch225-bootstrap-resource-plan-v1` plan fixes the service,
+private run root, empty scratch, immutable ledger, snapshot and no-clobber resource receipt.
+It sends no replay entries and captures cgroup and scratch measurements before worker shutdown.
+Fresh whole-host admission and a proven invocation-bound guard remain mandatory. Success checks
+the snapshot's accounts commitment and frozen-slot shape, not an external Bank hash or a complete
+cold-epoch peak; it grants no replay, runtime promotion, canonical sidecar or publication authority.
+If restoration or measurement fails while the parent is alive, it captures private cgroup and
+cleanup diagnostics in a separate no-clobber `failure.json`; that never substitutes for success.
+
+The opt-in [epoch-203 native restore comparison](docs/horizon-epoch203-native-restore.md)
+checks only the capped-shrink prefix's frozen restart state after a complete independent
+reread. It remains dormant without fresh protected admission and a proven guard; it sends no
+replay entries and does not qualify the remaining 419 slots, assembly, or publication.
+
+The separate `epoch203-checkpoint-continuation-diagnostic` node build is restricted
+to that exact retained prefix and the remaining 419 slots. Its
+[private continuation contract](docs/horizon-epoch203-native-restore.md#separate-419-slot-continuation)
+requires fresh full-path admission, repeats the native barrier in the executing
+suffix worker, and produces only private V4 assembly. It neither promotes the
+ordinary runtime route nor authorizes canonical sidecars or R2 publication.
+
+The separate [epoch-205 native restore profile](docs/horizon-epoch205-native-restore.md)
+pins its verified terminal snapshot and unchanged store 8 worker. It is dormant
+until the exact complete prefix, independent reader and fresh protected admission
+exist; it does not qualify the remaining 949 slots or enable ordinary replay.
+
+The dedicated `epoch213-checkpoint-continuation-diagnostic` node build exposes only the private
+epoch-213 continuation experiment. Invoke it with `213 /PRIVATE_RUN_ROOT/ledger --verify
+--checkpoint-continuation-plan=/SEALED/plan.json --checkpoint-continuation-plan-sha256=HEX`.
+Default builds reject these flags; the diagnostic build rejects ordinary replay, ranges, recovery,
+and qualification overrides. Its immutable plan uses schema
+`jetstreamer-private-epoch213-checkpoint-continuation-plan-v1` and binds `epoch`, `producer_unit`,
+`node_sha256`, `run_root`, `minimum_free_bytes`, and `{path, sha256}` inputs named `prefix_archive`,
+`prefix_manifest`, `native_probe`, `restart_snapshot`, `worker`, and `genesis_archive`.
+The runner independently rereads the exact retained prefix, authenticates its own sealed binary
+and zero-restart persistent service, and rechecks the full native snapshot checkpoint in the actual
+worker before replaying the final 457 slots. It preserves independent raw write cursors and assembles
+only a private V4 archive. Fresh fleet admission and an invocation-bound guard remain prerequisites.
+The result has no canonical sidecar and grants no publication, retirement, or R2 authority.
+Independent final verification, current-plugin validation, initial adjacent-boundary evidence,
+and a reviewed V4 admission path remain required before normal publication gates can open.
+
+The separately build-bound [epoch-144 continuation](docs/horizon-epoch144-continuation.md)
+uses `epoch144-checkpoint-continuation-diagnostic`, the exact validated prefix through
+62,639,490 and the remaining 509 slots. It requires a fresh complete-path admission;
+the successful native-only comparison and its 40-GiB budget are not launch authority.
+It preserves both runtime generations and independent cursors in private V4 output.
+
+The final sealed root cohort replays epochs 298-301 in a private lane. A fresh campaign manifest
+must bind `--last-epoch=301 --publish-through-epoch=300`; after all four archives and the epoch-301
+root gate pass, its importer may transactionally publish only epochs 298-300. Epoch 301 remains
+private and sidecar-free and must never be placed in the public Horizon directory or uploaded to
+R2 by this campaign.
+
+Before a completed focused artifact is used as registry evidence, independently revalidate it with
+`cargo run --release -p jetstreamer-node --bin jetstreamer-qualification-verify -- ...`. The
+validator requires the exact epoch, output start, bootstrap and terminal slots, runtime profile,
+worker SHA-256, and private root. It fully re-reads the Horizon source and bound segment manifest,
+rejects non-private or multiply linked files, and fails if a canonical `.sha256` publication
+sidecar exists. When a candidate range contains a known canonical same-account conflict, supply
+the four `--expected-conflict-*` options together. The validator then seeks back into the already
+digest-bound archive and requires both named transactions to be successful, to retain exactly one
+write of the named account with the expected lamports, and to have increasing write versions. The
+durable JSON result includes that evidence; a partial option set, an out-of-range slot, a failed
+transaction, or incorrect write attribution fails closed.
+
+Eleven execution interventions are explicitly recorded in addition to the ordinary
+epoch-aligned pinned-worker snapshot restarts:
+
+1. The behaviorally safe v1.0.7 to v1.0.8 state handoff at slot 619,849.
+2. The fixed epoch-12 bootstrap at slot 5,183,736 and warmup through slot 5,183,999.
+3. Reconstruction and validation of the epoch-30 hard-fork marker at slot 13,334,463.
+4. The v1.2.32 to pre-CPI v1.2.24 state handoff at slot 29,327,576.
+5. The return to v1.2.32 at slot 29,371,188 with CPI and vote-timestamp state reconstructed.
+6. The v1.3.23 envelope extends through epoch 128 because mainnet still accepted 4,008-byte stake
+   initializations through slot 55,725,865, while none were found after the epoch-129 feature boundary
+   at slot 55,728,000; publication still requires every terminal root.
+7. The v1.3.23 worker reconstructs mainnet's externally supplied hard-fork marker at slot
+   53,180,900 when starting from its predecessor snapshot, and requires both persisted mainnet
+   markers in later snapshots. The marker transforms the otherwise matching pre-extension bank hash
+   `EZzqCDxdzWF4sak54hfhz9CMExLjgoh9qtKbMn8TdNLA` into the canonical vote witness
+   `Fi4p8z3AkfsuGXZzQ4TD28N8QDNSWC7ccqAqTs2GPdPu`.
+8. Epochs 129-130 use exact v1.4.17 because the first canonical epoch-129 vote at slot 55,728,002
+   succeeds under v1.4.17 while terminal v1.4.25 rolls it back with `SlotHashMismatch`, and slot
+   56,298,256 records BPF-loader custom error `0x0b9f0002` while v1.4.25 returns
+   `ProgramFailedToComplete`; both epochs remain checkpoint-gated.
+9. Epochs 131 through 134 use exact v1.4.19. Complete source-status scans found 7, 1, and 12
+   legacy loader custom errors in epochs 131-133 and no `ProgramFailedToComplete` records through
+   epoch 134. At slot 58,011,466, v1.4.25 returned `ProgramFailedToComplete` for a transaction whose
+   canonical result is `ComputationalBudgetExceeded`; a 7,724-slot focused v1.4.19 replay reproduced
+   that status and the canonical slot-58,019,044 accounts hash. Complete scans of epochs 135-147
+   found no legacy custom errors and found per-epoch `ProgramFailedToComplete` counts of
+   `135:0, 136:1, 137:0, 138:0, 139:1, 140:1314, 141:0, 142:0, 143:0, 144:2,
+   145:204, 146:3, 147:2`, so v1.4.25 resumes from epoch 135's independent predecessor snapshot.
+10. Epoch 154 uses exact v1.5.8 from the hash-bound slot-66,527,778 snapshot because v1.5.6 rejects
+   a source-successful transaction at slot 66,528,004 while terminal v1.5.19 already disagrees at
+   slot 66,527,779. It reproduces the canonical slot-66,958,784 terminal accounts hash
+   `AVQPbbxxeLMaSyjVrcBC2fZpemNuGZhUF1CsQPBP16Ns`; v1.5.6 resumes at epoch 155, and every
+   production replay remains independently checkpoint-gated.
+11. Epoch 157 switches from v1.5.6 to v1.5.8 at slot 68,140,177. The preceding frozen v1.5.6 bank
+    has accounts hash `3TNSv7MXDB4GxhyRyHJcuBNeXaumYC8W8vu5WrwCXhhZ`; v1.5.8 reproduces the
+    source-recorded `ProgramFailedToComplete` result where v1.5.6 returns
+    `ComputationalBudgetExceeded`. Epoch 158 restarts v1.5.6 from its independently verified
+    predecessor snapshot. The v1.5.8 suffix reproduces the canonical slot-68,255,828 terminal
+    accounts hash `AVreSVPd46H4WiihQ2pFUcRExPRQwL1MxhzQHVGky8bH`; every production replay remains
+    independently checkpoint-gated.
+
+Input repair is planned independently of execution and adds five more historical interventions:
+
+| Slots or records | Input handling | Evidence gate |
+|---|---|---|
+| `0..4,258,776` | reconstruct status and fee from the selected runtime because the archive has no status frames | canonical account-state checkpoints |
+| `4,258,776..43,632,000` | use runtime-associated status and fee because the early writer could pair source statuses with the wrong transactions | exact worker identity plus canonical account-state checkpoints |
+| 1,084 exact records across 15 post-cutover slots | admit a missing status only for a checked-in `(slot, transaction index, signature)` match | hashed audit registry plus captured finalized RPC evidence |
+| `67,681,336..67,824,000` | exclude pre-v1.5.13 bincode candidates while retaining guarded protobuf fallback; this resolves bytes that are valid but unequal under both v1.5.12 and v1.5.13 | CID-verified contiguous boundary audit: protobuf at the last present predecessor slot 67,681,331, absent slots 67,681,332-335, and five v1.5.13-only records at the first present successor slot 67,681,336; the exact dual-valid slot-67,711,948 fixture is checked in |
+| 73,688 exact records across 88 present slots in `89,856,001..89,856,107` | replace the empty source frame with full finalized-block metadata only after slot, transaction index, signature order, and transaction signature all match | hash-bound full-epoch source audit plus 88 canonicalized finalized `getBlock` captures |
+
+For epoch 208, a Blockzilla Compact V2 `poh.wincode` can provide the ordered hashes that are
+absent from the confirmed-block source. Build `jetstreamer-blockzilla-poh-extract` from the reviewed
+workspace and pass every post-gap slot as `--target SLOT:BOUNDARIES`, where `BOUNDARIES` comes from
+the sealed skipped-slot audit. The extractor opens the input without following symlinks, rejects a
+multiply linked or writable source, decodes and hashes the complete file, requires exactly
+`BOUNDARIES * ticks_per_slot` tick entries per target, and emits every slot-boundary hash in base58
+and hexadecimal form through a durable no-clobber JSON file. For example:
+
+```sh
+cargo run --release -p jetstreamer-utils --bin jetstreamer-blockzilla-poh-extract -- \
+  /absolute/private/epoch-208/poh.wincode \
+  --ticks-per-slot 64 \
+  --target 89856117:2 \
+  --target 89856121:2 \
+  --output /absolute/private/epoch-208-blockzilla-poh-targets.json
+```
+
+The real epoch-208 extraction must include all 25 targets from the audit, not only the two shown
+above. Extractor success is source evidence only. Pass its sealed output through
+`jetstreamer-blockzilla-boundary-collect` with the exact skipped-slot audit and finalized block
+metadata SHA-256 values. The collector hard-codes the 25 canonical post-gap slots, requires the 96
+per-slot boundaries and 71 hidden boundaries, checks canonical parent-slot arithmetic, requires
+each final boundary and final entry hash to equal its finalized blockhash, and rejects a repeated
+hash anywhere among all 96 hidden or final boundaries. It durably emits the existing
+`jetstreamer-epoch208-decoded-gap-boundaries-v1` worker input plus a private no-clobber receipt.
+Both outputs explicitly deny publication, runtime-route promotion, remote mutation, and R2
+mutation; collector success remains evidence for a later checkpoint qualification, not promotion
+authority by itself.
+
+Using this narrower definition, which excludes ordinary version pinning, snapshot-format support,
+PoH optimization, and AccountsDB maintenance, epochs 0-100 currently require eight distinct
+slot- or record-specific compatibility interventions.
+
+Snapshot selection and current-plugin streaming add three non-execution compatibility rules for the
+later range. All are general invariants rather than slot-special-case branches:
+
+| First observed at | General handling | Safety boundary |
+|---|---|---|
+| bootstrap slot `61,328,765` for epoch 142 | coalesce an hourly object and canonical root object only when slot, accounts hash, extension, byte length, CRC32C, and MD5 all match; prefer the root object | any digest or identity disagreement remains an ambiguous-preflight failure |
+| misplaced root alias `122724642/snapshot-116819852-*` | ignore the alias only when the exact canonical root path exists and filename identity, byte length, CRC32C, and MD5 all match; prefer the canonical path | a missing canonical path, absent MD5, or any identity/content disagreement remains a fatal inventory error |
+| late-anchor hourly objects, first observed around snapshots `110627202` and `116838296` | quarantine every object whose hourly anchor is later than its snapshot slot and record it in the preflight report; when a valid-anchor digest-identical copy exists, retain that copy | hourly objects are transport-only and never checkpoint trust anchors; if quarantine leaves no valid bootstrap, cohort planning fails closed |
+| epoch-boundary slots `75,168,000`, `86,832,000`, `88,560,000`, `88,992,000`, `89,424,000`, and `90,288,004` | permit up to 262,144 pre-transaction runtime-direct account writes, 64 MiB of their data, and 262,144 reward records in one archive block (observed: 131,073 writes, more than 32 MiB of write data, and 155,661 rewards) | all three limits remain finite and the independent per-account, bucket, and decode-work limits remain enforced; wire encoding is unchanged |
+| rent-collection slots `76,611,288`, `76,920,172`, `77,374,128`, `77,882,688`, `78,204,496`, and `80,017,516` | permit up to 8,192 post-transaction runtime-direct account writes and 16 MiB of their data in one archive block (observed: at least 4,097 writes at each earlier slot and 9,141,825 data bytes at slot 80,017,516) | both limits remain finite and the independent per-account, bucket, and cumulative decode-work limits remain enforced; the capacity is not encoded, so wire encoding is unchanged |
+
+Archive-container repair is tracked separately from execution compatibility. Early independently
+generated epoch 1-6 files can carry the old writer's zero placeholder as both their first bucket
+PoH anchor and first block `parent_blockhash`, even though the preceding archive contains the
+canonical parent. The re-encoding pipeline may replace only that initial placeholder: it requires
+the preceding canonical slot and blockhash, recomputes the first block's PoH to its already stored
+blockhash, rejects any other zero-parent block, writes a new file, and strictly decodes it before
+publication. This does not alter transaction, account-update, entry, or runtime semantics and is
+not counted as another execution intervention.
+
+Candidate mode requires the exact runtime identity, an explicit
+`JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1`, snapshot verification, and at least one canonical
+checkpoint after the bootstrap slot. Unknown opt-in values are rejected. Current behavioral
+evidence proves the old v1.0.7 vote-initialization semantics through slot 618,196 and first requires
+the v1.0.8 semantics at slot 630,648. The canonical snapshot at slot 619,848 is therefore the
+behaviorally safe handoff: v1.0.7 processes through that snapshot and v1.0.8 starts at slot 619,849.
+This routing point is not a claim about the exact deployment slot. Every candidate envelope remains
+explicitly non-canonical until its checkpoint replay completes. Additional exact patch workers stay
+registered but unassigned until differential evidence requires a narrower runtime boundary. This
+includes the v1.0.17 worker, which remains available for comparison without claiming a slot range.
+
+Epoch 67 requires more than one intra-epoch runtime handoff. Direct comparisons with Old Faithful
+show that v1.2.32 still matches recorded execution at slots 29,188,719 and 29,189,576. The first
+known source transaction requiring CPI to remain disabled is at slot 29,327,576, where v1.2.32
+succeeds but Old Faithful records BPF-loader error `0x0b9f0002`. The hourly GCS snapshots previously
+used to place the first handoff are not independent proof: their persisted slot-hash state disagrees
+with successful votes in the Old Faithful stream. The candidate route therefore keeps v1.2.32
+through slot 29,327,575, uses v1.2.24 through slot 29,371,187, and uses the v1.2.32 transition
+runtime afterward. Corrected source-lineage replay binds the first handoff at slot 29,327,575
+to accounts hash `A286WmNJJ1r5F8G2cnBqykiDGbXgo7aphzJVJqX5ZwbR` and the second at slot 29,371,187
+to `6ubQSWsXQ8dEtxTkZwgpB8vEVj4nAsQcSGmu9usxVSGR`. The successor then matches the complete
+terminal checkpoint at slot 29,807,999: bank hash
+`439dySBi6LuxMisYQJbt6iPGgu8oSZe3uvvALBRMPXsD` and accounts hash
+`5drX1gEHUyDxfnXEtotcfhZDUrwazrVMoH2A2icSsN3k`. Transactional cohort publication and both
+checksum commits remain mandatory; neither superseded handoff hash is treated as proof.
+
+Epoch 12 starts v1.0.23 from the canonical snapshot at slot 5,183,736 with legacy accounts hash
+`BUqwiSm2GgH9ByKrBDF6epXHYK9RRh3vyZDKtUqtMXfR`. Production discovery binds both values, so a
+later local epoch-11 snapshot cannot shorten the registered warmup. The worker warms slots 5,183,737
+through 5,183,999 and begins Horizon output at slot 5,184,000. This boundary uses an independently
+verified snapshot restart. The runtime handoff registry has no entry at 5,184,000.
+
+Transaction metadata is an independent compatibility dimension. Old Faithful has no status frame
+before slot `4,258,776`; the pinned historical runtime reconstructs transaction status there, while
+the remaining metadata stays explicitly unavailable. At and after that slot, a missing status frame
+is rejected unless it matches a checked-in audited `(slot, transaction index, signature)` anomaly.
+The early audit table binds 1,084 known holes across 15 slots to finalized RPC status evidence. For 463
+of them, finalized block RPC data also preserves the original balance vectors. For the other 621,
+complete metadata was absent from the captured RPC evidence and the other fields remain absent or
+at their defaults. The early source writer also stored execution results beside the wrong
+transactions. Observed singleton entries and complete slots prove that the corruption is not bounded
+to one entry or slot, so a source-status multiset is not valid execution evidence. For the epoch 0-100
+compatibility scope, the pinned runtime is authoritative for each transaction's status and fee.
+Audited holes only authorize the exact source omission and preserve any available ancillary metadata.
+Later canonical account-state checkpoints remain the admission gate for that reconstructed execution.
+Because the same writer defect could select another transaction's durable-nonce fee calculator,
+protocol-v5 workers also return the runtime-associated fee. Replay uses that fee for source-present
+records and audited missing-frame exceptions in the affected writer era. This policy changes during
+epoch 9 without changing the execution runtime. Separately, the epoch-208 archive has a bounded
+prefix gap covering every transaction in 88 present slots from `89,856,001` through `89,856,106`.
+A full-epoch audit found exactly 73,688 empty frames, and finalized block captures reproduce the
+same ordered signatures with non-null metadata for every record. Those records remain source-exact:
+replay admits only the checked-in `(slot, transaction index, signature)` identity, carries the full
+canonical metadata into Horizon, and still requires the replayed status to match it individually.
+
+Generated Horizon archives record the selected runtime identity and admission level, genesis,
+bootstrap state, output slot range, and transaction-metadata policy in a versioned provenance
+envelope. Range resume skips a completed archive only when that provenance matches the current
+slot-derived plan.
+
+One content-addressed rule is narrower than normal range resume. The epoch-11 archive produced at
+revision `0a8ec77094ddf2b21ff22e6f4a55fef836f8f2c6` may proceed from private crash recovery to
+the secure publisher, or be reused after publication, only when its complete provenance matches
+the audited v1.0.14 run. `JETSTREAMER_HISTORICAL_WORKER_V1_0_14` must resolve to
+`/home/sol/.jetstreamer-private/deploy-epoch11-full-v1014-20260910-v3/jetstreamer-historical-worker-v1-0-14`,
+and that executable must hash to the recorded SHA-256. The archive must then pass its full decode,
+semantic and PoH-chain checks, exact 2,765,674,556-byte length, and exact audited SHA-256. The old
+producer profile is not part of the general compatibility allowlist, so no other artifact from that
+profile gains admission.
+
+Root snapshots are the only trust anchors for historical verification. The read-only inventory
+preflight groups an epoch without a root checkpoint with the first later epoch that has one, as
+long as the runtime descriptor does not change. Hourly snapshots may shorten bootstrap work for
+an independent single-epoch cohort, but they never satisfy a checkpoint or anchor a root-gap
+cohort. The preflight manifest records the root object's generation, CRC32C, size, slot, accounts
+hash, and GCS MD5 when one exists. GCS composite objects intentionally lack MD5 metadata; schema
+v4 represents that case with an explicit `md5_hash: null` while still requiring and fingerprinting
+the immutable generation, canonical versioned URI, size, and CRC32C. Omitting the field is invalid,
+and schema v3 remains compatible while continuing to require MD5. The manifest also records the
+full cohort range and terminal root checkpoints.
+
+Epochs 17 through 19 are one such cohort. They start from root slot 7,343,776 and reach root
+checkpoints in epoch 19. First save the complete preflight report in an owner-controlled file and
+record its printed `manifest_fingerprint` through the review channel. The fingerprint supplied to
+the replay must be the independently reviewed value, not a value copied from a newly downloaded
+report. Run the cohort with:
+
+```bash
+JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1 \
+  cargo run --release -p jetstreamer-node --bin jetstreamer-node -- \
+  17-19 /path/to/output --verify --root-checkpoint-cohort \
+  --cohort-manifest=/secure/path/preflight-1-100.json \
+  --cohort-manifest-fingerprint=sha256:0f972577503068f9a3d74c2a427f20363da0e5fa3b727f3eb5bcba220cf7e976
+```
+
+This mode keeps one historical worker and one root-only verifier alive across every epoch
+boundary. It downloads the manifest's immutable GCS generation, verifies the recorded size,
+CRC32C, and MD5 when supplied, and holds the measured inode and SHA-256 digest through historical worker startup. The
+worker makes its own digest-checked private copy before decoding. The bootstrap normally comes
+from a root object. A singleton cohort may instead use the manifest's exact hourly transport
+object; its anchor, snapshot slot, path, and generation remain fingerprint-bound. Multi-epoch
+cohorts still require a root bootstrap, and hourly objects are never admitted as checkpoint
+expectations. Checkpoint expectations come
+only from the same fingerprinted manifest; replay does not replace them with a later bucket
+listing. Each epoch archive is written below the owner-only private run directory. The process
+checks the exact checkpoint handoff, the next archive's initial PoH and parent anchors,
+cross-bucket continuity, provenance, full archive decode, and archive digest while publication is
+closed. Each terminal checkpoint must match the archive's final present block, so trailing skipped
+slots do not create a false epoch-boundary requirement. A mismatch, missing final-epoch root,
+infrastructure failure, or interruption leaves every generated archive and its recognizable run
+state private and creates no checksum. The final root and every archive must pass before the
+transactional publisher can expose any cohort member. Publication capability is tested once before
+replay begins, then the ordered archive set is committed through one durable batch journal. While
+that journal or its completed outcome exists, archive reuse, checksum repair, and another batch all
+fail closed. After commit, Jetstreamer verifies the exact final inode set and checksums, writes and
+fsyncs an owner-only receipt below the destination's private evidence scope, and acknowledges the
+exact transaction ID before removing the private run. The receipt records the reviewed manifest
+fingerprint, canonical destination identity, ordered epochs, prior namespace identities, new archive
+digests, and final identities.
+
+On startup, a top-level producer recovers or observes any pending batch before inspecting an
+archive. It writes the same durable private receipt for a committed result, or a rollback receipt
+containing restored identities and the still-private validated archive digest. It then acknowledges
+that outcome and exits unconditionally. A clean subsequent invocation is required to resume. If
+the journal, destination, staged archive, or receipt evidence has changed, recovery makes no further
+mutation and the destination remains closed for operator review.
+
+Use `scripts/preflight_gcs_snapshots.py` before scheduling early epochs. Its schema-v4
+`verification_cohorts` array supplies the ranges accepted by this mode and fails if a root gap
+would cross a runtime boundary, select a non-historical runtime, or extend beyond the requested
+range.
+
+When live GCS inventory is temporarily unavailable, a previously reviewed v2, v3, or v4 report
+can be regrouped without weakening its object bindings. Pass both
+`--source-manifest-report=PATH` and the independently recorded
+`--source-manifest-fingerprint=sha256:...`; the preflight verifies the complete old manifest,
+strictly validates every generation, versioned URI, size, CRC32C, and schema-specific MD5 field,
+then emits a fresh v4 plan. It never treats the fingerprint embedded beside a report as an
+independent seal. Snapshot restore still revalidates the selected generation against GCS before
+use.
+
+When an epoch crosses a registered runtime boundary, `jetstreamer-node` splits it automatically
+into bounded child replays. Each child writes a complete Horizon V2 segment plus a durable JSON
+evidence sidecar bound to both the archive and worker executable by SHA-256. At the v1.0.7 →
+v1.0.8 boundary, the predecessor exports the registry-committed slot-619,848 snapshot only after
+its frozen checkpoint matches the canonical accounts hash. A second durable sidecar binds every
+snapshot byte—including status-cache state not covered by the accounts hash—to that checkpoint
+and the measured predecessor worker. The successor copies exactly the sidecar-declared byte length
+into private storage while verifying that digest, restores only the bound copy, and must reproduce
+the full checkpoint state
+without bootstrap writes. The final Horizon V3 records the exact handoff archive digest, streams
+and re-encodes the segments, checks PoH continuity and every segment's terminal blockhash, rebases
+runtime-local write versions into one contiguous namespace, fully decodes the result, and then
+publishes it atomically. Interrupted segment files are retained for validated resume, and an older
+final output is moved to a recoverable backup only after the new archive has passed verification.
+
+### Adaptive historical sweeps
+
+Create each immutable sweep deployment with `jetstreamer-seal-deployment` rather than copying
+members into a production directory by hand. The command accepts one absolute JSON plan, its
+separately supplied SHA-256, and the separately computed SHA-256 of the running sealer. It verifies
+the latter through `/proc/self/exe`, rehashes every source while copying it into a private stage, fsyncs
+each member, writes canonical `SHA256SUMS` and `deployment-seal-receipt.json`, then publishes the
+root-owned non-writable directory with a no-replace rename. The destination and all of its
+root-controlled ancestry must not be group- or world-writable. The receipt deliberately grants no
+replay, publication, or remote-mutation authority; capability probes and fresh admission remain
+mandatory.
+
+`scripts/adaptive_root_cohort_sweep.py` runs reviewed verification cohorts in separate,
+pre-provisioned lanes. It starts in planning mode. Execution is intended for a detached,
+root-owned service using a root-owned, non-writable deployment tree and owner-only controller
+state under root-controlled ancestry. The controller derives every work boundary from the
+fingerprinted preflight manifest and will not split a verification cohort.
+
+Snapshot preflight defaults to one epoch per verification cohort when every epoch has a root.
+Pass `--target-cohort-epochs=3` or `4` to deliberately carry one immutable historical runtime
+and its AccountsDb/cache state across consecutive epochs. The planner keeps every intermediate
+root, requires a root bootstrap for any multi-epoch cohort, and splits at runtime boundaries;
+when the preferred endpoint lacks a root it uses the latest earlier root in the target window.
+Only a target window with no root may extend through the first later root in the same runtime.
+Per-epoch archives and verification gates remain independent even though replay is continuous.
+
+Concurrency begins at the configured floor and increases gradually when CPU, memory, and disk
+headroom allow it. The optional `--memory-admission-gib` keeps the measured non-reclaimable
+per-worker reservation separate from the larger `MemoryMax` safety ceiling; it defaults to that
+ceiling unless an operator supplies measured evidence. Disk admission reserves a fixed safety
+margin and conservatively budgets the full configured private-storage allowance for every live
+producer before starting another one;
+it never terminates live work merely because available space falls below that estimate. By
+default, every producer runs as the unprivileged `sol:horizon` identity in a resource-bounded
+systemd unit. Hosts with a different dedicated identity must pass `--producer-user` and
+`--archive-group`; the controller resolves that account's home directory and applies it to the
+service environment, home execution barrier, sensitive-path isolation, ownership checks, live-unit
+adoption policy, sealed configuration digest, and printed plan. A plan may
+configure up to 32 lanes, but admission is still capped by the number of provisioned lanes and by
+the live CPU, memory-admission, and disk calculations. The final global claim check and launch
+are serialized through the bound public-directory lock, so controllers for different runtime eras
+cannot consume the same capacity slot concurrently. A queue's local lane count limits only how many
+jobs that queue can add; it does not become an accidental ceiling on the global producer count.
+Producer services deliberately use a minimal PATH. If `gcloud` is installed outside
+`/usr/bin`—for example by Homebrew—pass its absolute path with `--gcloud-bin`. The controller
+resolves and validates that executable, binds its SHA-256 into the sealed configuration, adds only
+its parent directory to the producer PATH, and requires the same environment when adopting a live
+unit.
+Every new sweep must also pass `--solana-rayon-threads` with the value selected by a bounded,
+same-snapshot performance qualification. The controller binds that value into its configuration,
+producer environment, and live-unit adoption checks. This prevents a high-core host from silently
+falling back to the legacy half-visible-CPU store fan-out and changing scratch amplification.
+If an authenticated reserve guard stops a cohort, keep its controller stopped while reviewing the
+durable guard receipts. A root-checkpoint run may retain a resumable run container even though its
+incomplete member must restart from the sealed bootstrap and its AccountsDb scratch is cleared.
+For that exact case, `scripts/retire_reserve_stopped_replay_scratch.py --check-only` proves the
+guard, terminal invocations, cursor-free state, preserved input/archive identities, and lack of live
+references. Re-run without `--check-only` to fsync a deletion intent and retire only the exact
+scratch tree. The run directory, input snapshot, partial archive, state, journals, and receipts stay
+in place for a later `JETSTREAMER_ROOT_COHORT_RESUME_RUN` launch. Never apply this cleanup to a run
+whose scratch contains a usable replay cursor.
+When a comparison uses a precommitted JSON selection policy, run
+`scripts/select_historical_performance_candidate.py` against the root-owned terminal result receipt.
+The selector requires exact zero-restart terminal evidence for the control and candidate, validates
+the policy-bound result manifest, applies every throughput and resource ratio plus the material
+storage-win rule, and fsyncs a no-clobber root-owned selection receipt. Selection alone never
+authorizes a qualification launch or publication; fresh inventory and resource admission remain
+separate gates. A dormant qualification service can bind that decision with
+`scripts/check_historical_performance_selection.py`: the gate requires the exact selected variant,
+policy digest, and sealed selector digest while also requiring the receipt to keep qualification
+launch, publication, and remote mutation unauthorized. Passing this check proves only which
+environment was selected; the service must still receive a separate fresh admission before start.
+Performance result manifests can bind a host-specific `private_root`, `unit_prefix`,
+`archive_filename`, and `canary_receipt_uid`; omitting them preserves the original epoch-202
+defaults. New comparisons should use selection-policy schema
+`jetstreamer-historical-performance-selection-policy-v2`, name the exact `control_variant` and
+`candidate_variant`, and set `require_wave_metrics` only when execution-wave instrumentation is
+part of the experiment. This keeps same-snapshot Rayon or storage-layout comparisons portable
+without weakening the sealed path, unit, receipt-owner, or no-publication checks.
+The sealed performance-admission checker accepts an optional
+`minimum_memory_available_bytes` floor (and optional absolute `meminfo_path`) in addition to its
+filesystem and VMA floors. Use the measured non-reclaimable reservation for every already-live and
+new worker plus the host reserve, rather than multiplying each worker's larger emergency
+`MemoryMax` ceiling.
+Producer namespace filtering uses a reload-stable cgroup-only allow-list; user namespaces and every
+other namespace type remain denied,
+and the empty capability set prevents the unprivileged worker from using the nominal cgroup option.
+The controller will adopt existing work only when the process identity, arguments, cgroup, lane,
+runtime, manifest, and complete sandbox configuration match the sealed plan. Overlapping epoch or
+lane claims stop scheduling.
+
+Completed lanes are imported one at a time through the same Rust recovery and transactional
+publication path used by manual cohort runs. Before launch, the root controller binds the source
+receipt, its gate context, and independently checked archive digests into durable state. A retained
+systemd unit supplies durable importer exit status across controller restarts. After a successful
+exit, the controller requires the public receipt to reproduce that evidence, rehashes every public
+archive, and records a root-owned completion attestation before unloading the unit. Directory
+inodes are bound into the sealed configuration and rechecked while the controller runs. A committed
+import consumes the source checksum sidecars so the lane can be reused. Publication journals,
+partial namespaces, changed receipts, and failed attempts remain in place for recovery or operator
+review; the controller does not delete them.
 
 ## Installation and Setup
 

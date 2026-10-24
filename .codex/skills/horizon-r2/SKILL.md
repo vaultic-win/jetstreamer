@@ -1,0 +1,1224 @@
+---
+name: horizon-r2
+description: Generate, verify, upload, and safely retire Horizon epoch archives using Cloudflare R2 as the durable inventory. Use when filling missing Horizon epochs, syncing verified .jet archives to R2, or resuming a specified epoch range.
+---
+
+# Horizon R2
+
+Treat R2 as durable storage. Never call `DeleteObject` or `DeleteObjects` except for the exact
+`epoch-N.epoch-status.json` lifecycle defined below. Never overwrite or delete a `.jet` or
+`.sha256` object as ordinary campaign work. Aborting an incomplete multipart upload is allowed.
+Preserve every other existing object by default. Overwrite an existing `.jet` only when positive
+verification evidence identifies that remote archive as erroneous and the user explicitly
+authorizes its replacement; a mismatch alone does not establish which copy is wrong.
+
+Cloudflare R2 public access is a bucket-level origin setting, not an S3 object ACL. R2 does not
+support `public-read`, `PutObjectAcl`, or the `x-amz-acl` upload header. Keep the authenticated S3
+API endpoint in `HORIZON_S3_ENDPOINT`. Do not rewrite objects or attempt per-object ACL changes to
+make them public. Anonymous-origin verification is not part of this workflow and must not delay
+authenticated upload, completion, status cleanup, or local retirement.
+
+Interpret an explicit request to make or mark all `.jet` archives and sidecars public as authority
+to enable the named bucket's managed `r2.dev` origin or named custom domain once. It is not authority
+to rewrite objects, change metadata, attempt unsupported per-object ACLs, or expose a different
+bucket. The bucket-level setting covers both existing and future objects. If the supplied
+control-plane credential cannot inspect or enable that origin, preserve all objects and report the
+permission blocker without holding up the authenticated archive campaign.
+
+Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before optional local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
+
+## Rust-first implementation policy
+
+- Implement all new Horizon production, verification, delivery, orchestration, monitoring,
+  admission, receipt-writing, and operational tooling in Rust by default. Do not add new Python or
+  shell business logic when the behavior can be owned by a reviewed Rust binary. Keep archive
+  parsing, hashing and integrity decisions, publication gates, R2 access, and local retirement in
+  Rust.
+- Existing reviewed and sealed Python or shell components may continue when they are already bound
+  into an active or prepared workflow and replacing them would invalidate durable evidence,
+  require restarting healthy work, or add migration risk. Do not stop, restart, or mutate a healthy
+  producer merely to change implementation language. Replace these components with reviewed Rust
+  implementations at the earliest safe opportunity, but do not let language migration delay,
+  block, or destabilize the active Horizon campaign.
+- When materially extending an existing non-Rust component, prefer replacing that behavior with a
+  tested, immutable Rust tool and migrate only through the normal sealing and capability gates. If
+  an urgent safety repair must remain in the existing language, keep it narrowly scoped, preserve
+  the Rust integrity boundary, and do not treat it as precedent for new non-Rust functionality.
+- Seal every new immutable runtime deployment with the repository's Rust
+  `jetstreamer-seal-deployment` binary, its separately supplied self-SHA-256, and a separately
+  hash-bound JSON plan. The tool must run as root, verify the running executable through
+  `/proc/self/exe`, copy and rehash each declared regular source without following symlinks, fsync every member
+  and the directory, write canonical `SHA256SUMS` plus a no-clobber deployment receipt, and publish
+  the directory with `renameat2(RENAME_NOREPLACE)`. Never hand-assemble a new production package or
+  replace an existing package directory. The seal receipt explicitly denies replay launch,
+  publication, and remote mutation; exact-node capability probes and fresh admission remain
+  independent requirements.
+
+For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Optional local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
+
+### In-flight epoch status objects
+
+- Own the accuracy and lifecycle of these objects: they drive a live dashboard, not an archival
+  history view. Read [references/dashboard-status.md](references/dashboard-status.md) before
+  changing an ETA model, handling a dropped/failed lane, or retiring stale status metadata.
+  A plausible old countdown is not an acceptable substitute for a current, evidence-backed estimate.
+- Always provide a definite numeric ETA for active work, including active repair. Do not propose
+  hiding its countdown or displaying "ETA unavailable" as the solution to a failed estimate.
+  Repair the estimate model and owner binding; include explicit recovery and delivery allowances
+  and disclose uncertainty in private evidence and human status updates. See the dashboard-status
+  reference for the distinction between active recovery and genuinely inactive work.
+- Publish one mutable R2 object named `epoch-N.epoch-status.json` for every epoch actively being
+  worked on, including input preparation, qualification, repair, replay and post-replay delivery,
+  until its canonical `.sha256` sidecar is committed. Internal labels such as "private" or
+  "diagnostic" must never hide active work from the dashboard. Label the real phase and bind its
+  live producer or current repair/task owner; a queued plan alone is not active work. Keep these objects out
+  of `HORIZON_DIR`; build them in private state and publish them with reviewed Rust tooling. The
+  object is operational metadata, never an archive, verification receipt, lease, or publication
+  gate.
+- Use this JSON shape. The four numeric fields are mandatory JSON integers, never `null`, strings,
+  ranges, infinities, or omitted values. `sampled_at_utc` and `phase` make freshness and the estimate
+  basis explicit:
+
+  ```json
+  {
+    "epoch": 224,
+    "jet_size_bytes": 0,
+    "elapsed_execution_millis": 0,
+    "estimated_remaining_millis": 0,
+    "sampled_at_utc": "2026-10-17T00:40:00Z",
+    "phase": "replay"
+  }
+  ```
+
+- The live Vaultic dashboard accepts exactly `replay`, `verification`, `upload`, and `readback`
+  as lowercase status phases. Use `replay` for observed transaction execution even when its
+  compatibility route remains under qualification, and `verification` for active native-input,
+  qualification, archive/plugin checks, assembly or finalization work before upload. Preserve the
+  precise internal stage and all qualification gates in private fleet/estimate receipts; the coarse
+  dashboard phase never promotes a job or qualifies an archive. Do not publish internal labels such
+  as `qualification`, `publication`, `finalization` or `queued-upload` as wire phases without a
+  coordinated consumer change. Compare an actual accepted payload when diagnosing missing ETAs;
+  an unsupported phase causes the reader to discard the whole report, including bytes and ETA.
+- Bind `epoch` to the exact live claim. Measure `jet_size_bytes` from the current `.jet` regular
+  file and use `0` before that file exists. Derive `elapsed_execution_millis` from the authoritative
+  producer invocation start, not from the most recent poll. `estimated_remaining_millis` is the
+  current best definite estimate of wall time until the matching R2 `.sha256` sidecar appears. It
+  therefore includes remaining replay, archive close/fsync, independent full and plugin checks,
+  required boundary verification, upload, whole-object readback, source revalidation, and sidecar
+  commit. Use `0` only when the sidecar is already committed and the status object is awaiting its
+  final verified deletion.
+- Update every in-flight epoch's status exactly once per normal 30-minute replay observation, from
+  the same identity-stable sample and ETA model. Do not add a second polling loop. Require the bound
+  controller/producer invocation IDs and restart counts to remain stable across the sample; a
+  failed or identity-changing sample publishes no replacement. For a legacy multi-epoch replay,
+  publish a status object for every still-uncommitted epoch claimed by that replay, even when a
+  later member has not begun and its current size is `0`.
+  Handle positively observed failure, dropout, phase handoff and sidecar-completion events promptly
+  without adding a routine polling loop. Update a genuinely active downstream phase with a supported,
+  evidence-bound publisher; do not keep labeling it replay or delete it just because replay ended.
+  Confirmed inactive work must have its misleading status removed through the separate inactive-status
+  lifecycle below, rather than retaining a countdown until an archive eventually completes.
+- Status objects are the sole routine R2 mutation exception: later 30-minute samples may replace
+  only the matching `epoch-N.epoch-status.json`, preferably with an ETag/version precondition so an
+  older writer cannot replace a newer sample. Verify the exact uploaded bytes through authenticated
+  R2 readback. Status publication does not require `HORIZON_PUBLIC_BASE_URL` and does not wait for an
+  anonymous origin. Never let status-object permissions or failures weaken the archive/sidecar
+  gates.
+- Use the Rust uploader's `status-publish` command once per claimed epoch immediately after the
+  coordinated v2 observer receipt is durable. Pass the exact directory containing that epoch's
+  current partial `.jet`; the command reports size `0` when the file has not begun. It verifies the observer
+  receipt SHA-256, stable zero-restart controller/producer IDs, and epoch claim, derives
+  `sampled_at_utc` from that receipt, conditionally creates or replaces only the canonical status
+  key, performs authenticated byte-for-byte readback, and fsyncs a private receipt:
+
+  ```sh
+  target/release/jetstreamer-r2 status-publish /absolute/current-jet-directory \
+    --epochs N-N \
+    --receipt-directory "$HOME/.jetstreamer-private/r2-status-receipts" \
+    --observer-receipt /absolute/horizon-live-resource-sample.json \
+    --observer-sha256 OBSERVER_SHA256 \
+    --expected-controller-invocation-id CONTROLLER_INVOCATION_ID \
+    --expected-producer-invocation-id PRODUCER_INVOCATION_ID \
+    --elapsed-execution-millis ELAPSED_MILLIS \
+    --estimated-remaining-millis REMAINING_MILLIS \
+    --phase replay
+  ```
+
+  This status command intentionally needs no public-origin environment setting. A failed observer
+  binding publishes nothing. Do not substitute a hand-written `put-object` command when publication
+  or authenticated readback fails. Run it with the identity that can traverse and write the configured
+  private receipt directory; validate that access before the first remote mutation. The reviewed
+  publisher treats an existing byte-for-byte identical status payload with the same sample timestamp
+  as an idempotent receipt-recovery retry: it performs no `PutObject`, repeats authenticated readback,
+  and durably writes the missing receipt. It must continue to reject the same timestamp with different
+  content, an older sample, or a different epoch. Use this recovery only after a prior invocation
+  reached remote publication/readback but failed while writing its local receipt.
+- When an active legacy multi-epoch lane has a hash-bound ETA model, derive the definite ETA and
+  elapsed-execution millisecond values
+  with the reviewed, sealed Rust `jetstreamer-horizon-status-estimate` binary before calling
+  `status-publish`. Bind the exact model, observer receipt, and running estimator SHA-256 values.
+  The model must name the expected zero-restart controller and producer invocation IDs, its prior
+  evidence receipts, exact archive directories, phase, private status-receipt directory, terminal
+  slots, fixed post-replay/verification/upload allowances, elapsed execution time, and the estimate
+  for each queued epoch. The estimator must rehash that evidence, require the observer's
+  stable live identities and sufficient slot rates, and fsync a private no-clobber estimate receipt.
+  Pass only the resulting integer millisecond values to the matching status publications. A missing
+  rate, identity change, stale timestamp, model mismatch, or estimator failure publishes no
+  replacement status object for the affected range; never substitute hand arithmetic after that
+  fail-closed result. When one observed range lacks rates but another remains healthy, a reviewed
+  schema-v3 partial model may estimate only the healthy range with the same previously validated
+  legacy formula. It must bind the complete observer range census, all current invocation IDs, the
+  root-owned owner-only estimate directory, prior estimate receipts that reproduce the formula, and
+  the exact coordinated observer receipt. Leave every excluded range's status objects unchanged;
+  never weaken the census or relabel a post-replay range as rate-bearing merely to refresh it.
+- Once a legacy producer advances into a later epoch while its controller still withholds every
+  archive until whole-cohort import, stop using the pairwise legacy formula: a completed replay is
+  not yet a sidecar. Use the reviewed schema-v4 cohort-gated model instead. Bind the current epoch's
+  exact observed terminal slot, add every still-queued cohort slot to every epoch that cannot be
+  exposed before the shared import gate, and give each epoch an evidence-backed downstream
+  allowance for import, verification, upload, readback, and its position in sidecar commit order.
+  Require the per-epoch replay-offset and downstream-allowance maps to cover the modeled range
+  exactly. If that model is unavailable or its evidence is incomplete, leave the affected status
+  objects unchanged rather than publishing the old pairwise ETA.
+- There are two authorized status-deletion lifecycles: verified archive completion, and positively
+  confirmed inactive/orphaned work. Both apply only to the exact `epoch-N.epoch-status.json` key;
+  neither authorizes an archive, sidecar, receipt, prefix, or bulk deletion.
+- For verified completion, delete that epoch's status after the canonical `.jet` has been
+  uploaded and read back, its `.sha256` sidecar has been created, and the complete pair has durable
+  authenticated verification evidence. Status deletion does not wait for an anonymous public
+  origin. A missing status object is not archive completion evidence. Never use this exception to
+  delete or overwrite any `.jet`, `.sha256`, receipt, or differently named R2 object.
+  Use the reviewed Rust uploader's `status-delete` command with the latest exact status-publication
+  receipt and its SHA-256 plus the canonical archive-receipt directory:
+
+  ```sh
+  target/release/jetstreamer-r2 status-delete "$HORIZON_DIR" \
+    --epochs N-N \
+    --receipt-directory "$HOME/.jetstreamer-private/r2-status-receipts" \
+    --archive-receipt-directory "$HOME/.jetstreamer-private/r2-receipts" \
+    --status-publication-receipt /absolute/epoch-N.status-TIMESTAMP.json \
+    --status-publication-sha256 STATUS_RECEIPT_SHA256
+  ```
+
+  For an event-driven cleanup triggered by the durable archive receipt, replace the two explicit
+  publication-receipt options with `--latest-status-publication-receipt`. The Rust command must
+  scan only the configured private status-receipt directory, validate every matching canonical
+  publication receipt, select the greatest canonical sample timestamp, compute its SHA-256 itself,
+  and bind the resulting exact path and digest into the deletion receipt. Do not discover the
+  latest receipt with a shell glob or mtime.
+
+  The command must revalidate the durable whole-object archive receipt and authenticated archive/
+  sidecar pair before and after deletion, require the current status bytes and ETag to match the
+  bound publication receipt, issue one conditional delete for only the canonical status key,
+  verify authenticated absence, and fsync a private no-clobber deletion receipt. Its idempotent
+  recovery path may accept an already-absent status only when the exact authenticated publication
+  receipt proves that object previously existed and the ready pair still passes every gate.
+- For confirmed inactive/orphaned work, remove the status promptly even when no ready archive exists.
+  Require durable terminal/ownership evidence, no replacement replay or active downstream/handoff,
+  an authenticated match to the exact owner's latest status-publication receipt, a fresh race check,
+  conditional deletion of only that key using its current ETag, authenticated absence verification,
+  and a private durable deletion receipt. Follow the dashboard-status reference. The existing
+  completion-only `status-delete` command must not be tricked into this path with fabricated ready
+  evidence. If no reviewed Rust inactive-cleanup path is deployed, implement and qualify it promptly;
+  report the remaining stale dashboard object explicitly until authenticated cleanup succeeds.
+
+### Host-specific R2 scratch / holding area
+
+When the user explicitly permits host-specific R2 scratch, use a separate key prefix in the
+configured bucket for safe cold offloading, not a FUSE replacement for live replay storage.
+The user must provide the unique directory/prefix name for this host before any scratch upload;
+never invent it from the hostname or reuse another host's prefix. Read
+[references/r2-holding.md](references/r2-holding.md) before parking, restoring, or retiring a local
+copy. Authenticated access is sufficient; no public URL or anonymous verification is required.
+This permission does not authorize overwriting or deleting R2 objects, changing bucket access,
+or weakening canonical archive/sidecar and local-retirement gates. A missing scratch name must
+not stall otherwise admissible ordinary campaign work.
+
+### Campaign fleet reconciliation
+
+- Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
+  campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
+  coordination and user reporting. Keep the loop work-conserving while repair agents investigate;
+  do not let one difficult epoch monopolize the main agent or stall independent admissible work.
+  Follow [the repair coordination guidance](references/host-utilization.md#delegate-epoch-specific-repairs)
+  when assigning work or admitting a repair experiment.
+- Maintain one authoritative fleet ledger for the complete assigned campaign, not merely a list of
+  the ranges that happened to appear in the latest live-resource observer config. Reconcile it in
+  the same 30-minute control cycle as the coordinated replay/resource observation and status-object
+  refresh; do not add another polling loop. A user-requested status check runs the same reconciliation
+  once out of band. Write each result as a durable no-clobber private receipt that binds the observer
+  receipt, the previous fleet receipt, the authenticated R2 inventory, and every service identity it
+  reports.
+  Batch independent authenticated inventory reads with bounded concurrency and deterministic epoch
+  order to shorten this cycle. Keep the complete inventory, anomaly checks, observer freshness and
+  before/after owner checks; a failed lookup must not produce a partial accepted ledger. This does
+  not increase replay or uploader concurrency or add another observation loop.
+- Classify every campaign epoch into exactly one operational state: `remote-ready`, `live-replay`,
+  `post-replay-pipeline`, `staged-admissible`, `blocked-qualification`, `failed-needs-repair`, or
+  `not-yet-staged`. For every non-ready epoch record the concrete next action and the evidence or
+  gate that permits or blocks it. Keep a separate, explicit active list containing only live replay,
+  verifier, uploader, or readback invocations whose exact systemd identity is currently present.
+  A plan, unit file, status object, prior receipt, or estimated completion time is never proof that
+  an epoch is active.
+- Census all producer/controller claims in the assigned range on every reconciliation, including
+  terminal, failed, quarantined, and newly started units that are absent from the observer config.
+  Bind live entries to exact controller and producer invocation IDs, zero-restart state, claimed
+  epoch range, scratch/output paths, and the current observer receipt. Compare the census with the
+  prior ledger so a disappeared invocation, restart, new claim, freed lane, or stalled downstream
+  stage becomes an explicit transition rather than silently falling out of monitoring.
+- Keep every failed epoch in the complete-range ledger and a durable open-repair backlog through
+  status deletion, scratch retirement, unit garbage collection, restarts and handoffs. Bind its
+  failed invocation, cause/slot/phase, preserved evidence, artifact disposition, repair commits/tests,
+  remaining qualification gates, concrete next action, blocker and last substantive progress.
+  Reconcile this backlog in the same 30-minute cycle and on observed failure events; removal from
+  the live dashboard is never removal from the work queue or proof of recovery.
+- Make diagnosis and qualified recovery of known failures a priority over additional discretionary
+  cold work. Start the smallest safe diagnostic/repair action in the current cycle rather than
+  repeatedly quarantining the epoch or choosing only easier new work. Keep healthy producers and
+  ready delivery stages moving. If repair genuinely depends on missing source, capacity or external
+  input, record that exact blocker and the next unblocking action, continue independent useful work,
+  and revisit the repair at each coordinated reconciliation. Never use priority to justify a blind
+  retry, an unqualified deployment or a weakened integrity/resource gate. Keep the incident open
+  until a qualified recovery reaches the verified ready-pair outcome; a source commit, passing unit
+  test, queued retry or new invocation alone does not close it.
+- Authenticated-read every in-range `epoch-N.epoch-status.json` that exists and compare its epoch,
+  sample timestamp, controller/producer binding from the local publication receipt when available,
+  and corresponding live claim. Report its freshness separately from its ETA. If no matching live
+  invocation exists, classify the object as stale/orphaned operational metadata, exclude that epoch
+  from the active list, and never present its remaining-milliseconds value or projected finish time
+  as current. Check for a replacement live invocation, downstream delivery stage or authenticated
+  handoff before declaring work inactive. When inactivity and ownership are positively established,
+  perform the conditional inactive-status cleanup promptly; a missing ready pair must not keep a
+  dead job visible on the dashboard. Uncertain ownership or a transient failed probe is not deletion
+  authority. Status cleanup never authorizes restarting a replay or declaring the epoch complete.
+- Push every reconciled epoch forward in the same control cycle when a safe next action is already
+  authorized: dispatch ready verification/upload/readback stages, perform fresh admission for the
+  next disjoint staged epoch when capacity and integrity gates pass, and promptly backfill a lane
+  freed by clean completion. For a failed producer, capture and bind terminal evidence immediately,
+  remove it from the active list, preserve or retire artifacts under the normal rules, and begin the
+  required diagnosis or qualified replacement path. Do not defer an executable action merely to
+  the next status report, and do not weaken a compatibility, resource, integrity, or publication
+  gate to keep the fleet looking busy.
+- User-facing progress summaries must be generated from the newest accepted fleet ledger. Show at
+  least the active epoch or range, current phase, last fresh sample time, progress/ETA when valid,
+  and next action. Also call out failed, stale-status, or admission-blocked epochs that materially
+  affect what lands next. Never infer that the numerically next epoch is about to upload merely
+  because an old status object's ETA has elapsed.
+
+## Resolve the work
+
+- On a fresh host, or whenever any requested epoch is outside the checked-in runtime registry,
+  read [references/fresh-server.md](references/fresh-server.md) before downloading snapshots or
+  launching replay. An explicit range assigns work; it does not authorize guessing an execution
+  runtime or weakening a compatibility boundary.
+- Treat invocation without an epoch argument as authorization to start the next missing supported
+  work, not as an inventory-only request. If the lowest missing requested epoch is unsupported,
+  begin the compatibility-qualification path in the fresh-server reference instead of silently
+  skipping it. Accept either one epoch or an inclusive `START-END` range when the user supplies a
+  bound. Do not ask for a range merely because it was omitted.
+- Locate the Jetstreamer repository and read its current historical compatibility table and active controller state before starting generation.
+- Before selecting initial replay concurrency, replacing a completed lane, or increasing the host's
+  proven lane count, read [references/host-utilization.md](references/host-utilization.md). Operate
+  work-conservingly inside the safety envelope: keep the next disjoint candidate staged, promptly
+  backfill cleanly completed capacity up to the last proven operating point after fresh admission,
+  and treat an otherwise admissible idle lane as a condition to explain and resolve. Increasing
+  beyond the proven point remains a one-lane experiment requiring a clean coordinated sample at
+  least 1,800 seconds after the preceding routine sample.
+  Use that reference's measured-budget and time-to-sidecar policies to qualify capacity estimates
+  and choose among admissible candidates; numerical epoch order alone is not a throughput policy.
+- Every host's control loop must explicitly answer **"Can I fit another disjoint lane now?"** at
+  each existing 30-minute observation, user-requested status check, and authenticated completion,
+  failure, or admission/guard-handoff event. Use the same fresh evidence, not a second polling loop.
+  Record the next candidate, live/proven lane counts, current resource arithmetic, eligibility,
+  exact limiting gate, and executable next action in the fleet's existing next-action/evidence
+  entries or a hash-bound capacity-decision receipt. Recompute from current invocation-bound claims;
+  do not carry terminal owners' growth reservations forward without justification.
+  If a qualified candidate fits, admit it in the same cycle and continue filling the proven operating
+  point. If the missing bound is resource qualification, start the smallest freshly admissible bounded
+  experiment instead of merely reporting idle capacity. Scaling beyond the proven point remains one
+  experimental lane at a time until a later clean coordinated sample. A cycle must not end with only
+  "waiting for capacity": name the concrete blocker and how it will be resolved. Apply this on every
+  participating host within its own assigned range; never infer another host's capacity from local
+  observations. Optimize verified R2 sidecars per day, preserve every safety/integrity gate, and add
+  no extra autonomous routine polls.
+- Select the desired active lane count from **memory utilization alone**, targeting **90% of
+  system memory** as the user requested. Use observed aggregate lane RSS and actual host usage,
+  including non-lane usage once; the 1.5× RSS reservation is a scheduling allowance, not a second
+  utilization target. Prefer controlled oversubscription toward that target. Do not turn disk or
+  CPU estimates into a lower desired lane count: handle disk pressure by checkpointing/parking
+  a selected job in the host's R2 holding area, and manage CPU/I/O sharing within the existing
+  controls. Compatibility, integrity, invocation-bound guards and the century disk safety floor
+  still govern execution. Prepare and verify the pressure-relief path before relying on it.
+  Read [references/r2-holding.md](references/r2-holding.md) for the idempotent checkpoint/stop,
+  upload/readback, local retirement, restore and resume lifecycle. Freezing alone retains RSS;
+  releasing memory requires a supported durable checkpoint-and-stop path. Record any missing
+  recovery capability as work to implement, not an excuse to retain obsolete lane reservations.
+- Track process RSS for each lane inside that same observation, including the parent and its
+  worker processes once each. Record the process census, current aggregate lane RSS, per-process
+  RSS high-water marks, and the largest valid aggregate lane RSS observed for the current century.
+  Do not substitute cgroup `memory.peak` or sum process high-water marks as a concurrent lane peak.
+  Use **1.5 times the century's maximum observed lane RSS** as the per-lane memory reservation
+  ceiling, superseding the earlier 2-times rule. The user's initial RSS estimate for epochs 200–300
+  is **150 GB decimal**, giving an initial **225 GB decimal memory reservation per lane**; the
+  separate scratch estimate remains 300 GB. Replace the seed with valid observed lane RSS as it
+  accumulates. Read the memory policy in [references/host-utilization.md](references/host-utilization.md).
+- Prefer capped-shrink workers for new replays when that exact runtime/worker profile is supported.
+  Bind the capped worker's actual digest and settings in the sealed package, capability evidence,
+  admission and guard; never substitute a worker beneath a live job. Preserve healthy existing
+  producers. Capped shrink changes resource planning, not canonical checkpoint, full/current-plugin,
+  provenance or publication requirements. Read the century-specific scratch policy in
+  [references/host-utilization.md](references/host-utilization.md) when budgeting a candidate.
+  For epochs 200–300, the user has chosen **300 GB (300,000,000,000 bytes) of scratch per capped-shrink
+  lane** as the planning assumption. Use it for new admission generations instead of carrying an
+  uncapped worker's historical scratch projection into a capped candidate. Account separately for
+  archive output, restore/copy and verification overlap, all live remaining-growth claims and the
+  century safety floor. Other centuries need their own measured or user-selected scratch assumption;
+  800 GB for the 900s was illustrative, not an adopted bound. Keep actual resource guards and
+  increase concurrency through the normal one-lane experiment beyond the proven operating point.
+- Define the filesystem safety floor for a campaign century from resulting `.jet` sizes, not from
+  snapshots, replay scratch, or a fixed multi-terabyte constant. For the current century use epochs
+  200 through 300 inclusive. Select each epoch at most once and include only canonical complete
+  `.jet` lengths backed by the normal full/plugin and R2 ready-pair evidence; exclude partial,
+  diagnostic, verification-tail, archive-only, and currently growing files. Let `S` be the sum of
+  those lengths and `C` their count. The floor is `ceil(2 * S / C)` bytes. Recompute it before every
+  admission decision and whenever a 30-minute observation sees a newly completed sample. If `C` is
+  zero, retain the last sealed floor for that century and admit nothing from an invented estimate.
+  Record the exact epoch/length census, arithmetic, rounded byte floor, and evidence digests. When a
+  controller accepts only whole GiB, pass `ceil(floor_bytes / 2^30)`. Keep invocation-bound projected
+  remaining growth as a separate admission term; do not relabel the sum of those claims as the safety
+  floor. When the memory-selected concurrency would exhaust local space, checkpoint and offload
+  selected work through the verified holding lifecycle to maintain this floor and make room.
+  Do not launch a job without adequate local execution space or a working pressure-relief path;
+  retain the memory-selected target while implementing the missing transition.
+- Plan ordinary missing work as independently replayable and independently publishable singleton
+  epochs. Generate fresh manifests with `--target-cohort-epochs=1`, seal one epoch per replay claim,
+  and keep multiple disjoint singletons running concurrently up to fresh CPU, memory, VMA, I/O, and
+  century-floor admission. Backfill a freed lane promptly; otherwise parallel execution gains are
+  lost behind a shared completion gate. Do not make one epoch wait for an adjacent epoch before its
+  own verification, upload, readback, or `.sha256` sidecar. Preserve healthy legacy multi-epoch
+  replays already in flight instead of restarting them. Use a multi-epoch verification cohort only
+  when an exact compatibility/root requirement or the explicitly private epoch-301 verification
+  tail requires it, and keep its publication boundary sealed.
+- Use `HORIZON_DIR` when set; otherwise use `$HOME/horizon`. Keep only `epoch-N.jet` and `epoch-N.jet.sha256` in that public directory.
+- Authenticated storage credentials are `HORIZON_S3_ENDPOINT`, `HORIZON_ACCESS_KEY_ID`, and
+  `HORIZON_SECRET_ACCESS_KEY`. Check only that they exist; never print their values. The S3
+  endpoint path names the bucket.
+- With an explicit user range, restrict ordinary generation, verification, upload, and cleanup to
+  that range; the only permitted out-of-range work is the isolated verification tail below.
+- Treat the explicit range end as the publication boundary even when a sealed verification cohort
+  must replay farther to reach its terminal root. Keep every out-of-range verification-tail archive
+  in private storage, give it no canonical sidecar, and exclude it from the public Horizon directory
+  and R2. Deeply validate the complete sealed cohort before transactionally importing only the
+  requested contiguous prefix through the repository's bounded recovery option. Seal this intent in
+  the source plan: run `preflight_gcs_snapshots.py` through the first compatible later root with
+  `--last-epoch` set to that verification endpoint and `--publish-through-epoch` set to the user's
+  requested range end. Require the manifest's tail epochs to be marked
+  `verification-tail-private`; never rely on an operator remembering an unrecorded boundary.
+- Without a range, inventory canonical R2 pairs first. Upload any complete local pairs missing from R2, then begin with the lowest missing epoch supported by the repository's compatibility manifests. Continue with disjoint singleton epochs in parallel as fresh admission permits.
+- An R2 epoch is storage-complete only when both `epoch-N.jet` and `epoch-N.jet.sha256` exist and
+  agree with verified local evidence. A checksum-only or archive-only epoch is incomplete.
+- Use the repository binary's mutation-free inventory mode for an authoritative explicit-range
+  census: `jetstreamer-r2 inventory "$HORIZON_DIR" --epochs START-END`. It issues only archive HEAD
+  and sidecar GET requests and reports every epoch in JSON. Treat `ready-pair` as remote presence
+  evidence only; it does not replace the private R2 receipt or the original full/plugin gates.
+  Investigate every `sidecar-only`, `invalid-sidecar`, or `metadata-mismatch` anomaly immediately;
+  never repair or overwrite it merely because inventory detected it.
+
+Remote object pairs are the shared inventory between servers; private receipts and controller
+state are host-local evidence and must not be copied to make another host believe work completed.
+Give concurrently operating hosts disjoint explicit epoch ranges. Existing R2 objects are never a
+lease: if ranges overlap accidentally, stop the duplicate producer rather than racing publication.
+
+### Preserve valid work and yield shared boundary uploads
+
+- Preserve valid or resumable local work by default. Do not discard, restart from scratch,
+  quarantine as disposable, or otherwise retire an archive, replay state, segment manifest, or
+  verification evidence merely because another agent or server is working on the same epoch.
+  Work is legitimately completed elsewhere only after the canonical R2 archive and matching
+  sidecar form a verified `ready-pair`. Even then, remove the local copy only through the normal
+  receipt and boundary-gated retirement path; remote completion does not make useful local evidence
+  disposable.
+- For an epoch at a range or server boundary, an authenticated active upload owned by another agent
+  is a handoff: assume that owner will finish it and do not race it with another upload, sidecar, or
+  replay. Require evidence that binds the exact epoch/object keys to a live uploader invocation or
+  durable active handoff; an archive-only object, an incomplete multipart upload, a stale status
+  message, or an unbound process is not enough. Re-observe the owner at the normal monitoring
+  cadence and treat only the matching canonical sidecar as completion.
+- If the owning upload terminates or its authenticated handle disappears before the ready-pair is
+  committed, inspect its durable state and resume idempotently from preserved valid artifacts.
+  Never delete those artifacts to simplify ownership. If a matching ready-pair appears, yield the
+  boundary epoch to that completed work and continue the disjoint remainder; if any remote anomaly
+  or mismatch appears, stop and investigate instead of choosing a winner or overwriting either
+  copy.
+
+## Produce and verify
+
+- Use the repository's sealed historical replay/controller path and automatic slot-range runtime selection. Do not invent a compatibility override.
+- Before cold-replaying an epoch with a retained verified prefix, read
+  [references/checkpoint-continuation.md](references/checkpoint-continuation.md). Prefer a qualified
+  checkpoint continuation when its complete validation-to-sidecar path is faster and freshly
+  admissible. A snapshot, matching accounts hash, partial archive, or private assembly success alone
+  does not establish that qualification or authorize publication.
+- Run generation and long-lived verification/upload watchers in persistent systemd units so loss of the interactive session cannot kill them. Use `Restart=on-failure` with a bounded retry delay only when every invocation gets isolated diagnostic output and scratch, or a proven launcher preserves the failed invocation's artifacts before opening the next output. A replay normally creates or truncates its `.jet` at startup, so never let an automatic retry reuse the same diagnostic archive path. Use a fail-closed non-restarting unit and relaunch manually after evidence capture when attempt isolation is unavailable. Do not use `Restart=always`, because successful completion must remain terminal. Respect unrelated jobs, configured RAM reserves, and the current century `.jet`-derived disk floor.
+- A controller with a long polling interval must wake that wait when SIGTERM/SIGINT requests
+  shutdown; setting a flag while leaving a restartable sleep in place can consume the entire systemd
+  stop timeout. Before sealing a new controller generation, verify a no-worker instance reaches
+  clean terminal success promptly when stopped.
+- When a guard pauses adaptive controllers around a serialized public import, authenticate and fsync
+  the exact live systemd controller commands plus the importer's invocation ID before stopping the
+  first controller. After a guard restart, recover that state, finish stopping authenticated live
+  controllers (including late arrivals) before waiting on the same zero-restart importer, and keep
+  the state until every controller has been restored or deliberately left paused. A collected
+  importer unit is terminal only when no other public importer is live. Never replace a guard while
+  it has stopped-controller commands only in memory and its bound importer is still active.
+- Before starting a recurring status timer, initialize its last-observed state to the replay's
+  authoritative launch time and validate the monitor once manually. A timer that exists without
+  this state is not monitoring the replay; diagnose monitor failures without restarting a healthy
+  producer. After any `systemctl daemon-reload` while monotonic monitor timers are active, re-observe
+  every timer's next deadline: systemd can move a pending `OnActiveSec` deadline relative to the
+  reload. If that delays an already-due check, run only the oneshot monitor immediately and confirm
+  that `OnUnitActiveSec` has re-anchored the next interval; never restart the producer to repair its
+  monitor schedule.
+- A hardened adaptive lane may use an isolated `CLOUDSDK_CONFIG` under its private lane root.
+  Refreshing the interactive user's default GCloud configuration does not refresh those copies.
+  Before retrying a producer after authentication changes, update the isolated configuration with
+  a consistent, permission-preserving copy of the refreshed credential databases, then perform a
+  read-only lookup of one exact generation-bound snapshot through the lane's effective
+  `CLOUDSDK_CONFIG`, account, and project. Never print an access token or infer success from a
+  lookup made through the interactive default configuration. Refresh idle lanes before they are
+  admitted so a controller does not consume an attempt on stale credentials. Never replace or
+  mutate the isolated configuration of a live producer: first authenticate its exact systemd
+  invocation and lane claim, and update only lanes with no live process or staged launch. Stage a
+  coherent permission-preserving configuration copy beside the idle lane, validate it with the
+  exact generation-bound lookup, and install it atomically instead of copying credential databases
+  piecemeal into the effective directory.
+- A dormant standalone downloader that is intentionally authorized by the operator's interactive
+  `gcloud auth login` should instead bind the exact login-session `CLOUDSDK_CONFIG`; do not point it
+  at a one-time credential copy and then ask the operator to refresh a different configuration.
+  Under `ProtectHome=read-only`, explicitly grant the service write access to that exact GCloud
+  configuration because token refresh and SDK state updates may require it. Before start, run a
+  read-only token or generation-bound metadata check with the service's effective
+  `CLOUDSDK_CONFIG`, account, and project, suppressing token output. File timestamps or successful
+  authentication through another configuration are not sufficient evidence.
+- When launching into a fresh isolated diagnostic-output directory, ensure it contains the verified
+  same-cluster genesis expected by the loader. A cached snapshot does not imply the genesis is
+  present. Preseed only from digest-bound retained evidence and verify the copied digest and
+  ownership; otherwise validate noninteractive gcloud authentication for the service identity.
+- Before sealing a generation-pinned GCS restore helper, exercise its metadata parser against the
+  host's live `gcloud storage objects describe --format=json` output. Current Homebrew gcloud uses
+  normalized `crc32c_hash`, `md5_hash`, integer `size`, and `storage_url` fields, while older
+  releases exposed raw-API `crc32c`, `md5Hash`, string `size`, and `id` fields. Accept both shapes,
+  fail on conflicting aliases, and require either the exact raw object ID or exact versioned
+  `storage_url`; authentication success without this complete identity/hash proof is insufficient.
+  GCS composite objects legitimately omit MD5. Represent them only with the current manifest
+  schema's explicit `md5_hash: null`, and still require the exact generation, canonical versioned
+  URI, nonzero size, and canonical CRC32C. Recompute CRC32C after download and retain the local
+  SHA-256/inode binding. Never accept a missing MD5 field, fake a digest, or relax a legacy schema
+  that requires MD5.
+  Before transferring an absent snapshot, require actual free bytes to cover the complete expected
+  object size above the current century `.jet`-derived filesystem floor. Recheck that floor after hashing the
+  temporary download and before no-clobber publication. If either gate fails, discard only the
+  temporary download and leave the destination and receipt absent.
+- If live GCS inventory is temporarily unavailable, regroup only from a previously sealed v2, v3,
+  or v4 preflight report whose independently recorded fingerprint is supplied explicitly. Use
+  `scripts/preflight_gcs_snapshots.py --source-manifest-report=PATH
+  --source-manifest-fingerprint=sha256:...`; never use the report's adjacent embedded fingerprint
+  as the independent value. The conversion must strictly validate every selected generation,
+  canonical versioned URI, size, CRC32C, schema-specific MD5 representation, cohort/epoch binding,
+  and runtime route before emitting a fresh v4 manifest. This is planning evidence only: snapshot
+  restore must still re-observe the exact GCS generation and hashes before replay.
+- Failed-replay cleanup is authorized by default for this workflow. After confirming the failure and capturing the evidence needed to diagnose or reproduce it, stop the service and retry path, verify that no live process or staged relaunch references each exact target, and delete that failed run's scratch immediately instead of allowing failures to accumulate. Preserve diagnostic output and partial archives only until their useful evidence is sealed: for a terminal, non-resumable, superseded generation that cannot satisfy a full/plugin/publication gate, fsync a root-owned receipt with the service result, last slot/progress, exact size and archive hash when available, and copy any segment manifest outside the deletion tree; then retire the unreferenced local output promptly while retaining logs, manifests, receipts, hashes, and inputs needed for lineage or reproduction. Never apply this rule to a controlled stop that can genuinely resume in place or to any locally complete archive awaiting verification/upload. If a relaunch demonstrably starts from the bootstrap in a new isolated runtime generation with no resume cursor, verify the new worker's exact generation and reclaim older unreferenced generations promptly; preserving them does not make that replay resumable.
+- Treat a deterministic replay failure as an immediate source-level incident, not only an
+  operational quarantine. As soon as the failure and restart block are durably captured, begin
+  debugging it in the current work cycle: reproduce the mismatch as narrowly as practical, add a
+  regression for the exact canonical behavior, implement the smallest source fix, run the relevant
+  tests, and commit and push the fix to the configured Horizon fork. If the current branch already
+  contains the correction and regression, bind the exact commits and test evidence and proceed
+  directly to immutable qualification instead of making a duplicate change. Never restart or deploy
+  an unqualified fix, and do not let source work weaken evidence preservation or disturb healthy
+  producers.
+- Diagnose an archive `SectionTooLarge` against both the record-count and data-arena limits for the
+  named phase. The error's historical `bytes` field is also used for a count overflow, so a value
+  such as `8193 (limit 8192)` can mean the 8,193rd update rather than an 8,193-byte account. Capture
+  the exact slot, phase, observed value, immutable producer identities, and partial archive before
+  cleanup. Never drop, truncate, or misattribute an account update to make replay continue. When the
+  observed canonical shape exceeds a practical inline capacity that is not serialized on the wire,
+  raise it conservatively while retaining independent byte/decode-work bounds, add an exact
+  observed-shape plus one-past-the-new-bound writer/reader regression, and retry only in a fresh
+  isolated archive and scratch generation.
+- Treat an ordered historical-worker `ShuttingDown` acknowledgement as the worker protocol commit
+  point. A legacy worker can remain uninterruptible for longer than both graceful and forced reap
+  windows while the kernel tears down a multi-terabyte mmap-backed AccountsDb; delayed reaping after
+  that acknowledgement is cleanup latency, not replay divergence. Pin a parent build that transfers
+  the child, private runtime directory, and guardian to a detached reaper without failing the sealed
+  producer. Scratch retirement must still scan commands, maps, cwd/root/exe links, and descriptors
+  and refuse deletion while any process retains the tree. If an older parent instead exits nonzero
+  after the terminal checkpoint and `horizon archive complete`, quarantine its restart path, preserve
+  the archive and exact journal evidence, and reclaim only the unreferenced scratch. Do not invent a
+  missing segment manifest or publish the artifact: require an independently reviewed recovery path
+  and a complete durable archive reread before treating it as qualification evidence.
+  Ensure every immutable parent logs the complete bootstrap and terminal checkpoint summaries,
+  including last blockhash, drained-write count, and next write-version cursor. Those fields are
+  required to reconstruct auditable producer evidence after a post-archive parent failure; terminal
+  bank and accounts hashes alone are insufficient.
+  Populate recovery receipts by mechanically extracting checkpoint fields from the exact producer
+  invocation journal, then cross-check the terminal accounts hash against the trusted epoch-hashes
+  input before sealing them. If a durable receipt contains a transcription error, preserve it,
+  create a uniquely named superseding correction that binds both primary-source hashes, and require
+  every recovery plan to reference the correction; never silently edit or overwrite the old receipt.
+  Before using an older immutable `verify_archive` for recovery evidence, bind its archive-format
+  capacity limits to those of the exact producer. Capability-probe a known oversized record when the
+  producer raised a count or byte ceiling. A decoder rejection at its older limit is verifier
+  incompatibility, not archive-corruption evidence: preserve the failed invocation, seal a verifier
+  containing the producer's limit change, prove the same narrow region with both binaries, and retry
+  the complete reread under a distinct invocation before recovery continues.
+  When recovering v1.4.25 or v1.6.16 terminal evidence from the archive, do not equate all terminal-slot
+  account updates with the checkpoint's drained-write count. Bind the archive to single-runtime V2
+  `solana-v1.4.25` or `solana-v1.6.16` provenance, count pre-, transaction-, and post-phase writes separately, and
+  derive the checkpoint count as post-phase writes minus the final freeze-root drain write. Require
+  that runtime-specific derivation to match the journal's drained-write count and next write-version
+  cursor; fail closed for other provenance or an empty post phase until its runtime semantics are
+  independently qualified.
+- Do not raise replay concurrency from low CPU or RAM utilization alone. Snapshot extraction and
+  historical account state can consume hundreds of GiB per worker; require the controller's
+  configured per-worker disk admission budget and measured filesystem growth to leave the century
+  floor intact before launching another singleton. If a manual canary set would violate that gate, stop the
+  newest units and preserve their private run directories for later resumption.
+- Keep scheduling estimates distinct from hard cgroup ceilings. A controller may cap fleet size
+  through integer `logical_cpus / cpus_per_lane` or static-RAM arithmetic even when live CPU and
+  reclaimable-memory headroom are ample. Before relaxing those estimates, bind exact producer
+  invocations, compare multi-window effective CPU plus `MemoryCurrent`/`MemoryPeak`, and preserve
+  the established host memory reserve, century `.jet`-derived disk floor, VMA gate, `CPUQuota`, `MemoryHigh`, and
+  `MemoryMax`. Change one sealed controller generation, prove that it admits only the intended new
+  lane, and bind the resulting controller and producer invocation IDs into the reserve guard before
+  leaving it unattended. Never weaken disk or VMA admission merely to work around a CPU/RAM
+  scheduling estimate.
+  Before sealing an admission generation, reproduce the deployed controller's integer capacity
+  arithmetic with the observed host totals and prove the candidate actually fits every limiter. For
+  the adaptive controller this includes
+  `floor((MemTotal - protected_memory - memory_reserve) / memory_admission)`, not only
+  `MemAvailable` or `MemoryMax`. Treat `memory_admission` as an evidence-backed scheduling estimate,
+  not a synonym for the cgroup hard ceiling: it may be lowered in a fresh sealed generation when
+  multi-window `MemoryCurrent`/`MemoryPeak` evidence supports the estimate, while keeping
+  `MemoryHigh`, `MemoryMax`, protected/reserve memory, disk claims, VMA stops, and invocation-bound
+  guards unchanged. If the controller reaches its poll wait without creating the expected producer,
+  inspect every computed limiter before assuming authentication or launcher failure.
+- A controller that observes producers owned by other controllers must not silently charge every
+  external producer the same remaining-growth budget as a new local worker when stronger sealed
+  evidence establishes heterogeneous claims. Use invocation-bound external growth claims derived
+  from exact live trees and stable recent windows; keep the complete local worker budget for the
+  proposed launch and the century `.jet`-derived filesystem floor. Bind those claims into the controller
+  configuration and admission manifest. An absent unit, invocation mismatch, unbound producer, or
+  sampling race must fall back to the conservative full per-worker budget. Re-run admission rather
+  than editing claims underneath a live sealed controller.
+- When using the sealed historical-performance admission checker, install its manifest as an
+  absolute, root-owned, singly linked regular file with no group or world permission bits; use mode
+  `0400` or `0600`, never `0444`. Fsync the manifest and its parent directory before starting the
+  admission unit. Treat an identity rejection as a clean failed admission: confirm that its
+  `OnSuccess` controller did not start, correct only the observed ownership or mode mismatch, reset
+  the failed oneshot, and rerun the complete admission check rather than bypassing it.
+- Treat one ordinary epoch as one replay, verification, and publication unit even when adjacent
+  epochs share an immutable runtime. A singleton root-checkpoint cohort is valid and should reuse
+  the exact generation-pinned bootstrap through the reviewed cache input rather than sharing a
+  completion gate with neighboring epochs. Give every singleton its own claim, isolated output,
+  scratch, controller evidence, status object, verifiers, uploader eligibility, and terminal root.
+  Run many disjoint singleton units concurrently when fresh admission proves they fit. Measure and
+  report the restore cost, peak scratch, throughput, and time-to-sidecar so concurrency can be tuned
+  from evidence. Do not merge epochs merely to save a restore when doing so delays an otherwise
+  finished epoch's sidecar. Preserve any healthy multi-epoch generation that predates this policy;
+  its restart cost outweighs changing its shape mid-run.
+  Never use a continuous root-cohort plan to cross or erase a focused-qualification-only
+  compatibility gap. A diagnostic route that requires `--qualification-end-slot` remains
+  independently checkpoint-gated and may explicitly forbid carried runtime state; qualify and
+  promote every required checkpoint through its reviewed focused path before the ordinary runtime
+  registry or production preflight may coalesce those epochs. A retained manifest produced by an
+  older or broader temporary registry is not authority to bypass the current checked-in boundary.
+  When the sealed manifest's exact generation-pinned bootstrap is already retained locally, prefer
+  reusing that cache to downloading a duplicate only through a reviewed cohort input that preserves
+  the manifest's trust boundary. Require an absolute path with the exact canonical snapshot filename,
+  open it as a regular file without following symlinks, verify the manifest size, CRC32C, and MD5,
+  bind its SHA-256 and file identity, and revalidate the open file plus path immediately before worker
+  initialization. Preserve the original restore/download receipt. Never substitute loose directory
+  discovery, a copied filename, or an unbound cache entry for this check; if the deployed parent lacks
+  such an input, keep the cohort staged until authenticated generation-pinned download works or a new
+  immutable parent implementing the gate is qualified and deployed.
+  The checked-in adaptive controller exposes this input as repeated
+  `--cohort-bootstrap=EPOCH_OR_RANGE=/ABSOLUTE/PATH`. Require the range to name one exact managed
+  cohort and the archive to be a singly linked, root-owned, non-writable direct member of the sealed
+  deployment with an exact `SHA256SUMS` entry. Review the planning report's `cohort_bootstraps`
+  mapping before execute mode; the controller binds the path and digest into its configuration and
+  exact adoption arguments, while the parent performs the manifest filename, slot, size, CRC32C,
+  MD5, SHA-256, and file-identity checks. Do not pass this option to a controller or parent that
+  predates the reviewed cache gate. Do not infer parent compatibility from the controller source:
+  an immutable deployment can accidentally combine a newer controller with an older
+  `jetstreamer-node`. Before admission, capability-probe the exact sealed node with the intended
+  root-cohort, manifest, and cached-bootstrap arguments plus a deliberately mismatched manifest
+  fingerprint. Require it to reach the fingerprint gate, rather than reject the cached-bootstrap
+  argument combination, and bind the probe receipt and node SHA-256 into the admission manifest.
+  That fingerprint-only probe does not prove the node can deserialize the fingerprinted manifest
+  body, because fingerprint validation precedes strict schema decoding. Also run a no-replay schema
+  probe with the correct fingerprint and a deliberately invalid snapshot override; require the node
+  to pass manifest decoding and fail at the later snapshot identity or filename gate, with no replay
+  scratch or archive created. Reject any node that instead reports an unknown or missing manifest
+  field, even when its mismatched-fingerprint probe passed. If the exact sealed runtime route is
+  candidate-only, run the probe with the same explicit candidate opt-in that production planning
+  binds; an earlier candidate-route rejection proves nothing about manifest decoding. Record that
+  opt-in in the capability receipt. Before deleting empty probe scaffolding, prefer the repository's
+  bounded process-reference scanner covering exact command, map, cwd/root/exe, and descriptor paths;
+  a recursive `lsof +D` can remain expensive on a host with many mmap-heavy replay processes.
+  Treat a manifest's `publish_through_epoch` as an end-to-end import policy, not merely a field the
+  node can deserialize. The controller must validate the fingerprinted boundary, retain it with the
+  exact cohort, and pass it as `--publish-through-epoch` to the actual
+  `--recover-staged-cohort-only` invocation. Require a regression at that controller call site; a
+  unit test of the command builder alone is insufficient. Fail closed if a truncated boundary is
+  outside its cohort, appears before a later cohort, or disagrees with the report-level publication
+  boundary. This is mandatory for a private verification tail: for a 298-301 gate bounded at 300,
+  epoch 301 must remain private even after all four archives verify successfully.
+  Keep independently root-verifiable singleton epochs parallel whenever fresh admission is healthy:
+  historical execution is often mostly serial within one worker, so fleet concurrency is the main
+  wall-time lever. Never cross a runtime or compatibility boundary, exceed the immutable worker's
+  proven terminal bound, omit the epoch's terminal root, or overlap a live epoch claim. If an exact
+  root is unavailable and a bounded exceptional verification cohort is required, extend only to the
+  first compatible later root, seal the publication boundary, keep any verification tail private,
+  and do not generalize that exception into ordinary multi-epoch scheduling.
+- When a live replay's measured growth could cross the century `.jet`-derived filesystem floor before its next safe
+  milestone, use an actual-free-space guard rather than relying only on projections. Bind the guard
+  to the exact service invocation ID and zero-restart state, fsync a root-owned stop intent before
+  stopping that one producer, and make an intent-only interruption resumable even if free space
+  later recovers. Record completion only after the bound process is inactive. A reserve trip does
+  not authorize deleting its scratch, restarting it automatically, modifying remote objects, or
+  stopping any unbound invocation.
+  After operator review, a reserve-stopped run whose exact pinned node demonstrably restarts from
+  its retained sealed bootstrap (rather than a scratch cursor) may retire only that run's scratch.
+  Read [references/reserve-stop-retirement.md](references/reserve-stop-retirement.md) first. Prefer
+  the reviewed Rust `jetstreamer-r2 reserve-retire-scratch` profile where its exact package/layout
+  gates apply; preserve an already-bound, unchanged legacy scratch retirer only for a layout it
+  actually supports. Run check-only qualification before deletion. Bind the guard receipts, exact
+  owners, cursor-free state, retained archive/input hashes and deletion target. Preserve the run,
+  bootstrap, partial archives, state, journals and receipts. Do not use this path for in-place
+  resumable state, live owners, or an unsupported layout; qualify a Rust profile instead of
+  rewriting package metadata to mimic another schema.
+  For a producer owned by a live adaptive controller, use
+  `scripts/guard_adaptive_replay_reserve.py` and bind both invocation IDs. It must stop and confirm
+  the controller first, then resample and stop only the selected producer; otherwise the controller
+  can race the reserve action by scheduling replacement work. Leave the controller stopped after a
+  trip until an operator has reviewed the durable receipts and chosen a recovery or fresh cohort.
+  Use the single-service guard only for a genuinely standalone producer.
+  Bind the adaptive guard to a measured VMA ceiling as well as the filesystem floor. A live worker
+  above the ceiling, multiple identifiable workers, or unreadable maps must use the same durable
+  controller-before-producer stop path. Permit zero workers without a VMA trip because an authenticated
+  producer can remain active during terminal archive drainage; service identity, restart, and disk
+  checks still apply. Prove the installed sandbox can read the exact worker's maps on its first fire.
+  When admitting a new producer beside older live producers, set that producer's stop floor to the
+  century `.jet`-derived floor plus the evidence-backed remaining-growth budgets still owed to the older producers,
+  unless one proven aggregate guard serializes the complete fleet's response. Giving every lane an
+  independent guard at only the century floor lets several lanes consume the same headroom and can
+  overshoot the floor before their next samples. Record the exact budget formula and live claims
+  in the launch receipt; reduce the protected amount only from newer measured evidence, never from
+  idle CPU or current scratch size alone.
+  Do not leave an automatic admission trigger armed when the resulting controller can launch a
+  producer before its invocation-bound reserve guard can be created and proved. If controller or
+  producer invocation IDs are not knowable until launch, install the reviewed admission and
+  controller generation dormant, launch it under observation, bind the guard immediately to the
+  exact zero-restart invocations, and require the first sandboxed guard fire to pass before leaving
+  the replay unattended. When replacing an admission generation, explicitly clear or disable every
+  older timer, dependency, and `OnSuccess=` trigger that could still launch stale receipt,
+  capacity, binary, or guard assumptions. Preserve a durable receipt showing that old and new
+  launchers were inactive during the handoff; never infer that installing a replacement unit
+  neutralized the previous trigger.
+  Do not treat an unsandboxed manual guard invocation or an `active (waiting)` timer as proof that
+  the installed guard works. Before considering a producer protected, observe the timer's first
+  real service invocation complete with exit status zero under the deployed sandbox, and preserve
+  its sampled invocation ID, restart count, available bytes, floor, and no-trip result. If the
+  sandboxed invocation cannot traverse or write its private receipt path, stop that broken timer,
+  preserve its failure journal, correct the least-privilege capability or path policy, and repeat
+  this first-fire proof without restarting the producer. Pre-create every directory named by the
+  guard's `ReadWritePaths=` and verify its sealed owner and mode before launch; systemd resolves
+  those paths while constructing the mount namespace, so a missing receipt directory fails with
+  status 226 before the guard can sample or create it.
+- Before using scratch growth for admission or cross-host comparisons, resolve the exact live
+  `--replay-scratch` argument from the service/process rather than measuring a lane, qualification,
+  or retry parent. Record physical bytes, apparent bytes, file count, and a bounded-depth directory
+  breakdown for that exact generation. When growth is nonlinear, compare account-store file-size
+  distributions and disk/VMA growth per million transactions before attributing it to host capacity
+  or launching another worker.
+- Use the repository's Rust `jetstreamer-horizon-observe` binary for a new coordinated live-resource
+  sample instead of adding ad hoc shell or Python sampling logic. Seal the binary and its separately
+  hash-bound JSON configuration before operational use. Bind every replay to the exact controller
+  and producer invocation IDs, zero restarts, exact scratch path, and one worker executable beneath
+  that scratch; require the same identities before and after two race-tolerant, non-symlink-following
+  physical-block scans. Chain the sample to the preceding receipt and enforce at least 1,800 seconds
+  between routine observations. Publish its JSON no-clobber and fsync the file and containing
+  directory. A failed or identity-changing attempt creates no receipt and authorizes no immediate
+  retry inside the cadence window. The sample is resource evidence only: combine it with current
+  invocation-bound guard receipts and the complete reserve/admission arithmetic before launching a
+  new replay or lowering an external remaining-growth claim.
+  Use observer schema v2 end to end for every active deployment and all current operational
+  evidence: require config schema `jetstreamer-horizon-live-resource-sample-config-v2` and output
+  schema `jetstreamer-horizon-live-resource-sample-v2`. Author, seal, install, and consume only v2
+  observer configs and receipts for status publication, throughput, scaling, and fresh admission.
+  Preserve immutable pre-v2 historical receipts only as history. The final historical receipt may
+  appear solely as the cadence predecessor named by the first v2 receipt; it is not current
+  operational evidence and must never be copied, rewritten, or promoted into an active config or
+  receipt.
+- For pinned legacy Solana workers, record the visible CPU count and the effective
+  `SOLANA_RAYON_THREADS` value. When unset, the old thread-limit crate defaults to half of visible
+  CPUs, and AccountsDb also uses that value as its minimum store fan-out; a high-core host can
+  therefore create many extra 4-MiB AppendVecs per busy slot even when replay uses little CPU.
+  Confirm this with a per-slot store-count histogram rather than assuming transaction batching is
+  the sole cause. A historical snapshot restored with AccountsDb caching disabled sends every
+  commit directly through store selection, so singleton transaction commits and the minimum-store
+  fan-out can amplify each other. Treat the unpacked snapshot's files, physical bytes, and VMAs as
+  a baseline: compare settled incremental windows at equal transaction/update work, and never
+  extrapolate a full epoch from one early absolute scratch measurement. Before the next immutable
+  generation, use a bounded same-snapshot A/B to select an explicit value appropriate to the
+  worker's actual CPU quota, comparing throughput, physical bytes, file count, and VMAs; measure
+  commit-wave changes as a separate A/B. Decoupling eager per-slot store fan-out from the rayon
+  pool is also a distinct storage-layout experiment: keep it diagnostic until it wins that bounded
+  comparison and then passes the normal canonical checkpoint and plugin qualification.
+  A conflict-wave implementation must also preserve the pinned runtime's invalid-transaction lock
+  behavior: sanitize failures and duplicate account keys do not acquire locks, and repeated writable
+  keys within one transaction are not a cross-transaction attribution conflict. Differentially test
+  write/write and write/read barriers, independent batching, invalid duplicate-key handling, and the
+  known canonical conflicting-write slot before qualification.
+  Derive writable-key attribution with the same feature gate used by that pinned Bank's
+  `prepare_batch` account-lock path. This API is version-specific: the qualified v1.6 workers expose
+  `demote_sysvar_write_locks`, while v1.7 and v1.8 expose `demote_program_write_locks`. Do not copy
+  the older boolean or approximate writable keys across a runtime boundary; inspect the vendored
+  Bank and Message implementations, pass the exact active demotion value to `is_writable`, and add a
+  compile/runtime regression for the selected candidate.
+  Run each real boundary-snapshot integration test from that historical runtime's workspace root,
+  not from the repository root with only `--manifest-path`: rustup selects the pinned legacy
+  toolchain from the current directory, and every worker build script must reject a modern compiler.
+  Give the libtest process `RUST_MIN_STACK=134217728` for these old full-snapshot load/verify gates;
+  the default test-thread stack can overflow inside legacy snapshot restoration even when the same
+  code is valid in the production main thread. Keep this as a test-only environment setting and
+  still treat any hash, bank verification, or checkpoint mismatch as a real qualification failure.
+  Pin the chosen environment in the launch manifest and repeat the normal root/plugin qualification;
+  never change it underneath a live replay.
+  When a regression lives inside an excluded vendored runtime crate, do not assume the worker suite
+  executes that crate's own `#[cfg(test)]` tests. Old Cargo can also walk upward into the modern root
+  manifest, while a standalone copied crate can resolve newly published dependencies that its pinned
+  compiler cannot parse. Test it in a uniquely named disposable copy of the complete historical
+  workspace: add only the exact vendor crate as a temporary workspace member, retain the historical
+  `Cargo.lock` and toolchain, resolve offline, and remove an upstream dev-dependency only from that
+  disposable manifest when it is unused and absent from the pinned lock. Never alter production
+  workspace membership to make a vendor test run. Preserve failure output until a corrected retry is
+  proven, then delete the disposable tree promptly; the normal worker suite and real boundary-snapshot
+  gates remain independently required.
+- For a bounded performance cohort, capture cgroup CPU, memory peak/events, major-fault, pressure,
+  and I/O counters inside the persistent runner before and after its child; terminal service
+  cgroups may disappear before an external collector can read them. Keep target-slot detection
+  independent of optional throughput-counter parsing so a log-format change cannot let a canary
+  run past its bound. If the runner copies an immutable worker into scratch, make the safety guard
+  recognize the actual bound executable path as well as the source basename. Require exactly one
+  identifiable worker with readable maps in every active or activating lane and trip closed on
+  zero, multiple, or unreadable workers. The sole zero-worker exception is bounded post-target
+  drainage: before signaling the child, the pinned runner must fsync a no-clobber intent binding
+  the exact systemd invocation, target and observed slots, child PID, captured scratch metrics,
+  and absence of an external signal. The guard may accept that exact intent for a short sealed
+  timeout while the wrapper writes its final receipt; it must reject an absent, stale, malformed,
+  wrong-owner, or wrong-invocation intent and must never extend the exception to multiple workers
+  or a pre-target stop. Test the guard against the copied path and this handoff race in a nested
+  fake cgroup before sealing it.
+  A pinned legacy worker may acknowledge the runner's post-target SIGINT and then exit 1 while its
+  ready-entry channel closes. Normalize that exact outcome only after the runner has independently
+  observed the bound, retain the actual child return code and stop signal in its durable receipt,
+  and keep pre-target exit 1 fatal. Bind any accepted controlled-stop codes in the result manifest;
+  collectors and scratch retirement must reject codes outside that sealed allowlist.
+  Historical runtime state may live in a temporary directory that the parent removes during
+  shutdown. Freeze the bounded child process group and capture the exact scratch/accounts-state
+  statistics before sending the controlled stop; then resume and stop it. Do not design a terminal
+  collector that assumes those temporary AppendVecs will still exist after the parent exits.
+  A collector or selector that re-observes diagnostic archives below the producer home must not
+  use `ProtectHome=yes`: that makes a valid archive appear absent and can turn a successful cohort
+  into a false selection failure. Use `ProtectHome=read-only` plus an explicit read-only binding for
+  the exact private cohort root, and make only the root-owned receipt directory writable. Preserve
+  the failed sandbox invocation as evidence, correct it in a distinctly named oneshot unit, and
+  require that unit plus the selection receipt to succeed before scratch retirement.
+- When a follow-up performance cohort must preserve its predecessor's systemd unit identity as
+  durable result or cleanup evidence, give the follow-up producer template a distinct constrained
+  namespace instead of replacing or prematurely removing the predecessor template. Bind that
+  namespace transitively in the launch receipt, result manifest, collector, retirement plan, and
+  scratch retirer; reject undeclared or mismatched namespaces. A different template name does not
+  relax lane-path, invocation-ID, terminal-success, or live-reference checks.
+- After a bounded performance cohort has a root-owned, fsynced result receipt containing every
+  lane's exact scratch measurements, retire its scratch promptly without discarding the evidence
+  needed to choose or qualify a winner. For a multi-lane cohort, bind every exact scratch path in
+  one root-owned plan, require all producer units to remain at clean terminal success, and scan
+  process command lines, maps, cwd/root/exe links, and file descriptors for live references. Fsync
+  one intent covering the complete set before the first deletion, make an intent-only interruption
+  safely resumable, and fsync completion only after every bound tree is absent. Preserve partial
+  diagnostic archives, segment manifests, canary/result/guard receipts, configurations, genesis,
+  journals, and immutable manifests outside the scratch trees. This cleanup never authorizes
+  publication, a canonical sidecar, or an R2 mutation.
+- When a bounded comparison has a precommitted JSON policy, use the repository's
+  `scripts/select_historical_performance_candidate.py` rather than hand-calculating the decision.
+  Seal the selector first, require the exact root-owned terminal result receipt bound by that
+  policy, and preserve its no-clobber selection receipt. A selection receipt chooses an environment
+  only; it must keep qualification launch and publication unauthorized until their separate fresh
+  admission and integrity gates pass.
+- Treat a revised admission or launch manifest as a transitive binding change. Before activating
+  that revision, re-seal every downstream result collector, timer, cleanup manifest, and retirement
+  unit that names or hashes the superseded manifest. Validate the final launch receipt against the
+  downstream binding; do not edit an old sealed manifest underneath a live cohort to make it match.
+  A persistent `PathExists=` watcher remains true after its trigger file appears. If its service
+  later skips on a negative receipt condition, systemd can retrigger it in a tight loop. Make the
+  successful launch path stop or disable that watcher, or otherwise give it a proven one-shot
+  lifecycle; verify it is inactive after the launch receipt is durable. A path unit normally has
+  `SubState=waiting` before its event but reports `SubState=running` while its triggered service is
+  active, so an invocation-bound launcher may accept either authenticated active state; do not
+  mistake `running` for a foreign watcher. Bind its invocation ID, put a conservative
+  `StartLimitIntervalSec`/`StartLimitBurst` on the triggered service so a failed persistent event
+  cannot spin, and prove the actual triggered lifecycle before arming production. After an
+  authenticated stop, an installed path normally remains `loaded/inactive/dead`, while a collected
+  transient path may already be `not-found/inactive/dead`; accept either terminal shape rather than
+  waiting forever for a collected unit to reappear.
+- Preflight the host's VMA ceiling for mmap-backed historical account stores as part of admission.
+  Compare `vm.max_map_count` with live worker map counts and the snapshot/store-file baseline, and
+  leave credible growth headroom for the full replay. Some legacy Solana AppendVec code logs an
+  mmap failure through an uninitialized logger and then calls `exit(1)`, which can otherwise look
+  like a silent worker EOF. When the limit is inadequate and host policy permits, raise it to a
+  documented persistent value before launch and record the effective value; this is independent
+  of free RAM, CPU, and disk checks.
+- Reclaim local disk proactively when admission is constrained, but only from positively
+  reproducible caches, obsolete scratch generations, and terminal partial outputs whose sealed
+  evidence proves they cannot pass the full-epoch gates. Resolve each deletion target to an exact
+  canonical path, prove no live process or staged unit references it, preserve the manifest or
+  receipt needed to reproduce it, and record the before/after evidence. Build caches, obsolete
+  snapshots, fully generation-pinned snapshot caches, and proven superseded partial outputs may be
+  removed after those checks; required inputs, active scratch, resumable state, unsealed diagnostic
+  evidence, checkpoints, receipts, complete archives awaiting gates/publication, and all R2 objects
+  must remain untouched. Record both the target's measured physical bytes and filesystem free space,
+  but do not equate their delta while live jobs allocate or files share extents.
+  Treat command-line and mmap references as exact paths or descendants, not raw string prefixes:
+  a live `scratch-store8` sibling is not a reference to an empty completed `scratch` tree. Use the
+  repository retirement scanners' path-boundary checks, and still fail closed on any genuine
+  command, map, cwd/root/exe, or descriptor reference beneath the exact target. Invoke the scanner
+  so the exact target is not also present in a still-live parent `sudo`, shell, or wrapper argv; a
+  self-induced wrapper match is not zero-reference evidence. Preserve that match, rerun the scan
+  from a separate invocation whose parent command line does not contain the target, and delete only
+  after the clean scan. Never suppress arbitrary scanner PIDs or treat an incomplete sibling scan
+  as proof for targets it did not inspect.
+- Retire a generation-bound download cache only after its root-owned verification receipt still
+  binds the exact immutable cache identity, the consuming scan has durably recorded `complete`
+  against that same identity, and every explicitly bound producer/verifier/consumer invocation is
+  inactive with clean terminal success. Scan `/proc` commands, maps, cwd/root/exe links, and file
+  descriptors immediately before deletion. Fsync a no-clobber deletion intent first, unlink only
+  the one cache file, fsync its parent directory, preserve scan results and any retained matches,
+  then fsync a completion receipt. An intent-only interruption must be safely resumable and must
+  reject a replacement file at the same path. Any permission-denied `/proc` command, map, link, or
+  descriptor inspection is a failed gate, not evidence that the process has no reference. This is
+  local scratch reclamation only and never
+  authorizes an R2 mutation. A garbage-collected transient download unit may be proven by the exact
+  clean terminal state and invocation embedded in its root-owned cache receipt; still require live
+  terminal checks for explicitly bound verifier/consumer units that remain loaded.
+  `scripts/retire_verified_generation_cache.py` specifically requires its sealed RocksDB streaming
+  scan-state schema; it is not a generic snapshot-cache retirer. Do not fabricate that scan state or
+  repurpose the tool for a bootstrap copied into an immutable deployment. For that bootstrap case,
+  use `scripts/retire_verified_snapshot_cache.py` with a root-owned owner-only plan file. Put the
+  exact cache, generation-bound restore receipt, independent immutable deployment member, package
+  `SHA256SUMS`, successful exact-node capability receipt, and unique intent/completion receipt paths
+  in that plan. Pass only the plan path on the command line so the target is absent from the live
+  parent `sudo`/shell argv. Run `--check-only` first. The helper requires distinct single-link cache
+  and deployment inodes, full matching hashes, immutable package ownership, the capability
+  receipt's clean probe evidence, and a clean command/map/cwd/root/exe/fd scan. It fsyncs a
+  no-clobber intent before unlinking exactly the cache file, fsyncs the cache directory, and then
+  fsyncs a completion receipt; any preexisting intent or completion fails closed for manual recovery.
+  This never authorizes deleting the immutable deployment member, its receipts, or anything in R2.
+- For adaptive ranges, start the controller with `--r2-receipt-directory "$HOME/.jetstreamer-private/r2-receipts" --r2-bucket BUCKET`. The controller accepts receipts from that exact bucket only for bytes already bound by its root-owned local completion attestation; R2 can replace local storage, but can never establish initial completion.
+- Start the current Horizon verification plugin as soon as each local archive is available. R2 work may run concurrently with replay of other epochs. An archive is eligible for upload only after its full and current-plugin receipts bind the same archive SHA-256. It is not eligible for local retirement until both adjacent-boundary receipts bind that digest as well. Preserve the canonical lowercase coreutils sidecar format: `<64 hex>  epoch-N.jet\n`.
+- When a verifier starts on the first archive of a long continuous cohort, size its oneshot
+  `TimeoutStartSec` for the remaining replay plus final validation, not just one archive scan. While
+  waiting for later sidecars, dispatch the plugin verifier through
+  `scripts/watch_horizon_plugin_progressive.sh` (or an equivalently sealed receipt-aware watcher):
+  a matching exact receipt should skip the already-verified archive without another whole-file
+  hash on every poll, while each newly dispatched verifier must still hash before and after its
+  plugin scan. Preserve the receipt-producing verifier's script hash in the upload gate; the outer
+  watcher does not replace that evidence identity.
+- Start the progressive R2 uploader alongside those verifiers when the first complete archive pair
+  appears, so it can publish each epoch immediately after that epoch's exact full and plugin
+  receipts arrive. The uploader must remain receipt-gated per epoch and must not use local deletion
+  merely because it is long-lived. Do not order the uploader `After=` the cohort-long verifier
+  services or require all cohort sidecars as unit conditions: either mistake serializes publication
+  behind the last epoch. Systemd dependency directives such as `After=` and `Requires=` cannot be
+  removed by an empty drop-in assignment, so replace the complete unit when removing legacy
+  dependencies. Authenticate the triggering producer invocation, launch verifiers and uploader as
+  one recorded transition, and stop the persistent path watcher after a successful launch.
+- Report single-job latency and fleet completion cadence separately. Historical slot density varies,
+  so compare transaction and account-update throughput as well as slots per second. For live memory,
+  CPU, disk, or VMA experiments, use incremental pre/post windows after a settling interval rather
+  than cumulative rates; preserve invocation identity and do not restart a healthy replay merely to
+  obtain a cleaner sample.
+- Time replay terminal, archive close/fsync, each full validation, plugin verification, boundary
+  verification, upload, remote readback, and sidecar publication as distinct phases. Parallelize or
+  overlap independent work when safe, but do not collapse a producer scan and an independent durable
+  reread into one trust event or remove a verification gate merely to improve end-to-end latency.
+- Before launching an independent focused-qualification validator, read the durable segment
+  manifest and bind every expectation to it. In particular, pass its `output_slot_start`; do not
+  substitute `bootstrap_slot + 1`. A predecessor snapshot may warm up before the target epoch, so
+  replay can begin at `bootstrap_slot + 1` while recorded output begins at the epoch boundary.
+  Independently check that `terminal_slot - output_slot_start + 1` equals the manifest's
+  `output_slot_count`, and launch a distinct non-restarting attempt if an expectation was wrong.
+- Before capability-probing or launching a newly sealed complete-span focused package, attest it
+  with the reviewed Rust `jetstreamer-focused-package-attest` binary. Seal the binary together with
+  a separately hash-bound, root-owned immutable plan and invoke it with both the exact plan and
+  executable SHA-256 values. It must validate the deployment-seal receipt, require the package's
+  actual member set to equal `SHA256SUMS`, independently hash every member, bind the complete-span
+  manifest and all non-authorizing stop gates, prove the packaged bootstrap is a distinct inode
+  from the retained source, and pass its sealed free-space threshold before writing a no-clobber
+  private package receipt. A threshold rejection is a clean failed attestation: preserve the
+  package, write no receipt, and retry only after later coordinated resource evidence establishes
+  enough free space. The package receipt never authorizes replay, plugin verification,
+  publication, or R2 mutation; the exact-package capability probe and fresh admission remain
+  independent requirements. Do not extend the older Python package-layout helper for a new sealed
+  deployment.
+- Before spending a full archive scan on the current per-epoch plugin, also compare the segment
+  manifest's output start, terminal slot, and count with that epoch's complete canonical slot
+  range. A focused checkpoint artifact that starts at the epoch boundary but stops even one slot
+  before the epoch end can pass its own sealed partial-range validator while the current plugin
+  must reject its epoch notification. Preserve that artifact as diagnostic evidence, but do not
+  launch the production plugin gate, create a plugin receipt, canonicalize it, or publish it. Run
+  the plugin against such an artifact only when the explicit purpose is to exercise and record the
+  expected rejection path; mark that run diagnostic-only and give it no publication authority.
+- Before scheduling or launching a focused qualification, separately prove that the exact immutable
+  worker's own snapshot and entry bounds admit the requested terminal slot. A parent focused planner
+  may intentionally describe a wider search envelope than the currently deployed worker accepts;
+  planner routing alone is not launch authority. If the terminal lies beyond the worker's internal
+  bound, defer that lane until a reviewed source change extends the bound, range tests and the
+  relevant suites pass, the change is committed and pushed to every required SSH remote, and a new
+  immutable worker digest is bound in the launch manifest. Never silently substitute a nearby epoch
+  or weaken the worker guard.
+- Treat a source-obscured confirmed block that omits PoH tick entries as a compatibility gap whenever
+  its finalized parent relationship crosses one or more skipped slots. Repeating the visible block's
+  final blockhash across multiple tick/block boundaries changes RecentBlockhashes, SlotHashes, and the
+  frozen Bank hash even when the visible final blockhash and every transaction are canonical. Require
+  trusted intermediate PoH boundary hashes or an independently qualified exact-state recovery; do not
+  invent, interpolate, or repeat them. Finalized `getBlocks`/`getBlock` evidence and a successful
+  canonical vote whose tip hash disagrees with the reconstructed SlotHashes value can prove this
+  divergence, but RPC block metadata does not recover the missing intermediate PoH hash and therefore
+  cannot by itself authorize a runtime-route promotion or publication.
+  Do not assume Old Faithful's CAR `Block.shredding` table recovers those hashes. It maps entry indexes
+  to source shred-end indexes but carries neither shred payloads nor independent entry hashes. Decode
+  the exact post-gap block before relying on it: a table whose entries are `shred_end_idx = -1` except
+  for the final entry, alongside decoded entries that all repeat the visible final blockhash, preserves
+  transaction grouping only and cannot establish any hidden slot boundary. Record the exact block CID
+  evidence, but continue to require original data shreds or another trusted exact-state source.
+- Before limiting recovery to the first observed hash mismatch, census the complete source-obscured
+  slot interval with finalized `getBlocks` evidence and identify every parent jump. A single interval
+  can contain many disjoint skipped-slot runs. For each run, the first visible post-gap block can carry
+  `skipped_slots + 1` tick boundaries, so recover and validate original data shreds for every such
+  post-gap block, not only the skipped slot or the first failing block. Seal the raw block-list response,
+  the derived gap list, and the expected total hidden/boundary counts before starting the bounded ledger
+  scan. Independently bind finalized `getBlock` parent slots and final blockhashes for all targets; they
+  validate the recovered final boundary but still do not supply the hidden intermediate hashes.
+- For an exact-state recovery of such a gap, search immutable, generation-pinned ledger backups rooted
+  before the boundary for the blockstore `data_shred`, `code_shred`, and `meta` column families. When
+  the backup is too large for the current admission envelope, stream its compressed tar one SST at a
+  time with explicit per-SST, total-retention, memory, and runtime bounds; retain only matching SSTs
+  and durably checkpoint progress. Scan every SST before choosing a value: an LSM backup can contain
+  multiple internal versions and tombstones for the same big-endian `(slot, shred_index)` key, so a
+  partial scan or first match is not live-state evidence. Select the highest internal sequence only
+  after the complete generation-bound scan, honor deletions, and decode shred payloads with the exact
+  pinned runtime's header and bincode layout. Require the recovered entry/tick chain to reproduce the
+  visible canonical final blockhash and the missing intermediate boundary before changing a runtime
+  route; the ordinary checkpoint, plugin, boundary, and publication gates still apply independently.
+  Treat the resulting boundary set as a sealed runtime input, not as ambient diagnostic state. Bind an
+  absolute regular-file path and exact lowercase SHA-256 in the immutable qualification launch; open
+  without following symlinks, reject group/other-writable or changing files, constrain schema and slot
+  scope, and cap its size before parsing. At each parent jump, require exactly `slot - parent_slot`
+  boundaries at the runtime's canonical tick ordinals and require the final recovered hash to equal the
+  independently preserved visible blockhash before mutating the Bank. Record the recovery digest in the
+  launch evidence, and keep the new worker/runtime route unqualified until the normal exact checkpoint
+  and plugin gates pass.
+  If the sealed collector output is beneath a root-private evidence tree that the unprivileged worker
+  cannot traverse, do not relax that tree's permissions or grant the worker a broad DAC capability.
+  Revalidate the non-sensitive boundary bytes and collector receipt, then publish them no-clobber into
+  a separately fsynced, root-owned immutable bundle with a readable file mode and non-writable directory;
+  bind the worker to that deployed path and digest while leaving the original private evidence untouched.
+  When Blockzilla supplies a Compact V2 `poh.wincode`, extract only through the reviewed Rust
+  `jetstreamer-blockzilla-poh-extract` binary. Bind every requested slot and boundary count to the
+  sealed skipped-slot audit, use the runtime's exact ticks-per-slot value, and require the tool to
+  hash the complete singly linked, non-writable input while decoding it. For epoch 208, all 25
+  post-gap slots, 96 total boundaries, and 71 hidden intermediate boundaries are mandatory. Pass
+  the sealed extractor JSON, skipped-slot audit, and finalized block metadata through the reviewed
+  Rust `jetstreamer-blockzilla-boundary-collect` binary before deployment. The collector must bind
+  all three exact input SHA-256 values, require the fixed 25-slot epoch-208 census and canonical
+  parent arithmetic, require every extracted final boundary and final entry hash to equal the
+  preserved finalized blockhash, and reject a repeated hash anywhere among the 96 hidden or final
+  boundaries. Its no-clobber output and receipt remain private and explicitly deny publication,
+  runtime-route promotion, remote mutation, and R2 mutation. A decoded file, extractor or collector
+  success, or matching final hashes alone do not authorize runtime-route promotion, canonical
+  sidecars, publication, or R2 upload.
+
+## Deliver
+
+Build once with `cargo build --release -p jetstreamer-r2 -p jetstreamer-r2-progressive`. Store receipts outside the public archive directory, normally at `$HOME/.jetstreamer-private/r2-receipts`.
+
+For all complete local pairs:
+
+```sh
+target/release/jetstreamer-r2 sync "$HORIZON_DIR" \
+  --receipt-directory "$HOME/.jetstreamer-private/r2-receipts" \
+  --legacy-part-size-mib 5
+```
+
+Add `--epochs START-END` for an explicit range. Add `--delete-local` only after checking the matching plugin receipt and that no active controller or verifier still requires those local paths. Existing deployed controllers may use the public directory as their completion ledger; defer retirement for their managed range until that controller finishes or is deliberately upgraded to understand R2 receipts.
+
+After an adaptive controller has been deliberately deployed with `--r2-receipt-directory`, its completed cohorts no longer need a matching `--defer-epochs` entry: the progressive uploader may retire them after all normal publication gates pass. Never remove the defer for a controller that lacks this flag.
+
+For progressive delivery and retirement, pass the authenticated receipt directory and explicitly
+defer every active controller range. The coordinator performs authenticated sync and remote
+readback first. Delegate `--delete-local` only after the authenticated receipt agrees with the
+current remote pair and the normal local full/plugin/boundary gates pass:
+
+```sh
+/absolute/immutable/bin/jetstreamer-r2-progressive \
+  /absolute/immutable/bin/jetstreamer-r2 "$HORIZON_DIR" \
+  "$HOME/.jetstreamer-private/r2-receipts" START END \
+  --delete-local \
+  --local-mutation-lock "$HOME/.jetstreamer-private/r2-receipts/local-mutation.lock" \
+  --full-receipt-directory "$HOME/.jetstreamer-private/final-audits/receipts" \
+  --full-verifier-sha256 FULL_VERIFIER_SHA256[,TRANSITION_SHA256] \
+  --full-verifier-script-sha256 FULL_SCRIPT_SHA256 \
+  --plugin-receipt-directory "$HOME/.jetstreamer-private/plugin-audits/receipts" \
+  --plugin-pipeline-sha256 PIPELINE_SHA256[,TRANSITION_SHA256] \
+  --plugin-verifier-script-sha256 SCRIPT_SHA256 \
+  --boundary-receipt-directory "$HOME/.jetstreamer-private/boundary-audits/receipts" \
+  --boundary-verifier-sha256 BOUNDARY_SHA256[,TRANSITION_SHA256] \
+  --boundary-verifier-script-sha256 BOUNDARY_SCRIPT_SHA256 \
+  --defer-epochs ACTIVE_START-ACTIVE_END
+```
+
+Before arming any generated upload service, audit the effective wrapper without executing it using
+`scripts/audit_horizon_upload_wrapper.py`. Bind every configured `--*-sha256` option to the exact
+immutable binary or script it names, require the binding set to cover every hash option exactly
+once, and bind every configured full/plugin/boundary `--*-receipt-directory` to the exact verifier
+state directory that produces it. Require each configured receipt directory to be that state
+directory's `receipts/` child; pointing the uploader at the state-directory parent makes valid
+verifier receipts invisible and can leave publication waiting forever even when every hash is
+correct. Preserve the JSON result with the deployment evidence. Re-derive these hashes from the
+deployed files even when a wrapper and deployment manifest already agree with each other: copied or
+mistyped evidence can be internally consistent yet reject the verifier's correct receipt only after
+a long replay finishes. Repeat this audit after any wrapper, verifier, plugin, or immutable package
+transition and confirm the effective systemd `ExecStart` points at the audited wrapper.
+
+The binary must fail closed on an existing remote mismatch by default. If the user explicitly authorizes replacement, `--overwrite-existing` replaces both the archive and sidecar, performs a fresh whole-object SHA-256 readback, and atomically replaces the private receipt. A native R2 checksum, when present, must report type `COMPOSITE` and match local part-SHA-256 evidence. Objects without native R2 checksums require a matching reconstructed ETag, canonical sidecar, and, unless explicitly trusted as legacy, a successful whole-object SHA-256 readback.
+
+If a trusted legacy upload has a canonical sidecar but its archive object is missing, use
+`--repair-orphaned-archive` only after the user authorizes repair. The command requires the remote
+sidecar to match the verified local sidecar byte-for-byte, creates the archive with append-only
+preconditions, performs a whole-object SHA-256 readback, and leaves the existing sidecar untouched.
+It never admits a mismatching sidecar and is mutually exclusive with `--overwrite-existing`.
+
+Use `jetstreamer-r2 restore` when an ordered-chain or boundary audit needs an archive that has already been retired locally. Restore only into an explicit scratch directory, require `--epochs` and the private `--receipt-directory`, and let the Rust command enforce the recorded length, ETag, whole-file SHA-256, canonical sidecar, resumable conditional ranged GET, and no-clobber publication. Never download directly over a public Horizon archive.
+
+Use `jetstreamer-r2 retire-local` only when local retirement has already been authorized by the
+normal boundary gates or by an explicit user-approved backup/emergency policy. It makes no R2
+mutation: it requires a durable receipt with whole-object SHA-256 evidence, rehashes the local
+archive and ETag, re-observes the remote archive and sidecar, then removes the local sidecar before
+the archive. It requires an explicit `--epochs START-END`; never infer a destructive selection from
+directory discovery. The command deliberately does not decide policy, so never treat its integrity
+checks as a substitute for the ordinary full/plugin/boundary gates unless the user explicitly
+authorized that narrower local-retirement exception.
+
+For an explicit user-approved filesystem-floor exception, use
+`scripts/retire_horizon_at_reserve.py` as the policy wrapper and give it the exact same private
+`--local-mutation-lock` as the progressive uploader. The wrapper must recheck actual free space
+after acquiring the lock, validate that the public directory contains only complete canonical
+pairs inside the authorized range, call `retire-local` for one explicit epoch at a time, and stop
+as soon as the floor is recovered. A newly arriving pair must not broaden the selected set. Treat
+no eligible pair below the floor, a partial pair, an out-of-range entry, or failure to recover the
+floor after exhausting pairs as a hard failure. Before enabling its timer, prove one sandboxed
+above-floor invocation performs no archive hashing, no local removal, and no R2 mutation.
+
+When a restore or audit runs in a systemd sandbox with `ProtectHome=read-only` and the scratch
+directory itself named in `ReadWritePaths=`, clean the directory's contents but keep the empty
+scratch directory. Removing that directory requires write access to its parent and fails with
+`EROFS`; under `Restart=on-failure` this can otherwise trigger an unnecessary restore loop. Create
+the mount-point directory before starting the sandbox, validate its exact canonical path before
+cleanup, and constrain deletion to that directory with `find "$scratch" -xdev -mindepth 1 -delete`.
+
+Do not use `--legacy-etag-only` unless the user has explicitly established that a pre-existing object is trusted. Newly uploaded archives always require native R2 SHA-256 evidence or whole-object SHA-256 readback.
+
+## Operate safely
+
+- Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
+  exhausted by Tokio's core runtime threads. `retire-local` performs its archive
+  proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
+  count plus the wrapper processes, the proof can remain queued forever while
+  every visible thread is parked and the reserve lock stays held. Use at least
+  twice the service's visible logical-CPU count, with a minimum of 256 tasks,
+  unless the exact binary has a smaller sealed runtime-worker bound. On the first
+  below-floor retirement, prove that an additional worker is consuming CPU and
+  has the selected `.jet` open before considering the guard live. If it is
+  starved, stop the non-mutating attempt while the complete pair is still
+  present, raise only that unit's task ceiling, and retry the same verified
+  command.
+- Never use `sync -f PATH` or `sync --file-system PATH` to make a receipt durable on a filesystem
+  containing live replay scratch. GNU `sync -f` calls `syncfs(2)` and flushes the entire filesystem;
+  continuously dirtied mmap-backed AccountsDb pages can keep it blocked indefinitely and impose
+  avoidable writeback pressure on every producer. Durable receipt writers must fsync the receipt's
+  own file descriptor and then its containing directory descriptor, preferably inside the Rust or
+  Python writer that performs the atomic rename. Do not substitute a filesystem-wide flush.
+- Run multi-check shell observations with fail-fast semantics, normally `set -euo pipefail`, and
+  capture each asserted condition explicitly in the durable observation. Never let a later
+  successful status or presence probe mask an earlier failed absence, ownership, hash, or unit-state
+  assertion through the shell's final-command exit status. When correcting a mistaken observation,
+  preserve the original immutable receipt, seal a separate correction that binds its exact digest,
+  state the authoritative evidence and gate impact, and fix the human-readable summary rather than
+  rewriting history.
+- Private qualification, admission, guard, and publication receipt directories may deliberately be
+  root-only. An unprivileged `test -e`, `stat`, or file read can therefore look like absence even
+  when the receipt exists. Before declaring a required receipt missing, inspect the parent access
+  controls and repeat the existence, metadata, digest, and JSON checks through the intended
+  privileged reader. Treat an actual unreadable or invalid receipt as a failed gate; never weaken
+  its ownership or mode merely to make an unprivileged probe pass.
+  A root systemd service with an empty capability bounding set still cannot traverse a user-owned
+  mode-0700 ancestor: UID 0 needs `CAP_DAC_OVERRIDE` for that traversal. When such a sandbox must
+  read root-owned sealed evidence beneath the private root, retain only that capability (including
+  the effective or ambient set as required by the unit), keep the target mount read-only except for
+  exact receipt directories, and prove the read path in an equivalently sandboxed transient unit.
+  Do not relax private-directory permissions to work around the sandbox.
+  A root launcher that validates private evidence and then drops to an unprivileged scanner needs
+  CAP_SETGID and CAP_SETUID effective at the drop point in addition to any traversal capability.
+  `CapabilityBoundingSet=` limits what is possible but does not by itself prove those capabilities
+  are effective; bind the same minimal set through `AmbientCapabilities=` when required and run an
+  end-to-end sandbox proof that observes the unprivileged output owner before arming production.
+  For a long `Type=oneshot` verifier use `TimeoutStartSec=` as its execution bound;
+  `RuntimeMaxSec=` is ignored for oneshot units.
+- Use SSH URLs for Git network operations. Select a currently loaded keychain agent socket for the
+  active login session by verifying it with `ssh-add -l`; never hard-code an ephemeral socket path
+  from an earlier session. Check the inherited environment for required service credentials before
+  sourcing interactive shell startup files in a detached command. A startup file may attach to a
+  stale empty agent and return nonzero when it cannot prompt for the key passphrase even though a
+  different current-login socket is healthy. After any shell initialization, rediscover all
+  candidate sockets and select only one whose `ssh-add -l` succeeds and lists an identity; never
+  treat the socket exported by the startup file itself as proof that Git authentication is ready.
+- Never delete archives, sidecars, receipts or other R2 keys during cleanup or retries. The only
+  routine deletion exception is the exact `epoch-N.epoch-status.json` lifecycle above: verified
+  ready-pair completion or positively proven inactive/orphaned work, with authenticated conditional
+  deletion and durable evidence. No prefix or bulk deletion is authorized.
+- Never use `--overwrite-existing` without both positive evidence that the existing remote `.jet` is erroneous and explicit user authorization for its replacement.
+- Upload the sidecar only after the complete `.jet` has passed remote readback and local source revalidation; the matching sidecar is the readiness marker.
+- Never remove a local archive before its durable receipt exists and both remote objects have been re-observed.
+- Refuse to begin upload without exact full and current-plugin receipts. Refuse local retirement without both adjacent-boundary receipts as well.
+- Do not treat a sidecar alone as proof that the archive was uploaded.
+- Resume idempotently from R2 inventory and private receipts after interruption.
+- Leave exactly one normal 30-minute observation cadence for each running job, singleton, legacy
+  cohort, or durable watcher. Enforce 1,800 seconds as a hard minimum between autonomous routine
+  replay/resource observations; do not manually poll inside that window without a user request.
+  Use that same identity-stable observation to refresh every claimed epoch's
+  `epoch-N.epoch-status.json` and to reconcile the authoritative campaign fleet ledger; do not poll
+  separately for the table, active list, or R2 metadata. After arming
+  a persistent timer or watcher, do not poll it in short empty loops or emit repeated no-change
+  status turns. Let it run unattended and inspect it once the cadence interval has elapsed or its
+  scheduled event should have completed. A user request for a status update always authorizes one
+  immediate out-of-band replay/resource observation, even inside the normal 30-minute window; mark
+  its observer config with `"observation_reason": "user-requested-status"`, require the resulting
+  v2 receipt to record that reason and `routine_minimum_interval_enforced: false`, and use it to
+  refresh the status objects. Omit that config field, or set it to `routine`, for autonomous
+  observations so the observer enforces the 1,800-second predecessor interval. Do not
+  turn that exception into an autonomous retry loop or additional unrequested polls. Diagnose an
+  already-observed failure from existing evidence, but do not use it as a reason to restart or
+  duplicate healthy work.
