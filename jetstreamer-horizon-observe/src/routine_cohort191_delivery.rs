@@ -10,6 +10,8 @@ pub(super) struct Profile {
     pub publisher: Bound,
     pub terminal_event: Bound,
     pub event_directory: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    adoption_predecessor: Option<Bound>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -34,6 +36,45 @@ fn event_path(p: &Plan) -> Option<PathBuf> {
         s.event_directory
             .join(format!("event-{}.json", stamp(&p.sample_target_utc)))
     })
+}
+// The sealed first adoption alone can bridge one missed ordinary slot. Keeping
+// its exact accepted predecessor binding prevents later successors extending it.
+pub(super) fn interval(p: &Plan, old_time: &str) -> Result<Option<u64>> {
+    let Some(profile) = &p.cohort191_delivery else {
+        return Ok(None);
+    };
+    let Some(previous) = &profile.adoption_predecessor else {
+        return Ok(None);
+    };
+    if previous.path != p.previous_observer.path || previous.sha256 != p.previous_observer.sha256 {
+        return Ok(None);
+    }
+    let old = utc_seconds(old_time)?;
+    let target = utc_seconds(scheduled_target(p)?)?;
+    let event = bound_json(&profile.terminal_event, false)?;
+    ensure!(
+        event["schema"] == "jetstreamer-cohort191-terminal-transition-v1",
+        "191 adoption interval requires native terminal capture"
+    );
+    let captured = event["recorded_unix_seconds"]
+        .as_u64()
+        .context("191 terminal capture clock absent")?;
+    adoption_clocks(old, target, captured)?;
+    Ok(Some(target - old))
+}
+fn adoption_clocks(old: u64, target: u64, captured: u64) -> Result<()> {
+    let gap = target
+        .checked_sub(old)
+        .context("191 adoption precedes accepted predecessor")?;
+    ensure!(
+        (1800..=3600).contains(&gap) && gap % 1800 == 0,
+        "191 adoption must retain the bounded original30minute grid"
+    );
+    ensure!(
+        captured > old && captured <= target,
+        "191 native capture must follow accepted predecessor and precede target"
+    );
+    Ok(())
 }
 fn terminal(v: &Value, target: u64) -> Result<()> {
     jetstreamer_horizon_observe::cohort191_delivery_model::validate_native_terminal(
@@ -284,7 +325,7 @@ pub(super) fn enable(
             && !value.r2_mutations,
         "191 handoff spec acquired authority"
     );
-    let profile = value.profile;
+    let mut profile = value.profile;
     let proof = bound_json(&profile.terminal_event, false)?;
     ensure!(
         proof["schema"] == "jetstreamer-cohort191-terminal-transition-v1",
@@ -294,6 +335,7 @@ pub(super) fn enable(
     if let Some(target) = value.sample_target_utc {
         retime(next, &mut edited, &target)?;
     }
+    profile.adoption_predecessor = Some(next.previous_observer.clone());
     next.cohort191_delivery = Some(profile);
     next.expected_epochs = epochs;
     validate(next)?;
@@ -681,5 +723,48 @@ mod tests {
         ] {
             assert!(cadence_target("2026-10-24T00:26:00Z", target).is_err());
         }
+    }
+    #[test]
+    fn first191_adoption_interval_requires_grid_and_real_between_sample_capture() {
+        for gap in [1800, 3600] {
+            adoption_clocks(10000, 10000 + gap, 11000).unwrap();
+        }
+        for target in [9999, 10000, 11799, 11801, 12400, 13601, 15400] {
+            assert!(adoption_clocks(10000, target, 11000).is_err(), "{target}");
+        }
+        for capture in [9999, 10000, 13601] {
+            assert!(adoption_clocks(10000, 13600, capture).is_err(), "{capture}");
+        }
+        adoption_clocks(10000, 13600, 13600).unwrap();
+    }
+    #[test]
+    fn adoption_interval_cannot_be_borrowed_by_foreign_or_later_predecessor() {
+        let (mut p, _, _, _, _, _, _, _) = crate::tests::fixture101();
+        let profile = || Profile {
+            publisher: Bound {
+                path: "/absent/program".into(),
+                sha256: "a".repeat(64),
+            },
+            terminal_event: Bound {
+                path: "/absent/terminal".into(),
+                sha256: "b".repeat(64),
+            },
+            event_directory: "/var/lib/jetstreamer/horizon-cohort191-delivery-events-fixture"
+                .into(),
+            adoption_predecessor: None,
+        };
+        p.cohort191_delivery = Some(profile());
+        assert!(interval(&p, "2026-10-24T01:16:00Z").unwrap().is_none());
+        let previous = Bound {
+            path: p.previous_observer.path.clone(),
+            sha256: p.previous_observer.sha256.clone(),
+        };
+        p.cohort191_delivery.as_mut().unwrap().adoption_predecessor = Some(previous);
+        // Exact first binding attempts to read real proof; absence is an error.
+        assert!(interval(&p, "2026-10-24T01:16:00Z").is_err());
+        p.previous_observer.sha256 = "c".repeat(64);
+        assert!(interval(&p, "2026-10-24T01:16:00Z").unwrap().is_none());
+        p.previous_observer.path = "/later/observer".into();
+        assert!(interval(&p, "2026-10-24T02:16:00Z").unwrap().is_none());
     }
 }
