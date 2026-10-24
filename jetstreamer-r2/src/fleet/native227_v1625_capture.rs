@@ -36,6 +36,24 @@ fn persistent(p: &BTreeMap<String, String>) -> Result<()> {
         ],
     )
 }
+fn expected_environment() -> BTreeSet<String> {
+    [
+        if cfg!(feature = "native227-small") {
+            "RUST_MIN_STACK=67108864"
+        } else {
+            "RUST_MIN_STACK=134217728"
+        }
+        .into(),
+        "SOLANA_RAYON_THREADS=8".into(),
+        "JETSTREAMER_HISTORICAL_POH_THREADS=2".into(),
+        format!(
+            "JETSTREAMER_EPOCH227_V1625_TEST_SCRATCH={}/scratch",
+            c::ROOT
+        ),
+    ]
+    .into_iter()
+    .collect::<BTreeSet<String>>()
+}
 pub(super) fn sandbox(p: &BTreeMap<String, String>) -> Result<()> {
     persistent(p)?;
     require(
@@ -67,24 +85,13 @@ pub(super) fn sandbox(p: &BTreeMap<String, String>) -> Result<()> {
         p.get("CPUAffinity").is_some_and(|v| native_affinity(v)),
         "227 native CPU affinity differs"
     );
-    let expected = [
-        "RUST_MIN_STACK=134217728".into(),
-        "SOLANA_RAYON_THREADS=8".into(),
-        "JETSTREAMER_HISTORICAL_POH_THREADS=2".into(),
-        format!(
-            "JETSTREAMER_EPOCH227_V1625_TEST_SCRATCH={}/scratch",
-            c::ROOT
-        ),
-    ]
-    .into_iter()
-    .collect::<BTreeSet<String>>();
     ensure!(
         p.get("Environment")
             .context("227 environment")?
             .split_whitespace()
             .map(str::to_owned)
             .collect::<BTreeSet<_>>()
-            == expected,
+            == expected_environment(),
         "227 native environment differs"
     );
     ensure!(
@@ -494,6 +501,28 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn selected_environment_retains_original_and_matches_real_small_unit_template() {
+        let environment = expected_environment();
+        let stack = if cfg!(feature = "native227-small") {
+            "RUST_MIN_STACK=67108864"
+        } else {
+            "RUST_MIN_STACK=134217728"
+        };
+        assert!(environment.contains(stack));
+        assert_eq!(environment.len(), 4);
+        if cfg!(feature = "native227-small") {
+            let unit =
+                include_str!("../../../scripts/epoch227-v1625-native-input-small-v2.service");
+            let actual = unit
+                .lines()
+                .filter_map(|line| line.strip_prefix("Environment="))
+                .map(str::to_owned)
+                .collect::<BTreeSet<_>>();
+            assert_eq!(actual, environment);
+            assert!(!environment.contains("RUST_MIN_STACK=134217728"));
+        }
+    }
     #[test]
     fn transient_collected_or_remain_after_exit_units_cannot_be_captured() {
         let good = BTreeMap::from([
