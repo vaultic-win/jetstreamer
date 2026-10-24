@@ -97,13 +97,13 @@ backlog, with no stale terminal producer countdown.
 
 ## Optional retirement after logical closure
 
-The default `holding-retire185` plan still requires both original185 and141
+The default `holding-retire185` plan still requires both original epoch 185 and 141
 claims retained. An optional `closed_growth_disposition` binding selects a
-separately reviewed capacity schema for retirement after old185 has already
+separately reviewed capacity schema for retirement after old epoch 185 has already
 closed. It authenticates the same fixed closure/intent through the typed reader,
-requires the explicit original185 row already0 with disposition delta0, and
-preserves the original141 whole-root512GiB cap/binding. This is preservation of
-that original cap, not an incremental512GiB allocation on top of retained bytes
+requires the explicit original epoch 185 row already 0 with disposition delta 0, and
+preserves the original epoch 141 whole-root 512 GiB cap/binding. This preserves
+that original cap, with no incremental 512 GiB allocation on top of retained bytes
 or a new remaining-growth calculation.
 
 The opt-in projection binding is part of the durable retirement intent, so its

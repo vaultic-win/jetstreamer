@@ -1,4 +1,4 @@
-//! First real recovered191 queue event; resource timestamp remains unchanged.
+//! First real recovered epoch 191 queue event; resource timestamp remains unchanged.
 use super::*;
 pub(super) fn sample(p: &Plan, observer: &Value, proof: &Value, now: u64) -> Result<String> {
     let row = proof["queue_observation"]["epochs"]

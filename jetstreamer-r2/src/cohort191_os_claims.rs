@@ -1,4 +1,4 @@
-//! Count the authenticated old141 OS reservations in their successor exactly once.
+//! Count the authenticated old epoch 141 OS reservations in their successor exactly once.
 use super::*;
 
 const TRANSFER: &str =
@@ -112,8 +112,8 @@ fn documents(t: &Value, old: &Value, next: &Value, parent: &Value, other: u64) -
         LEGACY_REMAINING + 14 * GIB + (264_u64 << 20) == OTHER_MINIMUM && other >= OTHER_MINIMUM,
         "191 transferred OS obligations were dropped or counted as free space"
     );
-    // Only the base changes: other retains modern4GiB, original full legacy
-    // remaining allowance, fixture10GiB and both136 claims. No consumed credit.
+    // Only the base changes: other retains modern 4 GiB, original full legacy
+    // remaining allowance, fixture 10 GiB and both epoch 136 claims. No consumed credit.
     Ok(FLOOR)
 }
 

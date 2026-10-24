@@ -1,5 +1,5 @@
-//! Exact0516 failed fleet tail. Reuses six authenticated publications and the
-//! original resource observer; new191 metadata has its own genuine event clock.
+//! Exact 05:16 failed fleet tail. Reuses six authenticated publications and the
+//! original resource observer; new epoch 191 metadata has its own genuine event clock.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261024T051600Z-memory152-rebind-guard-stopped185-import-pending191-repair141-v2";
 const PLAN_SHA: &str = "61d0de19d0e401d692565dcb32edc414fcacf9d261f23d0702016470faf3504b";

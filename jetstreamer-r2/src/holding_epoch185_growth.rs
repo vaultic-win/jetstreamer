@@ -1004,7 +1004,7 @@ mod tests {
         ]);
         let valid = json!({"type":"a(usssoo)","data":[[row]]});
         let decoded = decode_native_jobs(&valid).unwrap();
-        // Even this sterile captured probe contains185 in a Horizon name and
+        // Even this sterile captured probe contains 185 in a Horizon name and
         // correctly hits the existing conservative entry fence.
         assert!(no_queued_entry_jobs(&decoded).is_err());
         let mut benign = valid.clone();

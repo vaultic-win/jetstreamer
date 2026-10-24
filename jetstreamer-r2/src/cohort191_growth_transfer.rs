@@ -1,4 +1,4 @@
-//! Exact original191 future replay allocation -> retained read-only delivery.
+//! Exact original epoch 191 future replay allocation -> retained read-only delivery.
 //! Metadata only. No source byte, guard, archive gate or execution is changed.
 use super::*;
 use std::os::fd::AsRawFd;
