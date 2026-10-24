@@ -14,6 +14,13 @@ const MAX_MEMORY: u64 = 6 << 30;
 const MAX_TASKS: u64 = 256;
 const MAX_SECONDS: u64 = 14400;
 const MAX_CPU: u64 = 8_000_000;
+const HOOKS: [&str; 5] = [
+    "ExecStartPre",
+    "ExecStartPost",
+    "ExecCondition",
+    "ExecStop",
+    "ExecStopPost",
+];
 const ALLOWED_CAPS: u64 = (1 << 1) | (1 << 2) | (1 << 19);
 #[derive(Clone, Debug, PartialEq)]
 struct Identity {
@@ -49,6 +56,7 @@ impl Identity {
 #[derive(Clone, Debug, PartialEq)]
 struct Facts {
     unit: Value,
+    hook_arrays: Value,
     kernel: Value,
     process_status: Value,
     mounts: Value,
@@ -108,6 +116,55 @@ fn unit() -> Result<Value> {
     let out=std::process::Command::new("/usr/bin/systemctl").env("LC_ALL","C").args(["show",UNIT,"--no-pager","--property=Id,LoadState,Type,User,Group,ActiveState,SubState,MainPID,InvocationID,NRestarts,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,ExecStop,ExecStopPost,OnSuccess,OnFailure,Triggers,TriggeredBy,NoNewPrivileges,ProtectSystem,ProtectHome,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,RootDirectory,RootImage,Result,ExecMainStatus"]).output()?;
     ensure!(out.status.success(), "self-restore manager query failed");
     property_object(&out.stdout)
+}
+// systemctl show can omit empty command arrays. Its omission is preserved;
+// actual typed D-Bus replies, queried independently for all five exact hooks,
+// are mandatory even when show prints an empty string.
+fn hook_arrays() -> Result<Value> {
+    let mut replies = serde_json::Map::new();
+    for name in HOOKS {
+        let out = std::process::Command::new("/usr/bin/busctl")
+            .args([
+                "--system",
+                "get-property",
+                "org.freedesktop.systemd1",
+                &bus_path(UNIT),
+                "org.freedesktop.systemd1.Service",
+                name,
+            ])
+            .output()?;
+        ensure!(
+            out.status.success() && out.stdout.len() <= 1024,
+            "self-restore typed hook array unavailable: {name}"
+        );
+        replies.insert(name.into(), json!(std::str::from_utf8(&out.stdout)?));
+    }
+    Ok(Value::Object(replies))
+}
+fn validate_hook_arrays(show: &Value, replies: &Value) -> Result<()> {
+    let values = replies
+        .as_object()
+        .context("self-restore typed hook replies missing")?;
+    ensure!(
+        values.len() == HOOKS.len() && values.keys().all(|k| HOOKS.contains(&k.as_str())),
+        "self-restore typed hook reply roster differs"
+    );
+    for name in HOOKS {
+        let raw = values
+            .get(name)
+            .and_then(Value::as_str)
+            .context("self-restore typed hook reply missing or malformed")?;
+        ensure!(
+            matches!(raw, "a(sasbttttuii) 0" | "a(sasbttttuii) 0\n"),
+            "self-restore typed hook array is not exactly empty: {name}"
+        );
+        ensure!(
+            show.get(name)
+                .is_none_or(|value| value.as_str() == Some("")),
+            "self-restore show hook disagrees with the actual empty typed array: {name}"
+        );
+    }
+    Ok(())
 }
 fn bus_path(unit: &str) -> String {
     let mut result = "/org/freedesktop/systemd1/unit/".to_owned();
@@ -221,7 +278,8 @@ struct ManagerLimits {
     runtime: u64,
     quota: u64,
 }
-fn validate_unit(v: &Value, b: &Binding<'_>, limits: ManagerLimits) -> Result<()> {
+fn validate_unit(v: &Value, b: &Binding<'_>, limits: ManagerLimits, hooks: &Value) -> Result<()> {
+    validate_hook_arrays(v, hooks)?;
     let Binding {
         pid,
         iid,
@@ -237,6 +295,8 @@ fn validate_unit(v: &Value, b: &Binding<'_>, limits: ManagerLimits) -> Result<()
     for (key, expected) in [
         ("Id", UNIT),
         ("LoadState", "loaded"),
+        ("Result", "success"),
+        ("ExecMainStatus", "0"),
         ("NRestarts", "0"),
         ("Restart", "no"),
         ("KillMode", "control-group"),
@@ -246,11 +306,6 @@ fn validate_unit(v: &Value, b: &Binding<'_>, limits: ManagerLimits) -> Result<()
         ("ProtectHome", "read-only"),
         ("RootDirectory", ""),
         ("RootImage", ""),
-        ("ExecStartPre", ""),
-        ("ExecStartPost", ""),
-        ("ExecCondition", ""),
-        ("ExecStop", ""),
-        ("ExecStopPost", ""),
         ("OnSuccess", ""),
         ("OnFailure", ""),
         ("Triggers", ""),
@@ -701,6 +756,7 @@ impl<'a> Context<'a> {
             "actual self-restore kernel argv differs from bound executable/spec/action"
         );
         let unit = unit()?;
+        let hook_arrays = hook_arrays()?;
         let timeout = raw_usec("TimeoutStartUSec")?;
         let runtime = raw_usec("RuntimeMaxUSec")?;
         let quota = raw_usec("CPUQuotaPerSecUSec")?;
@@ -718,6 +774,7 @@ impl<'a> Context<'a> {
                 runtime,
                 quota,
             },
+            &hook_arrays,
         )?;
         let status = process_status(&bounded_read(Path::new("/proc/self/status"), 65536)?, &unit)?;
         let kernel = kernel(&unit, pid, timeout, runtime, quota)?;
@@ -729,6 +786,7 @@ impl<'a> Context<'a> {
         );
         Ok(Facts {
             unit,
+            hook_arrays,
             kernel,
             process_status: status,
             mounts,
@@ -763,6 +821,7 @@ impl<'a> Context<'a> {
             floor: AtomicU64::new(100),
             initial: Facts {
                 unit,
+                hook_arrays: json!({}),
                 kernel: Value::Null,
                 process_status: Value::Null,
                 mounts: Value::Null,
@@ -859,13 +918,145 @@ impl<'a> Context<'a> {
         UNIT
     }
     pub(crate) fn evidence(&self) -> Value {
-        json!({"schema":"jetstreamer-foundation213-resumable-self-accounting-v1","unit":UNIT,"pid":self.pid,"invocation_id":self.iid,"self_sha256":self.self_sha,"spec":self.spec,"mapping":self.mapping,"custody":self.custody,"admission":self.admission,"unit_at_start":self.initial.unit,"kernel_controls":self.initial.kernel,"actual_process_privilege_status":self.initial.process_status,"actual_mount_scope":self.initial.mounts,"process_start_time":self.initial.start,"transition_flock_owned":true,"already_admitted_restore_only":true,"entry_recorded_unix_seconds":self.entry_clock,"entry_capacity_validated":self.entered(),"minimum_free_bytes":self.protected_floor(),"entry_age_gate_seconds":900,"maximum_execution_seconds":MAX_SECONDS,"freshness_policy":"fresh at entry; same bounded invocation and live protected guards/reserve thereafter","replay_competitor_comparison_only":true,"raw_censuses_preserved":true,"memory_credit_bytes":0,"disk_credit_bytes":0,"replay_launch_authorized":false,"retirement_authorized":false,"r2_mutations":false})
+        json!({"schema":"jetstreamer-foundation213-resumable-self-accounting-v1","unit":UNIT,"pid":self.pid,"invocation_id":self.iid,"self_sha256":self.self_sha,"spec":self.spec,"mapping":self.mapping,"custody":self.custody,"admission":self.admission,"unit_at_start":self.initial.unit,"typed_empty_hook_arrays":self.initial.hook_arrays,"kernel_controls":self.initial.kernel,"actual_process_privilege_status":self.initial.process_status,"actual_mount_scope":self.initial.mounts,"process_start_time":self.initial.start,"transition_flock_owned":true,"already_admitted_restore_only":true,"entry_recorded_unix_seconds":self.entry_clock,"entry_capacity_validated":self.entered(),"minimum_free_bytes":self.protected_floor(),"entry_age_gate_seconds":900,"maximum_execution_seconds":MAX_SECONDS,"freshness_policy":"fresh at entry; same bounded invocation and live protected guards/reserve thereafter","replay_competitor_comparison_only":true,"raw_censuses_preserved":true,"memory_credit_bytes":0,"disk_credit_bytes":0,"replay_launch_authorized":false,"retirement_authorized":false,"r2_mutations":false})
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn empty_hooks() -> Value {
+        Value::Object(
+            HOOKS
+                .into_iter()
+                .map(|k| {
+                    (
+                        k.into(),
+                        json!(include_str!(
+                            "fixtures/foundation213-empty-hooks/empty-array-reply.txt"
+                        )),
+                    )
+                })
+                .collect(),
+        )
+    }
+    #[test]
+    fn retained_actual_manager_evidence_omits_hooks_but_typed_replies_are_empty() {
+        let actual = property_object(include_bytes!(
+            "fixtures/foundation213-empty-hooks/manager-show.txt"
+        ))
+        .unwrap();
+        for name in HOOKS {
+            assert!(actual.get(name).is_none(), "{name}");
+        }
+        validate_hook_arrays(&actual, &empty_hooks()).unwrap();
+        assert_eq!(actual["InvocationID"], "dc6b1b8b8de44050a2b95c15c0b3602f");
+        assert_eq!(actual["ExecMainStatus"], "1");
+        // Authentic empty hooks cannot make a failed/terminal invocation live.
+        let (_, spec, exe, limits) = fixture();
+        let binding = Binding {
+            pid: 803491,
+            iid: "dc6b1b8b8de44050a2b95c15c0b3602f",
+            exe: &exe,
+            spec: &spec,
+            self_sha: &"b".repeat(64),
+        };
+        assert!(validate_unit(&actual, &binding, limits, &empty_hooks()).is_err());
+    }
+    #[test]
+    fn actual_omitted_show_hooks_require_every_exact_typed_empty_array() {
+        let (mut show, spec, exe, limits) = fixture();
+        for key in HOOKS {
+            show.as_object_mut().unwrap().remove(key);
+        }
+        let original = show.clone();
+        let raw = empty_hooks();
+        let binding = Binding {
+            pid: 4242,
+            iid: &"1".repeat(32),
+            exe: &exe,
+            spec: &spec,
+            self_sha: &"b".repeat(64),
+        };
+        validate_unit(&show, &binding, limits, &raw).unwrap();
+        assert_eq!(show, original);
+        for key in HOOKS {
+            assert!(show.get(key).is_none());
+            let mut missing = raw.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(validate_unit(&show, &binding, limits, &missing).is_err());
+            for wrong in [
+                json!("a(sasbttttuii) 1"),
+                json!("as 0\n"),
+                json!("a(sasbttttuii) 00\n"),
+                json!("a(sasbttttuii) 0 extra\n"),
+                json!(""),
+                Value::Null,
+                json!(false),
+            ] {
+                let mut changed = raw.clone();
+                changed[key] = wrong;
+                assert!(
+                    validate_unit(&show, &binding, limits, &changed).is_err(),
+                    "{key}"
+                );
+            }
+            for wrong in [Value::Null, json!("/unbound/hook"), json!([])] {
+                let mut changed = show.clone();
+                changed[key] = wrong;
+                assert!(
+                    validate_unit(&changed, &binding, limits, &raw).is_err(),
+                    "{key}"
+                );
+            }
+        }
+        let mut extra = raw.clone();
+        extra["UnrequestedHook"] = json!("a(sasbttttuii) 0\n");
+        assert!(validate_unit(&show, &binding, limits, &extra).is_err());
+        // Only the five authenticated arrays can be absent from show.
+        for key in [
+            "Id",
+            "LoadState",
+            "Result",
+            "ExecMainStatus",
+            "Type",
+            "User",
+            "Group",
+            "ActiveState",
+            "SubState",
+            "MainPID",
+            "InvocationID",
+            "NRestarts",
+            "Restart",
+            "KillMode",
+            "Delegate",
+            "ControlGroup",
+            "MemoryMax",
+            "MemoryHigh",
+            "MemorySwapMax",
+            "TasksMax",
+            "NoNewPrivileges",
+            "ProtectSystem",
+            "ProtectHome",
+            "ReadWritePaths",
+            "CapabilityBoundingSet",
+            "AmbientCapabilities",
+            "RootDirectory",
+            "RootImage",
+            "OnSuccess",
+            "OnFailure",
+            "Triggers",
+            "TriggeredBy",
+            "ExecStart",
+        ] {
+            let mut changed = show.clone();
+            changed.as_object_mut().unwrap().remove(key);
+            assert!(
+                validate_unit(&changed, &binding, limits, &raw).is_err(),
+                "{key}"
+            );
+        }
+    }
     fn fixture() -> (Value, Bound, PathBuf, ManagerLimits) {
         let b = Bound {
             path: "/var/lib/jetstreamer/exact-restore/restore-plan.json".into(),
@@ -916,7 +1107,7 @@ mod tests {
             spec: &spec,
             self_sha: &sha,
         };
-        validate_unit(&v, &binding, l).unwrap();
+        validate_unit(&v, &binding, l, &empty_hooks()).unwrap();
         for (key, value) in [
             ("Id", json!("horizon-other-maintenance.service")),
             ("InvocationID", json!("2".repeat(32))),
@@ -942,7 +1133,10 @@ mod tests {
         ] {
             let mut bad = v.clone();
             bad[key] = value;
-            assert!(validate_unit(&bad, &binding, l).is_err(), "{key}");
+            assert!(
+                validate_unit(&bad, &binding, l, &empty_hooks()).is_err(),
+                "{key}"
+            );
         }
         for from_to in [
             (ACTION, "holding-foundation213-maintain"),
@@ -951,7 +1145,7 @@ mod tests {
         ] {
             let mut bad = v.clone();
             bad["ExecStart"] = json!(text(&v, "ExecStart").unwrap().replace(from_to.0, from_to.1));
-            assert!(validate_unit(&bad, &binding, l).is_err());
+            assert!(validate_unit(&bad, &binding, l, &empty_hooks()).is_err());
         }
         for wrong in [
             ManagerLimits { timeout: 0, ..l },
@@ -965,7 +1159,7 @@ mod tests {
                 ..l
             },
         ] {
-            assert!(validate_unit(&v, &binding, wrong).is_err());
+            assert!(validate_unit(&v, &binding, wrong, &empty_hooks()).is_err());
         }
         let mut exec = v.clone();
         exec["Type"] = json!("exec");
@@ -978,9 +1172,10 @@ mod tests {
                 runtime: MAX_SECONDS * 1_000_000,
                 ..l
             },
+            &empty_hooks(),
         )
         .unwrap();
-        assert!(validate_unit(&exec, &binding, l).is_err());
+        assert!(validate_unit(&exec, &binding, l, &empty_hooks()).is_err());
     }
     #[test]
     fn real_kernel_rounding_cpu_ratio_and_whole_exact_process_membership_are_checked() {
@@ -1032,13 +1227,15 @@ mod tests {
             b"4 2 0:1 /home/ubuntu/horizon /home/ubuntu/horizon rw - ext4 /dev/root rw\n",
         );
         assert!(mount_scope(&public).is_err());
-        assert!(mount_scope(
-            String::from_utf8(mounts.to_vec())
-                .unwrap()
-                .replace(".jetstreamer-private", ".jetstreamer-private-other")
-                .as_bytes()
-        )
-        .is_err());
+        assert!(
+            mount_scope(
+                String::from_utf8(mounts.to_vec())
+                    .unwrap()
+                    .replace(".jetstreamer-private", ".jetstreamer-private-other")
+                    .as_bytes()
+            )
+            .is_err()
+        );
         assert!(mount_scope(b"malformed mount line").is_err());
     }
     #[test]
@@ -1051,14 +1248,16 @@ mod tests {
             ("NoNewPrivs:\t1", "NoNewPrivs:\t0"),
             ("CapEff:\t0000000000080006", "CapEff:\t0000000000280006"),
         ] {
-            assert!(process_status(
-                String::from_utf8(status.to_vec())
-                    .unwrap()
-                    .replace(from, to)
-                    .as_bytes(),
-                &v
-            )
-            .is_err());
+            assert!(
+                process_status(
+                    String::from_utf8(status.to_vec())
+                        .unwrap()
+                        .replace(from, to)
+                        .as_bytes(),
+                    &v
+                )
+                .is_err()
+            );
         }
     }
     #[test]
