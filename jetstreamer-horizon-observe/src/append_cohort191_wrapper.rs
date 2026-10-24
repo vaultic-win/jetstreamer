@@ -357,10 +357,12 @@ fn execute(p: &Plan, plan_sha: &str, owner: u32, check_only: bool) -> Result<()>
 }
 fn run() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    let capture = args.len() == 4 && args[1] == "--capture-plan" && args[2] == "--self-sha256";
     ensure!(
-        (args.len() == 6 || args.len() == 7 && args[6] == "--check-only")
-            && args[2] == "--plan-sha256"
-            && args[4] == "--self-sha256",
+        capture
+            || ((args.len() == 6 || args.len() == 7 && args[6] == "--check-only")
+                && args[2] == "--plan-sha256"
+                && args[4] == "--self-sha256"),
         "closed augmentation argv required"
     );
     // SAFETY: geteuid has no arguments or side effects.
@@ -370,9 +372,46 @@ fn run() -> Result<()> {
     );
     let own = fs::read_link("/proc/self/exe")?;
     ensure!(
-        stamp(&own, 0, true)?.sha256 == args[5],
+        stamp(&own, 0, true)?.sha256 == args[if capture { 3 } else { 5 }],
         "augmentation executable differs"
     );
+    if capture {
+        directory(Path::new(STATE), 0, 0o700)?;
+        directory(Path::new(TARGET), 0, 0o555)?;
+        let _lock = lock(&Path::new(STATE).join("lock"), 0)?;
+        ensure!(
+            stamp(Path::new(SOURCE), 0, true)?.sha256 == SHA,
+            "foreign wrapper source"
+        );
+        let mut original_members = BTreeMap::new();
+        for name in NAMES {
+            original_members.insert(
+                name.into(),
+                stamp(&Path::new(TARGET).join(name), 0, name == "jetstreamer-r2")?,
+            );
+        }
+        ensure!(
+            original_members["jetstreamer-r2"].sha256 == R2_SHA,
+            "foreign original publisher"
+        );
+        let p = Plan {
+            schema: "jetstreamer-exact191-wrapper-augmentation-plan-v1".into(),
+            target_directory: TARGET.into(),
+            wrapper_source: SOURCE.into(),
+            state_directory: STATE.into(),
+            original_members,
+            wrapper_sha256: SHA.into(),
+            existing_members_may_change: false,
+            r2_mutations_authorized: false,
+        };
+        originals(&p, 0)?;
+        record(
+            &Path::new(STATE).join("plan.json"),
+            &serde_json::to_value(&p)?,
+        )?;
+        println!("{STATE}/plan.json");
+        return Ok(());
+    }
     let plan = Path::new(&args[1]);
     ensure!(
         stamp(plan, 0, false)?.sha256 == args[3],
