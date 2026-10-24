@@ -22,6 +22,8 @@ const FLEET_ROOT_101: &str = "/var/lib/jetstreamer-horizon-fleet-101-200-2026101
 const LIMIT: u64 = 16 << 20;
 const BUCKET: &str = "solana-archive-with-accounts-data";
 
+#[path = "routine_failed1046_next.rs"]
+mod failed1046_next;
 #[path = "routine_next.rs"]
 mod next_preparation;
 #[path = "routine_publication144_recover.rs"]
@@ -2045,6 +2047,7 @@ fn main() {
                             | "--recover-delivery198"
                             | "--promote-partial2018"
                             | "--prepare-next"
+                            | "--prepare-after-failed1046"
                             | "--prepare-next-controller-rebind"
                             | "--prepare-next-upload198"
                             | "--prepare-next-delivery160"
@@ -2267,6 +2270,12 @@ fn main() {
                 &fs::read_link("/proc/self/exe")?,
                 &args[5],
             );
+        }
+        if args
+            .get(6)
+            .is_some_and(|arg| arg == "--prepare-after-failed1046")
+        {
+            return failed1046_next::prepare(&plan, &bound, &args[5]);
         }
         if args.get(6).is_some_and(|arg| preparation_mode(arg)) {
             let spec = if args.len() == 10 {

@@ -1,0 +1,59 @@
+{
+  "diagnostic_replays": [
+    {
+      "controller_unit": "horizon-qualify-144-assembly-only-recovery-20261022-v1.service",
+      "expected_controller_invocation_id": "00ca9bfb862549f6b99117b1ce590365",
+      "expected_producer_invocation_id": "00ca9bfb862549f6b99117b1ce590365",
+      "producer_unit": "horizon-qualify-144-assembly-only-recovery-20261022-v1.service",
+      "range": "144",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch144-assembly-only-20261022-v2",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "horizon-qualify-141-original-entry-capped-root-20261023-v1.service",
+      "expected_controller_invocation_id": "e639f007d482464f8a251455659d2ede",
+      "expected_producer_invocation_id": "e639f007d482464f8a251455659d2ede",
+      "producer_unit": "horizon-qualify-141-original-entry-capped-root-20261023-v1.service",
+      "range": "141",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1/scratch",
+      "worker_executable_basename": "historical-worker"
+    }
+  ],
+  "filesystem_path": "/home/sol",
+  "host_global_pressure": true,
+  "minimum_interval_seconds": 1800,
+  "not_before_utc": "2026-10-24T10:46:00Z",
+  "observation_reason": "routine",
+  "output": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261024T104600Z.json",
+  "previous_sample": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261024T101600Z.json",
+  "replays": [
+    {
+      "controller_unit": "jetstreamer-epochs152-153-target3-controller-v1-r2.service",
+      "expected_controller_invocation_id": "4b6e30004fcf4d34a2d6b98568f3ab1a",
+      "expected_producer_invocation_id": "1a7e8cde872b45f786979150d5639ab4",
+      "producer_unit": "jetstreamer-root-sweep-e152-153-t3-20261014-v1-r2-e152-153-lane-l-1.service",
+      "range": "152-153",
+      "scratch_path": "/home/sol/.jetstreamer-private/epochs122-147-20260922-v1/lane-l/private/destination-f0502ad9e2b58e1f52d68f8da4f9d00d78b67576850f6c505a39ab6187066d13/work/root-cohort-152-153/run-1885971-1792019817911426837/scratch",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "jetstreamer-epochs155-156-target3-controller-v1-r2.service",
+      "expected_controller_invocation_id": "5c0c6dc3faa14a6d8a639af8a1c76774",
+      "expected_producer_invocation_id": "518ff0bf0bbb4413a155a63f95907163",
+      "producer_unit": "jetstreamer-root-sweep-e155-156-t3-20261014-v1-r2-e155-156-lane-m-1.service",
+      "range": "155-156",
+      "scratch_path": "/home/sol/.jetstreamer-private/epochs122-147-20260922-v1/lane-m/private/destination-377311d00215c722968bf5168e20c49672ad468b8a9b95c51005c159f773b77d/work/root-cohort-155-156/run-1664860-1792130156118424794/scratch",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "jetstreamer-epochs183-184-readerfix-full-20261023-controller-v2-r2.service",
+      "expected_controller_invocation_id": "a4a903998b45470a9315861f986a2b1d",
+      "expected_producer_invocation_id": "489e219d38d14d4594d8649ff698f666",
+      "producer_unit": "jetstreamer-root-sweep-e183-184-full-20261023-v2-r2-e183-184-lane-a-1.service",
+      "range": "183-184",
+      "scratch_path": "/home/sol/.jetstreamer-private/epochs183-184-readerfix-20261020-v1/lane-a/private/destination-5fad4af8232cf109b3de38ce6f2e8b0b5de809152d314dc95d1a6ab7f168b90c/work/root-cohort-183-184/run-293448-1792722217286871408/scratch",
+      "worker_executable_basename": "historical-worker"
+    }
+  ],
+  "schema": "jetstreamer-horizon-live-resource-sample-config-v2"
+}

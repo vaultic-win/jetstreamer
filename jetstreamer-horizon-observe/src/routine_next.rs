@@ -229,7 +229,7 @@ pub(super) fn derive_next(
     Ok((next, next_config, observer_package, cycle_package))
 }
 
-fn validate_folded_scope(p: &Plan, fleet_plan: &Value) -> Result<()> {
+pub(super) fn validate_folded_scope(p: &Plan, fleet_plan: &Value) -> Result<()> {
     if let Some(scope) = &p.scope_101_200 {
         let tracked = fleet_plan["tracked_units"]
             .as_array()
@@ -249,7 +249,13 @@ pub(super) fn encoded(value: &Value) -> Result<Vec<u8>> {
     b.push(b'\n');
     Ok(b)
 }
-fn seal_plan(stage: &Path, source: &str, destination: &Path, name: &str, digest: &str) -> Value {
+pub(super) fn seal_plan(
+    stage: &Path,
+    source: &str,
+    destination: &Path,
+    name: &str,
+    digest: &str,
+) -> Value {
     json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
         "members":[{"source":stage.join(source),"name":name,"sha256":digest,"mode":256}]})
 }
