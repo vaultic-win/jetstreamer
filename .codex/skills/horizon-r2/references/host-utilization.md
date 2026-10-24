@@ -91,6 +91,24 @@ shortfall and qualify reclamation/offload or a separate reviewed guard handoff b
 Enforce this calculation in actual admission as well as planning, using the same coordinated
 sample and authenticated guard evidence; it does not authorize another routine resource poll.
 
+Protect runtime-enforced available-memory floors as well. Bind each live owner's actual wrapper
+and guard reserve. Use the larger of the host reserve and the largest enforced live-owner floor
+once, then add the candidate allowance and protected remaining hard-memory growth once. Do not
+add a shared floor per lane or substitute current RSS for remaining hard growth. The existing
+native epoch 223 prefix enforces 480 GiB available memory; that inherited constraint is separate
+from the user's 90 percent target and must not become a default reserve for new profiles. Keep
+the memory-selected desired lane count while qualifying execution or a supported guard handoff.
+An admission path that cannot protect a live owner's enforced reserve is not qualified for that
+owner; do not lower its guard or mutate its sealed wrapper to make another lane fit.
+
+Allocation credited against future disk growth must be a proven lower bound. A guard's upper-bound
+tree walk can count hardlinked paths or shared extents repeatedly, so its total alone cannot earn
+that credit. Bind unique allocation to the exact owner, root descriptors and filesystem profile;
+reject aliases, mount escapes or shared allocation that the qualified proof cannot account for.
+Clamp credit conservatively across the coordinated sample, guard and current admission evidence.
+Keep any required integrity scan inside that fresh admission transaction, without another routine
+polling loop. Unavailable allocation proof grants no new credit or admission.
+
 ### Memory reservations from lane RSS
 
 Observe RSS in the existing 30-minute resource sample, with the ordinary user-requested status
