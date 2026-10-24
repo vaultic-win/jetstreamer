@@ -393,7 +393,7 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
         record["plan"] = json!({"path":plan.path,"sha256":plan.sha256});
         record["filesystem_available_bytes"] = json!(free(t)?);
         ensure!(
-            serde_json::to_vec_pretty(&record)?.len() as u64 + 1 <= LEDGER_BOUND,
+            (serde_json::to_vec_pretty(&record)?.len() as u64) < LEDGER_BOUND,
             "cache identity ledger exceeds bound"
         );
         persist(&p.output, &record)?;
@@ -422,12 +422,32 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
     let state = p.output.parent().context("cache receipt directory")?;
     let intent = state.join("intent.json");
     let completion = state.join("completion.json");
+    if p.output.try_exists()? {
+        let checked = read_record(&p.output)?;
+        ensure!(
+            checked["binding"] == binding && checked["retirement_performed"] == false,
+            "interrupted retirement check differs"
+        );
+    } else {
+        ensure!(
+            !intent.try_exists()? && !completion.try_exists()? && current == original,
+            "cache changed or interrupted history lost its check"
+        );
+        persist(
+            &p.output,
+            &json!({"binding":binding,"checks":evidence,"retirement_performed":false}),
+        )?;
+    }
+    let second_check_sha256 = hash_file(&p.output, 1 << 20)?.0;
     if completion.try_exists()? {
         let done = read_record(&completion)?;
+        let started = read_record(&intent)?;
         ensure!(
             done["binding"] == binding
                 && empty(&current)
-                && done["intent_sha256"] == hash_file(&intent, 1 << 20)?.0,
+                && done["intent_sha256"] == hash_file(&intent, 1 << 20)?.0
+                && started["binding"] == binding
+                && started["second_check_sha256"] == second_check_sha256,
             "cache completion changed or files reappeared"
         );
         println!(
@@ -437,8 +457,9 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
         return Ok(());
     }
     if intent.try_exists()? {
+        let started = read_record(&intent)?;
         ensure!(
-            read_record(&intent)?["binding"] == binding,
+            started["binding"] == binding && started["second_check_sha256"] == second_check_sha256,
             "cache interrupted-recovery intent differs"
         );
     } else {
@@ -447,12 +468,8 @@ pub(super) fn run(p: &Plan, plan: &Bound, self_sha: &str) -> Result<()> {
             "cache changed after check; no retirement without a new reviewed check"
         );
         persist(
-            &p.output,
-            &json!({"binding":binding,"checks":evidence,"retirement_performed":false}),
-        )?;
-        persist(
             &intent,
-            &json!({"binding":binding,"available_bytes_before":free(t)?,"original_entries":original.nodes.len()}),
+            &json!({"binding":binding,"second_check_sha256":second_check_sha256,"available_bytes_before":free(t)?,"original_entries":original.nodes.len()}),
         )?;
     }
     checks(p, t)?;
