@@ -340,6 +340,9 @@ fn no_queued_entry_jobs(jobs: &Value) -> Result<()> {
         let entry = unit.starts_with("jetstreamer-root-sweep-")
             || unit.starts_with("horizon-controller-")
             || unit.starts_with("horizon-qualify-")
+            || unit.starts_with("horizon-perf-")
+            || unit.starts_with("jetstreamer-epoch185-")
+            || (unit.starts_with("horizon-") && unit.contains("185"))
             || (unit.starts_with("jetstreamer-") && unit.contains("controller"));
         ensure!(
             !entry,
@@ -879,6 +882,9 @@ mod tests {
             "jetstreamer-epoch185-full-controller.service",
             "horizon-controller-185.service",
             "horizon-qualify-185-replacement.service",
+            "horizon-perf-epoch185-export@trial.service",
+            "jetstreamer-epoch185-repair.service",
+            "horizon-epoch185-native-export.service",
         ] {
             assert!(no_queued_entry_jobs(&json!([{"unit":unit}])).is_err());
         }
