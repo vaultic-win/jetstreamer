@@ -4,6 +4,7 @@ use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 mod capped141;
+mod canary227;
 mod metadata_cycle;
 mod missing157;
 mod native207;
@@ -257,6 +258,7 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
     if let Some(owner) = qualification_status::inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
+    if let Some(owner)=fleet::canary227_status_inactive_owner(publication)? {return Ok(vec![owner]);}
     if let Some(owner) = fleet::full227_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
@@ -423,6 +425,8 @@ fn fresh_census(
     }
     let native209 = plan.epoch == 209 && native209::recognized(terminal_fleet, owners);
     let native210 = plan.epoch == 210 && native210::recognized(terminal_fleet, owners);
+    let canary227=plan.epoch==227 && canary227::recognized(terminal_fleet,owners);
+    if canary227 {canary227::validate(&current,terminal_fleet,owners)?;}
     let native227_v1625 = plan.epoch == 227 && native227_v1625::recognized(terminal_fleet, owners);
     if native227_v1625 {
         native227_v1625::validate(&current, terminal_fleet, owners)?;
@@ -468,6 +472,7 @@ fn fresh_census(
             && !native207
             && !native209
             && !native210
+            && !canary227
             && !native227_v1625
             && !native228
             && !warmup223

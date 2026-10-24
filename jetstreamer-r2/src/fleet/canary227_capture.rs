@@ -279,14 +279,18 @@ fn launch(s: &Spec, a: &Value, u: &Value, now: u64) -> Result<(DiagnosticClaim, 
         "snapshot_slot":c::BOOTSTRAP,"snapshot_accounts_hash":c::ACCOUNTS,"worker_entry_start":c::BOOTSTRAP+1,
         "worker_entry_end_exclusive":c::TARGET+1,"output_slot_start":98_064_000u64,"target_slot":c::TARGET,
         "terminal_root_slot":c::TERMINAL,"canonical_checkpoint_slots":[c::BOOTSTRAP,c::TERMINAL],"controlled_target_is_checkpoint":false,
-        "target_stop_protocol":"cooperative-resume-only","maximum_scratch_bytes":c::SCRATCH,"maximum_root_physical_bytes":c::SCRATCH,
+        "target_stop_protocol":"cooperative-resume-only"});
+    r.as_object_mut().unwrap().extend(serde_json::from_value::<serde_json::Map<String,Value>>(json!({
+        "maximum_scratch_bytes":c::SCRATCH,"maximum_root_physical_bytes":c::SCRATCH,
         "control_metadata_bytes":c::CONTROL_METADATA,"candidate_incremental_peak_bytes":c::CANDIDATE,"experimental_envelope_bytes":c::CANDIDATE,
         "maximum_memory_bytes":c::MEMORY,"memory_high_bytes":c::HIGH,"cpu_quota_cores":8,"solana_rayon_threads":8,"historical_poh_threads":2,
         "rust_min_stack_bytes":67_108_864u64,"maximum_runtime_seconds":c::RUNTIME_MAX,"bounded_replay_authorized":true,
-        "guard_minimum_free_bytes":a["protected_existing_floor_bytes"],"required_initial_free_bytes":a["required_initial_free_bytes"],
-        "observer":a["observer"],"fleet":a["fleet"],"resource_samples_taken":0,"expected_exec_start":u["ExecStart"],
-        "evidence":{"units":[{"unit":c::UNIT,"invocation_id":iid,"restarts":0,"load_state":u["LoadState"],"result":u["Result"],
-            "main_pid":pid,"active_state":u["ActiveState"],"sub_state":u["SubState"]}]}});
+        "guard_minimum_free_bytes":a["protected_existing_floor_bytes"],"required_initial_free_bytes":a["required_initial_free_bytes"]}))?);
+    r["observer"] = a["observer"].clone();
+    r["fleet"] = a["fleet"].clone();
+    r["resource_samples_taken"] = json!(0);
+    r["expected_exec_start"] = u["ExecStart"].clone();
+    r["evidence"] = json!({"units":[{"unit":c::UNIT,"invocation_id":iid,"restarts":0,"load_state":u["LoadState"],"result":u["Result"],"main_pid":pid,"active_state":u["ActiveState"],"sub_state":u["SubState"]}]});
     for (k, path, sha) in [
         ("node", c::NODE, c::NODE_SHA),
         ("worker", c::WORKER, c::WORKER_SHA),

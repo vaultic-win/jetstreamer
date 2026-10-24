@@ -9,6 +9,13 @@ mod assembly144;
 mod assembly144_admission;
 mod assembly144_prepare;
 mod bounded205;
+mod canary227;
+mod canary227_capability;
+mod canary227_admission;
+mod canary227_capture;
+mod canary227_event;
+mod canary227_terminal;
+mod canary227_status;
 mod census141_poh;
 mod cold223_scan;
 mod continuation144;
@@ -156,6 +163,8 @@ pub(super) fn warmup223_terminal_status_identity(proof: &Value) -> Result<(Strin
 pub(super) fn warmup223_terminal_not_replaced(proof: &Value) -> Result<()> {
     warmup223::terminal_not_replaced(proof)
 }
+pub(super) async fn publish_canary227_status()->Result<()> {canary227_status::run().await}
+pub(super) fn canary227_status_inactive_owner(receipt:&StatusPublicationReceipt)->Result<Option<(String,String)>> {canary227_status::inactive_owner(receipt)}
 pub(super) async fn publish_full227_status() -> Result<()> {
     full227_status::run().await
 }
@@ -318,6 +327,10 @@ pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(Strin
 pub(super) fn native227_terminal_observer_view(f: &Value, o: &Value) -> Result<Value> {
     native227_terminal_observation::view(f,o)
 }
+pub(super) fn capture_canary227_v1625_terminal()->Result<()> {canary227_terminal::capture()}
+pub(super) fn canary227_terminal_status_identity(proof:&Value)->Result<(String,String,u64)> {Ok((canary227::UNIT.into(),canary227_terminal::validate(proof)?,proof["main_pid"].as_u64().context("227 canary terminal PID")?))}
+pub(super) fn admit_canary227_v1625() -> Result<()> { canary227_admission::run() }
+pub(super) fn capture_canary227_v1625() -> Result<()> { canary227_capture::run() }
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
 }
@@ -1052,6 +1065,7 @@ fn validate_same_sample_admission(
             "f4f5c0758c1c02b7d9a3b2b1595af7bbc033997f671cd43f2d4a92d38c346c69"
         }
         205 if bounded205::namespace(claim) => bounded205::GUARD_SHA256,
+        227 if canary227::namespace(claim) => canary227::GUARD_SHA,
         205 if prefix205::namespace(claim) => prefix205::GUARD_SHA,
         204 if prefix204::namespace(claim) => prefix204::GUARD_SHA,
         227 if singleton227::namespace(claim) => singleton227::SINGLETON_GUARD_SHA,
@@ -1289,6 +1303,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if prefix223::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| prefix223::guard_matches(claim, &receipt, plan))
+    } else if canary227::namespace(claim) {
+        bound_json(&claim.launch_receipt)
+            .is_ok_and(|receipt| canary227::guard_matches(claim, &receipt, plan))
     } else if bounded205::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| bounded205::guard_matches(claim, &receipt, plan))
@@ -1430,6 +1447,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
     let bounded_203 =
         receipt["schema"] == "jetstreamer-private-epoch203-bounded-resource-launch-v1";
     let bounded_205 = receipt["schema"] == bounded205::SCHEMA;
+    let canary_227 = receipt["schema"] == canary227::SCHEMA;
+    ensure!(!canary227::namespace(claim) || canary_227, "227 canary namespace requires its exact launch schema");
     let tail_223 = receipt["schema"] == tail223::SCHEMA;
     let prefix_223 = receipt["schema"] == prefix223::SCHEMA;
     let prefix_223_native20 = receipt["schema"] == prefix223_native20::SCHEMA;
@@ -1501,6 +1520,7 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             || shrink_budget_225
             || bounded_203
             || bounded_205
+            || canary_227
             || tail_223
             || prefix_223
             || prefix_223_native20
@@ -1535,6 +1555,8 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         prefix223::launch_matches(claim, receipt)
     } else if tail_223 {
         tail223::launch_matches(claim, receipt)
+    } else if canary_227 {
+        canary227::launch_matches(claim, receipt)
     } else if bounded_205 {
         bounded205::launch_matches(claim, receipt)
     } else if native_restore {
@@ -2535,6 +2557,10 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == canary227_terminal::SCHEMA {
+                canary227_terminal::predecessor(&previous,&plan,&event,sample,started_seconds)?;
+            } else if event["schema"] == canary227::SCHEMA {
+                canary227_event::event_predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native227_v1625::SCHEMA {
                 native227_v1625_event::event_predecessor(
                     &previous,
@@ -2775,7 +2801,15 @@ pub(super) async fn run() -> Result<()> {
     native209_terminal::census_check(&plan, &before)?;
     native210_terminal::census_check(&plan, &before)?;
     native227_v1625_terminal::census_check(&plan, &before)?;
+    canary227_terminal::census_check(&plan,&before)?;
     native228_terminal::census_check(&plan, &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == canary227::SCHEMA {
+        let previous=bound_json(plan.previous_fleet.as_ref().context("227 canary prior fleet missing")?)?;
+        let claims=plan.diagnostics.iter().filter(|c|canary227::namespace(c) && &c.launch_receipt==binding).collect::<Vec<_>>();
+        ensure!(claims.len()==1,"227 canary event requires one exact new diagnostic");
+        canary227_event::event_census(&previous,&before,claims[0])?;
+    }
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native209::SCHEMA
     {
@@ -3188,6 +3222,10 @@ pub(super) async fn run() -> Result<()> {
                 )?;
                 prefix223_native20_capture::sandbox(&props)?;
             }
+            if canary227::namespace(claim) {
+                let launch = bound_json(&claim.launch_receipt)?;
+                ensure!(canary227::same_command(&current["ExecStart"], &launch["expected_exec_start"]), "227 canary live command changed");
+            }
             if bounded205::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -3424,6 +3462,7 @@ pub(super) async fn run() -> Result<()> {
                 publication.as_ref().is_ok_and(|(receipt, _, _)| {
                     qualification_status::matches(receipt, epoch, &observer, &before)
                         || super::repair141::matches(receipt, epoch, &before)
+                        || canary227_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)

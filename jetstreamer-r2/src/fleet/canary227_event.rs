@@ -239,13 +239,22 @@ mod tests {
         let old = Gate {
             state: "failed-needs-repair".into(),
             next_action: "repair".into(),
-            evidence: vec![binding.clone()],
+            evidence: vec![BoundFile {
+                path: binding.path.clone(),
+                sha256: binding.sha256.clone(),
+            }],
             reserve_stop: None,
         };
         let mut new = Gate {
             state: old.state.clone(),
             next_action: "bounded comparison".into(),
-            evidence: vec![binding, claim.launch_receipt.clone()],
+            evidence: vec![
+                binding,
+                BoundFile {
+                    path: claim.launch_receipt.path.clone(),
+                    sha256: claim.launch_receipt.sha256.clone(),
+                },
+            ],
             reserve_stop: None,
         };
         gate(&old, &new, 227, &claim).unwrap();

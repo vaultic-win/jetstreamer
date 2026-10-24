@@ -3537,6 +3537,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capped141-terminal-capture") {
         return inactive_status::capture_capped141_terminal();
     }
+    if env::args().nth(1).as_deref() == Some("status-publish-canary227") {
+        return fleet::publish_canary227_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-full227") {
         return fleet::publish_full227_status().await;
     }
@@ -3617,6 +3620,15 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("admit-native209-input") {
         return fleet::admit_native209_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-canary227-v1625-terminal") {
+        return fleet::capture_canary227_v1625_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-canary227-v1625") {
+        return fleet::admit_canary227_v1625();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-canary227-v1625") {
+        return fleet::capture_canary227_v1625();
     }
     if env::args().nth(1).as_deref() == Some("admit-native227-v1625-input") {
         return fleet::admit_native227_v1625_input();
