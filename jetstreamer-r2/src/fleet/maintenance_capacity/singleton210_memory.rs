@@ -85,7 +85,7 @@ pub(super) fn required(
 }
 
 /// A delivery stage is charged once and has no new replay guard.
-/// The original native223 identity gate is unchanged from the full210 policy.
+/// The original native 223 identity gate is unchanged from the full 210 policy.
 pub(super) fn delivery_required(
     fleet: &Value,
     total: u64,

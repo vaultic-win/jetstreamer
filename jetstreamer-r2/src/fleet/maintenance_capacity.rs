@@ -1,4 +1,4 @@
-//! Fresh bounded private223 maintenance with every accepted owner protected.
+//! Fresh bounded private epoch 223 maintenance with every accepted owner protected.
 //! Capped peers retain their raw fleet/observer history and full hard limits.
 use super::*;
 mod singleton210_memory;
@@ -41,7 +41,7 @@ fn sampled(o: &Value, f: &Value, now: u64) -> Result<u64> {
             && f["last_epoch"] == 300
             && f["sampled_at_utc"] == o["recorded_at_utc"]
             && f["inventory"]["anomalies"] == 0,
-        "Maintenance needs the accepted fresh201-300 observation"
+        "Maintenance needs the accepted fresh 201-300 observation"
     );
     let mut rows = o["replays"]
         .as_array()
