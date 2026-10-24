@@ -335,3 +335,25 @@ existing transition lock, so no new lock file is allocated ahead of admission.
 Real-scale257-owner before/after persistence, oversized-no-write and exact floor
 boundary tests accompany the change; the full isolated R2 suite passed631 tests
 with47 host-specific tests ignored.
+
+The corrected sealed `9f71329f` binary then completed the actual probe admission
+and restoration against accepted345 under root's exclusive admission slot.
+The complete admission receipt is524,600 bytes, retaining both257-unit censuses;
+it reserves33,574,576 bytes (32MiB metadata plus20,144 data) above the independently
+computed2,240,920,861,911-byte protected floor. Its SHA-256 is
+`5df0b27376b2625c428ef9f6d45545d1cb66b837478e982bf10f4aefc605341e` at
+`/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1/receipts/restore-admission-983b3ec32558ec8a9f0019702e18ddfc902bf7944b8f44a7e2410933c8ff5b25.json`.
+
+The authenticated full20,144-byte restore independently verified digest
+`133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945`.
+The private content-addressed `.blob` is root-owned,mode0400,single-link with no
+remaining partial. Both the dedicated fixture and original runtime genesis
+retain that digest. The durable2,543-byte staging-only restore receipt is
+`/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1/receipts/restore-79e0c1c7fa31c580f57890d5692e46c685ccb5441679cb55d00ff1cc99c9460b.json`,
+SHA-256 `a913fce8eb00ffb2dfa69f87272b041e4703ee9590118898f5a841e2cbe9bff6`.
+The child performed only authenticated R2 reads during restoration; no R2
+overwrite/deletion, canonical mutation, local retirement, producer/service change,
+host job launch or new resource observation occurred. The exclusive slot was
+returned to root immediately after verification. This qualifies the small
+transport round trip; the125GB prefix remains unparked and requires its own
+complete custody/readback/restoration before separately reviewed retirement.
