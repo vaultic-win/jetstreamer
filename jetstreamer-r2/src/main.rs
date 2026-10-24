@@ -72,6 +72,7 @@ mod cohort_finalization;
 mod fleet;
 mod fleet_memory;
 mod holding;
+mod holding213_transport_probe;
 mod inactive_status;
 mod inventory_batch;
 mod native223_status;
@@ -3375,6 +3376,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("probe-transport-holding213") {
+        return holding213_transport_probe::run().await;
+    }
     if matches!(
         env::args().nth(1).as_deref(),
         Some(
