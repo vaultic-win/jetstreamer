@@ -394,6 +394,15 @@ pub fn validate_admission(p: &Plan, plan_sha: &str, v: &Value, now: u64) -> Resu
     let limits: KernelLimits = serde_json::from_value(v["kernel_limits"].clone())?;
     limits.validate(p)?;
     let proposal: Bound = serde_json::from_value(v["resource_proposal"].clone())?;
+    let original_fleet: Bound = serde_json::from_value(v["fleet_observation"].clone())?;
+    let mirror: Bound = serde_json::from_value(v["fleet_observation_readable_mirror"].clone())?;
+    ensure!(
+        mirror.sha256 == original_fleet.sha256
+            && mirror.path != original_fleet.path
+            && mirror.path.is_absolute()
+            && !mirror.path.starts_with(&p.run_root),
+        "fleet mirror must preserve exact original bytes without replacing accepted lineage"
+    );
     ensure!(
         proposal.path.is_absolute() && capped::parse_sha(&proposal.sha256)? != [0; 32],
         "actual complete-path resource proposal binding missing"
@@ -635,7 +644,7 @@ mod tests {
             "restore_suffix_validation_and_assembly_overlap_included":true,"fleet_observation":bound("fleet.json"),
             "ordinary_replay_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,
             "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false,
-            "resource_proposal":bound("resources.json"),"kernel_limits":{
+            "resource_proposal":bound("resources.json"),"fleet_observation_readable_mirror":bound("fleet-mirror.json"),"kernel_limits":{
                 "requested_memory_max_bytes":192u64<<30,"requested_memory_high_bytes":176u64<<30,
                 "memory_swap_max_bytes":0,"tasks_max":512,"cpu_quota_usec_per_second":8_000_000,
                 "runtime_max_usec":86_400_000_000u64}})

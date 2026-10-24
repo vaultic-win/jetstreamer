@@ -239,7 +239,7 @@ fn capture(p: CapturePlan) -> Result<()> {
 
 fn state(unit: &str) -> Result<BTreeMap<String, String>> {
     let output = Command::new("/usr/bin/systemctl").env("LC_ALL", "C").args([
-        "show", unit, "--property=Id,LoadState,InvocationID,ActiveState,SubState,MainPID,NRestarts,Restart,KillMode,Delegate,ControlGroup,User,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax",
+        "show", unit, "--property=Id,LoadState,InvocationID,ActiveState,SubState,MainPID,NRestarts,Restart,KillMode,Delegate,ControlGroup,User,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,Result,ExecMainStatus",
     ]).output()?;
     ensure!(
         output.status.success() && output.stdout.len() <= 16384,
@@ -499,12 +499,18 @@ struct ProcessIdentity {
 }
 
 fn final_process_identity(pid: u32) -> Result<ProcessIdentity> {
-    Ok(ProcessIdentity {
+    let value = ProcessIdentity {
         pid,
         start: start_time(pid)?,
         executable: fs::read_link(format!("/proc/{pid}/exe"))?,
         mapped: archive_file_identity(&File::open(format!("/proc/{pid}/exe"))?)?,
-    })
+    };
+    if start_time(pid)? != value.start
+        || fs::read_link(format!("/proc/{pid}/exe"))? != value.executable
+    {
+        return Err(CensusChurn.into());
+    }
+    Ok(value)
 }
 
 fn close_census<F>(
@@ -664,6 +670,35 @@ fn validate_stage(previous: Option<&Phase>, next: &Phase, workers: usize) -> Res
     Ok(())
 }
 
+fn completed_owner(
+    p: &Plan,
+    plan_sha: &str,
+    iid: &str,
+    s: &BTreeMap<String, String>,
+) -> Result<bool> {
+    for (key, value) in [
+        ("LoadState", "loaded"),
+        ("InvocationID", iid),
+        ("MainPID", "0"),
+        ("ActiveState", "inactive"),
+        ("SubState", "dead"),
+        ("NRestarts", "0"),
+        ("Restart", "no"),
+        ("Result", "success"),
+        ("ExecMainStatus", "0"),
+    ] {
+        if s.get(key).map(String::as_str) != Some(value) {
+            return Ok(false);
+        }
+    }
+    let phase: Phase =
+        serde_json::from_slice(&control::stable_read(&p.phase_path(), 16384, 1000, true)?)?;
+    Ok(phase.stage == Stage::Complete
+        && phase
+            .validate(p, plan_sha, iid, control::now_millis()?)
+            .is_ok())
+}
+
 fn guard(p: Plan, plan_sha: &str, producer_iid: &str) -> Result<()> {
     let admission: Value = serde_json::from_slice(&control::stable_read(
         &p.admission_receipt,
@@ -675,6 +710,13 @@ fn guard(p: Plan, plan_sha: &str, producer_iid: &str) -> Result<()> {
     let limits: KernelLimits = serde_json::from_value(admission["kernel_limits"].clone())?;
     let resource_proposal: Bound = serde_json::from_value(admission["resource_proposal"].clone())?;
     let proposal: Value = serde_json::from_slice(&control::sealed(&resource_proposal, 8 << 20)?)?;
+    let guard_memory = proposal["guard_memory_max_bytes"]
+        .as_u64()
+        .context("independent guard memory reservation")?;
+    ensure!(
+        (1..=1 << 30).contains(&guard_memory),
+        "invalid independent guard memory cap"
+    );
     ensure!(
         proposal["kernel_limits"] == admission["kernel_limits"]
             && proposal["producer_plan"]["sha256"] == plan_sha,
@@ -723,27 +765,38 @@ fn guard(p: Plan, plan_sha: &str, producer_iid: &str) -> Result<()> {
     let mut executables = BTreeMap::new();
     loop {
         let before = state(&p.producer_unit)?;
-        let current_time = control::now_millis()?;
         // Natural completed phase may be observed before or after PID1 reaps
         // the producer. This guard never calls success a publication receipt.
-        if before
-            .get("InvocationID")
-            .is_some_and(|v| v == producer_iid)
-            && before.get("MainPID").is_some_and(|v| v == "0")
-            && control::stable_read(&p.phase_path(), 16384, 1000, true)
-                .ok()
-                .and_then(|bytes| serde_json::from_slice::<Phase>(&bytes).ok())
-                .is_some_and(|phase| {
-                    phase.stage == Stage::Complete
-                        && phase
-                            .validate(&p, plan_sha, producer_iid, current_time)
-                            .is_ok()
-                })
-        {
+        if completed_owner(&p, plan_sha, producer_iid, &before)? {
             return Ok(());
         }
         let pid = authenticate(&before, producer_iid, "ubuntu")?;
         let observed = (|| -> Result<(Phase, Value, u64, root_budget::Observation, Value)> {
+            let guard_state = state(&p.guard_unit)?;
+            ensure!(
+                authenticate(&guard_state, &guard_iid, "root")? == std::process::id()
+                    && guard_state
+                        .get("MemoryMax")
+                        .and_then(|s| s.parse::<u64>().ok())
+                        == Some(guard_memory),
+                "independent guard owner or admitted hard memory cap changed"
+            );
+            let guard_group = format!("/system.slice/{}", p.guard_unit);
+            ensure!(
+                guard_state.get("ControlGroup") == Some(&guard_group),
+                "independent guard cgroup differs"
+            );
+            let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+            ensure!(page > 0, "guard kernel page size unavailable");
+            let page = page as u64;
+            ensure!(
+                kernel_number(
+                    &Path::new("/sys/fs/cgroup").join(&guard_group[1..]),
+                    "memory.max"
+                )? == guard_memory / page * page
+                    && guard_memory / page > 0,
+                "independent guard kernel memory cap differs"
+            );
             let mut observation = None;
             for attempt in 0..3 {
                 let phase: Phase = serde_json::from_slice(&control::stable_read(
@@ -821,6 +874,7 @@ fn guard(p: Plan, plan_sha: &str, producer_iid: &str) -> Result<()> {
                     "maximum_process_rss_bytes":p.maximum_process_rss_bytes,"maximum_worker_vmas":p.maximum_worker_vmas,
                     "phase":phase,"processes":processes,"root_physical_observation":physical,
                     "kernel_limits":limits,"actual_kernel_limits":kernel,"resource_proposal":resource_proposal,
+                    "guard_memory_max_bytes":guard_memory,
                     "remote_mutations":false,"r2_mutations":false});
                 control::atomic_json(&p.heartbeat_path(), &heartbeat, 0, true)?;
                 if previous.is_none() {
@@ -834,6 +888,14 @@ fn guard(p: Plan, plan_sha: &str, producer_iid: &str) -> Result<()> {
                 previous = Some(phase);
             }
             Err(error) => {
+                let current = state(&p.producer_unit)?;
+                if completed_owner(&p, plan_sha, producer_iid, &current)? {
+                    return Ok(());
+                }
+                ensure!(
+                    authenticate(&current, producer_iid, "ubuntu")? == pid,
+                    "guard refuses stop intent or signal for a terminal/replacement owner"
+                );
                 let value = json!({"schema":"jetstreamer-capped204205-guard-stop-intent-v1","epoch":p.epoch,
                     "plan_sha256":plan_sha,"producer_invocation_id":producer_iid,"guard_invocation_id":guard_iid,
                     "recorded_unix_millis":now,"reason":error.to_string(),"r2_mutations":false});

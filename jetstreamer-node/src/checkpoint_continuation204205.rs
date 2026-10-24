@@ -284,6 +284,7 @@ impl Write for GuardedSink<'_> {
 }
 
 pub(crate) async fn run(
+    requested_epoch: u64,
     plan_path: PathBuf,
     plan_sha: String,
     destination: PathBuf,
@@ -306,6 +307,10 @@ pub(crate) async fn run(
         .map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
+    require(
+        p.epoch == requested_epoch,
+        "continuation plan targets another requested epoch",
+    )?;
     p.validate(&destination).map_err(|e| e.to_string())?;
     let profile = capped::profile(p.epoch).map_err(|e| e.to_string())?;
     require(
@@ -349,7 +354,8 @@ pub(crate) async fn run(
     // Authenticate the fleet sample's real immutable bytes rather than a named
     // digest inside a positive admission assertion.
     let fleet: Bound =
-        serde_json::from_value(admitted["fleet_observation"].clone()).map_err(|e| e.to_string())?;
+        serde_json::from_value(admitted["fleet_observation_readable_mirror"].clone())
+            .map_err(|e| e.to_string())?;
     control::sealed(&fleet, 64 << 20).map_err(|e| e.to_string())?;
     let resource_proposal: Bound =
         serde_json::from_value(admitted["resource_proposal"].clone()).map_err(|e| e.to_string())?;

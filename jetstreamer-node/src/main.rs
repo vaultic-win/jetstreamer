@@ -19827,6 +19827,7 @@ async fn main() {
         };
         let result = if cfg!(feature = "capped204205-checkpoint-continuation-diagnostic") {
             checkpoint_continuation204205::run(
+                start_epoch,
                 plan,
                 hash,
                 dest_dir,
