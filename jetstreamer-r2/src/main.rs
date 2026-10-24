@@ -3343,22 +3343,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    if matches!(
-        env::args().nth(1).as_deref(),
-        Some(
-            "holding-park"
-                | "holding-restore"
-                | "holding-admit-restore"
-                | "holding-restore-genesis-probe"
-                | "holding-inspect136"
-                | "holding-foundation213-park"
-                | "holding-foundation213-admit-restore"
-                | "holding-foundation213-restore"
-                | "holding-foundation213-retire"
-                | "holding-foundation213-maintain"
-                | "holding-foundation213-maintenance-finalize"
-        )
-    ) {
+    if env::args().nth(1).as_deref().is_some_and(holding::command) {
         return holding::run().await;
     }
     match env::args().nth(1).as_deref() {

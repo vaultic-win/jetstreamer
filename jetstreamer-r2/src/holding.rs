@@ -1161,11 +1161,22 @@ async fn restore_blob<F: Fn() -> Result<()>>(
     Ok(destination)
 }
 
+pub(super) fn command(action: &str) -> bool {
+    matches!(
+        action,
+        "holding-park"
+            | "holding-restore"
+            | "holding-admit-restore"
+            | "holding-restore-genesis-probe"
+            | "holding-inspect136"
+    ) || foundation213::command(action)
+}
+
 pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-foundation213-park|holding-foundation213-admit-restore|holding-foundation213-restore SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-foundation213-park|holding-foundation213-admit-restore|holding-foundation213-restore|holding-foundation213-restore-resumable SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,

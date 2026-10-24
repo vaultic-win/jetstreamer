@@ -36,13 +36,16 @@ is qualified and built with `--all-features` (both `native210-small` and
 `native227-small`), directly descended from cb69. This does not transplant the
 75007955 retirement implementation.
 
-- Default-feature R2 suite:646 passed,0 failed,48 ignored.
-- All-features R2 suite:646 passed,0 failed,48 ignored.
+- Initial default-feature R2 suite:646 passed,0 failed,48 ignored.
+- Final all-features R2 suite (including dispatch regression):647 passed,0 failed,48 ignored.
 - Exact all-features root-owned disposable fixture:1 passed,0 failed. It used only
   temporary local files and an ephemeral loopback HTTP endpoint.
 - Default and all-features strict release/all-target Clippy:passed.
 
 Logs are preserved at `/tmp/foundation213-resumable-full-tests-v1.log`,
+`/tmp/foundation213-resumable-dispatch-tests-v2.log`,
+`/tmp/foundation213-resumable-dispatch-root-fixture-v1.log`,
+`/tmp/foundation213-resumable-dispatch-clippy-v1.log`,
 `/tmp/foundation213-resumable-allfeatures-tests-v1.log`,
 `/tmp/foundation213-resumable-allfeatures-root-fixture-v1.log`,
 `/tmp/foundation213-resumable-clippy-v2.log`, and
@@ -55,3 +58,8 @@ Frozen production build provenance and copied-candidate SHA256 are written to th
 separate unsealed candidate directory after commit. Root owns all sealing, sandbox
 qualification and operational admission. No deployment or R2 mutation is part of
 this qualification.
+
+The top-level CLI and inner Foundation dispatch share one holding-command predicate.
+A regression exercises every existing route and the new opt-in command; this closes
+an integration omission found before any candidate was deployed. The0d567cb1
+unsealed test copy is explicitly blocked and superseded.
