@@ -146,15 +146,80 @@ fn original_journal(bytes: &[u8]) -> Result<()> {
     );
     Ok(())
 }
-fn current_original_journal() -> Result<()> {
-    let output = Command::new("journalctl")
-        .args(["-u", UNIT, "--output=json", "--no-pager"])
-        .output()?;
+fn guard_journal(bytes: &[u8]) -> Result<()> {
+    let allowed = BTreeSet::from([
+        "28aa88a5095a4ae086f69fc1a07a2ecb",
+        "51909e7b8b5245fdbbe2f52e8377ab98",
+        GUARD_IID,
+    ]);
+    let mut samples = BTreeMap::new();
+    let mut completions = BTreeMap::new();
+    for (i, line) in std::str::from_utf8(bytes)?.lines().enumerate() {
+        let r: Value = serde_json::from_str(line)?;
+        let msg = r["MESSAGE"].as_str().context("native227 guard message")?;
+        if r["_PID"] == "1" && r["UNIT"] == GUARD {
+            let iid = r["INVOCATION_ID"]
+                .as_str()
+                .context("native227 guard manager IID")?;
+            ensure!(
+                allowed.contains(iid),
+                "native227 newer guard invocation exists"
+            );
+            if msg == format!("{GUARD}: Deactivated successfully.") {
+                ensure!(
+                    completions.insert(iid.to_owned(), i).is_none(),
+                    "native227 duplicate guard completion"
+                );
+            }
+        } else {
+            let iid = r["_SYSTEMD_INVOCATION_ID"]
+                .as_str()
+                .context("native227 guard worker IID")?;
+            ensure!(allowed.contains(iid), "native227 guard writer changed");
+            let v: Value = serde_json::from_str(msg)?;
+            ensure!(
+                v["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+                    && v["guard_invocation_id"] == iid
+                    && v["producer_invocation_id"] == IID
+                    && v["native_main"]["main_pid"] == 447704
+                    && v["maximum_root_physical_bytes"] == 96_000_000_000u64
+                    && v["trip_reason"].is_null()
+                    && v["producer_stop_enabled"] == true,
+                "native227 original guard proof differs"
+            );
+            ensure!(
+                samples.insert(iid.to_owned(), i).is_none(),
+                "native227 duplicate guard sample"
+            );
+        }
+    }
     ensure!(
-        output.status.success() && output.stdout.len() <= MAX_JSON_BYTES as usize,
-        "native227 current journal unavailable or oversized"
+        samples.len() == allowed.len()
+            && completions.len() == allowed.len()
+            && allowed.iter().all(|id| samples
+                .get(*id)
+                .zip(completions.get(*id))
+                .is_some_and(|(a, b)| a < b)),
+        "native227 original guard completion chain absent"
     );
-    original_journal(&output.stdout)
+    Ok(())
+}
+fn current_original_journal() -> Result<()> {
+    for (unit, guard) in [(UNIT, false), (GUARD, true)] {
+        let output = Command::new("journalctl")
+            .args(["-u", unit, "--output=json", "--no-pager"])
+            .output()?;
+        ensure!(
+            output.status.success() && output.stdout.len() <= MAX_JSON_BYTES as usize,
+            "native227 current journal unavailable or oversized"
+        );
+        if guard {
+            guard_journal(&output.stdout)?;
+        } else {
+            original_journal(&output.stdout)?;
+        }
+    }
+    Ok(())
 }
 pub(super) fn outcome(p: &Plan, v: &Value) -> Result<()> {
     profile(p)?;
@@ -303,6 +368,39 @@ mod tests {
             "completion_receipt":"/home/ubuntu/.jetstreamer-private/native227-small-retirement-9fe28fc9-v1/complete.json",
             "authority":{"local_failed_diagnostic_retirement_authorized":true,"preserve_run_root":true,
                 "archive_publication_authorized":false,"remote_mutations":false,"r2_mutations":false}})).unwrap()
+    }
+    #[test]
+    fn cleared_guard_requires_only_the_original_three_completed_fires() {
+        let mut rows = Vec::new();
+        for id in [
+            "28aa88a5095a4ae086f69fc1a07a2ecb",
+            "51909e7b8b5245fdbbe2f52e8377ab98",
+            GUARD_IID,
+        ] {
+            let sample = json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_invocation_id":id,
+                "producer_invocation_id":IID,"native_main":{"main_pid":447704},"maximum_root_physical_bytes":96_000_000_000u64,
+                "trip_reason":null,"producer_stop_enabled":true});
+            rows.push(
+                json!({"_PID":"22","_SYSTEMD_INVOCATION_ID":id,"MESSAGE":sample.to_string()}),
+            );
+            rows.push(json!({"_PID":"1","UNIT":GUARD,"INVOCATION_ID":id,"MESSAGE":format!("{GUARD}: Deactivated successfully.")}));
+        }
+        let encode = |r: &[Value]| {
+            r.iter()
+                .map(Value::to_string)
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        guard_journal(encode(&rows).as_bytes()).unwrap();
+        let mut bad = rows.clone();
+        bad[0]["_SYSTEMD_INVOCATION_ID"] = json!("a".repeat(32));
+        assert!(guard_journal(encode(&bad).as_bytes()).is_err());
+        let mut bad = rows.clone();
+        bad.push(
+            json!({"_PID":"1","UNIT":GUARD,"INVOCATION_ID":"a".repeat(32),"MESSAGE":"Starting"}),
+        );
+        assert!(guard_journal(encode(&bad).as_bytes()).is_err());
+        assert!(guard_journal(encode(&rows[..4]).as_bytes()).is_err());
     }
     #[test]
     fn retirement_profile_never_borrows_a_registered_replay_or_expands_target_scope() {
