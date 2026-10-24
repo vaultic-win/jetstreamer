@@ -13,6 +13,8 @@ pub(super) struct Profile {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub import_pending: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal_collector: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     adoption_predecessor: Option<Bound>,
 }
 #[derive(Deserialize)]
@@ -141,6 +143,11 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     );
     tool_ok(&s.publisher)?;
     let v = bound_json(&s.terminal_event, false)?;
+    ensure!(
+        s.terminal_collector.is_none()
+            || (!s.import_pending && v["schema"] == "jetstreamer-cohort191-terminal-transition-v1"),
+        "191 separate terminal collector borrowed by another transition"
+    );
     if s.import_pending {
         cohort191_import::validate(p, &v)?;
         return Ok(());
@@ -152,9 +159,20 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     } else {
         terminal(&v, utc_seconds(&p.sample_target_utc)?)?;
     }
+    let collector = s.terminal_collector.as_ref().unwrap_or(&s.publisher);
+    if s.terminal_collector.is_some() {
+        ensure!(
+            collector.path
+                == Path::new(
+                    "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2"
+                ),
+            "191 terminal collector is not the original sealed native reader"
+        );
+        tool_ok(collector)?;
+    }
     ensure!(
-        v["capture_self_sha256"] == s.publisher.sha256
-            && v["capture_program"].as_str() == s.publisher.path.to_str(),
+        v["capture_self_sha256"] == collector.sha256
+            && v["capture_program"].as_str() == collector.path.to_str(),
         "191 transition producer differs from sealed publisher"
     );
     // Bind immutable capture provenance before removing the replay model. This
@@ -164,7 +182,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
     if v["schema"] == "jetstreamer-cohort191-terminal-transition-v1" {
         ensure!(
             c["schema"] == "jetstreamer-cohort191-terminal-collection-plan-v1"
-                && c["program"] == serde_json::to_value(&s.publisher)?
+                && c["program"] == serde_json::to_value(collector)?
                 && c["source_batch"] == v["source_batch"]
                 && c["public_batch"] == v["public_batch"]
                 && c["output"].as_str() == s.terminal_event.path.to_str()
@@ -330,8 +348,13 @@ pub(super) fn enable(
     spec: &Bound,
     pending: bool,
 ) -> Result<()> {
+    let replacing_import = next
+        .cohort191_delivery
+        .as_ref()
+        .is_some_and(|s| s.import_pending)
+        && !pending;
     ensure!(
-        is_101(next)? && next.cohort191_delivery.is_none(),
+        is_101(next)? && (next.cohort191_delivery.is_none() || replacing_import),
         "191 transition is already enabled/foreign"
     );
     let value: HandoffSpec = serde_json::from_value(bound_json(spec, true)?)?;
@@ -365,7 +388,23 @@ pub(super) fn enable(
             }),
         "191 first transition requires observer-independent native terminal proof"
     );
-    let (_model, mut edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
+    let (mut edited, epochs) = if replacing_import {
+        // The accepted pending transition already removed this exact replay.
+        // Preserve every surviving observer range rather than removing twice.
+        let old = next.cohort191_delivery.as_ref().unwrap();
+        let old_proof = bound_json(&old.terminal_event, false)?;
+        ensure!(
+            old_proof["schema"] == "jetstreamer-cohort191-import-pending-transition-v1"
+                && old_proof["source_batch"] == proof["source_batch"]
+                && !next.expected_epochs.iter().any(|e| (191..=194).contains(e))
+                && !range_set(config, "replays")?.contains("191-194"),
+            "191 public transition differs from accepted original pending cohort"
+        );
+        (config.clone(), next.expected_epochs.clone())
+    } else {
+        let (_, edited, epochs) = remove_replay(model, config, &next.expected_epochs)?;
+        (edited, epochs)
+    };
     if let Some(target) = value.sample_target_utc {
         retime(next, &mut edited, &target)?;
     }
@@ -519,6 +558,22 @@ pub(super) fn derive_fleet(p: &Plan, fleet: &mut Value) -> Result<()> {
     }
     if let Some((event, v)) = accepted {
         for c in v["claims"].as_array().context("191 accepted claims")? {
+            let key = c["epoch"]
+                .as_u64()
+                .context("191 accepted epoch")?
+                .to_string();
+            let gate = &mut fleet["gates"][&key];
+            gate["state"] = json!("post-replay-pipeline");
+            gate["next_action"] = json!(
+                "Continue exact accepted native delivery owner and stage forecast; independent full/plugin and authenticated sync gates remain required"
+            );
+            let evidence = serde_json::to_value(&event)?;
+            let entries = gate["evidence"]
+                .as_array_mut()
+                .context("191 accepted gate evidence")?;
+            if !entries.contains(&evidence) {
+                entries.push(evidence);
+            }
             let mut claim = c.clone();
             claim
                 .as_object_mut()
@@ -793,6 +848,7 @@ mod tests {
                 .into(),
             adoption_predecessor: None,
             import_pending: false,
+            terminal_collector: None,
         };
         p.cohort191_delivery = Some(profile());
         assert!(interval(&p, "2026-10-24T01:16:00Z").unwrap().is_none());

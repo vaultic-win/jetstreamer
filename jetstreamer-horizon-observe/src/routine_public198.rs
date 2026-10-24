@@ -1012,6 +1012,25 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
     value["output"] = json!(ledger_path);
     let package = delivery198::seal_values(p, "public198-stage", &[("fleet-plan.json", value)])?;
     let plan = file(package.join("fleet-plan.json"), true)?;
+    publish_sealed(
+        p,
+        observer,
+        &plan,
+        &p.cycle_directory.join("child-public198-fleet.json"),
+    )
+}
+pub(super) fn publish_sealed(
+    p: &Plan,
+    observer: &Bound,
+    plan: &Bound,
+    result: &Path,
+) -> Result<Value> {
+    let profile = p
+        .public198_delivery
+        .as_ref()
+        .context("198 public profile")?;
+    read(profile)?;
+    let ledger_path = p.cycle_directory.join("public198-provisional-fleet.json");
     child(
         cohort191_delivery::fleet_reader(p),
         &[
@@ -1021,7 +1040,7 @@ pub(super) fn publish(p: &Plan, fleet: &Value, observer: &Bound) -> Result<Value
             plan.sha256.clone(),
         ],
         true,
-        &p.cycle_directory.join("child-public198-fleet.json"),
+        result,
     )?;
     let provisional = file(ledger_path, false)?;
     let ledger = bound_json(&provisional, false)?;

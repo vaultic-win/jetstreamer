@@ -32,6 +32,8 @@ mod terminal_handoff;
 
 #[path = "routine_census141_poh.rs"]
 mod census141_poh;
+#[path = "routine_cohort191_gate_recovery.rs"]
+mod cohort191_gate_recovery;
 #[path = "routine_delivery160.rs"]
 mod delivery160;
 #[path = "routine_delivery198.rs"]
@@ -1998,6 +2000,8 @@ fn main() {
                     && matches!(
                         args[6].as_str(),
                         "--check-only"
+                            | "--recover-import191-gates"
+                            | "--check-import191-gate-recovery"
                             | "--recover-publication144-history"
                             | "--check-publication144-history-recovery"
                             | "--recover-fleet-tail"
@@ -2048,6 +2052,19 @@ fn main() {
             sha256: args[3].clone(),
         };
         let plan: Plan = serde_json::from_slice(&bound_bytes(&bound, true)?)?;
+        if args.get(6).is_some_and(|a| {
+            matches!(
+                a.as_str(),
+                "--recover-import191-gates" | "--check-import191-gate-recovery"
+            )
+        }) {
+            return cohort191_gate_recovery::run(
+                &plan,
+                &bound,
+                &args[5],
+                args[6] == "--check-import191-gate-recovery",
+            );
+        }
         if args.get(6).is_some_and(|a| {
             a == "--recover-repair185-fleet" || a == "--check-repair185-fleet-recovery"
         }) {
