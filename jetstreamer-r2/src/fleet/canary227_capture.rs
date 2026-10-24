@@ -20,7 +20,7 @@ struct Spec {
     output: PathBuf,
 }
 fn sandbox(p: &BTreeMap<String, String>, command: &str) -> Result<()> {
-    // systemd stores the decimal caps rounded down to whole pages.
+    // systemd exposes requested decimal caps; the runner checks rounded cgroup limits.
     require(
         p,
         &[
@@ -30,8 +30,8 @@ fn sandbox(p: &BTreeMap<String, String>, command: &str) -> Result<()> {
             ("Restart", "no"),
             ("KillMode", "control-group"),
             ("Delegate", "no"),
-            ("MemoryHigh", "149999996928"),
-            ("MemoryMax", "224999997440"),
+            ("MemoryHigh", "150000000000"),
+            ("MemoryMax", "225000000000"),
             ("MemorySwapMax", "0"),
             ("CPUQuotaPerSecUSec", "8s"),
             ("TasksMax", "512"),
@@ -453,8 +453,8 @@ mod tests {
             ("Restart", "no"),
             ("KillMode", "control-group"),
             ("Delegate", "no"),
-            ("MemoryHigh", "149999996928"),
-            ("MemoryMax", "224999997440"),
+            ("MemoryHigh", "150000000000"),
+            ("MemoryMax", "225000000000"),
             ("MemorySwapMax", "0"),
             ("CPUQuotaPerSecUSec", "8s"),
             ("TasksMax", "512"),
@@ -485,7 +485,7 @@ mod tests {
         for (key, value) in [
             ("Type", "simple"),
             ("User", "root"),
-            ("MemoryMax", "225000000000"),
+            ("MemoryMax", "224999997440"),
             ("ReadWritePaths", "/home/ubuntu"),
             ("NRestarts", "1"),
             ("Transient", "yes"),
