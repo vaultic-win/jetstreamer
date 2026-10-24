@@ -447,7 +447,7 @@ pub(super) fn prepare(
             .context("status estimate missing")?;
         validate_status(&s, p, &next.previous_observer, estimate)?;
         ensure!(
-            next.expected_epochs.contains(&epoch)
+            p.expected_epochs.contains(&epoch)
                 && seen.insert(epoch)
                 && s["authenticated_readback"] == true
                 && s["status"]["sampled_at_utc"] == p.sample_target_utc
