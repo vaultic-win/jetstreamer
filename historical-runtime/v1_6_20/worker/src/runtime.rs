@@ -878,10 +878,10 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
         crate::epoch228_profile::validate_snapshot(slot)?;
     }
     if cfg!(feature = "epoch227-capped-qualification") && slot != 98_063_464 {
-        return Err("epoch227 capped requires the exact cold snapshot98063464".into());
+        return Err("epoch227 capped requires the exact cold snapshot 98063464".into());
     }
     if cfg!(feature = "epoch223-prefix-qualification") && slot != 96_335_538 {
-        return Err("epoch223 prefix requires the exact cold snapshot96335538".into());
+        return Err("epoch223 prefix requires the exact cold snapshot 96335538".into());
     }
     if !(MIN_SUPPORTED_SNAPSHOT_SLOT..MAX_SUPPORTED_SLOT_EXCLUSIVE).contains(&slot) {
         return Err(format!(

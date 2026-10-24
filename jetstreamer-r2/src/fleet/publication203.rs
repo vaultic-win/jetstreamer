@@ -189,7 +189,7 @@ fn terminal(name: &str, iid: &str) -> Result<Value> {
             && v["_EXE"] == "/usr/lib/systemd/systemd"
             && v["MESSAGE"] == format!("{name}: Deactivated successfully.")
         {
-            ensure!(found.replace(v).is_none(), "duplicated203 terminal event");
+            ensure!(found.replace(v).is_none(), "duplicated 203 terminal event");
         }
     }
     Ok(
@@ -373,7 +373,7 @@ pub(super) fn admit() -> Result<()> {
                 && v["admitted"] == true,
             "203 prior admission conflicts"
         );
-        println!("Exact203 admission already exists; original freshness still applies");
+        println!("Exact 203 admission already exists; original freshness still applies");
         return Ok(());
     }
     let v = bound_json(&s.verification)?;
@@ -477,7 +477,7 @@ pub(super) fn admit() -> Result<()> {
         "maximum_new_disk_bytes":64u64<<20,"maximum_memory_bytes":32u64<<30,"publication_memory_max_bytes":16u64<<30,"upload_memory_max_bytes":32u64<<30,"phases_must_be_serial":true,"recorded_unix_seconds":now()?,"maximum_launch_delay_seconds":900,
         "resource_samples_taken":0,"producer_mutations":false,"replay_launch_authorized":false,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
-    println!("Exact203 publication admitted; no archive or remote mutation performed");
+    println!("Exact 203 publication admitted; no archive or remote mutation performed");
     Ok(())
 }
 
@@ -643,7 +643,7 @@ pub(super) fn capture() -> Result<()> {
                 && old["self_sha256"] == self_sha,
             "203 prior handoff conflicts"
         );
-        println!("Exact203 handoff already captured; no duplicate action");
+        println!("Exact 203 handoff already captured; no duplicate action");
         return Ok(());
     }
     let o = bound_json(&s.observer)?;
@@ -752,7 +752,7 @@ pub(super) fn capture() -> Result<()> {
         "owner":u,"sandbox":sandbox,"prior_stage_terminal":prior,"claim":claim,"capture_spec":private157::binding(&binding),"self_sha256":self_sha,
         "resource_samples_taken":0,"phase_handoff_event":true,"grants_publication_or_upload_authority":false,"producer_mutations":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
-    println!("Exact203 phase handoff recorded without a resource poll or remote mutation");
+    println!("Exact 203 phase handoff recorded without a resource poll or remote mutation");
     Ok(())
 }
 

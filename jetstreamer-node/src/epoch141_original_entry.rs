@@ -58,7 +58,7 @@ fn validate_scope(
     private: Option<(&Path, &Path, &Path)>,
 ) -> Result<(), String> {
     if start != 141 || end != 141 || plan != Some((60911751, 60911752, 61328765)) || forbidden {
-        return Err("original-entry qualification requires exact141/bootstrap60911751/terminal61328765, no cohort/recovery/carried route".into());
+        return Err("original-entry qualification requires exact 141/bootstrap60911751/terminal61328765, no cohort/recovery/carried route".into());
     }
     let root = Path::new("/home/sol/.jetstreamer-private");
     let Some((destination, output, scratch)) = private else {

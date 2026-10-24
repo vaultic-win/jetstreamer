@@ -269,7 +269,7 @@ pub(super) fn validate(proof: &Value) -> Result<()> {
     let raw = sealed_bytes(&fixed(MANAGER, MANAGER_SHA))?;
     let mut manager = serde_json::Map::new();
     for line in std::str::from_utf8(&raw)?.lines() {
-        let (k, v) = line.split_once('=').context("full227 raw manager field")?;
+        let (k, v) = line.split_once('=').context("full 227 raw manager field")?;
         ensure!(
             manager.insert(k.into(), json!(v)).is_none(),
             "full 227 duplicate raw manager property"

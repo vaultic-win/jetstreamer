@@ -169,7 +169,7 @@ pub(crate) fn publish_using(
             .join(format!("child-publication144-{name}.json"));
         if let Err(e) = child(writer, &args, !check, &capture) {
             return Ok(
-                json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":bound(capture,false)?,"reason":format!("Exact144 status needs prompt repair:{e:#}"),"archive_mutations":false}),
+                json!({"provisional_fleet":provisional,"publication_skipped":true,"failed_child":bound(capture,false)?,"reason":format!("Exact 144 status needs prompt repair: {e:#}"),"archive_mutations":false}),
             );
         }
     }

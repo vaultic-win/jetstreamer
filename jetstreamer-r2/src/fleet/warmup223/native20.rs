@@ -1,4 +1,4 @@
-//! Closed first16-entry native 20 owner. No synthetic checkpoint or zero-entry claim.
+//! Closed first 16-entry native 20 owner. No synthetic checkpoint or zero-entry claim.
 use super::super::*;
 pub(super) const UNIT: &str = "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service";
 pub(super) const ROOT: &str =

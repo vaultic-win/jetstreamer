@@ -65,7 +65,7 @@ fn budget(v: &Value) -> Result<(u64, Value)> {
         sum,
         json!({"target_archive_bytes":LENGTH,"historical_archive_bytes":SOURCE_LENGTH,
         "scaled_phase_millis":phases,"dispatch_margin_millis":600000,"total_upload_to_sidecar_millis":sum,
-        "method":"Ceiling scale exact verified198 hash/upload/readback-and-source-revalidation durations by full160 byte length; add10minutes dispatch margin, anchor once to actual160 uploader dispatch. Completed replay/import/full/plugin are excluded; no deadline reset, remaining-time clamp or skipped integrity gate."}),
+        "method":"Ceiling scale exact verified198 hash/upload/readback-and-source-revalidation durations by full 160 byte length; add 10 minutes dispatch margin, anchor once to actual 160 uploader dispatch. Completed replay/import/full/plugin are excluded; no deadline reset, remaining-time clamp or skipped integrity gate."}),
     ))
 }
 fn event_start(records: &[Value]) -> Result<u64> {

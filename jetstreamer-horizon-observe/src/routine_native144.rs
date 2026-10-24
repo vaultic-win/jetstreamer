@@ -316,7 +316,7 @@ pub(super) fn enable(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
             && next.native144_restore.is_none()
             && next.completed144_prefix.is_some()
             && public198::refreshed(next),
-        "native 144 requires unmigrated completed144/native198 history"
+        "native 144 requires unmigrated completed 144/native198 history"
     );
     let s: Spec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(

@@ -2975,7 +2975,7 @@ mod tests {
             "snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst";
         const SLOT: u64 = 89_423_444;
         let scratch = env::var("JETSTREAMER_EPOCH207_V1616_TEST_SCRATCH")
-            .expect("explicit isolated207test scratch required");
+            .expect("explicit isolated 207 test scratch required");
         let path = Path::new(&scratch);
         assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
         let root = path.parent().unwrap();

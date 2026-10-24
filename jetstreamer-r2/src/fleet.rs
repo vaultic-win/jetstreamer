@@ -3323,7 +3323,7 @@ pub(super) async fn run() -> Result<()> {
             } else {
                 "blocked-qualification"
             };
-            next = "Preserve original157 producer, queued successor replay and independent runtime-segment verification; ETA unavailable until a qualified rate-bearing replay observation is restored. Review actual terminal/ownership changes, never restart from a missing worker.";
+            next = "Preserve original 157 producer, queued successor replay and independent runtime-segment verification; ETA unavailable until a qualified rate-bearing replay observation is restored. Review actual terminal/ownership changes, never restart from a missing worker.";
         }
         if diagnostics.iter().any(|claim| {
             claim["live"] == true

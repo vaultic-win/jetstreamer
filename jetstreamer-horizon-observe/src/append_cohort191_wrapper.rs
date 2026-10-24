@@ -562,7 +562,7 @@ mod tests {
         assert_eq!(fs::read(b).unwrap(), b"existing");
     }
     #[test]
-    #[ignore = "root CAP_DAC_OVERRIDE is required to append to a sealed0555 directory"]
+    #[ignore = "root CAP_DAC_OVERRIDE is required to append to a sealed 0555 directory"]
     fn append_reentry_and_publication_frontier_recovery() {
         let (_d, p, o) = fixture();
         assert_eq!(o, 0);

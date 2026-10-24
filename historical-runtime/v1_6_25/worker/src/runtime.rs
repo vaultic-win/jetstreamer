@@ -3265,7 +3265,7 @@ mod tests {
         let snapshot = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst";
         let ledger = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1";
         let scratch = env::var("JETSTREAMER_EPOCH227_V1625_TEST_SCRATCH")
-            .expect("explicit isolated227 native test scratch required");
+            .expect("explicit isolated 227 native test scratch required");
         let path = Path::new(&scratch);
         assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));
         let root = path.parent().unwrap();

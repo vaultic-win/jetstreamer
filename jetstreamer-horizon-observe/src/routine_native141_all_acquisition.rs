@@ -152,7 +152,7 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
             && !all_acquisition_enabled(p)
             && public160_timing::enabled(p)
             && p.publication144.is_none(),
-        "all-target transition needs accepted timed160 and complete earlier acquisition history"
+        "all-target transition needs accepted timed 160 and complete earlier acquisition history"
     );
     let s: Spec = serde_json::from_value(bound_json(b, true)?)?;
     spec(&s)?;
@@ -192,7 +192,7 @@ pub(super) fn fold_at(f: &mut Value, claim: Value, b: &Bound, unit: &str) -> Res
     let gate = &mut f["gates"]["141"];
     ensure!(
         gate["state"] == "failed-needs-repair",
-        "all-target acquisition cannot close141repair"
+        "all-target acquisition cannot close 141 repair"
     );
     gate["next_action"] = json!(
         "Inspect the exact all18283target raw acquisition and its post-close source revalidation; preserve every prior failed/rejection/first-target outcome. Complete attempt coverage is distinct from raw acquisition and does not prove canonical ancestry, historical liveness, hidden PoH, roots or recovery. Preserve partial outcomes on failure and continue qualified PoH/checkpoint/full/plugin/ready-pair gates. No ordinary replay claim, dashboard ETA or publication authority."

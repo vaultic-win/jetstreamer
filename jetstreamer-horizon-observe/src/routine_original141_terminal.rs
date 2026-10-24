@@ -242,7 +242,7 @@ pub(super) fn next_config(p: &Plan, c: &mut Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root exact0809 full observer and sealed terminal evidence; immutable reads and terminal ownership only"]
+    #[ignore = "root exact 0809 full observer and sealed terminal evidence; immutable reads and terminal ownership only"]
     fn actual_terminal_recovery_preserves_five_producers_and_old144() {
         let b=Bound{path:"/var/lib/jetstreamer/horizon-routine-plan-101-200-20261023T080958Z-controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1/cycle-plan.json".into(),sha256:"5b59944a3adffb8450a709ce42f2113f0026753793001e8a1addc0e1e00edd30".into()};
         let mut p: Plan = serde_json::from_value(bound_json(&b, true).unwrap()).unwrap();

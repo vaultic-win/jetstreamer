@@ -19,7 +19,7 @@ const GUARDS: [&str; 5] = [
 #[path = "original141_growth.rs"]
 #[allow(
     clippy::duplicate_mod,
-    reason = "Growth validation belongs to each separately compiled closed141 profile"
+    reason = "Growth validation belongs to each separately compiled closed 141 profile"
 )]
 mod growth_bridge;
 #[path = "original141_guard_pin.rs"]
@@ -133,7 +133,7 @@ fn genesis_bytes() -> Result<Vec<u8>> {
         sha256: GENESIS_SHA.into(),
     };
     sealed_file(&b)?;
-    let bytes = read_stable_bounded(&b.path, 8 * 1024 * 1024, "original141 genesis")?;
+    let bytes = read_stable_bounded(&b.path, 8 * 1024 * 1024, "original 141 genesis")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == GENESIS_SHA,
         "original 141 genesis digest differs"
@@ -181,7 +181,7 @@ pub(super) fn prepare() -> Result<()> {
     let mut receipt = json!({"schema":"jetstreamer-original141-private-layout-v2","epoch":141,"run_root":ROOT,"uid":1001,"gid":1003,"genesis_sha256":GENESIS_SHA,"genesis_bytes":bytes.len(),"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"self_sha256":a[3],"recorded_unix_seconds":now()?});
     trace_fields(&mut receipt);
     private157::immutable_receipt(&root.join("receipts/layout.json"), &receipt)?;
-    println!("original141 private layout and verified genesis staged; no launch");
+    println!("original 141 private layout and verified genesis staged; no launch");
     Ok(())
 }
 fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> {
@@ -596,7 +596,7 @@ pub(super) async fn admit() -> Result<()> {
     validate_output_destination(&s.output)?;
     if check {
         println!(
-            "original141 admission inputs passed; no resource/remote observation, write or launch"
+            "original 141 admission inputs passed; no resource/remote observation, write or launch"
         );
         return Ok(());
     }
@@ -669,7 +669,7 @@ pub(super) async fn admit() -> Result<()> {
     receipt["cpu_budget"] = cpu;
     receipt["host_memory_reserve_bytes"] = json!(64u64 << 30);
     private157::immutable_receipt(&s.output, &receipt)?;
-    println!("original141 fresh experimental admission written; no launch or publication");
+    println!("original 141 fresh experimental admission written; no launch or publication");
     Ok(())
 }
 #[derive(Deserialize)]
@@ -753,7 +753,7 @@ pub(super) fn capture() -> Result<()> {
     );
     launch(&r, &c)?;
     private157::immutable_receipt(&c.launch_receipt.path, &r)?;
-    println!("actual guarded original141 launch captured; fleet handoff still required");
+    println!("actual guarded original 141 launch captured; fleet handoff still required");
     Ok(())
 }
 

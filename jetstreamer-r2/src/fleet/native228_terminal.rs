@@ -362,7 +362,7 @@ fn checked_proof(b: &BoundFile, self_sha: &str, s: &Spec) -> Result<Value> {
 mod tests {
     use super::*;
     #[test]
-    #[ignore = "root read-only actual337 collected228 capture-spec regression; no Bank, runtime mutation, proof write or R2"]
+    #[ignore = "root read-only actual 337 collected 228 capture-spec regression; no Bank, runtime mutation, proof write or R2"]
     fn actual_collected337_capture_spec_passes_without_writing_the_proof() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let b = match (std::env::var("HORIZON_NATIVE228_CHECK_SPEC_PATH"),

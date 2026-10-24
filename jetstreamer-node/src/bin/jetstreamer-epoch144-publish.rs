@@ -603,7 +603,7 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
         .as_u64()
         .context("admitted protection missing")?;
     if check {
-        println!("exact144 publication preflight passed; no writes, copy, hash or import");
+        println!("exact 144 publication preflight passed; no writes, copy, hash or import");
         return Ok(());
     }
     let scope = write_scope::confine(&[&p.work_directory, &p.receipt_directory, dest])?;
@@ -699,7 +699,7 @@ fn run(p: &Plan, plan: &Bound, self_sha: &str, check: bool) -> Result<()> {
     full.write(format!("{DIGEST} {FULL} {RUNNER}\n").as_bytes())?;
     plugin.write(format!("{DIGEST} {PLUGIN} {RUNNER}\n").as_bytes())?;
     acknowledge_archive_publication_batch(dest, publication.transaction_id)?;
-    println!("exact144 artifact committed locally; original preserved; no R2 mutation");
+    println!("exact 144 artifact committed locally; original preserved; no R2 mutation");
     Ok(())
 }
 /// Disposable proof of the same FD, privilege-drop and transaction sequence.
@@ -757,7 +757,7 @@ fn capability(root: &Path, self_sha: &str) -> Result<()> {
         .set_permissions(fs::Permissions::from_mode(0o3770))
         .context("fixture owner restores SGID")?;
     preflight_archive_publication(&stage, &dest)?;
-    let context = b"exact144 disposable filesystem capability, no campaign admission";
+    let context = b"exact 144 disposable filesystem capability, no campaign admission";
     let publication = publish_verified_archive_batch_if_absent_with_context_and_lock_timeout(
         Sha256::digest(context).into(),
         &[144],
@@ -772,7 +772,7 @@ fn capability(root: &Path, self_sha: &str) -> Result<()> {
     )?;
     sink.json(&json!({"schema":"jetstreamer-exact144-publication-capability-v1","publisher_sha256":self_sha,"diagnostic_fixture":true,"mount_id":mount,"kernel_write_scope":scope,"outside_write_denied":true,"filesystem_transaction_passed":true,"root_receipt_fd_survives_permanent_privilege_drop":true,"effective_uid":unsafe{libc::geteuid()},"effective_gid":unsafe{libc::getegid()},"transaction_id":sha256_hex_string(&publication.transaction_id),"artifact_publication_authorized":false,"runtime_registry_promotion_authorized":false,"remote_mutations":false,"r2_mutations":false}))?;
     acknowledge_archive_publication_batch(&dest, publication.transaction_id)?;
-    println!("exact144 disposable filesystem capability passed; no campaign artifacts touched");
+    println!("exact 144 disposable filesystem capability passed; no campaign artifacts touched");
     Ok(())
 }
 fn main() -> Result<()> {

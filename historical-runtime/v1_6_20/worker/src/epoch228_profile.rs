@@ -10,7 +10,7 @@ pub const EPOCH_END: u64 = 98_927_999;
 
 pub fn validate_snapshot(slot: u64) -> Result<(), String> {
     if slot != BOOTSTRAP_SLOT {
-        return Err("epoch228 capped requires the exact cold snapshot98495291".into());
+        return Err("epoch228 capped requires the exact cold snapshot 98495291".into());
     }
     Ok(())
 }
@@ -47,7 +47,7 @@ mod tests {
         };
         const SNAPSHOT:&str="/var/lib/jetstreamer/horizon-contiguous-228-230-current-46b4b4a-v1/snapshot-98495291-GfiRSgpC1qvH3uxVd9VAtYZ6qKM8fcdkyoyAkhF7izLq.tar.zst";
         let scratch = env::var("JETSTREAMER_EPOCH228_V1620_TEST_SCRATCH")
-            .expect("explicit isolated228 scratch required");
+            .expect("explicit isolated 228 scratch required");
         let path = Path::new(&scratch);
         let root = path.parent().unwrap();
         assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("scratch"));

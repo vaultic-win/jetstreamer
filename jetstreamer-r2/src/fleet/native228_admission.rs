@@ -606,7 +606,7 @@ mod tests {
         assert!(protected_floor(100, 200, &guards).is_err());
     }
     #[test]
-    #[ignore = "root immutable334 metadata only; no resource poll, process launch, Bank, archive or network"]
+    #[ignore = "root immutable 334 metadata only; no resource poll, process launch, Bank, archive or network"]
     fn root_saved334_terminal_peers_preserve_the_complete_old_live_census() {
         assert_eq!(unsafe { libc::geteuid() }, 0);
         let fleet = BoundFile {

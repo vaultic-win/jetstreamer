@@ -476,7 +476,7 @@ fn run() -> Result<()> {
         "archive_ready_pair_proven":false,"remote_mutations":false,"r2_mutations":false}),
     )?;
     println!(
-        "exact144 client progress/forecast recorded; no resource sample, status publication, archive hash or remote access"
+        "exact 144 client progress/forecast recorded; no resource sample, status publication, archive hash or remote access"
     );
     Ok(())
 }

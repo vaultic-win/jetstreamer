@@ -447,7 +447,7 @@ fn run() -> Result<()> {
     guard(&p.output_directory, start)?;
     if a[6] == "--check-only" {
         println!(
-            "full18283 closed acquisition/clock/finalized census bound; no raw target decode,PoH,output or recovery"
+            "full 18283 closed acquisition/clock/finalized census bound; no raw target decode, PoH, output or recovery"
         );
         return Ok(());
     }

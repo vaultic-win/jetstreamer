@@ -402,7 +402,7 @@ pub(super) fn run() -> Result<()> {
             "204 conflicting prior admission"
         );
         println!(
-            "Exact204 admission already exists; caller must still enforce its original freshness"
+            "Exact 204 admission already exists; caller must still enforce its original freshness"
         );
         return Ok(());
     }

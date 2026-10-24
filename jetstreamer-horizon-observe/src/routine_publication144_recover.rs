@@ -162,7 +162,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     );
     if check {
         println!(
-            "exact144 history recovery qualified; no resource sample,status write or remote request"
+            "exact 144 history recovery qualified; no resource sample, status write or remote request"
         );
         return Ok(());
     }

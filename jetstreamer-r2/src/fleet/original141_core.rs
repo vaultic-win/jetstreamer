@@ -225,7 +225,7 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
 }
 pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     shape(r, c)?;
-    let checkpoints = read_stable_bounded(Path::new(CHECKPOINTS), 1024, "original141 checkpoints")?;
+    let checkpoints = read_stable_bounded(Path::new(CHECKPOINTS), 1024, "original 141 checkpoints")?;
     ensure!(
         hex_lower(&Sha256::digest(&checkpoints)) == CHECKPOINTS_SHA,
         "original 141 checkpoint bytes changed"

@@ -160,7 +160,7 @@ mod tests {
         let terminal_units = serde_json::from_value(terminal["unit_census"].clone()).unwrap();
         assert!(
             current(&fixture(true), &terminal_units).is_err(),
-            "a pre-failure active338 owner cannot authorize a post-failure launch"
+            "a pre-failure active 338 owner cannot authorize a post-failure launch"
         );
         for pointer in ["/diagnostics", "/unit_census", "/epochs"] {
             let mut bad = terminal.clone();

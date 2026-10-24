@@ -19622,7 +19622,7 @@ async fn main() {
                 || private_singleton_preflight
             {
                 eprintln!(
-                    "singleton preflight requires the exclusive209–212build and may appear only once"
+                    "singleton preflight requires the exclusive 209–212 build and may appear only once"
                 );
                 exit(2);
             }

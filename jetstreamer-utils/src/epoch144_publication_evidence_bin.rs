@@ -430,7 +430,7 @@ fn run() -> Result<()> {
     );
     let mut result = collect(&p)?;
     if check {
-        println!("exact144 evidence validated; no writes, archive hash, copy or publication");
+        println!("exact 144 evidence validated; no writes, archive hash, copy or publication");
         return Ok(());
     }
     result["plan"] = json!({"path":a[1],"sha256":a[3]});
@@ -528,7 +528,7 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "explicit root read-only validation of the actual retained full144 receipt"]
+    #[ignore = "explicit root read-only validation of the actual retained full 144 receipt"]
     fn retained_full144_receipt_passes() {
         let v = read(
             &bound(

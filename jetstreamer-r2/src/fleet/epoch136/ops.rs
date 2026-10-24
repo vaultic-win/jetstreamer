@@ -27,7 +27,7 @@ mod growth_bridge;
 #[path = "../original141_guard_pin.rs"]
 #[allow(
     clippy::duplicate_mod,
-    reason = "Guard firstfire provenance binds136's distinct compile-time unit and paths"
+    reason = "Guard firstfire provenance binds 136's distinct compile-time unit and paths"
 )]
 mod guard_pin;
 fn invocation(s: &str) -> bool {
@@ -851,7 +851,7 @@ fn guards(s: &Spec, o: &Value) -> Result<Value> {
         "136 live 141 guard not successful"
     );
     let path = guard_root.join(format!("sample-{iid}.json"));
-    let bytes = read_stable_bounded(&path, 16 << 20, "136 protected141 guard sample")?;
+    let bytes = read_stable_bounded(&path, 16 << 20, "136 protected 141 guard sample")?;
     let g: Value = serde_json::from_slice(&bytes)?;
     private141_guard_contract(
         &u,
@@ -1207,7 +1207,7 @@ pub(super) fn capture() -> Result<()> {
     );
     launch(&r, &c)?;
     private157::immutable_receipt(&c.launch_receipt.path, &r)?;
-    println!("actual136 guarded bounded launch attested; complete fleet adoption still required");
+    println!("actual 136 guarded bounded launch attested; complete fleet adoption still required");
     Ok(())
 }
 

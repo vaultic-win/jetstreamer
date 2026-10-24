@@ -160,7 +160,7 @@ pub(super) fn decision(p: &Plan, o: &Value, ledger: &Value) -> Result<Value> {
     } else if terminal_repair {
         (
             "epoch186 runtime/input readiness and fresh guarded admission; epoch141 execution mismatch remains a priority repair",
-            "Extract and diagnose the sealed failed141 transaction/account evidence. Freshly qualify/admit the disjoint compatible186 singleton while repairing141; do not blindly rerun the failed141 worker or scale another experimental lane before a clean expanded sample.",
+            "Extract and diagnose the sealed failed 141 transaction/account evidence. Freshly qualify/admit the disjoint compatible 186 singleton while repairing 141; do not blindly rerun the failed 141 worker or scale another experimental lane before a clean expanded sample.",
         )
     } else {
         (

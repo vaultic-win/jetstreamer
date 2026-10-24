@@ -79,14 +79,14 @@ pub(crate) fn validate_cli(
             && count == 1
             && destination
             && !forbidden,
-        "private144 continuation requires its dedicated build, only144, one --verify, explicit private destination, and no ordinary override",
+        "private144 continuation requires its dedicated build, only 144, one --verify, explicit private destination, and no ordinary override",
     )
 }
 fn validate_plan(p: &Plan, destination: &Path) -> Result<(), String> {
     require(
         p.schema == "jetstreamer-private-epoch144-checkpoint-continuation-plan-v2"
             && p.epoch == EPOCH,
-        "wrong144 continuation plan",
+        "wrong 144 continuation plan",
     )?;
     require(
         p.producer_unit
@@ -198,7 +198,7 @@ fn protection_release(v: &Value) -> Result<(), String> {
             && v["replay_launch_authorized"] == false
             && v["local_retirement_authorized"] == false
             && v["r2_mutations"] == false,
-        "144 needs exact completed198 accounting release, not an arbitrary lower floor",
+        "144 needs exact completed 198 accounting release, not an arbitrary lower floor",
     )
 }
 
@@ -439,7 +439,7 @@ pub(crate) async fn run(
 ) -> Result<(), String> {
     require(
         cfg!(feature = "epoch144-checkpoint-continuation-diagnostic"),
-        "dedicated144 continuation build required",
+        "dedicated 144 continuation build required",
     )?;
     let p: Plan = serde_json::from_slice(&sealed_bytes(
         &Evidence {
@@ -644,7 +644,7 @@ pub(crate) async fn run(
     verifier.finish()?;
     require(
         fs::metadata(&suffix).map_err(|e| e.to_string())?.len() <= 8u64 << 30,
-        "144 suffix exceeded experimental8GiB reservation; preserve output and requalify peak before assembly",
+        "144 suffix exceeded experimental 8 GiB reservation; preserve output and requalify peak before assembly",
     )?;
     publish_historical_segment_manifest(EPOCH, q, &suffix, &result, candidate)?;
     require_no_checksum(&suffix)?;

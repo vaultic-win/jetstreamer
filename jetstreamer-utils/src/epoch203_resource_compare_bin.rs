@@ -270,7 +270,7 @@ fn compare(b: &Metrics, c: &Metrics) -> Value {
             "progress_window_slots_per_second":c.progress_window_slots_per_second/b.progress_window_slots_per_second,
             "progress_window_transactions_per_second":c.progress_window_transactions_per_second/b.progress_window_transactions_per_second,
             "progress_window_account_updates_per_second":c.progress_window_account_updates_per_second/b.progress_window_account_updates_per_second},
-        "limitations":["Same target permits at most1000slots overshoot; raw work totals and window boundaries are reported for interpretation.",
+        "limitations":["Same target permits at most 1000 slots overshoot; raw work totals and window boundaries are reported for interpretation.",
             "Progress-window rates start at the first progress marker, not a proven settling boundary, and are not equal-work windows; compare terminal capture and observed overshoot.",
             "No complete-prefix nonlinear peak, canonical checkpoint, plugin or restart qualification follows from a bounded comparison."],
         "authority":{"production_configuration_selected":false,"replay_launch_authorized":false,

@@ -490,7 +490,7 @@ pub(super) fn run(capture: bool) -> Result<()> {
         )?;
     }
     println!(
-        "warmup223 {} captured; no service or R2 mutation",
+        "warmup 223 {} captured; no service or R2 mutation",
         if capture {
             "live ownership"
         } else {

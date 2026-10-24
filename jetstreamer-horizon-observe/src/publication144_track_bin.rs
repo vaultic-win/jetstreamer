@@ -304,7 +304,7 @@ fn run() -> Result<()> {
             &json!({"schema":"jetstreamer-exact144-publication-terminal-v1","epoch":144,"launch":lb,"owner":before,"service_success":success,"archive_verification_or_ready_pair_proven":false,"publication_authorized":false,"retirement_authorized":false,"r2_mutations":false,"remote_mutations":false}),
         )?;
     }
-    println!("exact144 owner receipt durable; no launch, archive or remote mutation");
+    println!("exact 144 owner receipt durable; no launch, archive or remote mutation");
     Ok(())
 }
 fn main() -> Result<()> {

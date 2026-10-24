@@ -236,7 +236,7 @@ pub(super) fn run() -> Result<()> {
     }
     inputs()?;
     if a.len() == 8 {
-        println!("exact160 owner inputs valid; no resource sample, proof, archive or R2 mutation");
+        println!("exact 160 owner inputs valid; no resource sample, proof, archive or R2 mutation");
         return Ok(());
     }
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

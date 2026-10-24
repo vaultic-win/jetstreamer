@@ -734,7 +734,7 @@ mod tests {
         assert!(guard(&changed, 1000).is_err());
     }
     #[test]
-    #[ignore = "root read-only actual sealed203 primary inputs/accepted296; no resource or remote observations, writes or launch"]
+    #[ignore = "root read-only actual sealed 203 primary inputs/accepted296; no resource or remote observations, writes or launch"]
     fn actual_sealed203_inputs_and_accepted296_match() {
         let read =
             |path: &str| -> Value { serde_json::from_slice(&fs::read(path).unwrap()).unwrap() };

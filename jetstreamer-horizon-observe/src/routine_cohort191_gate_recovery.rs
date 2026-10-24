@@ -173,7 +173,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     );
     if check {
         println!(
-            "exact191 gate continuation preflight passed; no observation,remote request or status rewrite"
+            "exact 191 gate continuation preflight passed; no observation, remote request or status rewrite"
         );
         return Ok(());
     }
