@@ -19,6 +19,10 @@ const OS_TRANSFER: &str =
     "/usr/local/lib/jetstreamer/horizon-cohort191-os-claim-transfer-20261024-v1/transfer.json";
 const OS_SHA: &str = "1f697f633f8c231ac1fa236f1181fb80fef0ffa02986dae85cca800ef95542c6";
 const GROWTH: u64 = 824_633_720_832;
+const ORIGINAL185: &str = "0de9498a3c2f4c6dbd7350d052fc7e02";
+const CLOSED185: &str =
+    "/var/lib/jetstreamer/horizon-old185-attempt-growth-closure-20261024-v1/closure.json";
+const CLOSED185_SHA: &str = "7a57f946c5e6cb08bc9a99e8a6b76a6ed33fffb013a673715924192a327d0553";
 const ORIGINAL141: &str = "e639f007d482464f8a251455659d2ede";
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -121,8 +125,24 @@ fn protected141(rows: &[Row]) -> Result<()> {
     );
     Ok(())
 }
+fn protected185(rows: &[Row]) -> Result<()> {
+    let key = format!("epoch185/{ORIGINAL185}");
+    let found: Vec<_> = rows
+        .iter()
+        .filter(|r| r.producer_invocation_id == ORIGINAL185)
+        .collect();
+    ensure!(
+        found.len() == 1
+            && found[0].claim_key == key
+            && found[0].epoch == 185
+            && found[0].outstanding_bytes == 0,
+        "191 transfer must preserve the authenticated original185 closure at zero"
+    );
+    Ok(())
+}
 fn project(rows: &[Row]) -> Result<(Vec<Row>, u64)> {
     protected141(rows)?;
+    protected185(rows)?;
     let key = format!("epoch191/{IID}");
     let mut keys = BTreeSet::new();
     let mut found = false;
@@ -298,7 +318,7 @@ fn latest_fleet(selected: &Bound, f: &Value) -> Result<()> {
 }
 fn routes(unit: &str) -> Result<Value> {
     let out=Command::new("/usr/bin/systemctl").args(["show",unit,"--all","--no-pager",
-        "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,ControlGroup,Job,Restart,Triggers,TriggeredBy,OnSuccess,OnFailure,UnitFileState"]).output()?;
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,NRestarts,ControlGroup,Job,Restart,Triggers,TriggeredBy,OnSuccess,OnFailure,UnitFileState,Result,ExecMainStatus,ExecMainCode,RequiredBy,WantedBy,RequisiteOf,BoundBy,UpheldBy,PartOf,ConsistsOf,StartLimitAction,FailureAction,SuccessAction"]).output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 16384,
         "191 native launch-route metadata unavailable"
@@ -322,12 +342,37 @@ fn routes_shape(v: &Value, unit: &str) -> Result<()> {
         && v["NRestarts"] == "0"
         && v["ControlGroup"] == ""
         && no_manager_job(&v["Job"])
-        && ["Triggers", "TriggeredBy", "OnSuccess", "OnFailure"]
-            .iter()
-            .all(|k| v[*k] == "");
+        && [
+            "Triggers",
+            "TriggeredBy",
+            "OnSuccess",
+            "OnFailure",
+            "RequiredBy",
+            "WantedBy",
+            "RequisiteOf",
+            "BoundBy",
+            "UpheldBy",
+            "PartOf",
+            "ConsistsOf",
+        ]
+        .iter()
+        .all(|k| v[*k] == "");
     let absent = v["LoadState"] == "not-found" && matches!(v["Restart"].as_str(), Some("" | "no"));
+    // The separately authenticated collected terminal proof establishes the
+    // natural successful exit. An inert static controller's on-failure policy
+    // cannot restart it without a new start job or dependency/trigger route.
+    let dormant_success = unit == CONTROLLER
+        && v["UnitFileState"] == "static"
+        && v["Restart"] == "on-failure"
+        && v["Result"] == "success"
+        && v["ExecMainStatus"] == "0"
+        && v["ExecMainCode"] == "0";
+    let actions_inert = ["StartLimitAction", "FailureAction", "SuccessAction"]
+        .iter()
+        .all(|key| v[*key] == "none");
     let installed = v["LoadState"] == "loaded"
-        && v["Restart"] == "no"
+        && (v["Restart"] == "no" || dormant_success)
+        && actions_inert
         && matches!(v["UnitFileState"].as_str(), Some("disabled" | "static"));
     ensure!(
         matches!(unit, UNIT | CONTROLLER) && v["Id"] == unit && inert && (absent || installed),
@@ -404,6 +449,31 @@ fn fresh(p: &Plan) -> Result<Value> {
         b["path"]=="/var/lib/jetstreamer/horizon-original141-capped-root-admission-20261023-v1/admission.json"
         && b["sha256"]=="945561bbf6dc282cbc0375cb84d777abace765956f61e8cd1e35863056ca5b3b"),
         "191 all-claims census omits actual original141 cap binding");
+    ensure!(
+        c["other_claim_evidence"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|b| b["path"] == CLOSED185 && b["sha256"] == CLOSED185_SHA),
+        "191 census omits authenticated original185 closure overlay"
+    );
+    let closure = bound(
+        &Bound {
+            path: CLOSED185.into(),
+            sha256: CLOSED185_SHA.into(),
+        },
+        false,
+    )?;
+    ensure!(
+        closure["schema"] == "jetstreamer-horizon-old185-attempt-growth-closed-v2"
+            && closure["descriptor"]["subject"]["producer_invocation_id"] == ORIGINAL185
+            && closure["closed_original_reservation_bytes"] == GROWTH
+            && closure["physical_space_credit_bytes"] == 0
+            && closure["archive_or_scratch_removed"] == false
+            && closure["guard_floor_mutations_authorized"] == false
+            && closure["new_replay_or_restore_authorized"] == false,
+        "191 census changed original185 closure authority"
+    );
     let (os, other) = policy_shape(&policy)?;
     let budget = crate::cohort191_dispatch::growth_transfer_delivery_budget(&os, other)?;
     let terminal =
@@ -457,13 +527,18 @@ fn fresh(p: &Plan) -> Result<Value> {
     let current = fleet::census(&names, 101, 200)?;
     let mut stable = BTreeMap::new();
     for (name, u) in &current {
-        if u["MainPID"]
+        let old = &f["unit_census"][name];
+        if old["MainPID"]
             .as_str()
             .and_then(|s| s.parse::<u64>().ok())
             .is_some_and(|n| n > 0)
+            || old["ActiveState"] == "activating"
+            || u["MainPID"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .is_some_and(|n| n > 0)
             || u["ActiveState"] == "activating"
         {
-            let old = &f["unit_census"][name];
             for key in [
                 "Id",
                 "LoadState",
@@ -613,6 +688,27 @@ fn intent_shape(v: &Value, desc: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn intent_basis(v: &Value, check: &Bound, census: &Bound) -> Result<()> {
+    ensure!(
+        v["check"] == json!(check) && v["census"] == json!(census),
+        "191 existing intent belongs to another check/census; preserve it for explicit reconciliation"
+    );
+    Ok(())
+}
+fn projection_basis(rows: &[Row], recorded: &[Row]) -> Result<(Vec<Row>, u64)> {
+    let (out, delta) = project(rows)?;
+    let (expected, _) = project(recorded)?;
+    let map = |rows: Vec<Row>| {
+        rows.into_iter()
+            .map(|row| (row.claim_key.clone(), row))
+            .collect::<BTreeMap<_, _>>()
+    };
+    ensure!(
+        map(out.clone()) == map(expected),
+        "191 reader changed another recorded reservation"
+    );
+    Ok((out, delta))
+}
 fn same_frontier(a: &Value, b: &Value) -> bool {
     [
         "fleet",
@@ -648,6 +744,7 @@ fn transferred(p: &Plan, spec: &Bound, check: bool) -> Result<()> {
         let b: Bound = serde_json::from_value(v["intent"].clone())?;
         ensure!(b.path == intent, "191 transfer intent namespace differs");
         intent_shape(&bound(&b, false)?, &desc)?;
+        authenticate_transfer(&v, &desc)?;
         println!("{}", receipt.display());
         return Ok(());
     }
@@ -684,6 +781,7 @@ fn transferred(p: &Plan, spec: &Bound, check: bool) -> Result<()> {
             && old["checked"] == true
             && old["reservation_transferred"] == false
             && old["physical_free_space_credit_bytes"] == 0
+            && same_frontier(&old["native"], &before)
             && old["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|t| t <= now && now - t <= 900),
@@ -691,6 +789,7 @@ fn transferred(p: &Plan, spec: &Bound, check: bool) -> Result<()> {
     );
     if let Some(v) = recorded(&intent)? {
         intent_shape(&v, &desc)?;
+        intent_basis(&v, prior, &p.census)?;
     } else {
         fleet::persist(
             &intent,
@@ -710,8 +809,69 @@ fn transferred(p: &Plan, spec: &Bound, check: bool) -> Result<()> {
         "guard_changes_authorized":false,"restore_authorized":false,"retirement_authorized":false,"publication_authorized":false,
         "new_replay_authorized":false,"new_execution_authorized":false,"r2_mutations":false});
     ledger_shape(&value, &desc)?;
+    authenticate_transfer(&value, &desc)?;
     fleet::persist(&receipt, &value)?;
     println!("{}", receipt.display());
+    Ok(())
+}
+fn authenticate_transfer(v: &Value, desc: &Value) -> Result<()> {
+    let spec: Bound = serde_json::from_value(v["acceptance_spec"].clone())?;
+    let accepted: Plan = serde_json::from_value(bound(&spec, true)?)?;
+    scope(&accepted)?;
+    member(&accepted.program.path, &accepted.program.sha256)?;
+    ensure!(
+        accepted.transfer_authorized
+            && descriptor(&accepted) == *desc
+            && v["acceptance_census"] == json!(accepted.census),
+        "191 transfer lacks its actual authorized acceptance plan"
+    );
+    let check = accepted
+        .prior_check
+        .as_ref()
+        .context("191 accepted check missing")?;
+    ensure!(
+        v["acceptance_check"] == json!(check),
+        "191 transfer accepted another check"
+    );
+    let checked = bound(check, false)?;
+    let intent: Bound = serde_json::from_value(v["intent"].clone())?;
+    let iv = bound(&intent, false)?;
+    intent_shape(&iv, desc)?;
+    intent_basis(&iv, check, &accepted.census)?;
+    let check_spec: Bound = serde_json::from_value(checked["spec"].clone())?;
+    let checked_plan: Plan = serde_json::from_value(bound(&check_spec, true)?)?;
+    scope(&checked_plan)?;
+    member(&checked_plan.program.path, &checked_plan.program.sha256)?;
+    ensure!(
+        !checked_plan.transfer_authorized
+            && checked_plan.prior_check.is_none()
+            && descriptor(&checked_plan) == *desc
+            && checked_plan.census.path == accepted.census.path
+            && checked_plan.census.sha256 == accepted.census.sha256
+            && checked["schema"] == "jetstreamer-original191-growth-check-v2"
+            && checked["descriptor"] == *desc
+            && checked["checked"] == true
+            && checked["reservation_transferred"] == false
+            && checked["physical_free_space_credit_bytes"] == 0
+            && same_frontier(&checked["native"], &v["native"]),
+        "191 transfer lacks its genuine matching successful CHECK basis"
+    );
+    let census = bound(&accepted.census, true)?;
+    ensure!(
+        v["native"]["rows_before"] == census["reservation_rows"]
+            && v["native"]["fleet"] == json!(accepted.fleet)
+            && v["native"]["census"] == json!(accepted.census)
+            && v["native"]["event"] == json!(accepted.delivery_event),
+        "191 transfer changed its accepted census/owner basis"
+    );
+    let before: Vec<Row> = serde_json::from_value(v["native"]["rows_before"].clone())?;
+    let (after, delta) = project(&before)?;
+    ensure!(
+        delta == GROWTH
+            && v["native"]["rows_after"] == json!(after)
+            && v["native"]["original191_disposition_bytes"] == GROWTH,
+        "191 transfer projection is incomplete or counted more than once"
+    );
     Ok(())
 }
 fn read(p: &ReadPlan) -> Result<()> {
@@ -747,7 +907,9 @@ fn read(p: &ReadPlan) -> Result<()> {
         "191 reader intent namespace differs"
     );
     intent_shape(&bound(&intent, false)?, desc)?;
-    let (rows, delta) = project(&p.reservation_rows)?;
+    authenticate_transfer(&value, desc)?;
+    let recorded: Vec<Row> = serde_json::from_value(value["native"]["rows_before"].clone())?;
+    let (rows, delta) = projection_basis(&p.reservation_rows, &recorded)?;
     println!(
         "{}",
         serde_json::to_string(
@@ -755,6 +917,7 @@ fn read(p: &ReadPlan) -> Result<()> {
         "subject":subject(),"projected_reservation_rows":rows,"applied_disposition_bytes":delta,"physical_free_space_credit_bytes":0,
         "reservation_disposition_is_not_additive_free_space":true,"closed_original191_replay_future_growth_bytes":GROWTH,
         "retained_materials_and_downstream_obligations_unchanged":true,"new_admission_required":true,
+        "delivery_policy":desc["delivery_policy"],"delivery_budget":value["native"]["delivery_budget"],
         "guard_changes_authorized":false,"retirement_authorized":false,"new_execution_authorized":false})
         )?
     );
@@ -837,7 +1000,7 @@ mod tests {
                 ORIGINAL141,
                 549_755_813_888,
             ),
-            row("epoch185/already-closed", 185, "185-other-original", 0),
+            row(&format!("epoch185/{ORIGINAL185}"), 185, ORIGINAL185, 0),
             row("epoch152/live", 152, "152-live", GROWTH),
             row("os/shared-pool", 0, "", 4 << 30),
             row("191/readonly-owner", 191, "replacement-readonly", 16 << 20),
@@ -855,8 +1018,7 @@ mod tests {
         assert_eq!(again, out);
         let mut old185_live = initial.clone();
         old185_live[2].outstanding_bytes = GROWTH;
-        let (out, _) = project(&old185_live).unwrap();
-        assert_eq!(out[2], old185_live[2]);
+        assert!(project(&old185_live).is_err());
     }
     #[test]
     fn projection_rejects_aliases_partial_disposition_foreign_principal_and141_credit() {
@@ -883,6 +1045,65 @@ mod tests {
         let mut no141 = rows();
         no141.remove(1);
         assert!(project(&no141).is_err());
+    }
+    #[test]
+    fn reader_projection_preserves_every_recorded_non191_row() {
+        let initial = rows();
+        projection_basis(&initial, &initial).unwrap();
+        let (closed, _) = project(&initial).unwrap();
+        assert_eq!(projection_basis(&closed, &initial).unwrap().1, 0);
+        for index in [1, 2, 3, 4, 5] {
+            let mut bad = initial.clone();
+            bad[index].outstanding_bytes += 1;
+            assert!(projection_basis(&bad, &initial).is_err());
+        }
+        let mut missing = initial.clone();
+        missing.remove(3);
+        assert!(projection_basis(&missing, &initial).is_err());
+        let mut reordered = initial.clone();
+        reordered.reverse();
+        projection_basis(&reordered, &initial).unwrap();
+    }
+    #[test]
+    fn interrupted_intent_cannot_switch_its_check_or_census() {
+        let check = Bound {
+            path: "/check".into(),
+            sha256: "a".repeat(64),
+        };
+        let census = Bound {
+            path: "/census".into(),
+            sha256: "b".repeat(64),
+        };
+        let original = json!({"check":check,"census":census});
+        intent_basis(&original, &check, &census).unwrap();
+        let other = Bound {
+            path: "/other".into(),
+            sha256: "c".repeat(64),
+        };
+        assert!(intent_basis(&original, &other, &census).is_err());
+        assert!(intent_basis(&original, &check, &other).is_err());
+    }
+    #[test]
+    fn dormant_on_failure_policy_needs_the_exact_successful_static_controller() {
+        let mut terminal = inert(CONTROLLER);
+        terminal["Restart"] = json!("on-failure");
+        terminal["UnitFileState"] = json!("static");
+        routes_shape(&terminal, CONTROLLER).unwrap();
+        for (key, value) in [
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+            ("ActiveState", "activating"),
+            ("WantedBy", "another.service"),
+            ("RequiredBy", "another.target"),
+            ("UpheldBy", "keeper.service"),
+            ("SuccessAction", "reboot"),
+        ] {
+            let mut bad = terminal.clone();
+            bad[key] = json!(value);
+            assert!(routes_shape(&bad, CONTROLLER).is_err());
+        }
+        terminal["Id"] = json!(UNIT);
+        assert!(routes_shape(&terminal, UNIT).is_err());
     }
     fn policy() -> Value {
         json!({"schema":"jetstreamer-original191-readonly-delivery-policy-v2","host":"dev-samjohnson",
@@ -924,7 +1145,9 @@ mod tests {
     fn inert(unit: &str) -> Value {
         json!({"Id":unit,"LoadState":"loaded","ActiveState":"inactive","SubState":"dead","MainPID":"0",
             "NRestarts":"0","ControlGroup":"","Job":"","Restart":"no","Triggers":"","TriggeredBy":"",
-            "OnSuccess":"","OnFailure":"","UnitFileState":"disabled"})
+            "OnSuccess":"","OnFailure":"","UnitFileState":"disabled","Result":"success","ExecMainStatus":"0","ExecMainCode":"0",
+            "RequiredBy":"","WantedBy":"","RequisiteOf":"","BoundBy":"","UpheldBy":"","PartOf":"","ConsistsOf":"",
+            "StartLimitAction":"none","FailureAction":"none","SuccessAction":"none"})
     }
     #[test]
     fn original_launch_fence_never_confuses_terminal_pid_with_no_automatic_route() {
