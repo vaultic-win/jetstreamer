@@ -59,10 +59,14 @@ recovering125.3GB relative to the pre-operation host only after both complete.
 The small transport probe is never counted as replay capacity.
 
 Each file has a durable initial identity/hash/reference intent before any move.
-`RENAME_NOREPLACE` moves it into an exact root-private quarantine; the body and
+`renameat2(RENAME_NOREPLACE)` between pinned directory descriptors moves it into
+an exact root-private quarantine; the body and
 metadata are checked again, with another full hash and fresh closed-reference
 review before a durable deletion intent permits the exact quarantine unlink.
-Parent directories are individually fsynced after rename/unlink. Recovery
+The final `fstatat(AT_SYMLINK_NOFOLLOW)` and `unlinkat` use that pinned quarantine
+descriptor and one exact child basename. A renamed user-owned ancestor cannot
+redirect deletion onto a replacement path. Parent descriptors are individually
+fsynced after rename/unlink. Recovery
 distinguishes pre-move, quarantined, unlink-before-receipt and complete states;
 conflicting/reappeared paths or absence without intent fail closed. The durable
 operation identity binds custody+restoration rather than a stale resource plan,

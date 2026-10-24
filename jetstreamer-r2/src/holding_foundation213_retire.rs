@@ -1,6 +1,10 @@
 //! Only the original213 prefix and this operation's qualified staging copy.
 //! Every unlink is preceded by durable intent and a root-private quarantine.
 use super::*;
+use std::{
+    ffi::CString,
+    os::{fd::AsRawFd, unix::ffi::OsStrExt},
+};
 
 const SCHEMA: &str = "jetstreamer-foundation-holding-retirement-plan-v1";
 const RETIRE_METADATA_BYTES: u64 = 64 * 1024 * 1024;
@@ -237,7 +241,100 @@ fn resume_state(
         Ok(ResumeState::Unlinked)
     }
 }
+fn pinned_directory(path: &Path, owner: Option<u32>, private_mode: bool) -> Result<File> {
+    ensure!(path.canonicalize()? == path, "aliased retirement directory");
+    let before = fs::symlink_metadata(path)?;
+    let directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_DIRECTORY)
+        .open(path)?;
+    let opened = directory.metadata()?;
+    ensure!(
+        before.is_dir()
+            && opened.is_dir()
+            && before.dev() == opened.dev()
+            && before.ino() == opened.ino()
+            && owner.is_none_or(|uid| opened.uid() == uid)
+            && (!private_mode || opened.mode() & 0o7777 == 0o700),
+        "retirement directory changed or is unsafe"
+    );
+    Ok(directory)
+}
+fn child(path: &Path) -> Result<CString> {
+    ensure!(
+        path.components().count() == 1 && path.file_name().is_some_and(|n| n == path.as_os_str()),
+        "retirement directory operation requires one exact child name"
+    );
+    Ok(CString::new(path.as_os_str().as_bytes())?)
+}
+fn rename_pinned(source: &Path, directory: &File, name: &Path) -> Result<()> {
+    let parent = pinned_directory(
+        source.parent().context("retirement source parent")?,
+        None,
+        false,
+    )?;
+    ensure!(
+        parent.metadata()?.dev() == directory.metadata()?.dev(),
+        "retirement rename crosses filesystems"
+    );
+    let source_name = child(Path::new(source.file_name().context("source basename")?))?;
+    let destination_name = child(name)?;
+    ensure!(
+        unsafe {
+            libc::renameat2(
+                parent.as_raw_fd(),
+                source_name.as_ptr(),
+                directory.as_raw_fd(),
+                destination_name.as_ptr(),
+                libc::RENAME_NOREPLACE,
+            )
+        } == 0,
+        "anchored no-clobber retirement rename failed: {}",
+        std::io::Error::last_os_error()
+    );
+    parent.sync_all()?;
+    directory.sync_all()?;
+    Ok(())
+}
+fn unlink_pinned(directory: &File, name: &Path, expected: &Value) -> Result<()> {
+    let name = child(name)?;
+    let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
+    ensure!(
+        unsafe {
+            libc::fstatat(
+                directory.as_raw_fd(),
+                name.as_ptr(),
+                metadata.as_mut_ptr(),
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        } == 0,
+        "cannot stat anchored retirement target: {}",
+        std::io::Error::last_os_error()
+    );
+    let m = unsafe { metadata.assume_init() };
+    ensure!(
+        m.st_mode & libc::S_IFMT == libc::S_IFREG
+            && expected["device"].as_u64() == Some(m.st_dev)
+            && expected["inode"].as_u64() == Some(m.st_ino)
+            && expected["length"].as_u64() == u64::try_from(m.st_size).ok()
+            && expected["nlink"].as_u64() == Some(m.st_nlink)
+            && expected["uid"].as_u64() == Some(u64::from(m.st_uid))
+            && expected["gid"].as_u64() == Some(u64::from(m.st_gid))
+            && expected["mode"].as_u64() == Some(u64::from(m.st_mode & 0o7777))
+            && expected["mtime"].as_i64() == Some(m.st_mtime)
+            && expected["mtime_ns"].as_i64() == Some(m.st_mtime_nsec),
+        "anchored retirement target differs from the durably verified identity"
+    );
+    ensure!(
+        unsafe { libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), 0) } == 0,
+        "anchored retirement unlink failed: {}",
+        std::io::Error::last_os_error()
+    );
+    directory.sync_all()?;
+    Ok(())
+}
 fn retire_one(directory: &Path, p: &Spec, spec: &Bound, original: bool) -> Result<()> {
+    let quarantine_directory = pinned_directory(directory, Some(0), true)?;
     let operation = operation(p);
     let label = if original {
         "original-prefix"
@@ -301,9 +398,11 @@ fn retire_one(directory: &Path, p: &Spec, spec: &Bound, original: bool) -> Resul
         );
         no_references(&source)?;
         closed(p)?;
-        rename_noreplace(&source, &quarantine)?;
-        File::open(source.parent().context("retirement source parent")?)?.sync_all()?;
-        File::open(directory)?.sync_all()?;
+        rename_pinned(
+            &source,
+            &quarantine_directory,
+            Path::new(quarantine.file_name().unwrap()),
+        )?;
     }
     if !absence(&quarantine)? {
         hash(&quarantine, expected, original)?;
@@ -335,8 +434,11 @@ fn retire_one(directory: &Path, p: &Spec, spec: &Bound, original: bool) -> Resul
         );
         no_references(&quarantine)?;
         closed(p)?;
-        fs::remove_file(&quarantine)?;
-        File::open(directory)?.sync_all()?;
+        unlink_pinned(
+            &quarantine_directory,
+            Path::new(quarantine.file_name().unwrap()),
+            expected,
+        )?;
     } else {
         ensure!(
             !absence(&deletion)?,
@@ -590,5 +692,55 @@ mod tests {
             ResumeState::Unlinked
         );
         assert!(fs::symlink_metadata(&quarantine).is_err());
+    }
+    #[test]
+    fn renamed_ancestor_cannot_redirect_the_authorized_quarantine_unlink() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("quarantine");
+        let moved = root.path().join("moved");
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        let source = root.path().join("source.blob");
+        fs::write(&source, b"exact retained fixture").unwrap();
+        let expected = id(&fs::symlink_metadata(&source).unwrap());
+        let fd = pinned_directory(&path, Some(unsafe { libc::geteuid() }), true).unwrap();
+        rename_pinned(&source, &fd, Path::new("source.blob")).unwrap();
+        fs::rename(&path, &moved).unwrap();
+        fs::create_dir(&path).unwrap();
+        fs::write(
+            path.join("source.blob"),
+            b"unrelated replacement must survive",
+        )
+        .unwrap();
+        unlink_pinned(&fd, Path::new("source.blob"), &expected).unwrap();
+        assert!(!moved.join("source.blob").exists());
+        assert_eq!(
+            fs::read(path.join("source.blob")).unwrap(),
+            b"unrelated replacement must survive"
+        );
+        assert!(child(Path::new("../outside")).is_err());
+        assert!(child(Path::new("/absolute")).is_err());
+    }
+    #[test]
+    fn anchored_unlink_requires_the_exact_inode_and_preserves_a_symlink_or_replacement() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let path = root.path().join("target");
+        fs::write(&path, b"first identity").unwrap();
+        let expected = id(&fs::symlink_metadata(&path).unwrap());
+        let fd = pinned_directory(root.path(), Some(unsafe { libc::geteuid() }), true).unwrap();
+        fs::rename(&path, root.path().join("preserved")).unwrap();
+        fs::write(&path, b"replacement").unwrap();
+        assert!(unlink_pinned(&fd, Path::new("target"), &expected).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"replacement");
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink(root.path().join("preserved"), &path).unwrap();
+        assert!(unlink_pinned(&fd, Path::new("target"), &expected).is_err());
+        assert_eq!(
+            fs::read(root.path().join("preserved")).unwrap(),
+            b"first identity"
+        );
     }
 }
