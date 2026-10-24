@@ -1,4 +1,4 @@
-//! Evidence-only comparison of the exact epoch203 t16 and t1 bounded attempts.
+//! Evidence-only comparison of the exact epoch 203 t16 and t1 bounded attempts.
 //! This never selects a production route, changes resource claims or launches work.
 use {
     anyhow::{Context, Result, ensure},

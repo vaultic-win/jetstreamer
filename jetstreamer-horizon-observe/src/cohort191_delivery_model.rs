@@ -1,4 +1,4 @@
-//! Forecast arithmetic and pure terminal validation for191–194 metadata.
+//! Forecast arithmetic and pure terminal validation for 191–194 metadata.
 //! No observation, receipt writing, publication or admission.
 //! Callers must independently authenticate every input, current phase, queue and
 //! canonical ready pair. Native capture and the optional routine profile own those gates.
@@ -298,8 +298,8 @@ mod tests {
 }
 
 /// Pure terminal proof used before excluding this cohort from the ordinary
-/// rate-bearing census. A root at84239250 plus four closes is required; no
-/// checkpoint is invented for the skipped tail to84239999.
+/// rate-bearing census. A root at 84239250 plus four closes is required; no
+/// checkpoint is invented for the skipped tail to 84239999.
 pub fn validate_native_terminal(v: &serde_json::Value, cutoff: u64) -> Result<()> {
     use serde_json::Value;
     fn fields<'a>(message: &'a str, prefix: &str) -> Result<BTreeMap<&'a str, &'a str>> {

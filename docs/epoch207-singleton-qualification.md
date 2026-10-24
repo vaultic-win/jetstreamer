@@ -1,21 +1,21 @@
-# Epoch207 independent singleton qualification
+# Epoch 207 independent singleton qualification
 
 See [the exact root-metadata unblock and independent 209–212 preparation](epoch207-root-metadata-unblock.md)
 after the native bootstrap proof passes. The missing 89523820 MD5 remains a separate
 authenticated-generation metadata gate.
 
-The retained complete-span focused plan enters epoch208 through slot90,287,519.
+The retained complete-span focused plan enters epoch 208 through slot 90,287,519.
 That route includes the known missing source boundaries at89,856,117/89,856,121.
-Its failure to qualify does not require epoch207 itself to include that interval.
+Its failure to qualify does not require epoch 207 itself to include that interval.
 
 The separate `epoch207-singleton-qualification` node build admits only a private,
-explicitly verified, candidate-opted-in root cohort for epoch207. It starts from
-the retained canonical snapshot89,423,444, preserves both canonical root checks
-at89,523,820 and89,855,469, records all432,000epoch slots89,424,000–89,855,999,
+explicitly verified, candidate-opted-in root cohort for epoch 207. It starts from
+the retained canonical snapshot 89,423,444, preserves both canonical root checks
+at 89,523,820 and 89,855,469, records all 432,000epoch slots 89,424,000–89,855,999,
 and uses the existing native terminal/ordered-chain/cohort publication gates for
-the final530slots after the second root. There is no epoch208input, prefix
+the final 530 slots after the second root. There is no epoch 208 input, prefix
 assembly or checkpoint restart in this route. The normal compatibility registry
-still rejects epoch207. The generation profile is separately labeled
+still rejects epoch 207. The generation profile is separately labeled
 `epoch207-singleton-qualification-v1`; other private node modes cannot be
 combined with this build.
 
@@ -31,10 +31,10 @@ The Rust `jetstreamer-epoch207-singleton-prepare` tool reads only the exact seal
 v2preflight and207snapshot-bindings file in
 `/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2`.
 It rechecks both file digests and the independently recorded old manifest
-fingerprint. It preserves the207cohort's bootstrap and both root identities,
-including generation, CRC32C and size, in a fresh v4singleton report. Known
+fingerprint. It preserves the 207cohort's bootstrap and both root identities,
+including generation, CRC32C and size, in a fresh v4 singleton report. Known
 bootstrap/terminal MD5s come from the separately bound snapshot-binding receipt.
-The first root's v2metadata has no MD5 field; its explicit v4null follows the
+The first root's v2 metadata has no MD5 field; its explicit v4null follows the
 existing offline v2conversion convention and is recorded as unobserved legacy
 MD5, not a claim that the current GCS object is composite. Re-observe that exact
 generation before admitting the full singleton cohort restore or replay; never
@@ -43,14 +43,14 @@ bootstrap-only native check against its exact retained, hash-bound inputs.
 
 Run the sealed helper as root with a fresh output file
 `/var/lib/jetstreamer/horizon-207-singleton-*/preflight207-singleton.json`,
-whose canonical parent is precreated root0700:
+whose canonical parent is precreated root 0700:
 
 ```sh
 /sealed/jetstreamer-epoch207-singleton-prepare OUTPUT --self-sha256 HELPER_SHA
 ```
 
 It takes no resource observation, starts no worker, performs no network access,
-and fsyncs a no-clobber mode0400report and its parent. Seal the report into a
+and fsyncs a no-clobber mode 0400report and its parent. Seal the report into a
 readable immutable deployment before supplying it to the unprivileged node.
 Do not feed JavaScript-rounded consensus numbers or a hand-edited fingerprint
 to the node.
@@ -64,35 +64,35 @@ Reuse the already sealed capped v1.6.16 worker:
 sha256 4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc
 ```
 
-The full command is a single epoch207 `--verify --root-checkpoint-cohort` with
+The full command is a single epoch 207 `--verify --root-checkpoint-cohort` with
 the newly sealed v4report/fingerprint and exact retained snapshot override.
 Set the candidate opt-in and that exact worker override; pin
 `JETSTREAMER_PRIVATE_RUN_ROOT` beneath the same new owner-private
 `/home/ubuntu/.jetstreamer-private/qualification-207-singleton-*` run root.
-Destination is its precreated mode0700 `output/` child. Legacy focused CLI,
+Destination is its precreated mode 0700 `output/` child. Legacy focused CLI,
 alternative snapshots, recovery, inherited leases, directory loading and
 another epoch are rejected. Add `--epoch207-singleton-preflight` only for the
 planning proof, and never mistake that proof for a replay.
 
-This preparation changes no running job or R2object. Before a real attempt,
+This preparation changes no running job or R2 object. Before a real attempt,
 the campaign owner must bind a fresh complete fleet/resource sample, the current
 twice-average-.jet century floor, every protected remaining-growth claim and
-all active auxiliaries. The300GB century scratch assumption is separate from
+all active auxiliaries. The 300 GB century scratch assumption is separate from
 output, copies and margin. An exact invocation-bound guard must protect both
 private cohort state and output, with its first actual worker fire proven.
 Native bootstrap, both canonical root checks, complete native terminal/output,
 independent full/current-plugin checks and authenticated upload/readback/sidecar
-commit remain separate required evidence. Keep the epoch208source incident open.
+commit remain separate required evidence. Keep the epoch 208 source incident open.
 
 ## Optimized native input stage
 
 The ignored `runtime::tests::native_epoch207_cold_input_matches_canonical_accounts_commitment`
-test uses the unchanged capped v1.6.16 runtime and exact rustc1.51.0 release
+test uses the unchanged capped v1.6.16 runtime and exact rustc 1.51.0 release
 profile. It accepts only an empty owner-private
 `/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-*/scratch`,
 passed as `JETSTREAMER_EPOCH207_V1616_TEST_SCRATCH`. It hashes the exact retained
 8,474,139,490-byte bootstrap and20,144-byte genesis before loading, restores into
-that private scratch and freezes only bootstrap slot89,423,444. It requires the
+that private scratch and freezes only bootstrap slot 89,423,444. It requires the
 canonical accounts hash, no bootstrap writes, and unchanged write cursor,
 capitalization and transaction count. No entry replay occurs.
 
@@ -102,12 +102,12 @@ Capture the compiler artifact's optimized test executable and list the exact
 ignored test with `--exact --ignored --list` before any execution. A listed
 test is not a native input proof. Do not substitute an old debug harness.
 
-Native cold planning uses128GiB hard/112GiB high memory,300GB decimal disk
-planning,8explicitly bound CPUs,2700seconds, no restart/network and zero entries.
+Native cold planning uses 128 GiB hard/112GiB high memory, 300 GB decimal disk
+planning, 8explicitly bound CPUs, 2700 seconds, no restart/network and zero entries.
 Root must coordinate fresh complete-fleet admission before the actual job,
-including any live native227disk-growth and128GiB memory claim. Use a separately
-sealed closed207profile of the shared exact MainPID/executable/VMA native guard;
-never rename this executable to `historical-worker` or borrow227's sealed guard.
+including any live native227disk-growth and 128 GiB memory claim. Use a separately
+sealed closed 207profile of the shared exact MainPID/executable/VMA native guard;
+never rename this executable to `historical-worker` or borrow 227's sealed guard.
 The approved-native pipeline status origin must bind the exact unit/invocation,
 canonical matching UTC/Unix clocks, sealed inputs and current guard/admission
 evidence. Its dashboard phase is `verification`; every qualification/publication

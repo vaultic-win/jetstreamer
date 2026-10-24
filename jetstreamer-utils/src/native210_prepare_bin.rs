@@ -1,4 +1,4 @@
-//! Exact native210 preparation. Does not admit, launch, restore or contact R2.
+//! Exact native 210 preparation. Does not admit, launch, restore or contact R2.
 #[allow(dead_code)]
 #[path = "epoch141_ledger_common.rs"]
 mod common;

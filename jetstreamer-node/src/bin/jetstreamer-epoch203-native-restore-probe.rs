@@ -1,4 +1,4 @@
-//! Private fixed epoch203 restore-only comparator; no replay or publication.
+//! Private fixed epoch 203 restore-only comparator; no replay or publication.
 mod profile {
     pub(super) const EPOCH: u64 = 203;
     pub(super) const GENERATION_PROFILE: &str = "jetstreamer-node/0.7.0/old-faithful-to-horizon-v2@3de96e71010a8a2f5e629f666227b137483bff7b";

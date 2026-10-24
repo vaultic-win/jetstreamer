@@ -6,13 +6,13 @@ mutate a canonical archive or release any pending growth claim. Its wire phase i
 `verification` and it preserves the open `failed-needs-repair` fleet entry.
 
 The old producer `horizon-qualify-141-original-entry-capped-root-20261023-v1.service`
-(invocation `e639f007d482464f8a251455659d2ede`) is terminal. The actual native capped141
+(invocation `e639f007d482464f8a251455659d2ede`) is terminal. The actual native capped 141
 terminal capture and guard stop-completion are mandatory. Neither chat text nor a
 handwritten open-repair entry establishes terminal or resumability evidence.
 
 No durable Bank beyond bootstrap slot **60911751** is proven. Cold recovery must
 redo **417014** slots to root **61328765**, then **15234** slots to terminal
-**61343999**. Last logged slot60942360 and retained partial bytes receive no
+**61343999**. Last logged slot 60942360 and retained partial bytes receive no
 resume credit. The queue streams a stable raw fingerprint of the retained partial,
 recording byte count and elapsed hashing time; this is explicitly neither footer,
 prefix validity, archive verification nor a serialized Bank proof. It never writes
@@ -38,15 +38,15 @@ programs are immutable root-owned regular files. Output is the precreated root-o
 root-only `task-admissions` subdirectory. Existing launch/state prohibits retry.
 
 Launch requires one accepted coordinated v2 observer/fleet/completion, no more
-than1800s old, authenticated no-anomaly inventory and all sample/digest links.
-Actual OS free space must preserve228833779142B baseline, the existing256MiB
-bootstrap claim and a separate64MiB queue claim. Existing protected resident and
+than 1800s old, authenticated no-anomaly inventory and all sample/digest links.
+Actual OS free space must preserve228833779142B baseline, the existing 256 MiB
+bootstrap claim and a separate 64 MiB queue claim. Existing protected resident and
 reservation ceilings cannot be lowered. Total and currently available memory must
-fit the separate2GiB queue bound. Independently launch with CPUQuota100%,
-MemoryMax2GiB, swap0, bounded tasks, no automatic restarts, a private network,
+fit the separate 2 GiB queue bound. Independently launch with CPUQuota 100%,
+MemoryMax 2 GiB, swap 0, bounded tasks, no automatic restarts, a private network,
 read-only failed scratch and only the precise metadata directory writable.
 There is no replay, export or input-restore growth inside this queue budget.
-All queue state is bounded to64MiB on the OS filesystem; reaching the cap fails
+All queue state is bounded to 64 MiB on the OS filesystem; reaching the cap fails
 closed and preserves the repair entry.
 
 The queue owns actual task state across subprocess gaps. Its exact slots are:
@@ -66,7 +66,7 @@ and exact `argv`. The task unit must be
 ELF must actually execute the epoch141-scoped immutable work plan as an exact argv
 element. A sleeping or metadata-only r2 process cannot stand in for the task.
 Intake is **evidence only** and explicitly grants no resource, replay or publication
-admission. Success means actual terminal exit0, never export/restore qualification.
+admission. Success means actual terminal exit 0, never export/restore qualification.
 Failure, restart or replacement writes persistent failure state; it never silently
 retries, erases retained bytes or closes the open epoch repair.
 
@@ -79,15 +79,15 @@ nonempty `estimate_uncertainty`, `planning_assumptions_reviewed:true`, and
 `engineering_and_capacity_parallel`. `allowance_millis` has positive integers for
 `engineering_and_qualification`, `capacity_and_admission`,
 `bootstrap_restore_and_initialization`, `checkpoint_close_export_restore`.
-The existing downstream policy supplies the complete36h delivery allowance.
-A first planning example uses24h engineering,48h capacity in explicitly reviewed
-parallel,6h bootstrap and12h checkpoint close/export/restore. All are planning
+The existing downstream policy supplies the complete 36h delivery allowance.
+A first planning example uses 24h engineering, 48h capacity in explicitly reviewed
+parallel, 6h bootstrap and 12h checkpoint close/export/restore. All are planning
 assumptions, not measured bounds. Export/restore is not yet mainnet qualified;
 build, API and segment/parent qualification remain real engineering obligations.
 The initial254-slot candidate does not establish continuation or restore capability.
 
-At historical1694 slots /1749194714 microseconds (0.9684456433 slots/s), this
-example gives root replay430601349ms, suffix15730362ms, and total813531711ms
+At historical 1694 slots /1749194714 microseconds (0.9684456433 slots/s), this
+example gives root replay 430601349 ms, suffix 15730362 ms, and total 813531711 ms
 (**9d9h58m51.711s**). No partial-bank progress is subtracted. This numeric projection
 must be re-reviewed as qualification, capacity or throughput changes; it is not a
 promised landing deadline.
@@ -113,7 +113,7 @@ stopped replay or latest poll. Report zero current jet bytes during repair; reta
 failed-attempt size remains only in private estimate evidence.
 
 Before conditional PUT, authenticate the current status's exact prior receipt,
-payload and ETag, accepting only the old capped141 or this exact current repair
+payload and ETag, accepting only the old capped 141 or this exact current repair
 owner. Pin that ETag or absence through the shared publication preflight. A changed
 owner, stale sample, already-ready pair or race fails closed. Authenticated byte-for-
 byte readback and a durable normal pipeline status receipt remain mandatory.
@@ -131,15 +131,15 @@ same newly sealed native r2 program, `active_repair:{queue_plan,owner_capture,
 planning_policy,invocation_id}`, and explicit false `replay_launch_authorized`,
 `publication_authorized`, `r2_mutations`. This requires an actual queue capture;
 there are no future or fabricated IIDs. It preserves the existing historical
-original141 profile and diagnostic input, leaves ordinary replay publisher pins
-unchanged and disables the old141 replay-status hook by selecting active repair.
+original 141 profile and diagnostic input, leaves ordinary replay publisher pins
+unchanged and disables the old 141 replay-status hook by selecting active repair.
 The coordinator must be sealed from this combined source, not an older helper.
 
-The new successor uses a distinct repair141 namespace, preserves the current
-observer configuration and single scheduled sample, injects only the real141
+The new successor uses a distinct repair 141 namespace, preserves the current
+observer configuration and single scheduled sample, injects only the real 141
 repair pipeline claim and tracked unit, and keeps its failed-needs-repair gate.
 Both provisional and final fleet reads use the new repair-capable reader, including
-when the191 delivery profile is also present. No healthy producer is restarted.
+when the 191 delivery profile is also present. No healthy producer is restarted.
 Parent must replace the previously prepared coordinator/timer through the normal
 single-successor lifecycle; preparing a second package alone does not remove the
 old scheduled owner. The first sample must be at or after actual queue start.
@@ -147,7 +147,7 @@ old scheduled owner. The first sample must be at or after actual queue start.
 Each accepted sample fingerprints the current queue state, checks the unchanged
 unqualified checkpoint/growth facts, and recalculates a definite full cold recovery
 projection from the measured rate and reviewed remaining stage allowances. A task
-returning exit0 does not count as export/restore, checkpoint or resource admission
+returning exit 0 does not count as export/restore, checkpoint or resource admission
 qualification. Until a qualified milestone exists, retain its full positive
 allowance and explain that lack of credit in private assessment evidence. This can
 move the landing time later when progress remains unqualified; never silently

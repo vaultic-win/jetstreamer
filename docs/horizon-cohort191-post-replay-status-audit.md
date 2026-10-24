@@ -1,8 +1,8 @@
-# Epoch191–194 post-replay status audit
+# Epoch 191–194 post-replay status audit
 
 This audit uses the accepted2026-10-23 21:56 sample and immutable deployed
 source/receipts only. It makes no new resource/replay observation, launch,
-runtime change, R2 mutation or archive-readiness claim. The22:26 refresh is
+runtime change, R2 mutation or archive-readiness claim. The 22:26 refresh is
 outside this source task and remains the parent's responsibility.
 
 ## Accepted evidence and current estimate
@@ -27,23 +27,23 @@ IID `ea93199ed2fa470d99de248c2a10b246`. Its controller is
 has SHA-256 `a4ce1f8dd91853e8837fb8bf17b923fa4874c726ed551e84dc7b4ae720f2fab2`.
 The original producer and clock were preserved when that controller changed.
 
-At21:56 the producer was at84205000, with terminal84239999 and a qualified
+At 21:56 the producer was at 84205000, with terminal 84239999 and a qualified
 2.822306096289095 slots/second rate:34999 slots remain. The accepted model
-adds a common12,401,000ms replay projection to12/24/36/48hour downstream
-allowances, yielding55,601,000 /98,801,000 /142,001,000 /185,201,000ms for
+adds a common 12,401,000 ms replay projection to12/24/36/48hour downstream
+allowances, yielding 55,601,000 /98,801,000 /142,001,000 /185,201,000ms for
 191/192/193/194. These are the *existing accepted planning estimates*, not a
 new sample or measured downstream stage durations. All four objects were
 authenticated, current and bound-live in the saved fleet.
 
-The source cohort is v1.6.15 with bootstrap82511783, output starting82512000,
-and final epoch slot84239999. Its final independently supplied root checkpoint
-is84239250 (not84239999);749 later archive slots remain after that checkpoint.
+The source cohort is v1.6.15 with bootstrap 82511783, output starting 82512000,
+and final epoch slot 84239999. Its final independently supplied root checkpoint
+is 84239250 (not 84239999);749 later archive slots remain after that checkpoint.
 Both complete span and all manifest root obligations matter. Never invent a
 canonical checkpoint hash at the epoch's final slot.
 
 ## Exact deployed pins
 
-The21:56 routine ran
+The 21:56 routine ran
 `/usr/local/lib/jetstreamer/horizon-epoch141-eta-risk-tools-20261023-v1/jetstreamer-horizon-routine-cycle`,
 SHA-256 `5c042c57a3fb50f5657f4a46692e7cbbf7716f0ae5acec0f918404a1af9563ae`.
 Its legacy R2 reader is
@@ -74,26 +74,26 @@ old rate or relabeling the old ordinary status.
 
 There is **no currently tested/pinned191 post-replay status route**:
 
-- `cohort_finalization::{scope,handoff_scope}` has exact216–219,160 and198
-  profiles, not191–194.
+- `cohort_finalization::{scope,handoff_scope}` has exact 216–219,160 and 198
+  profiles, not 191–194.
 - `pipeline_status::Binding::validate` permits controller handoff only for its
-  existing exact origins. Its UID1001 receipt-directory exception is similarly
-  restricted to160/198/144, not191–194.
-- The routine has no191 pipeline profile, transition, finalization proof,
+  existing exact origins. Its UID 1001 receipt-directory exception is similarly
+  restricted to 160/198/144, not 191–194.
+- The routine has no 191 pipeline profile, transition, finalization proof,
   post-replay estimate publisher or successor/completion binding.
 - Actual-importer namespace parsing supports
   `jetstreamer-root-import-...-eFIRST-LAST-SEQUENCE.service`, but that alone is
-  observational scope parsing, not authenticated191 provenance or a live claim.
-- Legacy full/plugin watcher status readers cover qualified160/198 children;
+  observational scope parsing, not authenticated 191 provenance or a live claim.
+- Legacy full/plugin watcher status readers cover qualified 160/198 children;
   a range watcher with no actual matching child is never a191 verification owner.
 
-At21:56 the full verifier `jetstreamer-horizon-audit-epochs182-200-v5.service`,
+At 21:56 the full verifier `jetstreamer-horizon-audit-epochs182-200-v5.service`,
 plugin watcher `jetstreamer-horizon-plugin-receipt-watcher-shard-e-v5-fsync.service`,
 and boundary watcher `jetstreamer-horizon-boundary-audit-181-200-v7-fsync.service`
-were all **failed**. No191 upload/readback owner appears in the saved fleet.
+were all **failed**. No 191 upload/readback owner appears in the saved fleet.
 This is existing evidence, not a fresh failure observation. Their old invocation
 IDs must not be adopted as healthy future owners. Qualified repair/dispatch is
-needed; the existing12hour increments are not proof those stages are running.
+needed; the existing 12 hour increments are not proof those stages are running.
 
 ## Required terminal-to-sidecar transition
 
@@ -107,7 +107,7 @@ needed; the existing12hour increments are not proof those stages are running.
    are sealed, authenticate the controller's pending import ownership. Capture
    the exact root-owned state and full source-receipt semantics at that event
    or a normal coordinated sample. Do not read mutable current state here and
-   backdate it into21:56. The future batch SHA and path are not yet authenticated
+   backdate it into 21:56. The future batch SHA and path are not yet authenticated
    by the saved sample and must not be invented.
 3. The controller serializes import. It creates
    `jetstreamer-root-import-e191-194-t5-20261016-v2-r2-e191-194-SEQUENCE.service`
@@ -132,7 +132,7 @@ needed; the existing12hour increments are not proof those stages are running.
    invocation-bound progress, age/stall penalty and throughput. Keep source
    revalidation and canonical sidecar commit as explicit remaining work. Include
    work ahead of each epoch if the qualified coordinator serializes whole syncs.
-   Do not assume191→194 commit order without qualifying/enforcing that topology.
+   Do not assume 191→194 commit order without qualifying/enforcing that topology.
 7. Adjacent boundaries normally gate *local retirement*, while upload requires
    full/current-plugin receipts. Keep boundary repair visible but add it to the
    sidecar critical path only if the actual chosen publication policy requires
@@ -143,13 +143,13 @@ needed; the existing12hour increments are not proof those stages are running.
    Keep an active downstream claim represented; never delete merely because
    replay ended. Neither a missed ETA nor absent rate proves inactivity.
 
-The routine transition must atomically remove only191–194 from the ordinary
+The routine transition must atomically remove only 191–194 from the ordinary
 replay model/observer census, add four evidence-bound pipeline entries and keep
-the other seven ordinary epoch estimates,141 profile, full fleet, and single
+the other seven ordinary epoch estimates, 141 profile, full fleet, and single
 cadence intact. Validate ordinary and pipeline completion receipts separately,
 carry the new optional profile into the successor, and isolate a191 metadata
 incident so it does not suppress unrelated statuses. Preserve the genuine
-predecessor and shared2156 evidence; no healthy restart or duplicate sampling.
+predecessor and shared 2156 evidence; no healthy restart or duplicate sampling.
 
 ## Staged model candidate and qualification work remaining
 
@@ -177,8 +177,8 @@ epochs and overflow. Only rustfmt and diff checks have run; **no build/test or
 deployment qualification is claimed**. After coordinating modern-target
 ownership, run the observer library's `cohort191_delivery_model::tests`, full
 observer/R2 tests and strict Clippy when the actual profile integration exists.
-Then build/seal a new exact191 R2 reader/publisher and routine coordinator; do
-not replace existing immutable packages or masquerade as198. Qualify its exact
+Then build/seal a new exact 191 R2 reader/publisher and routine coordinator; do
+not replace existing immutable packages or masquerade as 198. Qualify its exact
 live and denied-owner/check-only paths in the matching sandbox, bind a fresh
 coordinated observer/fleet and native event evidence, and let the parent make
 the explicit immutable metadata handoff. No currently deployed package can be
@@ -197,17 +197,17 @@ The optional routine profile binds `publisher`, the initial `terminal_event`,
 and an exact `/var/lib/jetstreamer/horizon-cohort191-delivery-events-*`
 `event_directory`. It consumes `event-YYYYMMDDTHHMMSSZ.json` from the same existing
 coordinated observation cutoff. An accepted native final-root/four-close event
-removes only191–194 from the ordinary model/config census; the expected ordinary
-list becomes152,153,155,156,183,184,185. Successor serialization preserves the
+removes only 191–194 from the ordinary model/config census; the expected ordinary
+list becomes 152,153,155,156,183,184,185. Successor serialization preserves the
 profile and derives the next event name from the next scheduled sample, never
 reusing the previous ETA as a fresh observation. The existing publishers and
-pins for141/144/160/198 are retained. The new R2 reader owns only191 metadata and
+pins for 141/144/160/198 are retained. The new R2 reader owns only 191 metadata and
 the provisional/final fleet reconciliation that must understand its claims.
 
-Missing or invalid current191 custody produces a private no-clobber incident.
-It does not stop the seven ordinary publications, private141 publication, or
+Missing or invalid current 191 custody produces a private no-clobber incident.
+It does not stop the seven ordinary publications, private 141 publication, or
 fleet/successor work. An accepted event binds exact original replay receipts,
-controller-rebind proof, original PID/IID, canonical root84239250, four archive
+controller-rebind proof, original PID/IID, canonical root 84239250, four archive
 closes, current artifacts, phase-owner manager start, and the original producer
 clock. Before import it does not demand a future source batch. After import it
 checks the actual native source/public batches, all manifest checkpoint hashes,
@@ -223,8 +223,8 @@ Direct native upload and readback forecasts must reproduce their own phase's
 PID/IID-bound progress rate and stall age at the fixed sample cutoff. Upload
 acknowledgements never substitute for readback progress. Source revalidation tail
 estimation still fails closed until its separate progress/policy source is
-qualified. No terminal timestamp is fabricated at84239999: the trusted final
-root remains84239250 and the archive can close after its skipped tail.
+qualified. No terminal timestamp is fabricated at 84239999: the trusted final
+root remains 84239250 and the archive can close after its skipped tail.
 
 ### Independent dispatcher contract
 
@@ -252,13 +252,13 @@ one. Its returned receipt binds the actual source/public paths and digests.
 The independent runner profile is
 `horizon-verify-canonical-pair-dev-samjohnson191-v1` with:
 
-- Exact epoch191–194, `/home/sol/horizon`, and state
+- Exact epoch 191–194, `/home/sol/horizon`, and state
   `/var/lib/jetstreamer/horizon-cohort191-canonical-verification-20261023-v1/epoch-N/{full,plugin}`.
 - Actual services `horizon-full-verify-N-native191-20261023-v1.service` and
   `horizon-plugin-verify-N-native191-20261023-v1.service`.
 - Planned sealed runner
   `/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-horizon-verify-pair`.
-- Existing qualified compatible198 readers (`verify_archive` SHA
+- Existing qualified compatible 198 readers (`verify_archive` SHA
   `5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574`;
   `horizon_pipeline` SHA
   `e20892a111f8e26c8e25561a939eaf171771789753059100510c936d92092137`).
@@ -270,15 +270,15 @@ The runner authenticates its exact archive, sidecar, reader, service, plan and
 fresh observer. The dispatcher must independently call `dispatch_import_check`
 and preserve its native source/public provenance before launch. It must bind the
 runner's newly sealed SHA into the uploader's accepted wrapper allowlists. The
-runner's1TiB read-only home floor is not a growth-reservation proof or a reduction
-of replay guards or century floors. Its one64GiB verifier plus64GiB reserve check
+runner's 1 TiB read-only home floor is not a growth-reservation proof or a reduction
+of replay guards or century floors. Its one 64 GiB verifier plus 64 GiB reserve check
 also does not replace the dispatcher's capacity receipt, current RSS reservation
 ceiling, concurrent compiler reservation, OS statfs and bounded state/log checks.
 
-After191 terminates, `memory_concurrency_target` remains independently computed
+After 191 terminates, `memory_concurrency_target` remains independently computed
 from the actual current owner count and RSS census. The unchanged five-owner
 `capped186_budget` can fail closed without invalidating that four-owner memory
-envelope; it must not be fabricated by retaining191 as a fifth live replay.
+envelope; it must not be fabricated by retaining 191 as a fifth live replay.
 
 ### Gates still required before rollout
 
@@ -289,14 +289,14 @@ exact new CLI routes. Qualify the parent's independent dispatch and serial uploa
 configuration, actual importer/source-batch capture, all receipt-directory/hash
 allowlists, fresh same-cutoff event generation, queued ownership coverage, and
 source-revalidation tail estimates. A waiting plan is not an active verifier.
-Boundary190–191 through194–195 dispatch stays separate from sidecar publication
+Boundary 190–191 through 194–195 dispatch stays separate from sidecar publication
 and must use qualified modern readers, rather than the failed legacy watcher,
-before guarded local retirement is enabled. No512GiB remaining-growth claim is
+before guarded local retirement is enabled. No 512 GiB remaining-growth claim is
 released until the parent authenticates the completed-cohort transition.
 
 The import controller is allowed to return naturally once `all_complete()` has
 rehash-verified the public cohort. Both custody capture and dispatch admission
-now accept its exact retained inactive/dead exit0 lifecycle, requiring the same
+now accept its exact retained inactive/dead exit 0 lifecycle, requiring the same
 CID/command, zero restarts, no job/cgroup, real manager start, one trusted PID1
 successful-deactivation event, and the exact original controller's native
 `all sealed cohorts 191-194 are public` message before that event. Pending import

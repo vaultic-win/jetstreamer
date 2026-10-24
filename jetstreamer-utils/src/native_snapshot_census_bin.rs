@@ -40,7 +40,7 @@ fn profile(epoch: &str) -> Result<Profile> {
             sha256: "77e5b3bbb733d9ab3b2383c1ad9f1d7ef4062aedacbe9e2326927512c4b95e07",
             slot: "98063464",
         }),
-        _ => bail!("only exact epoch210 and epoch227 input profiles are admitted"),
+        _ => bail!("only exact epoch 210 and epoch 227 input profiles are admitted"),
     }
 }
 const GIB: u64 = 1024 * 1024 * 1024;
@@ -293,7 +293,7 @@ fn census<R: Read>(source: R, slot: &str) -> Result<Census> {
         );
     }
     result.decompressed_tar_bytes = remainder.count;
-    // Allow four 4KiB units per inode/directory for metadata. This is a stated
+    // Allow four 4 KiB units per inode/directory for metadata. This is a stated
     // experiment margin, not a filesystem-independent physical upper bound.
     result.metadata_allowance_bytes = result
         .entries

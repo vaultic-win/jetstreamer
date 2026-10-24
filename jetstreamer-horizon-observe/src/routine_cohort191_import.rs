@@ -1,4 +1,4 @@
-//! First post-producer191 observation while the real native import is pending.
+//! First observation after producer 191 while the real native import is pending.
 use super::*;
 const IMPORTER: &str = "jetstreamer-root-import-e191-194-t5-20261016-v2-r2-e191-194-2.service";
 const IMPORT_IID: &str = "611c55c179654410a5dddce41fd6c019";
@@ -20,7 +20,7 @@ pub(super) fn adoption_clocks(old: u64, target: u64, captured: u64) -> Result<()
         .context("191 pending adoption precedes accepted predecessor")?;
     ensure!(
         (1800..=7200).contains(&gap) && gap % 1800 == 0,
-        "191 import adoption must retain bounded original30minute grid"
+        "191 import adoption must retain bounded original 30 minute grid"
     );
     ensure!(
         captured > old && captured <= target,

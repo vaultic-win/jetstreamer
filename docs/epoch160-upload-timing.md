@@ -1,13 +1,13 @@
-# Epoch160 upload timing
+# Epoch 160 upload timing
 
 The canonical-import profile may enable `timed_upload` only through the exact
 accepted1728-to1758 preparation transition. It retains the original producer
 clock and all archive, full/plugin, upload, readback and sidecar gates.
 
-For an authenticated actual160 upload child, the routine binds the unique
-original17:14:25 dispatch journal event to the unchanged serial uploader's unit,
+For an authenticated actual 160 upload child, the routine binds the unique
+original 17:14:25 dispatch journal event to the unchanged serial uploader's unit,
 invocation, PID, UID/GID, executable and cgroup. It ceiling-scales the measured
-verified198 hash, upload and readback/source-revalidation phase durations to the
+verified 198 hash, upload and readback/source-revalidation phase durations to the
 complete148095631232-byte160 archive, adds ten minutes of dispatch margin, and
 anchors that total once to the real dispatch time. Already completed replay,
 import and independent full/plugin scans are not remaining work.

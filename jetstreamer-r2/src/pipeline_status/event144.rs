@@ -52,7 +52,7 @@ fn checked(p: &Plan, observer: &Value, proof: &Value, now: u64) -> Result<(Strin
             && p.estimate_evidence
                 .iter()
                 .any(|e| e.path == b.path && e.sha256 == b.sha256),
-        "event profile is not exact144 initial upload handoff"
+        "event profile is not exact 144 initial upload handoff"
     );
     ensure!(
         proof["schema"] == "jetstreamer-exact144-authenticated-child-progress-v2"

@@ -14,7 +14,7 @@ fn private_directory(path: &Path, uid: u32) -> Result<(u64, u64)> {
     let m = fs::symlink_metadata(path)?;
     ensure!(
         m.is_dir() && m.uid() == uid && m.mode() & 0o077 == 0 && path.canonicalize()? == path,
-        "full227 archive directory is not canonical and owner-private: {}",
+        "full 227 archive directory is not canonical and owner-private: {}",
         path.display()
     );
     Ok((m.dev(), m.ino()))
@@ -28,7 +28,7 @@ fn size(path: &Path, uid: u32) -> Result<Option<u64>> {
     };
     ensure!(
         a.is_file() && a.uid() == uid && a.nlink() == 1,
-        "full227 unsafe partial archive"
+        "full 227 unsafe partial archive"
     );
     let b = fs::symlink_metadata(path)?;
     ensure!(
@@ -38,13 +38,13 @@ fn size(path: &Path, uid: u32) -> Result<Option<u64>> {
             && b.dev() == a.dev()
             && b.ino() == a.ino()
             && b.len() >= a.len(),
-        "full227 partial archive was replaced or shrank"
+        "full 227 partial archive was replaced or shrank"
     );
     Ok(Some(a.len()))
 }
 
 pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Result<Measurement> {
-    ensure!(pid > 1, "full227 invalid producer PID");
+    ensure!(pid > 1, "full 227 invalid producer PID");
     let output = root.join("output");
     let private = root.join("private");
     let scope = private.join(format!(
@@ -62,7 +62,7 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
     let prefix = format!("run-{pid}-");
     let mut candidates = Vec::new();
     for (index, entry) in fs::read_dir(&cohort)?.enumerate() {
-        ensure!(index < 64, "full227 cohort run census exceeds its bound");
+        ensure!(index < 64, "full 227 cohort run census exceeds its bound");
         let entry = entry?;
         let name = entry.file_name();
         let Some(suffix) = name.to_str().and_then(|s| s.strip_prefix(&prefix)) else {
@@ -72,11 +72,11 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
             !suffix.is_empty()
                 && suffix.bytes().all(|b| b.is_ascii_digit())
                 && suffix.parse::<u128>().is_ok_and(|n| n > 0),
-            "full227 malformed producer run identity"
+            "full 227 malformed producer run identity"
         );
         candidates.push(entry.path());
     }
-    ensure!(candidates.len() <= 1, "full227 ambiguous producer run");
+    ensure!(candidates.len() <= 1, "full 227 ambiguous producer run");
     let measurement = if let Some(run) = candidates.first() {
         let archives = run.join("archives");
         for p in [run, &archives] {
@@ -89,7 +89,7 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
                 && state_meta.uid() == uid
                 && state_meta.nlink() == 1
                 && state_meta.mode() & 0o777 == 0o600,
-            "full227 unsafe cohort state"
+            "full 227 unsafe cohort state"
         );
         let bytes = read_stable_bounded(&state_path, 65536, "full227 cohort state")?;
         let state: Value = serde_json::from_slice(&bytes)?;
@@ -97,14 +97,14 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
             state
                 == json!({"schema":"jetstreamer-root-cohort-run-v1","status":"running-private",
                 "start_epoch":227,"end_epoch":227,"manifest_fingerprint":fingerprint}),
-            "full227 cohort state does not bind the producer's manifest"
+            "full 227 cohort state does not bind the producer's manifest"
         );
         let path = archives.join("epoch-227.jet");
         let private_size = size(&path, uid)?;
         if let (Some(a), Some(b)) = (private_size, final_size) {
             ensure!(
                 a == b,
-                "full227 private and imported archive lengths differ"
+                "full 227 private and imported archive lengths differ"
             );
         }
         match (private_size, final_size) {
@@ -124,7 +124,7 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
     } else {
         Measurement {
             jet_size_bytes: final_size
-                .context("full227 current producer run and archive absent")?,
+                .context("full 227 current producer run and archive absent")?,
             path: final_path,
             source: "import-destination",
             cohort_state_sha256: None,
@@ -133,7 +133,7 @@ pub(super) fn measure(root: &Path, pid: u64, fingerprint: &str, uid: u32) -> Res
     for (path, identity) in directories {
         ensure!(
             private_directory(&path, uid)? == identity,
-            "full227 archive directory changed during measurement"
+            "full 227 archive directory changed during measurement"
         );
     }
     Ok(measurement)

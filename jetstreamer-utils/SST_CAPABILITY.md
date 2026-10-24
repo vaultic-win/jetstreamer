@@ -73,13 +73,13 @@ database tar, compares every source member byte-for-byte, verifies all native
 CF/live-file references against the census, resolves outside-prefix range and
 point deletions plus WAL-only updates, and rehashes every collected input after
 native resolution. This is disposable-fixture qualification only, never evidence
-for epoch141 or any real ledger generation.
+for epoch 141 or any real ledger generation.
 
 `horizon_ledger_bzip::collect_bound_bzip2` adds a diagnostic local-input binding
 layer. It accepts only a canonical absolute, singly linked, non-writable regular
 file owned by root or the effective user, with independently supplied compressed
 length and lowercase SHA-256. It hashes the entire bounded compressed input before
-collection and again while decoding every bzip2 stream, then rechecks both the
+collection and again while decoding every bzip 2 stream, then rechecks both the
 descriptor and named path identity including ctime. The decompressed tar collector
 still enforces every file, aggregate and trailer limit. Tests cover multistream
 input, wrong digest/length/budget, unsafe inputs, truncation, corrupt checksums,
@@ -92,7 +92,7 @@ receipt, fresh resource admission, persistent guarded execution and durable
 result receipt must still be supplied by a reviewed caller. Neither a successful
 compressed binding nor a complete tar census proves original-backup completeness,
 native live state, correct PoH boundaries or publication eligibility. No actual
-epoch141 source has been collected by these fixture tests.
+epoch 141 source has been collected by these fixture tests.
 
 `horizon_ledger_tar::census_rocksdb_tar` and
 `horizon_ledger_bzip::census_bound_bzip2` run the same complete member parser and
@@ -105,7 +105,7 @@ admitting retention, without passing a partial scan off as complete. It does not
 predict filesystem physical allocation, supply native database inputs, or prove
 source completeness/live state. A real census still requires a persistent bounded
 caller, immutable generation binding, fresh CPU/RAM/I/O admission and durable
-receipts. The library tests do not constitute a census of the real epoch141 input.
+receipts. The library tests do not constitute a census of the real epoch 141 input.
 
 `jetstreamer-epoch141-ledger-census` is the private offline runner for that census
 only. It requires independently supplied executable, immutable plan and fresh
@@ -175,7 +175,7 @@ and validate complete entry/tick/PoH chains plus canonical anchors. There is no
 operational native recovery caller yet. The native fixture exercises this core
 against an entire collected crash-shaped database, including outside-prefix range
 deletion, point deletion, updated WAL and WAL-only values, and rejects an omitted
-family allowlist. These remain disposable-fixture tests, not epoch141 evidence.
+family allowlist. These remain disposable-fixture tests, not epoch 141 evidence.
 
 `jetstreamer-epoch141-ledger-metadata` is a separate, read-only exact-generation
 gate for `60911751/rocksdb.tar.bz2#1634789748052739` in the regional ledger
@@ -197,7 +197,7 @@ kill and reap its own unprivileged SDK child at the bound. An ignored root-only
 sandbox test exercises the actual shared UID drop and timeout path with a
 disposable sleep child, and proves no-clobber receipt writes beneath a valid
 root-private directory. Do not apply the older metadata observer's
-epoch203–212 capability assumptions to epoch141.
+epoch 203–212 capability assumptions to epoch 141.
 
 `jetstreamer-epoch141-ledger-download` provides a separate **fresh-attempt-only**
 private transfer wrapper for that same fixed generation. It shares the existing
@@ -304,16 +304,16 @@ caller obligations. It never infers missing boundaries, uses Bank hashes as PoH
 hashes, or grants source, runtime or publication authority.
 
 Tests cover the complete synthetic metadata→shred→entry→PoH path and a tampered
-entry. The pinned Rust1.46 v1.4.25 SDK `hash`/`hashv` fixture independently supplies
-three golden boundary hashes and a bincode1.3.1 SlotMeta wire digest, asserted by
+entry. The pinned Rust 1.46 v1.4.25 SDK `hash`/`hashv` fixture independently supplies
+three golden boundary hashes and a bincode 1.3.1 SlotMeta wire digest, asserted by
 the modern decoders. These are synthetic SDK primitive/layout checks, **not** a
-real-ledger run, upstream full Entry-crate qualification, recovered epoch141
+real-ledger run, upstream full Entry-crate qualification, recovered epoch 141
 boundaries or canonical checkpoint/plugin/publication evidence.
 
 `horizon_legacy_recovery` binds the exact logical lookup set to the entire
 independently supplied post-gap target census. The pinned blockstore keys are
 eight big-endian slot bytes for `meta`, and two big-endian u64s (slot/index) for
-`data_shred`; layout is checked against revision893cc764's `blockstore_db.rs`
+`data_shred`; layout is checked against revision 893cc764's `blockstore_db.rs`
 SHA-256 `7391732d9c41d09cdf4f1c9997c9ee37ccace9040aa5845249918084bcc0b046`.
 An initial complete metadata query determines every owed contiguous data index.
 A second native read must include unchanged metadata and every planned data key.
@@ -324,13 +324,13 @@ The bridge rejects missing, extra, reordered, substituted or absent logical
 records before assembling all batches, decoding all entries and verifying all
 target chains under one aggregate hash-work bound. It also rejects a reused
 boundary across separate targets. Its eleven-target integration is synthetic,
-not actual epoch141 recovery or native provenance. Borrowed candidate records
+not actual epoch 141 recovery or native provenance. Borrowed candidate records
 are not authenticated merely because this bridge accepts them. Trusted real
 clock, canonical anchors, backup/native evidence and persistent guarded receipt
 production remain separate caller obligations; there is no operational native
 recovery caller or runtime/publication promotion here.
 The explicit native crash-shaped WAL fixture also writes eleven synthetic
-SlotMeta/shred pairs, collects the complete database through multistream bzip2,
+SlotMeta/shred pairs, collects the complete database through multistream bzip 2,
 performs both full-census native query stages and verifies all 33 synthetic
 boundaries through this bridge. This is end-to-end disposable-fixture evidence,
 not original-backup completeness or real historical PoH recovery.
@@ -358,5 +358,5 @@ fresh admission and prove its first real guard before use. Enforce independent
 CPU, memory, task and oneshot start-time limits; a read callback cannot interrupt
 blocked native syscalls. The current tests cover source/census/target/admission
 substitution, native fixtures and root-private no-clobber receipt writes only.
-No real retained epoch141 database or actual-source native run is established by
+No real retained epoch 141 database or actual-source native run is established by
 this source. Trusted clock/anchored PoH and all canonical gates remain separate.

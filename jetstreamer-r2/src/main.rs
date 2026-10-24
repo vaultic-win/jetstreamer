@@ -1543,7 +1543,7 @@ fn prepare_status_receipt_directory(directory: &Path) -> Result<()> {
         directory.canonicalize()? == directory
             && metadata.is_dir()
             && (uid == 0 || metadata.uid() == uid),
-        "status receipt directory must already be canonical,private and owned by the reader or its authorized user"
+        "status receipt directory must already be canonical, private and owned by the reader or its authorized user"
     );
     // Never chmod an already-private or foreign-owned directory. A privileged reader may deliberately
     // traverse a campaign-user-owned 0700 directory using only DAC_OVERRIDE;
@@ -1707,7 +1707,7 @@ async fn publish_initial144_handoff_status(
 fn validate_initial144_handoff(previous: Option<&EpochStatus>, status: &EpochStatus) -> Result<()> {
     ensure!(
         status.epoch == 144 && status.phase == "upload",
-        "event is not initial144 upload"
+        "event is not initial 144 upload"
     );
     if let Some(previous) = previous {
         ensure!(

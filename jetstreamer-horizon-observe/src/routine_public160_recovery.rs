@@ -1,4 +1,4 @@
-//! Recover only the interrupted16:58 metadata transaction; never repeat replay statuses.
+//! Recover only the interrupted 16:58 metadata transaction; never repeat replay statuses.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261022T165800Z-public160-native141-acquisition-scans-upload198-v1";
 const PLAN_SHA: &str = "9ce0eb518223931865a774f882adaaac1eb06682d03b9b5a8b178760a9b0ac0c";
@@ -40,7 +40,7 @@ fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
             && f["signal"].is_null()
             && f["tool"] == serde_json::to_value(&p.tools.r2)?
             && f["stderr"]["text"] == "Error: duplicate or inconsistent cohort pipeline claim\n",
-        "not the exact public160 shared-uploader metadata failure"
+        "not the exact public 160 shared-uploader metadata failure"
     );
     Ok(())
 }
@@ -184,7 +184,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         &root.join("child-provisional.json"),
     )?;
     let provisional = file(provisional_path, false)?;
-    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Previously completed198; recovery only restores160 downstream status"});
+    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Previously completed 198; recovery only restores 160 downstream status"});
     let ledger = bound_json(&provisional, false)?;
     ensure!(
         ledger["inventory"]["anomalies"] == 0
@@ -238,7 +238,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
     let b: Bound = serde_json::from_value(b.clone())?;
     ensure!(
         b.path == Path::new(ROOT).join("public160-recovery-v1/intent.json"),
-        "foreign160 recovery intent"
+        "foreign 160 recovery intent"
     );
     let v = bound_json(&b, false)?;
     ensure!(
@@ -253,7 +253,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
             && v["archive_mutations"] == false
             && v["sidecar_mutations"] == false
             && v["replay_launch_authorized"] == false,
-        "foreign160 recovery receipt"
+        "foreign 160 recovery receipt"
     );
     p.tools.r2 = reader();
     Ok(())

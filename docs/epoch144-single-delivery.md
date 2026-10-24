@@ -1,8 +1,8 @@
-# Exact144 serialized delivery
+# Exact 144 serialized delivery
 
 `jetstreamer-publication144-deliver` is one bounded delivery worker, not a
 second progressive coordinator. It never generates replay, overwrites an R2
-object, or retires a local archive. Its sealed strict plan binds the exact144
+object, or retires a local archive. Its sealed strict plan binds the exact 144
 publisher and tracker plans, approved R2 client, endpoint digest, root-private
 output directory and the existing global uploader's lock device/inode.
 
@@ -20,11 +20,11 @@ a durable intent before waiting on the same inode-checked mutation lock held
 by the unchanged global uploader, then revalidates all terminal/canonical gates
 after acquisition. The lock spans the existing Rust client's144-only sync and
 owned-status cleanup. Both uploaders therefore serialize even if the global
-coordinator independently becomes eligible for144. No live160 upload is stopped
+coordinator independently becomes eligible for 144. No live 160 upload is stopped
 or restarted. The archive-sync child permanently changes to UID1001/GID1003, replaces its
 supplementary groups, clears ambient/effective/permitted/inheritable capabilities,
 and verifies the drop before exec. The distinct fixed completion-only status
-command retains root because publication receipts are root-owned0600. No
+command retains root because publication receipts are root-owned 0600. No
 arbitrary command or different epoch can borrow that metadata identity.
 
 The only archive command is ordinary `sync --epochs 144-144`; no overwrite,
@@ -32,7 +32,7 @@ repair-orphaned, trusted-legacy or local-deletion flag is available. A matching
 whole-object-readback R2 receipt is required before archive completion. If owned
 status history exists, the approved Rust completion-only status deletion path
 performs its ordinary exact-key conditional cleanup. Unknown status ownership is
-not deletion authority. Canonical144 and the original private assembly remain
+not deletion authority. Canonical 144 and the original private assembly remain
 local for ordinary adjacent-boundary retirement policy.
 
 Intent, lock acquisition, upload exit, archive completion, status cleanup and
@@ -60,7 +60,7 @@ invoke its client. A separate root-private metadata mutex prevents concurrent
 capture writers; canonical complete JSON, fsync, owner-only final permissions
 and no-clobber writes prevent partial or foreign receipts from being adopted.
 Existing genuine captures are revalidated without overwriting their bytes.
-No actual144capture or terminal event is claimed until a real worker exists.
+No actual 144capture or terminal event is claimed until a real worker exists.
 
 The candidate archive client emits `r2-upload-start`, `r2-upload-progress` and
 `r2-upload-committed` JSON events. Progress counts distinct successful part
@@ -71,8 +71,8 @@ acknowledgement. These observations are not integrity receipts: even multipart
 commit explicitly leaves `whole_file_sha256_verified` false. The independent
 whole-object readback and canonical sidecar gates remain unchanged.
 
-The status parser accepts `queued-upload` only for epoch144, and pipeline
-publication further requires the exact144 upload unit and original publisher
+The status parser accepts `queued-upload` only for epoch 144, and pipeline
+publication further requires the exact 144 upload unit and original publisher
 binding. The legacy replay status CLI does not gain this phase. Parser support
 alone does not qualify the queue ETA, prove an active worker or authorize a
 status publication. The delivery worker and composite fleet/status reader must
@@ -87,10 +87,10 @@ The worker always waits for its child even if writing that receipt fails, so a
 metadata error cannot leave the child unobserved. A regression exercises this
 error path and requires the child to have been reaped.
 
-The candidate routine helper supports simultaneous private141 PoH and local144
+The candidate routine helper supports simultaneous private 141 PoH and local 144
 publication profiles only through the separately pinned composite-capable
 progress client. Both original captures, private scan evidence and the full
-native141 retry history remain mandatory. Neither older single-profile reader
+native 141 retry history remain mandatory. Neither older single-profile reader
 can be substituted for this combined profile; adding a profile grants no new
 replay, publication or mutation authority.
 
@@ -109,7 +109,7 @@ is a read-only progress-evidence producer, not the routine status writer. Its
 strict `jetstreamer-exact144-child-progress-plan-v1` binds `delivery_plan`,
 `delivery_launch`, `child_launch`, and `observer` path/SHA pairs,
 `sample_unix_millis`, and a no-clobber `output_receipt` under the precreated
-root-owned0700 `/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1`.
+root-owned 0700 `/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1`.
 The filename is exactly `progress-SAMPLE_MILLIS.json`. Seal both executable and
 plan before operational use. The initial sealed readers accept the pinned v6
 delivery worker and progress client only. The nonblocking successor binds v7
@@ -136,7 +136,7 @@ acquisition or network request.
 
 The follow-up candidate's `authenticated-child-progress-v2` receipt adds a
 definite integer forecast for an authenticated active child, binding the exact
-retained198 timing calibration. Upload and ordered readback use the slower of
+retained 198 timing calibration. Upload and ordered readback use the slower of
 their actual wall-time rate and byte-scaled historical rate. Wall time runs
 through the sample, including a silent interval since the last checkpoint.
 The model keeps separate complete readback, source-revalidation and sidecar
@@ -153,7 +153,7 @@ This forecast does not model shared-lock queue contention,
 adopt an upload into the fleet, or authorize a dashboard update. It does not
 retroactively change the sealed v1 reader. Queue handling, the fleet/status
 consumer and the exact inactive/failure lifecycle remain separate real gates
-before starting144 delivery. Use the existing coordinated cadence; do not create
+before starting 144 delivery. Use the existing coordinated cadence; do not create
 a second progress polling loop.
 
 ## Nonblocking delivery candidate

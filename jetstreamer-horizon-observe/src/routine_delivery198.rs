@@ -1,4 +1,4 @@
-//! Exact198 replay -> authenticated active producer-finalization handoff.
+//! Exact 198 replay -> authenticated active producer-finalization handoff.
 //! No replay launch, archive mutation, retirement, or new resource observation.
 use super::*;
 
@@ -129,7 +129,7 @@ pub(super) fn retime(next: &mut Plan, config: &mut Value, spec: &Bound) -> Resul
             && target == "2026-10-21T20:18:00Z"
             && next.previous_observer.sha256
                 == "2eeb72a1f51220db978745c846c7b3bd9e2695a5bdb58c9969bfd0fe7fee5773",
-        "198 retime is not exact missed20:08 recovery"
+        "198 retime is not exact missed 20:08 recovery"
     );
     let old = stamp(&next.sample_target_utc);
     let new = stamp(&target);
@@ -162,7 +162,7 @@ fn original_range(model: &Value) -> Result<Option<&Value>> {
             || r["range"] == "198"),
         "198 is not an independently publishable singleton"
     );
-    ensure!(found.len() <= 1, "duplicate198 modeled range");
+    ensure!(found.len() <= 1, "duplicate 198 modeled range");
     Ok(found.first().copied())
 }
 
@@ -208,7 +208,7 @@ fn validate_proof(proof: &Value, target: u64, initial: bool) -> Result<()> {
             && proof["epoch"] == 198
             && (handoff || proof["phase"] == "producer-finalization")
             && proof["before"] == proof["after"],
-        "unqualified198 finalization proof"
+        "unqualified 198 finalization proof"
     );
     for flag in [
         "resource_sample_taken",
@@ -437,7 +437,7 @@ fn validate_pending_evidence(e: &Value) -> Result<()> {
             )
             && recovery.sha256
                 == "baad8fedb7ae8ab271da2c34850b54f626b907424eeb6c9669947b7d6dce3444",
-        "foreign198handoff recovery evidence"
+        "foreign 198handoff recovery evidence"
     );
     Ok(())
 }
@@ -464,7 +464,7 @@ fn read_profile_with_archive(
                 == Some(Path::new(
                     "/var/lib/jetstreamer/horizon-epoch198-delivery-observations-v1"
                 )),
-        "foreign198 delivery deployment/census"
+        "foreign 198 delivery deployment/census"
     );
     tool_ok(&Bound {
         path: if profile.controller_handoff {
@@ -714,7 +714,7 @@ pub(super) fn enable(
     completion: &Value,
     spec: &Bound,
 ) -> Result<()> {
-    ensure!(is_101(next)?, "foreign198delivery scope");
+    ensure!(is_101(next)?, "foreign 198delivery scope");
     let value: HandoffSpec = serde_json::from_slice(&bound_bytes(spec, true)?)?;
     ensure!(
         value.schema == "jetstreamer-epoch198-routine-handoff-spec-v1"
@@ -729,7 +729,7 @@ pub(super) fn enable(
     }
     ensure!(
         next.expected_epochs.contains(&198),
-        "initial198delivery must consume replay claim"
+        "initial 198delivery must consume replay claim"
     );
     let prior = bound_json(&next.previous_fleet, false)?;
     ensure!(
@@ -1013,7 +1013,7 @@ pub(super) fn publish(p: &Plan, model: &Value, fleet: &Value, observer: &Bound) 
         "claim_phase":claim_phase,"origin_unit":UNIT,"origin_invocation_id":INVOCATION,
         "model_path":model_path,"model_sha256":"","fleet_path":bound.path,"fleet_sha256":bound.sha256},
         "observer":observer,"fleet":bound,"origin_launch":profile.origin_publication,
-        "estimate_evidence":[profile.proof],"estimate_basis":"Exact active delivery owner is independently reauthenticated; actual archive close plus previously qualified43200second downstream budget, never an elapsed replay countdown or ready assertion",
+        "estimate_evidence":[profile.proof],"estimate_basis":"Exact active delivery owner is independently reauthenticated; actual archive close plus previously qualified 43200 second downstream budget, never an elapsed replay countdown or ready assertion",
         "estimated_remaining_millis":remaining,"jet_path":archive_path,"expected_jet_size_bytes":meta.len(),
         "peer_units":[],"receipt_directory":STATUS,"receipt_directory_uid":1001});
     let sealed = seal_values(p, "delivery198-status", &[("pipeline-plan.json", value)])?;
@@ -1093,14 +1093,17 @@ fn validate_publication(p: &Plan, observer: &Bound, plan: &Bound, r: &Value) -> 
 
 pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
     if c.get("public198_promotion").is_some() {
-        ensure!(public198::promoted(p, c)?, "foreign198 partial promotion");
+        ensure!(public198::promoted(p, c)?, "foreign 198 partial promotion");
         return Ok(());
     }
     if p.public198_delivery.is_some() {
         return public198::validate_completed(p, c);
     }
     if p.epoch198_delivery.is_none() {
-        ensure!(c["epoch198_delivery"].is_null(), "unexpected198 completion");
+        ensure!(
+            c["epoch198_delivery"].is_null(),
+            "unexpected 198 completion"
+        );
         return Ok(());
     }
     let d = &c["epoch198_delivery"];
@@ -1109,7 +1112,7 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
         let intent: Bound = serde_json::from_value(c["recovery_intent"].clone())?;
         ensure!(
             intent.path == p.cycle_directory.join("metadata-recovery-v1/intent.json"),
-            "foreign198 recovery intent"
+            "foreign 198 recovery intent"
         );
         let value = bound_json(&intent, false)?;
         ensure!(
@@ -1130,7 +1133,7 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
             } else {
                 "delivery198-status/sealed/pipeline-plan.json"
             }),
-        "foreign198 pipeline plan"
+        "foreign 198 pipeline plan"
     );
     let value = bound_json(&plan, true)?;
     let publication: Bound = serde_json::from_value(d["publication"].clone())?;
@@ -1634,7 +1637,7 @@ mod tests {
         assert!(validate_completed(&p, &json!({"epoch198_delivery":{"publication":{}}})).is_err());
         validate_completed(&p, &json!({})).unwrap();
         p.epoch198_delivery = Some(profile());
-        // Fail before reading a proof when the ordinary198 claim was not
+        // Fail before reading a proof when the ordinary 198 claim was not
         // explicitly transferred or when the exact publisher is not pinned.
         assert!(effective_model(&p, &model).is_err());
         p.expected_epochs.clear();

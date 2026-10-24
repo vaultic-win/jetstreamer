@@ -50,7 +50,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
                 == Some(
                     expected_command(r["assembly_plan"]["sha256"].as_str().unwrap_or("")).as_str()
                 ),
-        "assembly144 launch scope or exact command differs"
+        "assembly 144 launch scope or exact command differs"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -66,7 +66,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     ] {
         ensure!(
             r[flag] == false,
-            "assembly144 forbidden launch authority:{flag}"
+            "assembly 144 forbidden launch authority:{flag}"
         );
     }
     Ok(())
@@ -105,7 +105,7 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
             && r["required_guard_minimum_free_bytes"] == a["required_guard_minimum_free_bytes"]
             && a["observer"] == r["observer"]
             && a["fleet"] == r["previous_fleet"],
-        "assembly144 exact plan/admission/resource binding differs"
+        "assembly 144 exact plan/admission/resource binding differs"
     );
     for (key, digest) in [
         (
@@ -127,13 +127,13 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
     ] {
         ensure!(
             a[key] == digest,
-            "assembly144 source identity differs:{key}"
+            "assembly 144 source identity differs:{key}"
         );
     }
     for key in ["prefix_manifest", "suffix_manifest"] {
         ensure!(
             p[key]["sha256"] == a[format!("{key}_sha256")],
-            "assembly144 source manifest differs"
+            "assembly 144 source manifest differs"
         );
     }
     for flag in [
@@ -143,7 +143,7 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(a[flag] == false, "assembly144 admission authority:{flag}");
+        ensure!(a[flag] == false, "assembly 144 admission authority:{flag}");
     }
     let admitted = a["recorded_unix_seconds"]
         .as_u64()
@@ -153,7 +153,7 @@ fn bindings(r: &Value, p: &Value, a: &Value, ab: &BoundFile) -> Result<()> {
         .context("assembly launch time")?;
     ensure!(
         admitted <= launched && launched - admitted <= 900,
-        "assembly144 launch admission stale/future"
+        "assembly 144 launch admission stale/future"
     );
     assembly144_admission::check_timeout(&a["original_timeout"])?;
     Ok(())
@@ -186,7 +186,7 @@ fn live_owner(r: &Value, c: &DiagnosticClaim, v: &Value) -> Result<()> {
                 .and_then(|s| s.parse::<u32>().ok())
                 .is_some_and(|n| n > 0)
             && command(&v["ExecStart"]) == command(&r["expected_exec_start"]),
-        "assembly144 live owner differs"
+        "assembly 144 live owner differs"
     );
     Ok(())
 }
@@ -215,7 +215,7 @@ fn validate_limits(l: &BTreeMap<&str, &str>) -> Result<()> {
         ("ReadWritePaths", ROOT),
         ("Environment", ""),
     ] {
-        ensure!(l.get(k) == Some(&v), "assembly144 sandbox differs:{k}");
+        ensure!(l.get(k) == Some(&v), "assembly 144 sandbox differs:{k}");
     }
     Ok(())
 }
@@ -224,7 +224,7 @@ fn live_limits() -> Result<()> {
         "--property=Type,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,PrivateMounts,NoNewPrivileges,ReadWritePaths,User,Group,UMask,CapabilityBoundingSet,AmbientCapabilities,Environment"]).output()?;
     ensure!(
         o.status.success() && o.stdout.len() < 16384,
-        "assembly144 limits unreadable"
+        "assembly 144 limits unreadable"
     );
     let text = std::str::from_utf8(&o.stdout)?;
     let mut fields = BTreeMap::new();

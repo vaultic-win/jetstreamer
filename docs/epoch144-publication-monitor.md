@@ -1,4 +1,4 @@
-# Exact epoch144 publication ownership
+# Exact epoch 144 publication ownership
 
 `jetstreamer-publication144-track` captures the separately admitted exact V4
 publisher; it cannot launch it, copy an archive, publish a checksum, or call R2.
@@ -23,7 +23,7 @@ The common `/home/sol` writable mount preserves rename identity; the publisher's
 own Landlock policy independently confines mutations to its exact stage, public
 directory, and receipt root. Capture also binds the publisher's already-fsynced
 admission intent and repeats the owner query before writing a no-clobber,
-fsynced, mode0400 `launch.json` beneath the precreated root-private
+fsynced, mode 0400 `launch.json` beneath the precreated root-private
 `/var/lib/jetstreamer/horizon-publication144-owner-20261022-v1` directory.
 
 Terminal mode requires the same invocation, command and limits with no main PID.
@@ -62,7 +62,7 @@ sidecar, retirement, runtime promotion, or R2 authority follows from monitoring.
 ## Delivery timing evidence
 
 `jetstreamer-publication144-calibrate --self-sha256 SHA [--check-only]` reads
-only four exact epoch198 uploader journal markers and a separately sealed copy
+only four exact epoch 198 uploader journal markers and a separately sealed copy
 of its verified R2 receipt. It binds the original unit, invocation, PID, UID,
 executable, message ordering, complete byte length and final verification time.
 It rejects missing, duplicated or differently owned events. No resource sample,
@@ -76,22 +76,22 @@ This is a forecast, not a publication gate, capacity claim, guaranteed bound or
 permission to start. Consume it through a separately bound live pipeline model;
 do not invent a launch timestamp or silently reset an overdue deadline.
 
-The status writer's UID1001 receipt-directory exception is separately scoped to
-epoch144's exact captured canonical-artifact publisher origin and its fixed
-publication/upload service names. The original198 exception remains unchanged.
-An arbitrary144 job, another origin receipt, another epoch, or a generic launch
+The status writer's UID 1001 receipt-directory exception is separately scoped to
+epoch 144's exact captured canonical-artifact publisher origin and its fixed
+publication/upload service names. The original 198 exception remains unchanged.
+An arbitrary 144 job, another origin receipt, another epoch, or a generic launch
 cannot borrow either exception. Elapsed execution still comes from the actual
 root systemd manager start event. This source support alone neither publishes
 an ETA nor qualifies a downstream uploader.
 
 The revised routine source uses the already-generated coordinated provisional
 fleet from the same control cycle; it does not take another resource sample or
-inventory loop for144. A live publisher gets phase `publication`, the retained
+inventory loop for 144. A live publisher gets phase `publication`, the retained
 complete109177480876-byte original as the measured current archive, and the
 calibrated4979863-millisecond total deadline anchored to its unique root manager
 start event. The model and publication receipt are independently bound and
 authenticated. A pre-launch sample, overdue deadline, changed owner, invalid
 model or failed readback publishes no replacement. Successor preparation checks
-the144receipt separately from the nine ordinary replay statuses. An absent live
+the 144 receipt separately from the nine ordinary replay statuses. An absent live
 publisher is not labelled replay or ready. Uploader phase integration and the
 terminal/inactive status lifecycle remain separate launch prerequisites.

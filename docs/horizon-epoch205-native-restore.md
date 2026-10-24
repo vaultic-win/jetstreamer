@@ -2,13 +2,13 @@
 
 The opt-in `epoch205-native-restore-diagnostic` feature builds
 `jetstreamer-epoch205-native-restore-probe`. This is a separately pinned private
-profile, not a relabelled epoch-203/213 receipt or a new ordinary runtime route.
+profile, not a relabelled epoch- 203/213 receipt or a new ordinary runtime route.
 It shares the restore-only engine with the existing epoch-203 probe; every
 epoch, snapshot, worker, source-prefix path, schema and attempt namespace is
 fixed at compile time. The epoch-203 profile retains its prior bindings and its
 already-sealed deployment is not replaced by this source refactor.
 
-The 205 profile pins the unchanged v1.6.16 store8 worker
+The 205 profile pins the unchanged v1.6.16 store 8 worker
 `3f5e8efe...`, the exact snapshot at slot 88,991,050, its full verified
 SHA-256 `1b2a41f022847dc2ba9609e5a13aadc0e79b213b5245166b06954bf8c6d9042f`,
 length 8,407,269,066, and accounts root
@@ -31,7 +31,7 @@ Execution additionally requires a separately sealed input policy and a fresh,
 hash-bound restore-only admission receipt covering the century floor and all
 older growth plus the full incremental restore peak. The fixed 128-GiB peak
 and thirteen-sample century floor are rejection minima, never a complete host
-admission or a full cold-epoch bound. Require the intended UID1000 persistent
+admission or a full cold-epoch bound. Require the intended UID 1000 persistent
 zero-restart invocation, exact isolated private paths, VMA/inode headroom,
 bounded environment, and a proven invocation-bound reserve/VMA guard. Do not
 install a launcher, automatic retry or admission trigger from source/test

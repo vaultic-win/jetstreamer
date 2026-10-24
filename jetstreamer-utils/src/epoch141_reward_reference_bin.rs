@@ -99,8 +99,8 @@ fn summary(response: &Value, anchor: &Value) -> Result<Value> {
         rows.push((key, tag, lamports, balance));
     }
     rows.sort();
-    // Legacy bincode1.3.1 fixed-int Vec<(Pubkey,RewardInfo)> wire format.
-    // Enum discriminants are u32; Pubkey is exactly32 bytes (no length).
+    // Legacy bincode 1.3.1 fixed-int Vec<(Pubkey, RewardInfo)> wire format.
+    // Enum discriminants are u32; Pubkey is exactly 32 bytes (no length).
     let mut bytes = (rows.len() as u64).to_le_bytes().to_vec();
     for (key, tag, lamports, balance) in rows {
         bytes.extend(key);

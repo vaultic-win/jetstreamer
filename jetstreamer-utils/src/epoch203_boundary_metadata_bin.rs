@@ -1,4 +1,4 @@
-//! Closed offline collection of finalized203 RPC boundary metadata.
+//! Closed offline collection of finalized 203 RPC boundary metadata.
 //! Never opens an archive, contacts RPC/R2, promotes a runtime or permits publication.
 #[allow(dead_code)]
 mod epoch141_ledger_common;

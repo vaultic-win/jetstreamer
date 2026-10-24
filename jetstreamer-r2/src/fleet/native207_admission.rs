@@ -238,7 +238,7 @@ fn native227_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
             && row["phase"] == "private-cold-snapshot-verification"
             && row["ordinary_replay_claim"] == false
             && owner["Id"] == singleton227_admission::NATIVE_UNIT,
-        "207 unknown native227 auxiliary"
+        "207 unknown native 227 auxiliary"
     );
     let plan = bound_json(&BoundFile {
         path: f["plan"].as_str().context("207 prior plan")?.into(),
@@ -255,13 +255,13 @@ fn native227_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
-        "207 native227 needs one registered claim"
+        "207 native 227 needs one registered claim"
     );
     let claim: PipelineClaim = serde_json::from_value(claims[0].clone())?;
     ensure!(
         claim.invocation_id == owner["InvocationID"]
             && claim.evidence == serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,
-        "207 native227 origin changed"
+        "207 native 227 origin changed"
     );
     singleton227::native_live(&claim, owner)?;
     Ok(claim)
@@ -278,10 +278,10 @@ fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         let owner = singleton227_admission::active_owner(row)?;
         let group = owner["ControlGroup"]
             .as_str()
-            .context("207 native227 cgroup")?;
+            .context("207 native 227 cgroup")?;
         ensure!(
             group == format!("/system.slice/{}", claim.unit),
-            "207 native227 cgroup escaped"
+            "207 native 227 cgroup escaped"
         );
         let root = Path::new("/sys/fs/cgroup").join(&group[1..]);
         let read = |name: &str| -> Result<u64> {
@@ -295,7 +295,7 @@ fn auxiliary_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
                 && high == 112u64 << 30
                 && read("memory.swap.max")? == 0
                 && charge <= cap,
-            "207 native227 hard memory controls differ"
+            "207 native 227 hard memory controls differ"
         );
         let remaining = cap - charge;
         total = total
@@ -337,17 +337,17 @@ fn protected_growth(
         let claim = native227_claim(f, row)?;
         ensure!(
             seen.insert(claim.unit.clone()),
-            "207 duplicate native227 owner"
+            "207 duplicate native 227 owner"
         );
         let guard = reduced_guards
             .remove(&claim.unit)
-            .context("207 native227 needs its latest protective guard")?;
+            .context("207 native 227 needs its latest protective guard")?;
         let g = bound_json(&guard)?;
         let origin = bound_json(&claim.evidence[0])?;
         let plan: BoundFile = serde_json::from_value(origin["guard_plan"].clone())?;
         let time = g["recorded_unix_seconds"]
             .as_u64()
-            .context("207 native227 guard clock")?;
+            .context("207 native 227 guard clock")?;
         ensure!(
             time >= sample
                 && time <= now
@@ -387,15 +387,15 @@ fn protected_growth(
                     .is_some_and(|(a, b)| a >= b)
                 && g["remote_mutations"] == false
                 && g["r2_mutations"] == false,
-            "207 protected native227 guard differs"
+            "207 protected native 227 guard differs"
         );
         let physical = g["root_physical_observation"]["conservative_physical_bytes"]
             .as_u64()
             .filter(|n| *n <= c::SCRATCH)
-            .context("207 native227 physical bound")?;
+            .context("207 native 227 physical bound")?;
         let rows = o["diagnostic_replays"]
             .as_array()
-            .context("207 native227 sample")?;
+            .context("207 native 227 sample")?;
         let observed = rows
             .iter()
             .filter(|r| r["observation"]["producer_after"]["invocation_id"] == claim.invocation_id)
@@ -404,12 +404,12 @@ fn protected_growth(
             observed.len() == 1
                 && observed[0]["status"] == "observed"
                 && observed[0]["observation"]["invocation_binding_stable"] == true,
-            "207 native227 sample identity differs"
+            "207 native 227 sample identity differs"
         );
         let allocated = observed[0]["observation"]["conservative_observed_physical_bytes"]
             .as_u64()
             .filter(|n| *n <= c::SCRATCH)
-            .context("207 native227 scratch allocation")?
+            .context("207 native 227 scratch allocation")?
             .min(physical);
         let remaining = c::SCRATCH - allocated;
         extra = extra

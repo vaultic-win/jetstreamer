@@ -1,4 +1,4 @@
-//! Separate store8 epoch203 prefix measurement; not a complete-prefix replay.
+//! Separate store 8 epoch 203 prefix measurement; not a complete-prefix replay.
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-203-canary.jet";

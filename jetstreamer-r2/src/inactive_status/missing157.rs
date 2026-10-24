@@ -1,4 +1,4 @@
-//! Exact collected157 missing-terminal failure; no ready-archive assertion.
+//! Exact collected 157 missing-terminal failure; no ready-archive assertion.
 use super::*;
 const CONTROLLER: &str = "jetstreamer-epoch157-target3-controller-v1-r2.service";
 const CONTROLLER_IID: &str = "fcba4ece12fa462faf9062a3ad607879";
@@ -92,7 +92,7 @@ fn terminal_shapes(current: &BTreeMap<String, Value>) -> Result<()> {
             && producer["SubState"] == "dead"
             && producer["MainPID"] == "0"
             && producer["InvocationID"] == "",
-        "157owner live, replaced, or terminal identity ambiguous"
+        "157 owner live, replaced, or terminal identity ambiguous"
     );
     Ok(())
 }
@@ -103,7 +103,7 @@ pub(super) fn validate_current(
 ) -> Result<()> {
     validate(e, expected)?;
     terminal_shapes(current)?;
-    // A cleared InvocationID alone is not terminal proof. Require PID1's latest
+    // A cleared InvocationID alone is not terminal proof. Require PID 1's latest
     // authenticated manager lifecycle to stop this exact controller, repeatedly.
     status_inactive::cleared_controller_proof(CONTROLLER, CONTROLLER_IID)?;
     Ok(())

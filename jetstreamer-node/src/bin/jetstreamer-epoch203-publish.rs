@@ -418,7 +418,7 @@ fn scan203_terminal(private_dir: &Path, verification: &Value) -> Result<Value> {
         let (k, v) = line.split_once('=').context("203 scanner field")?;
         ensure!(
             properties.insert(k.to_owned(), v.to_owned()).is_none(),
-            "duplicate203 scanner property"
+            "duplicate 203 scanner property"
         );
     }
     for (key, value) in [
@@ -439,7 +439,7 @@ fn scan203_terminal(private_dir: &Path, verification: &Value) -> Result<Value> {
             properties.get("InvocationID").map(String::as_str),
             Some("") | Some(IID)
         ),
-        "foreign203 scan invocation"
+        "foreign 203 scan invocation"
     );
     let journal = std::process::Command::new("/usr/bin/journalctl")
         .args(["--unit", UNIT, "--output=json", "--no-pager"])
@@ -463,7 +463,7 @@ fn scan203_terminal(private_dir: &Path, verification: &Value) -> Result<Value> {
         {
             ensure!(
                 manager.replace(v).is_none(),
-                "duplicate203 scanner completion"
+                "duplicate 203 scanner completion"
             );
         }
     }
@@ -477,7 +477,7 @@ fn validate_archive(file: &File) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("archive open: {e}"))?;
     ensure!(
         reader.header().slot_start == 87696000 && reader.header().slot_count == 432000,
-        "not complete epoch203 coverage"
+        "not complete epoch 203 coverage"
     );
     let provenance = reader
         .provenance()

@@ -1405,7 +1405,7 @@ impl MetaSnapshot {
     }
 }
 
-/// Comparable snapshot of one transaction: (fee, sig0, n_updates, concat
+/// Comparable snapshot of one transaction: (fee, sig 0, n_updates, concat
 /// of update data, loaded writable+readonly addresses).
 type TxSnapshot = (u64, Signature, usize, Vec<u8>, Vec<Address>);
 

@@ -405,7 +405,7 @@ fn fresh_census(
     }
     let capped141 = capped141::recognized(terminal_fleet);
     if capped141 {
-        ensure!(plan.epoch == 141, "foreign capped141 cleanup epoch");
+        ensure!(plan.epoch == 141, "foreign capped 141 cleanup epoch");
         capped141::validate_current(&current, terminal_fleet, owners)?;
     }
     let terminal185 = terminal185::recognized(terminal_fleet);
@@ -647,7 +647,7 @@ pub(super) async fn run() -> Result<()> {
     let history_time = if terminal185::recognized(&history) {
         terminal185::time(&plan, &history)?
     } else if capped141::recognized(&history) {
-        ensure!(plan.epoch == 141, "foreign capped141 terminal evidence");
+        ensure!(plan.epoch == 141, "foreign capped 141 terminal evidence");
         capped141::time(&history)?
     } else if natural144::recognized(&history) {
         ensure!(
@@ -656,7 +656,7 @@ pub(super) async fn run() -> Result<()> {
                     == Path::new(
                         "/usr/local/lib/jetstreamer/horizon-epoch144-terminal-evidence-20261021-v1/terminal.json"
                     ),
-            "foreign144 terminal evidence"
+            "foreign 144 terminal evidence"
         );
         natural144::time(&history)?
     } else if missing157::recognized(&history) {
@@ -668,7 +668,7 @@ pub(super) async fn run() -> Result<()> {
                     )
                 && plan.terminal_fleet.sha256
                     == "00c2bbed7338c19b688a50a7ad14bdc639f98659a56de2cbe8a31abe40c47159",
-            "foreign157terminal evidence"
+            "foreign 157 terminal evidence"
         );
         missing157::time(&history)?
     } else if history["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1" {

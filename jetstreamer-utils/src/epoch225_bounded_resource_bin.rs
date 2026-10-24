@@ -1,4 +1,4 @@
-//! Private epoch225 measurement; no runtime, root, or publication promotion.
+//! Private epoch 225 measurement; no runtime, root, or publication promotion.
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = false;
     pub const ARCHIVE_NAME: &str = "epoch-225-canary.jet";

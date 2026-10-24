@@ -3,16 +3,16 @@
 ## Exact admitted 183–184 repair adoption
 
 The optional `repair185_handoff` extends an already accepted four-lane profile
-with the independently publishable epoch185 singleton. It binds the exact
-`e185-full-20261023-v1-r2` producer, staged controller, original185 capability,
-fresh full768GiB admission and actual timer-fired guard proof. Its guard floor
-is3503746342342bytes (the century floor plus four older full768GiB claims), with
-the unchanged800000VMA stop. The fifth model has terminal80351999, zero queued
-replay slots and12h downstream allowance. Retain the original185 reserve-stop
+with the independently publishable epoch 185 singleton. It binds the exact
+`e185-full-20261023-v1-r2` producer, staged controller, original 185 capability,
+fresh full 768 GiB admission and actual timer-fired guard proof. Its guard floor
+is 3503746342342 bytes (the century floor plus four older full 768 GiB claims), with
+the unchanged 800000VMA stop. The fifth model has terminal 80351999, zero queued
+replay slots and 12h downstream allowance. Retain the original 185 reserve-stop
 repair history until a verified ready pair; launch is not recovery.
 
 Use the distinct `repair185-repair183-...` generation and full five-range,
-eleven-epoch census. Initial185 snapshot restoration may explicitly omit only
+eleven-epoch census. Initial 185 snapshot restoration may explicitly omit only
 185 from estimates while retaining its full live claim and every healthy ETA;
 require zero markers/resets, no first/last/rate, and one readable guarded worker.
 An established replay may not revert to this bootstrap exception. Receipt/model
@@ -20,13 +20,13 @@ validation and successor preparation remain offline; active-cycle preflight
 separately authenticates both actual reserve guards. Never track recurring guard
 invocations as stable replay owners or restart healthy work during adoption.
 
-Epoch185's old `reserve_stop` is invocation-specific. Once its exact new
+Epoch 185's old `reserve_stop` is invocation-specific. Once its exact new
 admission/guard handoff is verified, preserve that stop in the separately sealed
 history receipt and retain both original intent/completion evidence; remove only
-the obsolete active-stop field from the derived185 gate. Keep its
+the obsolete active-stop field from the derived 185 gate. Keep its
 `failed-needs-repair` gate and every other evidence item unchanged. This is not
 repair closure, scratch retirement, or authority to ignore a new guard trip.
-The exact03:29 transaction has a bounded fleet-tail recovery that authenticates
+The exact 03:29 transaction has a bounded fleet-tail recovery that authenticates
 the failed owner/child, immutable five-range sample/model and ten successful
 status receipts, seals that one-gate correction, and completes fleet inventory
 without another sample or replay-status publication.
@@ -49,14 +49,14 @@ Record `unestimated_bootstrap_epochs: [183, 184]` explicitly; do not invent a
 terminal, rate, or countdown. The immutable model keeps the handoff evidence
 and full expected observer census. The next cycle re-adopts the pair only from
 that bound bootstrap predecessor, and publishes both estimates once real
-progress is available. Missing progress after the epoch184 transition is an
+progress is available. Missing progress after the epoch 184 transition is an
 error, not a bootstrap exception. Never resample to repair a metadata rejection.
 
-The exact October23 02:29 metadata transaction has a separate fleet-tail recovery
+The exact October 23 02:29 metadata transaction has a separate fleet-tail recovery
 mode (`--check-repair183-fleet-recovery`, then `--recover-repair183-fleet`). It
 binds the failed invocation, rejected child, observer, immutable models and eight
 successful authenticated status receipts. The v2 recovery seals a correction
-removing only the two183–184 guard service/timer observations from the fleet's
+removing only the two 183–184 guard service/timer observations from the fleet's
 stable replay-unit census: their minute-by-minute invocations legitimately change
 during an inventory read. Replay owners remain fully identity-stable; the actual
 guard and timer are authenticated separately through the sealed handoff and live
@@ -69,20 +69,20 @@ The first-fire receipt schema is
 `jetstreamer-horizon-repair183-guard-first-fire-v1`. Require the actual timer-fired
 service invocation, zero exit/restarts, absent stop intent/completion and its
 original JSON `sample`: armed/no-trip, exact live owner IDs, one readable worker
-at or below800000VMAs, and minimum-free3332894621696bytes. The coordinator also
+at or below 800000VMAs, and minimum-free3332894621696bytes. The coordinator also
 checks the still-active exact guard timer, healthy service, pinned unchanged
 guard script and live guard command bindings. This guard protects the existing
 live guards without lowering any of their floors.
 
 For initial adoption, the original three-range model and its accepted estimate
-receipt remain unchanged history. Only the effective model adds183–184 after
+receipt remain unchanged history. Only the effective model adds 183–184 after
 validating the complete admission and first-fire lineage; the observer's first
 predecessor must be the admission's prelaunch observation. Use the distinct
 `repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1`
 namespace, a four-range v2 observer configuration and the exact ten-epoch census.
 Never edit a sealed three-range plan or arm a second observer for its timestamp.
 
-Both epochs remain behind the epoch184 import gate. While183 is observed, add
+Both epochs remain behind the epoch 184 import gate. While 183 is observed, add
 432000 queued slots to each ETA; after a stable, identity-matching transition to
 184, remove that offset and keep the12h/24h downstream allowances. Reject backward
 or unknown terminals, owner changes, partial/overlapping claims and reset clocks.
@@ -102,8 +102,8 @@ permit another scan, timestamp rewriting, stale publication, or a cadence bypass
 Offline successor preparation clears the recovery field and schedules from the
 accepted actual observation time, preserving the 1,800-second minimum.
 
-The fixed October22 narrative review may update only the exact superseded
-`next_action` strings for epochs203,205,227. Bind its immutable path and
+The fixed October 22 narrative review may update only the exact superseded
+`next_action` strings for epochs 203,205,227. Bind its immutable path and
 SHA-256 in each affected epoch's `additional_gate_evidence`. The coordinator
 authenticates the ordinary predecessor template unchanged, then applies this
 exact compiled-in review while deriving the new fleet plan. It preserves states,
@@ -115,7 +115,7 @@ This is narrative correction only, not admission or replay authority. Do not
 substitute a manually edited predecessor template: the exact prior ledger's
 template path and digest must still match during preflight.
 
-The separately bound October21 epoch203 capacity-stop incident may replace only
+The separately bound October 21 epoch 203 capacity-stop incident may replace only
 its exact stale natural-root task with an open `failed-needs-repair` gate. The
 coordinator authenticates the fixed immutable incident, exact failed invocation,
 guard reason, last/required slots and denial of cleanup/retry/publication rights.
@@ -137,7 +137,7 @@ This mode needs no credentials and makes no subprocess, systemd, resource or
 remote observation. It consumes the exact accepted observer/model/estimate/
 fleet/status receipts, rejects a newer fleet, and preserves all owner IDs,
 diagnostic claims, gates, additional evidence and tool pins. It advances by
-exactly1800seconds and increments only the canonical observer generation.
+exactly 1800 seconds and increments only the canonical observer generation.
 An out-of-band observation, changed auxiliary scope or an inconsistent/partial
 completion fails closed for manual review.
 
@@ -157,7 +157,7 @@ while the template retains prior tracked units. This avoids an indefinitely
 growing bounded supplemental list without removing history. All other gates,
 tool pins and receipts are preserved. The 201–300 generation rules are unchanged.
 
-Precreate the selected profile's root with root ownership and mode0700:
+Precreate the selected profile's root with root ownership and mode 0700:
 `/var/lib/jetstreamer/horizon-next-preparations-v1` for 201–300, or
 `/var/lib/jetstreamer/horizon-next-preparations-101-200-v2` for 101–200. The tool writes one
 no-clobber `TIMESTAMP-v1/` child containing `observer.json`, `cycle-plan.json`,

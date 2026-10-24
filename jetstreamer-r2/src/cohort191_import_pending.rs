@@ -125,7 +125,7 @@ fn bootstrap(p: &Bootstrap, pb: &Bound, self_sha: &str) -> Result<Value> {
                     "/var/lib/jetstreamer/horizon-cohort191-import-pending-20261024-v1/bootstrap.json"
                 )
             && p.origins.keys().copied().eq(191..=194),
-        "foreign191 import bootstrap"
+        "foreign 191 import bootstrap"
     );
     member(&p.program.path, &p.program.sha256)?;
     let cutoff = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -308,7 +308,7 @@ pub(super) fn retained_events(proof: &Bound, p: &Capture, cutoff: u64) -> Result
 fn observe(p: &Observe, self_sha: &str) -> Result<Value> {
     ensure!(
         p.schema == "jetstreamer-cohort191-import-pending-observation-plan-v1",
-        "foreign191 pending observation"
+        "foreign 191 pending observation"
     );
     let b = bound(&p.bootstrap, false)?;
     shape(&b)?;
@@ -430,7 +430,7 @@ pub(super) fn run(observation: bool) -> Result<()> {
             && args[3] == "--plan-sha256"
             && args[5] == "--self-sha256"
             && unsafe { libc::geteuid() } == 0,
-        "native191 pending PLAN --plan-sha256 SHA --self-sha256 SHA"
+        "native 191 pending PLAN --plan-sha256 SHA --self-sha256 SHA"
     );
     member(&fs::read_link("/proc/self/exe")?, &args[6])?;
     let pb = Bound {

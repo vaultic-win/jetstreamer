@@ -1,4 +1,4 @@
-//! One append-only, invocation-bound extension for the already executing203 assembler.
+//! One append-only, invocation-bound extension for the already executing 203 assembler.
 //! Never restarts a producer, changes resource guards, or permits publication.
 use super::continuation203 as c;
 use super::*;
@@ -117,7 +117,7 @@ fn evidence(v: &Value) -> Result<()> {
     )?;
     ensure!(
         (79_000_000..=85_000_000).contains(&(b.checked_sub(a).context("fixture time inversion")?)),
-        "runtime fixture did not survive original20s and finish80s sleep"
+        "runtime fixture did not survive original 20s and finish 80s sleep"
     );
     let a = event(
         list("historical213")?,
@@ -134,7 +134,7 @@ fn evidence(v: &Value) -> Result<()> {
     ensure!(
         (27_000_000_000..29_000_000_000)
             .contains(&(b.checked_sub(a).context("213 time inversion")?)),
-        "historical213 assembly evidence differs"
+        "historical 213 assembly evidence differs"
     );
     Ok(())
 }

@@ -512,7 +512,7 @@ fn reader<R: Read + Send + 'static>(input: R, tx: mpsc::SyncSender<Result<String
             let read = reader.by_ref().take(65537).read_until(b'\n', &mut bytes);
             let message = match read {
                 Ok(0) => break,
-                Ok(_) if bytes.len() > 65536 => Err("child log line exceeds64KiB".into()),
+                Ok(_) if bytes.len() > 65536 => Err("child log line exceeds 64 KiB".into()),
                 Ok(_) => String::from_utf8(bytes).map_err(|e| e.to_string()),
                 Err(e) => Err(e.to_string()),
             };

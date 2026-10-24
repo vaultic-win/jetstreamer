@@ -1,6 +1,6 @@
 # Not installable until actual sealed guard-plan path/digest replace the tokens.
 [Unit]
-Description=Horizon native228 actual MainPID protective guard
+Description=Horizon native 228 actual MainPID protective guard
 
 [Service]
 Type=oneshot

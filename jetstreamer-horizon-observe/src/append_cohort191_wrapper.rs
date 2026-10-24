@@ -135,7 +135,7 @@ fn originals(p: &Plan, owner: u32) -> Result<()> {
     }
     for e in fs::read_dir(&p.target_directory)? {
         let n = e?.file_name();
-        let n = n.to_str().context("nonUTF8 package entry")?;
+        let n = n.to_str().context("non-UTF8 package entry")?;
         ensure!(
             NAMES.contains(&n) || n == WRAPPER || n == STAGE,
             "unexpected package entry"

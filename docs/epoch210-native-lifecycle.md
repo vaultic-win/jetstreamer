@@ -1,14 +1,14 @@
 # Epoch 210 native lifecycle operator protocol
 
 The Rust `jetstreamer-r2` control commands below prepare/admit, authenticate and
-record the exact epoch210 native input test. They never start a producer,
+record the exact epoch 210 native input test. They never start a producer,
 restore a Bank, create an archive, publish a sidecar or take a resource sample.
 Keep the [sealed preparation bindings](epoch210-native-preparation.md) and the
 300000000000-byte whole-root/128 GiB hard-memory cap unchanged.
 
 Every command takes `SPEC --spec-sha256 SPEC_SHA --self-sha256 HELPER_SHA` as
 root. Specs are canonical immutable root-owned single-link files; output parents
-must be fresh root0700 directories. Receipts are no-clobber, fsynced and sealed.
+must be fresh root 0700 directories. Receipts are no-clobber, fsynced and sealed.
 Use the separately sealed lifecycle helper for fleet, status and inactive-status
 consumers that must understand the new claim. Preserve existing healthy replay,
 guard, verifier and uploader binaries; do not replace them merely to deploy this
@@ -16,10 +16,10 @@ control profile.
 
 ## Prepare and admit
 
-Install the exact dormant service file as root0444 at
+Install the exact dormant service file as root 0444 at
 `/etc/systemd/system/archive-210-v1616-native-input-actual-v1.service`, SHA-256
 `474e889f9d40294654f52a3f2ce0f3d3d06b89fc5f19cd97695f5aa5f42ccb24`.
-Do not enable it at boot or start it yet. Precreate empty ubuntu0700 directories
+Do not enable it at boot or start it yet. Precreate empty ubuntu 0700 directories
 `/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1` and its
 `scratch/` child. Static deployment retains terminal evidence; transient units
 and `RemainAfterExit=yes` are rejected by running capture.
@@ -64,7 +64,7 @@ The helper rehashes the exact test/guard/snapshot/genesis, requires empty scratc
 validates the complete accepted resource census and peer identities, preserves
 hard-memory growth and existing guard floors, and brackets all arithmetic with
 actual free-memory/free-disk, owner and cap checks. Existing full209/full227 and
-optional native228 accounting is reused without changing the accepted fleet.
+optional native 228 accounting is reused without changing the accepted fleet.
 It requires a 90 percent host-memory target, century 1.5x RSS bound, stable VMAs
 and observed pressure. A stale owner or capacity change is a hard rejection.
 

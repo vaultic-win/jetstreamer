@@ -4,33 +4,35 @@ const MARKER: &str = "epoch223-v1620-native-input slot=96335538 bank_hash=8LxWwz
 fn checkpoint(rows: &[Value], unit: &str, iid: &str) -> Result<Value> {
     ensure!(
         !rows.is_empty() && rows.len() <= 4096,
-        "native223 proof journal bounds"
+        "native 223 proof journal bounds"
     );
     let mut markers = [None; 3];
     let mut last = 0u64;
     for (index, row) in rows.iter().enumerate() {
         let clock = row["__REALTIME_TIMESTAMP"]
             .as_str()
-            .context("native223 proof clock")?
+            .context("native 223 proof clock")?
             .parse::<u64>()?;
-        ensure!(clock >= last, "native223 proof clock rollback");
+        ensure!(clock >= last, "native 223 proof clock rollback");
         last = clock;
-        let message = row["MESSAGE"].as_str().context("native223 proof message")?;
+        let message = row["MESSAGE"]
+            .as_str()
+            .context("native 223 proof message")?;
         let selected = if row["_PID"] == "1" {
             ensure!(
                 row["UNIT"] == unit && row["INVOCATION_ID"] == iid,
-                "native223 foreign manager proof"
+                "native 223 foreign manager proof"
             );
             (message == format!("{unit}: Deactivated successfully.")).then_some(2)
         } else {
             ensure!(
                 row["_SYSTEMD_UNIT"] == unit && row["_SYSTEMD_INVOCATION_ID"] == iid,
-                "native223 foreign child proof"
+                "native 223 foreign child proof"
             );
             if message.contains("epoch223-v1620-native-input ") {
                 ensure!(
                     message.ends_with(MARKER),
-                    "native223 canonical tuple differs"
+                    "native 223 canonical tuple differs"
                 );
                 Some(0)
             } else if message.starts_with("test result:") {
@@ -38,7 +40,7 @@ fn checkpoint(rows: &[Value], unit: &str, iid: &str) -> Result<Value> {
                     message.starts_with(
                         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; "
                     ),
-                    "native223 actual test count/outcome differs"
+                    "native 223 actual test count/outcome differs"
                 );
                 Some(1)
             } else {
@@ -48,17 +50,17 @@ fn checkpoint(rows: &[Value], unit: &str, iid: &str) -> Result<Value> {
         if let Some(selected) = selected {
             ensure!(
                 markers[selected].replace(index).is_none(),
-                "native223 duplicate qualification marker"
+                "native 223 duplicate qualification marker"
             );
         }
     }
     let positions = markers
         .into_iter()
         .collect::<Option<Vec<_>>>()
-        .context("native223 tuple/test/clean-terminal proof missing")?;
+        .context("native 223 tuple/test/clean-terminal proof missing")?;
     ensure!(
         positions.windows(2).all(|w| w[0] < w[1]),
-        "native223 qualification order differs"
+        "native 223 qualification order differs"
     );
     Ok(
         json!({"slot":96_335_538u64,"bank_hash":"8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F",
@@ -85,16 +87,16 @@ pub(in crate::fleet) fn run() -> Result<()> {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.starts_with("horizon-native223-input-proof-")),
-        "native223 input proof scope"
+        "native 223 input proof scope"
     );
     let event = bound_json(&spec.terminal_event)?;
     let (profile, iid, success, _) = native20_event::terminal_proof(&event)?;
-    ensure!(success, "native223 input did not terminate successfully");
+    ensure!(success, "native 223 input did not terminate successfully");
     let journal: BoundFile = serde_json::from_value(event["journal"].clone())?;
     let bytes = read_stable_bounded(&journal.path, 16 << 20, "native223 qualification journal")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == journal.sha256,
-        "native223 qualification journal digest"
+        "native 223 qualification journal digest"
     );
     let rows = serde_json::Deserializer::from_slice(&bytes)
         .into_iter::<Value>()

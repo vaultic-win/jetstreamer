@@ -29,11 +29,11 @@ fn validate_shapes(
 ) -> Result<()> {
     ensure!(
         expected == proven,
-        "collected native223 terminal event names another invocation"
+        "collected native 223 terminal event names another invocation"
     );
     ensure!(
         collected(current, &expected.0) && collected(historical, &expected.0),
-        "native223 owner is live, replaced or lacks genuine collected history"
+        "native 223 owner is live, replaced or lacks genuine collected history"
     );
     Ok(())
 }
@@ -44,7 +44,7 @@ pub(super) fn validate(
 ) -> Result<()> {
     ensure!(
         recognized(terminal_fleet, owners),
-        "not an approved collected native223 owner"
+        "not an approved collected native 223 owner"
     );
     let binding: Bound = serde_json::from_value(terminal_fleet["metadata_event"].clone())?;
     let proof = bound_json(&binding)?;
@@ -53,7 +53,7 @@ pub(super) fn validate(
     validate_shapes(
         current
             .get(&expected.0)
-            .context("native223 owner absent from current census")?,
+            .context("native 223 owner absent from current census")?,
         &terminal_fleet["unit_census"][&expected.0],
         expected,
         &proven,

@@ -1,4 +1,4 @@
-//! Exact, read-only epoch140 selected-prefix audit. Never creates an archive or
+//! Exact, read-only epoch 140 selected-prefix audit. Never creates an archive or
 //! ordinary segment manifest, starts replay, or authorizes publication.
 use {
     anyhow::{Context, Result, ensure},
@@ -198,7 +198,7 @@ fn bound_bytes(b: &Bound, maximum: u64, immutable: bool) -> Result<Vec<u8>> {
 fn evidence(b: &Bound, expected: &str) -> Result<Value> {
     ensure!(
         b.sha256 == expected,
-        "not the exact reviewed epoch140 evidence"
+        "not the exact reviewed epoch 140 evidence"
     );
     Ok(serde_json::from_slice(&bound_bytes(b, 256 * 1024, false)?)?)
 }
@@ -438,7 +438,7 @@ impl Audit {
                 && self.epoch_seen
                 && self.last_hash == CUT_HASH
                 && self.last_block_slot == CUT,
-            "prefix extent,raw cursor,epoch metadata or final PoH hash mismatch"
+            "prefix extent, raw cursor, epoch metadata or final PoH hash mismatch"
         );
         ensure!(
             self.cut_phases

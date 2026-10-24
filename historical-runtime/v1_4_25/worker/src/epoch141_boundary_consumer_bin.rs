@@ -64,7 +64,7 @@ fn validate(bytes: &[u8]) -> Result<usize, String> {
         }
         for (index, boundary) in group.boundaries.iter().enumerate() {
             if boundary.tick_ordinal != 64 * (index as u64 + 1) {
-                return Err("noncanonical pinned64tick boundary ordinal".into());
+                return Err("noncanonical pinned 64tick boundary ordinal".into());
             }
             let hash = Hash::from_str(&boundary.hash).map_err(|e| e.to_string())?;
             if hash == Hash::default() || hash.to_string() != boundary.hash || !seen.insert(hash) {

@@ -1,4 +1,4 @@
-//! Refresh private141's operational replay ETA in the existing control cycle.
+//! Refresh private 141's operational replay ETA in the existing control cycle.
 //! The new reader is only metadata tooling; no replay or archive gate changes.
 use super::*;
 
@@ -32,7 +32,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 )
             )
             && !p.expected_epochs.contains(&141),
-        "foreign141 status profile or duplicate estimate"
+        "foreign 141 status profile or duplicate estimate"
     );
     tool_ok(&s.publisher)?;
     policy(s)?;
@@ -128,7 +128,7 @@ fn publish_with(
                     "previous_status_must_not_be_presented_as_current":true,
                     "terminality_established":false,"inactive_cleanup_authorized":false,
                     "remaining_growth_released":false,"repair_must_remain_open":true,
-                    "next_action":"Inspect the preserved child failure and current owner. Repair an active owner's estimate; for positive capped141 termination, capture native manager evidence and reconcile the complete replacement/downstream claim census before conditional inactive cleanup. Preserve prefix/checkpoint bytes; root61328765 still leaves15234 suffix slots. No unavailable sample, missing rate or timeout proves inactivity.",
+                    "next_action":"Inspect the preserved child failure and current owner. Repair an active owner's estimate; for positive capped 141 termination, capture native manager evidence and reconcile the complete replacement/downstream claim census before conditional inactive cleanup. Preserve prefix/checkpoint bytes; root 61328765 still leaves 15234 suffix slots. No unavailable sample, missing rate or timeout proves inactivity.",
                     "replay_launch_authorized":false,"publication_authorized":false}),
             )?;
             Ok(
@@ -226,7 +226,7 @@ pub(super) fn completion(p: &Plan, c: &Value) -> Result<()> {
             c["qualification141_status"]["enabled"] == true
                 && c["qualification141_status"]["new_resource_samples"] == 0
                 && c["qualification141_status"]["publication_authorized"] == false,
-            "completion omits current141 operational status"
+            "completion omits current 141 operational status"
         );
         if c["qualification141_status"]["refresh_outcome"] == "incident" {
             let b: Bound =

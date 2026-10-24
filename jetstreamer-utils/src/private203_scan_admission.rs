@@ -1,4 +1,4 @@
-// Fresh admission for the exact203 private scan; no producer signals or R2 access.
+// Fresh admission for the exact 203 private scan; no producer signals or R2 access.
 const SCAN203_UNIT: &str = "horizon-full-verify-203-private-v4-af051b90-v1.service";
 const PROTECTED203_PRODUCERS: [(&str, &str); 2] = [
     (
@@ -218,7 +218,7 @@ fn scan203_guard(
     } else {
         ensure!(
             v.get("producer_stop_enabled").is_none(),
-            "legacy225 guard format differs"
+            "legacy 225 guard format differs"
         );
     }
     let out = Command::new("/usr/bin/systemctl")
@@ -277,30 +277,30 @@ fn admit_private203_scan(plan: &Plan, binding: &Evidence, runner: &str) -> Resul
     ] {
         ensure!(
             own.get(key).map(String::as_str) == Some(value),
-            "scan203 sandbox differs: {key}"
+            "scan 203 sandbox differs: {key}"
         );
     }
     ensure!(
         own.get("ReadWritePaths").map(String::as_str) == plan.private_directory.to_str(),
-        "scan203 write scope differs"
+        "scan 203 write scope differs"
     );
-    let iid = own.get("InvocationID").context("scan203 invocation")?;
+    let iid = own.get("InvocationID").context("scan 203 invocation")?;
     ensure!(
         iid.len() == 32 && iid.bytes().all(|b| b.is_ascii_hexdigit()),
-        "scan203 invocation missing"
+        "scan 203 invocation missing"
     );
     let (total, available) = scan203_memory(&fs::read_to_string("/proc/meminfo")?)?;
     let charged = (192u64 + 224 + 128) << 30;
     let target = total / 10 * 9;
     ensure!(
         charged <= target && available >= (128u64 << 30) + total / 10,
-        "scan203 memory admission failed"
+        "scan 203 memory admission failed"
     );
     let free = free_bytes(&plan.private_directory)?;
     ensure!(
         free.checked_sub(plan.maximum_archive_bytes)
             .is_some_and(|remaining| remaining >= plan.protected_free_bytes),
-        "scan203 disk admission failed"
+        "scan 203 disk admission failed"
     );
     let guards = vec![
         scan203_guard(
@@ -323,7 +323,7 @@ fn admit_private203_scan(plan: &Plan, binding: &Evidence, runner: &str) -> Resul
         )?,
     ];
     let after = scan203_census()?;
-    ensure!(before == after, "scan203 fleet changed during admission");
+    ensure!(before == after, "scan 203 fleet changed during admission");
     for (unit, p) in &producers {
         let after = scan203_properties(unit)?;
         for key in [

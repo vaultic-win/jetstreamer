@@ -93,7 +93,7 @@ fn checked(
             && r["maximum_archive_bytes"] == 112u64 << 30
             && r["candidate_incremental_peak_bytes"] == 160u64 << 30
             && r["protected_existing_floor_bytes"] == 3_916_063_202_758u64,
-        "assembly144 exact private launch differs"
+        "assembly 144 exact private launch differs"
     );
     for flag in [
         "ordinary_replay_claim",
@@ -268,7 +268,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                     .is_some_and(|s| s.private144_observer
                         && original141::retained144_census(p, s)
                         && owner(p, &s.diagnostic_ranges[0])),
-            "foreign assembly144 routine profile"
+            "foreign assembly 144 routine profile"
         );
         read(s)?;
     }

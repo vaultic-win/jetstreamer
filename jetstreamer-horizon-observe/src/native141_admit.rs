@@ -33,7 +33,7 @@ const ALL_RETRY_NATIVE_SHA: &str =
     "153a0d1302369f7ff1272d8b62ca9e777d4d1e3bd5a172e5edec5fe3ad28c295";
 const FLOOR: u64 = 4_740_696_923_590;
 const RESERVATION: u64 = 32 << 30;
-// First-target output is capped at192MiB; native logging rolls at4MiB/two logs.
+// First-target output is capped at 192 MiB; native logging rolls at4MiB/two logs.
 // One GiB includes slack, without reducing the protected reserve or old profiles.
 const ACQUISITION_RESERVATION: u64 = 1 << 30;
 const MEMORY: u64 = 144 << 30;
@@ -341,7 +341,7 @@ fn owner_bindings(fleet: &Value) -> Result<BTreeMap<String, String>> {
         .as_array()
         .context("missing complete active census")?
     {
-        ensure!(row["epoch"] != 141, "epoch141 already has an active owner");
+        ensure!(row["epoch"] != 141, "epoch 141 already has an active owner");
         let mut found = false;
         for key in ["controller", "producer", "unit"] {
             if row[key].is_null() {

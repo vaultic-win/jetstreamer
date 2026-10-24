@@ -1,4 +1,4 @@
-//! Recover only the exact02:29 bootstrap fleet-tail transaction; never repeat replay statuses.
+//! Recover only the exact 02:29 bootstrap fleet-tail transaction; never repeat replay statuses.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261023T022958Z-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
 const PLAN_SHA: &str = "224a145cf146dd9b42448b8baaaeef41527b5bce0290501bf8f93c713dc8b716";
@@ -26,14 +26,14 @@ fn corrected_fleet(original: &Value) -> Result<Value> {
     let mut corrected = original.clone();
     let units = corrected["tracked_units"]
         .as_array_mut()
-        .context("repair183 tracked units")?;
+        .context("repair 183 tracked units")?;
     for name in [
         "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.service",
         "jetstreamer-adaptive-reserve-epochs183-184-full-20261023-v1.timer",
     ] {
         ensure!(
             units.iter().filter(|u| u.as_str() == Some(name)).count() == 1,
-            "repair183 guard census correction is not exact"
+            "repair 183 guard census correction is not exact"
         );
         units.retain(|u| u.as_str() != Some(name));
     }
@@ -57,7 +57,7 @@ fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
             && f["signal"].is_null()
             && f["tool"] == serde_json::to_value(&p.tools.r2)?
             && f["stderr"]["text"] == "Error: invalid fleet unit name\n",
-        "not the exact repair183 guard-timer metadata failure"
+        "not the exact repair 183 guard-timer metadata failure"
     );
     Ok(())
 }
@@ -219,7 +219,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         &root.join("child-provisional.json"),
     )?;
     let provisional = file(provisional_path, false)?;
-    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Previously completed198; recovery repairs guard-timer fleet census without replay status republication"});
+    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Previously completed 198; recovery repairs guard-timer fleet census without replay status republication"});
     let ledger = bound_json(&provisional, false)?;
     ensure!(
         ledger["inventory"]["anomalies"] == 0
@@ -275,7 +275,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
     let b: Bound = serde_json::from_value(b.clone())?;
     ensure!(
         b.path == Path::new(ROOT).join("repair183-fleet-recovery-v2/intent.json"),
-        "foreign183 fleet recovery intent"
+        "foreign 183 fleet recovery intent"
     );
     let v = bound_json(&b, false)?;
     ensure!(
@@ -290,7 +290,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
             && v["archive_mutations"] == false
             && v["sidecar_mutations"] == false
             && v["replay_launch_authorized"] == false,
-        "foreign183 fleet recovery receipt"
+        "foreign 183 fleet recovery receipt"
     );
     p.tools.r2 = reader();
     Ok(())
@@ -307,7 +307,7 @@ pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
         corrected.path
             == Path::new(ROOT)
                 .join("repair183-fleet-recovery-v2/guard-census-correction/sealed/fleet-plan.json"),
-        "foreign repair183 corrected plan"
+        "foreign repair 183 corrected plan"
     );
     let original = Bound {
         path: Path::new(ROOT).join("sealed/fleet-plan.json"),
@@ -315,7 +315,7 @@ pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
     };
     ensure!(
         bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
-        "repair183 correction changed more than the two non-replay guard observations"
+        "repair 183 correction changed more than the two non-replay guard observations"
     );
     Ok(true)
 }

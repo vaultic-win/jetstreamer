@@ -1,4 +1,4 @@
-//! Retain bytes and mask only the stopped, obsolete136–147 controller.
+//! Retain bytes and mask only the stopped, obsolete 136–147 controller.
 //! Copies cross sandbox bind mounts; rename/exchange stay within one parent.
 use super::*;
 
@@ -49,7 +49,7 @@ fn checked_bytes(path: &Path, sha: &str, uid: u32) -> Result<Vec<u8>> {
             && md.nlink() == 1
             && md.mode() & 0o022 == 0
             && before.length <= 1 << 20,
-        "unsafe136 controller configuration"
+        "unsafe 136 controller configuration"
     );
     let bytes = read_stable_bounded(path, 1 << 20, "136 controller bytes")?;
     ensure!(
@@ -70,7 +70,7 @@ fn state_record(path: &Path, uid: u32) -> Result<Option<Value>> {
                     && md.nlink() == 1
                     && md.is_file()
                     && path.canonicalize()? == path,
-                "unsafe136 control state"
+                "unsafe 136 control state"
             );
             Ok(Some(serde_json::from_slice(&read_stable_bounded(
                 path,
@@ -149,7 +149,7 @@ fn retained_copy(
                     && md.uid() == uid
                     && md.len() <= expected.length
                     && partial.canonicalize()? == partial,
-                "unsafe136 partial config copy"
+                "unsafe 136 partial config copy"
             );
             if md.mode() & 0o777 == 0o400 {
                 checked_bytes(&partial, sha, uid)?;
@@ -246,7 +246,7 @@ fn retain_and_mask(
         Ok(md) if md.file_type().is_symlink() => {
             ensure!(
                 fs::read_link(original)? == Path::new("/dev/null"),
-                "foreign136 controller alias"
+                "foreign 136 controller alias"
             );
             checked_bytes(retained, sha, uid)?;
             ensure!(
@@ -258,7 +258,7 @@ fn retain_and_mask(
             return Err(e)
                 .context("136 original path absent or unreadable outside atomic exchange");
         }
-        _ => bail!("unsupported136 controller path"),
+        _ => bail!("unsupported 136 controller path"),
     }
     ensure!(
         fs::read_link(original)? == Path::new("/dev/null"),
@@ -307,7 +307,7 @@ pub(super) fn disable(m: &Mapping, p: &Disable, spec: &Bound) -> Result<()> {
         p.schema == "jetstreamer-horizon-holding-disable136-retry-plan-v2"
             && p.archived_unit.path == Path::new(ARCHIVE)
             && p.archived_unit.sha256 == CONFIG_SHA,
-        "foreign136 controller retirement scope"
+        "foreign 136 controller retirement scope"
     );
     let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
     mapping(&supplied)?;

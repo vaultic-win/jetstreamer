@@ -1,4 +1,4 @@
-//! Compile-time epoch144 retained-prefix restart source identity.
+//! Compile-time epoch 144 retained-prefix restart source identity.
 //! Restore and continuation require separately qualified implementations.
 pub(super) const EPOCH: u64 = 144;
 pub(super) const FILENAME: &str =

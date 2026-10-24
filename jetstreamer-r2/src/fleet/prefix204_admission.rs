@@ -101,7 +101,7 @@ fn guard(g: &Value, epoch: u64, sample: u64, now: u64) -> Result<()> {
             g["maximum_root_physical_bytes"] == 300_000_000_000u64
                 && g.get("root_physical_observation_error")
                     .is_some_and(Value::is_null),
-            "204 lost203 own-root protection"
+            "204 lost 203 own-root protection"
         );
     }
     Ok(())
@@ -167,7 +167,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
     let row = rows
         .iter()
         .find(|r| r["range"] == "225-226")
-        .context("204 protected225 observation missing")?;
+        .context("204 protected 225 observation missing")?;
     ensure!(
         row["status"] == "observed"
             && row["observation"]["invocation_binding_stable"] == true
@@ -175,12 +175,12 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
             && row["observation"]["worker_before"]["vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n < 3500000),
-        "204 protected225 sample unhealthy"
+        "204 protected 225 sample unhealthy"
     );
     let row = rows
         .iter()
         .find(|r| r["range"] == "205-205")
-        .context("204 protected205 observation missing")?;
+        .context("204 protected 205 observation missing")?;
     ensure!(
         row["status"] == "observed"
             && row["observation"]["invocation_binding_stable"] == true
@@ -188,7 +188,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
             && row["observation"]["worker_before"]["vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n < 3500000),
-        "204 protected205 sample unhealthy"
+        "204 protected 205 sample unhealthy"
     );
     Ok((sampled, reservation))
 }
@@ -229,13 +229,13 @@ fn owners(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
             );
         }
     }
-    let scan = c.get(SCANNER).context("204 protected203 scan missing")?;
+    let scan = c.get(SCANNER).context("204 protected 203 scan missing")?;
     ensure!(
         scan["ActiveState"] == "activating"
             && scan["SubState"] == "start"
             && scan["InvocationID"] == SCANNER_IID
             && scan["NRestarts"] == "0",
-        "204 protected203 scan no longer matches the admitted fleet; reconcile its terminal/handoff first"
+        "204 protected 203 scan no longer matches the admitted fleet; reconcile its terminal/handoff first"
     );
     for (name, iid) in [(LIVE205, IID205), (LIVE225, IID225)] {
         let u = c.get(name).context("204 missing protected owner")?;
@@ -275,7 +275,7 @@ fn protected_caps() -> Result<Value> {
                 .context("204 protected resource property")?;
             ensure!(
                 p.insert(key, value).is_none(),
-                "duplicate204 protected property"
+                "duplicate 204 protected property"
             );
         }
         let group = format!("/system.slice/{unit}");

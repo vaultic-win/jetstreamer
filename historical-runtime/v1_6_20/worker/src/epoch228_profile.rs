@@ -1,4 +1,4 @@
-//! Closed epoch228 qualification span. No runtime/consensus substitution.
+//! Closed epoch 228 qualification span. No runtime/consensus substitution.
 pub const BOOTSTRAP_SLOT: u64 = 98_495_291;
 pub const FIRST_ENTRY_SLOT: u64 = BOOTSTRAP_SLOT + 1;
 pub const TERMINAL_ROOT_SLOT: u64 = 98_928_278;

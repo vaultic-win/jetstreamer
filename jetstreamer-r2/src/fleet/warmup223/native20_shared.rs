@@ -17,7 +17,7 @@ fn checked_sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
     let stamp = utc_seconds(
         o["recorded_at_utc"]
             .as_str()
-            .context("native20 resource clock")?,
+            .context("native 20 resource clock")?,
     )?;
     ensure!(
         spec.schema == SPEC_SCHEMA
@@ -32,7 +32,7 @@ fn checked_sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
             && f["observer_sha256"] == spec.observer.sha256
             && f["sampled_at_utc"] == o["recorded_at_utc"]
             && f["inventory"]["anomalies"] == 0,
-        "native20 needs fresh accepted full fleet"
+        "native 20 needs fresh accepted full fleet"
     );
     ensure!(
         o["host_memory"]["conservative_available_kib"]
@@ -42,17 +42,17 @@ fn checked_sample(spec: &Spec, o: &Value, f: &Value, now: u64) -> Result<u64> {
             && o["filesystem"]["conservative_available_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= INITIAL_DISK),
-        "native20 envelope does not fit"
+        "native 20 envelope does not fit"
     );
     ensure!(
         f["inventory"]["entries"]
             .as_array()
-            .context("native20 inventory")?
+            .context("native 20 inventory")?
             .iter()
             .filter(|r| r["epoch"] == 223 && r["state"] == "missing")
             .count()
             == 1,
-        "native20 must not duplicate remote223"
+        "native 20 must not duplicate remote 223"
     );
     checked_owners(f)?;
     if EXPECT_FULL227 {
@@ -78,10 +78,10 @@ fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
         super::full227_peer::accepted(f)?;
         return Ok(None);
     }
-    let rows = f["active"].as_array().context("native20 active census")?;
+    let rows = f["active"].as_array().context("native 20 active census")?;
     ensure!(
         matches!(rows.len(), 3 | 4),
-        "native20 envelope admits only three old replays and optional authenticated native207"
+        "native 20 envelope admits only three old replays and optional authenticated native 207"
     );
     for (name, iid) in super::OWNERS.into_iter().skip(1) {
         ensure!(
@@ -92,7 +92,7 @@ fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
                 })
                 .count()
                 == 1,
-            "native20 protected old owner differs"
+            "native 20 protected old owner differs"
         );
     }
     let native = rows
@@ -100,7 +100,7 @@ fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
         .filter(|r| active_unit(r)["Id"] == native207::UNIT)
         .collect::<Vec<_>>();
     if rows.len() == 3 {
-        ensure!(native.is_empty(), "native20 protected old owner omitted");
+        ensure!(native.is_empty(), "native 20 protected old owner omitted");
         native207_terminal::find(f)?;
         return Ok(None);
     }
@@ -108,13 +108,13 @@ fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
         native.len() == 1
             && native[0]["epoch"] == 207
             && native[0]["phase"] == "private-cold-snapshot-verification",
-        "native20 requires the registered native207 owner"
+        "native 20 requires the registered native 207 owner"
     );
     let p: super::super::Plan = serde_json::from_value(bound_json(&BoundFile {
-        path: f["plan"].as_str().context("native20 fleet plan")?.into(),
+        path: f["plan"].as_str().context("native 20 fleet plan")?.into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("native20 plan SHA")?
+            .context("native 20 plan SHA")?
             .into(),
     })?)?;
     let claims = p
@@ -124,14 +124,14 @@ fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
-        "native20 native207 claim missing/duplicate"
+        "native 20 native 207 claim missing/duplicate"
     );
     let c: PipelineClaim = serde_json::from_value(serde_json::to_value(claims[0])?)?;
     ensure!(
         c.invocation_id == active_unit(native[0])["InvocationID"]
             && c.evidence
                 == serde_json::from_value::<Vec<BoundFile>>(native[0]["evidence"].clone())?,
-        "native20 native207 registered evidence differs"
+        "native 20 native 207 registered evidence differs"
     );
     native207::claim(&c)?;
     Ok(Some(c))
@@ -139,7 +139,7 @@ fn checked_owners(f: &Value) -> Result<Option<PipelineClaim>> {
 fn names(f: &Value) -> Result<BTreeSet<String>> {
     let mut n = f["unit_census"]
         .as_object()
-        .context("native20 census")?
+        .context("native 20 census")?
         .keys()
         .cloned()
         .collect::<BTreeSet<_>>();
@@ -149,7 +149,7 @@ fn names(f: &Value) -> Result<BTreeSet<String>> {
 fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
     let native = checked_owners(f)?;
     for (name, iid) in super::OWNERS.into_iter().skip(1) {
-        let u = c.get(name).context("native20 old owner missing")?;
+        let u = c.get(name).context("native 20 old owner missing")?;
         ensure!(
             u["InvocationID"] == iid
                 && u["NRestarts"] == "0"
@@ -161,10 +161,10 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
                 && pipeline_status::same_exec_start(
                     f["unit_census"][name]["ExecStart"]
                         .as_str()
-                        .context("native20 prior command")?,
-                    u["ExecStart"].as_str().context("native20 live command")?
+                        .context("native 20 prior command")?,
+                    u["ExecStart"].as_str().context("native 20 live command")?
                 ),
-            "native20 old owner changed"
+            "native 20 old owner changed"
         );
     }
     if EXPECT_FULL227 {
@@ -172,7 +172,7 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
     } else {
         let native_owner = c
             .get(native207::UNIT)
-            .context("native20 native207 census missing")?;
+            .context("native 20 native 207 census missing")?;
         if let Some(native) = native {
             native207::live(&native, native_owner)?;
         } else {
@@ -187,7 +187,7 @@ fn protected(f: &Value, c: &BTreeMap<String, Value>) -> Result<()> {
                 || (!EXPECT_FULL227 && name == native207::UNIT)
                 || (EXPECT_FULL227 && name == singleton227::UNIT)
                 || super::OWNERS.iter().skip(1).any(|(n, _)| n == name),
-            "unaccounted live native20 competitor:{name}"
+            "unaccounted live native 20 competitor:{name}"
         );
     }
     Ok(())
@@ -208,7 +208,7 @@ fn inputs() -> Result<()> {
             && p["minimum_free_bytes"] == INITIAL_DISK
             && p["node"]["sha256"]
                 == "99f643ff0dbbcd37d1fbc524a1c1088d7273c7fc91330df059d30d51b8b0fcd4",
-        "native20 actual plan differs"
+        "native 20 actual plan differs"
     );
     let proof = bound_json(&BoundFile {
         path: "/var/lib/jetstreamer/horizon-native223-input-proof-release-v1/input-proof.json"
@@ -219,7 +219,7 @@ fn inputs() -> Result<()> {
         proof["native_input_qualified"] == true
             && proof["entry_replay"] == false
             && proof["repair_closed"] == false,
-        "native20 input proof differs"
+        "native 20 input proof differs"
     );
     let cap = bound_json(&BoundFile {
         path: CAPABILITY_PATH.into(),
@@ -233,7 +233,7 @@ fn inputs() -> Result<()> {
             && cap["parent_planning_report"]["runtime_profile"] == "solana-v1.6.20"
             && cap["worker_sha256"]
                 == "52d6c86a8103b8965ca68ead96af471a7899a0a0e6e69c48989b39fd5d922f0c",
-        "native20 exact capability differs"
+        "native 20 exact capability differs"
     );
     if EXPECT_FULL227 {
         ensure!(
@@ -257,12 +257,12 @@ fn sandbox(c: &PipelineClaim, u: &Value) -> Result<()> {
                 .is_some_and(|n| n > 0)
             && pipeline_status::same_exec_start(
                 &command(),
-                u["ExecStart"].as_str().context("native20 command")?
+                u["ExecStart"].as_str().context("native 20 command")?
             ),
-        "native20 owner differs"
+        "native 20 owner differs"
     );
     let out=ProcessCommand::new("systemctl").args(["show",UNIT,"--property=Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,ProtectControlGroups,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,OOMPolicy,OOMScoreAdjust"]).output()?;
-    ensure!(out.status.success(), "native20 sandbox unavailable");
+    ensure!(out.status.success(), "native 20 sandbox unavailable");
     let text = std::str::from_utf8(&out.stdout)?;
     let fields = text
         .lines()
@@ -290,7 +290,7 @@ fn sandbox(c: &PipelineClaim, u: &Value) -> Result<()> {
         ("OOMPolicy", "kill"),
         ("OOMScoreAdjust", "1000"),
     ] {
-        ensure!(fields.get(k) == Some(&v), "native20 sandbox differs:{k}");
+        ensure!(fields.get(k) == Some(&v), "native 20 sandbox differs:{k}");
     }
     Ok(())
 }
@@ -329,14 +329,14 @@ fn protective(c: &PipelineClaim) -> Result<(BoundFile, Value)> {
             && p["worker_root"] == format!("{ROOT}/scratch")
             && g["minimum_free_bytes"] == DISK_FLOOR
             && p["minimum_free_bytes"] == DISK_FLOOR,
-        "native20 VMA/disk guard missing or tripped"
+        "native 20 VMA/disk guard missing or tripped"
     );
     let out = ProcessCommand::new("systemctl")
         .args(["show", GUARD_TIMER, "--property=ActiveState", "--value"])
         .output()?;
     ensure!(
         out.status.success() && out.stdout == b"active\n",
-        "native20 guard timer inactive"
+        "native 20 guard timer inactive"
     );
     Ok((b, selection.history))
 }
@@ -372,25 +372,25 @@ fn launch_shape(c: &PipelineClaim, r: &Value) -> Result<()> {
             && utc_seconds(
                 r["sampled_at_utc"]
                     .as_str()
-                    .context("native20 origin UTC")?
+                    .context("native 20 origin UTC")?
             )? == r["recorded_unix_seconds"]
                 .as_u64()
-                .context("native20 origin clock")?,
-        "native20 launch identity or truthful authority differs"
+                .context("native 20 origin clock")?,
+        "native 20 launch identity or truthful authority differs"
     );
     Ok(())
 }
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     ensure!(
         c.evidence.len() == 1 && c.evidence[0].path == Path::new(STATE).join("launch.json"),
-        "native20 launch evidence differs"
+        "native 20 launch evidence differs"
     );
     let r = bound_json(&c.evidence[0])?;
     launch_shape(c, &r)?;
     let ab: BoundFile = serde_json::from_value(r["admission"].clone())?;
     ensure!(
         ab.path == Path::new(STATE).join("admission.json"),
-        "native20 foreign admission"
+        "native 20 foreign admission"
     );
     let a = bound_json(&ab)?;
     ensure!(
@@ -399,7 +399,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
             && a["required_observed_free_bytes"] == INITIAL_DISK
             && a["minimum_available_memory_bytes"] == MEMORY_RESERVE
             && a["candidate_memory_bytes"] == 128u64 << 30,
-        "native20 admission differs"
+        "native 20 admission differs"
     );
     if EXPECT_FULL227 {
         super::full227_peer::validate_budget(&a["expanded_fleet_budget"])?;
@@ -411,17 +411,17 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
         r["guard_history"]["unit"] == GUARD
             && r["guard_history"]["maximum_age_seconds"] == 120
             && g["producer_invocation_id"] == c.invocation_id,
-        "native20 captured guard history names another owner"
+        "native 20 captured guard history names another owner"
     );
     let guards = a["guards"]
         .as_array()
-        .context("native20 admission guard bindings")?;
+        .context("native 20 admission guard bindings")?;
     let histories = a["guard_history"]
         .as_array()
-        .context("native20 admission guard history")?;
+        .context("native 20 admission guard history")?;
     ensure!(
         guards.len() == 3 && histories.len() == 3,
-        "native20 admission guard history census differs"
+        "native 20 admission guard history census differs"
     );
     for (index, history) in histories.iter().enumerate() {
         let b: BoundFile = serde_json::from_value(guards[index].clone())?;
@@ -430,7 +430,7 @@ pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
         ensure!(
             history["maximum_age_seconds"] == 1800
                 && guard["producer_invocation_id"] == super::OWNERS[index + 1].1,
-            "native20 preserved guard history differs"
+            "native 20 preserved guard history differs"
         );
     }
     Ok(())
@@ -470,7 +470,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
                 && a["recorded_unix_seconds"]
                     .as_u64()
                     .is_some_and(|n| n <= now && now - n <= 900),
-            "native20 admission stale/foreign"
+            "native 20 admission stale/foreign"
         );
         let claim = PipelineClaim {
             epoch: 223,
@@ -478,7 +478,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
             unit: UNIT.into(),
             invocation_id: own["InvocationID"]
                 .as_str()
-                .context("native20 live IID")?
+                .context("native 20 live IID")?
                 .into(),
             expected_exec_start: command(),
             evidence: vec![],
@@ -490,7 +490,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
         ensure!(
             after[UNIT]["InvocationID"] == own["InvocationID"]
                 && after[UNIT]["MainPID"] == own["MainPID"],
-            "native20 capture owner changed"
+            "native 20 capture owner changed"
         );
         private157::immutable_receipt(
             &Path::new(STATE).join("launch.json"),
@@ -500,7 +500,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
         ensure!(
             own["MainPID"] == "0"
                 && matches!(own["ActiveState"].as_str(), Some("inactive" | "failed")),
-            "native20 already active"
+            "native 20 already active"
         );
         let mut guards = Vec::new();
         let mut guard_map = BTreeMap::new();
@@ -539,7 +539,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
         protected(&f, &after)?;
         ensure!(
             after[UNIT]["MainPID"] == "0",
-            "native20 started during admission"
+            "native 20 started during admission"
         );
         let expanded_budget = if EXPECT_FULL227 {
             let peer = super::full227_peer::guard(&f, sampled, now)?;
@@ -563,7 +563,7 @@ pub(super) fn run(capture: bool, binding: BoundFile, self_sha: String) -> Result
             protected(&f, &final_census)?;
             ensure!(
                 final_census[UNIT]["MainPID"] == "0",
-                "native20 started during expanded budget capture"
+                "native 20 started during expanded budget capture"
             );
         }
         private157::immutable_receipt(

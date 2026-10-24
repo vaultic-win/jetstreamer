@@ -275,7 +275,7 @@ pub(crate) fn mount(p: &Plan) -> Result<(BTreeMap<String, String>, u64)> {
         ("StopWhenUnneeded", "no"),
         ("BindsTo", ""),
         ("PartOf", ""),
-        ("Where", p.run_root.to_str().context("nonUTF8 root")?),
+        ("Where", p.run_root.to_str().context("non-UTF8 root")?),
     ] {
         ensure!(
             values.get(key).map(String::as_str) == Some(value),
@@ -345,7 +345,7 @@ fn inventory_owned(p: &Plan, device: u64, uid: u32, gid: u32) -> Result<Value> {
         let relative = path
             .strip_prefix(&p.run_root)?
             .to_str()
-            .context("nonUTF8 artifact")?;
+            .context("non-UTF8 artifact")?;
         if m.is_dir() {
             if path.parent() == Some(p.run_root.as_path()) {
                 directories.insert(relative.to_string());

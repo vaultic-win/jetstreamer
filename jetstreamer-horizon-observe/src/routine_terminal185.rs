@@ -1,4 +1,4 @@
-//! Exact guard-stopped185 terminal transition. Metadata only; retained bytes and
+//! Exact guard-stopped 185 terminal transition. Metadata only; retained bytes and
 //! every historical growth/floor obligation remain protected.
 use super::*;
 #[path = "routine_terminal185_holding.rs"]
@@ -26,7 +26,7 @@ pub(super) fn admit_holding(p: &mut Plan, b: &Bound) -> Result<()> {
     let profile = p
         .terminal185
         .as_mut()
-        .context("185 holding classification requires terminal185 profile")?;
+        .context("185 holding classification requires terminal 185 profile")?;
     if let Some(old) = &profile.holding_admission {
         ensure!(
             old.path == b.path && old.sha256 == b.sha256,
@@ -51,7 +51,7 @@ fn manager(name: &str) -> Result<Value> {
         let (k, v) = l.split_once('=').context("185 manager framing")?;
         ensure!(
             m.insert(k.into(), json!(v)).is_none(),
-            "duplicate185 manager field"
+            "duplicate 185 manager field"
         );
     }
     Ok(Value::Object(m))
@@ -203,7 +203,7 @@ fn proof_value(v: &Value, cutoff: u64, admission: Option<&Bound>) -> Result<()> 
     ensure!(
         ib.path == Path::new(GUARD).join("intent.json")
             && cb.path == Path::new(GUARD).join("completion.json"),
-        "foreign185 guard paths"
+        "foreign 185 guard paths"
     );
     guard(&bound_json(&ib, false)?, &bound_json(&cb, false)?)?;
     for (name, iid) in [(CONTROLLER, CID), (PRODUCER, PID)] {
@@ -292,14 +292,14 @@ pub(super) fn capture(p: &Plan, spec: &Bound, program: &Path, self_sha: &str) ->
                     .join("terminal.json")
                     .to_string_lossy()
                     .as_ref(),
-        "foreign185 capture plan"
+        "foreign 185 capture plan"
     );
     let ib: Bound = serde_json::from_value(s["guard_intent"].clone())?;
     let cb: Bound = serde_json::from_value(s["guard_completion"].clone())?;
     ensure!(
         ib.path == Path::new(GUARD).join("intent.json")
             && cb.path == Path::new(GUARD).join("completion.json"),
-        "foreign185 guard paths"
+        "foreign 185 guard paths"
     );
     guard(&bound_json(&ib, false)?, &bound_json(&cb, false)?)?;
     let mut journals = serde_json::Map::new();
@@ -432,7 +432,7 @@ pub(super) fn enable(p: &mut Plan, c: &mut Value, spec: &Bound) -> Result<()> {
             && v["publication_authorized"] == false
             && v["r2_mutations"] == false
             && p.terminal185.is_none(),
-        "foreign185 handoff"
+        "foreign 185 handoff"
     );
     if let Some(target) = v.get("sample_target_utc") {
         retime(
@@ -462,7 +462,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     let g = &mut f["gates"]["185"];
     g["state"] = json!("failed-needs-repair");
     g["next_action"] = json!(
-        "Controlled disk-floor stop at80099168 before80351999. Preserve partial/scratch/launch/guard proof; establish an actual durable native checkpoint or independently qualified cold recovery, then fresh guarded capacity admission. No resume or growth-release credit. Old185 status is stale pending qualified lifecycle; no R2 deletion authorized."
+        "Controlled disk-floor stop at 80099168 before 80351999. Preserve partial/scratch/launch/guard proof; establish an actual durable native checkpoint or independently qualified cold recovery, then fresh guarded capacity admission. No resume or growth-release credit. Old 185 status is stale pending qualified lifecycle; no R2 deletion authorized."
     );
     let a = g["evidence"]
         .as_array_mut()

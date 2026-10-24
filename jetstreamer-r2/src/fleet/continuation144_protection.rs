@@ -1,4 +1,4 @@
-//! Release only completed198's future growth, not its retained archive or evidence.
+//! Release only completed 198's future growth, not its retained archive or evidence.
 //! This receipt is a protection-accounting proposal, never admission or launch.
 use super::*;
 
@@ -36,7 +36,7 @@ fn release_policy(policy: &Value, floor: u64, ready: &Value) -> Result<Value> {
             && claims["198"]["producer_unit"] == PRODUCER
             && claims["198"]["producer_invocation_id"] == "e5612ef00a5b4fcab04df2c13a6b35b0"
             && claims["198"]["controller_unit"] == CONTROLLER,
-        "original198 reservation differs"
+        "original 198 reservation differs"
     );
     let sum = claims.values().try_fold(0u64, |sum, v| {
         sum.checked_add(

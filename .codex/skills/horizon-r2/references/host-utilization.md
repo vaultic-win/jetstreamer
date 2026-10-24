@@ -104,11 +104,11 @@ concurrent lane peak. Assembly/restore/verifier roles should remain labeled sepa
 replay when comparing lane shapes.
 
 The user's policy is a per-lane scheduling memory reservation **no greater than 1.5× the maximum
-valid aggregate lane RSS observed in that century**, superseding the earlier2× multiplier. Use
+valid aggregate lane RSS observed in that century**, superseding the earlier 2× multiplier. Use
 integer bytes and compute `floor(3 * maximum_lane_rss_bytes / 2)` with checked arithmetic; do not
-round a whole-GiB reservation above the ceiling. For epochs200–300 the initial user-selected RSS
-estimate is150,000,000,000B, so the initial memory reservation is225,000,000,000B per lane. This is
-an estimate until replaced by observed aggregate RSS; it is separate from the300GB scratch budget.
+round a whole-GiB reservation above the ceiling. For epochs 200–300 the initial user-selected RSS
+estimate is 150,000,000,000 B, so the initial memory reservation is 225,000,000,000 B per lane. This is
+an estimate until replaced by observed aggregate RSS; it is separate from the 300 GB scratch budget.
 Maintain the century maximum from durable identity-valid samples, without silently resetting it
 when a lane finishes or a new observer is deployed. Other centuries need their own RSS history.
 
@@ -185,7 +185,7 @@ slot, raw message and finalized result before choosing another runtime experimen
 RPC bytes and distinguish post-commit trace observations from loaded account preimages. A newer
 worker passing a short suffix does not qualify it for an older cold prefix; follow independently
 checkpointed era boundaries rather than repeating an unchanged failing warmup or suppressing the
-native error. See [the epoch223 investigation](../../../../docs/epoch223-fee-load-diagnostics.md).
+native error. See [the epoch 223 investigation](../../../../docs/epoch223-fee-load-diagnostics.md).
 
 Measure restore baseline separately from settled replay growth: physical and apparent scratch,
 file count, VMAs, CPU, memory peak/events, I/O pressure, transactions and account updates. Bind the
@@ -232,7 +232,7 @@ the normal work-conserving backfill path rather than waiting for another status 
   after launch, start the dormant controller under observation, immediately bind and prove its
   reserve/VMA guard, and do not leave it unattended before the first real sandboxed guard fire.
   Before an input-capability probe, validate the private run root itself and each required child
-  under the actual service user. Creating mode0700 children can leave an automatically created
+  under the actual service user. Creating mode 0700 children can leave an automatically created
   parent group-writable; check ownership, traversal and owner-only modes before spending time
   hashing large immutable inputs.
 - If current concurrency is below the proven operating point and every gate passes, launch the

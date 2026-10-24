@@ -560,7 +560,7 @@ pub(crate) fn validate_complete_collection(
         let entry: BoundFile = serde_json::from_value(entry.clone())?;
         ensure!(
             entry.path == bound.path && entry.sha256 == bound.sha256,
-            "changed,dropped,reordered or substituted target binding"
+            "changed, dropped, reordered or substituted target binding"
         );
         let receipt: TargetReceipt = serde_json::from_slice(&read_bound(bound)?)?;
         ensure!(receipt.metadata.slot == slot, "target key changed");
@@ -588,7 +588,7 @@ fn validate_declared_targets(
         let entry: BoundFile = serde_json::from_value(entry.clone())?;
         ensure!(
             entry.path == bound.path && entry.sha256 == bound.sha256,
-            "changed,dropped,reordered or substituted target binding"
+            "changed, dropped, reordered or substituted target binding"
         );
     }
     Ok(())

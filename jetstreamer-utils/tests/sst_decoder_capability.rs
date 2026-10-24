@@ -9,7 +9,7 @@ use jetstreamer_utils::{
 };
 
 // Synthetic exact-layout records, shared by the crash-shaped writer and reader.
-// These are not epoch141 records or independently authenticated real anchors.
+// These are not epoch 141 records or independently authenticated real anchors.
 fn legacy_gap_fixture() -> Vec<(PohExpectation, Vec<u8>, Vec<u8>)> {
     let mut hash = [9; 32];
     (0..11u64)
@@ -108,7 +108,7 @@ fn native_readonly_wal_fixture_child() {
     database.put_cf(cf, key(3), b"wal-only-value").unwrap();
     let meta_cf = database.cf_handle("meta").unwrap();
     // Complete, explicitly disconnected metadata shaped like the first actual
-    // epoch141 rejection. Synthetic bytes, not historical-source evidence.
+    // epoch 141 rejection. Synthetic bytes, not historical-source evidence.
     database
         .put_cf(
             meta_cf,
@@ -285,7 +285,7 @@ fn native_readonly_resolves_manifest_and_wal() {
     )
     .unwrap();
     // Bind the same complete crash-shaped database through compressed input as
-    // well, including a bzip2 member boundary inside the tar. Native resolution
+    // well, including a bzip 2 member boundary inside the tar. Native resolution
     // below consumes this second, independently collected private generation.
     let mut compressed = Vec::new();
     for chunk in [&bytes[..777], &bytes[777..]] {

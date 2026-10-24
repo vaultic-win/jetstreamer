@@ -1,4 +1,4 @@
-//! Exact private203 continuation. No ordinary reuse, import, sidecar or R2 authority.
+//! Exact private 203 continuation. No ordinary reuse, import, sidecar or R2 authority.
 use super::checkpoint_continuation::{
     Evidence, RestartProof, assemble_sources, authenticate_service, available_bytes,
     checkpoint_matches, create_private_dir, require, require_no_checksum, require_retained_input,

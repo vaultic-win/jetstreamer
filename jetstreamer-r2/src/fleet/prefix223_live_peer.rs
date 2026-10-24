@@ -1,4 +1,4 @@
-//! Shared closed accounting for the actual native20 full-prefix223 peer.
+//! Shared closed accounting for the actual native 20 full-prefix peer for epoch 223.
 //! Never alters the accepted fleet, claims, history or producer.
 use super::prefix223_native20 as c;
 use super::*;
@@ -10,11 +10,11 @@ fn roster_scope(f: &Value) -> Result<()> {
     let mut seen = false;
     for row in f["active"]
         .as_array()
-        .context("peer223 full223 complete census")?
+        .context("peer 223 full 223 complete census")?
     {
         let owner = singleton227_admission::active_owner(row)?;
         if owner["Id"] != c::UNIT {
-            ensure!(row["epoch"] != 223, "unmodeled active223 peer");
+            ensure!(row["epoch"] != 223, "unmodeled active 223 peer");
             continue;
         }
         ensure!(
@@ -26,7 +26,7 @@ fn roster_scope(f: &Value) -> Result<()> {
                 && row["epoch"] == 223
                 && row["phase"] == "private-known-root-prefix"
                 && row["ordinary_replay_claim"] == false,
-            "peer223 full223 duplicate or changed owner scope"
+            "peer 223 full 223 duplicate or changed owner scope"
         );
         seen = true;
     }
@@ -43,16 +43,16 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
             && row["launch_receipt_sha256"] == LAUNCH_SHA
             && row["phase"] == "private-known-root-prefix"
             && row["ordinary_replay_claim"] == false,
-        "peer223 unknown epoch223 owner"
+        "peer 223 unknown epoch 223 owner"
     );
     let p: Plan = serde_json::from_value(bound_json(&BoundFile {
         path: f["plan"]
             .as_str()
-            .context("peer223 full223 fleet plan")?
+            .context("peer 223 full 223 fleet plan")?
             .into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("peer223 full223 plan digest")?
+            .context("peer 223 full 223 plan digest")?
             .into(),
     })?)?;
     let matches = p
@@ -62,7 +62,7 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
         .collect::<Vec<_>>();
     ensure!(
         matches.len() == 1,
-        "peer223 full223 needs one authenticated diagnostic claim"
+        "peer 223 full 223 needs one authenticated diagnostic claim"
     );
     let d = matches[0];
     ensure!(
@@ -75,7 +75,7 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
             && d.launch_receipt.sha256 == row["launch_receipt_sha256"]
             && owner["NRestarts"] == "0"
             && diagnostic_stage_running(owner),
-        "peer223 full223 invocation, command or launch changed"
+        "peer 223 full 223 invocation, command or launch changed"
     );
     let launch = native209::immutable_json(&d.launch_receipt)?;
     ensure!(
@@ -89,12 +89,12 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
                 .map(|n| n.to_string())
                 .as_deref()
                 == owner["MainPID"].as_str(),
-        "peer223 full223 launch owner changed"
+        "peer 223 full 223 launch owner changed"
     );
     c::bindings(d, &launch)?;
     ensure!(
         c::same_command(&owner["ExecStart"]),
-        "peer223 full223 live command changed"
+        "peer 223 full 223 live command changed"
     );
     Ok((
         DiagnosticClaim {
@@ -124,7 +124,7 @@ fn guard(
 ) -> Result<()> {
     let t = g["recorded_unix_seconds"]
         .as_u64()
-        .context("peer223 full223 guard clock")?;
+        .context("peer 223 full 223 guard clock")?;
     ensure!(
         p["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
             && c::guard_matches(d, launch, p)
@@ -176,23 +176,23 @@ fn guard(
                 .is_some_and(|(a, b)| a >= b)
             && g["remote_mutations"] == false
             && g["r2_mutations"] == false,
-        "peer223 protected full223 guard changed, stale or tripped"
+        "peer 223 protected full 223 guard changed, stale or tripped"
     );
     Ok(())
 }
 
 type Split = (Value, BTreeMap<String, BoundFile>, u64, Vec<Value>);
 pub(super) fn allocation(o: &Value, g: &Value, iid: &str) -> Result<(u64, u64, u64)> {
-    ensure!(iid == IID, "peer223 allocation belongs to another attempt");
+    ensure!(iid == IID, "peer 223 allocation belongs to another attempt");
     let rows = o["diagnostic_replays"]
         .as_array()
-        .context("peer223 full223 observer census")?
+        .context("peer 223 full 223 observer census")?
         .iter()
         .filter(|r| r["producer_unit"] == c::UNIT)
         .collect::<Vec<_>>();
     ensure!(
         rows.len() == 1,
-        "peer223 full223 needs one coordinated whole-root sample"
+        "peer 223 full 223 needs one coordinated whole-root sample"
     );
     let row = rows[0];
     let sample = &row["observation"];
@@ -206,16 +206,16 @@ pub(super) fn allocation(o: &Value, g: &Value, iid: &str) -> Result<(u64, u64, u
             && sample["producer_after"]["unit"] == c::UNIT
             && sample["producer_before"]["invocation_id"] == iid
             && sample["producer_after"]["invocation_id"] == iid,
-        "peer223 full223 allocation sample has another owner or directory scope"
+        "peer 223 full 223 allocation sample has another owner or directory scope"
     );
     let sampled = sample["conservative_observed_physical_bytes"]
         .as_u64()
         .filter(|n| *n <= c::PEAK)
-        .context("peer223 full223 sampled whole-root allocation exceeds envelope")?;
+        .context("peer 223 full 223 sampled whole-root allocation exceeds envelope")?;
     let guarded = g["root_physical_observation"]["conservative_physical_bytes"]
         .as_u64()
         .filter(|n| *n <= c::PEAK)
-        .context("peer223 full223 current guarded allocation exceeds envelope")?;
+        .context("peer 223 full 223 current guarded allocation exceeds envelope")?;
     Ok((sampled.min(guarded), sampled, guarded))
 }
 fn split(
@@ -243,16 +243,16 @@ fn split(
     let mut measurements = Vec::new();
     for row in f["active"]
         .as_array()
-        .context("peer223 full223 census")?
+        .context("peer 223 full 223 census")?
         .iter()
         .filter(|r| r["epoch"] == 223)
     {
         let owner = singleton227_admission::active_owner(row)?;
-        ensure!(measurements.is_empty(), "peer223 duplicate full223 owner");
+        ensure!(measurements.is_empty(), "peer 223 duplicate full 223 owner");
         let (d, launch) = claim(f, row)?;
         let b = reduced_guards
             .remove(&d.unit)
-            .context("peer223 full223 needs latest protective guard")?;
+            .context("peer 223 full 223 needs latest protective guard")?;
         let g = bound_json(&b)?;
         let plan: BoundFile = serde_json::from_value(launch["guard_plan"].clone())?;
         guard(
@@ -275,7 +275,7 @@ fn split(
     }
     reduced["active"]
         .as_array_mut()
-        .context("peer223 reduced full223 census")?
+        .context("peer 223 reduced full 223 census")?
         .retain(|r| singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] != c::UNIT));
     Ok((reduced, reduced_guards, growth, measurements))
 }
@@ -292,7 +292,7 @@ fn memory_limits(
     let requested_high = 150_000_000_000u64;
     ensure!(
         page > 0 && page.is_power_of_two(),
-        "peer223 invalid host page size"
+        "peer 223 invalid host page size"
     );
     ensure!(
         launch["maximum_memory_bytes"] == c::MEMORY
@@ -306,7 +306,7 @@ fn memory_limits(
             && high == requested_high / page * page
             && swap == 0
             && charge <= cap,
-        "peer223 full223 requested or kernel-rounded hard memory envelope changed"
+        "peer 223 full 223 requested or kernel-rounded hard memory envelope changed"
     );
     Ok(cap - charge)
 }
@@ -317,7 +317,7 @@ fn peer_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut evidence = Vec::new();
     for row in f["active"]
         .as_array()
-        .context("peer223 full223 memory census")?
+        .context("peer 223 full 223 memory census")?
         .iter()
         .filter(|r| r["epoch"] == 223)
     {
@@ -325,7 +325,7 @@ fn peer_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         let (d, launch) = claim(f, row)?;
         ensure!(
             owner["ControlGroup"] == format!("/system.slice/{}", d.unit),
-            "peer223 full223 cgroup escaped"
+            "peer 223 full 223 cgroup escaped"
         );
         let root = Path::new("/sys/fs/cgroup/system.slice").join(&d.unit);
         let read = |name: &str| -> Result<u64> {
@@ -335,11 +335,11 @@ fn peer_memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         let high = read("memory.high")?;
         let charge = read("memory.current")?;
         let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })
-            .context("peer223 host page size unavailable")?;
+            .context("peer 223 host page size unavailable")?;
         let remaining = memory_limits(&launch, cap, high, charge, read("memory.swap.max")?, page)?;
         total = total
             .checked_add(remaining)
-            .context("peer223 full223 memory overflow")?;
+            .context("peer 223 full 223 memory overflow")?;
         evidence.push(
             json!({"epoch":223,"unit":d.unit,"invocation_id":d.invocation_id,
             "hard_memory_cap_bytes":cap,"current_cgroup_charge_bytes":charge,
@@ -357,7 +357,7 @@ fn without_peer(f: &Value) -> Result<Value> {
     let mut view = f.clone();
     view["active"]
         .as_array_mut()
-        .context("peer223 accounting view")?
+        .context("peer 223 accounting view")?
         .retain(|row| {
             singleton227_admission::active_owner(row).map_or(true, |u| u["Id"] != c::UNIT)
         });
@@ -368,13 +368,13 @@ pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
     let mut names = prefix223_native20_admission::roster(&view)?;
     if f["active"]
         .as_array()
-        .context("peer223 full active roster")?
+        .context("peer 223 full active roster")?
         .len()
         != view["active"].as_array().unwrap().len()
     {
         ensure!(
             names.insert(c::UNIT.into()),
-            "duplicate peer223 roster owner"
+            "duplicate peer 223 roster owner"
         );
     }
     Ok(names)
@@ -392,7 +392,7 @@ pub(super) fn disk(
     evidence.extend(rest);
     Ok((
         base.checked_add(extra)
-            .context("peer223 total disk overflow")?,
+            .context("peer 223 total disk overflow")?,
         evidence,
     ))
 }
@@ -403,7 +403,7 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     evidence.extend(rest);
     Ok((
         base.checked_add(extra)
-            .context("peer223 total memory overflow")?,
+            .context("peer 223 total memory overflow")?,
         evidence,
     ))
 }
@@ -420,12 +420,12 @@ fn current_shape(expected: &Value, observed: &Value) -> Result<()> {
     ] {
         ensure!(
             expected[key] == observed[key],
-            "peer223 manager changed:{key}"
+            "peer 223 manager changed:{key}"
         );
     }
     ensure!(
         diagnostic_stage_running(observed) && c::same_command(&observed["ExecStart"]),
-        "peer223 is not the original live command"
+        "peer 223 is not the original live command"
     );
     Ok(())
 }
@@ -433,7 +433,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     roster(f)?;
     for row in f["active"]
         .as_array()
-        .context("peer223 current census")?
+        .context("peer 223 current census")?
         .iter()
         .filter(|r| r["epoch"] == 223)
     {
@@ -443,7 +443,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
             expected,
             current
                 .get(c::UNIT)
-                .context("peer223 current owner missing")?,
+                .context("peer 223 current owner missing")?,
         )?;
         let properties = singleton227_capture::properties(
             c::UNIT,

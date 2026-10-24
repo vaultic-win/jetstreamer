@@ -1,10 +1,10 @@
-//! Compressed epoch205 terminal input only; no restore, suffix or publication.
+//! Compressed epoch 205 terminal input only; no restore, suffix or publication.
 mod profile {
     pub(super) const EPOCH: u64 = 205;
     pub(super) const PROTECTED_FLEET: bool = true;
     pub(super) const PLAN_SCHEMA: &str = "horizon-epoch205-terminal-snapshot-prepare-plan-v1";
     pub(super) const RECEIPT_SCHEMA: &str = "horizon-epoch205-terminal-snapshot-prepared-v1";
-    // Unchanged older203/223/225 full growth claims plus the thirteen-jet floor.
+    // Unchanged older 203/223/225 full growth claims plus the thirteen-jet floor.
     pub(super) const MINIMUM_PROTECTED_FREE: u64 = 3_615_543_542_675;
     pub(super) const FILENAME: &str =
         "snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst";

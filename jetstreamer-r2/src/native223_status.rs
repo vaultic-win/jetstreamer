@@ -39,12 +39,12 @@ struct Plan {
 fn bound(b: &Bound) -> Result<Value> {
     ensure!(
         b.path.is_absolute() && is_lower_hex(&b.sha256, 64),
-        "native223 evidence binding"
+        "native 223 evidence binding"
     );
     let bytes = read_stable_bounded(&b.path, MAX_OBSERVER_RECEIPT_BYTES, "native223 evidence")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == b.sha256,
-        "native223 evidence digest differs"
+        "native 223 evidence digest differs"
     );
     Ok(serde_json::from_slice(&bytes)?)
 }
@@ -62,7 +62,7 @@ fn intent(v: &Value) -> Result<()> {
                 == "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665"
             && v["maximum_memory_bytes"] == 128u64 * (1 << 30)
             && v["resource_samples_taken"] == 0,
-        "native223 intent scope differs"
+        "native 223 intent scope differs"
     );
     for key in [
         "entry_replay",
@@ -70,7 +70,7 @@ fn intent(v: &Value) -> Result<()> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(v[key] == false, "native223 intent grants authority");
+        ensure!(v[key] == false, "native 223 intent grants authority");
     }
     Ok(())
 }
@@ -89,7 +89,7 @@ fn owner(v: &Value) -> bool {
 fn live(f: &Value) -> Result<Value> {
     ensure!(
         !Path::new(INTENT).with_file_name("result.json").exists(),
-        "native223 input already reached its terminal handoff"
+        "native 223 input already reached its terminal handoff"
     );
     let current = fleet::unit(UNIT)?;
     let old = &f["unit_census"][UNIT];
@@ -100,12 +100,12 @@ fn live(f: &Value) -> Result<Value> {
             && pipeline_status::same_exec_start(
                 old["ExecStart"]
                     .as_str()
-                    .context("native223 accepted command")?,
+                    .context("native 223 accepted command")?,
                 current["ExecStart"]
                     .as_str()
-                    .context("native223 current command")?
+                    .context("native 223 current command")?
             ),
-        "native223 owner changed"
+        "native 223 owner changed"
     );
     Ok(current)
 }
@@ -120,27 +120,27 @@ fn elapsed(sample: u64) -> Result<u64> {
         .output()?;
     ensure!(
         output.status.success(),
-        "native223 invocation clock unavailable"
+        "native 223 invocation clock unavailable"
     );
     let start = std::str::from_utf8(&output.stdout)?.trim().parse::<u64>()? / 1000;
     let mut clock = std::mem::MaybeUninit::<libc::timespec>::uninit();
     ensure!(
         unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, clock.as_mut_ptr()) } == 0,
-        "native223 monotonic clock"
+        "native 223 monotonic clock"
     );
     let clock = unsafe { clock.assume_init() };
     let now = u64::try_from(clock.tv_sec)?
         .checked_mul(1000)
         .and_then(|n| n.checked_add(u64::try_from(clock.tv_nsec).ok()? / 1_000_000))
-        .context("native223 clock overflow")?;
+        .context("native 223 clock overflow")?;
     let age = SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_millis()
         .checked_sub(u128::from(sample) * 1000)
-        .context("native223 future status")?;
+        .context("native 223 future status")?;
     now.checked_sub(start)
         .and_then(|n| n.checked_sub(u64::try_from(age).ok()?))
-        .context("native223 sample predates invocation")
+        .context("native 223 sample predates invocation")
 }
 fn remaining(stages: &BTreeMap<String, u64>, elapsed: u64) -> Result<u64> {
     ensure!(
@@ -148,7 +148,7 @@ fn remaining(stages: &BTreeMap<String, u64>, elapsed: u64) -> Result<u64> {
             && stages.values().all(|n| *n > 0 && *n <= 30 * 86_400_000)
             && stages["native_input"] <= 1_800_000
             && stages["bounded_warmup"] <= 3_600_000,
-        "native223 complete staged ETA required"
+        "native 223 complete staged ETA required"
     );
     stages.iter().try_fold(0u64, |total, (stage, value)| {
         total
@@ -157,7 +157,7 @@ fn remaining(stages: &BTreeMap<String, u64>, elapsed: u64) -> Result<u64> {
             } else {
                 *value
             })
-            .context("native223 ETA overflow")
+            .context("native 223 ETA overflow")
     })
 }
 pub(super) fn matches(
@@ -197,7 +197,7 @@ pub(super) fn inactive_owner(
             && publication.producer_invocation_id == IID
             && publication.pipeline_binding.is_none()
             && publication.status.jet_size_bytes == 0,
-        "native223 inactive status owner differs"
+        "native 223 inactive status owner differs"
     );
     let i = bound(&Bound {
         path: INTENT.into(),
@@ -214,14 +214,14 @@ pub(super) fn inactive_owner(
                 == fleet::utc_seconds(
                     o["recorded_at_utc"]
                         .as_str()
-                        .context("native223 inactive observer clock")?
+                        .context("native 223 inactive observer clock")?
                 )?
                 .max(
                     i["recorded_unix_seconds"]
                         .as_u64()
-                        .context("native223 inactive event clock")?
+                        .context("native 223 inactive event clock")?
                 ),
-        "native223 inactive status sample differs"
+        "native 223 inactive status sample differs"
     );
     Ok(Some((UNIT.into(), IID.into())))
 }
@@ -231,13 +231,13 @@ pub(super) async fn run() -> Result<()> {
         (args.len() == 7 || (args.len() == 8 && args[7] == "--check-only"))
             && args[3] == "--plan-sha256"
             && args[5] == "--self-sha256",
-        "native223 status arguments"
+        "native 223 status arguments"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0
             && is_lower_hex(&args[6], 64)
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == args[6],
-        "native223 root/self binding"
+        "native 223 root/self binding"
     );
     let plan_bound = Bound {
         path: args[2].clone().into(),
@@ -252,7 +252,7 @@ pub(super) async fn run() -> Result<()> {
             && !p.estimate_evidence.is_empty()
             && p.estimate_evidence.len() <= 16
             && p.estimate_receipt.is_absolute(),
-        "native223 status plan scope"
+        "native 223 status plan scope"
     );
     let i = bound(&p.intent)?;
     intent(&i)?;
@@ -264,11 +264,11 @@ pub(super) async fn run() -> Result<()> {
     let observer_clock = fleet::utc_seconds(
         o["recorded_at_utc"]
             .as_str()
-            .context("native223 observer clock")?,
+            .context("native 223 observer clock")?,
     )?;
     let event_clock = i["recorded_unix_seconds"]
         .as_u64()
-        .context("native223 intent clock")?;
+        .context("native 223 intent clock")?;
     let sample = fleet::utc_seconds(&p.sampled_at_utc)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
@@ -286,16 +286,16 @@ pub(super) async fn run() -> Result<()> {
             && f["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|n| n >= event_clock),
-        "native223 needs accepted event/fresh observation"
+        "native 223 needs accepted event/fresh observation"
     );
     let fleet_plan = bound(&Bound {
         path: f["plan"]
             .as_str()
-            .context("native223 accepted plan")?
+            .context("native 223 accepted plan")?
             .into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("native223 accepted plan digest")?
+            .context("native 223 accepted plan digest")?
             .into(),
     })?;
     ensure!(
@@ -308,13 +308,13 @@ pub(super) async fn run() -> Result<()> {
                 && claim["evidence"].as_array().is_some_and(|rows| rows
                     .iter()
                     .any(|row| row["path"] == INTENT && row["sha256"] == INTENT_SHA)))),
-        "native223 accepted fleet lacks the exact native intent claim"
+        "native 223 accepted fleet lacks the exact native intent claim"
     );
     let before = live(&f)?;
     let elapsed = elapsed(sample)?;
     ensure!(
         elapsed <= 1_800_000,
-        "native223 input runtime allowance exhausted"
+        "native 223 input runtime allowance exhausted"
     );
     let mut status = EpochStatus {
         epoch: 223,
@@ -334,7 +334,7 @@ pub(super) async fn run() -> Result<()> {
             saved["schema"] == "jetstreamer-native223-status-estimate-v1"
                 && saved["plan_sha256"] == plan_bound.sha256
                 && saved["intent_sha256"] == INTENT_SHA,
-            "foreign native223 estimate"
+            "foreign native 223 estimate"
         );
         status = serde_json::from_value(saved["status"].clone())?;
         ensure!(
@@ -342,7 +342,7 @@ pub(super) async fn run() -> Result<()> {
                 && status.sampled_at_utc == p.sampled_at_utc
                 && status.phase == "verification"
                 && status.jet_size_bytes == 0,
-            "native223 saved estimate scope"
+            "native 223 saved estimate scope"
         );
     } else if args.len() == 7 {
         fleet::persist(
@@ -352,7 +352,7 @@ pub(super) async fn run() -> Result<()> {
     }
     ensure!(
         live(&f)? == before,
-        "native223 owner changed during estimate"
+        "native 223 owner changed during estimate"
     );
     if args.len() == 8 {
         println!(
@@ -366,7 +366,7 @@ pub(super) async fn run() -> Result<()> {
     let s3 = s3_client(&config);
     ensure!(
         live(&f)? == before,
-        "native223 owner changed before publication"
+        "native 223 owner changed before publication"
     );
     let (etag, previous) = publish_epoch_status(&s3, &config, &status).await?;
     let path = status_receipt_path(&p.receipt_directory, &status);
@@ -386,7 +386,7 @@ pub(super) async fn run() -> Result<()> {
                 && old.observer_receipt_sha256 == p.observer.sha256
                 && old.controller_invocation_id == IID
                 && old.producer_invocation_id == IID,
-            "native223 prior publication differs"
+            "native 223 prior publication differs"
         );
     } else {
         write_status_receipt(
@@ -411,7 +411,7 @@ pub(super) async fn run() -> Result<()> {
     }
     ensure!(
         live(&f)? == before,
-        "native223 owner changed during publication"
+        "native 223 owner changed during publication"
     );
     println!("{}", path.display());
     Ok(())

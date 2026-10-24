@@ -125,13 +125,13 @@ fn gate(
             || root.next_write_version > terminal.next_write_version
         {
             return Err(format!(
-                "epoch{epoch} root/terminal scope or progression mismatch"
+                "epoch {epoch} root/terminal scope or progression mismatch"
             ));
         }
         if member["manifest_root"]["slot"] != expected.slot
             || member["manifest_root"]["accounts_hash"] != expected.accounts_hash
         {
-            return Err(format!("epoch{epoch} trusted manifest root differs"));
+            return Err(format!("epoch {epoch} trusted manifest root differs"));
         }
         verified.push(cohort_publication::VerifiedManifestCheckpoint {
             slot: root.slot,
@@ -248,11 +248,11 @@ fn completed_restore213_quiescent(
     match fs::read_to_string(&path) {
         Ok(procs) if procs.trim().is_empty() => (),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
-        _ => return Err("completed213 probe still has processes or unreadable cgroup".into()),
+        _ => return Err("completed 213 probe still has processes or unreadable cgroup".into()),
     }
     let after = systemd_recovery_fields(name, "horizon-qualify-")?;
     if after != *fields {
-        return Err("completed213 probe changed during quiescence check".into());
+        return Err("completed 213 probe changed during quiescence check".into());
     }
     Ok(true)
 }
@@ -394,19 +394,19 @@ fn trusted219_terminal() -> Result<ArchiveBlockEvidence, String> {
             "trusted219",
         )?
     {
-        return Err("trusted219 content changed".into());
+        return Err("trusted 219 content changed".into());
     }
     let reader = jetstreamer_horizon::archive::ArchiveReader::open(std::io::BufReader::new(file))
         .map_err(|e| e.to_string())?;
     let count = reader.bucket_count();
     if reader.header().epoch != 219 || count == 0 {
-        return Err("trusted219 header changed".into());
+        return Err("trusted 219 header changed".into());
     }
     let tail = verify_archive_bucket_range(path, measured.identity, count - 1, count, None)?;
     let terminal = tail
         .chain
         .terminal_block
-        .ok_or("trusted219 terminal missing")?;
+        .ok_or("trusted 219 terminal missing")?;
     if terminal.slot != 95039999
         || terminal.blockhash.to_string() != "4MaWCL7a9CgF9XrNHgt9TA5cryFkW8P7S6aCdCU8cXRW"
         || !jetstreamer_node::archive_checksum::path_matches_archive_identity(
@@ -415,7 +415,7 @@ fn trusted219_terminal() -> Result<ArchiveBlockEvidence, String> {
         )
         .map_err(|e| e.to_string())?
     {
-        return Err("trusted219 terminal/identity changed".into());
+        return Err("trusted 219 terminal/identity changed".into());
     }
     Ok(terminal)
 }
@@ -424,12 +424,12 @@ fn bind_first_anchor(
     first: &ArchiveChainEvidence,
     prior: ArchiveBlockEvidence,
 ) -> Result<(), String> {
-    let first_block = first.first_block.ok_or("epoch220 first block missing")?;
+    let first_block = first.first_block.ok_or("epoch 220 first block missing")?;
     if first.initial_poh_anchor != Some(prior.blockhash)
         || first_block.parent_slot != prior.slot
         || first_block.parent_blockhash != prior.blockhash
     {
-        return Err("epoch220 does not continue trusted219 terminal".into());
+        return Err("epoch 220 does not continue trusted 219 terminal".into());
     }
     Ok(())
 }
@@ -445,7 +445,7 @@ pub(super) fn recover(
     use std::os::unix::fs::MetadataExt;
     if effective_user_id() != 1000 || env::var_os(PRIVATE_RUN_ROOT_ENV).is_some() {
         return Err(
-            "failed-prefix recovery requires original uid1000 and default shared epoch leases"
+            "failed-prefix recovery requires original uid 1000 and default shared epoch leases"
                 .into(),
         );
     }
@@ -539,7 +539,7 @@ pub(super) fn recover(
                         || meta.len() != BYTES[index]
                         || meta.mode() & 0o777 != 0o440
                     {
-                        return Err(format!("epoch{epoch} original source identity changed"));
+                        return Err(format!("epoch {epoch} original source identity changed"));
                     }
                     let mut archive_chain = ArchiveChainEvidence::default();
                     let pool = rayon::ThreadPoolBuilder::new()
@@ -556,7 +556,7 @@ pub(super) fn recover(
                                 Some(&mut archive_chain),
                             )
                         })?
-                        .ok_or_else(|| format!("epoch{epoch} incomplete"))?;
+                        .ok_or_else(|| format!("epoch {epoch} incomplete"))?;
                     let provenance = read_bound_cohort_provenance(&source_archive, validated)?;
                     Ok(RecoveredCohortEpoch {
                         epoch,
@@ -621,7 +621,7 @@ pub(super) fn recover(
         &publication,
         &gate,
     )?;
-    // The failed source run contains preserved partial223 and is NEVER cleaned here.
+    // The failed source run contains preserved partial 223 and is NEVER cleaned here.
     Ok(
         json!({"schema":"horizon-failed-prefix220-recovery-completed-v1","epochs":epochs,"recovery_receipt":input.recovery_receipt,"recovery_receipt_sha256":jetstreamer_node::segment_manifest::sha256_hex_string(&receipt_sha),"publication_receipt":completed.receipt_path,"publication_transaction_id":jetstreamer_node::segment_manifest::sha256_hex_string(&completed.transaction_id),"archive_count":completed.archive_count,"source_run_preserved":true,"partial223_preserved":true,"r2_ready_pair_proven":false,"remote_mutations":false,"r2_mutations":false}),
     )

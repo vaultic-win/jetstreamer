@@ -1,6 +1,6 @@
 # Dormant exact native-input template. Root must admit, seal and install explicitly.
 [Unit]
-Description=Horizon epoch227 v1.6.25 native bootstrap verification
+Description=Horizon epoch 227 v1.6.25 native bootstrap verification
 
 [Service]
 Type=exec

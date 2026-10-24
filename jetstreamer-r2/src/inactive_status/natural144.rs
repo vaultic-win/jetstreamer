@@ -1,4 +1,4 @@
-//! Exact naturally completed private144 owner, not a complete epoch assertion.
+//! Exact naturally completed private 144 owner, not a complete epoch assertion.
 use super::*;
 const UNIT: &str = "horizon-qualify-epoch144-loader-focus-20261016-v1.service";
 const IID: &str = "ea4a806906ba493e9af49e2a9c71c9e7";

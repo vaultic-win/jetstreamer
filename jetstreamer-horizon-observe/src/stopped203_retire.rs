@@ -71,7 +71,7 @@ fn validate_plan(p: &Plan) -> Result<()> {
             && p.checker.sha256 == CHECKER_SHA
             && p.check_plan.path == Path::new(CHECK_PLAN)
             && p.check_plan.sha256 == CHECK_PLAN_SHA,
-        "not the independently qualified stopped203case"
+        "not the independently qualified stopped 203 case"
     );
     ensure!(
         unit_name(&p.check_unit, "horizon-203-stopped-scratch-retire-check-")

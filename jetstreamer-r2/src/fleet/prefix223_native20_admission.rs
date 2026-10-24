@@ -1,4 +1,4 @@
-//! Admit a cold native20 prefix without hiding another running repair owner.
+//! Admit a cold native 20 prefix without hiding another running repair owner.
 use super::{prefix223_native20 as c, *};
 mod planning;
 pub(super) fn plan() -> Result<()> {
@@ -50,19 +50,19 @@ pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
                 row["epoch"] == 228
                     && row["phase"] == "private-cold-snapshot-verification"
                     && row["ordinary_replay_claim"] == false,
-                "native228 peer scope differs"
+                "native 228 peer scope differs"
             );
         } else if name == singleton209::UNIT {
             ensure!(
                 row["epoch"] == 209
                     && row["phase"] == "diagnostic-qualification"
                     && row["ordinary_replay_claim"] == false,
-                "full209 peer scope differs"
+                "full 209 peer scope differs"
             );
         } else {
             anyhow::bail!("unmodeled full-prefix peer:{name}");
         }
-        ensure!(row["epoch"] != 223, "another active223 owner exists");
+        ensure!(row["epoch"] != 223, "another active 223 owner exists");
     }
     Ok(names)
 }
@@ -137,10 +137,10 @@ fn completed_guards(
     for (name, bound) in guards {
         let (unit, dir) = guard_selector(name)?;
         let dir = if name == singleton209::UNIT {
-            let parent = bound.path.parent().context("full209 bound guard parent")?;
+            let parent = bound.path.parent().context("full 209 bound guard parent")?;
             ensure!(
                 parent.starts_with("/var/lib/jetstreamer"),
-                "full209 guard receipt escaped private evidence"
+                "full 209 guard receipt escaped private evidence"
             );
             parent
         } else {
@@ -209,7 +209,7 @@ fn sample_for_plan(
     ensure!(
         o["lane_rss_history"]["200"]["reservation_ceiling_bytes"] == ceiling
             && c::MEMORY <= ceiling,
-        "prefix memory cap exceeds century1.5x observed RSS"
+        "prefix memory cap exceeds century 1.5x observed RSS"
     );
     let psi = &o["host_global_pressure"]["cross_sample"];
     ensure!(
@@ -270,7 +270,7 @@ fn sample_for_plan(
     );
     ensure!(
         !require_memory_fit || available >= total / 10 + c::MEMORY,
-        "prefix candidate exceeds90percent memory target"
+        "prefix candidate exceeds 90 percent memory target"
     );
     Ok((t, floor, available))
 }
@@ -287,7 +287,7 @@ fn arithmetic(
         .max(guard_floor);
     ensure!(
         protected <= c::FLOOR,
-        "prefix protected growth/unchanged guard floor exceeds sealed2TB plan; new generation required"
+        "prefix protected growth/unchanged guard floor exceeds sealed 2 TB plan; new generation required"
     );
     let base = (480u64 << 30)
         .max(total / 10)
@@ -318,7 +318,7 @@ pub(super) fn validate_saved(a: &Value) -> Result<()> {
             && a["capability"] == json!({"path":c::CAPABILITY,"sha256":c::CAPABILITY_SHA})
             && a["warmup_terminal"] == json!({"path":c::WARMUP,"sha256":c::WARMUP_SHA})
             && a["resource_plan"] == json!({"path":c::PLAN,"sha256":c::PLAN_SHA}),
-        "native20 prefix saved admission scope differs"
+        "native 20 prefix saved admission scope differs"
     );
     let (computed, memory) = arithmetic(
         a["century_floor_bytes"]

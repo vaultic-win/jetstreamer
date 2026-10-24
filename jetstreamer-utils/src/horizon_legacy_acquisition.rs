@@ -1,6 +1,6 @@
 //! Raw acquisition only: never ancestry, PoH, recovery or publication authority.
 //!
-//! Solana893cc764 blockstore_db.rs SHA256
+//! Solana 893cc764 blockstore_db.rs SHA256
 //! 7391732d9c41d09cdf4f1c9997c9ee37ccace9040aa5845249918084bcc0b046:
 //! SlotColumn keys are big endian u64; data_shred keys are two big endian u64s.
 //! The strict recovery planner and assembler deliberately remain unchanged.

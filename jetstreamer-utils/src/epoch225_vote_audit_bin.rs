@@ -1,4 +1,4 @@
-//! Offline, non-authorizing comparison of the exact epoch225 trace and finalized votes.
+//! Offline, non-authorizing comparison of the exact epoch 225 trace and finalized votes.
 use {
     anyhow::{Context, Result, ensure},
     serde::{Deserialize, Serialize},

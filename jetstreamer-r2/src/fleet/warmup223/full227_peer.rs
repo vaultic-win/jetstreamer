@@ -1,4 +1,4 @@
-//! Expanded v2 admission accounts for the exact already-running full227 owner.
+//! Expanded v2 admission accounts for the exact already-running full 227 owner.
 use super::super::singleton227 as lane;
 use super::super::*;
 pub(super) const IID: &str = "a10f37b57711425a81633c62c66438d5";
@@ -11,7 +11,7 @@ fn require_timer(read: impl FnOnce(&str, &str) -> Result<BTreeMap<String, String
     )?;
     ensure!(
         properties.get("ActiveState").map(String::as_str) == Some("active"),
-        "v2 full227 guard timer inactive"
+        "v2 full 227 guard timer inactive"
     );
     Ok(())
 }
@@ -45,12 +45,12 @@ fn memory_envelope(
             .context("v2 sealed requested memory limit missing")?;
         ensure!(
             properties.get(key).map(String::as_str) == Some(raw),
-            "v2 full227 requested systemd memory limit changed:{key}"
+            "v2 full 227 requested systemd memory limit changed:{key}"
         );
         let expected = effective_limit(raw.parse()?, page_size)?;
         ensure!(
             kernel.get(file) == Some(&expected),
-            "v2 full227 effective kernel memory limit changed:{file}"
+            "v2 full 227 effective kernel memory limit changed:{file}"
         );
     }
     Ok(())
@@ -59,7 +59,7 @@ fn roster(f: &Value) -> Result<&Value> {
     let rows = f["active"].as_array().context("v2 complete owner census")?;
     ensure!(
         rows.len() == 4,
-        "v2 requires exactly three old owners plus full227; recompute for any added or missing owner"
+        "v2 requires exactly three old owners plus full 227; recompute for any added or missing owner"
     );
     for (name, iid) in super::OWNERS.into_iter().skip(1) {
         ensure!(
@@ -84,17 +84,17 @@ fn roster(f: &Value) -> Result<&Value> {
         .collect::<Vec<_>>();
     ensure!(
         matches.len() == 1,
-        "v2 requires the exact already-registered full227 invocation"
+        "v2 requires the exact already-registered full 227 invocation"
     );
     Ok(matches[0])
 }
 pub(super) fn accepted(f: &Value) -> Result<DiagnosticClaim> {
     let row = roster(f)?;
     let p: Plan = serde_json::from_value(bound_json(&BoundFile {
-        path: f["plan"].as_str().context("v2 full227 fleet plan")?.into(),
+        path: f["plan"].as_str().context("v2 full 227 fleet plan")?.into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("v2 full227 fleet plan digest")?
+            .context("v2 full 227 fleet plan digest")?
             .into(),
     })?)?;
     let claims = p
@@ -104,7 +104,7 @@ pub(super) fn accepted(f: &Value) -> Result<DiagnosticClaim> {
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
-        "v2 full227 registered claim missing/duplicate"
+        "v2 full 227 registered claim missing/duplicate"
     );
     let prior = claims[0];
     let c = DiagnosticClaim {
@@ -122,7 +122,7 @@ pub(super) fn accepted(f: &Value) -> Result<DiagnosticClaim> {
             && c.launch_receipt.path.to_str() == row["launch_receipt"].as_str()
             && c.launch_receipt.sha256 == row["launch_receipt_sha256"]
             && c.scratch_path == Path::new(lane::ROOT),
-        "v2 full227 accepted binding differs"
+        "v2 full 227 accepted binding differs"
     );
     lane::bindings(&c, &bound_json(&c.launch_receipt)?)?;
     Ok(c)
@@ -131,7 +131,9 @@ pub(super) fn protect(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     let c = accepted(f)?;
     let origin = bound_json(&c.launch_receipt)?;
     let old = owner(roster(f)?);
-    let u = current.get(lane::UNIT).context("v2 full227 owner absent")?;
+    let u = current
+        .get(lane::UNIT)
+        .context("v2 full 227 owner absent")?;
     for key in [
         "Id",
         "InvocationID",
@@ -141,11 +143,11 @@ pub(super) fn protect(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
         "SubState",
         "ControlGroup",
     ] {
-        ensure!(u[key] == old[key], "v2 full227 identity changed:{key}");
+        ensure!(u[key] == old[key], "v2 full 227 identity changed:{key}");
     }
     ensure!(
         diagnostic_stage_running(u) && lane::same_command(&u["ExecStart"], &origin),
-        "v2 full227 command/state changed"
+        "v2 full 227 command/state changed"
     );
     let caps = singleton227_capture::properties(lane::UNIT, "MemoryHigh,MemoryMax,MemorySwapMax")?;
     let page_size = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })
@@ -153,12 +155,12 @@ pub(super) fn protect(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     let expected_group = format!("/system.slice/{}", lane::UNIT);
     ensure!(
         u["ControlGroup"] == expected_group,
-        "v2 full227 cgroup path differs"
+        "v2 full 227 cgroup path differs"
     );
     let group = Path::new("/sys/fs/cgroup").join(expected_group.trim_start_matches('/'));
     ensure!(
         group.canonicalize()? == group,
-        "v2 full227 cgroup path redirected"
+        "v2 full 227 cgroup path redirected"
     );
     let kernel = ["memory.high", "memory.max", "memory.swap.max"]
         .into_iter()
@@ -176,7 +178,7 @@ pub(super) fn protect(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
 fn remaining_memory(o: &Value, cap: u64) -> Result<u64> {
     let rows = o["diagnostic_replays"]
         .as_array()
-        .context("v2 full227 resource census")?
+        .context("v2 full 227 resource census")?
         .iter()
         .filter(|r| r["producer_unit"] == lane::UNIT)
         .collect::<Vec<_>>();
@@ -184,7 +186,7 @@ fn remaining_memory(o: &Value, cap: u64) -> Result<u64> {
         rows.len() == 1
             && rows[0]["status"] == "observed"
             && rows[0]["observation"]["invocation_binding_stable"] == true,
-        "v2 full227 stable resource sample missing/duplicate"
+        "v2 full 227 stable resource sample missing/duplicate"
     );
     let row = &rows[0]["observation"];
     let mut charges = Vec::new();
@@ -193,30 +195,30 @@ fn remaining_memory(o: &Value, cap: u64) -> Result<u64> {
             row[phase]["unit"] == lane::UNIT
                 && row[phase]["invocation_id"] == IID
                 && row[phase]["restarts"] == 0,
-            "v2 full227 sampled identity differs"
+            "v2 full 227 sampled identity differs"
         );
         charges.push(
             row[phase]["cgroup"]["gauges"]["memory.current"]
                 .as_u64()
-                .context("v2 full227 cgroup charge missing")?,
+                .context("v2 full 227 cgroup charge missing")?,
         );
     }
     let charged = *charges.iter().min().unwrap();
     cap.checked_sub(charged)
-        .context("v2 full227 exceeded captured hard memory cap")
+        .context("v2 full 227 exceeded captured hard memory cap")
 }
 pub(super) fn sample_memory(o: &Value, f: &Value) -> Result<u64> {
     let c = accepted(f)?;
     let origin = bound_json(&c.launch_receipt)?;
     let cap = origin["sandbox"]["MemoryMax"]
         .as_str()
-        .context("v2 full227 hard cap")?
+        .context("v2 full 227 hard cap")?
         .parse::<u64>()?;
     ensure!(
         cap == 225_000_000_000
             && origin["sandbox"]["MemoryHigh"] == "150000000000"
             && origin["sandbox"]["MemorySwapMax"] == "0",
-        "v2 full227 captured memory policy differs"
+        "v2 full 227 captured memory policy differs"
     );
     let pending = remaining_memory(o, cap)?;
     let available = o["host_memory"]["conservative_available_kib"]
@@ -236,7 +238,7 @@ pub(super) fn sample_memory(o: &Value, f: &Value) -> Result<u64> {
                 >= (total / 10)
                     .checked_add(128u64 << 30)
                     .and_then(|n| n.checked_add(pending))
-                    .context("v2 90percent memory arithmetic overflow")?,
+                    .context("v2 90 percent memory arithmetic overflow")?,
         "v2 expanded memory envelope does not fit"
     );
     Ok(pending)
@@ -273,7 +275,7 @@ pub(super) fn guard(f: &Value, sample: u64, now: u64) -> Result<super::guard_rec
             ]
             .iter()
             .all(|k| g.get(*k).is_some_and(Value::is_null)),
-        "v2 full227 protective guard differs or tripped"
+        "v2 full 227 protective guard differs or tripped"
     );
     require_timer(singleton227_capture::properties)?;
     Ok(selected)
@@ -294,7 +296,7 @@ pub(super) fn budget(
         native209_full227::allocation(o, full_guard, IID)?;
     let remaining = lane::PEAK
         .checked_sub(credit)
-        .context("v3 full227 allocation credit exceeds envelope")?;
+        .context("v3 full 227 allocation credit exceeds envelope")?;
     // Derived arithmetic subcensus only, never an accepted or published fleet.
     // The complete four-owner census above remains the authority.
     let mut old = f.clone();
@@ -314,7 +316,7 @@ pub(super) fn budget(
         .context("v2 expanded disk arithmetic overflow")?;
     ensure!(
         protected <= 2_000_000_000_000,
-        "v2 expanded protected disk exceeds the sealed2TBfloor; raise the generation before launch"
+        "v2 expanded protected disk exceeds the sealed 2 TB floor; raise the generation before launch"
     );
     let (after_growth, _) = singleton227_admission::protected_growth(&old, o, guards, sample, now)?;
     let free_after = singleton227_admission::disk_free()?;
@@ -331,18 +333,18 @@ pub(super) fn budget(
 pub(super) fn validate_budget(v: &Value) -> Result<()> {
     let credit = v["full227_scratch_credit_bytes"]
         .as_u64()
-        .context("saved full227 credit missing")?;
+        .context("saved full 227 credit missing")?;
     let remaining = lane::PEAK
         .checked_sub(credit)
-        .context("saved full227 credit exceeds cap")?;
+        .context("saved full 227 credit exceeds cap")?;
     let credited = v["schema"] == "jetstreamer-warmup223-expanded-budget-v3";
     if credited {
         let sampled = v["full227_sampled_whole_root_bytes"]
             .as_u64()
-            .context("saved full227 sample allocation")?;
+            .context("saved full 227 sample allocation")?;
         let guarded = v["full227_guarded_whole_root_bytes"]
             .as_u64()
-            .context("saved full227 guarded allocation")?;
+            .context("saved full 227 guarded allocation")?;
         ensure!(
             sampled <= lane::PEAK
                 && guarded <= lane::PEAK
@@ -357,7 +359,7 @@ pub(super) fn validate_budget(v: &Value) -> Result<()> {
                     .as_u64()
                     .zip(v["old_three_remaining_growth_bytes"].as_u64())
                     .is_some_and(|(a, b)| a <= b),
-            "saved full227 credit/bracket mismatch"
+            "saved full 227 credit/bracket mismatch"
         );
     }
     let sum = v["old_three_remaining_growth_bytes"]
@@ -391,7 +393,7 @@ pub(super) fn validate_budget(v: &Value) -> Result<()> {
         ensure!(
             v["full227_guarded_whole_root_bytes"]
                 == g["root_physical_observation"]["conservative_physical_bytes"],
-            "saved credit does not match bound full227 guard"
+            "saved credit does not match bound full 227 guard"
         );
     }
     super::guard_receipt::validate_history(&v["full227_guard_history"], &g)?;
@@ -400,7 +402,7 @@ pub(super) fn validate_budget(v: &Value) -> Result<()> {
             && v["full227_guard_history"]["maximum_age_seconds"] == 120
             && g["producer_invocation_id"] == IID
             && g["guard_sha256"] == lane::SINGLETON_GUARD_SHA,
-        "v2 saved full227 protective evidence differs"
+        "v2 saved full 227 protective evidence differs"
     );
     Ok(())
 }

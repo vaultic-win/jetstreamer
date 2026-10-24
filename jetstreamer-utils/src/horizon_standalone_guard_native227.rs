@@ -98,16 +98,16 @@ fn observe_at(
             && !unit.cgroup.starts_with("//")
             && unit.cgroup != "/"
             && !unit.cgroup.split('/').any(|s| s == ".." || s == "."),
-        "native227 MainPID/cgroup differs"
+        "native 227 MainPID/cgroup differs"
     );
     let pids = cgroup_pids(&cgroups.join(&unit.cgroup[1..]))?;
     ensure!(
         pids == vec![n.main_pid],
-        "native227 missing, escaped or additional process"
+        "native 227 missing, escaped or additional process"
     );
     ensure!(
         n.executable.is_absolute() && n.executable.canonicalize()? == n.executable,
-        "native227 noncanonical executable"
+        "native 227 noncanonical executable"
     );
     let expected = fs::symlink_metadata(&n.executable)?;
     ensure!(
@@ -116,18 +116,18 @@ fn observe_at(
             && expected.nlink() == 1
             && expected.mode() & 0o222 == 0
             && expected.len() <= 256 << 20,
-        "native227 unsafe sealed executable"
+        "native 227 unsafe sealed executable"
     );
     let proc = processes.join(n.main_pid.to_string());
     ensure!(
         fs::read_link(proc.join("exe"))? == n.executable,
-        "native227 executable escaped/replaced"
+        "native 227 executable escaped/replaced"
     );
     // Read the actual mapped inode through proc, not just the same pathname.
     let mut exe = File::open(proc.join("exe"))?;
     ensure!(
         same(&expected, &exe.metadata()?),
-        "native227 mapped inode differs"
+        "native 227 mapped inode differs"
     );
     let mut hash = Sha256::new();
     let mut buffer = [0u8; 128 * 1024];
@@ -138,7 +138,7 @@ fn observe_at(
             break;
         }
         total += count as u64;
-        ensure!(total <= 256 << 20, "native227 executable grew");
+        ensure!(total <= 256 << 20, "native 227 executable grew");
         hash.update(&buffer[..count]);
     }
     ensure!(
@@ -146,7 +146,7 @@ fn observe_at(
             && format!("{:x}", hash.finalize()) == n.sha256
             && same(&expected, &fs::symlink_metadata(&n.executable)?)
             && same(&expected, &exe.metadata()?),
-        "native227 executable digest/identity changed"
+        "native 227 executable digest/identity changed"
     );
     let mut vmas = 0u64;
     for line in BufReader::new(File::open(proc.join("maps"))?).lines() {
@@ -160,7 +160,7 @@ fn observe_at(
         vmas > 0
             && fs::read_link(proc.join("exe"))? == n.executable
             && cgroup_pids(&cgroups.join(&unit.cgroup[1..]))? == vec![n.main_pid],
-        "native227 process/maps changed during observation"
+        "native 227 process/maps changed during observation"
     );
     Ok(vec![(n.main_pid, vmas)])
 }

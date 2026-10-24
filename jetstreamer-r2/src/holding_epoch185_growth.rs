@@ -1,4 +1,4 @@
-//! Exact old185-attempt reservation fence. No physical retirement, guard change,
+//! Exact reservation fence for the old epoch 185 attempt. No physical retirement, guard change,
 //! epoch readiness, or new replay/restore admission follows from this receipt.
 use super::*;
 
@@ -63,7 +63,7 @@ fn record(path: &Path) -> Result<Option<Value>> {
                     && m.nlink() == 1
                     && m.mode() & 0o222 == 0
                     && path.canonicalize()? == path,
-                "unsafe185 growth ledger record"
+                "unsafe 185 growth ledger record"
             );
             Ok(Some(serde_json::from_slice(&read_stable_bounded(
                 path,
@@ -94,7 +94,7 @@ fn snapshot_bindings(
             && p.reconciliation.sha256 == RECONCILIATION_SHA
             && p.deployment.path == Path::new(DEPLOYMENT)
             && p.deployment.sha256 == DEPLOYMENT_SHA,
-        "foreign old185 reservation subject"
+        "foreign old 185 reservation subject"
     );
     ensure!(
         a["schema"] == "jetstreamer-historical-performance-admission-v1"
@@ -103,7 +103,7 @@ fn snapshot_bindings(
                 .as_u64()
                 .and_then(|n| n.checked_sub(OLD_FLOOR))
                 == Some(RESERVATION),
-        "old185 original incremental reservation differs"
+        "old 185 original incremental reservation differs"
     );
     let (_, etag, sha, length) = custody(c, m)?;
     ensure!(
@@ -126,7 +126,7 @@ fn snapshot_bindings(
             && e["job_resume_authorized"] == false
             && e["runtime_checkpoint_qualified"] == false
             && e["publication_authorized"] == false,
-        "old185 closure requires exact preserved failed bytes and authenticated whole-readback custody"
+        "old 185 closure requires exact preserved failed bytes and authenticated whole-readback custody"
     );
     ensure!(
         r["schema"] == "jetstreamer-terminal185-staged-reconciliation-v2"
@@ -137,12 +137,12 @@ fn snapshot_bindings(
             && r["staged_after"]["terminal_fragment_exclusions"] == json!([])
             && r["growth_claims_released"] == false
             && r["replay_data_removed"] == false,
-        "old185 launch-route reconciliation differs"
+        "old 185 launch-route reconciliation differs"
     );
     ensure!(
         d["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && d["destination"] == Path::new(DEPLOYMENT).parent().unwrap().to_str().unwrap(),
-        "old185 input deployment differs"
+        "old 185 input deployment differs"
     );
     Ok(())
 }
@@ -326,7 +326,7 @@ fn latest_fleet(b: &Bound, f: &Value) -> Result<()> {
                             .as_u64()
                             .context("185 candidate event clock")?
                             < recorded),
-                "newer fleet invalidates old185 closure census"
+                "newer fleet invalidates old 185 closure census"
             );
         }
     }
@@ -346,7 +346,7 @@ fn no_queued_entry_jobs(jobs: &Value) -> Result<()> {
             || (unit.starts_with("jetstreamer-") && unit.contains("controller"));
         ensure!(
             !entry,
-            "queued campaign entry job invalidates185 closure: {unit}"
+            "queued campaign entry job invalidates 185 closure: {unit}"
         );
     }
     Ok(())
@@ -430,7 +430,7 @@ fn fresh(p: &Close) -> Result<Value> {
     let fb: Bound = serde_json::from_value(c["fleet"].clone())?;
     ensure!(
         fb.path.parent() == Some(Path::new(FLEET_ROOT)),
-        "foreign185 closure fleet"
+        "foreign 185 closure fleet"
     );
     let f = evidence(&fb, false)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -513,7 +513,7 @@ fn ledger_scope(v: &Value, desc: &Value) -> Result<()> {
             && v["new_replay_or_restore_authorized"] == false
             && v["archive_or_scratch_removed"] == false
             && v["r2_mutations"] == false,
-        "old185 closure ledger has foreign scope, duplicate credit or mutation authority"
+        "old 185 closure ledger has foreign scope, duplicate credit or mutation authority"
     );
     Ok(())
 }
@@ -579,7 +579,7 @@ pub(super) fn run(m: &Mapping, p: &Close, spec: &Bound, check: bool) -> Result<(
     }
     ensure!(
         p.closure_authorized,
-        "old185 closure requires reviewed explicit plan authority"
+        "old 185 closure requires reviewed explicit plan authority"
     );
     let previous = bound(
         p.prior_check
@@ -642,14 +642,14 @@ fn project_reservations(rows: &[ReservationRow]) -> Result<(Vec<ReservationRow>,
     for row in &mut projected {
         ensure!(
             seen.insert(row.claim_key.clone()),
-            "duplicate reservation key would double-apply old185 disposition"
+            "duplicate reservation key would double-apply old 185 disposition"
         );
         if row.claim_key == key {
             ensure!(
                 row.epoch == 185
                     && row.producer_invocation_id == PRODUCER_ID
                     && matches!(row.outstanding_bytes, 0 | RESERVATION),
-                "old185 projection has foreign owner or unexplained partial disposition"
+                "old 185 projection has foreign owner or unexplained partial disposition"
             );
             found = true;
             delta = row.outstanding_bytes;
@@ -657,13 +657,13 @@ fn project_reservations(rows: &[ReservationRow]) -> Result<(Vec<ReservationRow>,
         } else {
             ensure!(
                 row.producer_invocation_id != PRODUCER_ID,
-                "original185 owner appears under a second claim key"
+                "original 185 owner appears under a second claim key"
             );
         }
     }
     ensure!(
         found,
-        "old185 projection must include its explicit original claim row"
+        "old 185 projection must include its explicit original claim row"
     );
     Ok((projected, delta))
 }
@@ -671,7 +671,7 @@ fn read_view(m: &Mapping, p: &ReadClosure) -> Result<Value> {
     ensure!(
         p.schema == "jetstreamer-horizon-old185-attempt-growth-read-plan-v2"
             && p.closure.path == Path::new(ROOT).join("closure.json"),
-        "foreign185 closure reader scope"
+        "foreign 185 closure reader scope"
     );
     let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
     mapping(&supplied)?;

@@ -1,4 +1,4 @@
-//! Metadata-only adoption of the exact actual guarded native141 acquisition.
+//! Metadata-only adoption of the exact actual guarded native 141 acquisition.
 //! The observer/model/status census is unchanged; this is not a new replay lane.
 use super::*;
 #[path = "routine_native141_acquisition.rs"]
@@ -145,7 +145,7 @@ fn rejection_evidence(b: &Bound) -> Result<Value> {
 fn evidence(s: &Profile) -> Result<()> {
     ensure!(
         s.first_guard.path == Path::new(GUARD) && s.first_guard.sha256 == GUARD_SHA,
-        "foreign native141 first guard"
+        "foreign native 141 first guard"
     );
     let g = bound_json(&s.first_guard, false)?;
     ensure!(
@@ -166,7 +166,7 @@ fn evidence(s: &Profile) -> Result<()> {
             && g["publication_authorized"] == false
             && g["remote_mutations"] == false
             && g["r2_mutations"] == false,
-        "native141 guard scope or authority differs"
+        "native 141 guard scope or authority differs"
     );
     Ok(())
 }
@@ -178,7 +178,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 && p.assembly144_recovery.is_some()
                 && p.sample_target_utc.as_str() >= "2026-10-22T08:58:00Z"
                 && !p.expected_epochs.contains(&141),
-            "native141 cannot alter ordinary claims or use an unqualified reader"
+            "native 141 cannot alter ordinary claims or use an unqualified reader"
         );
         evidence(s)?;
         if let Some(b) = &s.rejection {
@@ -211,7 +211,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
 pub(super) fn enable(p: &mut Plan) -> Result<()> {
     ensure!(
         is_101(p)? && p.native141_audit.is_none() && assembly144::reader_v2(p),
-        "native141 needs accepted original assembly-reader profile"
+        "native 141 needs accepted original assembly-reader profile"
     );
     let s = Profile {
         first_guard: Bound {
@@ -234,7 +234,7 @@ pub(super) fn enable(p: &mut Plan) -> Result<()> {
 pub(super) fn enable_rejection(p: &mut Plan, spec: &Bound) -> Result<()> {
     ensure!(
         reader(p) && !rejection_enabled(p),
-        "replacement requires original native141 history and reader"
+        "replacement requires original native 141 history and reader"
     );
     let v = bound_json(spec, true)?;
     ensure!(
@@ -249,7 +249,7 @@ pub(super) fn enable_rejection(p: &mut Plan, spec: &Bound) -> Result<()> {
     rejection_evidence(&b)?;
     p.native141_audit
         .as_mut()
-        .context("native141 profile")?
+        .context("native 141 profile")?
         .rejection = Some(b);
     p.tools.r2 = Bound {
         path: REJECTION_READER.into(),
@@ -265,32 +265,32 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
     let c = json!({"epoch":141,"unit":UNIT,"invocation_id":IID,"scratch_path":ROOT,"launch_receipt":s.first_guard});
     let ds = f["diagnostics"]
         .as_array_mut()
-        .context("native141 diagnostic history")?;
+        .context("native 141 diagnostic history")?;
     let found: Vec<_> = ds.iter().filter(|d| d["unit"] == UNIT).collect();
     ensure!(
         found.is_empty() || (found.len() == 1 && found[0] == &c),
-        "native141 history changed or duplicated"
+        "native 141 history changed or duplicated"
     );
     if found.is_empty() {
         ds.push(c);
     }
     let units = f["tracked_units"]
         .as_array_mut()
-        .context("native141 tracked units")?;
+        .context("native 141 tracked units")?;
     if !units.iter().any(|u| u == UNIT) {
         units.push(json!(UNIT));
     }
     let gate = &mut f["gates"]["141"];
     ensure!(
         gate["state"] == "failed-needs-repair",
-        "native141 audit must not close or relabel failed repair"
+        "native 141 audit must not close or relabel failed repair"
     );
     gate["next_action"] = json!(
-        "Track the exact admitted private read-only full-census native141 acquisition and retained candidate records. Preserve failure/terminal evidence and all original inputs; native success alone is not hidden-PoH/root qualification or recovery. Continue qualified PoH/checkpoint/full/plugin/ready-pair gates; no ordinary replay or public ETA from this audit."
+        "Track the exact admitted private read-only full-census native 141 acquisition and retained candidate records. Preserve failure/terminal evidence and all original inputs; native success alone is not hidden-PoH/root qualification or recovery. Continue qualified PoH/checkpoint/full/plugin/ready-pair gates; no ordinary replay or public ETA from this audit."
     );
     let entries = gate["evidence"]
         .as_array_mut()
-        .context("native141 repair evidence")?;
+        .context("native 141 repair evidence")?;
     let b = serde_json::to_value(&s.first_guard)?;
     if !entries.contains(&b) {
         entries.push(b);
@@ -318,7 +318,7 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
         }
         let gate = &mut f["gates"]["141"];
         gate["next_action"] = json!(
-            "Track the separately admitted private rejection-evidence attempt and preserve the original failed native141 audit. Inspect metadata-rejection.json only after its post-close source revalidation; full-target census, hidden PoH, canonical roots, full/plugin checks and ready-pair remain unproven. No ordinary ETA, blind retry or relaxed connectivity rule."
+            "Track the separately admitted private rejection-evidence attempt and preserve the original failed native 141 audit. Inspect metadata-rejection.json only after its post-close source revalidation; full-target census, hidden PoH, canonical roots, full/plugin checks and ready-pair remain unproven. No ordinary ETA, blind retry or relaxed connectivity rule."
         );
         let entries = gate["evidence"]
             .as_array_mut()

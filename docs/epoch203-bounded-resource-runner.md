@@ -14,7 +14,7 @@ Its compile-time profile pins:
 - epoch203/bootstrap `87,695,515`, snapshot SHA-256
   `e45584858d0c825f095a43ff5e5909e62a68d197d39c042a76727454525228c4`,
   length `8,142,103,526`;
-- unchanged v1.6.16 store8 worker SHA-256
+- unchanged v1.6.16 store 8 worker SHA-256
   `3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a`,
   `SOLANA_RAYON_THREADS=16`;
 - measurement target `87,720,000`, at most 1,000 observed slots of overshoot,
@@ -28,7 +28,7 @@ snapshot, worker, target, root and resource limits above, but pins
 `SOLANA_RAYON_THREADS=1` instead of 16. It requires `r1` unit/run-root namespaces
 and records the actual thread count in its result. This is a same-input storage
 fan-out/throughput comparison, not a runtime change or full-prefix qualification.
-The retained store8 worker uses `min(rayon_threads, 8)` eager stores; compare the
+The retained store 8 worker uses `min(rayon_threads, 8)` eager stores; compare the
 new result with the preserved 16-thread run at equal slots/transactions, including
 restore overhead, physical bytes, VMAs and phase timing. Do not extrapolate a
 short-window saving into a full-epoch budget. The default 203 profile and both
@@ -38,13 +38,13 @@ The immutable hash-bound plan uses
 `jetstreamer-private-epoch203-bounded-resource-plan-v1`, with the strict fields
 described for [epoch225](epoch225-bounded-resource-runner.md). It instead requires
 `horizon-qualify-203-bounded-resource-*.service`, a direct private run root named
-`bounded-resource-203-*`, and the exact epoch203 snapshot/target/root above. The
+`bounded-resource-203-*`, and the exact epoch 203 snapshot/target/root above. The
 checkpoint file must contain exactly the bootstrap and root snapshot names.
-This cannot borrow or shorten the existing complete-span epoch203 deployment.
+This cannot borrow or shorten the existing complete-span epoch 203 deployment.
 
-The binaries share target-stop/capture mechanics, not scope. Epoch225's fixed
+The binaries share target-stop/capture mechanics, not scope. Epoch 225's fixed
 profile, optional upstream-comparison feature, receipts and runtime bounds stay
-unchanged. There is no arbitrary epoch/profile option. The epoch203 binary
+unchanged. There is no arbitrary epoch/profile option. The epoch 203 binary
 removes inherited v1.6.20/v1.6.25 worker overrides and selects only its exact
 v1.6.16 worker.
 
@@ -56,7 +56,7 @@ bound cannot transfer another lane's memory reservation. Leave healthy replays
 and already-sealed guards unchanged.
 
 Use a separately sealed standalone guard's `bounded_canary` profile. It binds
-the epoch203 unit to the epoch203 schema and target; an epoch225 receipt cannot
+the epoch 203 unit to the epoch 203 schema and target; an epoch 225 receipt cannot
 excuse a missing worker. Preserve the strict pre-target worker census, reserve/
 VMA stops, bounded drainage, capture digest and nonrenewable receipt pin. Prove
 the first real sandboxed guard fire before unattended operation.
@@ -73,11 +73,11 @@ remain necessary for the proposed two-stage publication path.
 The parent's focused planner separately admits a prefix ending at the retained
 canonical root `88,127,580`: output starts at `87,696,000`, covers 431,581 slots,
 and leaves 419 slots through `88,127,999`. A planner regression checks this exact
-boundary and keeps ordinary epoch203 runtime selection rejected. This is only a
+boundary and keeps ordinary epoch 203 runtime selection rejected. This is only a
 planning capability, not evidence that a complete prefix exists, that the full
-prefix fits, or that its native restart tuple has been verified. The epoch213
-continuation runner remains restricted to its exact epoch213 artifacts; it cannot
-execute or publish an epoch203 continuation.
+prefix fits, or that its native restart tuple has been verified. The epoch 213
+continuation runner remains restricted to its exact epoch 213 artifacts; it cannot
+execute or publish an epoch 203 continuation.
 
 `jetstreamer-epoch203-resource-compare` provides a read-only, exact-attempt
 comparison after the single-thread run's successful `receipts/resource.json`

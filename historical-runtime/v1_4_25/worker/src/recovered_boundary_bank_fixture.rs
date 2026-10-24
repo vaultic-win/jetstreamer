@@ -1,5 +1,5 @@
 //! Version-specific Bank semantics only: no runtime input or replay authority.
-//! The first epoch141 recovered group is 60911776 <- 60911771 (five boundaries).
+//! The first epoch 141 recovered group is 60911776 <- 60911771 (five boundaries).
 use crate::snapshot;
 use solana_runtime::{bank::Bank, genesis_utils::create_genesis_config_with_leader};
 use solana_sdk::{
@@ -45,7 +45,7 @@ fn pinned_bank_gap_boundaries_preserve_queue_root_and_slot_hashes() {
         }
         parent.freeze();
         // Normalize the real five-slot jump to small slots. This tests Bank's
-        // tick/queue semantics, not the epoch141 snapshot or feature schedule.
+        // tick/queue semantics, not the epoch 141 snapshot or feature schedule.
         let gap = Arc::new(Bank::new_from_parent(&parent, &leader, 5));
         assert_eq!(gap.tick_height(), 64);
         assert_eq!(gap.max_tick_height(), 384);

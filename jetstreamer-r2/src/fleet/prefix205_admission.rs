@@ -98,7 +98,7 @@ fn guard(g: &Value, epoch: u64, sample: u64, now: u64) -> Result<()> {
             g["maximum_root_physical_bytes"] == 256u64 << 30
                 && g.get("root_physical_observation_error")
                     .is_some_and(Value::is_null),
-            "205 lost203 own-root protection"
+            "205 lost 203 own-root protection"
         );
     }
     Ok(())
@@ -164,7 +164,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
     let row = rows
         .iter()
         .find(|r| r["range"] == "225-226")
-        .context("205 protected225 observation missing")?;
+        .context("205 protected 225 observation missing")?;
     ensure!(
         row["status"] == "observed"
             && row["observation"]["invocation_binding_stable"] == true
@@ -172,7 +172,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, now: u64, required: u64) -> Result<(u6
             && row["observation"]["worker_before"]["vmas"]
                 .as_u64()
                 .is_some_and(|n| n > 0 && n < 3500000),
-        "205 protected225 sample unhealthy"
+        "205 protected 225 sample unhealthy"
     );
     Ok((sampled, reservation))
 }

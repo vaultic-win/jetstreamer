@@ -1,4 +1,4 @@
-//! Dormant exact144 assembly-only recovery. No worker, replay, sidecar or R2.
+//! Dormant exact 144 assembly-only recovery. No worker, replay, sidecar or R2.
 //! The original producer must have timed out; a successful/live owner forbids
 //! this fallback. Fresh distinct admission and a guard remain mandatory.
 use provenance as evidence;
@@ -242,7 +242,7 @@ fn run() -> Result<()> {
             && lm.nlink() == 1
             && lm.mode() & 0o077 == 0
             && unsafe { libc::flock(lease.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "shared144lease occupied or unsafe"
+        "shared 144lease occupied or unsafe"
     );
     let own = unit(UNIT)?;
     let iid = std::env::var("INVOCATION_ID").context("persistent assembly unit required")?;

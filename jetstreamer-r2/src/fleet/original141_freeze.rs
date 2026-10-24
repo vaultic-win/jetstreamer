@@ -1,4 +1,4 @@
-//! Closed freeze-component diagnostic; stops in the worker at60912004.
+//! Closed freeze-component diagnostic; stops in the worker at 60912004.
 const PACKAGE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-freeze-parent-20261023-v1";
 const WORKER_SHA: &str = "e5600e93710cda7bb2b8cf691c2e6707d307e7957b7023f0551d744b6e240605";
 const WORKER_ENTRY_TERMINAL: Option<u64> = Some(60912004);

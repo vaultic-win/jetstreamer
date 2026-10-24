@@ -73,14 +73,14 @@ fn sealed_file(b: &BoundFile) -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && canonical_digest(&json!(b.sha256)),
-        "unsealed136 input"
+        "unsealed 136 input"
     );
     Ok(())
 }
 fn self_ok(digest: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
-        "private136 operations require root"
+        "private 136 operations require root"
     );
     sealed_file(&BoundFile {
         path: fs::read_link("/proc/self/exe")?,
@@ -88,7 +88,7 @@ fn self_ok(digest: &str) -> Result<()> {
     })?;
     ensure!(
         hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == digest,
-        "private136 executable digest differs"
+        "private 136 executable digest differs"
     );
     Ok(())
 }
@@ -110,7 +110,7 @@ fn args() -> Result<(BoundFile, String, bool)> {
 fn absent(p: &Path) -> Result<()> {
     ensure!(
         fs::symlink_metadata(p).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
-        "private136 path occupied or unreadable:{}",
+        "private 136 path occupied or unreadable:{}",
         p.display()
     );
     Ok(())
@@ -121,14 +121,14 @@ fn dormant() -> Result<Value> {
         u["MainPID"] == "0"
             && matches!(u["ActiveState"].as_str(), Some("inactive" | "failed"))
             && u["NRestarts"] == "0",
-        "private136 candidate already active or restarting"
+        "private 136 candidate already active or restarting"
     );
     Ok(u)
 }
 fn capability(b: &BoundFile) -> Result<Value> {
     ensure!(
         b.path == Path::new(CAPABILITY) && b.sha256 == CAPABILITY_SHA,
-        "foreign136 capability binding"
+        "foreign 136 capability binding"
     );
     let c = bound_json(b)?;
     ensure!(
@@ -144,7 +144,7 @@ fn capability(b: &BoundFile) -> Result<Value> {
             && c["terminal_root_slot"] == 59183944
             && c["output_slot_count"] == 431945
             && c["excluded_epoch_suffix_slots"] == 55,
-        "private136 capability scope differs"
+        "private 136 capability scope differs"
     );
     for k in [
         "worker_spawned",
@@ -263,7 +263,7 @@ pub(super) fn prepare() -> Result<()> {
     let a: Vec<_> = env::args().collect();
     ensure!(
         a.len() == 4 && a[2] == "--self-sha256",
-        "prepare136 requires self digest"
+        "prepare 136 requires self digest"
     );
     self_ok(&a[3])?;
     let before = dormant()?;
@@ -276,7 +276,7 @@ pub(super) fn prepare() -> Result<()> {
     absent(root)?;
     ensure!(
         root.parent().context("136 parent")?.canonicalize()? == root.parent().unwrap(),
-        "noncanonical136 parent"
+        "noncanonical 136 parent"
     );
     directory(root, 1001, 1003)?;
     for name in ["destination", "output", "scratch", ".jetstreamer-private"] {
@@ -309,7 +309,7 @@ pub(super) fn prepare() -> Result<()> {
 fn layout(b: &BoundFile) -> Result<()> {
     ensure!(
         b.path == Path::new(ROOT).join("receipts/layout.json"),
-        "foreign136 layout"
+        "foreign 136 layout"
     );
     let l = bound_json(b)?;
     scope(&l)?;
@@ -334,7 +334,7 @@ fn layout(b: &BoundFile) -> Result<()> {
                 && m.uid() == 1001
                 && m.gid() == 1003
                 && m.mode() & 0o7777 == 0o700,
-            "unsafe136 layout directory"
+            "unsafe 136 layout directory"
         );
         if !name.is_empty() && name != "destination" {
             ensure!(
@@ -475,7 +475,7 @@ fn private141(o: &Value, l: &Value) -> Result<(u64, Value)> {
             && l["unit"] == PRIVATE141
             && l["invocation_id"] == PRIVATE141_IID
             && l["candidate_incremental_peak_bytes"] == PEAK,
-        "136 private141 remaining-growth authority differs"
+        "136 private 141 remaining-growth authority differs"
     );
     let rows = o["diagnostic_replays"]
         .as_array()
@@ -506,7 +506,7 @@ fn private141(o: &Value, l: &Value) -> Result<(u64, Value)> {
             && r["useful_work"]["slots_per_second"]
                 .as_f64()
                 .is_some_and(|n| n.is_finite() && n > 0.),
-        "136 live141 owner changed"
+        "136 live 141 owner changed"
     );
     for key in [
         "memory_events.oom",
@@ -516,7 +516,7 @@ fn private141(o: &Value, l: &Value) -> Result<(u64, Value)> {
     ] {
         ensure!(
             r["cross_sample"]["producer_cgroup_counter_delta"][key] == 0,
-            "136 live141 memory event prevents scaling:{key}"
+            "136 live 141 memory event prevents scaling:{key}"
         );
     }
     let consumed = r["scratch_pass_1"]["physical_bytes"]
@@ -527,7 +527,7 @@ fn private141(o: &Value, l: &Value) -> Result<(u64, Value)> {
                 .as_u64()
                 .context("141 second scratch")?,
         );
-    ensure!(consumed <= PEAK, "live141 already exceeds bounded stop");
+    ensure!(consumed <= PEAK, "live 141 already exceeds bounded stop");
     Ok((
         PEAK - consumed,
         json!({"launch":l["plan"],"unit":PRIVATE141,"invocation_id":PRIVATE141_IID,
@@ -597,7 +597,7 @@ fn memory(o: &Value) -> Result<u64> {
     let psi = &o["host_global_pressure"]["cross_sample"];
     let elapsed = psi["elapsed_millis"]
         .as_u64()
-        .context("136 comparable host-memory PSI pending: enable host_global_pressure in normally sealed successor observers and retain two enabled samples at least1800seconds apart")?;
+        .context("136 comparable host-memory PSI pending: enable host_global_pressure in normally sealed successor observers and retain two enabled samples at least 1800 seconds apart")?;
     ensure!(
         psi["status"] == "observed"
             && elapsed >= 1800000
@@ -657,7 +657,7 @@ fn latest(s: &Spec, f: &Value) -> Result<()> {
             );
             ensure!(
                 other < selected,
-                "newer or tied fleet invalidates136 admission"
+                "newer or tied fleet invalidates 136 admission"
             );
         }
     }
@@ -773,7 +773,7 @@ fn private141_guard_contract(u: &Value, g: &Value, p: &Value) -> Result<()> {
             && g["workers"].as_array().is_some_and(|w| w.len() == 1
                 && w[0][0].as_u64().is_some_and(|p| p > 1)
                 && w[0][1].as_u64().is_some_and(|v| v > 0 && v <= 3500000)),
-        "136 protected141 guard command, sealed plan, worker census or root budget changed"
+        "136 protected 141 guard command, sealed plan, worker census or root budget changed"
     );
     Ok(())
 }
@@ -845,10 +845,10 @@ fn guards(s: &Spec, o: &Value) -> Result<Value> {
     let u = unit(guard_unit)?;
     let iid = u["InvocationID"]
         .as_str()
-        .context("136 live141 guard invocation")?;
+        .context("136 live 141 guard invocation")?;
     ensure!(
         canonical_invocation(iid) && u["Result"] == "success" && u["ExecMainStatus"] == "0",
-        "136 live141 guard not successful"
+        "136 live 141 guard not successful"
     );
     let path = guard_root.join(format!("sample-{iid}.json"));
     let bytes = read_stable_bounded(&path, 16 << 20, "136 protected141 guard sample")?;
@@ -863,7 +863,7 @@ fn guards(s: &Spec, o: &Value) -> Result<Value> {
     )?;
     let at = g["recorded_unix_seconds"]
         .as_u64()
-        .context("136 live141 guard time")?;
+        .context("136 live 141 guard time")?;
     let time = now()?;
     ensure!(
         at <= time
@@ -894,11 +894,11 @@ fn guards(s: &Spec, o: &Value) -> Result<Value> {
                 .as_u64()
                 .zip(g["minimum_free_bytes"].as_u64())
                 .is_some_and(|(a, b)| a >= b),
-        "136 live141 reserve/root guard stale, changed or tripped"
+        "136 live 141 reserve/root guard stale, changed or tripped"
     );
     ensure!(
         unit(guard_unit)?["InvocationID"] == iid,
-        "136 live141 guard changed during read"
+        "136 live 141 guard changed during read"
     );
     result.insert(
         "141".into(),
@@ -920,7 +920,7 @@ fn cpu(o: &Value) -> Result<Value> {
     ensure!(
         private.get("InvocationID").map(String::as_str) == Some(PRIVATE141_IID)
             && private.get("CPUQuotaPerSecUSec").map(String::as_str) == Some("8s"),
-        "136 live141 CPU owner changed"
+        "136 live 141 CPU owner changed"
     );
     for (range, quota) in [
         ("152-153", 9u64),
@@ -991,7 +991,7 @@ fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     }
     let private = current
         .get(PRIVATE141)
-        .context("136 live141 omitted from complete census")?;
+        .context("136 live 141 omitted from complete census")?;
     let claim = DiagnosticClaim {
         epoch: 141,
         unit: PRIVATE141.into(),

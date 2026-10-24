@@ -1,4 +1,4 @@
-//! Metadata-only correction/capture of an already completed native223 tail.
+//! Metadata-only correction/capture of an already completed native 223 tail.
 //! No Bank restore, process observation, archive scan, replay or remote access.
 #![recursion_limit = "256"]
 #[allow(dead_code)]
@@ -236,7 +236,7 @@ fn validate(
             && launch["terminal_slot"] == 96767999
             && launch["output_slot_count"] == 477
             && launch["restart_policy"] == "no",
-        "wrong native25 launch"
+        "wrong native 25 launch"
     );
     let units = launch["evidence"]["units"]
         .as_array()

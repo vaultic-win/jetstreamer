@@ -1,4 +1,4 @@
-//! Closed full209 candidate. A launch never qualifies an archive or authorizes R2.
+//! Closed full 209 candidate. A launch never qualifies an archive or authorizes R2.
 use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch209-capped-singleton-launch-v1";
 pub(super) const UNIT: &str = "horizon-singleton-209-capped-4aeca563-v1.service";
@@ -186,7 +186,7 @@ pub(super) fn bindings(c: &DiagnosticClaim, launch: &Value) -> Result<()> {
         )?;
         ensure!(
             a["terminal223_accounting"] == singleton209_peer223::evidence(peer.as_ref()),
-            "209 full singleton terminal223 accounting changed"
+            "209 full singleton terminal 223 accounting changed"
         );
     }
     Ok(())

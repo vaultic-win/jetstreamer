@@ -27,7 +27,7 @@ fn scope(s: &Spec) -> Result<()> {
         && s.native_plan.path == Path::new(PLAN)
         && s.output.parent() == Some(Path::new("/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1"))
         && s.output.file_name().and_then(|n|n.to_str()).is_some_and(|n| n.starts_with("fleet-") && n.ends_with("-native144-admitted.json")),
-        "foreign native144 preparation scope");
+        "foreign native 144 preparation scope");
     Ok(())
 }
 fn claim(r: &Value, b: &BoundFile) -> Result<DiagnosticClaim> {
@@ -36,7 +36,7 @@ fn claim(r: &Value, b: &BoundFile) -> Result<DiagnosticClaim> {
         unit: UNIT.into(),
         invocation_id: r["invocation_id"]
             .as_str()
-            .context("native144 invocation")?
+            .context("native 144 invocation")?
             .into(),
         scratch_path: SCRATCH.into(),
         launch_receipt: BoundFile {
@@ -48,7 +48,7 @@ fn claim(r: &Value, b: &BoundFile) -> Result<DiagnosticClaim> {
 fn owners(previous: &Value) -> Result<Value> {
     let mut names: BTreeSet<_> = previous["unit_census"]
         .as_object()
-        .context("native144 census")?
+        .context("native 144 census")?
         .keys()
         .cloned()
         .collect();
@@ -89,7 +89,7 @@ fn guard_first_fire(current: &Value, sample: &Value, plan: &BoundFile, now: u64)
             && current["ExecStart"]
                 .as_str()
                 .is_some_and(|s| s.contains(" ; ignore_errors=no ;")),
-        "native144 requires exact fresh successful guard first fire"
+        "native 144 requires exact fresh successful guard first fire"
     );
     Ok(())
 }
@@ -98,7 +98,7 @@ fn guard_sandbox(limits: &str) -> Result<()> {
     for line in limits.lines() {
         let (key, value) = line
             .split_once('=')
-            .context("native144 guard sandbox field")?;
+            .context("native 144 guard sandbox field")?;
         ensure!(
             fields.insert(key, value).is_none(),
             "duplicate guard sandbox field"
@@ -114,7 +114,7 @@ fn guard_sandbox(limits: &str) -> Result<()> {
     ] {
         ensure!(
             fields.get(key) == Some(&value),
-            "native144 guard sandbox differs:{key}"
+            "native 144 guard sandbox differs:{key}"
         );
     }
     Ok(())
@@ -125,7 +125,7 @@ fn guard_configuration(iid: &str) -> Result<Value> {
             && iid
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
-        "native144 guard requires exact invocation"
+        "native 144 guard requires exact invocation"
     );
     Ok(
         json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
@@ -151,7 +151,7 @@ pub(super) fn run() -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && hex_lower(&Sha256::digest(fs::read(&exe)?)) == args[6],
-        "native144 preparer must be sealed"
+        "native 144 preparer must be sealed"
     );
     let s: Spec = serde_json::from_value(bound_json(&BoundFile {
         path: args[2].clone().into(),
@@ -182,17 +182,17 @@ pub(super) fn run() -> Result<()> {
             && admission["restore_only"] == true
             && admission["observer"] == binding(&s.observer)
             && admission["fleet"] == binding(&s.previous_fleet),
-        "native144 preparation does not bind admitted canonical predecessor"
+        "native 144 preparation does not bind admitted canonical predecessor"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let sample = utc_seconds(
         observer["recorded_at_utc"]
             .as_str()
-            .context("native144 sample")?,
+            .context("native 144 sample")?,
     )?;
     ensure!(
         sample <= now && now - sample <= 1800,
-        "native144 fleet transition sample stale"
+        "native 144 fleet transition sample stale"
     );
     if args[7] == "--capture" {
         ensure!(
@@ -201,10 +201,10 @@ pub(super) fn run() -> Result<()> {
                 .is_some_and(|n| n <= now && now - n <= 900)
                 && !previous["active"]
                     .as_array()
-                    .context("native144 active census")?
+                    .context("native 144 active census")?
                     .iter()
                     .any(|r| r["epoch"] == 144),
-            "native144 admission stale or overlapping"
+            "native 144 admission stale or overlapping"
         );
         let protected = owners(&previous)?;
         let current = unit(UNIT)?;
@@ -215,7 +215,7 @@ pub(super) fn run() -> Result<()> {
                 && current["MainPID"]
                     .as_str()
                     .is_some_and(|p| p.parse::<u32>().is_ok_and(|n| n > 0)),
-            "native144 not newly live"
+            "native 144 not newly live"
         );
         live_limits(UNIT)?;
         let r = json!({"schema":SCHEMA,"epoch":144,"unit":UNIT,"invocation_id":current["InvocationID"],"launched":true,"recorded_unix_seconds":now,
@@ -232,7 +232,7 @@ pub(super) fn run() -> Result<()> {
             sha256: "0".repeat(64),
         };
         launch(&r, &claim(&r, &b)?)?;
-        ensure!(unit(UNIT)? == current, "native144 changed during capture");
+        ensure!(unit(UNIT)? == current, "native 144 changed during capture");
         owners(&previous)?;
         immutable_receipt(Path::new(LAUNCH), &r)?;
         // Emit the invocation-bound guard configuration in the same observed
@@ -245,7 +245,7 @@ pub(super) fn run() -> Result<()> {
             &guard_configuration(
                 r["invocation_id"]
                     .as_str()
-                    .context("native144 capture invocation")?,
+                    .context("native 144 capture invocation")?,
             )?,
         )?;
         let guard_binding = file_binding(&guard_source)?;
@@ -272,8 +272,8 @@ pub(super) fn run() -> Result<()> {
                 && value["plan"] == pb["path"]
                 && value["plan_sha256"] == pb["sha256"]
                 && value["admission_transition_guard"]
-                    == binding(s.guard_sample.as_ref().context("native144 guard")?),
-            "native144 event differs"
+                    == binding(s.guard_sample.as_ref().context("native 144 guard")?),
+            "native 144 event differs"
         );
         let output = Path::new(ROOT).join("routine-spec.json");
         persist(
@@ -286,8 +286,8 @@ pub(super) fn run() -> Result<()> {
     let gb = s
         .guard_sample
         .as_ref()
-        .context("native144 requires actual guard first fire")?;
-    let gp = s.guard_plan.as_ref().context("native144 guard plan")?;
+        .context("native 144 requires actual guard first fire")?;
+    let gp = s.guard_plan.as_ref().context("native 144 guard plan")?;
     let guard = bound_json(gb)?;
     let guard_plan = bound_json(gp)?;
     let guard_unit = format!("{}-guard.service", UNIT.trim_end_matches(".service"));
@@ -296,7 +296,7 @@ pub(super) fn run() -> Result<()> {
     let limits = ProcessCommand::new("systemctl").args(["show",&guard_unit,"--property=ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities"]).output()?;
     ensure!(
         limits.status.success(),
-        "native144 guard sandbox unreadable"
+        "native 144 guard sandbox unreadable"
     );
     guard_sandbox(std::str::from_utf8(&limits.stdout)?)?;
     owners(&previous)?;
@@ -306,21 +306,21 @@ pub(super) fn run() -> Result<()> {
     plan["admission_transition_guard"] = binding(gb);
     let ds = plan["diagnostics"]
         .as_array_mut()
-        .context("native144 diagnostic history")?;
+        .context("native 144 diagnostic history")?;
     ensure!(
         !ds.iter().any(|d| d["unit"] == UNIT),
-        "duplicate native144 diagnostic"
+        "duplicate native 144 diagnostic"
     );
     ds.push(json!({"epoch":144,"unit":UNIT,"invocation_id":c.invocation_id,"scratch_path":SCRATCH,"launch_receipt":binding(&lb)}));
     let units = plan["tracked_units"]
         .as_array_mut()
-        .context("native144 tracked units")?;
+        .context("native 144 tracked units")?;
     if !units.contains(&json!(UNIT)) {
         units.push(json!(UNIT));
     }
     plan["gates"]["144"]["evidence"]
         .as_array_mut()
-        .context("native144 gate evidence")?
+        .context("native 144 gate evidence")?
         .extend([binding(&lb), binding(gb)]);
     let typed: Plan = serde_json::from_value(plan.clone())?;
     validate_same_sample_admission(

@@ -1,4 +1,4 @@
-//! Independent full209 verification receipts and serialized authenticated delivery.
+//! Independent full 209 verification receipts and serialized authenticated delivery.
 use super::{singleton209 as c, *};
 use std::os::fd::AsRawFd;
 const SCHEMA: &str = "jetstreamer-private-epoch209-singleton-delivery-receipt-v1";

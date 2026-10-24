@@ -1,4 +1,4 @@
-//! Independent source-only provenance expectation for exact144 assembly recovery.
+//! Independent source-only provenance expectation for exact 144 assembly recovery.
 //! Never accepts the original continuation's success profile or opens the target.
 #[allow(dead_code)]
 #[path = "jetstreamer-epoch144-provenance-expectation.rs"]

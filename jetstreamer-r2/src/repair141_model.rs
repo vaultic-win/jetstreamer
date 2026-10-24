@@ -1,4 +1,4 @@
-//! Pure planning for the exact stopped141 recovery. No filesystem, process,
+//! Pure planning for the exact stopped 141 recovery. No filesystem, process,
 //! replay, receipt or R2 authority. Historical throughput is a planning seed.
 pub const BOOTSTRAP: u64 = 60_911_751;
 pub const ROOT: u64 = 61_328_765;
@@ -61,8 +61,8 @@ pub fn forecast(rate: &Rate, p: &Policy) -> Result<Forecast, String> {
     } else {
         add(p.engineering_millis, p.capacity_millis)?
     };
-    // No credit for60942360 or a private partial: there is no durable Bank
-    // checkpoint beyond60911751. Even the pre-epoch bootstrap tail is redone.
+    // No credit for 60942360 or a private partial: there is no durable Bank
+    // checkpoint beyond 60911751. Even the pre-epoch bootstrap tail is redone.
     let root_replay_millis = replay(ROOT - BOOTSTRAP, rate)?;
     let suffix_replay_millis = replay(TERMINAL - ROOT, rate)?;
     let mut total = add(prerequisite_millis, p.bootstrap_millis)?;

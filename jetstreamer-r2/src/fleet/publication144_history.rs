@@ -1,4 +1,4 @@
-//! Exact real144 publication may retain completed private diagnostic history.
+//! Exact real 144 publication may retain completed private diagnostic history.
 //! This is not a general exception for overlapping private/public owners.
 use super::*;
 const PUB: &str = "horizon-publish-144-v4-20261022-v1.service";
@@ -37,7 +37,7 @@ fn checked_publisher(c: &PipelineClaim, v: &Value) -> Result<()> {
             && v["ordinary_replay_claim"] == false
             && v["publication_authorized"] == false
             && v["r2_mutations"] == false,
-        "private144 history cannot borrow a different public publisher/origin"
+        "private 144 history cannot borrow a different public publisher/origin"
     );
     Ok(())
 }
@@ -49,7 +49,7 @@ pub(super) fn validate(p: &Plan, census: &BTreeMap<String, Value>) -> Result<boo
     let pubs: Vec<_> = public.iter().copied().filter(|c| c.unit == PUB).collect();
     ensure!(
         pubs.len() == 1 && public.len() <= 2,
-        "duplicated or missing144 publisher history"
+        "duplicated or missing 144 publisher history"
     );
     let original = bound_json(pubs[0].evidence.first().context("144 origin evidence")?)?;
     checked_publisher(pubs[0], &original)?;
@@ -68,7 +68,7 @@ pub(super) fn validate(p: &Plan, census: &BTreeMap<String, Value>) -> Result<boo
                     Some("active" | "inactive" | "failed")
                 )
                 && matches!(v["SubState"].as_str(), Some("exited" | "dead" | "failed")),
-            "public144 cannot overlap a live private diagnostic"
+            "public 144 cannot overlap a live private diagnostic"
         );
     }
     for upload in public.iter().filter(|c| c.unit == UPLOAD) {
@@ -132,7 +132,7 @@ pub(super) fn event_predecessor(
             && previous["active"].as_array().is_some_and(|a| !a
                 .iter()
                 .any(|v| v["epoch"] == 144 && v["phase"] == "upload-readback")),
-        "event must advance actual owner after the same accepted resource sample,not repeat an upload refresh"
+        "event must advance actual owner after the same accepted resource sample, not repeat an upload refresh"
     );
     let u = upload[0];
     let b = p.metadata_event.as_ref().context("event binding")?;
@@ -160,7 +160,7 @@ pub(super) fn event_predecessor(
             && proof["resource_samples_taken"] == 0
             && proof["remote_mutations"] == false
             && proof["r2_mutations"] == false,
-        "metadata event lost authentic fresh child,forecast or original resource evidence"
+        "metadata event lost authentic fresh child, forecast or original resource evidence"
     );
     Ok(())
 }

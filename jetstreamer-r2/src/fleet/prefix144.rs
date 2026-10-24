@@ -1,4 +1,4 @@
-//! One exact private144 independent reread. Never a full epoch or replay claim.
+//! One exact private 144 independent reread. Never a full epoch or replay claim.
 use super::*;
 use private157::{binding, file_binding, immutable_receipt};
 mod completed;
@@ -407,7 +407,7 @@ pub(super) fn prepare() -> Result<()> {
     );
     plan["gates"]["144"]["state"] = json!("blocked-qualification");
     plan["gates"]["144"]["next_action"] = json!(
-        "Complete private independent retained144 prefix reread; original diagnostic ended cleanly and stale status was conditionally removed. Preserve archive. Final509slots, restart/assembly, full epoch/plugin and R2 remain unqualified."
+        "Complete private independent retained 144 prefix reread; original diagnostic ended cleanly and stale status was conditionally removed. Preserve archive. Final 509 slots, restart/assembly, full epoch/plugin and R2 remain unqualified."
     );
     plan["gates"]["144"]["evidence"]
         .as_array_mut()

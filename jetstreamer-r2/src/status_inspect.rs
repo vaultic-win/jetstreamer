@@ -5,7 +5,7 @@ pub(super) async fn run() -> Result<()> {
     let args = env::args().skip(2).collect::<Vec<_>>();
     ensure!(
         !args.is_empty() && args.len() <= 16,
-        "status-inspect EPOCH [EPOCH ...] (at most16)"
+        "status-inspect EPOCH [EPOCH ...] (at most 16)"
     );
     let epochs = args
         .iter()

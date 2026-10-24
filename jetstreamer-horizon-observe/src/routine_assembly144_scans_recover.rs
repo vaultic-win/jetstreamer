@@ -1,4 +1,4 @@
-//! Finish only the exact failed10:28 metadata transaction, without resampling.
+//! Finish only the exact failed 10:28 metadata transaction, without resampling.
 use super::*;
 const UNIT: &str = "horizon-routine-recover-assembly144-scans-1028-20261022-v1.service";
 const OLD: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261022T102800Z-native141-rejection-assembly144-upload198-refresh-completed144-v1";
@@ -19,7 +19,7 @@ fn scope(p: &Plan, pb: &Bound) -> Result<()> {
                 == Path::new(
                     "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261022T102800Z-native141-rejection-assembly144-scans-upload198-refresh-completed144-v1"
                 ),
-        "foreign assembly144 metadata recovery"
+        "foreign assembly 144 metadata recovery"
     );
     Ok(())
 }
@@ -378,7 +378,7 @@ fn finish_tail(
     let ledger = file(p.fleet_output.clone(), false)?;
     let lv = bound_json(&ledger, false)?;
     let completion = json!({"schema":"jetstreamer-horizon-routine-cycle-completion-v1","plan":pb,"self_sha256":self_sha,"invocation_id":invocation,"sampled_at_utc":p.sample_target_utc,"observer":observer,"model":model,"estimates":estimates,"fleet_plan":fleet_plan,"fleet":ledger,"inventory":lv["inventory"],"status_publications":statuses,
-        "epoch198_delivery":{"provisional_fleet":file(provisional_path,false)?,"publication_skipped":true,"reason":"Authenticated198 ready pair; status already conditionally deleted"},
+        "epoch198_delivery":{"provisional_fleet":file(provisional_path,false)?,"publication_skipped":true,"reason":"Authenticated 198 ready pair; status already conditionally deleted"},
         "assembly144_scans_tail":{"intent":recovery,"reader":reader,"failed_child":failure,"original_invocation_id":"2753d572a34748029a0f4eeda01e44e8","new_resource_samples":0,"status_republications":0},
         "new_resource_samples":0,"archive_mutations":false,"sidecar_mutations":false,"replay_launch_authorized":false,"deletions":false});
     next_preparation::completion_bindings(p, pb, &completion)?;

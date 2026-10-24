@@ -40,7 +40,7 @@ fn validate_acquisition(a: &Value) -> Result<()> {
             && a["compressed_input_verified"] == true
             && a["uri"]
                 == format!("gs://mainnet-beta-ledger-us-ny5/88991050/{NAME}#1634790073611030"),
-        "wrong terminal205 acquisition"
+        "wrong terminal 205 acquisition"
     );
     for f in [
         "native_restore_authorized",
@@ -151,7 +151,7 @@ fn package_proof() -> Result<Value> {
         .map(|e| {
             e?.file_name()
                 .into_string()
-                .map_err(|_| anyhow::anyhow!("nonUTF8 input member"))
+                .map_err(|_| anyhow::anyhow!("non-UTF8 input member"))
         })
         .collect::<Result<BTreeSet<_>>>()?;
     ensure!(

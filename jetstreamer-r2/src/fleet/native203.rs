@@ -1,4 +1,4 @@
-//! Closed observational contract for the independently checked203 restart probe.
+//! Closed observational contract for the independently checked 203 restart probe.
 //! A live restore comparison is never a suffix replay or a publication gate.
 use super::*;
 
@@ -73,17 +73,17 @@ fn shape(c: &DiagnosticClaim, r: &Value) -> Result<()> {
                     .as_u64()
                     .and_then(|n| n.checked_add(192u64 << 30))
             && NO_AUTHORITY.iter().all(|k| r[*k] == false),
-        "native203 fixed private restore scope differs"
+        "native 203 fixed private restore scope differs"
     );
     let expected = format!(
         "{{ path={PROBE} ; argv[]={PROBE} {PLAN} --plan-sha256 {} --self-sha256 {PROBE_SHA}",
         r["native_plan"]["sha256"]
             .as_str()
-            .context("native203 plan digest")?
+            .context("native 203 plan digest")?
     );
     ensure!(
         command(&r["expected_exec_start"]) == Some(expected.as_str()),
-        "native203 command differs"
+        "native 203 command differs"
     );
     Ok(())
 }
@@ -110,10 +110,10 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     ensure!(
         plan["schema"] == "jetstreamer-private-epoch203-native-restore-probe-plan-v1"
             && plan["inputs"]["sha256"] == r["input_policy_sha256"],
-        "native203 outer plan differs"
+        "native 203 outer plan differs"
     );
     let inputs = bound_json(&serde_json::from_value(plan["inputs"].clone())?)?;
-    ensure!(inputs_match(&inputs, r), "native203 inputs differ");
+    ensure!(inputs_match(&inputs, r), "native 203 inputs differ");
     // Rehash both complete independent-reader bindings, not a hand-entered
     // archive/range assertion. The probe independently checks their contents.
     for key in ["prefix_manifest", "prefix_validation"] {
@@ -141,7 +141,7 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             ]
             .iter()
             .all(|key| admission[*key] == false),
-        "native203 admission differs"
+        "native 203 admission differs"
     );
     Ok(())
 }
@@ -159,13 +159,13 @@ pub(super) fn validate_live(c: &DiagnosticClaim, current: &Value) -> Result<()> 
             && current["InvocationID"] == c.invocation_id
             && current["NRestarts"] == "0"
             && command(&current["ExecStart"]) == command(&r["expected_exec_start"]),
-        "native203 live command or owner differs"
+        "native 203 live command or owner differs"
     );
     let output = ProcessCommand::new("systemctl").args(["show", UNIT, "--no-pager",
         "--property=User,Group,Restart,KillMode,Delegate,TasksMax,MemoryHigh,MemoryMax,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities"]).output()?;
     ensure!(
         output.status.success() && output.stdout.len() < 16384,
-        "native203 sandbox unreadable"
+        "native 203 sandbox unreadable"
     );
     let text = std::str::from_utf8(&output.stdout)?;
     let limits: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
@@ -198,7 +198,7 @@ fn validate_limits(limits: &BTreeMap<&str, &str>) -> Result<()> {
     ] {
         ensure!(
             limits.get(key) == Some(&expected),
-            "native203 sandbox differs:{key}"
+            "native 203 sandbox differs:{key}"
         );
     }
     Ok(())

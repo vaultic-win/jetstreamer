@@ -1,4 +1,4 @@
-//! Status-only cleanup after independently proved native207 terminal success.
+//! Status-only cleanup after independently proved native 207 terminal success.
 use super::*;
 const UNIT: &str = "archive-207-v1616-native-input-actual-v1.service";
 pub(super) fn recognized(f: &Value, owners: &[(String, String)]) -> bool {
@@ -9,7 +9,7 @@ pub(super) fn validate(
     f: &Value,
     owners: &[(String, String)],
 ) -> Result<()> {
-    ensure!(recognized(f, owners), "not native207 terminal status");
+    ensure!(recognized(f, owners), "not native 207 terminal status");
     let proof = bound_json(&serde_json::from_value(f["metadata_event"].clone())?)?;
     let expected = fleet::native207_terminal_status_identity(&proof)?;
     ensure!(

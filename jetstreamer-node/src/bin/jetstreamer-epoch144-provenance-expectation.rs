@@ -1,4 +1,4 @@
-//! Independent, private expectation for the exact144 checkpoint restart.
+//! Independent, private expectation for the exact 144 checkpoint restart.
 //! Reads sealed source manifests only, never the assembled archive or R2.
 #[allow(dead_code)]
 #[path = "../../../jetstreamer-utils/src/epoch141_ledger_common.rs"]
@@ -94,7 +94,7 @@ fn outcome(v: &Value) -> Result<()> {
             && v["assembly"]["provenance_version"] == 4
             && v["fresh_prefix_full_validation_passed"] == true
             && v["fresh_native_checkpoint_matches"] == true,
-        "foreign or incomplete144 assembly"
+        "foreign or incomplete 144 assembly"
     );
     for key in [
         "canonical_sidecar_authorized",
@@ -234,7 +234,7 @@ fn terminal() -> Result<()> {
     ] {
         ensure!(
             fields.get(k) == Some(&v),
-            "actual144 producer not exact clean terminal:{k}"
+            "actual 144 producer not exact clean terminal:{k}"
         );
     }
     Ok(())
@@ -313,7 +313,7 @@ async fn main() -> Result<()> {
     ensure!(
         p.schema == "jetstreamer-private144-provenance-plan-v2"
             && p.prefix_manifest.sha256 == PREFIX_MANIFEST,
-        "foreign144 expectation plan"
+        "foreign 144 expectation plan"
     );
     terminal()?;
     let prefix: HistoricalSegmentManifest = serde_json::from_slice(&read(&p.prefix_manifest)?)?;

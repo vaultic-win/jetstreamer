@@ -84,7 +84,7 @@ pub(super) fn run() -> Result<()> {
         histories.insert(owner.to_owned(), selected["history"].clone());
     }
     let floor = singleton227_admission::century_floor_for(&f, 209)?;
-    // Exactly the reviewed accounting: two bounded stats per204/205 output.
+    // Exactly the reviewed accounting: two bounded stats per 204/205 output.
     // No scratch scan, replay/host resource observation, admission or worker.
     let (growth, measurements) =
         native209_admission::protected_growth(&af, &ao, &guards, sample, now)?;

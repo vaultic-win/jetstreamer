@@ -1,4 +1,4 @@
-//! Exact private141 layout/admission/capture. No service is launched here.
+//! Exact private 141 layout/admission/capture. No service is launched here.
 use super::*;
 use std::{
     ffi::CString,
@@ -62,14 +62,14 @@ fn sealed_file(b: &BoundFile) -> Result<()> {
             && m.uid() == 0
             && m.nlink() == 1
             && m.mode() & 0o222 == 0,
-        "unsealed original141 input"
+        "unsealed original 141 input"
     );
     Ok(())
 }
 fn self_ok(sha: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
-        "original141 operations require root"
+        "original 141 operations require root"
     );
     let own = fs::read_link("/proc/self/exe")?;
     let b = BoundFile {
@@ -79,7 +79,7 @@ fn self_ok(sha: &str) -> Result<()> {
     sealed_file(&b)?;
     ensure!(
         hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == sha,
-        "original141 self digest differs"
+        "original 141 self digest differs"
     );
     Ok(())
 }
@@ -101,7 +101,7 @@ fn spec_args() -> Result<(BoundFile, String, bool)> {
 fn require_absent(path: &Path) -> Result<()> {
     ensure!(
         fs::symlink_metadata(path).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
-        "original141 path occupied or unreadable:{}",
+        "original 141 path occupied or unreadable:{}",
         path.display()
     );
     Ok(())
@@ -112,7 +112,7 @@ fn dormant() -> Result<Value> {
         u["MainPID"] == "0"
             && matches!(u["ActiveState"].as_str(), Some("inactive" | "failed"))
             && u["NRestarts"] == "0",
-        "original141 owner is already active/restarted"
+        "original 141 owner is already active/restarted"
     );
     Ok(u)
 }
@@ -121,7 +121,7 @@ fn owned_directory(path: &Path, uid: u32, gid: u32) -> Result<()> {
     let c = CString::new(path.as_os_str().as_encoded_bytes())?;
     ensure!(
         unsafe { libc::chown(c.as_ptr(), uid, gid) } == 0,
-        "original141 directory ownership failed"
+        "original 141 directory ownership failed"
     );
     File::open(path)?.sync_all()?;
     File::open(path.parent().context("directory parent")?)?.sync_all()?;
@@ -136,7 +136,7 @@ fn genesis_bytes() -> Result<Vec<u8>> {
     let bytes = read_stable_bounded(&b.path, 8 * 1024 * 1024, "original141 genesis")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == GENESIS_SHA,
-        "original141 genesis digest differs"
+        "original 141 genesis digest differs"
     );
     Ok(bytes)
 }
@@ -170,13 +170,13 @@ pub(super) fn prepare() -> Result<()> {
         .open(&path)?;
     file.write_all(&bytes)?;
     // The operational unit uses UMask=0077; OpenOptions::mode alone would
-    // produce0400 and prevent the unprivileged replay from reading genesis.
+    // produce 0400 and prevent the unprivileged replay from reading genesis.
     file.set_permissions(fs::Permissions::from_mode(0o444))?;
     file.sync_all()?;
     File::open(path.parent().unwrap())?.sync_all()?;
     ensure!(
         dormant()? == before,
-        "original141 owner changed during layout"
+        "original 141 owner changed during layout"
     );
     let mut receipt = json!({"schema":"jetstreamer-original141-private-layout-v2","epoch":141,"run_root":ROOT,"uid":1001,"gid":1003,"genesis_sha256":GENESIS_SHA,"genesis_bytes":bytes.len(),"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"self_sha256":a[3],"recorded_unix_seconds":now()?});
     trace_fields(&mut receipt);
@@ -203,7 +203,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
             && f["plan_sha256"] == s.fleet_plan.sha256
             && p["observer"] == private157::binding(&s.observer)
             && f["inventory"]["anomalies"] == 0,
-        "original141 stale/foreign/unaccepted admission basis"
+        "original 141 stale/foreign/unaccepted admission basis"
     );
     if s.output != Path::new(ADMISSION) {
         let name = s
@@ -237,7 +237,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
                 .as_u64()
                 .is_some_and(|n| n >= SAMPLE_MEMORY_KIB)
             && o["vm_max_map_count"].as_u64().is_some_and(|n| n >= 4194304),
-        "original141 sampled envelope unavailable"
+        "original 141 sampled envelope unavailable"
     );
     let rows = o["replays"].as_array().context("replay census")?;
     ensure!(
@@ -247,7 +247,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
                 .filter_map(|r| r["range"].as_str())
                 .collect::<BTreeSet<_>>()
                 == BTreeSet::from(RANGES),
-        "original141 must preserve exact five lanes"
+        "original 141 must preserve exact five lanes"
     );
     for r in rows {
         ensure!(
@@ -262,7 +262,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
                 && r["useful_work"]["slots_per_second"]
                     .as_f64()
                     .is_some_and(|n| n.is_finite() && n > 0.),
-            "original141 existing lane unstable/not advancing"
+            "original 141 existing lane unstable/not advancing"
         );
         for key in [
             "memory_events.oom",
@@ -272,7 +272,7 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
         ] {
             ensure!(
                 r["cross_sample"]["producer_cgroup_counter_delta"][key] == 0,
-                "original141 existing memory event:{key}"
+                "original 141 existing memory event:{key}"
             );
         }
     }
@@ -290,21 +290,21 @@ fn accepted(s: &Spec, o: &Value, f: &Value, p: &Value, time: u64) -> Result<()> 
                 .context("active census")?
                 .iter()
                 .all(|e| e["epoch"] != 141),
-        "original141 already claimed or repair incident relabeled"
+        "original 141 already claimed or repair incident relabeled"
     );
     ensure!(
         s.growth.keys().map(String::as_str).collect::<BTreeSet<_>>()
             == BTreeSet::from(["152-153", "155-156", "191-194"])
             && s.guards.keys().map(String::as_str).collect::<BTreeSet<_>>()
                 == BTreeSet::from(RANGES),
-        "original141 incomplete growth/guard census"
+        "original 141 incomplete growth/guard census"
     );
     Ok(())
 }
 fn growth(s: &Spec, floor: u64) -> Result<(u64, Value)> {
     ensure!(
         floor == 205211459014,
-        "original141 century floor changed; review policy"
+        "original 141 century floor changed; review policy"
     );
     let evidence = growth_bridge::extend(s)?;
     let formula = floor
@@ -317,7 +317,7 @@ fn growth(s: &Spec, floor: u64) -> Result<(u64, Value)> {
 fn layout(s: &Spec) -> Result<()> {
     ensure!(
         s.layout.path == Path::new(ROOT).join("receipts/layout.json"),
-        "original141 foreign layout"
+        "original 141 foreign layout"
     );
     let l = bound_json(&s.layout)?;
     ensure!(
@@ -326,7 +326,7 @@ fn layout(s: &Spec) -> Result<()> {
             && l["uid"] == 1001
             && l["gid"] == 1003
             && l["genesis_sha256"] == GENESIS_SHA,
-        "original141 layout proof differs"
+        "original 141 layout proof differs"
     );
     for name in [
         "",
@@ -343,13 +343,13 @@ fn layout(s: &Spec) -> Result<()> {
                 && m.uid() == 1001
                 && m.gid() == 1003
                 && m.mode() & 0o777 == 0o700,
-            "original141 private writable path differs"
+            "original 141 private writable path differs"
         );
     }
     for name in ["output", "scratch", ".jetstreamer-private"] {
         ensure!(
             fs::read_dir(Path::new(ROOT).join(name))?.next().is_none(),
-            "original141 layout is no longer empty"
+            "original 141 layout is no longer empty"
         );
     }
     let entries = fs::read_dir(Path::new(ROOT).join("destination"))?
@@ -357,7 +357,7 @@ fn layout(s: &Spec) -> Result<()> {
         .collect::<std::io::Result<Vec<_>>>()?;
     ensure!(
         entries == [std::ffi::OsString::from("genesis.tar.bz2")],
-        "original141 destination is no longer genesis-only"
+        "original 141 destination is no longer genesis-only"
     );
     let bytes = read_stable_bounded(
         &Path::new(ROOT).join("destination/genesis.tar.bz2"),
@@ -366,7 +366,7 @@ fn layout(s: &Spec) -> Result<()> {
     )?;
     ensure!(
         hex_lower(&Sha256::digest(bytes)) == GENESIS_SHA,
-        "original141 private genesis changed"
+        "original 141 private genesis changed"
     );
     Ok(())
 }
@@ -404,7 +404,7 @@ fn latest_fleet(s: &Spec, f: &Value) -> Result<()> {
                             .as_u64()
                             .context("candidate record clock")?
                             < recorded),
-                "newer/tied fleet invalidates original141 admission"
+                "newer/tied fleet invalidates original 141 admission"
             );
         }
     }
@@ -459,7 +459,7 @@ fn guards(s: &Spec, o: &Value) -> Result<Value> {
     let mut result = serde_json::Map::new();
     for (i, range) in RANGES.iter().enumerate() {
         let c = &s.guards[*range];
-        ensure!(c.unit == GUARDS[i], "original141 guard unit differs");
+        ensure!(c.unit == GUARDS[i], "original 141 guard unit differs");
         require_absent(&c.intent)?;
         require_absent(&c.completion)?;
         let current = unit(&c.unit)?;
@@ -631,7 +631,7 @@ pub(super) async fn admit() -> Result<()> {
         .parse::<u64>()?;
     ensure!(
         available >= protected + PEAK && memory >= SAMPLE_MEMORY_KIB && vmas >= 4194304,
-        "original141 current envelope unavailable"
+        "original 141 current envelope unavailable"
     );
     let after = census(&names, 101, 200)?;
     continuation144_protection::owners(&f, &after)?;
@@ -658,7 +658,7 @@ pub(super) async fn admit() -> Result<()> {
     );
     ensure!(
         available >= required + PEAK,
-        "original141 current guards require larger envelope"
+        "original 141 current guards require larger envelope"
     );
     let mut receipt = json!({"schema":"jetstreamer-original141-root-admission-v2","epoch":141,"unit":UNIT,"admitted":true,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"candidate_incremental_peak_bytes":PEAK,"required_guard_minimum_free_bytes":required,"required_initial_free_bytes":required+PEAK,"minimum_available_memory_bytes":MIN_MEMORY,"existing_growth_claims_protected":true,"century_floor_protected":true,"century_floor_bytes":snapshot144::floor(&floor)?,"observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"spec":private157::binding(&sb),"layout":private157::binding(&s.layout),"growth":s.growth,"guard_evidence":guard_evidence,"unit_census_before":before,"unit_census_after":after,"available_bytes":available,"memory_available_kib":memory,"vm_max_map_count":vmas,"new_resource_samples":0,"guard_first_fire_required":true,"actual_fleet_transition_required":true,"recorded_unix_seconds":now()?,"invocation_id":inv,"self_sha256":own});
     for key in DENIED {
@@ -685,14 +685,14 @@ struct CaptureSpec {
 }
 pub(super) fn capture() -> Result<()> {
     let (sb, own, check) = spec_args()?;
-    ensure!(!check, "original141 capture has no preflight write path");
+    ensure!(!check, "original 141 capture has no preflight write path");
     let s: CaptureSpec = serde_json::from_value(bound_json(&sb)?)?;
     ensure!(
         s.schema == "jetstreamer-original141-launch-capture-spec-v2"
             && s.plan.path == Path::new(PLAN)
             && admission_path(&s.admission.path)
             && s.first_guard.path == Path::new(ROOT).join("receipts/first-guard.json"),
-        "foreign original141 capture paths"
+        "foreign original 141 capture paths"
     );
     let before = unit(UNIT)?;
     let inv = before["InvocationID"]
@@ -702,7 +702,7 @@ pub(super) fn capture() -> Result<()> {
     let p = bound_json(&s.plan)?;
     ensure!(
         s.first_guard.sha256 == s.first_guard_source.sha256,
-        "original141 first-guard pin must preserve exact source bytes"
+        "original 141 first-guard pin must preserve exact source bytes"
     );
     let g = bound_json(&s.first_guard_source)?;
     let gp: BoundFile =
@@ -739,17 +739,17 @@ pub(super) fn capture() -> Result<()> {
     limits(&props)?;
     ensure!(
         props.get("EnvironmentFiles") == Some(&""),
-        "original141 rejects unbound environment files"
+        "original 141 rejects unbound environment files"
     );
     ensure!(
         unit(UNIT)? == before,
-        "original141 owner changed during capture"
+        "original 141 owner changed during capture"
     );
     let pin = guard_pin::pin(&s.first_guard_source, &s.first_guard, &g, &gp)?;
     r["first_guard_timer_pin"] = pin;
     ensure!(
         unit(UNIT)? == before,
-        "original141 owner changed during guard pin"
+        "original 141 owner changed during guard pin"
     );
     launch(&r, &c)?;
     private157::immutable_receipt(&c.launch_receipt.path, &r)?;

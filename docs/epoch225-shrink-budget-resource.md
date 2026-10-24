@@ -36,7 +36,7 @@ and sidecar-free; no runtime registry or publication authority is granted here.
 
 The opt-in `jetstreamer-utils/epoch225-shrink-budget-resource` feature builds
 `jetstreamer-epoch225-shrink-budget-resource`. It reuses the reviewed bounded
-runner without changing the default epoch225 profile or any live deployment.
+runner without changing the default epoch 225 profile or any live deployment.
 It pins capped-shrink qualification worker `2dcc9b84…` built from the v1.6.25
 workspace with `epoch225-v1-6-25-qualification`, and the existing diagnostic
 parent `3915f578…`. The worker's wider internal bound grants no wider execution:
@@ -50,7 +50,7 @@ schemas. Units begin `horizon-qualify-225-bounded-resource-shrink-budget-`, and
 private roots begin `bounded-resource-225-shrink-budget-`. Preserve the same
 snapshot, genesis, checkpoint names, controlled-stop evidence and bounded-canary
 guard requirements. A passing bounded run cannot establish the full cold peak,
-canonical root, complete epoch225, epoch226 tail, plugin or publication gates.
+canonical root, complete epoch 225, epoch 226 tail, plugin or publication gates.
 Source availability, a release build and sealing are preparation only; require
 real selected-profile snapshot tests, exact-package capability, fresh admission,
 fleet registration and the guard's first real sandbox fire before leaving a
@@ -68,7 +68,7 @@ not authorize deletion: preserve a separate reviewed retirement intent, rerun
 the check immediately before Cargo's dev-profile cleanup, and retain completion
 evidence. Neither this cache profile nor cleanup relaxes any admission bound.
 If Cargo cannot select that old dev profile without also selecting its release
-sibling, do not fabricate a cache tag or relax Cargo's checks. The selected225
+sibling, do not fabricate a cache tag or relax Cargo's checks. The selected 225
 schema alone may explicitly opt into `retirement: { prior_check: { path,
 sha256 } }`. The checker revalidates the same complete cache census and every
 current source/reference gate, writes a fresh check and durable no-clobber intent,

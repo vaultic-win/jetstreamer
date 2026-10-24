@@ -226,7 +226,7 @@ fn package_proof() -> Result<Value> {
         .map(|e| {
             e?.file_name()
                 .into_string()
-                .map_err(|_| anyhow::anyhow!("nonUTF8 member"))
+                .map_err(|_| anyhow::anyhow!("non-UTF8 member"))
         })
         .collect::<Result<BTreeSet<_>>>()?;
     ensure!(

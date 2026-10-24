@@ -102,7 +102,7 @@ fn shape(p: &Plan, v: &Value, c: &Value) -> Result<()> {
                 == "c54ede068b3cfd743259f52b93a98847910abe4fac6ff50ab88c4bbcae5e9008"
             && v["evidence"]["sha256"]
                 == "5196699c86959e9704269ae7dbfc1c9432ebc82eb40f305dca6dd56ded891f64",
-        "foreign exact144 publication owner plan"
+        "foreign exact 144 publication owner plan"
     );
     for (field, parent, prefix) in [
         (

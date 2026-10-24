@@ -1,4 +1,4 @@
-//! Exact136 immutable input capability. No replay or process-launch API.
+//! Exact 136 immutable input capability. No replay or process-launch API.
 use {
     crate::ram_artifact_retention::{Bound, bound_json, hash_file},
     anyhow::{Context, Result, ensure},
@@ -50,7 +50,7 @@ fn validate(p: &Plan) -> Result<()> {
         p.schema == "jetstreamer-private-epoch136-input-capability-plan-v2"
             && p.unit == UNIT
             && p.run_root == Path::new(ROOT),
-        "foreign136 capability scope"
+        "foreign 136 capability scope"
     );
     Ok(())
 }
@@ -63,7 +63,7 @@ fn immutable(path: &Path, digest: &str, maximum: u64) -> Result<u64> {
     let (actual, m) = hash_file(path, maximum)?;
     ensure!(
         m.uid() == 0 && m.mode() & 0o222 == 0 && actual == digest,
-        "mutable or mismatching136 input: {}",
+        "mutable or mismatching 136 input: {}",
         path.display()
     );
     Ok(m.len())
@@ -74,7 +74,7 @@ fn manifest(v: &Value) -> Result<()> {
         .as_array()
         .context("manifest epoch census")?;
     let rows: Vec<_> = epochs.iter().filter(|r| r["epoch"] == 136).collect();
-    ensure!(rows.len() == 1, "epoch136 missing or duplicated");
+    ensure!(rows.len() == 1, "epoch 136 missing or duplicated");
     let r = rows[0];
     ensure!(
         r["runtime"] == "solana-v1.4.25"
@@ -89,7 +89,7 @@ fn manifest(v: &Value) -> Result<()> {
             && r["post_bootstrap_root_checkpoints"][0]["accounts_hash"]
                 == "HHd1o9dwpbyderGihEgb9inCBtMhqtoU855aFJPxnzk8"
             && r["post_bootstrap_root_checkpoints"][0]["generation"] == 1634786476182569u64,
-        "epoch136 canonical input lineage differs"
+        "epoch 136 canonical input lineage differs"
     );
     Ok(())
 }
@@ -115,7 +115,7 @@ fn private(path: &Path) -> Result<()> {
     let m = fs::symlink_metadata(path)?;
     ensure!(
         path.canonicalize()? == path && m.is_dir() && m.uid() == 1001 && m.mode() & 0o777 == 0o700,
-        "unsafe136 private capability directory"
+        "unsafe 136 private capability directory"
     );
     Ok(())
 }

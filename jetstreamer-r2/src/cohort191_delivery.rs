@@ -1,4 +1,4 @@
-//! Closed191–194 native metadata custody. Never creates a ready/archive receipt.
+//! Closed 191–194 native metadata custody. Never creates a ready/archive receipt.
 use super::*;
 #[path = "cohort191_collected.rs"]
 mod collected;
@@ -96,7 +96,7 @@ pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
             && m.uid() == 0
             && m.mode() & 0o022 == 0
             && (!sealed || m.mode() & 0o222 == 0),
-        "unsafe191 bound evidence"
+        "unsafe 191 bound evidence"
     );
     let bytes = read_stable_bounded(&b.path, 16 << 20, "191 evidence")?;
     ensure!(
@@ -113,7 +113,7 @@ fn member(path: &Path, digest: &str) -> Result<()> {
             && m.uid() == 0
             && m.nlink() == 1
             && m.mode() & 0o222 == 0,
-        "unsealed191 tool"
+        "unsealed 191 tool"
     );
     ensure!(
         hex_lower(&Sha256::digest(read_stable_bounded(
@@ -629,7 +629,7 @@ fn controller_lifecycle(
         json!({"kind":"collected-natural-terminal-controller","unit":actual,"events":events,"terminal_capture":b}),
     )
 }
-/// Capture actual retained manager exit0 properties before PID1 collects them.
+/// Capture actual retained manager exit 0 properties before PID1 collects them.
 /// Never invent this receipt from controller state or a completion message alone.
 pub(super) fn capture_controller_terminal() -> Result<()> {
     let a: Vec<_> = env::args().collect();
@@ -691,7 +691,7 @@ fn state_bytes() -> Result<(Vec<u8>, Value)> {
     let m = fs::symlink_metadata(STATE)?;
     ensure!(
         m.is_file() && m.uid() == 0 && m.nlink() == 1 && m.mode() & 0o077 == 0,
-        "unsafe191 controller state"
+        "unsafe 191 controller state"
     );
     let bytes = read_stable_bounded(Path::new(STATE), 2 << 20, "191 state")?;
     let v: Value = serde_json::from_slice(&bytes)?;
@@ -878,7 +878,7 @@ fn phase_scope(c: &Claim) -> Result<()> {
     }
     ensure!(
         (191..=194).contains(&c.epoch) && is_lower_hex(&c.invocation_id, 32),
-        "foreign191 claim"
+        "foreign 191 claim"
     );
     if scope(&c.phase, &c.unit) {
         ensure!(
@@ -896,7 +896,7 @@ fn phase_scope(c: &Claim) -> Result<()> {
                     | "upload-readback"
             ) && fleet::pipeline_unit_range_for_epoch(&c.phase, &c.unit, c.epoch)?
                 .contains(&c.epoch),
-            "foreign191 stage"
+            "foreign 191 stage"
         );
         if c.phase == "local-publication" {
             ensure!(
@@ -943,7 +943,7 @@ fn receipt_bytes(b: &Bound, uid: u32, limit: u64) -> Result<Vec<u8>> {
             && m.nlink() == 1
             && m.uid() == uid
             && m.mode() & 0o022 == 0,
-        "unsafe191 operator receipt"
+        "unsafe 191 operator receipt"
     );
     let bytes = read_stable_bounded(&b.path, limit, "191 operator receipt")?;
     ensure!(
@@ -1919,7 +1919,7 @@ pub(super) fn check() -> Result<()> {
     Ok(())
 }
 
-/// Pre-launch custody gate for the independent191 full/plugin dispatcher.
+/// Pre-launch custody gate for the independent 191 full/plugin dispatcher.
 /// Does not launch, reserve resources, mint verifier receipts, or mutate R2.
 pub(super) fn dispatch_import_check(
     source_batch: &Bound,

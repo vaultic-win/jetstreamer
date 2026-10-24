@@ -3,7 +3,7 @@
 The separately gated `jetstreamer-epoch203-root-prefix-resource` utility is a
 private qualification attempt, not ordinary replay, a full-epoch peak promise,
 or publication authority. Build it with `--features epoch203-root-prefix-resource`.
-It keeps the exact retained snapshot, v1.6.16 store8 worker and parent used by the
+It keeps the exact retained snapshot, v1.6.16 store 8 worker and parent used by the
 bounded comparisons, with the existing 16-thread setting. The one-thread
 comparison saved only 1.24% scratch and took 4.38% longer; it is not a reason to
 lower a full-prefix budget or change healthy producers.
@@ -62,11 +62,11 @@ observer cadence and classify the unit as private diagnostic qualification, with
 no public status countdown.
 
 After success, independently validate the complete retained prefix and its
-canonical checkpoint. Only then consider the separately reviewed epoch203
+canonical checkpoint. Only then consider the separately reviewed epoch 203
 restart tuple, 419-slot suffix and V4 assembly path described in the checkpoint
-continuation runbook. The epoch213 continuation runner is not reusable authority.
+continuation runbook. The epoch 213 continuation runner is not reusable authority.
 All full/plugin, provenance, publication, authenticated upload/readback and
-sidecar gates remain independent. Epoch301 remains private.
+sidecar gates remain independent. Epoch 301 remains private.
 
 The independent `jetstreamer-qualification-verify` must support the runner's
 literal `epoch-203-prefix.jet` name. Its explicit filename exception is restricted
@@ -79,14 +79,14 @@ validator. Prefix validation is not full-epoch or publication qualification.
 Use the validator's optional `--receipt=/PRIVATE/epoch-203-prefix.validation.json`
 to persist the independent result natively. The existing receipt parent must be
 canonical, owned by the reader and owner-only. The destination is checked before
-the scan, created without clobbering, written mode0400, and fsynced together with
+the scan, created without clobbering, written mode 0400, and fsynced together with
 the bound parent directory. Failed validation writes no receipt; retain any
 interrupted write for explicit diagnosis rather than overwriting it. Without
 this option, the existing stdout-only interface is unchanged.
 
 ## Read-only stopped-scratch qualification
 
-`jetstreamer-epoch203-stopped-scratch-check` is restricted to the exact October21
+`jetstreamer-epoch203-stopped-scratch-check` is restricted to the exact October 21
 reserve-stopped root-prefix invocation and its original private run directory.
 It accepts only `PLAN --plan-sha256 HEX --self-sha256 HEX`; there is no deletion
 or execute mode. Its strict plan binds the immutable incident, source review,

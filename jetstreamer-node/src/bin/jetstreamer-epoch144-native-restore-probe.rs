@@ -1,5 +1,5 @@
-//! Exact62639490 native comparison only. Never a suffix or publication path.
-//! Reuse the unchanged140 comparison/client/immutable-I/O helpers,not its plan.
+//! Exact 62639490 native comparison only. Never a suffix or publication path.
+//! Reuse the unchanged 140 comparison/client/immutable-I/O helpers, not its plan.
 #[allow(dead_code)]
 #[path = "jetstreamer-epoch140-native-restore-probe.rs"]
 mod baseline;
@@ -80,12 +80,12 @@ fn validate_admission(value: &Value, inputs: &Bound, self_sha: &str, now: u64) -
             && value["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|n| n <= now && now - n <= 900),
-        "no fresh exact144 native-only admission"
+        "no fresh exact 144 native-only admission"
     );
     Ok(())
 }
 fn read(bound: &Bound, expected: &str) -> Result<Value> {
-    ensure!(bound.sha256 == expected, "wrong144 bound evidence digest");
+    ensure!(bound.sha256 == expected, "wrong 144 bound evidence digest");
     Ok(serde_json::from_slice(&bound_bytes(
         &bound.path,
         expected,
@@ -100,7 +100,7 @@ fn scratch_census(root: &Path) -> Result<Value> {
         entries = entries.checked_add(1).context("census count overflow")?;
         ensure!(
             entries <= 1_000_000 && !m.file_type().is_symlink(),
-            "unsafe or oversized144 scratch census"
+            "unsafe or oversized 144 scratch census"
         );
         physical = physical
             .checked_add(m.blocks().checked_mul(512).context("block overflow")?)
@@ -110,7 +110,7 @@ fn scratch_census(root: &Path) -> Result<Value> {
                 pending.push(child?.path());
             }
         } else {
-            ensure!(m.is_file(), "special file in144 scratch");
+            ensure!(m.is_file(), "special file in 144 scratch");
             files += 1;
             apparent = apparent.checked_add(m.len()).context("apparent overflow")?;
         }
@@ -138,7 +138,7 @@ fn expectation(manifest: &Value, pass: &Value, clock: &Value) -> Result<SegmentC
             && pass["output_slot_start"] == 62208000
             && pass["output_slot_count"] == 431491
             && pass["canonical_checksum_sidecar_absent"] == true,
-        "wrong independently verified144 prefix"
+        "wrong independently verified 144 prefix"
     );
     ensure!(
         clock["schema"] == "jetstreamer-epoch144-serialized-snapshot-clock-v1"
@@ -149,14 +149,14 @@ fn expectation(manifest: &Value, pass: &Value, clock: &Value) -> Result<SegmentC
             && clock["publication_authorized"] == false
             && clock["census"]["clock"]["ticks_per_slot"] == 64
             && clock["census"]["clock"]["hashes_per_tick"] == 12500,
-        "wrong144 serialized source"
+        "wrong 144 serialized source"
     );
     let expected: SegmentCheckpointSummary = serde_json::from_value(manifest["terminal"].clone())?;
     ensure!(
         expected.slot == SLOT
             && expected.slot_complete
             && expected.accounts_hash == "59bAQjc2c1VqNWqGoCacp3tnyNyie3EYx4bjttvJhgeT",
-        "wrong144 root"
+        "wrong 144 root"
     );
     for (a, b) in [
         ("slot", "slot"),
@@ -169,7 +169,7 @@ fn expectation(manifest: &Value, pass: &Value, clock: &Value) -> Result<SegmentC
     ] {
         ensure!(
             manifest["terminal"][a] == clock["census"]["clock"][b],
-            "serialized144 terminal mismatch:{a}"
+            "serialized 144 terminal mismatch:{a}"
         );
     }
     Ok(expected)
@@ -179,7 +179,7 @@ fn source_checks(plan: &Inputs, self_sha: &str) -> Result<(SegmentCheckpointSumm
         plan.schema == "jetstreamer-epoch144-native-input-policy-v1"
             && plan.probe_sha256 == self_sha
             && plan.minimum_free_bytes >= PROTECTED + PEAK,
-        "wrong144 input policy"
+        "wrong 144 input policy"
     );
     let lm = fs::symlink_metadata(&plan.ledger_directory)?;
     ensure!(
@@ -198,7 +198,7 @@ fn source_checks(plan: &Inputs, self_sha: &str) -> Result<(SegmentCheckpointSumm
             && sm.mode() & 0o222 == 0
             && sm.nlink() == 1
             && sm.len() == 2569233422,
-        "wrong immutable144 compressed input"
+        "wrong immutable 144 compressed input"
     );
     bound_bytes(&plan.worker, WORKER, 256 << 20)?;
     bound_bytes(
@@ -221,7 +221,7 @@ fn check_inputs(path: &Path, policy_sha: &str, self_sha: &str, receipt: &Path) -
     };
     ensure!(
         unsafe { libc::geteuid() } == 1001,
-        "isolated input-reader UID1001 required"
+        "isolated input-reader UID 1001 required"
     );
     bound_bytes(&fs::read_link("/proc/self/exe")?, self_sha, 256 << 20)?;
     let plan: Inputs = serde_json::from_slice(&bound_bytes(path, policy_sha, 1 << 20)?)?;
@@ -274,14 +274,14 @@ fn check_inputs(path: &Path, policy_sha: &str, self_sha: &str, receipt: &Path) -
 fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 1001,
-        "isolated replay UID1001 required"
+        "isolated replay UID 1001 required"
     );
     let self_path = fs::read_link("/proc/self/exe")?;
     bound_bytes(&self_path, self_sha, 256 << 20)?;
     let binding: Plan = serde_json::from_slice(&bound_bytes(path, plan_sha, 1 << 20)?)?;
     ensure!(
         binding.schema == "jetstreamer-private-epoch144-native-restore-probe-plan-v2",
-        "wrong144 plan schema"
+        "wrong 144 plan schema"
     );
     let plan: Inputs = serde_json::from_slice(&bound_bytes(
         &binding.inputs.path,
@@ -292,7 +292,7 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
         plan.schema == "jetstreamer-epoch144-native-input-policy-v1"
             && plan.probe_sha256 == self_sha
             && plan.minimum_free_bytes >= PROTECTED + PEAK,
-        "wrong144 native scope/complete peak"
+        "wrong 144 native scope/complete peak"
     );
     let iid = env::var("INVOCATION_ID")?;
     ensure!(
@@ -419,7 +419,7 @@ fn execute(path: &Path, plan_sha: &str, self_sha: &str) -> Result<()> {
     )?;
     ensure!(
         passed && after >= PROTECTED,
-        "native144 comparison failed; outcome preserved"
+        "native 144 comparison failed; outcome preserved"
     );
     Ok(())
 }

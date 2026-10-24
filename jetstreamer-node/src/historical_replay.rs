@@ -66,7 +66,7 @@ fn verify_epoch224_transaction_write_lamports(
         };
         if entry.slot != EPOCH224_ACCOUNT_DELTA_DIAGNOSTIC_SLOT {
             return Err(format!(
-                "epoch224 diagnostic transaction write for slot {} arrived with entry slot {}",
+                "epoch 224 diagnostic transaction write for slot {} arrived with entry slot {}",
                 write.slot, entry.slot
             ));
         }
@@ -79,20 +79,20 @@ fn verify_epoch224_transaction_write_lamports(
         });
         let (transaction_index, scheduled) = matches.next().ok_or_else(|| {
             format!(
-                "epoch224 diagnostic write version {} has unknown transaction signature {}",
+                "epoch 224 diagnostic write version {} has unknown transaction signature {}",
                 write.write_version,
                 Signature::from(signature)
             )
         })?;
         if matches.next().is_some() {
             return Err(format!(
-                "epoch224 diagnostic signature {} maps to multiple source transactions",
+                "epoch 224 diagnostic signature {} maps to multiple source transactions",
                 Signature::from(signature)
             ));
         }
         if scheduled.expected_status.is_none() || scheduled.reconstruct_fee {
             return Err(format!(
-                "epoch224 diagnostic transaction {} lacks exact canonical metadata",
+                "epoch 224 diagnostic transaction {} lacks exact canonical metadata",
                 transaction_index
             ));
         }
@@ -101,7 +101,7 @@ fn verify_epoch224_transaction_write_lamports(
             || scheduled.status_meta.post_balances.len() != keys.len()
         {
             return Err(format!(
-                "epoch224 diagnostic transaction {} balance vectors do not match its {} static keys",
+                "epoch 224 diagnostic transaction {} balance vectors do not match its {} static keys",
                 transaction_index,
                 keys.len()
             ));
@@ -112,7 +112,7 @@ fn verify_epoch224_transaction_write_lamports(
             .filter(|(_, key)| key.to_bytes() == write.pubkey);
         let (account_index, _) = key_matches.next().ok_or_else(|| {
             format!(
-                "epoch224 diagnostic write version {} pubkey {} is absent from transaction {}",
+                "epoch 224 diagnostic write version {} pubkey {} is absent from transaction {}",
                 write.write_version,
                 Address::new_from_array(write.pubkey),
                 transaction_index
@@ -120,7 +120,7 @@ fn verify_epoch224_transaction_write_lamports(
         })?;
         if key_matches.next().is_some() {
             return Err(format!(
-                "epoch224 diagnostic transaction {} contains duplicate key {}",
+                "epoch 224 diagnostic transaction {} contains duplicate key {}",
                 transaction_index,
                 Address::new_from_array(write.pubkey)
             ));
@@ -128,7 +128,7 @@ fn verify_epoch224_transaction_write_lamports(
         let expected = scheduled.status_meta.post_balances[account_index];
         if write.lamports != expected {
             return Err(format!(
-                "epoch224 diagnostic lamport mismatch at slot {} entry {} transaction {} signature {} pubkey {}: expected {}, observed {}, write version {}",
+                "epoch 224 diagnostic lamport mismatch at slot {} entry {} transaction {} signature {} pubkey {}: expected {}, observed {}, write version {}",
                 entry.slot,
                 entry.entry_index,
                 entry.start_index + transaction_index,
@@ -146,7 +146,7 @@ fn verify_epoch224_transaction_write_lamports(
         // therefore ambiguous evidence, not a value we may silently replace.
         if !seen.insert((signature, write.pubkey)) {
             return Err(format!(
-                "epoch224 diagnostic transaction {} emitted duplicate final write for {}",
+                "epoch 224 diagnostic transaction {} emitted duplicate final write for {}",
                 transaction_index,
                 Address::new_from_array(write.pubkey)
             ));
@@ -166,7 +166,7 @@ fn verify_epoch224_changed_lamport_writes(
     for (transaction_index, scheduled) in entry.txs.iter().enumerate() {
         if scheduled.expected_status.is_none() || scheduled.reconstruct_fee {
             return Err(format!(
-                "epoch224 diagnostic transaction {} lacks exact canonical metadata",
+                "epoch 224 diagnostic transaction {} lacks exact canonical metadata",
                 transaction_index
             ));
         }
@@ -177,7 +177,7 @@ fn verify_epoch224_changed_lamport_writes(
             .map(|value| *value.as_array())
             .ok_or_else(|| {
                 format!(
-                    "epoch224 diagnostic transaction {} has no signature",
+                    "epoch 224 diagnostic transaction {} has no signature",
                     transaction_index
                 )
             })?;
@@ -186,7 +186,7 @@ fn verify_epoch224_changed_lamport_writes(
             || scheduled.status_meta.post_balances.len() != keys.len()
         {
             return Err(format!(
-                "epoch224 diagnostic transaction {} balance vectors do not match its {} static keys",
+                "epoch 224 diagnostic transaction {} balance vectors do not match its {} static keys",
                 transaction_index,
                 keys.len()
             ));
@@ -197,7 +197,7 @@ fn verify_epoch224_changed_lamport_writes(
                 && !seen.contains(&(signature, key.to_bytes()))
             {
                 return Err(format!(
-                    "epoch224 diagnostic missing write at slot {} entry {} transaction {} signature {} pubkey {}: pre {}, post {}",
+                    "epoch 224 diagnostic missing write at slot {} entry {} transaction {} signature {} pubkey {}: pre {}, post {}",
                     entry.slot,
                     entry.entry_index,
                     entry.start_index + transaction_index,
@@ -331,13 +331,13 @@ impl HistoricalReplay {
             live_start_slot,
         );
         if diagnostic_warmup_target.is_some() && !client.supports_entry_batches() {
-            return Err("bounded epoch223 warmup requires the approved batched worker".into());
+            return Err("bounded epoch 223 warmup requires the approved batched worker".into());
         }
         if diagnostic_warmup_target.is_some()
             && (!checkpoint_slots.contains(&96_335_538) || !checkpoint_slots.contains(&96_767_522))
         {
             return Err(
-                "bounded epoch223 warmup retains both real canonical checkpoint gates".into(),
+                "bounded epoch 223 warmup retains both real canonical checkpoint gates".into(),
             );
         }
         let replay = Self {

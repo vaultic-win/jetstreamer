@@ -1,4 +1,4 @@
-//! Adopt and refresh the real141 repair owner inside the existing observation.
+//! Adopt and refresh the real 141 repair owner inside the existing observation.
 //! No extra observer, producer restart, task launch or resource admission.
 use super::*;
 const UNIT: &str = "horizon-repair-141-floor-20261024-v1.service";
@@ -59,7 +59,7 @@ fn capture(s: &Profile) -> Result<Value> {
     let q = bound_json(&s.queue_plan, true)?;
     ensure!(
         q["schema"] == "jetstreamer-epoch141-repair-queue-plan-v2" && q["epoch"] == 141,
-        "foreign141 repair queue plan"
+        "foreign 141 repair queue plan"
     );
     Ok(c)
 }
@@ -102,7 +102,7 @@ pub(super) fn enable(p: &mut Plan, b: &Bound) -> Result<()> {
             && v["replay_launch_authorized"] == false
             && v["publication_authorized"] == false
             && v["r2_mutations"] == false,
-        "foreign141 repair cadence handoff"
+        "foreign 141 repair cadence handoff"
     );
     let s: Profile = serde_json::from_value(v["active_repair"].clone())?;
     let publisher: Bound = serde_json::from_value(v["publisher"].clone())?;

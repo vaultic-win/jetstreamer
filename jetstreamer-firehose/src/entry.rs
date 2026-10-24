@@ -12,7 +12,7 @@ use {
 // type Entry struct {
 // 	Kind         int
 // 	NumHashes    int
-// 	Hash         []uint8
+// 	Hash         []uint 8
 // 	Transactions List__Link
 // }
 /// Representation of a `Kind::Entry` node emitted by the firehose.
@@ -122,7 +122,7 @@ mod entry_tests {
         )
         .unwrap();
         println!("Link: {:?}", _cid);
-        // base58 must be bafyreibysst7x3lvzdrllbspoob5z2epcrb6bmzqqlcxxysvku4cmvdk4e
+        // base58 must be bafyreibysst 7x3lvzdrllbspoob5z2epcrb6bmzqqlcxxysvku4cmvdk4e
         assert_eq!(
             _cid.to_string(),
             "bafyreibysst7x3lvzdrllbspoob5z2epcrb6bmzqqlcxxysvku4cmvdk4e"

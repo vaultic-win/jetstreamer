@@ -55,7 +55,7 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
             && r["expected_exec_start"] == c.expected_exec_start
             && r["runner_sha256"] == RUNNER_SHA
             && r["private_verification_only"] == true,
-        "foreign private144scan launch"
+        "foreign private 144 scan launch"
     );
     for key in [
         "ordinary_replay_claim",
@@ -65,7 +65,7 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
         "remote_mutations",
         "r2_mutations",
     ] {
-        ensure!(r[key] == false, "private144scan grants authority:{key}");
+        ensure!(r[key] == false, "private 144 scan grants authority:{key}");
     }
     let stage = if c.unit == FULL_UNIT {
         "full"
@@ -87,7 +87,7 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
                     "/var/lib/jetstreamer/horizon-epoch144-private-verification-20261022-v1/{stage}"
                 )
             && p["producer_outcome"] == r["producer_outcome"],
-        "private144scan plan/source differs"
+        "private 144 scan plan/source differs"
     );
     let command = format!(
         "{{ path={RUNNER} ; argv[]={RUNNER} {} --plan-sha256 {} --self-sha256 {RUNNER_SHA}",
@@ -99,7 +99,7 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
             .split_once(" ; ignore_errors=")
             .map(|(s, _)| s)
             == Some(command.as_str()),
-        "private144scan command substituted"
+        "private 144 scan command substituted"
     );
     ensure!(
         p["verifier"]["sha256"]
@@ -108,7 +108,7 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
             } else {
                 "73e7535b9cedc7e565a92735ca6e07c7efb8e66755a6d5272ed16649b4d8cee9"
             },
-        "unqualified private144 verifier"
+        "unqualified private 144 verifier"
     );
     ensure!(
         o["schema"] == "jetstreamer-private-epoch144-checkpoint-continuation-v2"
@@ -124,7 +124,7 @@ fn checked(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Result<()> {
             && o["publication_authorized"] == false
             && o["canonical_sidecar_authorized"] == false
             && o["r2_mutations"] == false,
-        "private144scan requires genuine complete assembly"
+        "private 144 scan requires genuine complete assembly"
     );
     Ok(())
 }
@@ -225,7 +225,7 @@ fn checked_recovery(c: &PipelineClaim, r: &Value, p: &Value, o: &Value) -> Resul
 pub(super) fn validate(c: &PipelineClaim) -> Result<()> {
     ensure!(
         c.evidence.len() == 1,
-        "private144scan requires one exact launch receipt"
+        "private 144 scan requires one exact launch receipt"
     );
     let r = bound_json(&c.evidence[0])?;
     validate_bound(c, &r)
@@ -262,7 +262,7 @@ fn root_identity(fields: &BTreeMap<&str, &str>) -> Result<()> {
                 .get("Group")
                 .is_some_and(|g| matches!(*g, "" | "root"))
             && fields.get("DynamicUser") == Some(&"no"),
-        "private144scan requires explicit or default non-dynamic root"
+        "private 144 scan requires explicit or default non-dynamic root"
     );
     Ok(())
 }
@@ -271,10 +271,10 @@ fn live_limits(c: &PipelineClaim, current: &Value) -> Result<()> {
         current["Type"] == "exec"
             && current["InvocationID"] == c.invocation_id
             && current["NRestarts"] == "0",
-        "private144scan owner changed"
+        "private 144 scan owner changed"
     );
     let o=ProcessCommand::new("systemctl").args(["show",&c.unit,"--property=User,Group,DynamicUser,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,RuntimeMaxUSec"]).output()?;
-    ensure!(o.status.success(), "private144scan limits unreadable");
+    ensure!(o.status.success(), "private 144 scan limits unreadable");
     let text = std::str::from_utf8(&o.stdout)?;
     let fields: BTreeMap<_, _> = text.lines().filter_map(|s| s.split_once('=')).collect();
     root_identity(&fields)?;
@@ -296,7 +296,7 @@ fn live_limits(c: &PipelineClaim, current: &Value) -> Result<()> {
     ] {
         ensure!(
             fields.get(k) == Some(&v),
-            "private144scan sandbox differs:{k}"
+            "private 144 scan sandbox differs:{k}"
         );
     }
     let stage = stage(&c.unit);
@@ -308,7 +308,7 @@ fn live_limits(c: &PipelineClaim, current: &Value) -> Result<()> {
     }
     ensure!(
         fields.get("ReadWritePaths") == Some(&format!("{}/{stage}", state_root(&c.unit)).as_str()),
-        "private144scan writable paths differ"
+        "private 144 scan writable paths differ"
     );
     Ok(())
 }

@@ -1,4 +1,4 @@
-//! Correctness core for private epoch228 prefix extraction.
+//! Correctness core for private epoch 228 prefix extraction.
 //!
 //! This does not authorize an executor, resources, sidecars, publication or
 //! source retirement. A separately admitted controller must bind the completed
@@ -32,7 +32,7 @@ pub const FIRST_SLOT: u64 = 98_496_000;
 pub const CANONICAL_SLOTS: u64 = 432_000;
 pub const FOCUSED_SLOTS: u64 = 432_279;
 pub const TERMINAL_ROOT: u64 = 98_928_278;
-/// Separately sealed closed228 capped worker; never the227 binary or stock route.
+/// Separately sealed closed 228 capped worker; never the 227 binary or stock route.
 pub const PINNED_WORKER_SHA256: [u8; 32] = [
     0x1b, 0xfa, 0x8d, 0x51, 0xd4, 0x47, 0x29, 0xc7, 0x5d, 0xb7, 0xff, 0xe5, 0xd4, 0x66, 0xce, 0xc9,
     0xd9, 0x02, 0x21, 0x6d, 0x93, 0x62, 0xa6, 0xef, 0xb1, 0x29, 0xbf, 0x92, 0x7c, 0xa8, 0x56, 0x73,
@@ -77,7 +77,7 @@ pub struct ExtractionEvidence {
 
 /// Validates this exact checkpoint-bounded shape, without treating it as a
 /// complete epoch or promoting the candidate runtime. `worker` must come from
-/// the separately sealed228 package and the controller's hash-bound admission.
+/// the separately sealed 228 package and the controller's hash-bound admission.
 pub fn validate_scope(m: &HistoricalSegmentManifest, worker: [u8; 32]) -> Result<()> {
     ensure!(
         worker == PINNED_WORKER_SHA256
@@ -171,7 +171,7 @@ impl PinnedSource {
     {
         ensure!(
             (1..=MAXIMUM_OUTPUT_BYTES).contains(&maximum_bytes),
-            "228 output bound exceeds the reviewed160GiB ceiling"
+            "228 output bound exceeds the reviewed 160 GiB ceiling"
         );
         let m = fs::symlink_metadata(root)?;
         ensure!(

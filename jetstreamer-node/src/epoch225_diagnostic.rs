@@ -1,4 +1,4 @@
-//! The bounded v1.6.25 comparison never admits ordinary epoch225 publication.
+//! The bounded v1.6.25 comparison never admits ordinary epoch 225 publication.
 use std::path::Path;
 pub(crate) const BOOTSTRAP: u64 = 97_199_617;
 pub(crate) const TERMINAL_ROOT: u64 = 97_631_459;
@@ -17,10 +17,10 @@ pub(crate) fn validate_launch(
         || root_cohort
         || recovery_or_inherited_lease
     {
-        return Err("epoch225-v1-6-25-diagnostic requires exact private focused epoch225, snapshot97199617 and underlying canonicalroot97631459; ordinary replay, root cohorts, inherited leases, recovery and publication are unavailable".into());
+        return Err("epoch225-v1-6-25-diagnostic requires exact private focused epoch 225, snapshot 97199617 and underlying canonicalroot 97631459; ordinary replay, root cohorts, inherited leases, recovery and publication are unavailable".into());
     }
     let (ledger, output, scratch) =
-        paths.ok_or("epoch225 comparison requires private ledger/output/scratch paths")?;
+        paths.ok_or("epoch 225 comparison requires private ledger/output/scratch paths")?;
     let root = ledger.parent().ok_or("missing private run root")?;
     if root.parent() != Some(Path::new("/home/ubuntu/.jetstreamer-private"))
         || !root
@@ -37,7 +37,7 @@ pub(crate) fn validate_launch(
         || scratch != root.join("scratch")
     {
         return Err(
-            "epoch225 comparison paths must share an isolated bounded-resource-225 private root"
+            "epoch 225 comparison paths must share an isolated bounded-resource-225 private root"
                 .into(),
         );
     }

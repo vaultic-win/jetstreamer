@@ -9,7 +9,7 @@ The opt-in `epoch203-shrink-budget-resource` feature builds
 `jetstreamer-epoch203-bounded-resource` with the reviewed bounded runner and
 the v1.6.16 shrink-budget candidate worker `4aeca563…`. It pins parent
 `025757b9…`, the same generation-bound 87,695,515 bootstrap, target
-87,720,000 and terminal checkpoint 88,127,580 as the store8 comparison.
+87,720,000 and terminal checkpoint 88,127,580 as the store 8 comparison.
 The candidate caps returned shrink debt at the pinned upstream recovery
 budget; it does not change transaction, PoH, checkpoint or cursor semantics.
 

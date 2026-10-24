@@ -513,7 +513,7 @@ pub(super) fn prepare(
     if mode == "--prepare-next-native141" {
         ensure!(
             handoff_spec.is_none(),
-            "native141 consumes only its exact actual first guard"
+            "native 141 consumes only its exact actual first guard"
         );
         native141::enable(&mut next)?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
@@ -591,7 +591,7 @@ pub(super) fn prepare(
     if mode == "--prepare-next-repair141" {
         repair141_status::enable(
             &mut next,
-            handoff_spec.context("repair141 cadence handoff required")?,
+            handoff_spec.context("repair 141 cadence handoff required")?,
         )?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
         validate_observer_config(&next, &effective, &next_config)?;
@@ -601,7 +601,7 @@ pub(super) fn prepare(
         original141::enable(
             &mut next,
             &mut next_config,
-            handoff_spec.context("original141 handoff required")?,
+            handoff_spec.context("original 141 handoff required")?,
         )?;
         prefix157::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
         validate_observer_config(&next, &effective, &next_config)?;
@@ -625,7 +625,7 @@ pub(super) fn prepare(
     if mode == "--prepare-next-upload198" {
         ensure!(
             handoff_spec.is_none(),
-            "upload198 is a separate exact migration"
+            "upload 198 is a separate exact migration"
         );
         public198::enable_upload(&mut next)?;
         public198::namespaces(&mut next, &mut observer_package, &mut cycle_package)?;
@@ -640,7 +640,7 @@ pub(super) fn prepare(
     if let Some(spec) = prefix_spec {
         ensure!(
             !enable_terminal157 && !enable_private144 && !recover_controllers && !pause157,
-            "prefix157 migration must be separate"
+            "prefix 157 migration must be separate"
         );
         if mode == "--prepare-next-assembly144" {
             assembly144::enable(&mut next, &mut next_config, spec)?;

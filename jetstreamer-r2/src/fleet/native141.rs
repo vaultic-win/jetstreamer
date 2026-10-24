@@ -50,10 +50,10 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
                 .as_u64()
                 .is_some_and(|n| n >= FLOOR + (32u64 << 30))
             && r["trip"] == false,
-        "foreign or unguarded native141 claim"
+        "foreign or unguarded native 141 claim"
     );
     for flag in ["publication_authorized", "remote_mutations", "r2_mutations"] {
-        ensure!(r[flag] == false, "native141 guard grants authority:{flag}");
+        ensure!(r[flag] == false, "native 141 guard grants authority:{flag}");
     }
     Ok(())
 }
@@ -76,7 +76,7 @@ fn bindings(p: &Value, a: &Value) -> Result<()> {
             && p["log_directory"] == format!("{ROOT}/logs")
             && p["initial_guard_receipt"] == format!("{ROOT}/results/initial-guard.json")
             && p["output_receipt"] == format!("{ROOT}/results/candidates.json"),
-        "native141 plan scope differs"
+        "native 141 plan scope differs"
     );
     ensure!(
         a["schema"] == "jetstreamer-historical-performance-admission-receipt-v1"
@@ -93,7 +93,7 @@ fn bindings(p: &Value, a: &Value) -> Result<()> {
             && a["evidence"]["minimum_free_bytes"]
                 .as_u64()
                 .is_some_and(|n| n >= FLOOR + (32u64 << 30)),
-        "native141 admission differs"
+        "native 141 admission differs"
     );
     Ok(())
 }
@@ -131,7 +131,7 @@ fn live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
                 .and_then(|s| s.parse::<u64>().ok())
                 .is_some_and(|p| p > 0)
             && command(&v["ExecStart"]) == Some(expected_command().as_str()),
-        "native141 live command/owner changed"
+        "native 141 live command/owner changed"
     );
     Ok(())
 }
@@ -156,12 +156,12 @@ fn common_limits(p: &BTreeMap<&str, &str>) -> Result<()> {
         ("CapabilityBoundingSet", "cap_dac_override"),
         ("AmbientCapabilities", "cap_dac_override"),
     ] {
-        ensure!(p.get(k) == Some(&v), "native141 sandbox differs:{k}");
+        ensure!(p.get(k) == Some(&v), "native 141 sandbox differs:{k}");
     }
     ensure!(
         p.get("User").is_some_and(|s| s.is_empty() || *s == "root")
             && p.get("Group").is_some_and(|s| s.is_empty() || *s == "root"),
-        "native141 identity is not root"
+        "native 141 identity is not root"
     );
     Ok(())
 }
@@ -172,7 +172,7 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
             == Some(
                 &"/home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1/logs /home/sol/.jetstreamer-private/epoch141-native-full-census-20261022-v1/results"
             ),
-        "native141 writable paths differ"
+        "native 141 writable paths differ"
     );
     Ok(())
 }
@@ -186,7 +186,7 @@ pub(super) fn validate_live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
     launch(&bound_json(&c.launch_receipt)?, c)?;
     live(c, v)?;
     let output=ProcessCommand::new("systemctl").args(["show",UNIT,"--no-pager","--property=Type,Restart,KillMode,Delegate,RuntimeMaxUSec,CPUQuotaPerSecUSec,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,UMask,ProtectSystem,ProtectHome,PrivateNetwork,PrivateTmp,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,User,Group"]).output()?;
-    ensure!(output.status.success(), "native141 sandbox read failed");
+    ensure!(output.status.success(), "native 141 sandbox read failed");
     let text = std::str::from_utf8(&output.stdout)?;
     limits(&text.lines().filter_map(|s| s.split_once('=')).collect())
 }

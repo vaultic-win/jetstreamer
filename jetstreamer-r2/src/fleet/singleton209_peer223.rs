@@ -1,4 +1,4 @@
-//! Exact terminal223v2 carry-forward; original fleet and census remain evidence.
+//! Exact terminal 223v2 carry-forward; original fleet and census remain evidence.
 use super::*;
 pub(super) const UNIT: &str = "horizon-qualify-223-v1620-warmup-resource-8457f800-v2.service";
 const IID: &str = "58ab3d9221a6452685b8eab3ceabdb49";
@@ -16,7 +16,7 @@ fn scope(p: &Value) -> Result<()> {
             && p["unit"] == UNIT
             && p["invocation_id"] == IID
             && p["running_origin"]["path"] == ORIGIN,
-        "209 carry-forward requires the actual exact223v2 terminal proof"
+        "209 carry-forward requires the actual exact 223v2 terminal proof"
     );
     Ok(())
 }
@@ -33,23 +33,23 @@ pub(super) fn prepare(
     let (unit, iid) = warmup223::terminal_identity(&proof)?;
     ensure!(
         unit == UNIT && iid == IID,
-        "209 terminal223 identity differs"
+        "209 terminal 223 identity differs"
     );
     ensure!(
         proof["observer"] == private157::binding(observer)
             && proof["fleet"] == private157::binding(fleet),
-        "209 terminal223 proof must bind the same accepted observer and complete predecessor fleet"
+        "209 terminal 223 proof must bind the same accepted observer and complete predecessor fleet"
     );
     let rows = f["active"]
         .as_array()
-        .context("209 terminal223 active census")?;
+        .context("209 terminal 223 active census")?;
     let matching = rows
         .iter()
         .filter(|r| r["epoch"] == 223)
         .collect::<Vec<_>>();
     ensure!(
         matching.len() == 1,
-        "209 terminal223 predecessor needs exactly its registered live owner"
+        "209 terminal 223 predecessor needs exactly its registered live owner"
     );
     let row = matching[0];
     let owner = singleton227_admission::active_owner(row)?;
@@ -57,11 +57,11 @@ pub(super) fn prepare(
     let p: Plan = serde_json::from_value(bound_json(&BoundFile {
         path: f["plan"]
             .as_str()
-            .context("209 terminal223 fleet plan")?
+            .context("209 terminal 223 fleet plan")?
             .into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("209 terminal223 plan digest")?
+            .context("209 terminal 223 plan digest")?
             .into(),
     })?)?;
     let claims = p
@@ -87,20 +87,20 @@ pub(super) fn prepare(
                 &claims[0].expected_exec_start,
                 owner["ExecStart"]
                     .as_str()
-                    .context("209 terminal223 prior command")?
+                    .context("209 terminal 223 prior command")?
             ),
-        "209 terminal223 predecessor registered origin/owner differs"
+        "209 terminal 223 predecessor registered origin/owner differs"
     );
     let diagnostics = o["diagnostic_replays"]
         .as_array()
-        .context("209 terminal223 sampled rows")?;
+        .context("209 terminal 223 sampled rows")?;
     let samples = diagnostics
         .iter()
         .filter(|r| r["producer_unit"] == UNIT)
         .collect::<Vec<_>>();
     ensure!(
         samples.len() == 1,
-        "209 terminal223 predecessor sample missing or duplicate"
+        "209 terminal 223 predecessor sample missing or duplicate"
     );
     sampled(samples[0])?;
     Ok(Some(Peer {
@@ -123,7 +123,7 @@ fn sampled(r: &Value) -> Result<()> {
             && v["producer_before"]["invocation_id"] == IID
             && v["producer_after"]["invocation_id"] == IID
             && v["scratch_path"] == format!("{ROOT}/scratch"),
-        "209 terminal223 sampled identity/scope differs"
+        "209 terminal 223 sampled identity/scope differs"
     );
     Ok(())
 }
@@ -133,11 +133,11 @@ pub(super) fn arithmetic(f: &Value, o: &Value, peer: Option<&Peer>) -> Result<(V
     if peer.is_some() {
         reduced["active"]
             .as_array_mut()
-            .context("209 terminal223 arithmetic owners")?
+            .context("209 terminal 223 arithmetic owners")?
             .retain(|r| singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] != UNIT));
         observed["diagnostic_replays"]
             .as_array_mut()
-            .context("209 terminal223 arithmetic observations")?
+            .context("209 terminal 223 arithmetic observations")?
             .retain(|r| r["producer_unit"] != UNIT);
     }
     Ok((reduced, observed))
@@ -170,7 +170,7 @@ pub(super) fn owners(
             &p.proof,
             current
                 .get(UNIT)
-                .context("209 terminal223 current owner omitted")?,
+                .context("209 terminal 223 current owner omitted")?,
         )?;
         warmup223::terminal_not_replaced(&p.proof)?;
     }

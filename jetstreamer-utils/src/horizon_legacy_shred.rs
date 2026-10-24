@@ -35,7 +35,7 @@ pub struct DiagnosticSlotMeta {
 
 /// Decode the entire fixed-int SlotMeta record, rejecting partial or trailing data.
 ///
-/// Layout source: ledger/src/blockstore_meta.rs at revision893cc764, SHA256
+/// Layout source: ledger/src/blockstore_meta.rs at revision 893cc764, SHA256
 /// `25e29134699e586f626a56b79e507c4e0b1e92b21d47684841cdd727abc80ba7`.
 /// Require a known terminal index, fully consumed/received contiguous data range,
 /// bounded unique child slots, and strictly ordered completed-data endpoints.
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn bounded_complete_slot_metadata_matches_fixed_integer_layout() {
         let bytes = metadata(4, 4, 3, vec![60912007, 60912005], vec![1, 3]);
-        // Independent pinned SDK/bincode1.3.1 golden from its Rust1.46 workspace.
+        // Independent pinned SDK/bincode1.3.1 golden from its Rust 1.46 workspace.
         assert_eq!(
             format!("{:x}", sha2::Sha256::digest(&bytes)),
             "6b2bcca69ee61a560e719e0e58456ac5907e8e24c90434b90e9f8e12b25f6ec7"
@@ -334,7 +334,7 @@ mod tests {
 
     fn shred(index: u32, flags: u8, size: u16) -> Vec<u8> {
         // Fixed-int bincode field order of Signature + ShredCommonHeader +
-        // DataShredHeader. Two raw [u8;32] tuples reproduce Signature's 64 bytes.
+        // DataShredHeader. Two raw [u8; 32] tuples reproduce Signature's 64 bytes.
         let header = bincode::DefaultOptions::new()
             .with_fixint_encoding()
             .serialize(&(

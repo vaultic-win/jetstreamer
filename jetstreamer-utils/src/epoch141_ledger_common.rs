@@ -1,4 +1,4 @@
-//! Shared exact epoch141 source metadata, identity and durable-receipt gates.
+//! Shared exact epoch 141 source metadata, identity and durable-receipt gates.
 use {
     anyhow::{Context, Result, ensure},
     serde_json::Value,
@@ -217,7 +217,7 @@ pub(super) fn wait_bounded(child: &mut Child, timeout: Duration) -> Result<ExitS
             return Ok(status);
         }
         if start.elapsed() >= timeout {
-            // CAP_KILL is required when this root parent owns a UID1001 child
+            // CAP_KILL is required when this root parent owns a UID 1001 child
             // under a minimal capability bounding set. Reap before returning.
             child
                 .kill()

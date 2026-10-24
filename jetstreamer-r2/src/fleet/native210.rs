@@ -135,7 +135,7 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
         "210 unrelated origin evidence"
     );
     let a = immutable_json(&extras[1])?;
-    // Guard samples use the existing no-clobber0600 writer. Their exact digest
+    // Guard samples use the existing no-clobber 0600 writer. Their exact digest
     // is frozen by the immutable origin; do not demand a different writer mode.
     let g = bound_json(&extras[0])?;
     let p = immutable_json(&extras[2])?;

@@ -1,4 +1,4 @@
-//! Exact pending-controller ownership after the retained198 parent succeeds.
+//! Exact pending-controller ownership after the retained 198 parent succeeds.
 //! Observational only: no import launch, archive verification or publication.
 use super::*;
 use serde_json::json;
@@ -107,7 +107,7 @@ fn immutable(path: &str, digest: &str) -> Result<()> {
             && m.uid() == 0
             && m.mode() & 0o222 == 0
             && path.canonicalize()? == path,
-        "unsafe198handoff immutable evidence"
+        "unsafe 198handoff immutable evidence"
     );
     ensure!(
         hex_lower(&Sha256::digest(read_stable_bounded(

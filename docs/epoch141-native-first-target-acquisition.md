@@ -1,4 +1,4 @@
-# Private epoch141 first-target acquisition
+# Private epoch 141 first-target acquisition
 
 This is acquisition-only source support, not a deployed recovery route. The
 distinct native plan schema is
@@ -11,8 +11,8 @@ acquisition nor the older eleven-target proof is full recovery.
 The pinned complete SlotMeta decoder retains `is_connected=false`. A separate
 raw-acquisition planner requests target and parent `meta`, `root`, `dead_slots`
 and `orphans` keys, followed by every target `data_shred` index. Slot and shred
-keys follow the independently hashed893cc764 `blockstore_db.rs` layout. The
-observed last index777 requires778data shreds and786second-batch queries. The
+keys follow the independently hashed 893cc764 `blockstore_db.rs` layout. The
+observed last index 777 requires 778data shreds and786second-batch queries. The
 strict recovery planner and connected SlotMeta assembler remain unchanged and
 continue to reject the disconnected target.
 

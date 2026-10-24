@@ -443,7 +443,7 @@ pub fn export_archive(
         .map_err(|error| format!("failed to open {}: {}", archive_path.display(), error))?;
     let writer = BufWriter::new(output);
     // The handoff is ephemeral and both pinned runtimes accept zstd. Level 1
-    // avoids serial bzip2 becoming a material pause inside an already
+    // avoids serial bzip 2 becoming a material pause inside an already
     // multi-day production replay while retaining a compact, checksummed
     // archive.
     let encoder = zstd::stream::Encoder::new(writer, 1)
@@ -1117,7 +1117,7 @@ fn reject_unreferenced_append_vecs(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Load an already-extracted genesis or unpack the normal js2 genesis archive
+/// Load an already-extracted genesis or unpack the normal js 2 genesis archive
 /// into worker-private storage.  The shared ledger path is never modified.
 pub fn load_genesis(ledger_path: &Path, state_dir: &TempDir) -> Result<GenesisConfig, String> {
     let direct_directory = if ledger_path.is_file()

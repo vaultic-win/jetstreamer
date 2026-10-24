@@ -78,7 +78,7 @@ snapshot `301110ca…`, two Rayon threads and natural parent completion at
 96,767,522. It cannot run the 477-slot tail or request the unknown full-epoch
 terminal. Both bootstrap and terminal Bank/accounts commitments, exact output
 coverage and absent sidecar are required in its producer manifest. A progress
-line alone never completes the attempt. The existing epoch203 profiles retain
+line alone never completes the attempt. The existing epoch 203 profiles retain
 their own compile-bound scope and are not replaced.
 
 Its 72-hour runtime and 1,280-GiB terminal scratch bounds are diagnostic caps,
@@ -86,12 +86,12 @@ not measured full-prefix peak qualification. Fresh admission must reserve the
 complete conservative 1,536-GiB incremental envelope (scratch plus archive and
 buffers), all older live growth, and the current century floor. Its startup
 minimum of 2,584,751,391,635 bytes is only a rejection baseline: thirteen-sample
-floor 248,289,182,611 + unchanged225 growth640GiB + candidate1536GiB. It does
+floor 248,289,182,611 + unchanged 225 growth 640 GiB + candidate 1536 GiB. It does
 not account for a still-live203 owner; do not launch before fresh full-fleet
 admission proves every claim fits. Bind the exact producer to a proven actual
 free-space/VMA guard, protecting older claims. No new launch, guard or automatic
 admission trigger is installed merely by adding this utility. Preserve the
-existing203/225 workers and their guards. After natural success, independently
+existing 203/225 workers and their guards. After natural success, independently
 reread the prefix; producer success still grants no restart, assembly, complete
 epoch, plugin, canonical-sidecar or publication authority.
 
@@ -103,15 +103,15 @@ incident state and labels live work `private-known-root-prefix`, without a
 sidecar countdown or complete-epoch authority. Its same-observation admission
 requires the exact nested scratch path and the real one-worker first-fire guard.
 
-For the first prefix attempt, the original203producer's clean natural terminal
+For the first prefix attempt, the original 203producer's clean natural terminal
 and independently reread prefix are preserved in
 `horizon-prefix203-terminal-independent-evidence-v1`. The fleet authenticates
-that exact terminal handoff receipt before accepting release of its old960GiB
-remaining-growth claim; this does not qualify203's suffix or any new203work.
-Admission still reserves the unchanged225640GiB, the full2231536GiB trial and
-the thirteen-sample century floor: 2,584,751,391,635 bytes. The223guard protects
-225 plus a64GiB buffer and that floor: 1,004,203,426,707 bytes. No entry launch
-is granted by registration, capability, cache cleanup or terminal203evidence
+that exact terminal handoff receipt before accepting release of its old 960 GiB
+remaining-growth claim; this does not qualify 203's suffix or any new 203work.
+Admission still reserves the unchanged 225640 GiB, the full 2231536 GiB trial and
+the thirteen-sample century floor: 2,584,751,391,635 bytes. The 223 guard protects
+225 plus a64 GiB buffer and that floor: 1,004,203,426,707 bytes. No entry launch
+is granted by registration, capability, cache cleanup or terminal 203evidence
 alone: require fresh full-fleet/resource admission and a proved invocation guard.
 
 The independent reader has a separate closed prefix profile for
@@ -144,14 +144,14 @@ run with the known bootstrap alone; ordinary, cold, carried/cohort and restart
 paths retain their existing post-bootstrap obligations. Never turn a planning
 outcome into completion or construct a fictitious terminal expectation.
 The static audit also found the compiled IPC worker-profile identity had not
-included the epoch223 feature in its v1.6.25 overrides, although the registry
+included the epoch 223 feature in its v1.6.25 overrides, although the registry
 descriptor already did. Bind and test both identities. The pre-worker report
 must now validate that profile and resolve its worker executable as well.
 The old static era label includes v1.6.20; the selected descriptor is v1.6.25,
 as asserted by the actual bootstrap-selector regression and new preflight.
 
 The distinct `--epoch223-prefix-preflight` flag admits only the exact cold
-prefix96335538..96767522 and its prefix namespace. It cannot be combined with
+prefix 96335538..96767522 and its prefix namespace. It cannot be combined with
 either tail flag. It retains both independent checkpoint obligations and
 returns a `jetstreamer-private-epoch223-prefix-planning-preflight-v1` report
 only at the actual replay entrypoint's pre-worker barrier. Like tail preflight,
@@ -209,10 +209,10 @@ gates. Preserve the original failed invocation/partial and keep the repair open
 until epoch 223 reaches a verified R2 ready pair.
 
 The shared RAM-only snapshot supervisor has a distinct
-`epoch223-tail-snapshot-tests` build profile, incompatible with its epoch225
-and released-CPU profiles. It accepts only the exact sealed epoch223 test
+`epoch223-tail-snapshot-tests` build profile, incompatible with its epoch 225
+and released-CPU profiles. It accepts only the exact sealed epoch 223 test
 harness and tail snapshot, its own plan/unit/receipt namespaces, and the
-complete fresh 201–300 fleet with the unchanged live epoch203/225 identities.
+complete fresh 201–300 fleet with the unchanged live epoch 203/225 identities.
 The 13 independently established canonical size samples bind the century
 floor to 248,289,182,611 bytes. A changed census requires a reviewed update.
 
@@ -220,7 +220,7 @@ Its separate `epoch223-cold-snapshot-tests` build accepts only the sealed cold
 snapshot in `horizon-223-known-root-prefix-b1670f57-v1`, SHA-256
 `301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665`,
 9,815,262,303 bytes, and test anchor 96,335,538. It reuses the unchanged
-optimized epoch223 harness, not the tail input or tail plan. Plans use schema
+optimized epoch 223 harness, not the tail input or tail plan. Plans use schema
 `jetstreamer-private-epoch223-cold-ram-snapshot-test-plan-v1`, units
 `archive-223-cold-snapshot-test-*`, and receipts `ram-snapshot-test-223-cold-*`.
 Cold and tail profiles cannot be compiled together or borrow one another's
@@ -232,7 +232,7 @@ after fresh coordinated observation and matching complete fleet evidence.
 The fleet reconciler's closed `private-cold-snapshot-verification` role binds
 the exact actual-test unit, immutable plan and supervisor digest to the
 Rust-generated durable test intent. While live it remains private qualification
-with no sidecar ETA, and epoch223 stays in `failed-needs-repair`. It never
+with no sidecar ETA, and epoch 223 stays in `failed-needs-repair`. It never
 relabels a snapshot test as an ordinary replay or post-replay delivery stage.
 
 Run its capability mode under the same actual sandbox before snapshot mode.
@@ -242,7 +242,7 @@ tasks. Only its exact root-private receipt directory is host-writable.
 The child drops to UID/GID1000 with no supplementary groups/capabilities,
 has no network, and runs exactly the two ignored load/initialize tests with
 anchor 96,767,522, 128-MiB test stack and two Solana Rayon threads. Its
-prebuilt harness was compiled in the historical workspace with Rust1.51;
+prebuilt harness was compiled in the historical workspace with Rust 1.51;
 the runtime working directory is private tmpfs, never the mutable workspace.
 
 Fresh sampled and actual available memory must cover the 448-GiB host stop
@@ -253,10 +253,10 @@ growth claims nor creates replay output, canonical sidecars or publication
 authority. A successful snapshot check is still not a tail replay or a cold
 epoch qualification.
 
-Use the optimized (`cargo test --release`) epoch223 test harness for new
-snapshot checks. The previous epoch225 debug attempt exhausted its 30-minute
+Use the optimized (`cargo test --release`) epoch 223 test harness for new
+snapshot checks. The previous epoch 225 debug attempt exhausted its 30-minute
 bound before finishing the first test; its optimized counterpart passed both
-checks within the same bounds. Epoch223's initial debug attempt remains
+checks within the same bounds. Epoch 223's initial debug attempt remains
 independently sealed and supervised. Prepare a distinct optimized package and
 attempt instead of changing its executable, extending its timeout, or treating
 a timeout as a canonical mismatch. The optimized harness has the same source,

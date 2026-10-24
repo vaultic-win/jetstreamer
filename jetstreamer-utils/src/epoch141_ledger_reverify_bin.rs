@@ -1,4 +1,4 @@
-//! Reverify a frozen epoch141 transfer after a terminal post-download failure.
+//! Reverify a frozen epoch 141 transfer after a terminal post-download failure.
 //! Never downloads, changes the source, retries replay, or publishes an archive.
 mod epoch141_ledger_common;
 use {

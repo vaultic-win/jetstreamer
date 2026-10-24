@@ -14,10 +14,10 @@ poh-force-soft = ["sha2-fast/force-soft"]
 # the ordinary conflict-wave path. The worker still requires historical trace
 # output at runtime and remains an explicitly unqualified candidate.
 diagnostic-singleton = []
-# Private epoch223 candidate: two exact bootstraps, never beyond that epoch.
+# Private epoch 223 candidate: two exact bootstraps, never beyond that epoch.
 epoch223-v1-6-25-qualification = []
-# Isolated fee/load reproduction: exact cold bootstrap and first16warmup slots.
-# Keeps native execution semantics; cannot reach epoch223 recording or its tail.
+# Isolated fee/load reproduction: exact cold bootstrap and first 16warmup slots.
+# Keeps native execution semantics; cannot reach epoch 223 recording or its tail.
 epoch223-fee-load-warmup-diagnostic = ["epoch223-v1-6-25-qualification"]
 # Build-bound epoch-224 v1.6.25 comparison. It keeps ordinary conflict-wave
 # execution but refuses input after the first previously observed downstream
@@ -28,9 +28,9 @@ epoch224-v1-6-25-qualification = []
 # Private bounded epoch-225 comparison; no default era or publication change.
 epoch225-v1-6-25-diagnostic = []
 epoch225-v1-6-25-qualification = []
-# Isolated epoch227 native/bounded comparison through the first failed vote.
+# Isolated epoch 227 native/bounded comparison through the first failed vote.
 epoch227-v1-6-25-diagnostic = []
-# Exact epoch227 checkpoint qualification; no era or publication promotion.
+# Exact epoch 227 checkpoint qualification; no era or publication promotion.
 epoch227-v1-6-25-qualification = []
 
 [dependencies]

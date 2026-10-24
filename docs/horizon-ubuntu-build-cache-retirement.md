@@ -44,7 +44,7 @@ keep their contracts. Neither new profile can select top-level executables,
 build directories, another target, source, lockfiles, snapshots, Horizon
 archives, sealed deployments, or private replay/checkpoint state. A cache member
 named as an archive, sidecar, snapshot, checkpoint or lockfile refuses checking.
-UID1000 ownership and one filesystem are required throughout. Child symlinks
+UID 1000 ownership and one filesystem are required throughout. Child symlinks
 are inventoried and later unlinked without following their targets.
 
 Use the same sealed plan shape: `schema`, clean `source_commit`, preserved
@@ -65,7 +65,7 @@ state. Both repeat complete process/staged-unit and builder checks immediately
 before unlinking, without restarting or stopping anything.
 
 The positive v2 check writes an immutable root-owned identity ledger (maximum
-256MiB, one million members, depth128), binding source, lock, checker, profile,
+256 MiB, one million members, depth 128), binding source, lock, checker, profile,
 target and Cargo lock inode. It records every directory/file/link identity and
 symlink target; hardlink-aware unique-inode physical bytes are distinct from
 allocation summed across pathnames. A later separately sealed plan may specify
@@ -88,8 +88,8 @@ directories refuse recovery. Reduced hardlink counts from prior authorized
 unlinks are allowed. A completed retry repeats the safety gates and verifies the
 original intent binding before returning without additional deletions.
 
-The October24 audit measured about40.41GB in release/deps and75.72GB in debug
-incremental; the entire release profile was only44.73GB, so it cannot yield200GB.
+The October 24 audit measured about 40.41 GB in release/deps and 75.72 GB in debug
+incremental; the entire release profile was only 44.73 GB, so it cannot yield 200 GB.
 These are historical candidate footprints, not current reclaimability proofs or
 promised free-space gains. Existing hardlinks outside the target retain their
 data, and live lanes keep allocating. Root must review a successful fresh check
@@ -106,5 +106,5 @@ tree, receive that name exception. Files, symlinks, nested or malformed versions
 other checkpoint names and release/deps get no exception. Real checkpoint,
 snapshot, archive, sidecar and lock artifacts beneath either crate directory
 still refuse the census. Rejections identify the offending relative path and
-node type. The initial392a9checker correctly performed no deletion; its
+node type. The initial 392a9checker correctly performed no deletion; its
 overbroad substring refusal is preserved as failed check evidence.

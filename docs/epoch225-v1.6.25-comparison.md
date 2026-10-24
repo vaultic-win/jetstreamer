@@ -1,4 +1,4 @@
-# Private epoch225 v1.6.25 comparison
+# Private epoch 225 v1.6.25 comparison
 
 The sealed vote audit brackets the reconstructed Bank divergence between slots
 97,199,876 and 97,199,877. The latter contains a signed canonical transaction
@@ -10,7 +10,7 @@ program key as writable; v1.6.25 demotes it. This is not actual replay/root proo
 The explicit `epoch225-v1-6-25-diagnostic` feature selects the unchanged pinned
 upstream v1.6.25 semantics in a separately built node and worker. Default builds,
 ordinary registry bounds, active deployments and all publication gates remain
-unchanged. The node requires only focused private epoch225, snapshot 97,199,617,
+unchanged. The node requires only focused private epoch 225, snapshot 97,199,617,
 explicit verification, checkpoint input and the underlying canonical terminal
 root 97,631,459. It rejects ordinary replay, cohorts, recovery and inherited leases
 before destination setup. Combining unrelated diagnostic features is a build error.
@@ -32,7 +32,7 @@ and every publication/sidecar/R2 authority as false.
 Before any launch: pass source tests, publish the commits, seal exact parent,
 worker, runner and inputs, exercise exact-package focused/identity capability,
 and admit its full incremental budget from fresh coordinated evidence. Protect
-all older remaining-growth claims, the complete epoch213 budget and century
+all older remaining-growth claims, the complete epoch 213 budget and century
 floor. Install and prove the exact invocation's bounded reserve/VMA guard before
 leaving it unattended. Keep earlier attempts and receipts; never restart or mutate
 a healthy ordinary producer. Any mismatch remains fatal. Even a matching Bank at
@@ -59,6 +59,6 @@ outcome receipts are preserved in a root-sealed private evidence bundle. No
 canonical sidecar was created and no runtime/publication gate was promoted.
 
 The underlying canonical root `97,631,459` is itself 540 slots before the end of
-epoch225. Even reproducing that root would not make this prefix a complete
-epoch225 archive. Full cold-resource admission and a separately qualified
+epoch 225. Even reproducing that root would not make this prefix a complete
+epoch 225 archive. Full cold-resource admission and a separately qualified
 complete-span or checkpoint-continuation path remain necessary.

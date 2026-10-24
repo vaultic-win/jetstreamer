@@ -1,4 +1,4 @@
-//! Private cold223 canonical-root prefix, never a full epoch or publication gate.
+//! Private cold 223 canonical-root prefix, never a full epoch or publication gate.
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = true;
     pub const ARCHIVE_NAME: &str = "epoch-223.jet";
@@ -8,7 +8,7 @@ mod profile {
     pub const TARGET: u64 = 96_767_522;
     pub const TERMINAL: u64 = TARGET;
     pub const INITIAL_REPLAY: u64 = 96_335_539;
-    // Rejection baseline only: floor + unchanged225 growth + full1536GiB trial.
+    // Rejection baseline only: floor + unchanged 225 growth + full 1536 GiB trial.
     // Fresh full-fleet admission and an invocation-bound guard remain mandatory.
     pub const MINIMUM_FREE: u64 = 2_584_751_391_635;
     pub const MAX_SCRATCH: u64 = 1280 << 30;

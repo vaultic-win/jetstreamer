@@ -1,4 +1,4 @@
-//! Read-only admission evidence for the exact completed epoch144 assembly.
+//! Read-only admission evidence for the exact completed epoch 144 assembly.
 //! No copy, chown, sidecar, .ok gate, public import, or network access.
 #[allow(dead_code)]
 #[path = "epoch141_ledger_common.rs"]
@@ -163,7 +163,7 @@ fn validate_scan(v: &Value, stage: &str) -> Result<()> {
         linked(v, "plan")? == scan_plan(stage) && linked(v, "verifier")? == verifier(stage),
         "foreign plan/verifier"
     );
-    // Keep the scanner's array identity intact; it is not epoch213's struct.
+    // Keep the scanner's array identity intact; it is not epoch 213's struct.
     let id = v["archive_identity"]
         .as_array()
         .context("archive identity")?;

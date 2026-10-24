@@ -141,7 +141,7 @@ fn terminal_history(
         "guard history crosses boot identities"
     );
     // Very short oneshots can exit before journald reads /proc: _EXE and
-    // _CMDLINE may be absent. PID1's full successful-job command plus the
+    // _CMDLINE may be absent. PID 1's full successful-job command plus the
     // independently checked current immutable ExecStart remains authoritative.
     let finished_command = finish["MESSAGE"]
         .as_str()

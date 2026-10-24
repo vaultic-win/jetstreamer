@@ -18,7 +18,7 @@ fn validate(result: &Value, journal: &Value) -> Result<Value> {
             && result
                 .get("resource_capture_error")
                 .is_some_and(Value::is_null),
-        "cold223 input result differs"
+        "cold 223 input result differs"
     );
     for key in [
         "entry_replay",
@@ -30,7 +30,7 @@ fn validate(result: &Value, journal: &Value) -> Result<Value> {
     ] {
         ensure!(result[key] == false, "input test grants authority");
     }
-    let rows = journal.as_array().context("cold223 journal array")?;
+    let rows = journal.as_array().context("cold 223 journal array")?;
     ensure!(!rows.is_empty() && rows.len() <= 4096, "journal bounds");
     let mut markers = [None; 4];
     let mut previous_clock = 0u64;

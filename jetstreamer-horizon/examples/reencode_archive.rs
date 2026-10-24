@@ -18,7 +18,7 @@
 //! cargo run --release -p jetstreamer-horizon --example reencode_archive -- \
 //!     <source.jet> <destination.jet> \
 //!     [--buckets 1,7,42] [--format v1|v2] \
-//!     [--compression none|zstd|lz4] \
+//!     [--compression none|zstd|lz 4] \
 //!     [--diff adaptive|rle|outer|disabled] [--zstd-level N] [--bucket-slots N] \
 //!     [--repair-initial-parent PARENT_SLOT PARENT_BLOCKHASH]
 //! ```
@@ -71,7 +71,7 @@ impl CompressionName {
             "zstd" => Ok(Self::Zstd),
             "lz4" => Ok(Self::Lz4),
             _ => Err(format!(
-                "unsupported compression `{value}`; expected none, zstd, or lz4"
+                "unsupported compression `{value}`; expected none, zstd, or lz 4"
             )),
         }
     }

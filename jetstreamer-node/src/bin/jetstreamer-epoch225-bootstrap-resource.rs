@@ -1,4 +1,4 @@
-//! Private restore-only resource measurement for the exact epoch225 bootstrap.
+//! Private restore-only resource measurement for the exact epoch 225 bootstrap.
 //! No entries, archive, sidecar, runtime promotion, or publication authority.
 #[allow(dead_code)]
 #[path = "../historical.rs"]
@@ -27,8 +27,8 @@ const SNAPSHOT: &str = "094d3b28c39403580fbac083cdad67cc008b255dd375d61121710375
 const SNAPSHOT_SIZE: u64 = 10_177_204_112;
 const WORKER: &str = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c";
 const GENESIS: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
-// Protect currently sealed older-growth claims, century floor, full213384GiB
-// and this diagnostic256GiB. A fresh whole-host admission remains independent.
+// Protect currently sealed older-growth claims, century floor, full epoch 213 reservation of 384 GiB
+// and this diagnostic 256 GiB. A fresh whole-host admission remains independent.
 const MINIMUM_FREE: u64 = 3_185_678_193_366;
 const MAX_SCRATCH: u64 = 256 * 1024 * 1024 * 1024;
 #[derive(Deserialize)]

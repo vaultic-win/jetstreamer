@@ -2,15 +2,15 @@
 
 Build the original pinned v1.6.20 worker with the exclusive
 `epoch227-capped-qualification` feature under rustc 1.51.0. This is a separate
-candidate from epoch223's prefix and from the v1.6.25 diagnostics. It admits
+candidate from epoch 223's prefix and from the v1.6.25 diagnostics. It admits
 only cold snapshot 98,063,464 and entries 98,063,465–98,495,999. The additional
 `epoch227-capped-warmup-diagnostic` feature reduces the upper bound to
 98,063,480; it cannot substitute for the full singleton worker. Neither feature
 changes the default worker or permits another epoch. Combining either profile
-with epoch223 or singleton execution diagnostics fails compilation.
+with epoch 223 or singleton execution diagnostics fails compilation.
 
 The only execution change caps the physical AccountsDb shrink debt at 250,
-matching the existing epoch223 storage maintenance candidate. Transaction,
+matching the existing epoch 223 storage maintenance candidate. Transaction,
 account loading, fees, PoH, Bank hashing and native account updates remain the
 original runtime. Synthetic regressions check the exact bounds, reject malformed
 out-of-scope batches before decoding or Bank mutation, and confirm storage debt
@@ -64,7 +64,7 @@ CLI rejection, a sealed package or these source regressions as those proofs.
 
 `epoch227-singleton-service.service` is a dormant review template for
 `horizon-singleton-227-capped-710f6523-v1.service`. Prepare its fresh owner-private
-run root and `output/` child before loading it. Reject an existing epoch227
+run root and `output/` child before loading it. Reject an existing epoch 227
 archive, active owner or retained attempt rather than restarting over it. The
 parent copies and binds its worker as `historical-worker` inside the private
 generation, as required by the existing standalone guard.
@@ -80,16 +80,16 @@ creates no archive, polls no fleet and contacts no R2.
 Fresh admission must bind that capability and the successful native cold-input
 proof, one accepted complete fleet/resource observation, authenticated R2
 inventory, recomputed century floor, every live claim's remaining growth,
-protective guard identities and all auxiliary jobs. Account for native223 while
+protective guard identities and all auxiliary jobs. Account for native 223 while
 active; afterward bind its terminal result and retained scratch. Recheck protected
-identities and actual resources before and after admission. Reserve1.5 times the
-maximum observed aggregate lane RSS for this century, using the user's150GB seed
-only while actual evidence has not superseded it. The service's150GB high/225GB
+identities and actual resources before and after admission. Reserve 1.5 times the
+maximum observed aggregate lane RSS for this century, using the user's 150 GB seed
+only while actual evidence has not superseded it. The service's 150 GB high/225GB
 maximum are cgroup ceilings, not observed RSS. Check CPU, VMA and I/O separately;
 do not borrow another host's lane count or another century's resource model.
 
-The pending disk envelope is471,798,691,840 bytes:300GB decimal scratch,128GiB
-output and32GiB margin. Initial free space must exceed that envelope plus the
+The pending disk envelope is 471,798,691,840 bytes:300 GB decimal scratch, 128 GiB
+output and 32 GiB margin. Initial free space must exceed that envelope plus the
 current century floor and every other protected remaining growth claim. The
 guard floor excludes this lane's own envelope but preserves that same protected
 remainder. Its plan uses schema
@@ -97,7 +97,7 @@ remainder. Its plan uses schema
 `filesystem:"/"`, the entire run root as `worker_root`,
 `maximum_worker_vmas:3500000`,
 `maximum_root_physical_bytes:471798691840`, and a root-private receipt directory.
-The own-root cap includes private output; scratch alone still has a300GB planning
+The own-root cap includes private output; scratch alone still has a300 GB planning
 allowance. Seal the invocation-specific plan only after the service identity
 exists. Deploy the reviewed own-tree guard and its persistent safety timer;
 prove its first actual no-trip receipt has the exact invocation and one bound
@@ -105,11 +105,11 @@ worker before unattended admission. A zero-worker startup sample is insufficient
 Guard failures, budget errors or changing identities prevent that admission.
 This safety cadence must not add a second replay observation loop.
 
-Existing epoch204/205 admission commands have closed prefix contracts and cannot
+Existing epoch 204/205 admission commands have closed prefix contracts and cannot
 admit this singleton by substituting its inputs. The campaign owner must add the
-exact227 admission/launch contract to the Rust fleet tools, binding current
+exact 227 admission/launch contract to the Rust fleet tools, binding current
 observation, native proof, capability, guard and service sandbox. Keep the service
-dormant until integration and first-fire proof pass; then register epoch227 in
+dormant until integration and first-fire proof pass; then register epoch 227 in
 the single30-minute status-publication and downstream handoff cycle.
 
 The separate `singleton227`, `singleton227_admission` and
@@ -141,8 +141,8 @@ absent private `output` beneath `/var/lib/jetstreamer/horizon-227-capture-*`.
 The native zero-entry service has its own review template,
 `epoch227-native-input-service.service`, and exact unit name
 `horizon-native-input-227-capped-710f6523-v1.service`. It uses disk scratch,
-112/128GiB high/hard memory caps, eight CPUs and a45-minute execution ceiling.
-Its guard uses the entire native attempt root, a300GB physical cap and the
+112/128 GiB high/hard memory caps, eight CPUs and a45-minute execution ceiling.
+Its guard uses the entire native attempt root, a300 GB physical cap and the
 admission's exact protected floor. Use the separately compiled
 `epoch227-native-main-guard` profile, never the ordinary replay guard. Its
 `native_main` binding names the exact optimized native test executable,
@@ -160,7 +160,7 @@ Use persistent safety services/timers named
 `horizon-native227-protective-v1.service/.timer` for cold input and
 `horizon-singleton227-protective-v1.service/.timer` for entry replay. They run
 the reviewed immutable own-tree guard, with only its private receipt directory
-writable, root UID, private network,1GiB hard memory, one CPU and256 tasks.
+writable, root UID, private network, 1 GiB hard memory, one CPU and 256 tasks.
 Capture requires the exact guard invocation's PID1 successful completion and
 an active waiting safety timer. Native qualification never authorizes entry
 replay or archive publication. Register active native input verification in the
@@ -168,7 +168,7 @@ campaign fleet and publish its dashboard status through the generic reviewed
 verification publisher, binding the live native origin and accepted fleet.
 Use the coordinated observer and ETA binding when entry replay actually starts.
 
-The native harness must be the optimized historical rustc1.51 build at
+The native harness must be the optimized historical rustc 1.51 build at
 `/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test`,
 SHA-256 `1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3`.
 The earlier debug harness remains preserved and is not qualified for this launch.
@@ -178,9 +178,9 @@ The new native guard is sealed at
 Entry replay uses the separately feature-scoped `epoch227-singleton-guard`
 package `/var/lib/jetstreamer/horizon-singleton227-guard-80f302b1-v1`, SHA-256
 `80f302b12cce182a4aa2a37ec2067ed6c7d593c1caf867fb57622ceb4604d3f1`.
-Its complete plan requires the exact full227 unit and root, 471798691840-byte
+Its complete plan requires the exact full 227 unit and root, 471798691840-byte
 own-root cap, 3500000-VMA ceiling, root filesystem, and no native or bounded
-exemptions. The existing protected204/205/225 guard hashes remain unchanged.
+exemptions. The existing protected 204/205/225 guard hashes remain unchanged.
 
 Set `native_running:true` in a native capture spec to create a protected live
 `intent.json` before the test finishes. It requires the actual MainPID/VMA guard

@@ -1,4 +1,4 @@
-//! Fresh admission and metadata-only handoffs for the exact completed203 scan.
+//! Fresh admission and metadata-only handoffs for the exact completed 203 scan.
 //! Never starts/stops jobs, opens archive bytes, or mutates R2.
 use super::*;
 pub(super) const SCAN: &str = "horizon-full-verify-203-private-v4-af051b90-v1.service";
@@ -286,7 +286,7 @@ pub(super) fn guard(g: &Value, index: usize, sampled: u64, time: u64) -> Result<
                 .is_some_and(Value::is_null)
             && g["r2_mutations"] == false
             && g["remote_mutations"] == false,
-        "203 guard stale,tripped or foreign"
+        "203 guard stale, tripped or foreign"
     );
     if index > 0 {
         ensure!(
@@ -548,7 +548,7 @@ fn event_scope(s: &EventSpec) -> Result<&'static str> {
     let (name, file) = match s.phase.as_str() {
         "local-publication" => (PUBLISH, "publication-launch.json"),
         "upload-readback" => (UPLOAD, "upload-launch.json"),
-        _ => anyhow::bail!("unsupported203 handoff phase"),
+        _ => anyhow::bail!("unsupported 203 handoff phase"),
     };
     ensure!(
         s.output.file_name().and_then(|n| n.to_str()) == Some(file),
@@ -607,7 +607,7 @@ fn phase_limits(name: &str) -> Result<Value> {
         let (key, value) = line.split_once('=').context("203 phase property syntax")?;
         ensure!(
             p.insert(key.to_owned(), value.to_owned()).is_none(),
-            "duplicate203 phase property"
+            "duplicate 203 phase property"
         );
     }
     // systemctl omits empty list printers; verify the empty publication write

@@ -1,4 +1,4 @@
-//! Account for a live native228 peer without removing any unrelated owner.
+//! Account for a live native 228 peer without removing any unrelated owner.
 use super::native228 as peer;
 use super::*;
 
@@ -12,13 +12,13 @@ fn accepted(f: &Value) -> Result<Option<PipelineClaim>> {
         if owner["Id"] != peer::UNIT {
             continue;
         }
-        ensure!(found.is_none(), "223 duplicate native228 peer");
+        ensure!(found.is_none(), "223 duplicate native 228 peer");
         ensure!(
             row["epoch"] == 228
                 && row["phase"] == "private-cold-snapshot-verification"
                 && row["ordinary_replay_claim"] == false
                 && owner["ControlGroup"] == format!("/system.slice/{}", peer::UNIT),
-            "223 native228 peer shape differs"
+            "223 native 228 peer shape differs"
         );
         let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
             path: f["plan"].as_str().context("223 peer fleet plan")?.into(),
@@ -34,13 +34,13 @@ fn accepted(f: &Value) -> Result<Option<PipelineClaim>> {
             .collect::<Vec<_>>();
         ensure!(
             matches.len() == 1,
-            "223 native228 registered origin absent or duplicate"
+            "223 native 228 registered origin absent or duplicate"
         );
         let c: PipelineClaim = serde_json::from_value(serde_json::to_value(matches[0])?)?;
         ensure!(
             c.invocation_id == owner["InvocationID"]
                 && c.evidence == serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,
-            "223 native228 accepted origin changed"
+            "223 native 228 accepted origin changed"
         );
         peer::live(&c, owner)?;
         found = Some(c);
@@ -72,7 +72,7 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
             && high == 112u64 << 30
             && read("memory.swap.max")? == 0
             && charge <= cap,
-        "223 native228 cgroup memory controls differ"
+        "223 native 228 cgroup memory controls differ"
     );
     let remaining = cap - charge;
     let (base, mut evidence) = native228_admission::auxiliary_memory(&reduced(f, &c)?)?;
@@ -144,7 +144,7 @@ fn guard(g: &Value, c: &PipelineClaim, origin: &Value, sample: u64, now: u64) ->
                 .is_some_and(|(a, b)| a >= b)
             && g["remote_mutations"] == false
             && g["r2_mutations"] == false,
-        "223 native228 protective guard differs or tripped"
+        "223 native 228 protective guard differs or tripped"
     );
     Ok(())
 }

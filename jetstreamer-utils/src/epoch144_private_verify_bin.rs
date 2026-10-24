@@ -1,5 +1,5 @@
-//! Exact144 independent private scans. A read-only bind supplies the canonical
-//! plugin filename without copying109GB or creating a checksum/public archive.
+//! Exact 144 independent private scans. A read-only bind supplies the canonical
+//! plugin filename without copying 109 GB or creating a checksum/public archive.
 #[allow(dead_code)]
 #[path = "epoch141_ledger_common.rs"]
 mod evidence;
@@ -87,7 +87,7 @@ fn validate(p: &Plan, v: &Value, e: &Value, b: &Value) -> Result<()> {
                     "/var/lib/jetstreamer/horizon-epoch144-private-verification-20261022-v1"
                 })
                 .join(stage),
-        "foreign144scan plan"
+        "foreign 144 scan plan"
     );
     if recovery(p) {
         validate_recovery(
@@ -106,7 +106,7 @@ fn validate(p: &Plan, v: &Value, e: &Value, b: &Value) -> Result<()> {
                 && v["assembly"]["provenance_version"] == 4
                 && v["fresh_prefix_full_validation_passed"] == true
                 && v["fresh_native_checkpoint_matches"] == true,
-            "not complete private144 assembly"
+            "not complete private 144 assembly"
         );
         ensure!(
             e["schema"] == "jetstreamer-private-epoch144-provenance-expectation-v2"

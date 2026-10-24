@@ -1,4 +1,4 @@
-//! Recover only the exact02:29 bootstrap fleet-tail transaction; never repeat replay statuses.
+//! Recover only the exact 02:29 bootstrap fleet-tail transaction; never repeat replay statuses.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261023T032958Z-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
 const PLAN_SHA: &str = "b94636002204d78307b8e5e8bcc47bce042c1717536eb5541fb02cc0d7557224";
@@ -46,7 +46,7 @@ fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
             && f["signal"].is_null()
             && f["tool"] == serde_json::to_value(&p.tools.r2)?
             && f["stderr"]["text"] == "Error: reserve stop cannot discard another observer claim\n",
-        "not the exact epoch185 guard-timer metadata failure"
+        "not the exact epoch 185 guard-timer metadata failure"
     );
     Ok(())
 }
@@ -209,7 +209,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
         &root.join("child-provisional.json"),
     )?;
     let provisional = file(provisional_path, false)?;
-    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Previously completed198; recovery repairs guard-timer fleet census without replay status republication"});
+    let pipeline = json!({"provisional_fleet":provisional,"publication_skipped":true,"reason":"Previously completed 198; recovery repairs guard-timer fleet census without replay status republication"});
     let ledger = bound_json(&provisional, false)?;
     ensure!(
         ledger["inventory"]["anomalies"] == 0
@@ -265,7 +265,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
     let b: Bound = serde_json::from_value(b.clone())?;
     ensure!(
         b.path == Path::new(ROOT).join("repair185-fleet-recovery-v1/intent.json"),
-        "foreign183 fleet recovery intent"
+        "foreign 183 fleet recovery intent"
     );
     let v = bound_json(&b, false)?;
     ensure!(
@@ -280,7 +280,7 @@ pub(super) fn consume(p: &mut Plan, c: &Value) -> Result<()> {
             && v["archive_mutations"] == false
             && v["sidecar_mutations"] == false
             && v["replay_launch_authorized"] == false,
-        "foreign183 fleet recovery receipt"
+        "foreign 183 fleet recovery receipt"
     );
     p.tools.r2 = reader();
     Ok(())
@@ -297,7 +297,7 @@ pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
         corrected.path
             == Path::new(ROOT)
                 .join("repair185-fleet-recovery-v1/stop-history-correction/sealed/fleet-plan.json"),
-        "foreign epoch185 corrected plan"
+        "foreign epoch 185 corrected plan"
     );
     let original = Bound {
         path: Path::new(ROOT).join("sealed/fleet-plan.json"),
@@ -305,7 +305,7 @@ pub(super) fn completed_plan(p: &Plan, c: &Value) -> Result<bool> {
     };
     ensure!(
         bound_json(&corrected, true)? == corrected_fleet(&bound_json(&original, true)?)?,
-        "epoch185 correction changed more than the two non-replay guard observations"
+        "epoch 185 correction changed more than the two non-replay guard observations"
     );
     Ok(true)
 }

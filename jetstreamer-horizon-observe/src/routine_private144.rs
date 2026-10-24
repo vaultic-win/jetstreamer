@@ -27,7 +27,7 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
                     && p.tools.r2.path == Path::new(delivery198::HANDOFF_WRITER)
                     && p.tools.r2.sha256 == delivery198::HANDOFF_WRITER_SHA)
                 || original141::reader(p),
-            "private144 requires its qualified fleet/status writer"
+            "private 144 requires its qualified fleet/status writer"
         );
         ensure!(
             !p.expected_epochs.contains(&144)
@@ -39,14 +39,14 @@ pub(super) fn effective_model(p: &Plan, model: &Value) -> Result<Value> {
                         || r["epochs"]
                             .as_array()
                             .is_some_and(|a| a.contains(&json!(144)))),
-            "private144 must never have a production estimate"
+            "private 144 must never have a production estimate"
         );
         let ranges = model["expected_observer_ranges"]
             .as_array_mut()
             .context("expected observer census")?;
         ensure!(
             ranges.iter().filter(|r| **r == "144").count() <= 1,
-            "duplicate private144 census"
+            "duplicate private 144 census"
         );
         ranges.retain(|r| r != "144");
     }
@@ -62,7 +62,7 @@ fn config_owner(row: &Value) -> Result<()> {
             && row["expected_producer_invocation_id"] == INVOCATION
             && row["scratch_path"] == SCRATCH
             && row["worker_executable_basename"] == "historical-worker",
-        "private144 config owner or tree differs"
+        "private 144 config owner or tree differs"
     );
     Ok(())
 }
@@ -70,23 +70,23 @@ fn config_owner(row: &Value) -> Result<()> {
 pub(super) fn enable(p: &mut Plan, config: &mut Value, model: &Value) -> Result<()> {
     ensure!(
         is_101(p)? && !enabled(p),
-        "private144 migration requires unmigrated101 profile"
+        "private 144 migration requires unmigrated 101 profile"
     );
     let scope = p
         .scope_101_200
         .as_mut()
-        .context("private144 scope missing")?;
+        .context("private 144 scope missing")?;
     ensure!(
         scope.diagnostic_ranges.len() == 1
             && scope.diagnostic_ranges[0].expected_producer_invocation_id == INVOCATION,
-        "private144 migration requires exact original owner"
+        "private 144 migration requires exact original owner"
     );
     ensure!(
         config["diagnostic_replays"].is_null()
             || config["diagnostic_replays"]
                 .as_array()
                 .is_some_and(Vec::is_empty),
-        "private144 migration cannot replace existing private diagnostics"
+        "private 144 migration cannot replace existing private diagnostics"
     );
     let rows = config["replays"]
         .as_array_mut()
@@ -97,7 +97,10 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, model: &Value) -> Result<
         .filter(|(_, r)| r["range"] == "144")
         .map(|(i, _)| i)
         .collect();
-    ensure!(indices.len() == 1, "private144 source missing or duplicate");
+    ensure!(
+        indices.len() == 1,
+        "private 144 source missing or duplicate"
+    );
     config_owner(&rows[indices[0]])?;
     let row = rows.remove(indices[0]);
     config["diagnostic_replays"] = json!([row]);
@@ -112,7 +115,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, model: &Value) -> Result<
 }
 
 pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -> Result<()> {
-    ensure!(is_101(p)? && enabled(p), "private144 profile missing");
+    ensure!(is_101(p)? && enabled(p), "private 144 profile missing");
     effective_model(p, model)?;
     if p.assembly144_recovery.is_some() {
         return assembly144::observer(p, value, observed);
@@ -129,12 +132,12 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
             .context("ordinary census")?
             .iter()
             .any(|r| r["range"] == "144"),
-        "private144 cannot remain an ordinary claim"
+        "private 144 cannot remain an ordinary claim"
     );
     let rows = value["diagnostic_replays"]
         .as_array()
-        .context("private144 diagnostic census missing")?;
-    ensure!(rows.len() == 1, "private144 diagnostic census differs");
+        .context("private 144 diagnostic census missing")?;
+    ensure!(rows.len() == 1, "private 144 diagnostic census differs");
     let row = &rows[0];
     if !observed {
         return config_owner(row);
@@ -144,7 +147,7 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
             && row["producer_unit"] == UNIT
             && row["expected_producer_invocation_id"] == INVOCATION
             && row["scratch_path"] == SCRATCH,
-        "private144 envelope owner differs"
+        "private 144 envelope owner differs"
     );
     for field in [
         "ordinary_replay_claim",
@@ -155,7 +158,7 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
     ] {
         ensure!(
             row[field] == false,
-            "private144 envelope grants authority: {field}"
+            "private 144 envelope grants authority: {field}"
         );
     }
     match row["status"].as_str() {
@@ -163,7 +166,7 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
             ensure!(
                 row["observation"].is_null()
                     && row["error"].as_str().is_some_and(|s| !s.trim().is_empty()),
-                "unavailable144 requires explicit unresolved evidence"
+                "unavailable 144 requires explicit unresolved evidence"
             );
             // This is deliberately not terminal or inactivity evidence. The
             // independent full fleet census and open repair remain mandatory.
@@ -175,7 +178,7 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
                     && sample["range"] == "144"
                     && sample["scratch_path"] == SCRATCH
                     && sample["invocation_binding_stable"] == true,
-                "private144 observation differs"
+                "private 144 observation differs"
             );
             for kind in ["controller", "producer"] {
                 for point in ["before", "after"] {
@@ -187,12 +190,12 @@ pub(super) fn validate(p: &Plan, model: &Value, value: &Value, observed: bool) -
                                 owner["active_state"].as_str(),
                                 Some("active" | "activating")
                             ),
-                        "private144 observed owner changed"
+                        "private 144 observed owner changed"
                     );
                 }
             }
         }
-        _ => anyhow::bail!("unknown private144 observation outcome"),
+        _ => anyhow::bail!("unknown private 144 observation outcome"),
     }
     Ok(())
 }

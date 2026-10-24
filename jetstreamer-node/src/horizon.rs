@@ -431,7 +431,7 @@ impl HorizonRecorder {
     }
 
     /// Bind a complete byte/PoH-verified original slot's actual entry count.
-    /// Only the separate private141adapter calls this; all other source block
+    /// Only the separate private 141adapter calls this; all other source block
     /// metadata stays unchanged, including transaction counts and rewards.
     #[cfg(feature = "epoch141-original-entry-qualification")]
     pub fn record_original_entry_count(&self, slot: Slot, count: u64) -> Result<(), String> {

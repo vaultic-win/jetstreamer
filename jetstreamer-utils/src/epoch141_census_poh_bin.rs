@@ -1,4 +1,4 @@
-//! Complete private diagnostic of acquired141shreds, never a recovery route.
+//! Complete private diagnostic of acquired 141shreds, never a recovery route.
 #[allow(dead_code)]
 mod epoch141_acquired_input;
 mod epoch141_poh_clock;
@@ -98,7 +98,7 @@ fn memory_admission() -> Result<Value> {
         .parse::<u64>()?
         .checked_mul(1024)
         .context("memory overflow")?;
-    let minimum = 130u64 << 30; // existing128GiB host reserve plus hard2GiB diagnostic envelope
+    let minimum = 130u64 << 30; // existing 128 GiB host reserve plus hard 2 GiB diagnostic envelope
     ensure!(
         available >= minimum,
         "private PoH memory admission unavailable"
@@ -256,7 +256,7 @@ fn target_binding(v: &Value, expected_slot: u64) -> Result<Bound> {
                     .join("target-acquisitions")
                     .join(format!("slot-{expected_slot}.json"))
             && evidence::is_sha(&b.sha256),
-        "changed,reordered,duplicate or foreign acquired target"
+        "changed, reordered, duplicate or foreign acquired target"
     );
     Ok(b)
 }

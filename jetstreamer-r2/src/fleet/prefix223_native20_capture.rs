@@ -1,4 +1,4 @@
-//! Capture only an actually admitted full native20 prefix and real guarded IID.
+//! Capture only an actually admitted full native 20 prefix and real guarded IID.
 use super::{prefix223_native20 as c, *};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

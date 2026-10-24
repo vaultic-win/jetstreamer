@@ -1,7 +1,7 @@
 # Dormant review template. Requires registered profile, fresh admission and
 # an actual MainPID/executable/VMA protective guard. Do not start from this file.
 [Unit]
-Description=Horizon epoch228 original-runtime native cold input qualification
+Description=Horizon epoch 228 original-runtime native cold input qualification
 
 [Service]
 Type=exec

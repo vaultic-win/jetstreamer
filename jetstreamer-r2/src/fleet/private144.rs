@@ -1,4 +1,4 @@
-//! Keep the exact retained private144 owner in the full fleet after observer isolation.
+//! Keep the exact retained private 144 owner in the full fleet after observer isolation.
 use super::*;
 const UNIT: &str = "horizon-qualify-epoch144-loader-focus-20261016-v1.service";
 const IID: &str = "ea4a806906ba493e9af49e2a9c71c9e7";
@@ -36,7 +36,7 @@ fn classify_owner(
         row["producer_unit"] == unit
             && row["expected_producer_invocation_id"] == iid
             && row["scratch_path"] == scratch,
-        "private144 observer envelope owner differs"
+        "private 144 observer envelope owner differs"
     );
     for field in [
         "ordinary_replay_claim",
@@ -47,14 +47,14 @@ fn classify_owner(
     ] {
         ensure!(
             row[field] == false,
-            "private144 envelope grants authority: {field}"
+            "private 144 envelope grants authority: {field}"
         );
     }
     match row["status"].as_str() {
         Some("unavailable") => ensure!(
             row["observation"].is_null()
                 && row["error"].as_str().is_some_and(|s| !s.trim().is_empty()),
-            "private144 unavailable outcome lacks explicit uncertainty"
+            "private 144 unavailable outcome lacks explicit uncertainty"
         ),
         Some("observed") => {
             ensure!(
@@ -62,7 +62,7 @@ fn classify_owner(
                     && row["observation"]["range"] == "144"
                     && row["observation"]["scratch_path"] == scratch
                     && row["observation"]["invocation_binding_stable"] == true,
-                "private144 observation unstable"
+                "private 144 observation unstable"
             );
             for kind in ["controller", "producer"] {
                 for point in ["before", "after"] {
@@ -74,12 +74,12 @@ fn classify_owner(
                                 owner["active_state"].as_str(),
                                 Some("active" | "activating")
                             ),
-                        "private144 observed owner differs"
+                        "private 144 observed owner differs"
                     );
                 }
             }
         }
-        _ => anyhow::bail!("unknown private144 observation outcome"),
+        _ => anyhow::bail!("unknown private 144 observation outcome"),
     }
     let live = matches!(
         current["ActiveState"].as_str(),
@@ -88,7 +88,7 @@ fn classify_owner(
     if live {
         ensure!(
             current["InvocationID"] == iid && current["NRestarts"] == "0",
-            "private144 live owner replaced or restarted"
+            "private 144 live owner replaced or restarted"
         );
     }
     Ok(json!({"epoch":144,"phase":phase,"producer":current,
@@ -135,12 +135,12 @@ pub(super) fn observe(
                     .filter(|c| assembly144::namespace(c))
                     .count()
                     <= 1,
-            "private144 overlapping diagnostic is not its exact independent verifier"
+            "private 144 overlapping diagnostic is not its exact independent verifier"
         );
         // Preserve the old observation as terminal history, never as another
         // live claim. Cleared IDs alone are not sufficient: authenticate PID1.
         crate::inactive_status::private144_terminal_manager_proof(
-            census.get(UNIT).context("private144 old owner absent")?,
+            census.get(UNIT).context("private 144 old owner absent")?,
         )?;
         for claim in &overlaps {
             checked_diagnostic_launch(claim)?;
@@ -151,12 +151,12 @@ pub(super) fn observe(
                 .filter(|c| continuation144::namespace(c))
                 .count()
                 <= 1,
-            "duplicated144 continuation"
+            "duplicated 144 continuation"
         );
         if overlaps.iter().any(|c| continuation144::namespace(c)) {
             let native = census
                 .get(native144::UNIT)
-                .context("native144 history absent")?;
+                .context("native 144 history absent")?;
             ensure!(
                 native["InvocationID"] == "1219f5b93e0a40639db09f6996746243"
                     && native["ActiveState"] == "active"
@@ -164,7 +164,7 @@ pub(super) fn observe(
                     && native["MainPID"] == "0"
                     && native["Result"] == "success"
                     && native["ExecMainStatus"] == "0",
-                "continuation144 cannot overlap native comparison"
+                "continuation 144 cannot overlap native comparison"
             );
         }
         if overlaps.iter().any(|c| assembly144::namespace(c)) {
@@ -174,7 +174,7 @@ pub(super) fn observe(
                     .filter(|c| continuation144::namespace(c))
                     .count()
                     == 1,
-                "assembly144 lost original continuation history"
+                "assembly 144 lost original continuation history"
             );
             assembly144_admission::timeout_properties()?;
         }
@@ -202,7 +202,7 @@ pub(super) fn observe(
                 .context("ordinary replay census")?
                 .iter()
                 .any(|r| r["range"] == "144"),
-        "private144 fleet scope, gate, tracking or overlapping owner differs"
+        "private 144 fleet scope, gate, tracking or overlapping owner differs"
     );
     // These are independent, captured scans of the successful assembly, not
     // ordinary delivery or a second replay. Reopen their immutable provenance;
@@ -218,17 +218,17 @@ pub(super) fn observe(
         let claim = overlaps
             .iter()
             .find(|c| assembly144::namespace(c))
-            .context("assembly144 observer has no bound launch")?;
+            .context("assembly 144 observer has no bound launch")?;
         ensure!(
             rows[0]["expected_producer_invocation_id"] == claim.invocation_id
                 && rows[0]["scratch_path"].as_str() == claim.scratch_path.to_str(),
-            "assembly144 observer differs from launch"
+            "assembly 144 observer differs from launch"
         );
         return Ok(Some(classify_owner(
             rows[0],
             census
                 .get(assembly144::UNIT)
-                .context("assembly144 owner absent")?,
+                .context("assembly 144 owner absent")?,
             sample,
             assembly144::UNIT,
             &claim.invocation_id,
@@ -240,17 +240,17 @@ pub(super) fn observe(
         let claim = overlaps
             .iter()
             .find(|c| continuation144::namespace(c))
-            .context("continuation144 observer has no bound launch")?;
+            .context("continuation 144 observer has no bound launch")?;
         ensure!(
             rows[0]["expected_producer_invocation_id"] == claim.invocation_id
                 && rows[0]["scratch_path"].as_str() == claim.scratch_path.to_str(),
-            "continuation144 observer differs from launch"
+            "continuation 144 observer differs from launch"
         );
         return Ok(Some(classify_owner(
             rows[0],
             census
                 .get(continuation144::UNIT)
-                .context("continuation144 owner absent")?,
+                .context("continuation 144 owner absent")?,
             sample,
             continuation144::UNIT,
             &claim.invocation_id,
@@ -262,22 +262,22 @@ pub(super) fn observe(
         let claim = overlaps
             .iter()
             .find(|c| native144::namespace(c))
-            .context("native144 observer has no exact diagnostic claim")?;
+            .context("native 144 observer has no exact diagnostic claim")?;
         ensure!(
             rows[0]["expected_producer_invocation_id"] == claim.invocation_id
                 && rows[0]["scratch_path"].as_str() == claim.scratch_path.to_str(),
-            "native144 observer differs from bound launch"
+            "native 144 observer differs from bound launch"
         );
         let current = census
             .get(native144::UNIT)
-            .context("native144 census missing")?;
+            .context("native 144 census missing")?;
         return Ok(Some(classify_owner(
             rows[0],
             current,
             sample,
             native144::UNIT,
             &claim.invocation_id,
-            claim.scratch_path.to_str().context("native144 scratch")?,
+            claim.scratch_path.to_str().context("native 144 scratch")?,
             "native-restore-only",
         )?));
     }
@@ -285,7 +285,7 @@ pub(super) fn observe(
         rows[0],
         census
             .get(UNIT)
-            .context("private144 tracked unit missing from census")?,
+            .context("private 144 tracked unit missing from census")?,
         sample,
     )?))
 }

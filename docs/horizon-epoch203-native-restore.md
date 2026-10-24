@@ -21,11 +21,11 @@ capability on 2026-10-23: its synthetic fixture expected
 `jetstreamer-node/historical-replay-v1`, whereas the complete independently read
 prefix records the pinned producer profile
 `jetstreamer-node/0.7.0/old-faithful-to-horizon-v2@3de96e71010a8a2f5e629f666227b137483bff7b`.
-The corrected203 expectation pins that exact recorded identity; it does not
+The corrected 203 expectation pins that exact recorded identity; it does not
 accept arbitrary generation strings or edit retained evidence. The real producer
 manifest and independent reader receipt are regression fixtures, including
 rejection of the old placeholder and another generation even with a newly
-consistent typed-manifest digest. The shared205 comparator retains its prior
+consistent typed-manifest digest. The shared 205 comparator retains its prior
 closed expectation until its own completed prefix supplies actual evidence.
 
 The scope is the current capped-shrink worker `4aeca563…`, the independently
@@ -154,8 +154,8 @@ There is no automatic launch trigger or sidecar ETA in this registration.
 is a separate root-only, immutable-binary admission issuer, not a launcher.
 Its strict `jetstreamer-epoch203-continuation-admission-spec-v1` binds the
 accepted 201–300 fleet and its complete observer/plan, thirteen-sample century
-floor, original native admission, successful native result, controlled205
-terminal measurement, fresh225 guard, exact sealed parent and full-path resource
+floor, original native admission, successful native result, controlled 205
+terminal measurement, fresh 225 guard, exact sealed parent and full-path resource
 policy. A changed census requires new qualification rather than invented debt
 release. The 256-GiB trial comprises 64 GiB native copy/restore/indexes, 16 GiB
 suffix/archive growth, 112 GiB assembly, 16 GiB independent verification scratch
@@ -166,7 +166,7 @@ peak qualification.
 observations, writes or launch. Issuing an actual receipt additionally requires
 a persistent systemd invocation, two complete live-owner censuses, actual free
 space, available memory/CPU/VMA gates and still-fresh settled host-pressure
-evidence. It preserves all older225 growth and the prior conservative protected
+evidence. It preserves all older 225 growth and the prior conservative protected
 floor; its required guard floor also protects every byte outside the candidate's
 trial envelope at admission. The private no-clobber receipt leaves exact input
 capability, real-worker guard first fire, ordinary replay and publication gates

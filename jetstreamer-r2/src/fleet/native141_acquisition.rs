@@ -66,7 +66,7 @@ fn profile(unit: &str) -> Result<&'static Profile> {
         UNIT => Ok(&FIRST),
         u if u == ALL.unit => Ok(&ALL),
         u if u == ALL_RETRY.unit => Ok(&ALL_RETRY),
-        _ => anyhow::bail!("unknown native141 acquisition owner"),
+        _ => anyhow::bail!("unknown native 141 acquisition owner"),
     }
 }
 const FAMILIES: [&str; 16] = [
@@ -110,7 +110,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
                 .as_u64()
                 .is_some_and(|v| v >= FLOOR + profile.guard_reservation)
             && r["trip"] == false,
-        "foreign native141 acquisition attempt"
+        "foreign native 141 acquisition attempt"
     );
     for key in ["plan_sha256", "admission_sha256"] {
         let s = r[key].as_str().context("missing acquisition binding")?;
@@ -158,7 +158,7 @@ fn bindings(p: &Value, a: &Value, m: &Value) -> Result<()> {
             && p["initial_guard_receipt"] == format!("{root}/results/initial-guard.json")
             && p["metadata_receipt"] == format!("{root}/results/intent.json")
             && p["output_receipt"] == format!("{root}/results/{}", profile.output_name),
-        "native141 acquisition plan differs"
+        "native 141 acquisition plan differs"
     );
     ensure!(
         m["schema"] == "jetstreamer-historical-performance-admission-v1"
@@ -173,7 +173,7 @@ fn bindings(p: &Value, a: &Value, m: &Value) -> Result<()> {
                 .is_some_and(|v| v >= 144u64 << 30)
             && m["files"]
                 == json!([{"path":profile.tool,"sha256":profile.tool_sha,"uid":0,"gid":0,"mode":"0555"}]),
-        "native141 acquisition manifest differs"
+        "native 141 acquisition manifest differs"
     );
     ensure!(
         a["schema"] == "jetstreamer-historical-performance-admission-receipt-v1"
@@ -185,7 +185,7 @@ fn bindings(p: &Value, a: &Value, m: &Value) -> Result<()> {
             && a["evidence"]["filesystem"] == "/home/sol"
             && a["evidence"]["files"] == m["files"]
             && a["evidence"]["minimum_free_bytes"] == m["minimum_free_bytes"],
-        "native141 acquisition admission differs"
+        "native 141 acquisition admission differs"
     );
     for flag in [
         "services_started",
@@ -251,7 +251,7 @@ fn live(c: &DiagnosticClaim, r: &Value, v: &Value) -> Result<()> {
                 .and_then(|s| s.parse::<u64>().ok())
                 .is_some_and(|p| p > 0)
             && command(&v["ExecStart"]) == Some(expected_command(r, profile).as_str()),
-        "native141 acquisition live identity differs"
+        "native 141 acquisition live identity differs"
     );
     Ok(())
 }

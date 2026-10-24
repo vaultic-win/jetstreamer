@@ -8,7 +8,7 @@ and MD5 `bEVjbHoOexfklmZRKtsfSw==`. Plans cannot select another object or
 borrow the ledger tools' metadata/admission identity.
 
 The metadata observer and download engine are shared with the original fixed
-epoch141 ledger tools. Their old CLI, schema names, file identity and object
+epoch 141 ledger tools. Their old CLI, schema names, file identity and object
 constants remain unchanged. Existing sealed binaries and active ledger census
 are not replaced, restarted or modified by this source refactor.
 
@@ -26,7 +26,7 @@ same strict fields as the ledger download plan: `gcloud_sha256`, bound
 `staging_directory`, separate `output_receipt`, `stop_intent`,
 `stop_completion`, `initial_guard_receipt`, `minimum_free_bytes`, and bounded
 `maximum_runtime_seconds`. Paths must satisfy the existing canonical private
-directory and no-overlap gates. The SDK staging parent is root-owned0711;
+directory and no-overlap gates. The SDK staging parent is root-owned 0711;
 the new attempt is initially UID1001-owned0700 and frozen root-owned after
 the owned SDK group has stopped. Credential refresh may write the exact GCloud
 configuration, so the systemd sandbox must permit that while granting only
@@ -34,7 +34,7 @@ the separate attempt/receipt paths other write access.
 
 Fresh full admission must bind the exact downloader and snapshot metadata
 receipt. Protect the current century floor and every older invocation's growth
-claim; reserve the full object length plus64MiB independently above that sum.
+claim; reserve the full object length plus 64 MiB independently above that sum.
 Do not lower an existing guard to fit this diagnostic. The internal actual-free,
 staging-byte and runtime guard remains active through transfer and full digest
 verification and writes its initial private receipt. An observed trip records
@@ -51,7 +51,7 @@ computes length/CRC32C/MD5/SHA256, binds inode/owner/mode/link count, revalidate
 the file identity, fsyncs the frozen file/directory, and writes a no-clobber
 private receipt. A valid compressed snapshot is **not** native Bank restore
 proof, actual clock proof, a matched prefix tuple, continuation qualification,
-or replay/publication authority. Do not reuse the epoch213 restore probe for
-this snapshot. Preserve the retained epoch140 archive and require a dedicated
-qualified1.4.25 path before any suffix entry, assembly, canonical import or
+or replay/publication authority. Do not reuse the epoch 213 restore probe for
+this snapshot. Preserve the retained epoch 140 archive and require a dedicated
+qualified 1.4.25 path before any suffix entry, assembly, canonical import or
 sidecar.

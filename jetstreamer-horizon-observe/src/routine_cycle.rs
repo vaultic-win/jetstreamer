@@ -295,7 +295,7 @@ fn is_101(p: &Plan) -> Result<bool> {
                             || native144::owner(p, &scope.diagnostic_ranges[0])
                             || continuation144::owner(p, &scope.diagnostic_ranges[0])
                             || assembly144::owner(p, &scope.diagnostic_ranges[0])),
-                    "private144 observer requires exact retained diagnostic owner"
+                    "private 144 observer requires exact retained diagnostic owner"
                 );
             }
             if original141::enabled(p) {
@@ -308,7 +308,7 @@ fn is_101(p: &Plan) -> Result<bool> {
                             .filter(|d| original141::owner(p, d))
                             .count()
                             == 1,
-                    "original141 requires exact retained144 plus private141 owners"
+                    "original 141 requires exact retained 144 plus private 141 owners"
                 );
             }
             Ok(true)
@@ -699,7 +699,7 @@ fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
         private_dir(root)?;
         ensure!(
             expected.path.parent() == Some(root),
-            "foreign101fleet predecessor namespace"
+            "foreign 101fleet predecessor namespace"
         );
         for entry in fs::read_dir(root)? {
             let entry = entry?;
@@ -710,12 +710,15 @@ fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
             if !name.starts_with("fleet-") || !name.ends_with(".json") {
                 continue;
             }
-            ensure!(entry.file_type()?.is_file(), "unsafe101fleet census member");
+            ensure!(
+                entry.file_type()?.is_file(),
+                "unsafe 101fleet census member"
+            );
             let value: Value =
                 serde_json::from_slice(&read_checked(&entry.path(), LIMIT, 0, false)?)?;
             ensure!(
                 value["first_epoch"] == 101 && value["last_epoch"] == 200,
-                "foreign fleet inside101namespace"
+                "foreign fleet inside 101namespace"
             );
             if entry.path() == expected.path {
                 ensure!(
@@ -728,7 +731,7 @@ fn latest_fleet_unchanged(p: &Plan, previous: &Value) -> Result<()> {
                 && value["recorded_unix_seconds"] == previous["recorded_unix_seconds"];
             ensure!(
                 !tied && !newer_fleet_in_scope(&value, previous, 101, 200)?,
-                "newer campaign fleet exists;regenerate pending cycle"
+                "newer campaign fleet exists; regenerate pending cycle"
             );
         }
         return Ok(());
@@ -831,7 +834,7 @@ fn validate_templates(
                 && previous["last_epoch"] == 200
                 && (p.previous_fleet.path.parent() == Some(Path::new(FLEET_ROOT_101))
                     || provisional141::canonical_predecessor(p, previous)?.is_some()),
-            "foreign101fleet predecessor"
+            "foreign 101fleet predecessor"
         );
     }
     ensure!(
@@ -873,14 +876,14 @@ fn validate_templates(
     if p.epoch198_delivery.is_some() {
         ensure!(
             host101 && !p.expected_epochs.contains(&198),
-            "foreign198 delivery census"
+            "foreign 198 delivery census"
         );
         epochs.remove(&198);
     }
     if p.epoch160_delivery.is_some() {
         ensure!(
             host101 && !p.expected_epochs.contains(&160),
-            "foreign160 delivery census"
+            "foreign 160 delivery census"
         );
         epochs.remove(&160);
     }
@@ -963,7 +966,7 @@ fn validate_templates(
             model["status_receipt_directory"]
                 == "/home/sol/.jetstreamer-private/r2-status-receipts"
                 && model["status_receipt_directory_uid"] == 1001,
-            "wrong101status reader/directory ownership policy"
+            "wrong 101status reader/directory ownership policy"
         );
     }
     ensure!(
@@ -1199,7 +1202,7 @@ fn validate_observer_config(p: &Plan, model: &Value, config: &Value) -> Result<(
 const INCIDENT_225_SHA: &str = "fc51f75a6424fe41b0aaca503279f0e8a29a457c87c83579227c863e47101916";
 const STALE_225_ACTION_SHA: &str =
     "31b7234d02f074a61910c8f0bd99553990af2ed24788fc5d36c07f9ed9bc78ca";
-const CORRECTED_225_ACTION: &str = "Keep epoch225 repair open after the exact reserve stop ac9aee3d47eb41e483a5e008ed43d030. The parent already reclaimed material scratch; only8192B scaffolding remains. No scratch deletion or new retirement tool is needed or authorized. Preserve the20.2GiB partial archive, immutable bootstrap/genesis, guard chain and failed unit. Qualify a fresh admissible recovery resource envelope before any restart; require natural parent success at the canonical root, independent full/current-plugin verification and separate225-only publication gates. The226diagnostic tail remains private. No automatic restart, newdiskadmission, canonicalsidecar, runtimepromotion or publication is authorized by this narrative correction.";
+const CORRECTED_225_ACTION: &str = "Keep epoch 225 repair open after the exact reserve stop ac9aee3d47eb41e483a5e008ed43d030. The parent already reclaimed material scratch; only 8192 B scaffolding remains. No scratch deletion or new retirement tool is needed or authorized. Preserve the 20.2 GiB partial archive, immutable bootstrap/genesis, guard chain and failed unit. Qualify a fresh admissible recovery resource envelope before any restart; require natural parent success at the canonical root, independent full/current-plugin verification and separate225-only publication gates. The 226 diagnostic tail remains private. No automatic restart, newdiskadmission, canonicalsidecar, runtimepromotion or publication is authorized by this narrative correction.";
 
 /// Correct exactly one known stale task, not arbitrary gates or repair state.
 /// The immutable predecessor is retained and the incident stays open.
@@ -1229,7 +1232,7 @@ fn correct_stale_225_action(fleet: &mut Value, evidence: &Bound, incident: &Valu
             && incident["publication_authorized"] == false
             && incident["remote_mutations"] == false
             && incident["r2_mutations"] == false,
-        "bound225incident does not support the non-destructive task correction"
+        "bound 225incident does not support the non-destructive task correction"
     );
     fleet["gates"]["225"]["next_action"] = json!(CORRECTED_225_ACTION);
     Ok(true)
@@ -1265,7 +1268,7 @@ fn record_exact_203_stop(fleet: &mut Value, evidence: &Bound, incident: &Value) 
             && incident["partial_archive"]["preserve"] == true
             && incident["partial_archive"]["complete_archive"] == false
             && incident["repair_closed"] == false,
-        "bound203incident does not establish the exact terminal capacity stop"
+        "bound 203incident does not establish the exact terminal capacity stop"
     );
     for field in [
         "archive_deletion_authorized",
@@ -1330,7 +1333,7 @@ fn correct_oct22_action(
     let expected: Value = serde_json::from_str(OCT22_ACTION_REVIEW)?;
     ensure!(
         sha(OCT22_ACTION_REVIEW.as_bytes()) == OCT22_ACTION_REVIEW_SHA && review == &expected,
-        "Oct22 action review differs from the exact non-authorizing correction"
+        "Oct 22 action review differs from the exact non-authorizing correction"
     );
     let gate = &fleet["gates"][epoch];
     let eligible = gate["state"] == "blocked-qualification"
@@ -1700,7 +1703,7 @@ fn execute(p: &Plan, plan_bound: &Bound, self_sha: &str, check_only: bool) -> Re
                 && m.is_dir()
                 && m.uid() == 1001
                 && m.mode() & 0o6077 == 0,
-            "unsafe101status receipt directory"
+            "unsafe 101status receipt directory"
         );
     } else {
         private_dir(status_path)?;

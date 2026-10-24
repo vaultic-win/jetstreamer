@@ -1,4 +1,4 @@
-//! Closed follow-up through the formerly failing60912005 vote. No promotion.
+//! Closed follow-up through the formerly failing 60912005 vote. No promotion.
 const PACKAGE: &str = "/usr/local/lib/jetstreamer/horizon-epoch141-vote-prefix-parent-20261023-v1";
 const WORKER_SHA: &str = "8f61690a486c5c0322857b25980ec681ec58cfd870b3425cba4bb892e2f4eb9b";
 const WORKER_ENTRY_TERMINAL: Option<u64> = Some(60912005);

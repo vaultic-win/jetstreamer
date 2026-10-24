@@ -1,4 +1,4 @@
-//! Preserve the live full209 owner while admitting the distinct native228 job.
+//! Preserve the live full 209 owner while admitting the distinct native 228 job.
 use super::singleton209 as c;
 use super::*;
 
@@ -6,7 +6,7 @@ fn roster_scope(f: &Value) -> Result<()> {
     let mut seen = false;
     for row in f["active"]
         .as_array()
-        .context("228 full209 complete census")?
+        .context("228 full 209 complete census")?
     {
         let owner = singleton227_admission::active_owner(row)?;
         if owner["Id"] != c::UNIT {
@@ -17,7 +17,7 @@ fn roster_scope(f: &Value) -> Result<()> {
                 && row["epoch"] == 209
                 && row["phase"] == "diagnostic-qualification"
                 && row["ordinary_replay_claim"] == false,
-            "228 full209 duplicate or changed owner scope"
+            "228 full 209 duplicate or changed owner scope"
         );
         seen = true;
     }
@@ -31,13 +31,16 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
             && owner["Id"] == c::UNIT
             && row["phase"] == "diagnostic-qualification"
             && row["ordinary_replay_claim"] == false,
-        "228 unknown epoch209 owner"
+        "228 unknown epoch 209 owner"
     );
     let p: Plan = serde_json::from_value(bound_json(&BoundFile {
-        path: f["plan"].as_str().context("228 full209 fleet plan")?.into(),
+        path: f["plan"]
+            .as_str()
+            .context("228 full 209 fleet plan")?
+            .into(),
         sha256: f["plan_sha256"]
             .as_str()
-            .context("228 full209 plan digest")?
+            .context("228 full 209 plan digest")?
             .into(),
     })?)?;
     let matches = p
@@ -47,7 +50,7 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
         .collect::<Vec<_>>();
     ensure!(
         matches.len() == 1,
-        "228 full209 needs one authenticated diagnostic claim"
+        "228 full 209 needs one authenticated diagnostic claim"
     );
     let d = matches[0];
     ensure!(
@@ -57,7 +60,7 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
             && d.launch_receipt.sha256 == row["launch_receipt_sha256"]
             && owner["NRestarts"] == "0"
             && diagnostic_stage_running(owner),
-        "228 full209 invocation, command or launch changed"
+        "228 full 209 invocation, command or launch changed"
     );
     let launch = bound_json(&d.launch_receipt)?;
     ensure!(
@@ -71,12 +74,12 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
                 .map(|n| n.to_string())
                 .as_deref()
                 == owner["MainPID"].as_str(),
-        "228 full209 launch owner changed"
+        "228 full 209 launch owner changed"
     );
     c::bindings(d, &launch)?;
     ensure!(
         c::same_command(&owner["ExecStart"]),
-        "228 full209 live command changed"
+        "228 full 209 live command changed"
     );
     Ok((
         DiagnosticClaim {
@@ -106,7 +109,7 @@ fn guard(
 ) -> Result<()> {
     let t = g["recorded_unix_seconds"]
         .as_u64()
-        .context("228 full209 guard clock")?;
+        .context("228 full 209 guard clock")?;
     ensure!(
         p["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
             && c::guard_matches(d, launch, p)
@@ -158,7 +161,7 @@ fn guard(
                 .is_some_and(|(a, b)| a >= b)
             && g["remote_mutations"] == false
             && g["r2_mutations"] == false,
-        "228 protected full209 guard changed, stale or tripped"
+        "228 protected full 209 guard changed, stale or tripped"
     );
     Ok(())
 }
@@ -167,13 +170,13 @@ type Split = (Value, BTreeMap<String, BoundFile>, u64, Vec<Value>);
 pub(super) fn allocation(o: &Value, g: &Value, iid: &str) -> Result<(u64, u64, u64)> {
     let rows = o["diagnostic_replays"]
         .as_array()
-        .context("228 full209 observer census")?
+        .context("228 full 209 observer census")?
         .iter()
         .filter(|r| r["producer_unit"] == c::UNIT)
         .collect::<Vec<_>>();
     ensure!(
         rows.len() == 1,
-        "228 full209 needs one coordinated whole-root sample"
+        "228 full 209 needs one coordinated whole-root sample"
     );
     let row = rows[0];
     let sample = &row["observation"];
@@ -187,16 +190,16 @@ pub(super) fn allocation(o: &Value, g: &Value, iid: &str) -> Result<(u64, u64, u
             && sample["producer_after"]["unit"] == c::UNIT
             && sample["producer_before"]["invocation_id"] == iid
             && sample["producer_after"]["invocation_id"] == iid,
-        "228 full209 allocation sample has another owner or directory scope"
+        "228 full 209 allocation sample has another owner or directory scope"
     );
     let sampled = sample["conservative_observed_physical_bytes"]
         .as_u64()
         .filter(|n| *n <= c::PEAK)
-        .context("228 full209 sampled whole-root allocation exceeds envelope")?;
+        .context("228 full 209 sampled whole-root allocation exceeds envelope")?;
     let guarded = g["root_physical_observation"]["conservative_physical_bytes"]
         .as_u64()
         .filter(|n| *n <= c::PEAK)
-        .context("228 full209 current guarded allocation exceeds envelope")?;
+        .context("228 full 209 current guarded allocation exceeds envelope")?;
     Ok((sampled.min(guarded), sampled, guarded))
 }
 pub(super) fn split(
@@ -224,7 +227,7 @@ pub(super) fn split(
     let mut measurements = Vec::new();
     for row in f["active"]
         .as_array()
-        .context("228 full209 census")?
+        .context("228 full 209 census")?
         .iter()
         .filter(|r| r["epoch"] == 209)
     {
@@ -232,11 +235,11 @@ pub(super) fn split(
         if owner["Id"] == native209::UNIT {
             continue;
         }
-        ensure!(measurements.is_empty(), "228 duplicate full209 owner");
+        ensure!(measurements.is_empty(), "228 duplicate full 209 owner");
         let (d, launch) = claim(f, row)?;
         let b = reduced_guards
             .remove(&d.unit)
-            .context("228 full209 needs latest protective guard")?;
+            .context("228 full 209 needs latest protective guard")?;
         let g = bound_json(&b)?;
         let plan: BoundFile = serde_json::from_value(launch["guard_plan"].clone())?;
         guard(
@@ -259,7 +262,7 @@ pub(super) fn split(
     }
     reduced["active"]
         .as_array_mut()
-        .context("228 reduced full209 census")?
+        .context("228 reduced full 209 census")?
         .retain(|r| singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] != c::UNIT));
     Ok((reduced, reduced_guards, growth, measurements))
 }
@@ -294,7 +297,7 @@ fn memory_limits(
             && high == requested_high / page * page
             && swap == 0
             && charge <= cap,
-        "228 full209 requested or kernel-rounded hard memory envelope changed"
+        "228 full 209 requested or kernel-rounded hard memory envelope changed"
     );
     Ok(cap - charge)
 }
@@ -305,7 +308,7 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut evidence = Vec::new();
     for row in f["active"]
         .as_array()
-        .context("228 full209 memory census")?
+        .context("228 full 209 memory census")?
         .iter()
         .filter(|r| r["epoch"] == 209)
     {
@@ -316,7 +319,7 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         let (d, launch) = claim(f, row)?;
         ensure!(
             owner["ControlGroup"] == format!("/system.slice/{}", d.unit),
-            "228 full209 cgroup escaped"
+            "228 full 209 cgroup escaped"
         );
         let root = Path::new("/sys/fs/cgroup/system.slice").join(&d.unit);
         let read = |name: &str| -> Result<u64> {
@@ -339,7 +342,7 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         )?;
         total = total
             .checked_add(remaining)
-            .context("228 full209 memory overflow")?;
+            .context("228 full 209 memory overflow")?;
         evidence.push(json!({"epoch":209,"unit":d.unit,"invocation_id":d.invocation_id,
             "hard_memory_cap_bytes":cap,"current_cgroup_charge_bytes":charge,
             "remaining_hard_memory_growth_bytes":remaining,"resource_plan":launch["resource_plan"],

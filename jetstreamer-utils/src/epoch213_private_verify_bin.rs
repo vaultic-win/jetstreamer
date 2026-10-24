@@ -1,4 +1,4 @@
-//! Exact retained213 profile; existing sealed deployments are unchanged.
+//! Exact retained 213 profile; existing sealed deployments are unchanged.
 mod profile {
     pub const UNIT: &str = "horizon-qualify-213-checkpoint-continuation-ae43646-v1.service";
     pub const INVOCATION: &str = "1dfd29e7ced140b3ba407359cbdc0ee1";

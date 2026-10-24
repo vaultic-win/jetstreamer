@@ -29,7 +29,7 @@ use std::{cmp, collections::HashMap, env, path::Path, sync::Arc};
 use tempfile::TempDir;
 
 const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
-// Narrow epoch-129/130 candidate envelope. The minimum is the exact canonical
+// Narrow epoch- 129/130 candidate envelope. The minimum is the exact canonical
 // epoch-129 predecessor snapshot used by production. Source status at slot
 // 56,298,256 proves that v1.4.17 semantics remain required during epoch 130;
 // v1.4.19 resumes from epoch 131's independent predecessor snapshot. The

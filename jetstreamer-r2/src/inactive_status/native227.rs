@@ -1,4 +1,4 @@
-//! Cleared native227 owner identity is proved by its exact PID1 terminal event.
+//! Cleared native 227 owner identity is proved by its exact PID1 terminal event.
 use super::*;
 const UNIT: &str = "horizon-native-input-227-capped-710f6523-v1.service";
 pub(super) fn recognized(terminal_fleet: &Value, owners: &[(String, String)]) -> bool {
@@ -24,23 +24,23 @@ pub(super) fn validate(
 ) -> Result<()> {
     ensure!(
         recognized(terminal_fleet, owners),
-        "not a native227 terminal owner"
+        "not a native 227 terminal owner"
     );
     let binding: Bound = serde_json::from_value(terminal_fleet["metadata_event"].clone())?;
     let proof = bound_json(&binding)?;
     let proven = fleet::native227_terminal_status_identity(&proof)?;
     ensure!(
         owners[0] == proven,
-        "native227 terminal event names another invocation"
+        "native 227 terminal event names another invocation"
     );
     ensure!(
         shape(
             current
                 .get(UNIT)
-                .context("native227 current owner absent")?,
+                .context("native 227 current owner absent")?,
             &proven.1
         ) && shape(&terminal_fleet["unit_census"][UNIT], &proven.1),
-        "native227 owner live, replaced or lacking terminal history"
+        "native 227 owner live, replaced or lacking terminal history"
     );
     Ok(())
 }

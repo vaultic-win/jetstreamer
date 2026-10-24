@@ -1,4 +1,4 @@
-//! An exclusive private207cohort. No ordinary registry promotion or208tail.
+//! An exclusive private 207cohort. No ordinary registry promotion or 208 tail.
 #[cfg(all(
     feature = "epoch207-singleton-qualification",
     any(
@@ -58,7 +58,7 @@ pub(crate) fn validate_launch(
         || forbidden
         || snapshot.and_then(Path::file_name).and_then(|s| s.to_str()) != Some(SNAPSHOT)
     {
-        return Err("epoch207 singleton requires exact private207cohort, one explicit --verify, candidate opt-in and audited89423444snapshot; recovery, other qualifications and alternate spans are unavailable".into());
+        return Err("epoch 207 singleton requires exact private 207cohort, one explicit --verify, candidate opt-in and audited 89423444 snapshot; recovery, other qualifications and alternate spans are unavailable".into());
     }
     let root = output.parent().ok_or("207 output root missing")?;
     if output.file_name().and_then(|s| s.to_str()) != Some("output")
@@ -87,7 +87,7 @@ pub(crate) fn validate_filesystem(output: &Path) -> Result<(), String> {
             || path.canonicalize().map_err(|e| e.to_string())? != path
         {
             return Err(
-                "207 singleton paths must be canonical current-owner mode0700directories".into(),
+                "207 singleton paths must be canonical current-owner mode 0700directories".into(),
             );
         }
     }
@@ -105,7 +105,7 @@ pub(crate) fn validate_plan(plan: &super::RootCheckpointCohortPlan) -> Result<()
                 actual.slot >= START && actual.slot == slot && actual.accounts_hash == hash
             })
     {
-        return Err("207 singleton must preserve exact bootstrap and both canonical207roots;208tail is forbidden".into());
+        return Err("207 singleton must preserve exact bootstrap and both canonical 207roots; 208 tail is forbidden".into());
     }
     Ok(())
 }

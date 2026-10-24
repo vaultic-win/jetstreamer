@@ -1,4 +1,4 @@
-//! Optional closed191 native delivery metadata. Ordinary lanes keep their old
+//! Optional closed 191 native delivery metadata. Ordinary lanes keep their old
 //! publisher pins; only the fleet reader and these four publications use the
 //! newly sealed reader. Missing current custody is a durable isolated incident.
 use super::*;
@@ -87,7 +87,7 @@ fn adoption_clocks(old: u64, target: u64, captured: u64) -> Result<()> {
         .context("191 adoption precedes accepted predecessor")?;
     ensure!(
         (1800..=3600).contains(&gap) && gap % 1800 == 0,
-        "191 adoption must retain the bounded original30minute grid"
+        "191 adoption must retain the bounded original 30 minute grid"
     );
     ensure!(
         captured > old && captured <= target,
@@ -143,7 +143,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.starts_with("horizon-cohort191-delivery-events-")),
-        "foreign191 publisher, event namespace or duplicate ordinary claim"
+        "foreign 191 publisher, event namespace or duplicate ordinary claim"
     );
     ensure!(
         !s.native_handoff_event
@@ -344,7 +344,7 @@ fn cadence_target(old: &str, new: &str) -> Result<()> {
         .context("191 transition cannot backdate its successor")?;
     ensure!(
         gap % 1800 == 0,
-        "191 transition retime must retain the original30minute cadence grid"
+        "191 transition retime must retain the original 30 minute cadence grid"
     );
     Ok(())
 }

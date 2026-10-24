@@ -1,4 +1,4 @@
-//! Digest-bound private collection of an already retained bzip2 RocksDB tar.
+//! Digest-bound private collection of an already retained bzip 2 RocksDB tar.
 //!
 //! This is a diagnostic library, not a downloader or admission mechanism. The
 //! caller must independently authenticate the expected digest against the exact
@@ -89,7 +89,7 @@ pub struct BoundBzipCollection {
     pub publication_authorized: bool,
 }
 
-/// Collect a complete bzip2 tar from an immutable, digest-bound local input.
+/// Collect a complete bzip 2 tar from an immutable, digest-bound local input.
 ///
 /// Require a canonical absolute, singly linked, non-writable regular input owned
 /// by root or the effective user. Hash the complete input before touching the
@@ -297,7 +297,7 @@ fn inspect_bound_bzip2(
         None => census_rocksdb_tar(&mut decoder, archive_root, limits)?,
     };
     // The tar collector drains through decoded EOF; require the decoder to have
-    // validated every bzip2 member, including its checksum and stream footer.
+    // validated every bzip 2 member, including its checksum and stream footer.
     let mut end = [0_u8; 1];
     ensure!(decoder.read(&mut end)? == 0, "decoder did not reach EOF");
     drop(decoder);

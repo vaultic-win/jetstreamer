@@ -100,7 +100,7 @@ fn rpc_boundary(request: &Value, response: &Value) -> Result<FirstBlock> {
                 && item.get("error").is_none()
                 && expected.contains_key(&slot)
                 && !blocks.contains_key(&slot),
-            "RPC error,duplicate or unbound response"
+            "RPC error, duplicate or unbound response"
         );
         let result = &item["result"];
         let hash = result["blockhash"].as_str().context("missing blockhash")?;

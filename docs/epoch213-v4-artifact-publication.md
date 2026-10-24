@@ -51,7 +51,7 @@ nonempty or previous attempt is never overwritten or silently repaired.
 Pre-create only the dedicated
 `horizon-213-publication-work-UNIQUE` parent as root-owned mode 0755 on the public
 archive's filesystem. Keep its `stage` child absent. The parent must permit
-traversal after the permanent UID1000 drop while remaining non-writable to that
+traversal after the permanent UID 1000 drop while remaining non-writable to that
 UID; the newly created stage is owner-only. The legacy direct-child stage
 namespace is no longer admitted because it would broaden the write scope.
 

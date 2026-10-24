@@ -1,4 +1,4 @@
-//! Exact capped186 inputs. Replay remains gated on separate fresh admission.
+//! Exact capped 186 inputs. Replay remains gated on separate fresh admission.
 mod profile {
     pub const NATURAL_ROOT_FINISH: bool = true;
     pub const ARCHIVE_NAME: &str = "epoch-186-prefix.jet";

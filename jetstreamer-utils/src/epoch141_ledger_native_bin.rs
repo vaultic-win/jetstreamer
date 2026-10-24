@@ -115,7 +115,7 @@ fn profile(plan: &Plan) -> Result<bool> {
                         && s.ends_with(".service")
                         && s.bytes()
                             .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))),
-                "full native profile requires explicit fixed census,completed metadata and exact unit"
+                "full native profile requires explicit fixed census, completed metadata and exact unit"
             );
             if plan.schema == acquisition::SCHEMA {
                 ensure!(
@@ -229,7 +229,7 @@ fn targets(audit: &Value) -> Result<Vec<LegacySlotScope>> {
             && audit["replay_launch_authorized"] == false
             && audit["runtime_promotion_authorized"] == false
             && audit["r2_mutations"] == false,
-        "wrong exact epoch141 gap audit"
+        "wrong exact epoch 141 gap audit"
     );
     let gaps = audit["gaps"].as_array().context("missing target census")?;
     ensure!(gaps.len() == PAIRS.len(), "incomplete target census");
@@ -262,7 +262,7 @@ fn admission(plan: &Plan, receipt: &Value, manifest: &Value, exe: &Path, sha: &s
     if plan.schema == all_acquisition::SCHEMA {
         ensure!(
             manifest["native_profile"] == all_acquisition::ADMISSION,
-            "all-target acquisition needs independently qualified32GiB admission"
+            "all-target acquisition needs independently qualified 32 GiB admission"
         );
     }
     if plan.schema == acquisition::SCHEMA {
@@ -860,7 +860,7 @@ fn run() -> Result<()> {
             fs::symlink_metadata(&plan.admission_receipt)?.mtime(),
         )?)
         .context("future admission")?;
-    ensure!(age <= 300, "native admission older than300seconds");
+    ensure!(age <= 300, "native admission older than 300 seconds");
     let start = Instant::now();
     let free = guard(&plan, start)?;
     if full {

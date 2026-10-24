@@ -1,4 +1,4 @@
-//! Add the exact private original141 owner without replacing old144 history.
+//! Add the exact private original 141 owner without replacing old 144 history.
 use super::*;
 const UNIT: &str = "horizon-qualify-141-original-entry-root-20261023-v1.service";
 const ROOT: &str = "/home/sol/.jetstreamer-private/epoch141-original-entry-root-20261023-v1";
@@ -224,7 +224,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                 && r["resource_budget_kind"]
                     == "bounded-qualification-stop-not-adopted-full-epoch-peak"
                 && r.get("worker_entry_terminal_slot").is_none(),
-            "capped141 must bind its distinct worker and experimental budget, without a diagnostic stop"
+            "capped 141 must bind its distinct worker and experimental budget, without a diagnostic stop"
         );
     }
     if s.freeze_components {
@@ -233,7 +233,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                 && r["worker_freeze_component_diagnostic"] == true
                 && r["worker_entry_terminal_slot"]
                     == if s.vote_prefix { 60912005 } else { 60912004 },
-            "freeze141 requires its separately bounded worker"
+            "freeze 141 requires its separately bounded worker"
         );
     }
     if s.trace {
@@ -250,7 +250,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                 && g["root_physical_observation"]["conservative_physical_bytes"]
                     .as_u64()
                     .is_some_and(|n| n <= peak),
-            "trace141 handoff lacks bounded logging/physical guard scope"
+            "trace 141 handoff lacks bounded logging/physical guard scope"
         );
     }
     ensure!(
@@ -282,7 +282,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
             && r["private_original_entry_root_qualification"] == true
             && r["first_guard"]["path"] == format!("{root}/receipts/first-guard.json")
             && r["candidate_incremental_peak_bytes"] == if s.trace { peak } else { 768u64 << 30 },
-        "original141 handoff has foreign launch/owner/span"
+        "original 141 handoff has foreign launch/owner/span"
     );
     for key in [
         "replay_launch_authorized",
@@ -299,7 +299,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
     ] {
         ensure!(
             r[key] == false,
-            "original141 handoff grants authority:{key}"
+            "original 141 handoff grants authority:{key}"
         );
     }
     if s.coordinated_adoption {
@@ -325,7 +325,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                 && ep["diagnostics"]
                     .as_array()
                     .is_some_and(|a| a.iter().all(|v| v["unit"] != unit)),
-            "trace141 coordinated adoption must retain its exact accepted prelaunch predecessor"
+            "trace 141 coordinated adoption must retain its exact accepted prelaunch predecessor"
         );
     } else {
         ensure!(
@@ -356,21 +356,21 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                     == 1
                     && a.iter()
                         .any(|v| v["epoch"] == 141 && v["state"] == "failed-needs-repair")),
-            "original141 event changes scope/predecessor/repair state"
+            "original 141 event changes scope/predecessor/repair state"
         );
         let claims = ep["diagnostics"]
             .as_array()
-            .context("original141 event diagnostics")?;
+            .context("original 141 event diagnostics")?;
         ensure!(
             claims
                 .iter()
                 .filter(|v| v["unit"] == unit)
                 .eq(std::iter::once(&claim(s))),
-            "original141 event claim differs"
+            "original 141 event claim differs"
         );
         let events = e["diagnostics"]
             .as_array()
-            .context("original141 event owner census")?;
+            .context("original 141 event owner census")?;
         ensure!(
             events.iter().filter(|v| v["unit"]["Id"] == unit).count() == 1
                 && events.iter().any(|v| v["unit"]["Id"] == unit
@@ -381,7 +381,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                     && v["unit"]["NRestarts"] == "0"
                     && v["launch_receipt"].as_str() == s.launch.path.to_str()
                     && v["launch_receipt_sha256"] == s.launch.sha256),
-            "original141 event lacks exact actual live invocation"
+            "original 141 event lacks exact actual live invocation"
         );
     }
     ensure!(
@@ -415,7 +415,7 @@ fn checked(s: &Profile, r: &Value, e: &Value, ep: &Value, g: &Value) -> Result<(
                 .is_some_and(|(a, b)| a >= b)
             && g["remote_mutations"] == false
             && g["r2_mutations"] == false,
-        "original141 handoff lacks exact no-trip guard firstfire"
+        "original 141 handoff lacks exact no-trip guard firstfire"
     );
     Ok(())
 }
@@ -435,7 +435,7 @@ fn read(s: &Profile) -> Result<(Value, Value)> {
                 && prior["execution_evidence"]["later_batch_first_entry"] == 452
                 && prior["full_epoch_verified"] == false
                 && prior["publication_authorized"] == false,
-            "capped141 lacks exact successful bounded vote-prefix evidence"
+            "capped 141 lacks exact successful bounded vote-prefix evidence"
         );
     }
     if s.vote_prefix {
@@ -480,7 +480,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 && p.publication144.is_some()
                 && native141::all_retry_enabled(p)
                 && census141_poh::collected(p),
-            "original141 requires complete retained host history and private ETA isolation"
+            "original 141 requires complete retained host history and private ETA isolation"
         );
         read(s)?;
     }
@@ -496,14 +496,14 @@ fn migrate(scope: &mut Scope101200, config: &mut Value, s: &Profile) -> Result<(
         scope.private144_observer
             && scope.diagnostic_ranges.len() == 1
             && scope.diagnostic_ranges[0].range == "144",
-        "original141 requires retained sole144 diagnostic"
+        "original 141 requires retained sole 144 diagnostic"
     );
     let rows = config["diagnostic_replays"]
         .as_array_mut()
         .context("private census")?;
     ensure!(
         rows.len() == 1 && rows[0]["range"] == "144",
-        "original141 cannot replace/drop/duplicate old diagnostic"
+        "original 141 cannot replace/drop/duplicate old diagnostic"
     );
     rows.push(config_row(s));
     scope.diagnostic_ranges.push(DiagnosticClaim {
@@ -548,7 +548,7 @@ fn replace_terminal_trace(
         !next.capped_root
             || (old.invocation_id == "5b09e442086149b3a9775d728f1ff047"
                 && !next.coordinated_adoption),
-        "capped141 must replace the exact result-bound vote-prefix invocation"
+        "capped 141 must replace the exact result-bound vote-prefix invocation"
     );
     ensure!(
         !next.vote_prefix
@@ -603,7 +603,7 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     let (unit, _) = identity(s);
     ensure!(
         f["gates"]["141"]["state"] == "failed-needs-repair",
-        "private141 cannot close repair incident"
+        "private 141 cannot close repair incident"
     );
     let ds = f["diagnostics"]
         .as_array_mut()
@@ -611,7 +611,7 @@ fn fold(f: &mut Value, c: Value, g: Value, s: &Profile) -> Result<()> {
     let old: Vec<_> = ds.iter().filter(|v| v["unit"] == unit).collect();
     ensure!(
         old.is_empty() || old == vec![&c],
-        "original141 conflicts with retained claim"
+        "original 141 conflicts with retained claim"
     );
     if old.is_empty() {
         ds.push(c);
@@ -669,19 +669,19 @@ pub(super) fn derive_fleet(p: &Plan, f: &mut Value) -> Result<()> {
                 for epoch in 136..=139 {
                     if f["gates"][epoch.to_string()]["state"] == "blocked-qualification" {
                         f["gates"][epoch.to_string()]["next_action"] = json!(
-                            "Epoch144 is now remote-ready and the rebuilt141worker has passed the formerly blocking vote. Review retained136–139prefix checkpoint provenance and independent full/current-plugin evidence, then dispatch qualified retained work or a freshly admitted repair with the corrected worker. Keep each incident open until its verified ready pair."
+                            "Epoch 144 is now remote-ready and the rebuilt 141 worker has passed the formerly blocking vote. Review retained 136–139 prefix checkpoint provenance and independent full/current-plugin evidence, then dispatch qualified retained work or a freshly admitted repair with the corrected worker. Keep each incident open until its verified ready pair."
                         );
                     }
                 }
             }
             if f["gates"]["140"]["state"] == "blocked-qualification" {
                 f["gates"]["140"]["next_action"] = json!(
-                    "The complete original-entry/PoH bundle and successful60912005vote-prefix result are sealed. Advance corrected/capped141qualification to61328765 to close its canonical-root obligation; then qualify the retained140prefix plus248post-cut slots through the independent complete-span/full/plugin/delivery gates. Preserve the original140evidence."
+                    "The complete original-entry/PoH bundle and successful60912005vote-prefix result are sealed. Advance corrected/capped141qualification to 61328765 to close its canonical-root obligation; then qualify the retained 140 prefix plus248post-cut slots through the independent complete-span/full/plugin/delivery gates. Preserve the original 140evidence."
                 );
             }
             if f["gates"]["186"]["state"] == "blocked-qualification" {
                 f["gates"]["186"]["next_action"] = json!(
-                    "Capped1.6.15worker, cohesive186inputs and input capability are staged. Implement its distinct bounded admission/guard/fleet path against the current five production claims plus any live141remaining-growth claim. Reassess after each accepted event/sample; require a clean expanded operating point before another experimental lane. The512GiB/384GiB draft is not a qualified full-cold budget."
+                    "Capped 1.6.15 worker, cohesive 186 inputs and input capability are staged. Implement its distinct bounded admission/guard/fleet path against the current five production claims plus any live141remaining-growth claim. Reassess after each accepted event/sample; require a clean expanded operating point before another experimental lane. The512GiB/384GiB draft is not a qualified full-cold budget."
                 );
             }
         }
@@ -699,14 +699,17 @@ pub(super) fn consume_transition(p: &Plan, f: &mut Value) -> Result<()> {
     if enabled(p) && !f["admission_transition_guard"].is_null() {
         ensure!(
             transition_template(p, f)?,
-            "original141 cannot consume foreign admission guard"
+            "original 141 cannot consume foreign admission guard"
         );
         f["admission_transition_guard"] = Value::Null;
     }
     Ok(())
 }
 pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) -> Result<Value> {
-    let s = p.original141_root.as_ref().context("original141 profile")?;
+    let s = p
+        .original141_root
+        .as_ref()
+        .context("original 141 profile")?;
     let (unit, root) = identity(s);
     ensure!(
         !p.expected_epochs.contains(&141)
@@ -723,7 +726,7 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
                 .context("ordinary census")?
                 .iter()
                 .any(|r| r["range"] == "141" || r["range"] == "141-141"),
-        "original141 cannot acquire ordinary replay/ETA claim"
+        "original 141 cannot acquire ordinary replay/ETA claim"
     );
     let rows = v["diagnostic_replays"]
         .as_array()
@@ -732,20 +735,20 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
         rows.len() == 2
             && rows.iter().filter(|r| r["range"] == "141").count() == 1
             && rows.iter().filter(|r| r["range"] == "144").count() == 1,
-        "original141 requires exact141+retained144census"
+        "original 141 requires exact 141+retained 144census"
     );
     let row = rows.iter().find(|r| r["range"] == "141").unwrap();
     if !observed {
         ensure!(
             *row == config_row(s),
-            "original141 config owner/path changed"
+            "original 141 config owner/path changed"
         );
     } else {
         ensure!(
             row["producer_unit"] == unit
                 && row["expected_producer_invocation_id"] == s.invocation_id
                 && row["scratch_path"] == format!("{root}/scratch"),
-            "original141 envelope owner changed"
+            "original 141 envelope owner changed"
         );
         for key in [
             "ordinary_replay_claim",
@@ -754,13 +757,13 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
             "publication_authorized",
             "r2_mutations",
         ] {
-            ensure!(row[key] == false, "original141 envelope grants {key}");
+            ensure!(row[key] == false, "original 141 envelope grants {key}");
         }
         match row["status"].as_str() {
             Some("unavailable") => ensure!(
                 row["observation"].is_null()
                     && row["error"].as_str().is_some_and(|e| !e.trim().is_empty()),
-                "original141 missing explicit unresolved diagnostic evidence"
+                "original 141 missing explicit unresolved diagnostic evidence"
             ),
             Some("observed") => {
                 let o = &row["observation"];
@@ -769,7 +772,7 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
                         && o["range"] == "141"
                         && o["scratch_path"] == format!("{root}/scratch")
                         && o["invocation_binding_stable"] == true,
-                    "original141 observed identity differs"
+                    "original 141 observed identity differs"
                 );
                 for kind in ["controller", "producer"] {
                     for point in ["before", "after"] {
@@ -781,15 +784,15 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
                                     owner["active_state"].as_str(),
                                     Some("active" | "activating")
                                 ),
-                            "original141 observed owner changed"
+                            "original 141 observed owner changed"
                         );
                     }
                 }
             }
-            _ => anyhow::bail!("unknown original141 diagnostic outcome"),
+            _ => anyhow::bail!("unknown original 141 diagnostic outcome"),
         }
     }
-    // The existing144validator still receives its exact one-row census.
+    // The existing 144validator still receives its exact one-row census.
     let mut old = v.clone();
     old["diagnostic_replays"] = json!(
         rows.iter()
@@ -801,7 +804,7 @@ pub(super) fn diagnostics(p: &Plan, model: &Value, v: &Value, observed: bool) ->
 pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> {
     ensure!(
         is_101(p)? && publication144::composite_reader(p) && p.repair185_handoff.is_some(),
-        "original141 needs accepted five-lane history"
+        "original 141 needs accepted five-lane history"
     );
     let spec: Spec = serde_json::from_value(bound_json(b, true)?)?;
     ensure!(
@@ -810,7 +813,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
             && !spec.publication_authorized
             && !spec.remote_mutations
             && !spec.r2_mutations,
-        "authorizing or foreign original141 handoff"
+        "authorizing or foreign original 141 handoff"
     );
     let launch = bound_json(&spec.launch, false)?;
     let s = Profile {
@@ -824,7 +827,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
         event_plan: spec.event_plan,
         invocation_id: launch["invocation_id"]
             .as_str()
-            .context("original141 invocation")?
+            .context("original 141 invocation")?
             .into(),
     };
     ensure!(
@@ -864,7 +867,7 @@ pub(super) fn enable(p: &mut Plan, config: &mut Value, b: &Bound) -> Result<()> 
             .extend([serde_json::to_value(&s.launch)?, g]);
         ensure!(
             expected == actual && actual["observer"] == serde_json::to_value(&p.previous_observer)?,
-            "original141 event changes unrelated claims/history/scalars"
+            "original 141 event changes unrelated claims/history/scalars"
         );
     }
     if enabled(p) {

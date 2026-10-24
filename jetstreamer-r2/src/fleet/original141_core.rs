@@ -1,4 +1,4 @@
-// Shared validation for two closed, compile-bound private141 profiles.
+// Shared validation for two closed, compile-bound private 141 profiles.
 use super::*;
 #[path = "original141_ops.rs"]
 #[allow(
@@ -100,26 +100,26 @@ fn denied(v: &Value) -> Result<()> {
                 && v.get("worker_freeze_component_diagnostic").is_none()
                 && v["resource_budget_kind"]
                     == "bounded-qualification-stop-not-adopted-full-epoch-peak",
-            "capped141 must retain its experimental budget and qualification denials"
+            "capped 141 must retain its experimental budget and qualification denials"
         );
     }
     if let Some(slot) = WORKER_ENTRY_TERMINAL {
         ensure!(
             v["worker_freeze_component_diagnostic"] == true
                 && v["worker_entry_terminal_slot"] == slot,
-            "freeze141 must bind its worker-enforced diagnostic terminal"
+            "freeze 141 must bind its worker-enforced diagnostic terminal"
         );
     }
     if TRACE {
         ensure!(
             v["historical_trace_enabled"] == true && v["whole_root_physical_limit_bytes"] == PEAK,
-            "trace141 scope must bind trace logging and whole-root stop"
+            "trace 141 scope must bind trace logging and whole-root stop"
         );
     }
     for key in DENIED {
         ensure!(
             v[*key] == false,
-            "original141 grants forbidden authority:{key}"
+            "original 141 grants forbidden authority:{key}"
         );
     }
     Ok(())
@@ -169,7 +169,7 @@ fn shape(r: &Value, c: &DiagnosticClaim) -> Result<()> {
             && canonical_digest(&r["observer"]["sha256"])
             && canonical_digest(&r["previous_fleet"]["sha256"])
             && command(&r["expected_exec_start"]) == Some(expected_command().as_str()),
-        "original141 launch scope, input or owner differs"
+        "original 141 launch scope, input or owner differs"
     );
     denied(r)
 }
@@ -206,7 +206,7 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
                 .as_u64()
                 .zip(a["required_guard_minimum_free_bytes"].as_u64())
                 .is_some_and(|(free, floor)| floor.checked_add(PEAK).is_some_and(|n| free >= n)),
-        "original141 plan/admission binding differs"
+        "original 141 plan/admission binding differs"
     );
     let at = a["recorded_unix_seconds"]
         .as_u64()
@@ -216,7 +216,7 @@ fn bindings(r: &Value, p: &Value, a: &Value) -> Result<()> {
         .context("actual producer start clock")?;
     ensure!(
         at <= lt && lt - at <= 900 && r["recorded_unix_seconds"].as_u64().is_some_and(|n| lt <= n),
-        "stale/future original141 admission"
+        "stale/future original 141 admission"
     );
     for value in [p, a] {
         denied(value)?;
@@ -228,7 +228,7 @@ pub(super) fn launch(r: &Value, c: &DiagnosticClaim) -> Result<()> {
     let checkpoints = read_stable_bounded(Path::new(CHECKPOINTS), 1024, "original141 checkpoints")?;
     ensure!(
         hex_lower(&Sha256::digest(&checkpoints)) == CHECKPOINTS_SHA,
-        "original141 checkpoint bytes changed"
+        "original 141 checkpoint bytes changed"
     );
     let pb: BoundFile = serde_json::from_value(r["plan"].clone())?;
     let ab: BoundFile = serde_json::from_value(r["admission"].clone())?;
@@ -289,7 +289,7 @@ fn first_guard(c: &DiagnosticClaim, r: &Value, g: &Value, p: &Value) -> Result<(
             && p["unit"] == UNIT
             && p["invocation_id"] == c.invocation_id
             && guard_matches(c, r, p),
-        "original141 lacks a genuine invocation-bound one-worker guard first fire"
+        "original 141 lacks a genuine invocation-bound one-worker guard first fire"
     );
     Ok(())
 }
@@ -323,7 +323,7 @@ fn live_shape(c: &DiagnosticClaim, v: &Value) -> Result<()> {
                 .and_then(|s| s.parse::<u64>().ok())
                 .is_some_and(|n| n > 0)
             && command(&v["ExecStart"]) == Some(expected_command().as_str()),
-        "original141 live owner/command differs"
+        "original 141 live owner/command differs"
     );
     Ok(())
 }
@@ -352,19 +352,19 @@ fn limits(p: &BTreeMap<&str, &str>) -> Result<()> {
     ] {
         ensure!(
             p.get(key) == Some(&value),
-            "original141 sandbox differs:{key}"
+            "original 141 sandbox differs:{key}"
         );
     }
     let writable =
         format!("{ROOT}/destination {ROOT}/output {ROOT}/scratch {ROOT}/.jetstreamer-private");
     ensure!(
         p.get("ReadWritePaths") == Some(&writable.as_str()),
-        "original141 writable roots differ"
+        "original 141 writable roots differ"
     );
     let env = environment();
     ensure!(
         p.get("Environment") == Some(&env.as_str()),
-        "original141 environment differs"
+        "original 141 environment differs"
     );
     Ok(())
 }
@@ -408,7 +408,7 @@ pub(super) fn validate_live(c: &DiagnosticClaim, v: &Value) -> Result<()> {
     let o=ProcessCommand::new("systemctl").args(["show",UNIT,"--no-pager","--property=User,Type,Restart,KillMode,Delegate,RuntimeMaxUSec,CPUQuotaPerSecUSec,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,UMask,ProtectSystem,ProtectHome,PrivateTmp,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,Environment,EnvironmentFiles"]).output()?;
     ensure!(
         o.status.success() && o.stdout.len() <= 16384,
-        "original141 sandbox read failed"
+        "original 141 sandbox read failed"
     );
     let text = std::str::from_utf8(&o.stdout)?;
     let mut props = BTreeMap::new();

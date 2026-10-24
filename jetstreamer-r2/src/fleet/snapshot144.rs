@@ -79,7 +79,7 @@ fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
                 == "a9a8fb188816640ceef322697c4e8c7a421606e7a4fe9a95a9847d79ab89305e"
             && n.resource_proposal.sha256
                 == "ae18d37b9ed5a2eb38461e500ae75c0b6ea8e831a735afb764682e1566c64cda",
-        "foreign native144 input evidence"
+        "foreign native 144 input evidence"
     );
     let inputs = bound_json(&n.inputs)?;
     let capability = bound_json(&n.capability)?;
@@ -104,7 +104,7 @@ fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
             && proposal["conservative_proposal"]["native_incremental_peak_bytes"] == 40u64 << 30
             && proposal["conservative_proposal"]["protected_existing_floor_bytes"] == PROTECTED
             && proposal["native_restore_authorized"] == false,
-        "native144 capability/policy/resource mismatch"
+        "native 144 capability/policy/resource mismatch"
     );
     let cap = unit("horizon-epoch144-native-input-capability-20261021-v1.service")?;
     ensure!(
@@ -114,7 +114,7 @@ fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
             && cap["MainPID"] == "0"
             && cap["ExecMainStatus"] == "0"
             && cap["Result"] == "success",
-        "native144 input capability not exact terminal success"
+        "native 144 input capability not exact terminal success"
     );
     let snapshot = fs::symlink_metadata(
         "/home/sol/.jetstreamer-private/epoch144-snapshot-source-20261021-v1/download/snapshot-62639490-59bAQjc2c1VqNWqGoCacp3tnyNyie3EYx4bjttvJhgeT.tar.zst",
@@ -127,7 +127,7 @@ fn native_inputs(n: &Native, probe: &BoundFile) -> Result<()> {
             && snapshot.dev() == 64512
             && snapshot.ino() == 105578509
             && snapshot.len() == SIZE,
-        "native144 retained source identity changed"
+        "native 144 retained source identity changed"
     );
     Ok(())
 }
@@ -288,7 +288,7 @@ pub(super) fn run() -> Result<()> {
     );
     ensure!(
         native_only == s.native.is_some(),
-        "native-only evidence in wrong144 admission mode"
+        "native-only evidence in wrong 144 admission mode"
     );
     let invocation = env::var("INVOCATION_ID").context("persistent invocation required")?;
     ensure!(

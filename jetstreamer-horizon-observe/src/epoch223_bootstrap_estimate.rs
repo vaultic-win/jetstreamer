@@ -1,4 +1,4 @@
-//! Bounded identical-worker historical-rate prior while exact223 has no markers.
+//! Bounded identical-worker historical-rate prior while exact 223 has no markers.
 //! Does not relax the normal estimator's requirement for measured current rates.
 #[allow(dead_code)]
 #[path = "status_estimate.rs"]
@@ -112,7 +112,7 @@ fn historical_rate(r: &Value) -> Result<f64> {
             && p["last"]["slot"]
                 .as_u64()
                 .is_some_and(|s| (96336000..=LAST_SLOT).contains(&s)),
-        "historical rate is not from epoch223"
+        "historical rate is not from epoch 223"
     );
     let rate = p["slots_per_second"]
         .as_f64()

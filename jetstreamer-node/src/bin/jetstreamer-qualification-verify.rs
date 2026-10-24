@@ -369,11 +369,11 @@ fn retained_prefix_157(arguments: &Arguments) -> bool {
 fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), String> {
     if prefix223::namespace(arguments) && !prefix223::matches(arguments) {
         return Err(
-            "epoch223 prefix namespace requires its exact checkpoint-bounded partial scope".into(),
+            "epoch 223 prefix namespace requires its exact checkpoint-bounded partial scope".into(),
         );
     }
     if tail223::namespace(arguments) && !tail223::matches(arguments) {
-        return Err("epoch223 tail namespace requires its exact partial comparison scope".into());
+        return Err("epoch 223 tail namespace requires its exact partial comparison scope".into());
     }
     let expected_name = format!(
         "epoch-{}-through-{}.jet",
@@ -407,7 +407,7 @@ fn validate_complete_span_225_roots(
             || revision != "7de8a55b54d3e11058b82f9483bb405d143b455c")
     {
         return Err(
-            "epoch225 complete span does not bind its canonical roots and runtime revision".into(),
+            "epoch 225 complete span does not bind its canonical roots and runtime revision".into(),
         );
     }
     Ok(())
@@ -423,7 +423,7 @@ fn validate_prefix_root_identity(
             || revision != "86c26f843276581509c3434acc2efbf4202c44e0")
     {
         return Err(
-            "epoch203 prefix does not bind its exact canonical root and runtime revision".into(),
+            "epoch 203 prefix does not bind its exact canonical root and runtime revision".into(),
         );
     }
     Ok(())

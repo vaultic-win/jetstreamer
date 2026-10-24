@@ -116,7 +116,7 @@ pub(super) async fn run() -> Result<()> {
         ensure!(
             before.length == 103_802_397_352
                 && etag.trim_matches('"') == "6f543a2b1f7c1d60647a9f5f8b541150-1547",
-            "exact203 staged object identity differs"
+            "exact 203 staged object identity differs"
         );
     }
     let range = format!("bytes={}-{}", OFFSET, OFFSET + LENGTH as u64 - 1);

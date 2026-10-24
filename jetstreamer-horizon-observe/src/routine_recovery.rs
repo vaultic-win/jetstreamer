@@ -38,7 +38,10 @@ pub(super) fn epoch198_origin(model: &Value) -> Result<Option<Bound>> {
     if matches.is_empty() {
         return Ok(None);
     }
-    ensure!(matches.len() == 1, "duplicate198controller recovery origin");
+    ensure!(
+        matches.len() == 1,
+        "duplicate 198controller recovery origin"
+    );
     let binding: Bound = serde_json::from_value(matches[0].clone())?;
     ensure!(
         utc_seconds(
@@ -235,7 +238,7 @@ pub(super) fn enable(
             && next.package_controller_recovery.is_none()
             && next.sample_target_utc == "2026-10-21T14:38:00Z"
             && old_model["sample_target_utc"] == OLD,
-        "package recovery must consume genuine14:08completion"
+        "package recovery must consume genuine 14:08completion"
     );
     absent(&next.observer)?;
     absent(&next.cycle_directory)?;
@@ -293,7 +296,7 @@ pub(super) fn enable(
         .additional_tracked_units = vec![next.cycle_unit.clone()];
     config["not_before_utc"] = json!(NEXT);
     config["output"] = json!(next.observer);
-    // Preserve every predecessor hash, producer clock and pending157 handoff.
+    // Preserve every predecessor hash, producer clock and pending 157 handoff.
     // Isolate the already-private144 claim before its expected terminal event.
     private144::enable(next, config, old_model)?;
     interval(next)?;

@@ -1,4 +1,4 @@
-//! Retire only superseded first16 native20 scratch; preserve output and receipts.
+//! Retire only superseded first 16 native 20 scratch; preserve output and receipts.
 use super::*;
 const ROOT: &str =
     "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-warmup-8457f800-v2";

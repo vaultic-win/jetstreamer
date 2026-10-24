@@ -1,4 +1,4 @@
-//! Exact failed185 partial retirement after authenticated cold custody. This is
+//! Exact failed 185 partial retirement after authenticated cold custody. This is
 //! not canonical archive retirement or a portable runtime checkpoint.
 use super::*;
 
@@ -24,7 +24,7 @@ pub(super) struct Retire {
 fn scope(p: &Retire, m: &Mapping, e: &Value, c: &Value) -> Result<FileIdentity> {
     ensure!(
         p.schema == "jetstreamer-horizon-holding-retire185-plan-v2",
-        "foreign185 retirement scope"
+        "foreign 185 retirement scope"
     );
     let (_, etag, sha, length) = custody(c, m)?;
     ensure!(
@@ -163,7 +163,7 @@ fn original_claims(c: &Value) -> Result<Vec<Bound>> {
                 && epochs.insert(epoch)
                 && bytes > 0
                 && (epoch != 185 || bytes >= 824_633_720_832),
-            "missing, duplicate or released185/141 original claim"
+            "missing, duplicate or released 185/141 original claim"
         );
         bindings.push(serde_json::from_value(row["binding"].clone())?);
     }
@@ -338,7 +338,7 @@ fn basis(p: &Retire, m: &Mapping) -> Result<Value> {
             == Some(Path::new(
                 "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1"
             )),
-        "foreign185 capacity fleet"
+        "foreign 185 capacity fleet"
     );
     let f = evidence(&fb, false)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -386,7 +386,7 @@ fn basis(p: &Retire, m: &Mapping) -> Result<Value> {
                             < f["recorded_unix_seconds"]
                                 .as_u64()
                                 .context("185 basis clock")?),
-                "newer fleet invalidates185 retirement"
+                "newer fleet invalidates 185 retirement"
             );
         }
     }
@@ -624,11 +624,11 @@ fn local_state(
         (None, None) => {
             ensure!(
                 unlink_intent,
-                "unexplained185 local absence before unlink intent"
+                "unexplained 185 local absence before unlink intent"
             );
             Ok(LocalState::Absent)
         }
-        (Some(_), Some(_)) => bail!("conflicting185 source and quarantine both exist"),
+        (Some(_), Some(_)) => bail!("conflicting 185 source and quarantine both exist"),
     }
 }
 
@@ -700,7 +700,7 @@ fn read_record(path: &Path) -> Result<Option<Value>> {
                     && md.nlink() == 1
                     && path.canonicalize()? == path
                     && md.len() <= 1 << 20,
-                "unsafe185 transition record"
+                "unsafe 185 transition record"
             );
             let id = regular_identity(path)?;
             let bytes = fs::read(path)?;

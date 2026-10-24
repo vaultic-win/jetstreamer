@@ -91,7 +91,7 @@ fn bytes(text: &str) -> Result<(u64, Vec<u32>)> {
     Ok((total, fds.into_iter().collect()))
 }
 fn forecast(received: u64, elapsed: u64, revalidation: u64) -> Result<(u64, u64)> {
-    // Deduct1MiB/socket for TLS/HTTP/control traffic and discount another10%.
+    // Deduct1MiB/socket for TLS/HTTP/control traffic and discount another 10%.
     // Closed connections are omitted, conservatively undercounting transport.
     // These are approximate received bytes, explicitly not authenticated bytes.
     let useful = received
@@ -180,7 +180,7 @@ pub(super) fn estimate(sample: u64, calibration: &Value) -> Result<(u64, Value)>
     let sample_age = measured
         .checked_sub(u128::from(sample))
         .filter(|n| *n <= 600000)
-        .context("readback transport sample outside the bounded10minute metadata cycle")?;
+        .context("readback transport sample outside the bounded 10 minute metadata cycle")?;
     let elapsed = u64::try_from(measured)?
         .checked_sub(READBACK_MICROS.div_ceil(1000))
         .context("future readback event")?;

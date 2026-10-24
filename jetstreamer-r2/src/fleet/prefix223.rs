@@ -1,4 +1,4 @@
-//! Closed observational registration for the cold223 known-root prefix only.
+//! Closed observational registration for the cold 223 known-root prefix only.
 //! Never a full epoch, a restored suffix or a publication contract.
 use super::*;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch223-known-root-prefix-launch-v1";
@@ -104,7 +104,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
                 == "05bc7c27b637395d03ae311c45148b21845f86d09fe5ad7377e8abbbf9f414d4"
             && v["members"]["jetstreamer-node"]["sha256"] == NODE_SHA
             && v["members"]["jetstreamer-historical-worker-v1-6-25"]["sha256"] == WORKER_SHA,
-        "prefix223 capability owner differs"
+        "prefix 223 capability owner differs"
     );
     let p = &v["planning_preflight"];
     ensure!(
@@ -113,7 +113,7 @@ pub(super) fn capability(v: &Value) -> Result<()> {
             && p["terminal_slot"] == 96_767_522u64
             && p["output_slot_start"] == 96_336_000u64
             && p["output_slot_count"] == 431_523,
-        "prefix223 capability span differs"
+        "prefix 223 capability span differs"
     );
     for key in [
         "canonical_bootstrap_bound",
@@ -148,7 +148,7 @@ pub(super) fn terminal203_release(r: &Value) -> Result<()> {
     let evidence: BoundFile = serde_json::from_value(r["released203_terminal"].clone())?;
     ensure!(
         evidence.path == Path::new(RELEASE203) && evidence.sha256 == RELEASE203_SHA,
-        "prefix223 cannot release an unbound203owner"
+        "prefix 223 cannot release an unbound 203 owner"
     );
     let proof = bound_json(&evidence)?;
     ensure!(
@@ -158,7 +158,7 @@ pub(super) fn terminal203_release(r: &Value) -> Result<()> {
             && proof["producer_result_sha256"]
                 == "b2e5d62548e88dd743f6abbc52d7883d78ae486e38523ae1426d0827d422fb05"
             && proof["reader_handoff_authorized"] == true,
-        "203terminal proof differs"
+        "203 terminal proof differs"
     );
     Ok(())
 }

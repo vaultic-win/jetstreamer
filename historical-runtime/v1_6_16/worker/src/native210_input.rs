@@ -1,4 +1,4 @@
-//! Exact epoch210 bootstrap, independent of all other epochs' native proofs.
+//! Exact epoch 210 bootstrap, independent of all other epochs' native proofs.
 use super::native_cold_common::{self,Profile};
 const INPUT:Profile=Profile {
     epoch:210,

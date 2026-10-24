@@ -1,4 +1,4 @@
-//! Exact failed full227 invocation; preserves the accepted resource observation.
+//! Exact failed full 227 invocation; preserves the accepted resource observation.
 use super::{singleton227 as c, *};
 pub(super) const SCHEMA: &str = "jetstreamer-private-full227-terminal-failure-v1";
 const IID: &str = "a10f37b57711425a81633c62c66438d5";
@@ -28,19 +28,19 @@ fn sealed_bytes(binding: &BoundFile) -> Result<Vec<u8>> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && binding.path.canonicalize()? == binding.path,
-        "227failure input is not sealed/canonical"
+        "227 failure input is not sealed/canonical"
     );
     let bytes = read_stable_bounded(&binding.path, 16 << 20, "full227failure sealed input")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == binding.sha256,
-        "full227failure evidence SHA differs"
+        "full 227 failure evidence SHA differs"
     );
     Ok(bytes)
 }
 fn journal_rows(rows: &[Value]) -> Result<u64> {
     ensure!(
         !rows.is_empty() && rows.len() <= 4096,
-        "full227failure journal bound"
+        "full 227 failure journal bound"
     );
     let mismatch = format!(
         "historical execution mismatch at slot 98091122 entry 232 transaction 223 signature {SIGNATURE}: expected None, got Some(InstructionError {{ instruction_index: 0, error: Custom(2) }})"
@@ -52,19 +52,21 @@ fn journal_rows(rows: &[Value]) -> Result<u64> {
     for row in rows {
         let clock = row["__REALTIME_TIMESTAMP"]
             .as_str()
-            .context("full227 journal clock")?
+            .context("full 227 journal clock")?
             .parse::<u64>()?;
-        ensure!(clock >= previous, "full227 journal clock rollback");
+        ensure!(clock >= previous, "full 227 journal clock rollback");
         previous = clock;
-        let message = row["MESSAGE"].as_str().context("full227 journal message")?;
+        let message = row["MESSAGE"]
+            .as_str()
+            .context("full 227 journal message")?;
         if row["_PID"] == "1" {
             ensure!(
                 row["UNIT"] == c::UNIT && row["INVOCATION_ID"] == IID,
-                "full227 foreign manager event"
+                "full 227 foreign manager event"
             );
             ensure!(
                 !message.ends_with(": Deactivated successfully."),
-                "full227 failure cannot borrow success"
+                "full 227 failure cannot borrow success"
             );
             if message
                 == format!(
@@ -76,14 +78,14 @@ fn journal_rows(rows: &[Value]) -> Result<u64> {
                     row["EXIT_CODE"] == "exited"
                         && row["EXIT_STATUS"] == "1"
                         && exited.replace(clock).is_none(),
-                    "full227 duplicate/wrong manager exit"
+                    "full 227 duplicate/wrong manager exit"
                 );
             }
             if message.starts_with(&format!("{}: Failed with result '", c::UNIT)) {
                 ensure!(
                     message == format!("{}: Failed with result 'exit-code'.", c::UNIT)
                         && failed.replace(clock).is_none(),
-                    "full227 duplicate/wrong manager failure"
+                    "full 227 duplicate/wrong manager failure"
                 );
             }
         } else {
@@ -91,19 +93,19 @@ fn journal_rows(rows: &[Value]) -> Result<u64> {
                 row["_SYSTEMD_UNIT"] == c::UNIT
                     && row["_SYSTEMD_INVOCATION_ID"] == IID
                     && row["_PID"].as_str().and_then(|p| p.parse::<u64>().ok()) == Some(PID),
-                "full227 foreign producer journal"
+                "full 227 foreign producer journal"
             );
             if message.contains(&mismatch) {
                 signature_clock = Some(clock);
             }
         }
     }
-    let signature_clock = signature_clock.context("full227 exact raw mismatch absent")?;
-    let exited = exited.context("full227 PID1 exit1 absent")?;
-    let failed = failed.context("full227 PID1 failed outcome absent")?;
+    let signature_clock = signature_clock.context("full 227 exact raw mismatch absent")?;
+    let exited = exited.context("full 227 PID1 exit 1 absent")?;
+    let failed = failed.context("full 227 PID1 failed outcome absent")?;
     ensure!(
         signature_clock <= exited && exited <= failed,
-        "full227 failure clock ordering"
+        "full 227 failure clock ordering"
     );
     Ok(failed)
 }
@@ -128,17 +130,17 @@ fn terminal(u: &Value, command: &str) -> Result<()> {
             && pipeline_status::same_exec_start(
                 u["ExecStart"]
                     .as_str()
-                    .context("full227 terminal command")?,
+                    .context("full 227 terminal command")?,
                 command
             ),
-        "full227 owner is not the unchanged loadedfailed exact invocation"
+        "full 227 owner is not the unchanged loadedfailed exact invocation"
     );
     Ok(())
 }
 fn origin(f: &Value) -> Result<String> {
     let old: Plan = serde_json::from_value(bound_json(&fixed(
-        f["plan"].as_str().context("full227 prior plan")?,
-        f["plan_sha256"].as_str().context("full227 prior digest")?,
+        f["plan"].as_str().context("full 227 prior plan")?,
+        f["plan_sha256"].as_str().context("full 227 prior digest")?,
     ))?)?;
     let claims = old
         .diagnostics
@@ -153,35 +155,35 @@ fn origin(f: &Value) -> Result<String> {
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1,
-        "full227failure lacks exact registered original diagnostic"
+        "full 227 failure lacks exact registered original diagnostic"
     );
     let launch = checked_diagnostic_launch(claims[0])?;
     ensure!(
         launch["evidence"]["units"][0]["main_pid"] == PID,
-        "full227 original parent PID differs"
+        "full 227 original parent PID differs"
     );
     Ok(launch["expected_exec_start"]
         .as_str()
-        .context("full227 launch command")?
+        .context("full 227 launch command")?
         .into())
 }
 fn census_delta(prior: &Value, current: &BTreeMap<String, Value>, command: &str) -> Result<()> {
     terminal(
         current
             .get(c::UNIT)
-            .context("full227 missing terminal owner")?,
+            .context("full 227 missing terminal owner")?,
         command,
     )?;
     let mut expected: BTreeMap<String, Value> =
         serde_json::from_value(prior["unit_census"].clone())?;
     ensure!(
         expected.contains_key(c::UNIT),
-        "full227 absent from previous census"
+        "full 227 absent from previous census"
     );
     expected.insert(c::UNIT.into(), current[c::UNIT].clone());
     ensure!(
         &expected == current,
-        "full227 failure census changed an unrelated owner or omitted history"
+        "full 227 failure census changed an unrelated owner or omitted history"
     );
     Ok(())
 }
@@ -189,7 +191,7 @@ fn sample(f: &Value, o: &Value, observer: &BoundFile, now: u64) -> Result<()> {
     let t = utc_seconds(
         f["sampled_at_utc"]
             .as_str()
-            .context("full227 accepted sample")?,
+            .context("full 227 accepted sample")?,
     )?;
     ensure!(
         f["schema"] == super::SCHEMA
@@ -201,7 +203,7 @@ fn sample(f: &Value, o: &Value, observer: &BoundFile, now: u64) -> Result<()> {
             && o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && t <= now
             && now - t <= 1800,
-        "full227failure requires same fresh accepted resource sample"
+        "full 227 failure requires same fresh accepted resource sample"
     );
     Ok(())
 }
@@ -220,7 +222,7 @@ fn repair() -> Result<()> {
             && r["publication_authorized"] == false
             && r["remote_mutations"] == false
             && r["r2_mutations"] == false,
-        "full227 openrepair differs"
+        "full 227 openrepair differs"
     );
     Ok(())
 }
@@ -236,7 +238,7 @@ pub(super) fn validate(proof: &Value) -> Result<()> {
             && proof["journal"] == private157::binding(&fixed(JOURNAL, JOURNAL_SHA))
             && proof["terminal_raw_manager"] == private157::binding(&fixed(MANAGER, MANAGER_SHA))
             && proof["open_repair"] == private157::binding(&fixed(REPAIR, REPAIR_SHA)),
-        "full227failure proof scope/bindings differ"
+        "full 227 failure proof scope/bindings differ"
     );
     for key in [
         "repair_closed",
@@ -252,7 +254,7 @@ pub(super) fn validate(proof: &Value) -> Result<()> {
     ] {
         ensure!(
             proof[key] == false,
-            "full227failure grants forbidden authority:{key}"
+            "full 227 failure grants forbidden authority:{key}"
         );
     }
     repair()?;
@@ -261,7 +263,7 @@ pub(super) fn validate(proof: &Value) -> Result<()> {
     let o = bound_json(&observer)?;
     let recorded = proof["recorded_unix_seconds"]
         .as_u64()
-        .context("full227 capture clock")?;
+        .context("full 227 capture clock")?;
     sample(&f, &o, &observer, recorded)?;
     let command = origin(&f)?;
     let raw = sealed_bytes(&fixed(MANAGER, MANAGER_SHA))?;
@@ -270,7 +272,7 @@ pub(super) fn validate(proof: &Value) -> Result<()> {
         let (k, v) = line.split_once('=').context("full227 raw manager field")?;
         ensure!(
             manager.insert(k.into(), json!(v)).is_none(),
-            "full227 duplicate raw manager property"
+            "full 227 duplicate raw manager property"
         );
     }
     terminal(&Value::Object(manager), &command)?;
@@ -280,14 +282,14 @@ pub(super) fn validate(proof: &Value) -> Result<()> {
         proof["terminal_unix_microseconds"] == clock
             && recorded >= clock / 1_000_000
             && proof["sampled_at_utc"] == f["sampled_at_utc"],
-        "full227failure terminal/sample clock differs"
+        "full 227 failure terminal/sample clock differs"
     );
     for key in ["unit_census_before", "unit_census_after"] {
         census_delta(&f, &serde_json::from_value(proof[key].clone())?, &command)?;
     }
     ensure!(
         proof["unit_census_before"] == proof["unit_census_after"],
-        "full227failure capture changed census"
+        "full 227 failure capture changed census"
     );
     Ok(())
 }
@@ -311,7 +313,7 @@ pub(super) fn capture() -> Result<()> {
                 .and_then(|n| n.to_str())
                 .is_some_and(|n| n.starts_with("horizon-full227-terminal-proof-"))
             && s.output.file_name().is_some_and(|n| n == "proof.json"),
-        "full227failure output scope differs"
+        "full 227 failure output scope differs"
     );
     if s.output.try_exists()? {
         let old = native209::immutable_json(&serde_json::from_value(private157::file_binding(
@@ -320,7 +322,7 @@ pub(super) fn capture() -> Result<()> {
         ensure!(
             old["capture_spec"] == private157::binding(&binding)
                 && old["capture_helper_sha256"] == self_sha,
-            "full227failure retry conflicts"
+            "full 227 failure retry conflicts"
         );
         validate(&old)?;
         return Ok(());
@@ -333,7 +335,7 @@ pub(super) fn capture() -> Result<()> {
     let command = origin(&f)?;
     let names = f["unit_census"]
         .as_object()
-        .context("full227 old census")?
+        .context("full 227 old census")?
         .keys()
         .cloned()
         .collect();
@@ -344,7 +346,7 @@ pub(super) fn capture() -> Result<()> {
     census_delta(&f, &after, &command)?;
     ensure!(
         before == after,
-        "full227failure census changed during capture"
+        "full 227 failure census changed during capture"
     );
     let mut proof = json!({"schema":SCHEMA,"epoch":227,"unit":c::UNIT,"invocation_id":IID,"main_pid":PID,
         "running_origin":private157::binding(&fixed(ORIGIN,ORIGIN_SHA)),"journal":private157::binding(&fixed(JOURNAL,JOURNAL_SHA)),
@@ -380,7 +382,7 @@ pub(super) fn predecessor(
     validate(proof)?;
     let recorded = proof["recorded_unix_seconds"]
         .as_u64()
-        .context("full227 event time")?;
+        .context("full 227 event time")?;
     ensure!(
         p.first_epoch == 201
             && p.last_epoch == 300
@@ -396,13 +398,13 @@ pub(super) fn predecessor(
             && previous["recorded_unix_seconds"]
                 .as_u64()
                 .is_some_and(|t| t <= recorded),
-        "full227failure replaced/staled accepted observation"
+        "full 227 failure replaced/staled accepted observation"
     );
     let old: Plan = serde_json::from_value(bound_json(&fixed(
-        previous["plan"].as_str().context("full227 priorplan")?,
+        previous["plan"].as_str().context("full 227 priorplan")?,
         previous["plan_sha256"]
             .as_str()
-            .context("full227 priordigest")?,
+            .context("full 227 priordigest")?,
     ))?)?;
     plan_delta(&old, p, proof)
 }
@@ -427,13 +429,16 @@ fn plan_delta(old: &Plan, p: &Plan, proof: &Value) -> Result<()> {
                     && n.scratch_path == d.scratch_path
                     && n.launch_receipt == d.launch_receipt))
             && p.gates.len() == old.gates.len(),
-        "full227failure changed unrelated configuration/history"
+        "full 227 failure changed unrelated configuration/history"
     );
     for (epoch, g) in &old.gates {
-        let n = p.gates.get(epoch).context("full227failure omitted gate")?;
+        let n = p
+            .gates
+            .get(epoch)
+            .context("full 227 failure omitted gate")?;
         ensure!(
             serde_json::to_value(&n.reserve_stop)? == serde_json::to_value(&g.reserve_stop)?,
-            "full227failure changed reserve-stop proof"
+            "full 227 failure changed reserve-stop proof"
         );
         if *epoch == 227 {
             ensure!(
@@ -450,12 +455,12 @@ fn plan_delta(old: &Plan, p: &Plan, proof: &Value) -> Result<()> {
                         .as_ref()
                         .is_some_and(|b| n.evidence.contains(b))
                     && n.evidence.contains(&fixed(REPAIR, REPAIR_SHA)),
-                "full227failure gate must retain evidence and append exact failure/openrepair"
+                "full 227 failure gate must retain evidence and append exact failure/openrepair"
             );
         } else {
             ensure!(
                 n.state == g.state && n.next_action == g.next_action && n.evidence == g.evidence,
-                "full227failure changed another epoch gate"
+                "full 227 failure changed another epoch gate"
             );
         }
     }
@@ -473,7 +478,7 @@ pub(super) fn census_check(p: &Plan, current: &BTreeMap<String, Value>) -> Resul
     let prior = bound_json(
         p.previous_fleet
             .as_ref()
-            .context("full227 event predecessor missing")?,
+            .context("full 227 event predecessor missing")?,
     )?;
     census_delta(&prior, current, &origin(&prior)?)
 }

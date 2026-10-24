@@ -40,7 +40,7 @@ jobs:
             scope: "--workspace --exclude jetstreamer-node --exclude jetstreamer-horizon-observe"
             flags: "--all-features"
             examples: true
-          # The exact epoch223 snapshot package cannot be combined with the
+          # The exact epoch 223 snapshot package cannot be combined with the
           # older snapshot profiles. Exercise both feature families explicitly.
           - name: observer-existing-compatible-features
             scope: "-p jetstreamer-horizon-observe"

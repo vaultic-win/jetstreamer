@@ -1,4 +1,4 @@
-//! Prepare exact227 v1.6.25 native metadata. No Bank, service, observation or R2 work.
+//! Prepare exact 227 v1.6.25 native metadata. No Bank, service, observation or R2 work.
 #[allow(dead_code)]
 #[path = "epoch141_ledger_common.rs"]
 mod common;
@@ -110,7 +110,7 @@ fn run() -> Result<()> {
             && m.nlink() == 1
             && m.mode() & 0o222 == 0
             && m.len() == 10261480487,
-        "retained227 snapshot metadata differs"
+        "retained 227 snapshot metadata differs"
     );
     common::bound_file(
         &Path::new(INPUT).join("genesis.tar.bz2"),

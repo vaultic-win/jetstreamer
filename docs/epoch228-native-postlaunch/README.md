@@ -1,4 +1,4 @@
-# Native228 postlaunch binding templates
+# Native 228 postlaunch binding templates
 
 These are deliberately incomplete templates. Every null is a required actual
 value; no template is an admission, guard sample, registered owner or status
@@ -6,13 +6,13 @@ publication. Do not install, seal as live evidence, or publish a template until
 all placeholders have been bound to the real attempt. No fake IID/PID or ETA is
 provided. Cargo/rustc are unnecessary for filling these metadata bindings.
 
-The335 admission inputs are sealed at
+The 335 admission inputs are sealed at
 `/var/lib/jetstreamer/horizon-228-native-admission-inputs335-v1/spec.json`
 (SHA256 `0c4dd4099ba5b5f2e161e97bea62eba2ea4dde73c317d7d47d87b760fa6573a6`)
 and `resource-plan.json`
 (SHA256 `109bbe48e688f2f7bf15153b64413657061915bb2fa2ab99426412a528420b6d`).
-They omit terminal223 and retain the actual terminal209 proof. Root owns actual
-admission and start. The earlier babea3bb helper lacks228 registration in the
+They omit terminal 223 and retain the actual terminal 209 proof. Root owns actual
+admission and start. The earlier babea3bb helper lacks 228 registration in the
 shared century-floor gate and must be replaced with a tested, rebuilt sealed
 helper before retry. The guard and observer pins below remain separate.
 
@@ -22,7 +22,7 @@ Fill `guard-plan.template.json` from the just-started producer's real systemd
 InvocationID and MainPID, and from the durable admission receipt's
 `protected_existing_floor_bytes`. Do not derive an IID/PID from a planned unit,
 reuse a prior attempt, or infer a floor from the old sample's free bytes. The
-reviewed335 plan protects2TB and requires2.3TB initial free space; actual admission
+reviewed 335 plan protects 2 TB and requires 2.3 TB initial free space; actual admission
 must recompute every bound gate before start. The original four owners remain
 protected and appear unchanged in before/after census evidence.
 
@@ -35,7 +35,7 @@ plan path and digest. The protective service name must be exactly
 `horizon-native228-protective-v1.service`; precreate its root-private receipt
 directory and use the actual service/timer sandbox shown by the templates.
 
-First actual protective completion must occur within900 seconds of admission.
+First actual protective completion must occur within 900 seconds of admission.
 Bind its exact receipt (including current PID/IID, root budget, maps and executable
 proof), hash and PID1 success. Before capture the protective timer must be
 active/waiting and the oneshot inactive/dead with success/exit0. A planned timer,
@@ -54,15 +54,15 @@ Capture validates the actual producer/sandbox and four-owner census before and
 after. It records the producer's authoritative monotonic start and wall start;
 never replace that start clock with the observation time.
 
-Fill `claim.template.json` from that captured origin. Clone the complete accepted335
+Fill `claim.template.json` from that captured origin. Clone the complete accepted 335
 fleet plan without reconstructing or shortening its history. Append this one
 pipeline claim, add the one exact native unit to tracked_units, set metadata_event
-to the exact running origin, and bind previous_fleet to the accepted335 ledger.
-Keep the335 observer, all diagnostics, preserved223v1/v2 evidence and unrelated
-gates unchanged. Only228 may gain this attempt's evidence/next-action text;
+to the exact running origin, and bind previous_fleet to the accepted 335 ledger.
+Keep the 335 observer, all diagnostics, preserved223v1/v2 evidence and unrelated
+gates unchanged. Only 228 may gain this attempt's evidence/next-action text;
 completion or runtime/publishing authority never changes. The resulting central
 fleet is a launch event, not a fabricated new resource observation. The existing
-native228 event validator checks those exact deltas and actual old/new owners.
+native 228 event validator checks those exact deltas and actual old/new owners.
 
 ## Dashboard metadata
 
@@ -86,8 +86,8 @@ publication, then publish with the same plan and require authenticated readback
 and durable status receipt. Use the supported verification phase, zero .jet bytes
 and the origin's original start clock. A check-only success is not an upload.
 Initial launch-event metadata must be accepted/published promptly (the initial
-event path allows300 seconds). Continue through the sole normal30-minute cycle.
-The observer supporting the exact228 tuple is
+event path allows 300 seconds). Continue through the sole normal30-minute cycle.
+The observer supporting the exact 228 tuple is
 `/var/lib/jetstreamer/horizon-native228-observer-aceb6514-v1/jetstreamer-horizon-observe`,
 SHA256 `aceb6514c60e1cd61ea2ee4ad5012d6c103ff92e926e1dd4ff199433d0b3f2db`.
 Never fire another observation merely to fill this template.
@@ -110,4 +110,4 @@ cleanup path. A missing/collected unit is never synthetic terminal success. This
 qualifies native input only: focused replay, the279-slot checkpoint-bearing tail,
 432279-to432000 extraction, independent full/plugin checks and publication remain
 separate later gates. Retain the actual tail source and never fabricate a terminal
-Bank manifest at98927999.
+Bank manifest at 98927999.

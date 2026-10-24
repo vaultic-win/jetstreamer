@@ -1,4 +1,4 @@
-//! Exact03:16 native importer gate-contract continuation after six status writes.
+//! Exact 03:16 native importer gate-contract continuation after six status writes.
 //! Preserve failed artifacts and original sample; never repeat replay statuses.
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261024T031600Z-guard-stopped185-import-pending191-repair141-v2";
@@ -44,7 +44,7 @@ fn exact(p: &Plan, pb: &Bound, i: &Value, f: &Value) -> Result<()> {
             && f["tool"] == serde_json::to_value(cohort191_delivery::fleet_reader(p))?
             && f["stderr"]["text"]
                 == "Error: live pipeline requires an independently evidenced post-replay gate\n",
-        "not the exact03:16 original191 gate contract failure"
+        "not the exact 03:16 original 191 gate contract failure"
     );
     Ok(())
 }
@@ -95,7 +95,7 @@ pub(super) fn run(p: &Plan, pb: &Bound, self_sha: &str, check: bool) -> Result<(
     let sample = utc_seconds(&p.sample_target_utc)?;
     ensure!(
         sample <= now && now - sample <= 1800,
-        "history recovery needs original fresh resource sample,not a replacement observation"
+        "history recovery needs original fresh resource sample, not a replacement observation"
     );
     let model = file(p.cycle_directory.join("sealed/eta-model.json"), true)?;
     let mv = bound_json(&model, true)?;

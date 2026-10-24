@@ -1,4 +1,4 @@
-//! One152 controller-policy recovery; original producer and every archive gate survive.
+//! One 152 controller-policy recovery; original producer and every archive gate survive.
 use super::*;
 const CONTROLLER: &str = "jetstreamer-epochs152-153-target3-controller-v1-r2.service";
 const PRODUCER: &str =
@@ -124,7 +124,7 @@ fn proof(p: &Plan) -> Result<Option<Value>> {
     };
     ensure!(
         is_101(p)? && b.path == Path::new(PROOF),
-        "foreign152 rebind scope"
+        "foreign 152 rebind scope"
     );
     let v = bound_json(b, true)?;
     checked(
@@ -314,7 +314,7 @@ pub(super) fn interval(p: &Plan) -> Result<Option<u64>> {
     {
         ensure!(
             p.sample_target_utc == FIRST && utc_seconds(FIRST)? - utc_seconds(OLD)? == 3600,
-            "152 first transition must skip absent03:46 on original grid"
+            "152 first transition must skip absent 03:46 on original grid"
         );
         Ok(Some(3600))
     } else {
@@ -385,7 +385,7 @@ pub(super) fn enable(p: &mut Plan, c: &mut Value, b: &Bound) -> Result<()> {
             && failed["MainPID"] == "0"
             && failed["NRestarts"] == "0"
             && failed["ExecMainStatus"] == "1",
-        "152 recovery lacks exact failed03:46observer"
+        "152 recovery lacks exact failed 03:46observer"
     );
     p.memory152_rebind = Some(b.clone());
     let v = proof(p)?.context("152 proof")?;

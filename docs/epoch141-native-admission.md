@@ -29,7 +29,7 @@ runner, with one of the three exact `native_profile` values above.
 It has no snapshot field and cannot be consumed as generic replay admission.
 Required fields are the fixed `/home/sol` filesystem, `minimum_free_bytes` of at
 least 4,740,696,923,590 plus the selected profile's bound above, at least 144 GiB available memory (128 GiB
-protected/reserve plus a 16 GiB native envelope), one exact root-owned mode0555
+protected/reserve plus a 16 GiB native envelope), one exact root-owned mode 0555
 native executable in `files`, and path/SHA bindings for `observer`, `fleet`,
 `finalized_collection`, `family_policy` and `retained_collection`.
 
@@ -39,7 +39,7 @@ flags. Admission only checks this header and digest; it does not claim the
 native runner's independent full target reread. The accepted v2 observer and
 complete assigned-range fleet must agree, fit the resource envelope and be at
 most 30 minutes old. Every active controller/producer invocation is re-observed
-before and after admission. A changed/restarted/missing owner, existing epoch141
+before and after admission. A changed/restarted/missing owner, existing epoch 141
 owner, incomplete collector or armed/active native/check unit rejects admission.
 Any newer or conflicting assigned-range fleet receipt also rejects admission,
 including a later admission event carrying an older sample filename. Sample age

@@ -1,4 +1,4 @@
-//! Exact private144 full-path experimental admission. No service is launched.
+//! Exact private 144 full-path experimental admission. No service is launched.
 use super::*;
 
 const PROTECTION_SHA: &str = "2e0aec223a30d9af4ada3b4ef5feb82996c718ca1b951dbe04b62d0d5bfbf3e6";
@@ -64,7 +64,7 @@ fn policy(p: &Value, native: &Value, release: &Value) -> Result<()> {
             && release["protection"]["protected_free_bytes"] == PROTECTED
             && release["admission_authorized"] == false
             && release["replay_launch_authorized"] == false,
-        "144 missing exact completed198 accounting release"
+        "144 missing exact completed 198 accounting release"
     );
     Ok(())
 }
@@ -88,7 +88,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, p: &Value, now: u64) -> Result<()> {
             && f["inventory"]["anomalies"] == 0
             && time <= now
             && now - time <= 1800,
-        "stale or unaccepted144 full-path admission sample"
+        "stale or unaccepted 144 full-path admission sample"
     );
     ensure!(
         o["filesystem"]["conservative_available_bytes"]
@@ -100,7 +100,7 @@ fn sample(s: &Spec, o: &Value, f: &Value, p: &Value, now: u64) -> Result<()> {
             && o["vm_max_map_count"]
                 .as_u64()
                 .is_some_and(|n| n >= 4_194_304),
-        "sampled144 disk/memory/VMA envelope unavailable"
+        "sampled 144 disk/memory/VMA envelope unavailable"
     );
     ensure!(
         !f["active"]
@@ -224,7 +224,7 @@ pub(super) async fn run() -> Result<()> {
             && m.len() <= 256 << 20
             && s.node.path.file_name().and_then(|n| n.to_str()) == Some("jetstreamer-node")
             && hex_lower(&Sha256::digest(fs::read(&s.node.path)?)) == s.node.sha256,
-        "unsealed144 node"
+        "unsealed 144 node"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     sample(&s, &o, &f, &p, now)?;
@@ -269,7 +269,7 @@ pub(super) async fn run() -> Result<()> {
                 .context("floor samples")?
                 .iter()
                 .find(|v| v["epoch"] == 201)
-                .context("audited201 sample")?;
+                .context("audited 201 sample")?;
             let evidence = |path: &str, digest: &str| -> Result<Value> {
                 bound_json(&BoundFile {
                     path: proof[path].as_str().context("floor proof path")?.into(),
@@ -321,7 +321,7 @@ pub(super) async fn run() -> Result<()> {
         .parse::<u64>()?;
     ensure!(
         available >= PROTECTED + PEAK && mem >= 192 * 1024 * 1024 && vmas >= 4_194_304,
-        "actual144 full-path resource gate failed"
+        "actual 144 full-path resource gate failed"
     );
     let after = census(&names, 101, 200)?;
     continuation144_protection::owners(&f, &after)?;

@@ -46,7 +46,7 @@ fn delta(plan: &mut Value, s: &Spec, launch: &BoundFile, claim: &DiagnosticClaim
     tracked.push(json!(assembly144::UNIT));
     plan["gates"]["144"]["evidence"]
         .as_array_mut()
-        .context("assembly144 gate")?
+        .context("assembly 144 gate")?
         .extend([binding(launch), binding(&s.guard_sample)]);
     plan["previous_fleet"] = binding(&s.previous_fleet);
     plan["output"] = json!(s.output);

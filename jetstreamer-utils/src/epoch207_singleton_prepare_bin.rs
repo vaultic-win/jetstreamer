@@ -1,4 +1,4 @@
-//! Offline conversion of exact retained207 metadata into a private singleton.
+//! Offline conversion of exact retained 207 metadata into a private singleton.
 //! No Bank, worker, resource sample, GCloud or R2 access.
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};

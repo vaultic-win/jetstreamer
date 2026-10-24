@@ -105,7 +105,7 @@ fn children(parent: &File) -> Result<Vec<String>> {
             item?
                 .file_name()
                 .into_string()
-                .map_err(|_| anyhow::anyhow!("nonUTF8 scratch child"))?,
+                .map_err(|_| anyhow::anyhow!("non-UTF8 scratch child"))?,
         );
         ensure!(
             names.len() <= 100_000,
