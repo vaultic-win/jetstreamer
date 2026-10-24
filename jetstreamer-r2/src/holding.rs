@@ -97,6 +97,65 @@ fn bound(b: &Bound) -> Result<Value> {
     evidence(b, true)
 }
 fn evidence(b: &Bound, immutable: bool) -> Result<Value> {
+    evidence_with_limit(b, immutable, 1 << 20)
+}
+
+fn fleet_evidence_limit(path: &Path) -> Result<u64> {
+    ensure!(
+        path.is_absolute()
+            && path.parent()
+                == Some(Path::new(
+                    "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1"
+                ))
+            && path.extension().is_some_and(|s| s == "json"),
+        "fleet evidence outside approved campaign namespace: path={}",
+        path.display()
+    );
+    Ok(16 << 20)
+}
+
+fn fleet_evidence_shape(v: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
+            && v["first_epoch"] == 101
+            && v["last_epoch"] == 200,
+        "foreign campaign fleet evidence schema or range"
+    );
+    Ok(())
+}
+
+// Only this fixed campaign's complete fleet may exceed the generic 1 MiB cap.
+// Ownership, permissions, no-follow reads, stable identity and digest stay bound.
+fn campaign_fleet_evidence(b: &Bound) -> Result<Value> {
+    let v = evidence_with_limit(b, false, fleet_evidence_limit(&b.path)?)?;
+    fleet_evidence_shape(&v)
+        .with_context(|| format!("fleet evidence path={}", b.path.display()))?;
+    Ok(v)
+}
+
+fn evidence_payload(bytes: &[u8], sha256: &str, maximum: u64, path: &Path) -> Result<Value> {
+    ensure!(
+        bytes.len() as u64 <= maximum,
+        "holding evidence size rejected: path={} actual_bytes={} allowed_bytes={maximum}",
+        path.display(),
+        bytes.len()
+    );
+    ensure!(
+        hex_lower(&Sha256::digest(bytes)) == sha256,
+        "holding evidence digest differs: path={} actual_bytes={} allowed_bytes={maximum}",
+        path.display(),
+        bytes.len()
+    );
+    serde_json::from_slice(bytes).with_context(|| {
+        format!(
+            "invalid holding evidence JSON: path={} actual_bytes={} allowed_bytes={maximum}",
+            path.display(),
+            bytes.len()
+        )
+    })
+}
+
+fn evidence_with_limit(b: &Bound, immutable: bool, maximum: u64) -> Result<Value> {
     ensure!(
         digest(&b.sha256) && b.path.is_absolute() && b.path.canonicalize()? == b.path,
         "invalid holding evidence binding"
@@ -107,16 +166,29 @@ fn evidence(b: &Bound, immutable: bool) -> Result<Value> {
             && metadata.nlink() == 1
             && metadata.uid() == 0
             && metadata.mode() & if immutable { 0o222 } else { 0o022 } == 0
-            && metadata.len() <= 1 << 20,
-        "holding evidence must be sealed root-owned regular bytes"
+            && metadata.len() <= maximum,
+        "holding evidence must be sealed root-owned regular bytes: path={} actual_bytes={} allowed_bytes={maximum} uid={} mode={:o} links={} immutable={immutable}",
+        b.path.display(),
+        metadata.len(),
+        metadata.uid(),
+        metadata.mode() & 0o7777,
+        metadata.nlink()
     );
     let before = regular_identity(&b.path)?;
-    let bytes = fs::read(&b.path)?;
+    let bytes = read_stable_bounded(&b.path, maximum, "holding evidence").with_context(|| {
+        format!(
+            "holding evidence read rejected: path={} actual_bytes={} allowed_bytes={maximum}",
+            b.path.display(),
+            metadata.len()
+        )
+    })?;
     ensure!(
-        regular_identity(&b.path)? == before && hex_lower(&Sha256::digest(&bytes)) == b.sha256,
-        "holding evidence changed or digest differs"
+        regular_identity(&b.path)? == before,
+        "holding evidence identity changed: path={} actual_bytes={} allowed_bytes={maximum}",
+        b.path.display(),
+        bytes.len()
     );
-    Ok(serde_json::from_slice(&bytes)?)
+    evidence_payload(&bytes, &b.sha256, maximum, &b.path)
 }
 fn private(path: &Path) -> Result<()> {
     let m = fs::symlink_metadata(path)?;

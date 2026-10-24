@@ -323,7 +323,19 @@ fn write_ledger(path: &Path, ledger: &stopped_tree::Ledger) -> Result<Bound> {
         .file
         .set_permissions(fs::Permissions::from_mode(0o400))?;
     drop(writer);
+    publish_ledger(temp, path)
+}
+
+fn publish_ledger(temp: tempfile::NamedTempFile, path: &Path) -> Result<Bound> {
     persist_noclobber(temp, path)?;
+    // The shared receipt publisher uses 0440; this ledger's reader requires 0400.
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+    file.set_permissions(fs::Permissions::from_mode(0o400))?;
+    file.sync_all()?;
+    File::open(path.parent().context("scratch ledger parent missing")?)?.sync_all()?;
     Ok(Bound {
         path: path.into(),
         sha256: stream_hash(path)?,
@@ -631,5 +643,31 @@ mod tests {
         };
         assert!(writer.write_all(b"xx").is_err());
         assert_eq!(writer.file.metadata().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn ledger_publication_keeps_reader_mode_and_never_replaces_existing_ledger() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("ledger.json");
+        let bytes = b"{\"retained\":true}\n";
+        let mut temporary = tempfile::NamedTempFile::new_in(directory.path()).unwrap();
+        temporary.write_all(bytes).unwrap();
+        temporary
+            .as_file()
+            .set_permissions(fs::Permissions::from_mode(0o400))
+            .unwrap();
+        let binding = publish_ledger(temporary, &path).unwrap();
+        let metadata = fs::symlink_metadata(&path).unwrap();
+        assert_eq!(metadata.mode() & 0o7777, 0o400);
+        assert_eq!(metadata.nlink(), 1);
+        assert_eq!(fs::read(&path).unwrap().as_slice(), bytes);
+        assert_eq!(stream_hash(&path).unwrap(), binding.sha256);
+
+        let before = regular_identity(&path).unwrap();
+        let mut replacement = tempfile::NamedTempFile::new_in(directory.path()).unwrap();
+        replacement.write_all(b"replacement").unwrap();
+        assert!(publish_ledger(replacement, &path).is_err());
+        assert_eq!(regular_identity(&path).unwrap(), before);
+        assert_eq!(fs::read(&path).unwrap().as_slice(), bytes);
     }
 }

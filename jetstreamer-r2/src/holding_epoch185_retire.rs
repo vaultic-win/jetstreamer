@@ -340,7 +340,7 @@ fn basis(p: &Retire, m: &Mapping) -> Result<Value> {
             )),
         "foreign 185 capacity fleet"
     );
-    let f = evidence(&fb, false)?;
+    let f = campaign_fleet_evidence(&fb)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let disposition = if let Some(projection) = &p.closed_growth_disposition {
         let view = growth::retired_after_closure_basis(m, &p.mapping, projection)?;
