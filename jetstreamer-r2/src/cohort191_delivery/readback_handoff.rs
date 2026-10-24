@@ -9,6 +9,7 @@ const STATUS_DIRECTORY: &str = "/home/sol/.jetstreamer-private/r2-status-receipt
 pub(crate) struct Config {
     pub epoch: u64,
     pub accepted_fleet: Bound,
+    pub status_fleet: Bound,
     pub routine_completion: Bound,
     pub accepted_event: Bound,
     pub previous_status_publication: Bound,
@@ -198,8 +199,8 @@ pub(crate) fn previous_shape(
             && previous["pipeline_binding"]["claim_phase"] == "cohort191-delivery"
             && previous["pipeline_binding"]["origin_unit"] == UNIT
             && previous["pipeline_binding"]["origin_invocation_id"] == IID
-            && previous["pipeline_binding"]["fleet_path"] == json!(c.accepted_fleet.path)
-            && previous["pipeline_binding"]["fleet_sha256"] == c.accepted_fleet.sha256,
+            && previous["pipeline_binding"]["fleet_path"] == json!(c.status_fleet.path)
+            && previous["pipeline_binding"]["fleet_sha256"] == c.status_fleet.sha256,
         "readback prior status is not the accepted frame's exact upload owner"
     );
     Ok(())
@@ -208,6 +209,7 @@ pub(crate) fn previous_shape(
 pub(super) fn validate(p: &Capture, observer: &Value, clock: &Value) -> Result<()> {
     let c = config(clock)?.context("missing same-owner readback configuration")?;
     let fleet = bound(&c.accepted_fleet, false)?;
+    let status_fleet = bound(&c.status_fleet, false)?;
     let completion = bound(&c.routine_completion, false)?;
     let accepted = bound(&c.accepted_event, false)?;
     let resource = fleet::utc_seconds(
@@ -234,6 +236,7 @@ pub(super) fn validate(p: &Capture, observer: &Value, clock: &Value) -> Result<(
                     "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2"
                 ))
             && c.routine_completion.path == cycle.join("completion.json")
+            && c.status_fleet.path == cycle.join("public198-provisional-fleet.json")
             && fleet["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
             && fleet["first_epoch"] == 101
             && fleet["last_epoch"] == 200
@@ -244,6 +247,20 @@ pub(super) fn validate(p: &Capture, observer: &Value, clock: &Value) -> Result<(
             && completion["sampled_at_utc"] == *sample
             && completion["fleet"] == json!(c.accepted_fleet)
             && completion["observer"] == json!(p.observer)
+            && completion["cohort191_delivery"]["event"] == json!(c.accepted_event)
+            && completion["cohort191_delivery"]["status_publications"]
+                .as_array()
+                .is_some_and(|entries| entries
+                    .iter()
+                    .filter(|b| **b == json!(c.previous_status_publication))
+                    .count()
+                    == 1)
+            && status_fleet["schema"] == fleet["schema"]
+            && status_fleet["sampled_at_utc"] == *sample
+            && status_fleet["observer_receipt"] == fleet["observer_receipt"]
+            && status_fleet["observer_sha256"] == fleet["observer_sha256"]
+            && status_fleet["plan"] == fleet["plan"]
+            && status_fleet["plan_sha256"] == fleet["plan_sha256"]
             && clock["observer"] == json!(p.observer)
             && clock["terminal"] == json!(p.native_terminal_proof)
             && clock["resource_samples_taken"] == 0
@@ -267,6 +284,21 @@ pub(super) fn validate(p: &Capture, observer: &Value, clock: &Value) -> Result<(
             .count()
             == 1,
         "readback event is absent from the accepted fleet claim"
+    );
+    ensure!(
+        status_fleet["active"]
+            .as_array()
+            .is_some_and(|claims| claims
+                .iter()
+                .filter(|r| r["epoch"] == c.epoch
+                    && r["phase"] == "cohort191-delivery"
+                    && r["expected_invocation_id"] == "0defba8ed0844040a2601c68d79060b2"
+                    && r["evidence"]
+                        .as_array()
+                        .is_some_and(|a| a.contains(&json!(c.accepted_event))))
+                .count()
+                == 1),
+        "readback publication fleet does not bind the accepted native event"
     );
     validate_event(&accepted, resource)?;
     ensure!(
@@ -403,6 +435,10 @@ mod tests {
                 path: "/fleet.json".into(),
                 sha256: "fleet".into(),
             },
+            status_fleet: Bound {
+                path: "/status-fleet.json".into(),
+                sha256: "status-fleet".into(),
+            },
             routine_completion: Bound {
                 path: "/completion".into(),
                 sha256: "completion".into(),
@@ -427,7 +463,7 @@ mod tests {
             "status":{"epoch":191,"phase":"upload","sampled_at_utc":observer["recorded_at_utc"]},
             "pipeline_binding":{"unit":queue::UNIT,"invocation_id":"0defba8ed0844040a2601c68d79060b2",
                 "claim_phase":"cohort191-delivery","origin_unit":UNIT,"origin_invocation_id":IID,
-                "fleet_path":"/fleet.json","fleet_sha256":"fleet"}});
+                "fleet_path":"/status-fleet.json","fleet_sha256":"status-fleet"}});
         previous_shape(&prior, &c, &observer, &binding).unwrap();
         for pointer in [
             "/epoch",
@@ -437,6 +473,7 @@ mod tests {
             "/status/sampled_at_utc",
             "/pipeline_binding/invocation_id",
             "/pipeline_binding/fleet_sha256",
+            "/pipeline_binding/fleet_path",
             "/pipeline_binding/origin_invocation_id",
         ] {
             let mut changed = prior.clone();
