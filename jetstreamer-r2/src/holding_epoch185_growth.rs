@@ -667,7 +667,7 @@ fn project_reservations(rows: &[ReservationRow]) -> Result<(Vec<ReservationRow>,
     );
     Ok((projected, delta))
 }
-pub(super) fn read(m: &Mapping, p: &ReadClosure) -> Result<()> {
+fn read_view(m: &Mapping, p: &ReadClosure) -> Result<Value> {
     ensure!(
         p.schema == "jetstreamer-horizon-old185-attempt-growth-read-plan-v2"
             && p.closure.path == Path::new(ROOT).join("closure.json"),
@@ -698,17 +698,39 @@ pub(super) fn read(m: &Mapping, p: &ReadClosure) -> Result<()> {
     );
     intent_scope(&bound(&ib)?, desc)?;
     let (rows, delta) = project_reservations(&p.reservation_rows)?;
-    println!(
-        "{}",
-        serde_json::to_string(
-            &json!({"schema":"jetstreamer-horizon-old185-closed-reservation-view-v2",
+    Ok(
+        json!({"schema":"jetstreamer-horizon-old185-closed-reservation-view-v2",
         "closure":p.closure,"subject":subject(),"closed_original_reservation_bytes":RESERVATION,
         "applied_reservation_disposition_bytes":delta,"projected_reservation_rows":rows,
         "reservation_disposition_is_not_additive_free_space":true,
         "physical_space_credit_bytes":0,"minimum_inherited_guard_floor_bytes":v["minimum_inherited_guard_floor_bytes"],
         "new_flexible_owner_census_and_cold_admission_required":true,"old_five_owner_formula_validated":false,
-        "guard_handoff_required_before_any_lower_floor":true,"new_replay_or_restore_authorized":false})
-        )?
+        "guard_handoff_required_before_any_lower_floor":true,"new_replay_or_restore_authorized":false}),
+    )
+}
+pub(super) fn read(m: &Mapping, p: &ReadClosure) -> Result<()> {
+    println!("{}", serde_json::to_string(&read_view(m, p)?)?);
+    Ok(())
+}
+pub(super) fn retired_after_closure_basis(
+    m: &Mapping,
+    expected_mapping: &Bound,
+    plan: &Bound,
+) -> Result<Value> {
+    let p: ReadClosure = serde_json::from_value(bound(plan)?)?;
+    ensure!(
+        serde_json::to_value(&p.mapping)? == serde_json::to_value(expected_mapping)?,
+        "185 retirement closure projection has foreign mapping"
+    );
+    let view = read_view(m, &p)?;
+    require_already_closed(&p.reservation_rows, &view)?;
+    Ok(view)
+}
+fn require_already_closed(rows: &[ReservationRow], view: &Value) -> Result<()> {
+    ensure!(
+        view["applied_reservation_disposition_bytes"] == 0
+            && view["projected_reservation_rows"] == serde_json::to_value(rows)?,
+        "185 retirement requires already-closed original row0; it cannot release growth itself"
     );
     Ok(())
 }
@@ -825,6 +847,20 @@ mod tests {
         let mut alias = old_row(RESERVATION);
         alias.claim_key = "foreign-alias".into();
         assert!(project_reservations(&[old_row(RESERVATION), alias]).is_err());
+    }
+    #[test]
+    fn retirement_projection_cannot_apply_a_new_disposition_or_change_other_rows() {
+        let rows = vec![old_row(0)];
+        let view =
+            json!({"applied_reservation_disposition_bytes":0,"projected_reservation_rows":rows});
+        require_already_closed(&rows, &view).unwrap();
+        let mut new_credit = view.clone();
+        new_credit["applied_reservation_disposition_bytes"] = json!(RESERVATION);
+        assert!(require_already_closed(&rows, &new_credit).is_err());
+        assert!(require_already_closed(&[old_row(RESERVATION)], &view).is_err());
+        let mut changed = view.clone();
+        changed["projected_reservation_rows"] = json!([]);
+        assert!(require_already_closed(&rows, &changed).is_err());
     }
     fn ledger(desc: &Value) -> Value {
         json!({"schema":"jetstreamer-horizon-old185-attempt-growth-closed-v2",

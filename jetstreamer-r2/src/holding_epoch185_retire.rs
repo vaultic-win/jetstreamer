@@ -17,6 +17,8 @@ pub(super) struct Retire {
 
     capacity_completion: Bound,
     prior_check: Option<Bound>,
+    #[serde(default)]
+    closed_growth_disposition: Option<Bound>,
 }
 
 fn scope(p: &Retire, m: &Mapping, e: &Value, c: &Value) -> Result<FileIdentity> {
@@ -218,7 +220,112 @@ fn capacity_shape(c: &Value, f: &Value, now: u64) -> Result<()> {
     Ok(())
 }
 
-fn basis(p: &Retire) -> Result<Value> {
+fn after_growth_original_claims(c: &Value) -> Result<Vec<Bound>> {
+    let mut epochs = std::collections::BTreeSet::new();
+    let mut bindings = Vec::new();
+    for row in c["original_claim_bindings"]
+        .as_array()
+        .context("185 closed-growth original claims")?
+    {
+        let epoch = row["epoch"].as_u64().context("185 original epoch")?;
+        ensure!(
+            matches!(epoch, 141 | 185) && epochs.insert(epoch),
+            "185 closed-growth original binding duplicate or foreign"
+        );
+        let b: Bound = serde_json::from_value(row["binding"].clone())?;
+        if epoch == 185 {
+            ensure!(
+                row["retained_growth_bytes"] == 0
+                    && row["original_growth_bytes"] == 824_633_720_832u64
+                    && b.path
+                        == Path::new(
+                            "/usr/local/lib/jetstreamer/horizon-epoch185-full-admission-20261023-v2/admission-manifest.json"
+                        )
+                    && b.sha256
+                        == "c2074a168945f30e2a9a83464f8d07e94e835bbb504e0a84c5cdf91323a71cb9",
+                "185 closed-growth binding is not exact original768GiB-to0 disposition"
+            );
+        } else {
+            ensure!(
+                row["retained_growth_bytes"] == 549_755_813_888u64
+                    && b.path
+                        == Path::new(
+                            "/var/lib/jetstreamer/horizon-original141-capped-root-admission-20261023-v1/admission.json"
+                        )
+                    && b.sha256
+                        == "945561bbf6dc282cbc0375cb84d777abace765956f61e8cd1e35863056ca5b3b",
+                "141 original whole-root cap/binding cannot be reduced by185 retirement"
+            );
+        }
+        bindings.push(b);
+    }
+    ensure!(
+        epochs == std::collections::BTreeSet::from([141, 185]),
+        "185 closed-growth original claims incomplete"
+    );
+    Ok(bindings)
+}
+fn after_growth_projection_claims(view: &Value) -> Result<()> {
+    let rows = view["projected_reservation_rows"]
+        .as_array()
+        .context("185 retirement typed claim rows")?;
+    let original141: Vec<_> = rows
+        .iter()
+        .filter(|r| r["claim_key"] == "epoch141/e639f007d482464f8a251455659d2ede")
+        .collect();
+    ensure!(
+        original141.len() == 1
+            && original141[0]["epoch"] == 141
+            && original141[0]["producer_invocation_id"] == "e639f007d482464f8a251455659d2ede"
+            && original141[0]["outstanding_bytes"] == 549_755_813_888u64,
+        "185 retirement projection must preserve exact original141 whole-root cap"
+    );
+    Ok(())
+}
+fn after_growth_capacity_shape(c: &Value, f: &Value, now: u64, projection: &Bound) -> Result<()> {
+    let at = c["recorded_unix_seconds"]
+        .as_u64()
+        .context("185 closed-growth capacity clock")?;
+    let sampled = fleet::utc_seconds(
+        f["sampled_at_utc"]
+            .as_str()
+            .context("185 closed-growth fleet clock")?,
+    )?;
+    ensure!(
+        c["schema"] == "jetstreamer-horizon-holding-retire185-closed-growth-capacity-v2"
+            && c["host"] == HOST
+            && c["pressure_relief_only"] == true
+            && c["new_launch_authorized"] == false
+            && c["restore_authorized"] == false
+            && c["growth_claims_released"] == false
+            && c["pre_retirement_free_space_credit"] == 0
+            && c["epoch185_original_growth_claim_retained"] == false
+            && c["epoch185_original_growth_binding_retained"] == true
+            && c["epoch141_original_growth_claim_retained"] == true
+            && c["all_live_staged_and_retained_growth_claims_preserved"] == true
+            && c["closed_growth_disposition"] == serde_json::to_value(projection)?
+            && c["guard_completion"]
+                == json!({"path":Path::new(GUARD_ROOT).join("completion.json"),"sha256":COMPLETION_SHA})
+            && c["retained185_physical_bytes"] == 56_206_397_440u64
+            && c["all_current_protected_bytes"]
+                .as_u64()
+                .is_some_and(|n| n >= 3_503_746_342_342)
+            && f["schema"] == "jetstreamer-horizon-campaign-fleet-v1"
+            && f["first_epoch"] == 101
+            && f["last_epoch"] == 200
+            && c["sampled_at_utc"] == f["sampled_at_utc"]
+            && sampled >= 1792801960
+            && sampled <= now
+            && now - sampled <= 1800
+            && at >= sampled
+            && at <= now
+            && now - at <= 900,
+        "185 post-closure pressure relief requires exact closed disposition and every other claim preserved"
+    );
+    after_growth_original_claims(c)?;
+    no_replacement(f)
+}
+fn basis(p: &Retire, m: &Mapping) -> Result<Value> {
     let c = evidence(&p.capacity_completion, false)?;
     let fb: Bound = serde_json::from_value(c["fleet"].clone())?;
     ensure!(
@@ -230,8 +337,21 @@ fn basis(p: &Retire) -> Result<Value> {
     );
     let f = evidence(&fb, false)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    capacity_shape(&c, &f, now)?;
-    for b in original_claims(&c)? {
+    let disposition = if let Some(projection) = &p.closed_growth_disposition {
+        let view = growth::retired_after_closure_basis(m, &p.mapping, projection)?;
+        after_growth_projection_claims(&view)?;
+        after_growth_capacity_shape(&c, &f, now, projection)?;
+        Some(view)
+    } else {
+        capacity_shape(&c, &f, now)?;
+        None
+    };
+    let bindings = if disposition.is_some() {
+        after_growth_original_claims(&c)?
+    } else {
+        original_claims(&c)?
+    };
+    for b in bindings {
         let _ = evidence(&b, false)?;
     }
     // Reject omitted later phase events as well as newer normal observations.
@@ -295,9 +415,11 @@ fn basis(p: &Retire) -> Result<Value> {
         }
     }
     // No free-space-above-protected-growth condition: this only removes authenticated closed bytes.
-    Ok(
-        json!({"capacity_completion":p.capacity_completion,"fleet":fb,"current_unit_census":current}),
-    )
+    let mut basis = json!({"capacity_completion":p.capacity_completion,"fleet":fb,"current_unit_census":current});
+    if let Some(view) = disposition {
+        basis["closed_growth_disposition"] = view;
+    }
+    Ok(basis)
 }
 
 fn no_sidecars() -> Result<()> {
@@ -630,7 +752,7 @@ pub(super) async fn run(
     let expected = scope(p, m, &inspection, &c)?;
     let artifact_sha = inspection["sha256"].as_str().context("185 digest")?;
     let artifact_etag = inspection["multipart_etag"].as_str().context("185 etag")?;
-    let _ = basis(p)?;
+    let _ = basis(p, m)?;
     let _ = references(p)?;
     let remote_before = remote(client, m, &c).await?;
     let root = Path::new(STATE).join("retirements");
@@ -639,7 +761,7 @@ pub(super) async fn run(
         fs::metadata(&root)?.dev() == expected.device,
         "185 quarantine is on another filesystem"
     );
-    let descriptor = json!({"schema":"jetstreamer-holding-retire185-intent-v2","host":HOST,
+    let mut descriptor = json!({"schema":"jetstreamer-holding-retire185-intent-v2","host":HOST,
         "epoch":185,"source":SOURCE,"quarantine":QUARANTINE,"sha256":artifact_sha,"length":LENGTH,
         "multipart_etag":artifact_etag,"source_identity":inspection["source_identity"],
         "mapping":p.mapping,"custody":p.custody,"inspection":p.inspection,"guard_intent":p.guard_intent,"guard_completion":p.guard_completion,
@@ -647,6 +769,9 @@ pub(super) async fn run(
         "canonical_archive":false,"failure_repaired":false,"runtime_checkpoint_qualified":false,
         "job_resume_authorized":false,"replay_launch_authorized":false,"publication_authorized":false,
         "remote_mutations":false,"r2_mutations":false});
+    if let Some(projection) = &p.closed_growth_disposition {
+        descriptor["closed_growth_disposition"] = serde_json::to_value(projection)?;
+    }
     let intent = root.join("epoch185-intent.json");
     let moved = root.join("epoch185-moved.json");
     let unlink_intent = root.join("epoch185-unlink-intent.json");
@@ -725,7 +850,7 @@ pub(super) async fn run(
             let again = remote(client, m, &c).await?;
             native_checksum(&again, &proof, LENGTH)?;
         }
-        let _ = basis(p)?;
+        let _ = basis(p, m)?;
         let _ = references(p)?;
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let path = Path::new(STATE)
@@ -774,7 +899,7 @@ pub(super) async fn run(
         if !exact_record(&moved, &moved_descriptor)? {
             persist(&moved, &moved_descriptor)?;
         }
-        let _ = basis(p)?;
+        let _ = basis(p, m)?;
         let _ = references(p)?;
         no_references(Path::new(QUARANTINE))?;
         let again = remote(client, m, &c).await?;
@@ -787,7 +912,7 @@ pub(super) async fn run(
     } else {
         unlink_descriptor = old_unlink.context("185 absent recovery lacks unlink intent")?;
     }
-    let _ = basis(p)?;
+    let _ = basis(p, m)?;
     let _ = references(p)?;
     let remote_after = remote(client, m, &c).await?;
     let final_moved = read_record(&moved)?.context("185 completed retirement lacks moved proof")?;
@@ -840,6 +965,7 @@ mod tests {
             custody: b.clone(),
             capacity_completion: b.clone(),
             prior_check: None,
+            closed_growth_disposition: None,
         };
         let m = Mapping {
             schema: "jetstreamer-horizon-host-holding-prefix-v2".into(),
@@ -934,12 +1060,78 @@ mod tests {
         assert!(capacity_shape(&reduced, &f, 1792803360).is_err());
     }
     #[test]
+    fn opt_in_closed_growth_capacity_preserves_original_binding_and141_whole_cap() {
+        let projection = Bound {
+            path: "/sealed/closed-view-plan.json".into(),
+            sha256: "c".repeat(64),
+        };
+        let f = json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":101,"last_epoch":200,
+            "sampled_at_utc":"2026-10-24T00:56:00Z","epochs":[{"epoch":185,"state":"failed-needs-repair"}],
+            "active":[],"diagnostics":[],"pipelines":[]});
+        let c = json!({"schema":"jetstreamer-horizon-holding-retire185-closed-growth-capacity-v2","host":HOST,
+            "sampled_at_utc":f["sampled_at_utc"],"recorded_unix_seconds":1792803360u64,
+            "pressure_relief_only":true,"new_launch_authorized":false,"restore_authorized":false,
+            "growth_claims_released":false,"pre_retirement_free_space_credit":0,
+            "epoch185_original_growth_claim_retained":false,"epoch185_original_growth_binding_retained":true,
+            "epoch141_original_growth_claim_retained":true,"all_live_staged_and_retained_growth_claims_preserved":true,
+            "closed_growth_disposition":projection,
+            "guard_completion":{"path":Path::new(GUARD_ROOT).join("completion.json"),"sha256":COMPLETION_SHA},
+            "retained185_physical_bytes":56_206_397_440u64,"all_current_protected_bytes":3_503_746_342_342u64,
+            "original_claim_bindings":[
+                {"epoch":185,"retained_growth_bytes":0,"original_growth_bytes":824_633_720_832u64,
+                 "binding":{"path":"/usr/local/lib/jetstreamer/horizon-epoch185-full-admission-20261023-v2/admission-manifest.json","sha256":"c2074a168945f30e2a9a83464f8d07e94e835bbb504e0a84c5cdf91323a71cb9"}},
+                {"epoch":141,"retained_growth_bytes":549_755_813_888u64,
+                 "binding":{"path":"/var/lib/jetstreamer/horizon-original141-capped-root-admission-20261023-v1/admission.json","sha256":"945561bbf6dc282cbc0375cb84d777abace765956f61e8cd1e35863056ca5b3b"}}]});
+        after_growth_capacity_shape(&c, &f, 1792803360, &projection).unwrap();
+        assert!(capacity_shape(&c, &f, 1792803360).is_err());
+        for (key, value) in [
+            ("epoch185_original_growth_claim_retained", json!(true)),
+            ("epoch141_original_growth_claim_retained", json!(false)),
+            ("pre_retirement_free_space_credit", json!(1)),
+            ("growth_claims_released", json!(true)),
+            ("new_launch_authorized", json!(true)),
+            ("restore_authorized", json!(true)),
+            ("closed_growth_disposition", json!({})),
+            ("all_current_protected_bytes", json!(0)),
+        ] {
+            let mut bad = c.clone();
+            bad[key] = value;
+            assert!(
+                after_growth_capacity_shape(&bad, &f, 1792803360, &projection).is_err(),
+                "{key}"
+            );
+        }
+        for (row, key, value) in [
+            (0, "retained_growth_bytes", json!(1)),
+            (0, "original_growth_bytes", json!(1)),
+            (1, "retained_growth_bytes", json!(513_768_747_008u64)),
+            (1, "epoch", json!(185)),
+        ] {
+            let mut bad = c.clone();
+            bad["original_claim_bindings"][row][key] = value;
+            assert!(after_growth_capacity_shape(&bad, &f, 1792803360, &projection).is_err());
+        }
+        assert!(after_growth_capacity_shape(&c, &f, 1792804261, &projection).is_err());
+        let rows = json!({"projected_reservation_rows":[{"claim_key":"epoch141/e639f007d482464f8a251455659d2ede",
+            "epoch":141,"producer_invocation_id":"e639f007d482464f8a251455659d2ede","outstanding_bytes":549_755_813_888u64}]});
+        after_growth_projection_claims(&rows).unwrap();
+        let mut reduced = rows.clone();
+        reduced["projected_reservation_rows"][0]["outstanding_bytes"] = json!(1);
+        assert!(after_growth_projection_claims(&reduced).is_err());
+        assert!(after_growth_projection_claims(&json!({"projected_reservation_rows":[]})).is_err());
+    }
+    #[test]
     fn retirement_plan_cannot_select_paths_or_release_claims() {
         let b = json!({"path":"/sealed/fixture.json","sha256":"a".repeat(64)});
         let p = json!({"schema":"jetstreamer-horizon-holding-retire185-plan-v2",
             "mapping":b,"guard_intent":b,"guard_completion":b,"qualification":b,"deployment":b,
             "inspection":b,"custody":b,"capacity_completion":b,"prior_check":null});
-        assert!(serde_json::from_value::<Retire>(p.clone()).is_ok());
+        assert!(
+            serde_json::from_value::<Retire>(p.clone())
+                .unwrap()
+                .closed_growth_disposition
+                .is_none()
+        );
         for key in ["source", "quarantine", "scratch", "release_growth_claims"] {
             let mut bad = p.clone();
             bad[key] = json!(true);
