@@ -77,6 +77,21 @@ fn no_checksum(path: &Path) -> Result<()> {
 
 fn validate_admission_inputs(p: Plan, plan_sha: &str, self_sha: &str) -> Result<()> {
     p.validate(&p.run_root.join("ledger"))?;
+    for evidence in p.metadata.bounds().into_iter().chain([
+        &p.source_capture,
+        &p.prefix_archive,
+        &p.restart_snapshot,
+        &p.worker,
+        &p.genesis_archive,
+    ]) {
+        control::require_uid1000_readable(&evidence.path)?;
+    }
+    control::require_uid1000_traversable(
+        p.admission_receipt
+            .parent()
+            .context("future admission receipt parent")?,
+    )?;
+    control::require_uid1000_traversable(&p.guard_directory)?;
     ensure!(
         p.guard_sha256 == self_sha,
         "planned independent guard differs from the validating control binary"
@@ -948,6 +963,7 @@ fn run() -> Result<()> {
                 args.len() == 6,
                 "validate-plan does not accept guard arguments"
             );
+            control::require_uid1000_readable(Path::new(&args[1]))?;
             validate_admission_inputs(serde_json::from_slice(&bytes)?, &args[3], &args[5])
         }
         "capture" => {

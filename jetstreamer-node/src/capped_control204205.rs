@@ -275,6 +275,52 @@ pub fn sealed(bound: &Bound, maximum: u64) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+fn uid1000_access(uid: u32, gid: u32, mode: u32, execute: bool) -> bool {
+    let bit = if execute { 1 } else { 4 };
+    let shift = if uid == 1000 {
+        6
+    } else if gid == 1000 {
+        3
+    } else {
+        0
+    };
+    mode & (bit << shift) != 0
+}
+/// Conservative UID1000/primary-GID1000 DAC audit. Do not rely on root's
+/// ability to traverse private ancestry or on supplemental groups/ACLs that
+/// the separately qualified producer sandbox may not inherit.
+pub fn require_uid1000_readable(path: &Path) -> Result<()> {
+    require_uid1000_access(path, false)
+}
+pub fn require_uid1000_traversable(path: &Path) -> Result<()> {
+    require_uid1000_access(path, true)
+}
+fn require_uid1000_access(path: &Path, directory: bool) -> Result<()> {
+    ensure!(
+        path.is_absolute() && path.canonicalize()? == path,
+        "noncanonical UID1000 input path"
+    );
+    let m = fs::symlink_metadata(path)?;
+    ensure!(
+        if directory { m.is_dir() } else { m.is_file() },
+        "wrong UID1000 input type"
+    );
+    ensure!(
+        uid1000_access(m.uid(), m.gid(), m.mode(), directory),
+        "input not accessible to UID1000: {}",
+        path.display()
+    );
+    for parent in path.ancestors().skip(1) {
+        let m = fs::symlink_metadata(parent)?;
+        ensure!(
+            m.is_dir() && uid1000_access(m.uid(), m.gid(), m.mode(), true),
+            "private ancestry blocks UID1000: {}",
+            parent.display()
+        );
+    }
+    Ok(())
+}
+
 /// Bounded no-follow read, with a complete before/open/after identity check.
 /// Root heartbeat replacement is allowed between calls, never during a call.
 pub fn stable_read(path: &Path, maximum: u64, uid: u32, readonly: bool) -> Result<Vec<u8>> {
@@ -570,6 +616,16 @@ pub fn denied_authority() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn root_readability_does_not_substitute_for_the_actual_producer_permissions() {
+        assert!(!uid1000_access(0, 0, 0o700, true));
+        assert!(!uid1000_access(0, 0, 0o400, false));
+        assert!(uid1000_access(0, 0, 0o444, false));
+        assert!(uid1000_access(0, 0, 0o755, true));
+        assert!(uid1000_access(1000, 1000, 0o700, true));
+        assert!(uid1000_access(0, 1000, 0o750, true));
+        assert!(!uid1000_access(1000, 1000, 0o040, false));
+    }
     fn bound(name: &str) -> Bound {
         Bound {
             path: Path::new("/sealed").join(name),
@@ -861,7 +917,8 @@ mod tests {
         use std::os::unix::fs::symlink;
         let dir = tempfile::tempdir().unwrap();
         let owner = unsafe { libc::geteuid() };
-        let path = dir.path().join("receipt.json");
+        let root = dir.path().canonicalize().unwrap();
+        let path = root.join("receipt.json");
         atomic_json(&path, &json!({"counter":u64::MAX}), owner, false).unwrap();
         let bytes = stable_read(&path, 1024, owner, true).unwrap();
         assert_eq!(
@@ -870,7 +927,7 @@ mod tests {
         );
         assert!(atomic_json(&path, &json!({"counter":0}), owner, false).is_err());
         assert!(stable_read(&path, 1, owner, true).is_err());
-        let alias = dir.path().join("alias");
+        let alias = root.join("alias");
         symlink(&path, &alias).unwrap();
         assert!(stable_read(&alias, 1024, owner, true).is_err());
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
