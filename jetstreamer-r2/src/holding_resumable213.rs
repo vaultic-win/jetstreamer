@@ -548,15 +548,12 @@ mod tests {
                 .build(),
         )
     }
+    type RecordedRanges = Arc<Mutex<Vec<(u64, u64)>>>;
     fn monitored_server(
         body: Arc<Vec<u8>>,
         faults: Vec<&'static str>,
         writer_pause: Option<Arc<std::sync::atomic::AtomicBool>>,
-    ) -> (
-        Client,
-        std::thread::JoinHandle<()>,
-        Arc<Mutex<Vec<(u64, u64)>>>,
-    ) {
+    ) -> (Client, std::thread::JoinHandle<()>, RecordedRanges) {
         use std::sync::atomic::{AtomicUsize, Ordering};
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}", listener.local_addr().unwrap());
