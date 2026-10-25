@@ -4,6 +4,17 @@ mod runtime;
 mod epoch228_profile;
 mod snapshot;
 
+// Cargo feature unification must never enable the SDK policy behind an
+// ordinary worker's back, nor leave a semantic candidate on the old SDK path.
+const _: [(); 1] = [(); (cfg!(feature = "epoch223-called-program-demotion")
+    == solana_sdk::message::EPOCH223_CALLED_PROGRAM_DEMOTION) as usize];
+
+#[cfg(all(
+    feature = "epoch223-called-program-bracket",
+    feature = "epoch223-prefix-warmup-diagnostic"
+))]
+compile_error!("epoch 223 bracket and sixteen-slot warmup are exclusive scopes");
+
 #[cfg(all(
     feature = "epoch223-prefix-qualification",
     feature = "diagnostic-singleton"
@@ -32,7 +43,10 @@ use runtime::{ProcessEntriesError, RuntimeState};
 use solana_sdk::system_instruction::MAX_PERMITTED_DATA_LENGTH;
 use std::{io, mem};
 
+#[cfg(not(feature = "epoch223-called-program-demotion"))]
 const BACKEND_ID: &str = "solana-v1.6.20";
+#[cfg(feature = "epoch223-called-program-demotion")]
+const BACKEND_ID: &str = "solana-v1.6.20-epoch223-called-program-demotion-candidate";
 const SOLANA_TAG: &str = "v1.6.20";
 const SOLANA_COMMIT: &str = "77bdb45d4af61fc687161ec06cc0178ff79726d5";
 const ENTRY_CHUNK_TARGET_BYTES: u64 = (MAX_FRAME_BYTES / 2) as u64;
@@ -554,7 +568,12 @@ mod tests {
     fn handshake_is_explicitly_unqualified_candidate() {
         let handshake = handshake();
         assert_eq!(handshake.protocol_version, PROTOCOL_VERSION);
-        assert_eq!(handshake.backend_id, "solana-v1.6.20");
+        let expected_backend = if cfg!(feature = "epoch223-called-program-demotion") {
+            "solana-v1.6.20-epoch223-called-program-demotion-candidate"
+        } else {
+            "solana-v1.6.20"
+        };
+        assert_eq!(handshake.backend_id, expected_backend);
         assert_eq!(
             handshake.solana_commit,
             "77bdb45d4af61fc687161ec06cc0178ff79726d5"

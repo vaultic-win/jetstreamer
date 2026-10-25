@@ -763,6 +763,9 @@ impl RuntimeState {
             ));
         }
         self.bank.freeze();
+        if cfg!(feature = "epoch223-called-program-demotion") && self.enforce_candidate_range {
+            validate_epoch223_repair_bank_hash(self.bank.slot(), &self.bank.hash().to_string())?;
+        }
         let mut writes = self.drain_writes(None)?;
         self.bank.squash();
         // Bank::squash does not currently store accounts, but draining again
@@ -873,6 +876,24 @@ impl RuntimeState {
     }
 }
 
+// Independent finalized Vote evidence supplies these Bank hashes, not PoH
+// blockhashes or synthetic test results. Compare only; never write a hash.
+fn validate_epoch223_repair_bank_hash(slot: u64, actual: &str) -> Result<(), String> {
+    let expected = match slot {
+        96_544_586 => "3PMZX37CYLF9Ay87r1aKREnf1cZoWDLRKXRAMx5TZYso",
+        96_544_587 => "5UsE976GhKUXyUyKG1tUDiN7cT2BPYvKJN7Wx1ptJHm7",
+        _ => return Ok(()),
+    };
+    if actual != expected {
+        return Err(format!(
+            "epoch 223 private repair Bank {} hash mismatch: expected {}, actual {}",
+            slot, expected, actual
+        ));
+    }
+    eprintln!("epoch223 private repair canonical Bank: slot={} hash={}", slot, actual);
+    Ok(())
+}
+
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
     if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::validate_snapshot(slot)?;
@@ -911,6 +932,8 @@ fn effective_max_supported_entry_slot_exclusive() -> u64 {
         98_063_481
     } else if cfg!(feature = "epoch227-capped-qualification") {
         98_496_000
+    } else if cfg!(feature = "epoch223-called-program-bracket") {
+        96_544_589
     } else if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
         96_335_555
     } else if cfg!(feature = "epoch223-prefix-qualification") {
@@ -1555,9 +1578,10 @@ mod tests {
             .any(|i| i.program_id_index == 6));
         assert!(transaction.message.is_key_passed_to_program(6));
         assert!(transaction.message.is_non_loader_key(&key, 6));
-        assert_eq!(transaction.message.is_writable(6, true), true);
+        let expected = !cfg!(feature = "epoch223-called-program-demotion");
+        assert_eq!(transaction.message.is_writable(6, true), expected);
         let attribution = writable_key_attribution(&[transaction], true).unwrap();
-        assert_eq!(attribution.contains_key(key.as_ref()), true);
+        assert_eq!(attribution.contains_key(key.as_ref()), expected);
     }
 
     use solana_runtime::{
@@ -1720,6 +1744,8 @@ mod tests {
                 98_063_481
             } else if cfg!(feature = "epoch227-capped-qualification") {
                 98_496_000
+            } else if cfg!(feature = "epoch223-called-program-bracket") {
+                96_544_589
             } else if cfg!(feature = "epoch223-prefix-warmup-diagnostic") {
                 96_335_555
             } else if cfg!(feature = "epoch223-prefix-qualification") {
@@ -1820,7 +1846,10 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "epoch223-prefix-warmup-diagnostic")]
+    #[cfg(any(
+        feature = "epoch223-prefix-warmup-diagnostic",
+        feature = "epoch223-called-program-demotion"
+    ))]
     #[test]
     #[ignore]
     fn native_epoch223_cold_input_matches_canonical_accounts_commitment() {
@@ -1919,6 +1948,14 @@ mod tests {
             initialized.next_write_version
         );
         assert_eq!(checkpoint.transaction_count, original_transactions);
+        assert_eq!(Hash::new(&checkpoint.bank_hash).to_string(),
+            "8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F");
+        assert_eq!(Hash::new(&checkpoint.last_blockhash).to_string(),
+            "9cdE7Epzr7jcLCz8Ke2Lndf8DBqb3DJmxedKaKuCJHaa");
+        assert_eq!(checkpoint.capitalization, 503_889_539_326_183_230);
+        assert_eq!(checkpoint.transaction_count, 27_822_879_094);
+        assert_eq!(checkpoint.tick_height, 6_165_474_496);
+        assert_eq!(checkpoint.next_write_version, 105_933_183_112);
         assert_eq!(
             Hash::new(&checkpoint.accounts_hash).to_string(),
             "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE"
@@ -2997,7 +3034,7 @@ mod epoch223_parent432_store_regression {
         pubkey::Pubkey,
         transaction::Transaction,
     };
-    const EXPECT_PROGRAM_STORED: bool = true;
+    const EXPECT_PROGRAM_STORED: bool = !cfg!(feature = "epoch223-called-program-demotion");
     fn store_parent432_for_this_runtime(
         accounts: &Accounts,
         txs: &[Transaction],
@@ -3030,3 +3067,7 @@ mod epoch223_parent432_store_regression {
     }
     include!("../../../fixtures/epoch223_parent432_account_store_regression.rs");
 }
+
+#[cfg(test)]
+#[path = "epoch223_demotion_regression.rs"]
+mod epoch223_called_program_demotion_regression;
