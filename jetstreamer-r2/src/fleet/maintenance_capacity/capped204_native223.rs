@@ -1,5 +1,6 @@
 //! Epoch 204 resource release only. Terminal failure never qualifies an archive.
 use super::*;
+mod failed_history;
 const IID: &str = "e70aaf097e7c4583b216aba454145910";
 const LAUNCH: &str = "/var/lib/jetstreamer/horizon-native223-prefix-capture-actual-v1/launch.json";
 const LAUNCH_SHA: &str = "a629f2a5eb1a6be5e3ec38e66769f0698841fb7ccc8d43110ac3bfd73df99ac3";
@@ -50,10 +51,21 @@ fn terminal_shape(current: &Value, raw: &[u8]) -> Result<&'static str> {
             && prefix223_native20::same_command(&current["ExecStart"]),
         "epoch 204 release needs the exact terminal original native 223 owner"
     );
-    capped204205_work::exact_terminal_manager(raw, prefix223_native20::UNIT, IID)?;
+    ensure!(
+        raw.len() <= 4 << 20,
+        "native 223 terminal manager history exceeds bound"
+    );
     let rows = serde_json::Deserializer::from_slice(raw)
         .into_iter::<Value>()
         .collect::<std::result::Result<Vec<_>, _>>()?;
+    if rows
+        .iter()
+        .any(|r| r["MESSAGE_ID"] == failed_history::FAILURE_ID && r["INVOCATION_ID"] == IID)
+    {
+        failed_history::authenticate(current, &rows)?;
+        return Ok("failed-needs-repair");
+    }
+    capped204205_work::exact_terminal_manager(raw, prefix223_native20::UNIT, IID)?;
     let mut stopped = false;
     let mut failure = None;
     let mut success = false;
