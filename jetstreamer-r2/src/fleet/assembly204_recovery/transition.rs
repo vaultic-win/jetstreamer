@@ -384,6 +384,37 @@ fn terminal_context_join(x: &TerminalPrepare, terminal: &Value) -> Result<bool> 
     Ok(false)
 }
 
+pub(in crate::fleet) fn terminal_row(
+    bound: &BoundFile,
+    current: &BTreeMap<String, Value>,
+) -> Result<Value> {
+    let t = read(bound)?;
+    let name = s(&t, "unit")?;
+    let iid = s(&t, "invocation_id")?;
+    if t["result"] == "natural_success" {
+        ownership::validate_success_terminal(&t, name, iid)?;
+    } else {
+        ownership::validate_failure_terminal(&t)?;
+    }
+    let unit = current
+        .get(name)
+        .context("204 terminal current owner omitted")?;
+    ensure!(
+        is_idle(unit) && (unit["InvocationID"] == iid || unit["InvocationID"] == ""),
+        "204 terminal owner live/replaced"
+    );
+    for (name, row) in current.iter().filter(|(name, _)| scope(name, 204, 204)) {
+        ensure!(
+            is_idle(row),
+            "204 terminal overlaps live recovery owner: {name}"
+        );
+    }
+    Ok(
+        json!({"epoch":204,"phase":"assembly-recovery204-terminal","live":false,"positive_inactivity_confirmed":true,
+        "unit":unit,"terminal":bound,"result":t["result"],"current_sidecar_eta_valid":false,"authority":denied()}),
+    )
+}
+
 #[cfg(test)]
 mod terminal_context_tests {
     use super::*;
@@ -448,34 +479,4 @@ mod terminal_context_tests {
             saved_event_plan(&event, &old, &previous, None, Path::new("/fixture/event")).is_err()
         );
     }
-}
-pub(in crate::fleet) fn terminal_row(
-    bound: &BoundFile,
-    current: &BTreeMap<String, Value>,
-) -> Result<Value> {
-    let t = read(bound)?;
-    let name = s(&t, "unit")?;
-    let iid = s(&t, "invocation_id")?;
-    if t["result"] == "natural_success" {
-        ownership::validate_success_terminal(&t, name, iid)?;
-    } else {
-        ownership::validate_failure_terminal(&t)?;
-    }
-    let unit = current
-        .get(name)
-        .context("204 terminal current owner omitted")?;
-    ensure!(
-        is_idle(unit) && (unit["InvocationID"] == iid || unit["InvocationID"] == ""),
-        "204 terminal owner live/replaced"
-    );
-    for (name, row) in current.iter().filter(|(name, _)| scope(name, 204, 204)) {
-        ensure!(
-            is_idle(row),
-            "204 terminal overlaps live recovery owner: {name}"
-        );
-    }
-    Ok(
-        json!({"epoch":204,"phase":"assembly-recovery204-terminal","live":false,"positive_inactivity_confirmed":true,
-        "unit":unit,"terminal":bound,"result":t["result"],"current_sidecar_eta_valid":false,"authority":denied()}),
-    )
 }
