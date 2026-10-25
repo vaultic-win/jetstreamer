@@ -1,6 +1,7 @@
 //! Exact epoch 223 candidates over the coherent eaa8f5ac complete ledger.
 //! Pending candidate actors are charged in full, never hidden as free capacity.
 use super::*;
+use anyhow::Context as _;
 
 const GIB: u64 = 1 << 30;
 #[derive(Clone, Deserialize, serde::Serialize)]
