@@ -163,12 +163,9 @@ pub(super) fn manager(g: &Value, plan: &BoundFile, now: u64) -> Result<Value> {
             ("MemoryMax", "1073741824"),
             ("TasksMax", "256"),
             ("CPUQuotaPerSecUSec", "1s"),
-            ("Result", "success"),
-            ("ExecMainStatus", "0"),
-            ("ActiveState", "inactive"),
-            ("SubState", "dead"),
         ],
     )?;
+    completed_service_state(&p)?;
     let gp = bound_json(plan)?;
     ensure!(
         p.get("ReadWritePaths").map(String::as_str) == gp["receipt_directory"].as_str(),
@@ -228,6 +225,18 @@ pub(super) fn manager(g: &Value, plan: &BoundFile, now: u64) -> Result<Value> {
     Ok(
         json!({"properties":p,"timer":timer,"manager_completion":successful[0],"journal_sha256":sha,"completed_guard":completed}),
     )
+}
+pub(super) fn completed_service_state(p: &BTreeMap<String, String>) -> Result<()> {
+    require(
+        p,
+        &[
+            ("Result", "success"),
+            ("ExecMainStatus", "0"),
+            ("ActiveState", "inactive"),
+            ("SubState", "dead"),
+        ],
+    )
+    .context("canary launch capture requires its completed inactive guard")
 }
 fn peers(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     native210_peer_history::current(f, current)?;

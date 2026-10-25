@@ -186,7 +186,7 @@ fn no_stop(root: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub(super) fn validate_history(history: &Value, receipt: &Value) -> Result<()> {
+pub(super) fn validate_history_events(history: &Value, receipt: &Value) -> Result<()> {
     ensure!(
         history["schema"] == "jetstreamer-completed-guard-history-v1",
         "guard history schema differs"
@@ -217,6 +217,28 @@ pub(super) fn validate_history(history: &Value, receipt: &Value) -> Result<()> {
         *history == expected,
         "guard history is not the exact selected invocation"
     );
+    Ok(())
+}
+pub(super) fn validate_selected_events(
+    history: &Value,
+    receipt: &Value,
+    rows: &[Value],
+) -> Result<()> {
+    validate_history_events(history, receipt)?;
+    let name = history["unit"].as_str().context("guard history unit")?;
+    let latest = latest_completed(rows, name)?;
+    ensure!(
+        history["events"]
+            .as_array()
+            .context("guard history events")?
+            .last()
+            == Some(latest),
+        "guard history is not the latest completed manager fire"
+    );
+    Ok(())
+}
+pub(super) fn validate_history(history: &Value, receipt: &Value) -> Result<()> {
+    validate_history_events(history, receipt)?;
     let exe = Path::new(
         history["executable"]
             .as_str()

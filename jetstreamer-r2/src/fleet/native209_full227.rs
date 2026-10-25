@@ -2,6 +2,43 @@
 use super::singleton227 as c;
 use super::*;
 
+fn full_owner(row: &Value) -> Result<bool> {
+    let owner = singleton227_admission::active_owner(row)?;
+    if owner["Id"] == singleton227_admission::NATIVE_UNIT {
+        return Ok(false);
+    }
+    if owner["Id"] == canary227::UNIT {
+        canary227_peer::row_scope(row)?;
+        return Ok(false);
+    }
+    ensure!(owner["Id"] == c::UNIT, "209 unknown epoch227 owner");
+    Ok(true)
+}
+
+fn full_rows(f: &Value) -> Result<Vec<&Value>> {
+    // Authentication precedes classification. Leave the raw row and guard
+    // binding intact for the dedicated canary disk and memory adapters.
+    canary227_peer::validate_delegation(f)?;
+    classify_full_rows(f)
+}
+
+fn classify_full_rows(f: &Value) -> Result<Vec<&Value>> {
+    canary227_peer::roster(f)?;
+    let mut selected = Vec::new();
+    for row in f["active"]
+        .as_array()
+        .context("209 full 227 owner census")?
+        .iter()
+        .filter(|row| row["epoch"] == 227)
+    {
+        if full_owner(row)? {
+            ensure!(selected.is_empty(), "209 duplicate full227 owner");
+            selected.push(row);
+        }
+    }
+    Ok(selected)
+}
+
 fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
     let owner = singleton227_admission::active_owner(row)?;
     ensure!(
@@ -196,16 +233,8 @@ pub(super) fn split(
         .collect::<BTreeMap<_, _>>();
     let mut growth = 0u64;
     let mut measurements = Vec::new();
-    for row in f["active"]
-        .as_array()
-        .context("209 full227 census")?
-        .iter()
-        .filter(|r| r["epoch"] == 227)
-    {
+    for row in full_rows(f)? {
         let owner = singleton227_admission::active_owner(row)?;
-        if owner["Id"] == singleton227_admission::NATIVE_UNIT {
-            continue;
-        }
         ensure!(measurements.is_empty(), "209 duplicate full227 owner");
         let (d, launch) = claim(f, row)?;
         let b = reduced_guards
@@ -276,16 +305,8 @@ fn memory_limits(
 pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut total = 0u64;
     let mut evidence = Vec::new();
-    for row in f["active"]
-        .as_array()
-        .context("209 full227 memory census")?
-        .iter()
-        .filter(|r| r["epoch"] == 227)
-    {
+    for row in full_rows(f)? {
         let owner = singleton227_admission::active_owner(row)?;
-        if owner["Id"] == singleton227_admission::NATIVE_UNIT {
-            continue;
-        }
         let (d, launch) = claim(f, row)?;
         ensure!(
             owner["ControlGroup"] == format!("/system.slice/{}", d.unit),
@@ -325,6 +346,96 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn canary_row() -> Value {
+        json!({"epoch":227,"phase":"diagnostic-qualification","ordinary_replay_claim":false,
+            "scratch_path":canary227::ROOT,
+            "launch_receipt":"/var/lib/jetstreamer/horizon-227-v1625-canary-capture-selection-v2/launch.json",
+            "launch_receipt_sha256":"b".repeat(64),
+            "producer":{"Id":canary227::UNIT,"InvocationID":"a".repeat(32),"MainPID":"42",
+                "NRestarts":"0","LoadState":"loaded","Type":"exec","Result":"success",
+                "ActiveState":"active","SubState":"running",
+                "ControlGroup":format!("/system.slice/{}",canary227::UNIT)}})
+    }
+    fn mixed_canary_fleet() -> Value {
+        let row = canary_row();
+        json!({"active":[{"epoch":209,"producer":{"Id":singleton209::UNIT}},row],
+            "unit_census":{canary227::UNIT:row["producer"]},
+            "failed_history":{"227":"preserved"}})
+    }
+    #[test]
+    fn mixed_canary_routes_only_to_its_adapter_without_consuming_its_raw_row() {
+        let f = mixed_canary_fleet();
+        let before = f.clone();
+        assert!(classify_full_rows(&f).unwrap().is_empty());
+        assert_eq!(f, before);
+        // Shape alone cannot pass the production gate: this fixture has no
+        // authenticated fleet plan or launch. Both resource entry points fail.
+        assert!(full_rows(&f).is_err());
+        assert!(memory(&f).is_err());
+        assert!(split(&f, &json!({}), &BTreeMap::new(), 100, 101).is_err());
+    }
+    #[test]
+    fn unrelated_owner_and_guard_survive_both_full227_resource_entrypoints() {
+        let f = json!({"active":[{"epoch":209,"producer":{"Id":singleton209::UNIT}}],
+            "unit_census":{},"failed_history":{"227":"preserved"}});
+        let guards = BTreeMap::from([(
+            singleton209::UNIT.to_owned(),
+            BoundFile {
+                path: "/sealed/guard209.json".into(),
+                sha256: "c".repeat(64),
+            },
+        )]);
+        let (view, remaining, growth, evidence) = split(&f, &json!({}), &guards, 100, 101).unwrap();
+        assert_eq!(view, f);
+        assert_eq!(remaining, guards);
+        assert_eq!(growth, 0);
+        assert!(evidence.is_empty());
+        let (memory, evidence) = memory(&f).unwrap();
+        assert_eq!(memory, 0);
+        assert!(evidence.is_empty());
+    }
+    #[test]
+    fn native_and_full_profiles_remain_distinct_and_unknown_227_is_rejected() {
+        let native = json!({"epoch":227,"producer":{"Id":singleton227_admission::NATIVE_UNIT}});
+        let full = json!({"epoch":227,"producer":{"Id":c::UNIT}});
+        let f = json!({"active":[native,full,{"epoch":209,"producer":{"Id":singleton209::UNIT}}],"unit_census":{}});
+        assert_eq!(classify_full_rows(&f).unwrap(), vec![&f["active"][1]]);
+        let mut unknown = f.clone();
+        unknown["active"][0]["producer"]["Id"] = json!("unknown-227.service");
+        assert!(classify_full_rows(&unknown).is_err());
+        let mut duplicate = f.clone();
+        duplicate["active"].as_array_mut().unwrap().push(full);
+        assert!(classify_full_rows(&duplicate).is_err());
+    }
+    #[test]
+    fn delegation_rejects_changed_identity_scope_duplicates_and_conflicting_full_epoch() {
+        let f = mixed_canary_fleet();
+        for (pointer, value) in [
+            ("/active/1/producer/InvocationID", json!("d".repeat(32))),
+            ("/active/1/producer/MainPID", json!("43")),
+            ("/active/1/producer/NRestarts", json!("1")),
+            ("/active/1/producer/ActiveState", json!("inactive")),
+            ("/active/1/scratch_path", json!("/another-root")),
+            ("/active/1/launch_receipt", json!("/another-launch.json")),
+            ("/active/1/ordinary_replay_claim", json!(true)),
+            (
+                "/active/1/producer/Id",
+                json!("horizon-qualify-227-v1625-bounded-resource-old.service"),
+            ),
+        ] {
+            let mut bad = f.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(classify_full_rows(&bad).is_err(), "{pointer}");
+        }
+        for extra in [canary_row(), json!({"epoch":227,"producer":{"Id":c::UNIT}})] {
+            let mut bad = f.clone();
+            bad["active"].as_array_mut().unwrap().push(extra);
+            assert!(classify_full_rows(&bad).is_err());
+        }
+        let mut omitted = f.clone();
+        omitted["active"].as_array_mut().unwrap().pop();
+        assert!(classify_full_rows(&omitted).is_err());
+    }
     #[test]
     fn decimal_requested_limits_accept_only_exact_kernel_page_rounding() {
         let p = json!({"schema":"jetstreamer-private-epoch227-singleton-resource-plan-v1","mode":"replay","unit":c::UNIT,

@@ -43,7 +43,8 @@ pub(super) fn require(p: &BTreeMap<String, String>, values: &[(&str, &str)]) -> 
     for (k, v) in values {
         ensure!(
             p.get(*k).map(String::as_str) == Some(*v),
-            "227 sandbox differs:{k}"
+            "227 sandbox differs: {k}; expected {v}, observed {:?}",
+            p.get(*k)
         );
     }
     Ok(())
