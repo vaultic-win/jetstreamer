@@ -351,6 +351,10 @@ fn metrics(cgroup: &Path) -> Result<Value> {
 }
 
 fn scratch(root: &Path) -> Result<Value> {
+    scratch_with_limit(root, MAX_SCRATCH)
+}
+
+fn scratch_with_limit(root: &Path, maximum: u64) -> Result<Value> {
     let dev = fs::symlink_metadata(root)?.dev();
     let mut pending = vec![(root.to_path_buf(), 0)];
     let (mut physical, mut apparent, mut files, mut dirs) = (0u64, 0u64, 0u64, 0u64);
@@ -373,7 +377,7 @@ fn scratch(root: &Path) -> Result<Value> {
             .checked_add(m.blocks().checked_mul(512).context("block overflow")?)
             .context("size overflow")?;
         apparent = apparent.checked_add(m.len()).context("apparent overflow")?;
-        ensure!(physical <= MAX_SCRATCH, "scratch exceeds sealed profile limit of {MAX_SCRATCH} bytes");
+        ensure!(physical <= maximum, "scratch exceeds sealed profile limit of {maximum} bytes");
         if m.is_dir() {
             dirs += 1;
             if path.file_name().is_some_and(|n| n == "accounts-state") {

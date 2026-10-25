@@ -6,6 +6,9 @@ const MAX_WAIT_MILLIS: u64 = 120_000;
 const MAX_ADMISSION_AGE_MILLIS: u64 = 120_000;
 const HASH_MEMORY_HIGH: u64 = 14 << 30;
 const HASH_MEMORY_MAX: u64 = 16 << 30;
+mod custody {
+    include!("epoch223_demotion_custody.rs");
+}
 mod protective {
     include!("epoch223_demotion_guard.rs");
 }

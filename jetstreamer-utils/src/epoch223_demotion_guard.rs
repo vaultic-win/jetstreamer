@@ -61,51 +61,84 @@ impl Custody {
         Ok(())
     }
 }
-fn inspect(plan: &GuardPlan, custody: &Custody) -> Result<Value> {
-    observe(&plan.watched_runner)?;
-    let root = fs::symlink_metadata(&plan.run_root)?;
-    ensure!(
-        root.is_dir()
-            && root.uid() == 1000
-            && root.mode() & 0o077 == 0
-            && plan.run_root.canonicalize()? == plan.run_root,
-        "223 guard scratch root changed"
-    );
-    let mut pending = vec![(plan.run_root.clone(), 0u32)];
-    let (mut bytes, mut entries) = (0u64, 0u64);
-    let started = Instant::now();
-    while let Some((path, depth)) = pending.pop() {
-        entries += 1;
+struct RunRoot {
+    directory: File,
+    path: PathBuf,
+    device: u64,
+    inode: u64,
+    uid: u32,
+}
+impl RunRoot {
+    fn open(path: &Path, uid: u32) -> Result<Self> {
+        ensure!(path.canonicalize()? == path, "223 guard root redirected");
+        let directory = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .open(path)?;
+        let metadata = directory.metadata()?;
+        let root = Self {
+            directory,
+            path: path.into(),
+            device: metadata.dev(),
+            inode: metadata.ino(),
+            uid,
+        };
+        root.validate()?;
+        Ok(root)
+    }
+    fn validate(&self) -> Result<()> {
+        for m in [
+            self.directory.metadata()?,
+            fs::symlink_metadata(&self.path)?,
+        ] {
+            ensure!(
+                m.is_dir()
+                    && m.uid() == self.uid
+                    && m.mode() & 0o077 == 0
+                    && m.dev() == self.device
+                    && m.ino() == self.inode,
+                "223 guard original run-root replaced"
+            );
+        }
         ensure!(
-            depth <= 64
-                && entries + pending.len() as u64 <= 4_000_000
-                && started.elapsed() < Duration::from_secs(120),
-            "223 guard scratch scan bound"
+            self.path.canonicalize()? == self.path,
+            "223 guard run-root redirected"
         );
-        let m = fs::symlink_metadata(&path)?;
-        ensure!(
-            m.dev() == root.dev() && !m.file_type().is_symlink() && (m.is_dir() || m.is_file()),
-            "223 guard scratch escaped filesystem"
-        );
-        bytes = bytes
-            .checked_add(
-                m.blocks()
-                    .checked_mul(512)
-                    .context("223 guard block overflow")?,
-            )
-            .context("223 guard byte overflow")?;
-        ensure!(
-            bytes <= 471_798_691_840,
-            "223 guard total private disk envelope exceeded"
-        );
-        if m.is_dir() {
-            for child in fs::read_dir(path)? {
-                pending.push((child?.path(), depth + 1));
+        Ok(())
+    }
+}
+fn stable_measure(root: &RunRoot, mut measurement: impl FnMut() -> Result<Value>) -> Result<Value> {
+    // Compaction may unlink a child after lstat and before traversal. Retry only
+    // ENOENT against the same pinned root, at most twice; no new campaign sample.
+    for attempt in 0..3 {
+        root.validate()?;
+        match measurement() {
+            Ok(value) => {
+                root.validate()?;
+                return Ok(value);
+            }
+            Err(error) => {
+                let disappeared = error.chain().any(|cause| {
+                    cause
+                        .downcast_ref::<std::io::Error>()
+                        .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+                });
+                if !disappeared || attempt == 2 {
+                    return Err(error);
+                }
             }
         }
     }
+    anyhow::bail!("223 guard stable measurement retry exhausted")
+}
+fn inspect(plan: &GuardPlan, custody: &Custody, root: &RunRoot) -> Result<Value> {
+    observe(&plan.watched_runner)?;
+    let total = stable_measure(root, || scratch_with_limit(&plan.run_root, 471_798_691_840))?;
+    let bytes = total["physical_bytes"]
+        .as_u64()
+        .context("223 guard physical bytes")?;
     let scratch_root = plan.run_root.join("scratch");
-    let scratch = scratch(&scratch_root)?;
+    let scratch = stable_measure(root, || scratch(&scratch_root))?;
     let free = free_bytes(&plan.run_root)?;
     ensure!(
         free >= plan.protected_floor_bytes,
@@ -194,7 +227,8 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     // controls without changing the producer during qualification/startup.
     custody.file("cgroup.freeze", true)?;
     custody.file("cgroup.kill", true)?;
-    inspect(&plan, &custody)?;
+    let root = RunRoot::open(&plan.run_root, 1000)?;
+    inspect(&plan, &custody, &root)?;
     persist(
         &plan.ready_output,
         &json!({"schema":"jetstreamer-epoch223-demotion-guard-ready-v1",
@@ -209,7 +243,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         if custody.read("cgroup.procs")?.trim().is_empty() {
             return Ok(());
         }
-        if let Err(error) = inspect(&plan, &custody).and_then(|_| observe(&actor)) {
+        if let Err(error) = inspect(&plan, &custody, &root).and_then(|_| observe(&actor)) {
             persist(
                 &plan.stop_output,
                 &json!({"schema":"jetstreamer-epoch223-demotion-guard-stop-v1",
@@ -219,6 +253,93 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             )?;
             custody.stop()?;
             return Err(error);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn root() -> (tempfile::TempDir, RunRoot) {
+        let directory = tempfile::tempdir().unwrap();
+        let root = RunRoot::open(directory.path(), unsafe { libc::geteuid() }).unwrap();
+        (directory, root)
+    }
+    #[test]
+    fn renamed_same_owner_root_cannot_hide_original_open_files() {
+        let (directory, root) = root();
+        fs::write(directory.path().join("original"), b"retained").unwrap();
+        let held = File::open(directory.path().join("original")).unwrap();
+        let old = directory.path().with_extension("old");
+        fs::rename(directory.path(), &old).unwrap();
+        fs::create_dir(directory.path()).unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(root.validate().is_err());
+        assert!(stable_measure(&root, || scratch(directory.path())).is_err());
+        assert!(held.metadata().unwrap().len() > 0);
+        drop(held);
+        fs::remove_dir_all(old).unwrap();
+    }
+    #[test]
+    fn compaction_disappearance_retries_same_root_and_measures_remaining_files() {
+        let (directory, root) = root();
+        let file = directory.path().join("old-appendvec");
+        fs::write(&file, b"old").unwrap();
+        let mut attempts = 0;
+        let value = stable_measure(&root, || {
+            attempts += 1;
+            if attempts == 1 {
+                fs::remove_file(&file)?;
+                fs::write(directory.path().join("compacted-appendvec"), b"new")?;
+                return Err(std::io::Error::from(std::io::ErrorKind::NotFound).into());
+            }
+            scratch(directory.path())
+        })
+        .unwrap();
+        assert_eq!(attempts, 2);
+        assert_eq!(value["regular_files"], 1);
+        let mut failures = 0;
+        assert!(
+            stable_measure(&root, || {
+                failures += 1;
+                Err(std::io::Error::from(std::io::ErrorKind::NotFound).into())
+            })
+            .is_err()
+        );
+        assert_eq!(failures, 3);
+    }
+    #[test]
+    fn failed_protective_guard_cannot_strand_an_owned_native_child() {
+        // Disposable process only: the production runner returns its guard
+        // error before receipt writes; ChildGroup is the final stop backstop.
+        let child = Command::new("/bin/sleep")
+            .arg("60")
+            .process_group(0)
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        let owned = ChildGroup(child, false);
+        let unavailable = tempfile::tempdir().unwrap();
+        // A directory cannot be published as a file: deterministic receipt failure.
+        let destination = unavailable.path().join("not-a-receipt");
+        fs::create_dir(&destination).unwrap();
+        assert!(persist(&destination, &json!({"guard_failure":true})).is_err());
+        drop(owned);
+        let start = Instant::now();
+        loop {
+            let mut status = 0;
+            let result = unsafe { libc::waitpid(pid as i32, &mut status, libc::WNOHANG) };
+            if result == pid as i32
+                || (result == -1
+                    && std::io::Error::last_os_error().raw_os_error() == Some(libc::ECHILD))
+            {
+                break;
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(2),
+                "owned native process survived guard failure"
+            );
+            thread::sleep(Duration::from_millis(5));
         }
     }
 }

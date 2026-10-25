@@ -106,6 +106,18 @@ and scratch usage, and per-process VMA headroom. A fault first fsyncs a no-clobb
 stop intent, then freezes/kills through FD-relative original cgroup controls,
 preserving every file. It exits when that original cgroup empties and never
 follows a new target invocation. No service has been launched or stop exercised.
+The guard pins the original run-root directory FD/device/inode for its lifetime,
+rejecting a same-owner replacement before/after every physical measurement. It
+reuses the shared reviewed scratch walker (whose default profile limit and output
+are unchanged) with the exact root envelope. Only child-disappearance ENOENT may
+retry, at most twice, against that same pinned root; other errors fail closed.
+Compaction, exhausted retry and replaced-root fixtures are source-only, unrun.
+If stop-intent persistence fails, the guard exits without performing an unrecorded
+root stop. The producer independently re-observes its original guard every 15
+seconds and closes native permission on an exit/identity error. The shared
+natural-root runner then sends SIGCONT/SIGKILL only to its unreaped owned child
+group before attempting failure-receipt writes, backed by ChildGroup Drop. A
+disposable child/receipt-failure fixture covers that backstop; it remains unrun.
 
 Consumed root metadata must be readable through the runner's reviewed sandbox.
 Root capture outputs currently remain root-private; deployment must supply a
@@ -162,3 +174,21 @@ the original full runner Clippy selection, and a representative unchanged
 default bounded profile typecheck. Preserve the previous cumulative artifact
 charge, source/lock/tool/native closure pins and every failure. No successful
 native or replay qualification is implied by parsing, tests or Clippy.
+
+## Issuing custody contract
+
+Every new control/spawn issuing path must acquire exclusive bounded custody of
+`/run/lock/jetstreamer-horizon-admission.lock`: root-owned regular mode0600,
+no-follow, single-link, stable device/inode before and after acquisition and at
+commit. Keep it through actual actor/fleet/kernel revalidation, any kernel cap
+change, durable grant/receipt creation and final identity checks. Never hold it
+while waiting for long read-only input hashing. Do not unlink/recreate it to
+recover a presumed stale holder: kernel flock releases when a terminated holder
+closes its descriptor. Bounded-contention and replacement-inode fixtures remain
+unrun. This source helper has not created the real lock.
+
+The current legacy admission helpers do not participate. A new lock does not
+serialize them: root must keep all nonparticipating admission paths quiescent
+during an exact223 transaction, and all new issuing paths must join this custody
+protocol before concurrent admission is permitted. No transaction is authorized
+by this document or the existence of the helper.
