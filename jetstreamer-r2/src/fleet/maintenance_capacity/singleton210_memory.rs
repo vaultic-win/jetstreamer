@@ -247,6 +247,11 @@ pub(super) fn delivery_required(
 }
 
 pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
+    ensure!(
+        capacity["memory_before"]["full210_memory_policy"]["schema"]
+            == capacity["memory_after"]["full210_memory_policy"]["schema"],
+        "210 memory brackets cannot mix live and terminal native 223 policies"
+    );
     for stage in ["memory_before", "memory_after"] {
         let row = &capacity[stage];
         let total = row["host_total_memory_bytes"]
@@ -270,7 +275,22 @@ pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
                 "210 live policy cannot borrow terminal evidence"
             ),
             Some(FULL210_TERMINAL_SCHEMA) => {
-                capped204_native223::validate_terminal_saved(&policy["positive_terminal"])?;
+                let proof = &policy["positive_terminal"];
+                capped204_native223::validate_terminal_saved(proof)?;
+                for census in [
+                    "unit_census_before",
+                    "unit_census_after",
+                    "unit_census_after_memory_and_guard_checks",
+                ] {
+                    let owner = capacity[census]
+                        .as_object()
+                        .and_then(|units| units.get(prefix223_native20::UNIT))
+                        .context("210 terminal original absent from saved raw census")?;
+                    ensure!(
+                        owner == &proof["current_unit"],
+                        "210 terminal proof differs from saved raw census: {stage}:{census}"
+                    );
+                }
             }
             _ => bail!("210 full memory policy needs exact live or terminal native 223 evidence"),
         }
@@ -364,23 +384,54 @@ mod tests {
     }
 
     fn terminal_fleet(proof: &Value) -> Value {
-        json!({"active":[
-            {"epoch":207,"producer":{"Id":singleton207::UNIT}},
-            {"epoch":209,"producer":{"Id":singleton209::UNIT}},
-            {"epoch":225,"producer":{"Id":"horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service"}},
-            {"epoch":227,"producer":{"Id":canary227::UNIT}}],
+        let mut f = json!({"active":[],
             "unit_census":{(prefix223_native20::UNIT):proof["current_unit"]},
-            "epochs":[{"epoch":223,"state":"failed-needs-repair"}]})
+            "epochs":[{"epoch":223,"state":"failed-needs-repair"}]});
+        for (epoch, unit) in [
+            (207, singleton207::UNIT),
+            (209, singleton209::UNIT),
+            (
+                225,
+                "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+            ),
+            (227, canary227::UNIT),
+        ] {
+            let owner = json!({"Id":unit,"InvocationID":"a".repeat(32),
+                "LoadState":"loaded","ActiveState":"active","SubState":"running",
+                "MainPID":"123","NRestarts":"0","Result":"success","ExecMainStatus":"0",
+                "ControlGroup":format!("/system.slice/{unit}"),"Type":"exec"});
+            f["unit_census"][unit] = owner.clone();
+            f["active"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"epoch":epoch,"producer":owner}));
+        }
+        f
     }
 
     fn capacity(policy: Value, total: u64, growth: u64, required: u64) -> Value {
+        let census = if policy["schema"] == FULL210_TERMINAL_SCHEMA {
+            Some(terminal_fleet(&policy["positive_terminal"])["unit_census"].clone())
+        } else {
+            None
+        };
         let row = json!({"host_total_memory_bytes":total,
             "protected_existing_memory_growth_bytes":growth,
             "candidate_memory_max_bytes":singleton210::MEMORY,
             "minimum_available_memory_bytes":required,
             "sampled_available_memory_bytes":required,"actual_available_memory_bytes":required,
             "full210_memory_policy":policy});
-        json!({"memory_before":row,"memory_after":row})
+        let mut capacity = json!({"memory_before":row,"memory_after":row});
+        if let Some(census) = census {
+            for key in [
+                "unit_census_before",
+                "unit_census_after",
+                "unit_census_after_memory_and_guard_checks",
+            ] {
+                capacity[key] = census.clone();
+            }
+        }
+        capacity
     }
 
     #[test]
@@ -541,6 +592,61 @@ mod tests {
                 bad[stage][key] = json!(n - 1);
                 assert!(validate_capacity(&bad).is_err(), "{stage}:{key}");
             }
+        }
+    }
+
+    #[test]
+    fn terminal_consumer_binds_all_raw_censuses_without_equating_incidental_proof_fields() {
+        let proof = terminal_proof();
+        let total = 1_024_000_000_000;
+        let growth = 12345;
+        let (n, policy) = required_with_terminal(
+            &terminal_fleet(&proof),
+            total,
+            growth,
+            singleton210::MEMORY,
+            |_| Ok(proof),
+        )
+        .unwrap();
+        let good = capacity(policy, total, growth, n);
+        let mut independent = good.clone();
+        let after = &mut independent["memory_after"]["full210_memory_policy"]["positive_terminal"];
+        after["process_references"]["inspected_processes"] = json!(99);
+        after["pending_job_units"] = json!(["horizon-unrelated-metadata.service"]);
+        validate_capacity(&independent).unwrap();
+        for key in [
+            "unit_census_before",
+            "unit_census_after",
+            "unit_census_after_memory_and_guard_checks",
+        ] {
+            let mut missing = good.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(validate_capacity(&missing).is_err(), "{key}");
+            let mut missing_owner = good.clone();
+            missing_owner[key]
+                .as_object_mut()
+                .unwrap()
+                .remove(prefix223_native20::UNIT);
+            assert!(validate_capacity(&missing_owner).is_err(), "{key}");
+            let mut different = good.clone();
+            different[key][prefix223_native20::UNIT]["InvocationID"] = json!("b".repeat(32));
+            assert!(validate_capacity(&different).is_err(), "{key}");
+        }
+        // A collected display can pass the terminal reader on its own, but it
+        // must not contradict this admission's retained raw manager rows.
+        let mut different_proof = good.clone();
+        different_proof["memory_after"]["full210_memory_policy"]["positive_terminal"]["current_unit"]
+            ["InvocationID"] = json!("");
+        capped204_native223::validate_terminal_saved(
+            &different_proof["memory_after"]["full210_memory_policy"]["positive_terminal"],
+        )
+        .unwrap();
+        assert!(validate_capacity(&different_proof).is_err());
+        let (_, live) = required(&fleet(), total, growth, singleton210::MEMORY).unwrap();
+        for stage in ["memory_before", "memory_after"] {
+            let mut mixed = good.clone();
+            mixed[stage]["full210_memory_policy"] = live.clone();
+            assert!(validate_capacity(&mixed).is_err(), "{stage}");
         }
     }
     #[test]
