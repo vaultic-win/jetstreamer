@@ -1,10 +1,12 @@
-//! Closed full 210 memory policy while the original native 223 owner is live.
-//! A 90 percent target never overrides native 223's internal available floor.
+//! Closed full 210 memory policy with an exact live or terminal native 223 owner.
+//! Terminal ownership never lowers the preserved 480 GiB available floor.
 use super::*;
 
 const NATIVE223_IID: &str = "e70aaf097e7c4583b216aba454145910";
 const NATIVE223_FLOOR: u64 = 480 << 30;
 const NEW_GUARD_MAX: u64 = 1 << 30;
+const FULL210_LIVE_SCHEMA: &str = "jetstreamer-full210-live223-memory-policy-v1";
+const FULL210_TERMINAL_SCHEMA: &str = "jetstreamer-full210-terminal223-memory-policy-v1";
 
 /// Separate closed candidate policy. Do not broaden the existing 209/210 arms.
 pub(super) fn first_root233_required(
@@ -144,11 +146,49 @@ pub(super) fn required(
     protected_growth: u64,
     producer_max: u64,
 ) -> Result<(u64, Value)> {
-    original_native223(fleet)?;
+    required_with_terminal(
+        fleet,
+        total,
+        protected_growth,
+        producer_max,
+        capped204_native223::prove_terminal,
+    )
+}
+
+// Production supplies only the existing exact terminal observer. Keeping the
+// boundary explicit lets unit tests exercise issuance without service queries.
+fn required_with_terminal(
+    fleet: &Value,
+    total: u64,
+    protected_growth: u64,
+    producer_max: u64,
+    prove_terminal: impl FnOnce(&Value) -> Result<Value>,
+) -> Result<(u64, Value)> {
     ensure!(
         total > 0 && producer_max == singleton210::MEMORY && producer_max <= total,
         "210 full memory envelope differs"
     );
+    let owners = fleet["active"]
+        .as_array()
+        .context("210 full active census missing")?
+        .iter()
+        .map(singleton227_admission::active_owner)
+        .collect::<Result<Vec<_>>>()?;
+    let terminal = if owners
+        .iter()
+        .any(|owner| owner["Id"] == prefix223_native20::UNIT)
+    {
+        original_native223(fleet)?;
+        None
+    } else {
+        let proof = prove_terminal(fleet)?;
+        capped204_native223::validate_terminal_saved(&proof)?;
+        ensure!(
+            fleet["unit_census"][prefix223_native20::UNIT] == proof["current_unit"],
+            "210 terminal native 223 differs from the accepted raw census"
+        );
+        Some(proof)
+    };
     // This preserved full 210 generation's peer memory function returns only
     // remaining hard-cgroup growth. It does not already include a floor top-up.
     let host_baseline = total.div_ceil(10);
@@ -158,17 +198,19 @@ pub(super) fn required(
         .and_then(|n| n.checked_add(producer_max))
         .and_then(|n| n.checked_add(NEW_GUARD_MAX))
         .context("210 protected memory arithmetic overflow")?;
-    Ok((
-        required,
-        json!({"schema":"jetstreamer-full210-live223-memory-policy-v1",
+    let mut policy = json!({"schema":FULL210_LIVE_SCHEMA,
             "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
             "host_baseline_bytes":host_baseline,"native223_available_memory_floor_bytes":NATIVE223_FLOOR,
             "effective_available_memory_floor_bytes":effective_floor,
             "candidate_producer_hard_memory_bytes":producer_max,"candidate_guard_hard_memory_bytes":NEW_GUARD_MAX,
             "protected_existing_hard_memory_growth_bytes":protected_growth,
             "required_available_memory_bytes":required,"floor_counted_once":true,
-            "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
-    ))
+            "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
+    if let Some(proof) = terminal {
+        policy["schema"] = json!(FULL210_TERMINAL_SCHEMA);
+        policy["positive_terminal"] = proof;
+    }
+    Ok((required, policy))
 }
 
 /// A delivery stage is charged once and has no new replay guard.
@@ -222,9 +264,18 @@ pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
             .and_then(|n| n.checked_add(NEW_GUARD_MAX))
             .context("210 captured memory arithmetic overflow")?;
         let policy = &row["full210_memory_policy"];
+        match policy["schema"].as_str() {
+            Some(FULL210_LIVE_SCHEMA) => ensure!(
+                policy.get("positive_terminal").is_none(),
+                "210 live policy cannot borrow terminal evidence"
+            ),
+            Some(FULL210_TERMINAL_SCHEMA) => {
+                capped204_native223::validate_terminal_saved(&policy["positive_terminal"])?;
+            }
+            _ => bail!("210 full memory policy needs exact live or terminal native 223 evidence"),
+        }
         ensure!(
-            policy["schema"] == "jetstreamer-full210-live223-memory-policy-v1"
-                && policy["native223_unit"] == prefix223_native20::UNIT
+            policy["native223_unit"] == prefix223_native20::UNIT
                 && policy["native223_invocation_id"] == NATIVE223_IID
                 && policy["host_baseline_bytes"] == baseline
                 && policy["native223_available_memory_floor_bytes"] == NATIVE223_FLOOR
@@ -254,6 +305,244 @@ pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn terminal_proof() -> Value {
+        let row = |at: u64, mono: u64, id: &str, message: String| {
+            json!({"_PID":"1","_UID":"0","UNIT":prefix223_native20::UNIT,
+                "INVOCATION_ID":NATIVE223_IID,"_BOOT_ID":"a".repeat(32),
+                "__CURSOR":at.to_string(),"__REALTIME_TIMESTAMP":at.to_string(),
+                "__MONOTONIC_TIMESTAMP":mono.to_string(),"MESSAGE_ID":id,"MESSAGE":message})
+        };
+        let mut start = row(
+            1_000_000,
+            10,
+            "39f53479d3a045ac8e11786248231fbf",
+            format!(
+                "Started {} - Private qualification.",
+                prefix223_native20::UNIT
+            ),
+        );
+        start["JOB_TYPE"] = json!("start");
+        start["JOB_RESULT"] = json!("done");
+        let mut exit = row(
+            2_000_000,
+            20,
+            "98e322203f7a4ed290d09fe03c09fe15",
+            format!(
+                "{}: Main process exited, code=exited, status=1/FAILURE",
+                prefix223_native20::UNIT
+            ),
+        );
+        exit["EXIT_CODE"] = json!("exited");
+        exit["EXIT_STATUS"] = json!("1");
+        let failed = row(
+            2_000_001,
+            21,
+            "d9b373ed55a64feb8242e02dbe79a49c",
+            format!(
+                "{}: Failed with result 'exit-code'.",
+                prefix223_native20::UNIT
+            ),
+        );
+        let raw = [start, exit, failed]
+            .iter()
+            .map(|r| format!("{r}\n"))
+            .collect::<String>();
+        let mut proof = capped204_native223::terminal_fixture();
+        proof["outcome"] = json!("failed-needs-repair");
+        for (key, value) in [
+            ("ActiveState", "failed"),
+            ("SubState", "failed"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+        ] {
+            proof["current_unit"][key] = json!(value);
+        }
+        proof["manager_journal_sha256"] = json!(hex_lower(&Sha256::digest(raw.as_bytes())));
+        proof["manager_journal"] = json!(raw);
+        proof
+    }
+
+    fn terminal_fleet(proof: &Value) -> Value {
+        json!({"active":[
+            {"epoch":207,"producer":{"Id":singleton207::UNIT}},
+            {"epoch":209,"producer":{"Id":singleton209::UNIT}},
+            {"epoch":225,"producer":{"Id":"horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service"}},
+            {"epoch":227,"producer":{"Id":canary227::UNIT}}],
+            "unit_census":{(prefix223_native20::UNIT):proof["current_unit"]},
+            "epochs":[{"epoch":223,"state":"failed-needs-repair"}]})
+    }
+
+    fn capacity(policy: Value, total: u64, growth: u64, required: u64) -> Value {
+        let row = json!({"host_total_memory_bytes":total,
+            "protected_existing_memory_growth_bytes":growth,
+            "candidate_memory_max_bytes":singleton210::MEMORY,
+            "minimum_available_memory_bytes":required,
+            "sampled_available_memory_bytes":required,"actual_available_memory_bytes":required,
+            "full210_memory_policy":policy});
+        json!({"memory_before":row,"memory_after":row})
+    }
+
+    #[test]
+    fn live_policy_does_not_observe_or_borrow_terminal_evidence() {
+        let (n, policy) = required_with_terminal(
+            &fleet(),
+            1_024_000_000_000,
+            123,
+            singleton210::MEMORY,
+            |_| panic!("live policy must not query terminal ownership"),
+        )
+        .unwrap();
+        assert_eq!(policy["schema"], FULL210_LIVE_SCHEMA);
+        assert!(policy.get("positive_terminal").is_none());
+        let mut bad = capacity(policy, 1_024_000_000_000, 123, n);
+        bad["memory_before"]["full210_memory_policy"]["positive_terminal"] = terminal_proof();
+        assert!(validate_capacity(&bad).is_err());
+    }
+
+    #[test]
+    fn unknown_active_owner_still_fails_the_shared_complete_roster() {
+        let f = json!({"active":[{"epoch":224,"phase":"diagnostic-qualification",
+            "ordinary_replay_claim":false,"producer":{"Id":"horizon-unknown-repair.service"}}]});
+        assert!(prefix223_live_peer::roster(&f).is_err());
+    }
+
+    #[test]
+    fn terminal_issuer_and_shared_consumer_preserve_floor_guard_and_four_owner_growth() {
+        for proof in [terminal_proof(), capped204_native223::terminal_fixture()] {
+            let f = terminal_fleet(&proof);
+            let before = f.clone();
+            let total = 1_024_000_000_000;
+            let growth = 12345;
+            let (n, policy) =
+                required_with_terminal(&f, total, growth, singleton210::MEMORY, |seen| {
+                    assert_eq!(seen, &before);
+                    Ok(proof.clone())
+                })
+                .unwrap();
+            assert_eq!(f, before, "all four owners and failed history survive");
+            assert_eq!(
+                n,
+                NATIVE223_FLOOR + growth + singleton210::MEMORY + NEW_GUARD_MAX
+            );
+            assert_eq!(policy["schema"], FULL210_TERMINAL_SCHEMA);
+            assert_eq!(policy["positive_terminal"], proof);
+            assert_eq!(
+                policy["effective_available_memory_floor_bytes"],
+                NATIVE223_FLOOR
+            );
+            assert_eq!(policy["candidate_guard_hard_memory_bytes"], NEW_GUARD_MAX);
+            assert_eq!(
+                policy["protected_existing_hard_memory_growth_bytes"],
+                growth
+            );
+            validate_capacity(&capacity(policy, total, growth, n)).unwrap();
+        }
+    }
+
+    #[test]
+    fn terminal_issuer_rejects_missing_proof_changed_census_and_unknown_terminal_owner() {
+        let proof = terminal_proof();
+        let f = terminal_fleet(&proof);
+        assert!(
+            required_with_terminal(&f, 1_024_000_000_000, 0, singleton210::MEMORY, |_| {
+                bail!("no authenticated terminal proof")
+            })
+            .is_err()
+        );
+        let mut changed = f.clone();
+        changed["unit_census"][prefix223_native20::UNIT]["InvocationID"] = json!("b".repeat(32));
+        assert!(
+            required_with_terminal(
+                &changed,
+                1_024_000_000_000,
+                0,
+                singleton210::MEMORY,
+                |_| Ok(proof.clone())
+            )
+            .is_err()
+        );
+        for (pointer, value) in [
+            ("/unit", json!("horizon-unknown-native-owner.service")),
+            ("/invocation_id", json!("b".repeat(32))),
+            ("/original_launch/sha256", json!("f".repeat(64))),
+            ("/manager_journal_sha256", json!("f".repeat(64))),
+            ("/cgroup/state", json!("populated")),
+            ("/process_references/references", json!(["open"])),
+            (
+                "/pending_job_units",
+                json!(["horizon-qualify-223-replacement.service"]),
+            ),
+            ("/failure_history_preserved", json!(false)),
+        ] {
+            let mut bad = proof.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                required_with_terminal(&f, 1_024_000_000_000, 0, singleton210::MEMORY, |_| Ok(bad))
+                    .is_err(),
+                "{pointer}"
+            );
+        }
+    }
+
+    #[test]
+    fn terminal_consumer_rejects_missing_proof_unknown_policy_and_every_reduced_reservation() {
+        let proof = terminal_proof();
+        let total = 1_024_000_000_000;
+        let growth = 12345;
+        let (n, policy) = required_with_terminal(
+            &terminal_fleet(&proof),
+            total,
+            growth,
+            singleton210::MEMORY,
+            |_| Ok(proof),
+        )
+        .unwrap();
+        let good = capacity(policy, total, growth, n);
+        for stage in ["memory_before", "memory_after"] {
+            for (pointer, value) in [
+                ("schema", json!("unknown-policy")),
+                ("positive_terminal", Value::Null),
+                ("positive_terminal/invocation_id", json!("b".repeat(32))),
+                (
+                    "positive_terminal/process_references/references",
+                    json!(["open"]),
+                ),
+                (
+                    "native223_available_memory_floor_bytes",
+                    json!(NATIVE223_FLOOR - 1),
+                ),
+                ("effective_available_memory_floor_bytes", json!(total / 10)),
+                (
+                    "candidate_guard_hard_memory_bytes",
+                    json!(NEW_GUARD_MAX - 1),
+                ),
+                (
+                    "candidate_producer_hard_memory_bytes",
+                    json!(singleton210::MEMORY - 1),
+                ),
+                (
+                    "protected_existing_hard_memory_growth_bytes",
+                    json!(growth - 1),
+                ),
+                ("required_available_memory_bytes", json!(n - 1)),
+            ] {
+                let mut bad = good.clone();
+                *bad.pointer_mut(&format!("/{stage}/full210_memory_policy/{pointer}"))
+                    .unwrap() = value;
+                assert!(validate_capacity(&bad).is_err(), "{stage}:{pointer}");
+            }
+            for key in [
+                "minimum_available_memory_bytes",
+                "sampled_available_memory_bytes",
+                "actual_available_memory_bytes",
+            ] {
+                let mut bad = good.clone();
+                bad[stage][key] = json!(n - 1);
+                assert!(validate_capacity(&bad).is_err(), "{stage}:{key}");
+            }
+        }
+    }
     #[test]
     fn first_root233_preserves_the_exact_live_floor_and_all_hard_growth_once() {
         let total = 1_024_000_000_000;
@@ -387,7 +676,12 @@ mod tests {
     fn omitted_or_terminal_native_owner_never_silently_releases_its_floor() {
         let mut missing = fleet();
         missing["active"].as_array_mut().unwrap().pop();
-        assert!(required(&missing, 1_024_000_000_000, 0, singleton210::MEMORY).is_err());
+        assert!(
+            required_with_terminal(&missing, 1_024_000_000_000, 0, singleton210::MEMORY, |_| {
+                bail!("omitted owner has no authenticated terminal evidence")
+            })
+            .is_err()
+        );
         let mut terminal = fleet();
         terminal["active"][2]["producer"]["ActiveState"] = json!("inactive");
         terminal["unit_census"][prefix223_native20::UNIT] =
