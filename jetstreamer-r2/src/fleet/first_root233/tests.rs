@@ -9,8 +9,9 @@ fn admission_fixture() -> Value {
     let row = json!({"host_total_memory_bytes":total,"protected_existing_memory_growth_bytes":growth,
         "candidate_memory_max_bytes":MEMORY,"minimum_available_memory_bytes":needed,
         "sampled_available_memory_bytes":needed+100,"actual_available_memory_bytes":needed+1,
-        "first_root233_memory_policy":{"schema":"jetstreamer-first-root233-live223-memory-policy-v1",
+        "first_root233_memory_policy":{"schema":"jetstreamer-first-root233-native223-memory-policy-v1",
             "native223_unit":prefix223_native20::UNIT,
+            "native223_floor_state":"live","native223_release_proof":null,
             "native223_invocation_id":"e70aaf097e7c4583b216aba454145910","effective_available_memory_floor_bytes":floor,
             "candidate_producer_hard_memory_bytes":MEMORY,"candidate_guard_and_metadata_hard_memory_bytes":2u64<<30,
             "protected_existing_hard_memory_growth_bytes":growth,"required_available_memory_bytes":needed,"floor_counted_once":true}});

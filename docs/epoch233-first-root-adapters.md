@@ -57,10 +57,14 @@ growth, the candidate's 225 GB cap, and 2 GiB for its new guard and one metadata
 helper. It authenticates the existing shared floor component once. Both complete
 resource brackets are retained; the maximum disk and normalized hard-memory
 obligations must fit every sampled and actual availability value. Identity and
-static cap comparisons stay exact. The initial closed memory policy requires
-the genuine original live 223 owner; releasing that inherited floor after its
-termination needs a separately qualified terminal/guard transition, not an
-inferred absent owner or a lower default for all new jobs.
+static cap comparisons stay exact. The live floor applies while the genuine
+original 223 owner remains active. After it terminates, the shared positive
+release proof must establish the exact original launch/IID and PID1 terminal
+outcome, no pending replacement or trigger, an empty cgroup, no root process
+references, and preserved failure history. Only then does this profile use the
+host baseline. Both brackets and their frozen policies retain the full proof;
+recomputation revalidates it without another live scan. Absence alone grants no
+release, and the existing closed 209/210 policies retain their own rules.
 
 The roster comes from neutral typed legacy accounting plus authenticated capped
 204/205 peer frames and observer registration. There is no three-owner or fixed

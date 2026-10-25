@@ -13,12 +13,44 @@ pub(super) fn first_root233_required(
     protected_growth: u64,
     candidate: u64,
 ) -> Result<(u64, Value)> {
-    original_native223(fleet)?;
     ensure!(
         candidate == first_root233::MEMORY && total >= candidate,
         "first root 233 hard memory candidate differs"
     );
-    let floor = total.div_ceil(10).max(NATIVE223_FLOOR);
+    let owners = fleet["active"]
+        .as_array()
+        .context("first root 233 complete active census absent")?
+        .iter()
+        .map(singleton227_admission::active_owner)
+        .collect::<Result<Vec<_>>>()?;
+    let live = owners
+        .iter()
+        .any(|owner| owner["Id"] == prefix223_native20::UNIT);
+    let terminal = if live {
+        original_native223(fleet)?;
+        None
+    } else {
+        Some(capped204_native223::prove_terminal(fleet)?)
+    };
+    let policy = json!({"schema":"jetstreamer-first-root233-native223-memory-policy-v1",
+        "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
+        "native223_floor_state":if live {"live"}else{"positively-terminal"},"native223_release_proof":terminal});
+    first_root233_recompute(&policy, total, protected_growth, candidate)
+}
+
+pub(super) fn first_root233_recompute(
+    policy: &Value,
+    total: u64,
+    protected_growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    ensure!(
+        candidate == first_root233::MEMORY
+            && total >= candidate
+            && policy["schema"] == "jetstreamer-first-root233-native223-memory-policy-v1",
+        "first root 233 recomputed memory candidate or policy differs"
+    );
+    let floor = first_root233_saved_floor(policy, total)?;
     // The candidate's protective service and at most one metadata helper can
     // overlap replay. Existing guards are already in protected_growth.
     let additional = 2u64 << 30;
@@ -27,15 +59,38 @@ pub(super) fn first_root233_required(
         .and_then(|n| n.checked_add(candidate))
         .and_then(|n| n.checked_add(additional))
         .context("first root 233 memory overflow")?;
-    Ok((
-        required,
-        json!({"schema":"jetstreamer-first-root233-live223-memory-policy-v1",
-        "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
-        "effective_available_memory_floor_bytes":floor,"candidate_producer_hard_memory_bytes":candidate,
-        "candidate_guard_and_metadata_hard_memory_bytes":additional,
-        "protected_existing_hard_memory_growth_bytes":protected_growth,
-        "required_available_memory_bytes":required,"floor_counted_once":true}),
-    ))
+    let mut result = policy.clone();
+    result["effective_available_memory_floor_bytes"] = json!(floor);
+    result["candidate_producer_hard_memory_bytes"] = json!(candidate);
+    result["candidate_guard_and_metadata_hard_memory_bytes"] = json!(additional);
+    result["protected_existing_hard_memory_growth_bytes"] = json!(protected_growth);
+    result["required_available_memory_bytes"] = json!(required);
+    result["floor_counted_once"] = json!(true);
+    Ok((required, result))
+}
+
+pub(super) fn first_root233_saved_floor(policy: &Value, total: u64) -> Result<u64> {
+    ensure!(
+        total > 0
+            && policy["schema"] == "jetstreamer-first-root233-native223-memory-policy-v1"
+            && policy["native223_unit"] == prefix223_native20::UNIT
+            && policy["native223_invocation_id"] == NATIVE223_IID,
+        "first root 233 memory floor owner differs"
+    );
+    match policy["native223_floor_state"].as_str() {
+        Some("live") => {
+            ensure!(
+                policy["native223_release_proof"].is_null(),
+                "live native 223 cannot carry a release exemption"
+            );
+            Ok(total.div_ceil(10).max(NATIVE223_FLOOR))
+        }
+        Some("positively-terminal") => {
+            capped204_native223::validate_terminal_saved(&policy["native223_release_proof"])?;
+            Ok(total.div_ceil(10))
+        }
+        _ => bail!("first root 233 memory floor needs a live owner or positive terminal release"),
+    }
 }
 
 fn original_native223(f: &Value) -> Result<()> {
@@ -228,6 +283,45 @@ mod tests {
         assert!(required(&fleet(), total, growth, first_root233::MEMORY - 1).is_err());
     }
 
+    #[test]
+    fn first_root233_releases_only_a_positively_terminal_original_floor() {
+        let total = 1_024_000_000_000u64;
+        let growth = 12345;
+        let (live, mut policy) =
+            first_root233_required(&fleet(), total, growth, first_root233::MEMORY).unwrap();
+        policy["native223_floor_state"] = json!("positively-terminal");
+        policy["native223_release_proof"] = capped204_native223::terminal_fixture();
+        let (released, proof) =
+            first_root233_recompute(&policy, total, growth, first_root233::MEMORY).unwrap();
+        assert_eq!(
+            released,
+            total.div_ceil(10) + growth + first_root233::MEMORY + (2u64 << 30)
+        );
+        assert!(released < live);
+        assert_eq!(
+            proof["native223_release_proof"],
+            policy["native223_release_proof"]
+        );
+        for (path, value) in [
+            ("/native223_release_proof", Value::Null),
+            ("/native223_floor_state", json!("absent")),
+            (
+                "/native223_release_proof/process_references/references",
+                json!(["open"]),
+            ),
+            (
+                "/native223_release_proof/pending_job_units",
+                json!(["horizon-qualify-223-repair.service"]),
+            ),
+        ] {
+            let mut bad = policy.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(
+                first_root233_recompute(&bad, total, growth, first_root233::MEMORY).is_err(),
+                "{path}"
+            );
+        }
+    }
     fn fleet() -> Value {
         let native = json!({"Id":prefix223_native20::UNIT,"InvocationID":NATIVE223_IID,
             "LoadState":"loaded","ActiveState":"active","SubState":"running","Result":"success",

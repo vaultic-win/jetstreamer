@@ -28,10 +28,6 @@ pub(super) fn roster(f: &Value) -> Result<()> {
         );
     }
     ensure!(
-        seen.contains(prefix223_native20::UNIT),
-        "first root 233 inherited available-memory floor owner absent"
-    );
-    ensure!(
         f["unit_census"]
             .get(UNIT)
             .is_none_or(|v| v["ActiveState"] != "active" && v["SubState"] != "running"),
@@ -276,13 +272,13 @@ pub(super) fn validate_saved(a: &Value) -> Result<()> {
         let growth = row["protected_existing_memory_growth_bytes"]
             .as_u64()
             .context("first root 233 protected memory growth absent")?;
-        let floor = total.div_ceil(10).max(480u64 << 30);
+        let policy = &row["first_root233_memory_policy"];
+        let floor = maintenance_capacity::first_root233_saved_memory_floor(policy, total)?;
         let needed = floor
             .checked_add(growth)
             .and_then(|n| n.checked_add(MEMORY))
             .and_then(|n| n.checked_add(2u64 << 30))
             .context("first root 233 protected memory overflow")?;
-        let policy = &row["first_root233_memory_policy"];
         ensure!(
             row["candidate_memory_max_bytes"] == MEMORY
                 && row["minimum_available_memory_bytes"] == needed
@@ -292,7 +288,7 @@ pub(super) fn validate_saved(a: &Value) -> Result<()> {
                 && row["actual_available_memory_bytes"]
                     .as_u64()
                     .is_some_and(|n| n >= needed)
-                && policy["schema"] == "jetstreamer-first-root233-live223-memory-policy-v1"
+                && policy["schema"] == "jetstreamer-first-root233-native223-memory-policy-v1"
                 && policy["native223_unit"] == prefix223_native20::UNIT
                 && policy["native223_invocation_id"] == "e70aaf097e7c4583b216aba454145910"
                 && policy["effective_available_memory_floor_bytes"] == floor

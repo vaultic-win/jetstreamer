@@ -178,6 +178,66 @@ pub(super) fn prove_terminal(f: &Value) -> Result<Value> {
     )
 }
 
+/// Replay the immutable release evidence without another process or service
+/// observation. The original proof writer still owns the complete live checks.
+pub(super) fn validate_terminal_saved(proof: &Value) -> Result<()> {
+    let raw = proof["manager_journal"]
+        .as_str()
+        .context("native 223 release manager history absent")?
+        .as_bytes();
+    ensure!(
+        raw.len() <= 4 << 20
+            && proof["schema"] == "jetstreamer-capped204-native223-resource-terminal-v1"
+            && proof["unit"] == prefix223_native20::UNIT
+            && proof["invocation_id"] == IID
+            && proof["original_launch"] == json!({"path":LAUNCH,"sha256":LAUNCH_SHA})
+            && proof["manager_journal_sha256"] == hex_lower(&Sha256::digest(raw))
+            && proof["outcome"] == terminal_shape(&proof["current_unit"], raw)?
+            && proof["cgroup"]["path"]
+                == format!("/sys/fs/cgroup/system.slice/{}", prefix223_native20::UNIT)
+            && matches!(
+                proof["cgroup"]["state"].as_str(),
+                Some("absent" | "unpopulated")
+            )
+            && (proof["cgroup"]["state"] == "absent"
+                || canonical_digest(&proof["cgroup"]["events_sha256"]))
+            && proof["process_references"]["references"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+            && proof["process_references"]["inspected_processes"]
+                .as_u64()
+                .is_some()
+            && proof["pending_job_units"]
+                .as_array()
+                .is_some_and(|jobs| jobs
+                    .iter()
+                    .all(|name| name.as_str().is_some_and(|name| !epoch223_job(name))))
+            && proof["released_owner_only"] == true
+            && proof["failure_history_preserved"] == true
+            && proof["archive_qualification_authorized"] == false
+            && proof["publication_authorized"] == false
+            && proof["r2_mutations"] == false,
+        "native 223 saved resource release proof is incomplete or changed"
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+pub(super) fn terminal_fixture() -> Value {
+    let raw = tests::journal(
+        "7ad2d189f7e94e70a38c781354912448",
+        format!("{}: Deactivated successfully.", prefix223_native20::UNIT),
+    );
+    json!({"schema":"jetstreamer-capped204-native223-resource-terminal-v1",
+        "unit":prefix223_native20::UNIT,"invocation_id":IID,"outcome":"natural-success",
+        "original_launch":{"path":LAUNCH,"sha256":LAUNCH_SHA},"current_unit":tests::current(),
+        "manager_journal_sha256":hex_lower(&Sha256::digest(&raw)),"manager_journal":String::from_utf8(raw).unwrap(),
+        "cgroup":{"state":"absent","path":format!("/sys/fs/cgroup/system.slice/{}",prefix223_native20::UNIT)},
+        "process_references":{"inspected_processes":12,"references":[]},"pending_job_units":[],
+        "released_owner_only":true,"failure_history_preserved":true,"archive_qualification_authorized":false,
+        "publication_authorized":false,"r2_mutations":false})
+}
+
 pub(super) fn required(f: &Value, total: u64, growth: u64, candidate: u64) -> Result<(u64, Value)> {
     ensure!(
         total > 0 && matches!(candidate, n if n == 16 << 30 || n == 64 << 30),
@@ -216,13 +276,13 @@ pub(super) fn required(f: &Value, total: u64, growth: u64, candidate: u64) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn current() -> Value {
+    pub(super) fn current() -> Value {
         json!({"Id":prefix223_native20::UNIT,"LoadState":"loaded",
         "MainPID":"0","NRestarts":"0","InvocationID":IID,"ActiveState":"inactive",
         "SubState":"dead","Result":"success","ExecMainStatus":"0",
         "ExecStart":format!("{} ; ignore_errors=no }}", prefix223_native20::command())})
     }
-    fn journal(terminal: &str, message: String) -> Vec<u8> {
+    pub(super) fn journal(terminal: &str, message: String) -> Vec<u8> {
         let row = |time: &str, id: &str, msg: String| {
             json!({"_PID":"1","_UID":"0",
             "UNIT":prefix223_native20::UNIT,"INVOCATION_ID":IID,"__REALTIME_TIMESTAMP":time,
@@ -322,5 +382,25 @@ mod tests {
         assert!(no_replacement(&json!({"active":[]})).is_ok());
         let bad = json!({"active":[{"epoch":223,"phase":"replay","producer":{"Id":"replacement.service"}}]});
         assert!(no_replacement(&bad).is_err());
+    }
+    #[test]
+    fn saved_release_cannot_drop_custody_checks_or_change_the_original_owner() {
+        let proof = terminal_fixture();
+        validate_terminal_saved(&proof).unwrap();
+        for (path, value) in [
+            ("/current_unit/MainPID", json!("42")),
+            ("/current_unit/InvocationID", json!("replacement")),
+            ("/outcome", json!("failed-needs-repair")),
+            ("/manager_journal_sha256", json!("0".repeat(64))),
+            ("/cgroup/state", json!("populated")),
+            ("/cgroup/path", json!("/sys/fs/cgroup/other")),
+            ("/process_references/references", json!(["still open"])),
+            ("/pending_job_units", json!(["archive-223-native.service"])),
+            ("/archive_qualification_authorized", json!(true)),
+        ] {
+            let mut bad = proof.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(validate_terminal_saved(&bad).is_err(), "{path}");
+        }
     }
 }

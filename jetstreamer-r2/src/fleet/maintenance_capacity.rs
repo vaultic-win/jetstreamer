@@ -143,6 +143,9 @@ pub(super) fn check_first_root233(value: &Value) -> Result<Value> {
         MemoryMode::FirstRoot233,
     )
 }
+pub(super) fn first_root233_saved_memory_floor(policy: &Value, total: u64) -> Result<u64> {
+    singleton210_memory::first_root233_saved_floor(policy, total)
+}
 pub(super) fn check_singleton209_delivery(value: &Value, candidate: Candidate) -> Result<Value> {
     ensure!(
         candidate.additional_bytes == 1 << 30
@@ -446,8 +449,8 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
         };
         let hard = n(&memory_before, "protected_existing_memory_growth_bytes")?
             .max(n(&memory_after, "protected_existing_memory_growth_bytes")?);
-        let (recomputed_memory, policy) = singleton210_memory::first_root233_required(
-            &f,
+        let (recomputed_memory, policy) = singleton210_memory::first_root233_recompute(
+            &memory_after["first_root233_memory_policy"],
             n(&memory_after, "host_total_memory_bytes")?,
             hard,
             candidate.memory_max_bytes,
