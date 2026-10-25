@@ -1,0 +1,81 @@
+{
+  "schema": "jetstreamer-epoch207-admitted-metadata-preflight-proposal-v1",
+  "executed": false,
+  "authorization": "Requires separate parent authorization; metadata-only planning, not replay admission.",
+  "unit_proposal": "horizon-207-singleton-preflight-admitted-md5-v1.service",
+  "run_root_proposal": "/home/ubuntu/.jetstreamer-private/qualification-207-singleton-preflight-admitted-md5-v1",
+  "run_root_and_output_must_be_precreated_user1000_mode0700": true,
+  "node": {
+    "path": "/var/lib/jetstreamer/horizon-207-singleton-node-08e1-v1/jetstreamer-node",
+    "sha256": "08e14bb09a1cbf762ed1b8910a1d8a9e949f0a5890984060304bc6c7d45206f7"
+  },
+  "argv": [
+    "/var/lib/jetstreamer/horizon-207-singleton-node-08e1-v1/jetstreamer-node",
+    "207",
+    "/home/ubuntu/.jetstreamer-private/qualification-207-singleton-preflight-admitted-md5-v1/output",
+    "--verify",
+    "--root-checkpoint-cohort",
+    "--cohort-manifest=/var/lib/jetstreamer/horizon-207-root-metadata-candidate-reviewed-20261025-sdk59001-v1/preflight207-singleton-candidate.json",
+    "--cohort-manifest-fingerprint=sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7",
+    "--snapshot-archive=/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+    "--epoch207-singleton-preflight"
+  ],
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/home/ubuntu",
+    "RUST_LOG": "info",
+    "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME": "1",
+    "JETSTREAMER_HISTORICAL_WORKER_V1_6_16": "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/jetstreamer-historical-worker-v1-6-16-store8",
+    "TOKIO_WORKER_THREADS": "8",
+    "RAYON_NUM_THREADS": "8",
+    "SOLANA_RAYON_THREADS": "8"
+  },
+  "bounded_metadata_only_unit_requirements": {
+    "User": "ubuntu",
+    "Group": "ubuntu",
+    "Type": "exec",
+    "Restart": "no",
+    "KillMode": "control-group",
+    "RemainAfterExit": "yes",
+    "PrivateNetwork": "yes",
+    "MemoryMax": 1073741824,
+    "MemorySwapMax": 0,
+    "TasksMax": 512,
+    "CPUQuota": "800%",
+    "RuntimeMaxSec": 120,
+    "NoNewPrivileges": "yes",
+    "ProtectSystem": "strict",
+    "ProtectHome": "read-only",
+    "ReadWritePaths": [
+      "/home/ubuntu/.jetstreamer-private/qualification-207-singleton-preflight-admitted-md5-v1"
+    ]
+  },
+  "expected_stdout": {
+    "schema": "jetstreamer-private-epoch207-singleton-preflight-v1",
+    "epoch": 207,
+    "bootstrap_slot": 89423444,
+    "output_slot_start": 89424000,
+    "output_slot_end_exclusive": 89856000,
+    "canonical_root_slots": [
+      89523820,
+      89855469
+    ],
+    "manifest_fingerprint": "sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7",
+    "runtime": "solana-v1.6.16",
+    "candidate_only": true,
+    "full_epoch_replay_qualified": false,
+    "snapshot_restored": false,
+    "worker_started": false,
+    "replay_entries": 0,
+    "publication_authorized": false,
+    "remote_mutations": false,
+    "r2_mutations": false
+  },
+  "capture_requirements": [
+    "New no-clobber raw stdout/journal and actual loaded effective manager properties; preserve actual IID, ExecStart, executable hash, natural zero completion and zero-replay markers.",
+    "Keep RemainAfterExit until evidence capture so daemon collection cannot substitute historical/default ExecStart trailers.",
+    "Do not reuse old50896e94 preflight proof as if it proved new9df04afe fingerprint.",
+    "No snapshot body, worker, runtime, cloud or resource observation is part of metadata-only preflight."
+  ],
+  "source_basis": "Existing closed epoch207_singleton validate_launch/validate_plan and main metadata-only early return; no producer binary pin change is proposed merely for MD5 metadata."
+}

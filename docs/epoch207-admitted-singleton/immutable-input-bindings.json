@@ -1,0 +1,86 @@
+{
+  "schema": "jetstreamer-epoch207-admitted-singleton-next-step-bindings-v1",
+  "coherent_r2_source_base": "df57e9c041ab62f230c06cba4b95bf613ca6b2a4",
+  "reviewed_metadata_candidate": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-candidate-reviewed-20261025-sdk59001-v1/preflight207-singleton-candidate.json",
+    "sha256": "801707df48654c272b0fffc1005eea97b90dbd1ffe59190aede1c1616e134379",
+    "manifest_fingerprint": "sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7"
+  },
+  "authenticated_metadata_evidence": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-authenticated-20261025-sdk59001-v1/metadata-evidence.json",
+    "sha256": "41262e1c49c26c72009ef5ec3d6fbdee081873cbb64c4983398f9d7555478176",
+    "bytes": 3727,
+    "observed_mode": "0600",
+    "uid": 0,
+    "immutable_copy_required_for_admission": true
+  },
+  "preserved_native_proof": {
+    "path": "/var/lib/jetstreamer/horizon-native207-terminal-proof-v1/proof.json",
+    "sha256": "ed39b654d78d4530f82877866d4474435beb353503ad1d3ebfcae04823489819",
+    "bytes": 3031,
+    "observed_mode": "0400",
+    "uid": 0
+  },
+  "existing_closed_singleton_node": {
+    "path": "/var/lib/jetstreamer/horizon-207-singleton-node-08e1-v1/jetstreamer-node",
+    "sha256": "08e14bb09a1cbf762ed1b8910a1d8a9e949f0a5890984060304bc6c7d45206f7"
+  },
+  "existing_worker": {
+    "path": "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/jetstreamer-historical-worker-v1-6-16-store8",
+    "sha256": "3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a",
+    "unchanged_existing_worker_proposal": true
+  },
+  "preserved_bootstrap": {
+    "path": "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+    "sha256": "8af3cd20c8f9820dacd25932fc6b7938193e0d1a5dc83d8ddd59dfeea69b2ddc",
+    "bytes": 8474139490
+  },
+  "genesis": {
+    "path": "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/genesis.tar.bz2",
+    "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+    "bytes": 20144
+  },
+  "prior_metadata_base": {
+    "path": "/var/lib/jetstreamer/horizon-207-singleton-metadata-v1/preflight207-singleton.json",
+    "sha256": "a921cb0be8c518950b0611d2f03cfa05576655f3160be5732b2bc3157213a580",
+    "manifest_fingerprint": "sha256:50896e94150b8ca275a628bf1c760d81b45a8e5ac7bb5425c7e0d0b0d2f8b1e4"
+  },
+  "scope": {
+    "epoch": 207,
+    "bootstrap_slot": 89423444,
+    "replay_first_slot": 89423445,
+    "output_first_slot": 89424000,
+    "output_last_slot": 89855999,
+    "output_slot_count": 432000,
+    "canonical_accounts_roots": [
+      {
+        "slot": 89523820,
+        "accounts_hash": "7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik"
+      },
+      {
+        "slot": 89855469,
+        "accounts_hash": "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK"
+      }
+    ],
+    "post_last_known_root_slots": 530,
+    "epoch208_requested": false
+  },
+  "preserved_native_tuple": {
+    "slot": "89423444",
+    "bank_hash": "EzH8ssxUMpcqku5DUXiMhvmdXEtvr6HveAv9dM2Vsiib",
+    "accounts_hash": "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px",
+    "last_blockhash": "C3UvZbEzYj5vvQnogdekZcGhmvWfmonYWfn2xW2KAV7Y",
+    "capitalization": "500584876715315613",
+    "transaction_count": "22383626920",
+    "tick_height": "5723100480",
+    "next_write_version": "86171593405",
+    "replay_entries": "0",
+    "bootstrap_writes": "0"
+  },
+  "no_native_proof_or_snapshot_replacement": true,
+  "actual_preflight_for_new_fingerprint_available": false,
+  "full_replay_admission_available": false,
+  "launch_authorized": false,
+  "publication_authorized": false,
+  "actions_performed": "Source and small preserved metadata reads only; no Cargo, target, cloud, runtime, service, resource poll or R2 action."
+}

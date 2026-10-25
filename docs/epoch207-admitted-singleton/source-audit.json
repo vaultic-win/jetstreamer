@@ -1,0 +1,77 @@
+{
+  "schema": "jetstreamer-epoch207-admitted-singleton-source-audit-v1",
+  "source_base": "df57e9c041ab62f230c06cba4b95bf613ca6b2a4",
+  "source_files": [
+    {
+      "path": "jetstreamer-node/src/epoch207_singleton.rs",
+      "sha256": "156c649ffcd94987ec8f0781726350c60b6518acbd0dbacc2eab2272ede0f30d",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-node/src/main.rs",
+      "sha256": "ba5be6068a21b6a29da2b56cbc0b118f7e7cc6781c8ccf2b8bcc6c3e99665f1d",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet.rs",
+      "sha256": "5e6046df7654704142dabbae2863558ea4b7a3a67e857c0988dc9e43493add89",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/main.rs",
+      "sha256": "36fd7ffe24e9681565f5d60fb718b067400ea164817b80c22d9ee28eb00a7f49",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/native207.rs",
+      "sha256": "70c228fd4e89eebb2ebb3508a736f04ecb7c149165393d0bbb08257a21d3f902",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/native207_admission.rs",
+      "sha256": "34ed3663813c63063fd25b85b05ba5f3c03d00e2e7bc4383df44ec057465df2b",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/native207_terminal.rs",
+      "sha256": "c62e532b73d24c78634aab643544d149d28f5c5886625367db8f52b966eeb1ea",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/singleton209.rs",
+      "sha256": "33f631c3a9e3d10268ccbdc93995741f879141e911f6abf754c93a15597c26a4",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/singleton209_admission.rs",
+      "sha256": "39ea7f63ae263b068c6219d9bbe7e213cf46be895150aef36129591462cedb8b",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/singleton209_prepare.rs",
+      "sha256": "5403669b5ae251a792dd84a6039cc4afbd00cd19bd659f7500d7ebddea4859a0",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/maintenance_capacity.rs",
+      "sha256": "d667deef50ca18630d7e61b78252c219483bb05c578b7b02d2519f3aebd09d60",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/first_root233/admission.rs",
+      "sha256": "93085251f3dc7a8a56c7bc6209fe6dc9e2e0ad511431ebf727536b6204d70862",
+      "equals_coherent_source_df57e9c0": true
+    },
+    {
+      "path": "jetstreamer-r2/src/fleet/capped204205_work.rs",
+      "sha256": "3a4c15e15738fd787170503c9d8c61a7e57964e1f50c1dda197a83ab07233f7a",
+      "equals_coherent_source_df57e9c0": true
+    }
+  ],
+  "existing_native207_only_accepts_bootstrap_phase": true,
+  "full_singleton207_admission_route_found": false,
+  "closed_node_metadata_preflight_available": true,
+  "source_code_changed": false,
+  "cargo_or_target_used": false,
+  "runtime_service_cloud_resource_or_r2_actions": false
+}

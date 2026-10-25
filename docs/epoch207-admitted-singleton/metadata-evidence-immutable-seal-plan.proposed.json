@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/var/lib/jetstreamer/horizon-207-root-metadata-authenticated-reviewed-20261025-sdk59001-v1",
+  "members": [
+    {
+      "source": "/var/lib/jetstreamer/horizon-207-root-metadata-authenticated-20261025-sdk59001-v1/metadata-evidence.json",
+      "name": "metadata-evidence.json",
+      "sha256": "41262e1c49c26c72009ef5ec3d6fbdee081873cbb64c4983398f9d7555478176",
+      "mode": 292
+    }
+  ]
+}
