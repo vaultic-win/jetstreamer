@@ -73,7 +73,7 @@ fn exact_scope(b: &BoundFile, v: &Value, plan: &BoundFile, unit: &BoundFile) -> 
             && b.sha256 == RECEIPT_SHA
             && plan.path == Path::new(PLAN)
             && plan.sha256 == PLAN_SHA
-            && unit.path == PathBuf::from(format!("/etc/systemd/system/{UNIT}"))
+            && unit.path == Path::new(&format!("/etc/systemd/system/{UNIT}"))
             && unit.sha256 == UNIT_SHA
             && v["invocation_id"] == IID
             && v["bindings"]["self_sha256"] == c::RUNNER_SHA
