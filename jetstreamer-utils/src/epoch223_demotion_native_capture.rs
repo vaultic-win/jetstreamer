@@ -58,10 +58,54 @@ struct Completion {
     publication_authorized: bool,
     r2_mutations: bool,
 }
-fn output_valid(bytes: &[u8]) -> Result<()> {
+struct Tuple {
+    slot: u64,
+    bank: String,
+    accounts: String,
+    last: String,
+    capitalization: u64,
+    transactions: u64,
+    tick: u64,
+    write: u64,
+    replay: u64,
+    bootstrap_writes: u64,
+    passed: u64,
+    ignored: u64,
+}
+fn observed_tuple(marker: &str, passed: u64, ignored: u64) -> Result<Tuple> {
+    let mut fields = BTreeMap::new();
+    for token in marker.split_whitespace().skip(1) {
+        let (key, value) = token.split_once('=').context("223 native tuple token")?;
+        ensure!(
+            fields.insert(key, value).is_none(),
+            "223 duplicate actual tuple key"
+        );
+    }
+    let mut take =
+        |key| -> Result<String> { Ok(fields.remove(key).context("223 native tuple key")?.into()) };
+    let tuple = Tuple {
+        slot: take("slot")?.parse()?,
+        bank: take("bank_hash")?,
+        accounts: take("accounts_hash")?,
+        last: take("last_blockhash")?,
+        capitalization: take("capitalization")?.parse()?,
+        transactions: take("transaction_count")?.parse()?,
+        tick: take("tick_height")?.parse()?,
+        write: take("next_write_version")?.parse()?,
+        replay: take("replay_entries")?.parse()?,
+        bootstrap_writes: take("bootstrap_writes")?.parse()?,
+        passed,
+        ignored,
+    };
+    ensure!(fields.is_empty(), "223 unexpected actual tuple key");
+    Ok(tuple)
+}
+fn output_valid(bytes: &[u8]) -> Result<Tuple> {
     let text = std::str::from_utf8(bytes)?;
     let mut marker = None;
+    let mut actual_marker = String::new();
     let mut success = None;
+    let (mut passed, mut ignored) = (0u64, 0u64);
     for (line_number, line) in text.lines().enumerate() {
         if let Some((_, tail)) = line.split_once("epoch223-v1620-native-input ") {
             ensure!(
@@ -69,6 +113,7 @@ fn output_valid(bytes: &[u8]) -> Result<()> {
                     && format!("epoch223-v1620-native-input {tail}") == MARKER,
                 "223 new harness canonical tuple differs or repeats"
             );
+            actual_marker = format!("epoch223-v1620-native-input {tail}");
         }
         if line.starts_with("test result:") {
             ensure!(
@@ -76,13 +121,23 @@ fn output_valid(bytes: &[u8]) -> Result<()> {
                     && line.starts_with("test result: ok. 1 passed; 0 failed; 0 ignored;"),
                 "223 actual test did not pass exactly once without ignored tests"
             );
+            passed = line
+                .split_whitespace()
+                .nth(3)
+                .context("223 actual passed count")?
+                .parse()?;
+            ignored = line
+                .split_whitespace()
+                .nth(7)
+                .context("223 actual ignored count")?
+                .parse()?;
         }
     }
     ensure!(
         marker.zip(success).is_some_and(|(m, s)| m < s),
         "223 canonical marker must precede actual one-test success"
     );
-    Ok(())
+    observed_tuple(&actual_marker, passed, ignored)
 }
 fn journal_valid(bytes: &[u8], actor: &Actor) -> Result<()> {
     let (mut start, mut terminal) = (None, None);
@@ -228,7 +283,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         "223 actual new harness result differs"
     );
     let stdout = bound_bytes(&result.harness_stdout, 0, 64 << 20)?;
-    output_valid(&stdout)?;
+    let tuple = output_valid(&stdout)?;
     let journal = bound_bytes(&spec.journal, 0, 16 << 20)?;
     journal_valid(&journal, &launch.supervisor)?;
     let keys = "Id,InvocationID,NRestarts,MainPID,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,Type,User,Restart,ExecStart";
@@ -273,29 +328,32 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     );
     let proof = NativeProof {
         schema: "jetstreamer-epoch223-demotion-native-input-proof-v1".into(),
-        source_commit: SOURCE.into(),
-        worker_sha256: WORKER.into(),
-        harness_sha256: HARNESS.into(),
+        source_commit: launch.source_commit,
+        worker_sha256: launch.worker_sha256,
+        harness_sha256: launch.harness.sha256,
         test_name: TEST.into(),
-        source_qa_sha256: QA.into(),
-        manager_success: true,
-        restart_count: 0,
-        snapshot_sha256: SNAPSHOT.into(),
-        genesis_sha256: GENESIS.into(),
-        success: true,
-        bootstrap_slot: 96_335_538,
-        bank_hash: "8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F".into(),
-        accounts_hash: "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE".into(),
-        last_blockhash: "9cdE7Epzr7jcLCz8Ke2Lndf8DBqb3DJmxedKaKuCJHaa".into(),
-        capitalization: 503_889_539_326_183_230,
-        transaction_count: 27_822_879_094,
-        tick_height: 6_165_474_496,
-        next_write_version: 105_933_183_112,
+        source_qa_sha256: launch.source_qa_sha256,
+        manager_success: terminal.get("Result").map(String::as_str) == Some("success"),
+        restart_count: terminal
+            .get("NRestarts")
+            .context("223 actual restart count")?
+            .parse()?,
+        snapshot_sha256: launch.snapshot.sha256,
+        genesis_sha256: launch.genesis.sha256,
+        success: result.success,
+        bootstrap_slot: tuple.slot,
+        bank_hash: tuple.bank,
+        accounts_hash: tuple.accounts,
+        last_blockhash: tuple.last,
+        capitalization: tuple.capitalization,
+        transaction_count: tuple.transactions,
+        tick_height: tuple.tick,
+        next_write_version: tuple.write,
         slot_complete: true,
-        replay_entries: 0,
-        bootstrap_writes: 0,
-        passed_tests: 1,
-        ignored_tests: 0,
+        replay_entries: tuple.replay,
+        bootstrap_writes: tuple.bootstrap_writes,
+        passed_tests: tuple.passed,
+        ignored_tests: tuple.ignored,
         actual_unit: launch.supervisor.unit,
         actual_invocation_id: launch.supervisor.invocation_id,
         launch: spec.launch,

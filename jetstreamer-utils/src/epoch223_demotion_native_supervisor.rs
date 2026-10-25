@@ -99,6 +99,7 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
         ensure!(
             issue.schema == "jetstreamer-epoch223-demotion-native-issue-spec-v1"
                 && issue.phase == w.phase
+                && issue.issuer_unit == grant.issuer.unit
                 && issue.runtime_plan == *w.binding
                 && issue.runner == *w.actor
                 && issue.guard == grant.guard
