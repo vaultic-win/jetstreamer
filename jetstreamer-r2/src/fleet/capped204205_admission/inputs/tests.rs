@@ -311,3 +311,25 @@ fn probe_command_accepts_one_actual_manager_record_without_relaxing_identity() {
         assert!(!probe_exec_start_matches(expected, &bad), "accepted {bad}");
     }
 }
+
+#[test]
+fn thread_profile_proposal_binds_exactly_eight_sorted_cpu_ids_and_keeps_old_history() {
+    let (s, p, mut r) = fixture();
+    proposal(&s, &p, &r).unwrap();
+    let profile = json!({"schema":"jetstreamer-capped204205-eight-thread-profile-v1","cpu_ids":[0,1,2,3,4,5,6,7]});
+    r["kernel_limits"]["thread_profile"] = profile.clone();
+    proposal(&s, &p, &r).unwrap();
+    for ids in [
+        json!([]),
+        json!([0, 1, 2, 3, 4, 5, 6]),
+        json!([0, 1, 2, 3, 4, 5, 6, 7, 8]),
+        json!([0, 1, 2, 3, 4, 5, 6, 6]),
+        json!([7, 6, 5, 4, 3, 2, 1, 0]),
+    ] {
+        let mut bad = r.clone();
+        bad["kernel_limits"]["thread_profile"]["cpu_ids"] = ids;
+        assert!(proposal(&s, &p, &bad).is_err());
+    }
+    r["kernel_limits"]["thread_profile"]["unexpected"] = json!(true);
+    assert!(proposal(&s, &p, &r).is_err());
+}

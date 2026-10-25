@@ -291,7 +291,7 @@ fn heartbeat(
 fn props(name: &str) -> Result<BTreeMap<String, String>> {
     singleton227_capture::properties(
         name,
-        "Id,InvocationID,MainPID,NRestarts,ActiveState,SubState,ControlGroup,ExecStart,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec",
+        "Id,InvocationID,MainPID,NRestarts,ActiveState,SubState,ControlGroup,ExecStart,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,Environment,CPUAffinity",
     )
 }
 fn field(p: &BTreeMap<String, String>, key: &str) -> Result<u64> {
@@ -364,6 +364,23 @@ fn producer_limits(
     let properties = props(name)?;
     identity(&properties, &current[name])?;
     let k = &peer.input.admission["kernel_limits"];
+    if let Some(value) = k.get("thread_profile") {
+        let profile: super::super::capped204205_thread_profile::ThreadProfile =
+            serde_json::from_value(value.clone())?;
+        profile.check_manager(&properties)?;
+        ensure!(
+            g["actual_kernel_limits"]["thread_profile"] == *value
+                && g["processes"]["thread_profile"] == *value,
+            "current guard lost exact thread profile"
+        );
+        profile.check_process(field(&properties, "MainPID")?.try_into()?)?;
+        for worker in g["processes"]["workers"]
+            .as_array()
+            .context("thread profile worker census")?
+        {
+            profile.check_process(number(worker, "pid")?.try_into()?)?;
+        }
+    }
     let page = number(&g["actual_kernel_limits"], "host_page_size_bytes")?;
     ensure!(
         page >= 4096 && page.is_power_of_two(),

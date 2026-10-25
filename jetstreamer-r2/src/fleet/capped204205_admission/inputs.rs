@@ -90,9 +90,19 @@ pub(super) fn proposal(s: &Spec, p: &Value, r: &Value) -> Result<()> {
     );
     let k = &r["kernel_limits"];
     ensure!(
-        k.as_object().is_some_and(|o| o.len() == 6),
-        "capped kernel limits must have exactly six numeric fields"
+        k.as_object().is_some_and(|o| o.len()
+            == if o.contains_key("thread_profile") {
+                7
+            } else {
+                6
+            }),
+        "capped kernel limits must have six numeric fields and optional exact thread profile"
     );
+    if let Some(profile) = k.get("thread_profile") {
+        let profile: super::super::capped204205_thread_profile::ThreadProfile =
+            serde_json::from_value(profile.clone())?;
+        profile.validate()?;
+    }
     let memory = number(k, "requested_memory_max_bytes")?;
     let high = number(k, "requested_memory_high_bytes")?;
     let runtime = number(k, "runtime_max_usec")?;
@@ -154,6 +164,15 @@ pub(super) fn source_closure(s: &Spec, p: &Value) -> Result<()> {
         ensure!(
             files.contains_key(name),
             "capped source closure omitted:{name}"
+        );
+    }
+    // A new thread-profile proposal must capture the source that enforces it;
+    // old immutable closures remain readable without rewriting history.
+    let proposal = native209::immutable_json(&s.resource_proposal)?;
+    if proposal["kernel_limits"].get("thread_profile").is_some() {
+        ensure!(
+            files.contains_key("capped_thread_profile.rs") && files.contains_key("main.rs"),
+            "thread profile source closure omitted entrypoint or contract"
         );
     }
     ensure!(
@@ -392,6 +411,20 @@ fn probe_result(cap: &Value, probe: &BoundFile, plan: &BoundFile, result: &Value
     denied(result)?;
     let actual = &result["actual_kernel"];
     let k = &cap["kernel_limits"];
+    if let Some(value) = k.get("thread_profile") {
+        let profile: super::super::capped204205_thread_profile::ThreadProfile =
+            serde_json::from_value(value.clone())?;
+        let manager: std::collections::BTreeMap<String, String> = serde_json::from_value(
+            result["guard_observations"]["producer_manager_before"].clone(),
+        )?;
+        profile.check_manager(&manager)?;
+        ensure!(
+            actual["thread_profile"] == *value
+                && result["guard_observations"]["actual_process_sample"]["thread_profile"]
+                    == *value,
+            "actual disposable probe lost exact thread profile"
+        );
+    }
     let page = number(actual, "host_page_size_bytes")?;
     ensure!(
         page > 0 && page.is_power_of_two(),

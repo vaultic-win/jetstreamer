@@ -6094,3 +6094,8 @@ mod singleton_discovery_tests {
         }
     }
 }
+
+// Shared producer contract; entrypoint-only methods are unused in the R2 consumer.
+#[allow(dead_code)]
+#[path = "../../jetstreamer-node/src/capped_thread_profile.rs"]
+mod capped204205_thread_profile;
