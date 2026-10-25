@@ -124,6 +124,18 @@ pub(super) fn proposal(s: &Spec, p: &Value, r: &Value) -> Result<()> {
     );
     Ok(())
 }
+/// New positive admission is a mutation boundary, distinct from interpreting
+/// an immutable historical six-field receipt or proposal.
+pub(super) fn require_fresh_thread_profile(r: &Value) -> Result<()> {
+    let profile: super::super::capped204205_thread_profile::ThreadProfile = serde_json::from_value(
+        r["kernel_limits"]
+            .get("thread_profile")
+            .context("new capped admission requires an explicit eight-CPU thread profile")?
+            .clone(),
+    )?;
+    profile.validate()
+}
+
 fn bound_member(v: &Value) -> Result<BoundFile> {
     let b: BoundFile = serde_json::from_value(v.clone())?;
     ensure!(

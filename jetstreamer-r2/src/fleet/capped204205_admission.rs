@@ -603,6 +603,7 @@ pub(super) fn run() -> Result<()> {
     let p = native209::immutable_json(&s.producer_plan)?;
     let proposal = native209::immutable_json(&s.resource_proposal)?;
     inputs::proposal(&s, &p, &proposal)?;
+    inputs::require_fresh_thread_profile(&proposal)?;
     inputs::source_closure(&s, &p)?;
     let capability = inputs::capability(&s, &p, &proposal)?;
     runtime_inputs(&s, &p)?;
@@ -751,6 +752,7 @@ pub(super) fn run() -> Result<()> {
     runtime_inputs(&s, &p)?;
     fresh_root(&p)?;
     readable(&readable_mirror.path)?;
+    inputs::require_fresh_thread_profile(&proposal)?;
     publish(&s.output, &receipt)?;
     Ok(())
 }

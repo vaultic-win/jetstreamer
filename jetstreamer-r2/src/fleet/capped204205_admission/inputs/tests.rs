@@ -333,3 +333,31 @@ fn thread_profile_proposal_binds_exactly_eight_sorted_cpu_ids_and_keeps_old_hist
     r["kernel_limits"]["thread_profile"]["unexpected"] = json!(true);
     assert!(proposal(&s, &p, &r).is_err());
 }
+
+#[test]
+fn fresh_admission_rejects_legacy_profile_without_rewriting_historical_interpretation() {
+    let (s, p, mut r) = fixture();
+    // The original proposal remains interpretable as immutable history.
+    proposal(&s, &p, &r).unwrap();
+    assert!(require_fresh_thread_profile(&r).is_err());
+    let profile = json!({"schema":"jetstreamer-capped204205-eight-thread-profile-v1","cpu_ids":[0,1,2,3,4,5,6,7]});
+    r["kernel_limits"]["thread_profile"] = profile.clone();
+    proposal(&s, &p, &r).unwrap();
+    require_fresh_thread_profile(&r).unwrap();
+    for bad in [
+        Value::Null,
+        json!({}),
+        json!({"schema":"other","cpu_ids":[0,1,2,3,4,5,6,7]}),
+        json!({"schema":"jetstreamer-capped204205-eight-thread-profile-v1","cpu_ids":[0,1,2,3,4,5,6]}),
+        json!({"schema":"jetstreamer-capped204205-eight-thread-profile-v1","cpu_ids":[0,1,2,3,4,5,6,7,8]}),
+    ] {
+        r["kernel_limits"]["thread_profile"] = bad;
+        assert!(require_fresh_thread_profile(&r).is_err());
+    }
+    r["kernel_limits"]
+        .as_object_mut()
+        .unwrap()
+        .remove("thread_profile");
+    proposal(&s, &p, &r).unwrap();
+    assert!(require_fresh_thread_profile(&r).is_err());
+}
