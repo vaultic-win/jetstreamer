@@ -24,7 +24,6 @@ mod canary227_status;
 mod canary227_terminal;
 mod capped204205_admission;
 mod capped204205_work;
-mod original_capped204205;
 mod census141_poh;
 mod cold223_scan;
 mod continuation144;
@@ -36,6 +35,7 @@ mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
 mod epoch136;
+mod first_root233;
 mod foundation_holding_capacity;
 mod full209_status;
 mod full210_peer;
@@ -83,6 +83,7 @@ mod original141_capped;
 mod original141_freeze;
 mod original141_trace;
 mod original141_vote_prefix;
+mod original_capped204205;
 mod output_credit204205;
 mod ownroot203_rebase;
 mod prefix144;
@@ -103,6 +104,7 @@ mod prefix223_native20_status;
 mod private144;
 mod private144_scan;
 mod private157;
+mod private_prefix;
 mod publication144_history;
 mod publication203;
 mod ram_auxiliary;
@@ -176,6 +178,20 @@ pub(super) fn prefix223_native20_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
 ) -> Result<Option<(String, String)>> {
     prefix223_native20_status::inactive_owner(receipt)
+}
+pub(super) fn admit_first_root233() -> Result<()> {
+    first_root233::admit()
+}
+pub(super) fn capture_first_root233() -> Result<()> {
+    first_root233::capture_launch()
+}
+pub(super) async fn publish_first_root233_status() -> Result<()> {
+    first_root233::publish_status().await
+}
+pub(super) fn first_root233_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    first_root233::inactive_owner(receipt)
 }
 pub(super) fn retire_warmup223_scratch() -> Result<()> {
     warmup223_retire::run()
@@ -452,14 +468,19 @@ pub(super) fn capped204205_origin_scope(epoch: u64, unit: &str) -> Result<()> {
 pub(super) fn capped204205_cleanup_allowed(f: &Value, epoch: u64) -> bool {
     capped204205_work::cleanup_allowed(f, epoch)
 }
-pub(super) fn original_capped204205_terminal_time(epoch:u64,e:&Value)->Result<Option<u64>> {
-    original_capped204205::terminal_time(epoch,e)
+pub(super) fn original_capped204205_terminal_time(epoch: u64, e: &Value) -> Result<Option<u64>> {
+    original_capped204205::terminal_time(epoch, e)
 }
-pub(super) fn original_capped204205_terminal_current(epoch:u64,e:&Value,current:&BTreeMap<String,Value>,owners:&[(String,String)])->Result<bool> {
-    original_capped204205::terminal_current(epoch,e,current,owners)
+pub(super) fn original_capped204205_terminal_current(
+    epoch: u64,
+    e: &Value,
+    current: &BTreeMap<String, Value>,
+    owners: &[(String, String)],
+) -> Result<bool> {
+    original_capped204205::terminal_current(epoch, e, current, owners)
 }
-pub(super) fn original_capped204205_repair_scope(name:&str,first:u64,last:u64)->bool {
-    original_capped204205::repair_unit(name,first,last)
+pub(super) fn original_capped204205_repair_scope(name: &str, first: u64, last: u64) -> bool {
+    original_capped204205::repair_unit(name, first, last)
 }
 pub(super) fn capped204205_cleanup_current(
     f: &Value,
@@ -726,6 +747,9 @@ fn validate_private_225_terminal(value: &Value) -> Result<()> {
 fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     let launch = bound_json(&claim.launch_receipt)?;
     validate_diagnostic_launch(&launch, claim)?;
+    if first_root233::namespace(claim) {
+        first_root233::bindings(claim, &launch)?;
+    }
     if private_225_verification(claim) {
         let evidence: BoundFile = serde_json::from_value(launch["terminal_evidence"].clone())?;
         validate_private_225_terminal(&bound_json(&evidence)?)?;
@@ -1270,6 +1294,7 @@ fn validate_same_sample_admission(
         223 if tail223::namespace(claim) => tail223::GUARD_SHA,
         223 if prefix223::namespace(claim) => prefix223::GUARD_SHA,
         223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
+        233 if first_root233::namespace(claim) => first_root233::GUARD_SHA,
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -1467,6 +1492,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if first_root233::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| first_root233::guard_matches(claim, &r, plan));
+    }
     if verification223::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| verification223::guard_matches(claim, &r, plan));
@@ -1606,6 +1635,13 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if first_root233::namespace(claim) || receipt["schema"] == first_root233::SCHEMA {
+        ensure!(
+            first_root233::launch_matches(claim, receipt),
+            "first root 233 namespace, schema, or private prefix scope differs"
+        );
+        return Ok(());
+    }
     if epoch136::namespace(claim) || receipt["schema"] == epoch136::SCHEMA {
         return epoch136::launch(receipt, claim);
     }
@@ -3407,6 +3443,9 @@ pub(super) async fn run() -> Result<()> {
             || (retained220::namespace(claim) && retained220::live(current));
         if is_active {
             register_live_diagnostic_scope(&mut live_diagnostic_epochs, claim)?;
+            if first_root233::namespace(claim) {
+                first_root233::validate_live(claim, current)?;
+            }
             if private157::namespace(claim) {
                 private157::live_limits()?;
             }
@@ -3599,6 +3638,7 @@ pub(super) async fn run() -> Result<()> {
                 "private-original-entry-root-qualification"
             } else if prefix223::namespace(claim)
                 || prefix223_native20::namespace(claim)
+                || first_root233::namespace(claim)
                 || prefix205::namespace(claim)
                 || prefix204::namespace(claim)
             {
@@ -3797,6 +3837,7 @@ pub(super) async fn run() -> Result<()> {
                         || full209_status::matches(receipt, epoch, &observer, &before)
                         || full210_status::matches(receipt, epoch, &observer, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
+                        || first_root233::status_matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                         || capped204205_work::status_matches(receipt, epoch, &capped_work)

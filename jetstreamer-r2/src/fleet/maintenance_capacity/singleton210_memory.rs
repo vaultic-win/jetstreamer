@@ -6,6 +6,38 @@ const NATIVE223_IID: &str = "e70aaf097e7c4583b216aba454145910";
 const NATIVE223_FLOOR: u64 = 480 << 30;
 const NEW_GUARD_MAX: u64 = 1 << 30;
 
+/// Separate closed candidate policy. Do not broaden the existing 209/210 arms.
+pub(super) fn first_root233_required(
+    fleet: &Value,
+    total: u64,
+    protected_growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    original_native223(fleet)?;
+    ensure!(
+        candidate == first_root233::MEMORY && total >= candidate,
+        "first root 233 hard memory candidate differs"
+    );
+    let floor = total.div_ceil(10).max(NATIVE223_FLOOR);
+    // The candidate's protective service and at most one metadata helper can
+    // overlap replay. Existing guards are already in protected_growth.
+    let additional = 2u64 << 30;
+    let required = floor
+        .checked_add(protected_growth)
+        .and_then(|n| n.checked_add(candidate))
+        .and_then(|n| n.checked_add(additional))
+        .context("first root 233 memory overflow")?;
+    Ok((
+        required,
+        json!({"schema":"jetstreamer-first-root233-live223-memory-policy-v1",
+        "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
+        "effective_available_memory_floor_bytes":floor,"candidate_producer_hard_memory_bytes":candidate,
+        "candidate_guard_and_metadata_hard_memory_bytes":additional,
+        "protected_existing_hard_memory_growth_bytes":protected_growth,
+        "required_available_memory_bytes":required,"floor_counted_once":true}),
+    ))
+}
+
 fn original_native223(f: &Value) -> Result<()> {
     let active = f["active"].as_array().context("210 full active census")?;
     let rows = active
@@ -167,6 +199,34 @@ pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn first_root233_preserves_the_exact_live_floor_and_all_hard_growth_once() {
+        let total = 1_024_000_000_000;
+        let growth = 12345;
+        let (needed, policy) =
+            first_root233_required(&fleet(), total, growth, first_root233::MEMORY).unwrap();
+        assert_eq!(
+            needed,
+            (480u64 << 30) + growth + first_root233::MEMORY + (2u64 << 30)
+        );
+        assert_eq!(
+            policy["protected_existing_hard_memory_growth_bytes"],
+            growth
+        );
+        let mut replacement = fleet();
+        replacement["active"][2]["producer"]["InvocationID"] = json!("f".repeat(32));
+        replacement["unit_census"][prefix223_native20::UNIT] =
+            replacement["active"][2]["producer"].clone();
+        assert!(
+            first_root233_required(&replacement, total, growth, first_root233::MEMORY).is_err()
+        );
+        assert!(first_root233_required(&fleet(), total, u64::MAX, first_root233::MEMORY).is_err());
+        assert!(
+            first_root233_required(&fleet(), total, growth, first_root233::MEMORY - 1).is_err()
+        );
+        // The older closed 209/210 policies retain their own candidate rules.
+        assert!(required(&fleet(), total, growth, first_root233::MEMORY - 1).is_err());
+    }
 
     fn fleet() -> Value {
         let native = json!({"Id":prefix223_native20::UNIT,"InvocationID":NATIVE223_IID,

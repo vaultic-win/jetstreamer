@@ -7,6 +7,7 @@ enum MemoryMode {
     Existing,
     Full210,
     Full209Delivery,
+    FirstRoot233,
 }
 
 #[derive(Deserialize)]
@@ -128,6 +129,17 @@ pub(super) fn check_singleton210(value: &Value, minimum_disk: u64) -> Result<Val
 }
 pub(super) fn singleton210_memory_proven(capacity: &Value) -> Result<()> {
     singleton210_memory::validate_capacity(capacity)
+}
+pub(super) fn check_first_root233(value: &Value) -> Result<Value> {
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes: first_root233::DISK_RESERVATION,
+            memory_max_bytes: first_root233::MEMORY,
+            minimum_protected_disk_bytes: first_root233::FLOOR,
+        },
+        MemoryMode::FirstRoot233,
+    )
 }
 pub(super) fn check_singleton209_delivery(value: &Value, candidate: Candidate) -> Result<Value> {
     ensure!(
@@ -252,6 +264,10 @@ fn memory_sample(
             let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
             (n, Some(("full209_delivery_memory_policy", p)))
         }
+        MemoryMode::FirstRoot233 => {
+            let (n, p) = singleton210_memory::first_root233_required(f, total, reserve, candidate)?;
+            (n, Some(("first_root233_memory_policy", p)))
+        }
     };
     let actual = native209_admission::actual_memory()?;
     ensure!(
@@ -360,8 +376,9 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
             t,
             now,
         )?;
+    let bracketed = matches!(mode, MemoryMode::FirstRoot233);
     ensure!(
-        after_growth <= growth && after_memory_growth <= memory_growth,
+        bracketed || (after_growth <= growth && after_memory_growth <= memory_growth),
         "Maintenance protected resource growth increased during admission"
     );
     let memory_after = memory_sample(
@@ -374,14 +391,71 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
     )?;
     let current = census(&names, 201, 300)?;
     current_owners(&f, &current)?;
+    let final_caps =
+        capped204205_admission::combined_limits(&f, &s.protected_guards, &current, now)?;
     ensure!(
-        before == current
-            && caps
-                == capped204205_admission::combined_limits(&f, &s.protected_guards, &current, now)?,
+        before == current && caps == final_caps,
         "maintenance owners/caps changed across final memory/guard checks"
     );
     let final_free = singleton227_admission::disk_free()?;
-    envelope(minimum, candidate.additional_bytes, final_free)?;
+    let growth_before = growth;
+    let (minimum, required, growth, bracket_policy) = if bracketed {
+        let growth = growth.max(after_growth);
+        let (floor, _) = native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
+        let minimum = floor.max(candidate.minimum_protected_disk_bytes);
+        let recomputed_disk = envelope(minimum, candidate.additional_bytes, sampled_free)?;
+        envelope(
+            minimum,
+            candidate.additional_bytes,
+            actual_free.min(final_free),
+        )?;
+        let n = |row: &Value, key: &str| {
+            row[key]
+                .as_u64()
+                .with_context(|| format!("first root 233 bracket field absent: {key}"))
+        };
+        let hard = n(&memory_before, "protected_existing_memory_growth_bytes")?
+            .max(n(&memory_after, "protected_existing_memory_growth_bytes")?);
+        let (recomputed_memory, policy) = singleton210_memory::first_root233_required(
+            &f,
+            n(&memory_after, "host_total_memory_bytes")?,
+            hard,
+            candidate.memory_max_bytes,
+        )?;
+        let (required, required_memory) = capped204205_admission::bracketed_requirements(
+            required,
+            recomputed_disk,
+            n(&memory_before, "minimum_available_memory_bytes")?,
+            n(&memory_after, "minimum_available_memory_bytes")?,
+            recomputed_memory,
+        );
+        ensure!(
+            capped204205_admission::bracketed_fit(
+                before == current,
+                caps == final_caps,
+                required,
+                required_memory,
+                [sampled_free, actual_free, final_free],
+                [
+                    n(&memory_before, "sampled_available_memory_bytes")?
+                        .min(n(&memory_after, "sampled_available_memory_bytes")?),
+                    n(&memory_before, "actual_available_memory_bytes")?,
+                    n(&memory_after, "actual_available_memory_bytes")?
+                ]
+            ),
+            "first root 233 complete bracketed disk/memory obligations do not fit every availability and identity gate"
+        );
+        (
+            minimum,
+            required,
+            growth,
+            Some(json!({"recomputed_complete_memory_policy":policy,
+            "complete_required_memory_bytes":required_memory,"recomputed_complete_disk_requirement_bytes":recomputed_disk})),
+        )
+    } else {
+        envelope(minimum, candidate.additional_bytes, final_free)?;
+        (minimum, required, growth, None)
+    };
     let mut capacity = json!({"schema":"jetstreamer-horizon-maintenance-capacity-v1","host":"horizon-vaultic","first_epoch":201,"last_epoch":300,
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"sampled_at_utc":f["sampled_at_utc"],
         "resource_basis":value,"century_floor_bytes":floor,"protected_remaining_growth_bytes":growth,
@@ -397,6 +471,30 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
             "full_admitted_disk_envelopes_charged":true,"allocation_credit_bytes":0}});
     if let Some(evidence) = accounting_o.get("terminal_observation_accounting") {
         capacity["terminal_observation_accounting"] = evidence.clone();
+    }
+    if bracketed {
+        let accounted = memory_after["available_floor_component_accounted_once_bytes"]
+            .as_u64()
+            .context("first root 233 accounted floor component absent")?;
+        ensure!(
+            memory_before["available_floor_component_accounted_once_bytes"] == accounted,
+            "first root 233 accounted floor component changed across brackets"
+        );
+        let before_hard = memory_growth
+            .checked_sub(accounted)
+            .context("first root 233 first hard growth underflow")?;
+        let after_hard = after_memory_growth
+            .checked_sub(accounted)
+            .context("first root 233 final hard growth underflow")?;
+        capacity["bracketed_obligations"] = json!({"disk_growth_before_bytes":growth_before,
+            "disk_growth_after_bytes":after_growth,"protected_disk_growth_bytes":growth,
+            "raw_memory_growth_before_bytes":memory_growth,"raw_memory_growth_after_bytes":after_memory_growth,
+            "available_floor_component_accounted_once_bytes":accounted,
+            "hard_memory_growth_before_bytes":before_hard,"hard_memory_growth_after_bytes":after_hard,
+            "protected_hard_memory_growth_bytes":before_hard.max(after_hard),
+            "policy":"safe maximum of both brackets; each disk/memory sample must fit; identities and caps remain exact"});
+        capacity["bracketed_obligations"]["complete_policy"] =
+            bracket_policy.context("first root 233 bracket policy absent")?;
     }
     Ok(capacity)
 }

@@ -3638,6 +3638,15 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-prefix223-native20") {
         return fleet::publish_prefix223_native20_status().await;
     }
+    if env::args().nth(1).as_deref() == Some("admit-first-root233") {
+        return fleet::admit_first_root233();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-first-root233") {
+        return fleet::capture_first_root233();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-first-root233") {
+        return fleet::publish_first_root233_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("admit-native207-input") {
         return fleet::admit_native207_input();
     }
