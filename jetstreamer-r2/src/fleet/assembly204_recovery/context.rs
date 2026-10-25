@@ -1319,7 +1319,11 @@ mod tests {
         for (file, key, value) in [
             (plan.clone(), "unrelated_guard_floor", json!(0)),
             (plan.clone(), "assembly204_recovery", Value::Null),
-            (plan.clone(), "assembly204_recovery_history", json!([])),
+            (
+                plan.clone(),
+                "assembly204_recovery_history",
+                json!([{"invented":true}]),
+            ),
             (plan.clone(), "tracked_units", json!([])),
             (plan.clone(), "gates", json!({})),
             (plan.clone(), "schema", json!("foreign")),
