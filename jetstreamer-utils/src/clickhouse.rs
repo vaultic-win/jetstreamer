@@ -109,37 +109,6 @@ fn require_embedded_binary(bytes: &[u8]) -> Result<(), ClickhouseError> {
     Ok(())
 }
 
-#[cfg(test)]
-mod embedding_tests {
-    use super::*;
-
-    #[test]
-    fn absent_binary_returns_actionable_error() {
-        let error = require_embedded_binary(&[]).unwrap_err().to_string();
-        assert!(error.contains("JETSTREAMER_CLICKHOUSE_BINARY"));
-        assert!(error.contains("JETSTREAMER_CLICKHOUSE_SHA256"));
-    }
-
-    #[tokio::test]
-    async fn no_embedding_rejects_both_entrypoints_before_startup() {
-        if require_embedded_binary(CLICKHOUSE_BINARY).is_ok() {
-            // Explicit-embedding builds must never execute their supplied input in this test.
-            return;
-        }
-        assert!(
-            matches!(start().await, Err(ClickhouseError::Process(message))
-            if message.contains("No ClickHouse binary embedded"))
-        );
-        assert!(
-            start_client()
-                .await
-                .unwrap_err()
-                .to_string()
-                .contains("No ClickHouse binary embedded")
-        );
-    }
-}
-
 /// Future type returned when supervising the ClickHouse process.
 pub type ClickhouseProcessFuture = Pin<Box<dyn Future<Output = Result<(), ()>> + Send>>;
 /// Tuple containing the readiness channel and process future returned by [`start`].
@@ -487,4 +456,35 @@ pub fn stop_sync() {
         .build()
         .unwrap()
         .block_on(stop());
+}
+
+#[cfg(test)]
+mod embedding_tests {
+    use super::*;
+
+    #[test]
+    fn absent_binary_returns_actionable_error() {
+        let error = require_embedded_binary(&[]).unwrap_err().to_string();
+        assert!(error.contains("JETSTREAMER_CLICKHOUSE_BINARY"));
+        assert!(error.contains("JETSTREAMER_CLICKHOUSE_SHA256"));
+    }
+
+    #[tokio::test]
+    async fn no_embedding_rejects_both_entrypoints_before_startup() {
+        if require_embedded_binary(CLICKHOUSE_BINARY).is_ok() {
+            // Explicit-embedding builds must never execute their supplied input in this test.
+            return;
+        }
+        assert!(
+            matches!(start().await, Err(ClickhouseError::Process(message))
+            if message.contains("No ClickHouse binary embedded"))
+        );
+        assert!(
+            start_client()
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("No ClickHouse binary embedded")
+        );
+    }
 }
