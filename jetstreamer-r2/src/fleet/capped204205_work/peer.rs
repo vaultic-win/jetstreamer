@@ -1,6 +1,7 @@
 //! Complete conservative accounting for a registered, guarded 204/205 owner.
 //! Derived legacy views never alter the accepted fleet or claim zero resources.
 use super::*;
+mod assembly_history;
 struct Peer {
     claim: Claim,
     input: Inputs,
@@ -222,32 +223,11 @@ fn assembly_owners(f: &Value, o: &Value, expanded: bool) -> Result<BTreeMap<Stri
         };
         let previous_bound: BoundFile =
             serde_json::from_value(peer.input.frame["previous_fleet"].clone())?;
-        let previous = bound_json(&previous_bound)?;
+        let (old, predecessor_history) = assembly_history::select(peer, &previous_bound)?;
         ensure!(
-            previous["schema"] == SCHEMA
-                && previous["first_epoch"] == 201
-                && previous["last_epoch"] == 300
-                && previous["inventory"]["anomalies"] == 0,
-            "assembly predecessor fleet is foreign or unresolved"
-        );
-        let prior = accepted(&previous)?;
-        let matches = prior
-            .iter()
-            .filter(|p| p.claim.epoch == peer.claim.epoch)
-            .collect::<Vec<_>>();
-        ensure!(
-            matches.len() == 1,
-            "assembly has no unique earlier accepted owner frame"
-        );
-        let old = matches[0];
-        ensure!(
-            old.claim.launch == peer.claim.launch
-                && old.claim.producer_plan == peer.claim.producer_plan
-                && old.claim.admission == peer.claim.admission
-                && old.row["current_stage"] == "assembly"
-                && number(&old.input.frame, "sampled_unix_millis")?
-                    <= number(&peer.input.frame, "sampled_unix_millis")?,
-            "assembly predecessor changed owner/admission, phase, or time direction"
+            number(&old.input.frame, "sampled_unix_millis")?
+                <= number(&peer.input.frame, "sampled_unix_millis")?,
+            "Assembly positive predecessor frame goes forward in time"
         );
         let old_guard = evidence::bound(
             &serde_json::from_value(old.input.frame["guard_snapshot"].clone())?,
@@ -274,6 +254,7 @@ fn assembly_owners(f: &Value, o: &Value, expanded: bool) -> Result<BTreeMap<Stri
             "frame":private157::binding(&peer.claim.frame),"launch":private157::binding(&peer.claim.launch),
             "admission":private157::binding(&peer.claim.admission),"producer_plan":private157::binding(&peer.claim.producer_plan),
             "guard_snapshot":peer.input.frame["guard_snapshot"],"previous_fleet":private157::binding(&previous_bound),
+            "predecessor_history":predecessor_history,
             "included_in_whole_host_resident_memory":true,"fabricated_worker_rss":false,
             "disk_or_hard_memory_growth_exempted":false,"admission_authorized":false});
         ensure!(
