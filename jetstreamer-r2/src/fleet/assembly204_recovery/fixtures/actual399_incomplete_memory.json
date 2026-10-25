@@ -1,0 +1,73 @@
+{
+  "fixture_scope": "Exact reduced extract from actual incomplete399capacity; not a replacement capacity/admission proof. Synthetic corrected225observations in tests are separately labelled.",
+  "original_capacity_sha256": "519a2b46602e3c55aa13ac08570b0c336d173459058b02e3dae5985321061772",
+  "original_capacity_path": "/var/lib/jetstreamer/horizon-204-assembly-control-24524cdd-v1/capacity-399-v1.json",
+  "accepted_primary_names": [
+    "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+    "horizon-singleton-209-capped-4aeca563-v1.service",
+    "horizon-qualify-207-singleton-admitted-v1.service"
+  ],
+  "protected_guard_names": [
+    "horizon-qualify-207-singleton-admitted-v1.service",
+    "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+    "horizon-singleton-209-capped-4aeca563-v1.service"
+  ],
+  "memory_before": {
+    "protected_existing_memory_growth_bytes": 193436213248,
+    "protected_memory_evidence": [
+      {
+        "current_cgroup_charge_bytes": 110377263104,
+        "guard_hard_memory_reserved_bytes": 1073741824,
+        "hard_memory_cap_bytes": 224999997440,
+        "invocation_id": "74eb420ca4574a50a35913d1417124f1",
+        "remaining_hard_memory_growth_bytes": 115696476160,
+        "unit": "horizon-qualify-207-singleton-admitted-v1.service"
+      },
+      {
+        "current_cgroup_charge_bytes": 147260260352,
+        "epoch": 209,
+        "hard_memory_cap_bytes": 224999997440,
+        "host_page_size_bytes": 4096,
+        "invocation_id": "1bf0db73ccd44c2c90461889498d4f82",
+        "kernel_memory_high_bytes": 149999996928,
+        "remaining_hard_memory_growth_bytes": 77739737088,
+        "requested_memory_high_bytes": 150000000000,
+        "requested_memory_max_bytes": 225000000000,
+        "resource_plan": {
+          "path": "/var/lib/jetstreamer/horizon-209-singleton-admission-specs-336-v1/resource-plan.json",
+          "sha256": "26176be8ea8584849bec2abc994f79c90bbae6c7aa21b2e6093fb40d6d4ddb63"
+        },
+        "unit": "horizon-singleton-209-capped-4aeca563-v1.service"
+      }
+    ]
+  },
+  "memory_after": {
+    "protected_existing_memory_growth_bytes": 193026322432,
+    "protected_memory_evidence": [
+      {
+        "current_cgroup_charge_bytes": 110432022528,
+        "guard_hard_memory_reserved_bytes": 1073741824,
+        "hard_memory_cap_bytes": 224999997440,
+        "invocation_id": "74eb420ca4574a50a35913d1417124f1",
+        "remaining_hard_memory_growth_bytes": 115641716736,
+        "unit": "horizon-qualify-207-singleton-admitted-v1.service"
+      },
+      {
+        "current_cgroup_charge_bytes": 147615391744,
+        "epoch": 209,
+        "hard_memory_cap_bytes": 224999997440,
+        "host_page_size_bytes": 4096,
+        "invocation_id": "1bf0db73ccd44c2c90461889498d4f82",
+        "kernel_memory_high_bytes": 149999996928,
+        "remaining_hard_memory_growth_bytes": 77384605696,
+        "requested_memory_high_bytes": 150000000000,
+        "requested_memory_max_bytes": 225000000000,
+        "resource_plan": {
+          "path": "/var/lib/jetstreamer/horizon-209-singleton-admission-specs-336-v1/resource-plan.json",
+          "sha256": "26176be8ea8584849bec2abc994f79c90bbae6c7aa21b2e6093fb40d6d4ddb63"
+        },
+        "unit": "horizon-singleton-209-capped-4aeca563-v1.service"
+      }
+    ]
+  }
+}

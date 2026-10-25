@@ -193,6 +193,7 @@ pub(super) fn admit(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let c = candidate(downstream::Stage::Assembly, 0)?;
     let capacity = maintenance_capacity::check_assembly204_recovery(&a.resource_basis, c)?;
     validate_capacity(&capacity, c.memory_max_bytes, c.additional_bytes)?;
+    validate_provenance(&capacity)?;
     custody::old_idle(&context)?;
     ownership::no_overlap(&context, None)?;
     custody::check_source_names(&capture)?;
@@ -331,6 +332,7 @@ pub(super) fn stage_capacity(basis: &Value, stage: downstream::Stage, bytes: u64
     let c = candidate(stage, bytes)?;
     let result = maintenance_capacity::check_assembly204_recovery(basis, c)?;
     validate_capacity(&result, c.memory_max_bytes, c.additional_bytes)?;
+    validate_provenance(&result)?;
     Ok(result)
 }
 fn owner_sets(
@@ -408,6 +410,27 @@ pub(super) fn validate_provenance(v: &Value) -> Result<()> {
 #[cfg(test)]
 mod roster_tests {
     use super::*;
+    #[test]
+    fn actual399_incomplete_saved_capacity_is_not_retroactively_promoted() {
+        let saved: Value =
+            serde_json::from_str(include_str!("fixtures/actual399_incomplete_memory.json"))
+                .unwrap();
+        let expected = saved["accepted_primary_names"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        let guards = saved["protected_guard_names"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        for phase in ["memory_before", "memory_after"] {
+            assert!(owner_sets(&expected, &guards, &saved[phase]).is_err());
+        }
+    }
     #[test]
     fn missing_primary_or_independent_guard_never_replays_as_complete_capacity() {
         let expected = BTreeSet::from(["primary.service".into(), "sibling.service".into()]);

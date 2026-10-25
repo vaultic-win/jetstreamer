@@ -1,6 +1,7 @@
 //! Lossless resource adapters for the closed 207 full epoch and 233 first root.
 //! No historical view may erase one of these owners or grant allocation credit.
 use super::{verification223_live_peer as base, *};
+mod legacy_memory;
 #[cfg(test)]
 pub(super) use base::fixture_row;
 fn profile(name: &str) -> Option<(u64, &'static str)> {
@@ -287,11 +288,12 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     }
     let (n, more) = base::memory(&without(f)?)?;
     proof.extend(more);
-    Ok((
+    legacy_memory::complete(
+        f,
         n.checked_add(extra)
             .context("closed peers combined memory overflow")?,
         proof,
-    ))
+    )
 }
 pub(super) fn limits(f: &Value) -> Result<Value> {
     roster(f)?;
