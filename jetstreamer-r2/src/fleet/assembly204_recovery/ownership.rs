@@ -4,7 +4,8 @@ use super::*;
 mod peer;
 mod work_input;
 pub(in crate::fleet) use peer::{
-    peer_current, peer_guards, peer_limits, peer_names, peer_observation, peer_resources, peer_view,
+    peer_current, peer_guards, peer_limits, peer_memory_owners, peer_names, peer_observation,
+    peer_resources, peer_view,
 };
 use work_input::WorkInput;
 #[derive(Clone, Deserialize, Serialize)]
@@ -85,7 +86,13 @@ pub(super) fn no_overlap(
     actor: Option<downstream::Stage>,
 ) -> Result<()> {
     let current = context.census(&context::closed_names())?;
-    validate_closed_ownership(&current, actor)?;
+    no_overlap_current(&current, actor)
+}
+fn no_overlap_current(
+    current: &BTreeMap<String, Value>,
+    actor: Option<downstream::Stage>,
+) -> Result<()> {
+    validate_closed_ownership(current, actor)?;
     for name in current.keys().filter(|name| {
         name.split(|c: char| !c.is_ascii_digit())
             .any(|n| n == "204")
@@ -477,6 +484,8 @@ struct WorkSpec {
     claim: WorkInput,
     observer: BoundFile,
     previous_fleet: BoundFile,
+    #[serde(default)]
+    observer_history: Vec<BoundFile>,
     output: PathBuf,
 }
 pub(super) fn guard_shape(
@@ -527,25 +536,20 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
     custody::plan_scope(&p)?;
     let origin = read(&w.claim.launch)?;
     validate_launch(&origin, &w.claim.recovery_plan, &p, &w.claim.admission)?;
-    let context = AcceptedContext {
-        fleet: w.previous_fleet.clone(),
-        observer: w.observer.clone(),
-    };
+    let context = context::WorkContext::new(
+        w.previous_fleet.clone(),
+        w.observer.clone(),
+        w.observer_history.clone(),
+    )?;
     let launch = read(&w.claim.actor_launch)?;
     let stage: downstream::Stage = serde_json::from_value(launch["stage"].clone())?;
-    no_overlap(&context, Some(stage))?;
     let names = names_for_epoch(w.claim.epoch)?;
     let before = context.census(&names)?;
+    no_overlap_current(&before, Some(stage))?;
     let owner = before.get(stage.unit()).context("204 actor omitted")?;
     same_owner(&launch["owner"], owner)?;
     ensure!(is_live(owner), "204 current work actor inactive");
     let observer = bound_json(&w.observer)?;
-    let previous = bound_json(&w.previous_fleet)?;
-    ensure!(
-        previous["observer_receipt"] == w.observer.path.to_string_lossy().as_ref()
-            && previous["observer_sha256"] == w.observer.sha256,
-        "204 work context must be accepted coordinated observer"
-    );
     let producer = kernel(owner, stage.memory())?;
     let guard = if stage == downstream::Stage::Assembly {
         let g = before
@@ -602,6 +606,7 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
     let frame = json!({"schema":"jetstreamer-epoch204-assembly-recovery-work-v1","epoch":204,"stage":stage,"phase":phase,
         "recovery_plan":w.claim.recovery_plan,"launch":w.claim.launch,"actor_launch":w.claim.actor_launch,
         "unit_census_before":before,"unit_census_after":after,"observer":w.observer,"previous_fleet":w.previous_fleet,
+        "accepted_context":context.accepted_binding()?,"observer_history":w.observer_history,
         "sampled_unix_millis":sampled,"sampled_at_utc":millis_utc(sampled)?,"epoch_started_unix_millis":ORIGIN,
         "observer_sampled_at_utc":observer["recorded_at_utc"],"observer_is_context":true,"new_resource_samples":0,
         "guard_snapshot":guard_snapshot,"stage_admission":launch["stage_admission"],"producer_limits":producer,"guard_limits":guard,"output_bytes":output_bytes,"issuer":issuer(spec,self_sha),"authority":denied()});
@@ -714,6 +719,7 @@ pub(in crate::fleet) fn row(
         o == *observer,
         "204 recovery frame has another coordinated observer"
     );
+    context::WorkContext::from_frame(&frame)?.validate_saved(current)?;
     let owner = current
         .get(stage.unit())
         .context("204 current actor missing")?;
@@ -812,10 +818,7 @@ pub(super) async fn publish(v: &Value, _spec: &BoundFile, self_sha: &str) -> Res
     );
     let frame = read(&x.claim.frame)?;
     let observer = bound_json(&serde_json::from_value(frame["observer"].clone())?)?;
-    let context = AcceptedContext {
-        fleet: serde_json::from_value(frame["previous_fleet"].clone())?,
-        observer: serde_json::from_value(frame["observer"].clone())?,
-    };
+    let context = context::WorkContext::from_frame(&frame)?;
     let names = names(&x.claim)?;
     let before = context.census(&names)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

@@ -89,4 +89,16 @@ mod tests {
         extra["frame"] = json!("future");
         assert!(serde_json::from_value::<WorkSpec>(extra).is_err());
     }
+    #[test]
+    fn refresh_spec_accepts_only_explicit_bound_intermediate_observer_history() {
+        let mut refresh = spec(input());
+        let initial: WorkSpec = serde_json::from_value(refresh.clone()).unwrap();
+        assert!(initial.observer_history.is_empty());
+        refresh["observer_history"] =
+            json!([{"path":"/fixture/intermediate-observer.json","sha256":"d".repeat(64)}]);
+        let parsed: WorkSpec = serde_json::from_value(refresh.clone()).unwrap();
+        assert_eq!(parsed.observer_history.len(), 1);
+        refresh["observer_history"] = json!([{"path":"/fixture/missing-digest.json"}]);
+        assert!(serde_json::from_value::<WorkSpec>(refresh).is_err());
+    }
 }

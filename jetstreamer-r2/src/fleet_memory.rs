@@ -68,21 +68,37 @@ fn checked_with_assembly(
             .collect::<Vec<_>>();
         ensure!(rows.len() == 1, "Assembly memory owner duplicated");
         let row = rows[0];
+        match proof["schema"].as_str() {
+            Some("jetstreamer-typed-capped-assembly-memory-owner-v1") => ensure!(
+                row["phase"] == "capped204205-continuation"
+                    && proof["launch"] == row["launch"]
+                    && proof["producer_plan"] == row["producer_plan"],
+                "capped Assembly memory lineage differs"
+            ),
+            Some("jetstreamer-typed-recovery204-assembly-memory-owner-v1") => ensure!(
+                row["phase"] == "assembly-recovery204"
+                    && proof["epoch"] == 204
+                    && proof["origin_launch"].is_object()
+                    && proof["actor_launch"].is_object()
+                    && proof["recovery_plan"].is_object()
+                    && proof["origin_launch"] == row["origin_launch"]
+                    && proof["actor_launch"] == row["actor_launch"]
+                    && proof["recovery_plan"] == row["recovery_plan"],
+                "recovery204 Assembly memory lineage differs"
+            ),
+            _ => anyhow::bail!("unknown typed Assembly memory owner"),
+        }
         ensure!(
-            proof["schema"] == "jetstreamer-typed-capped-assembly-memory-owner-v1"
-                && proof["role"] == "assembly-non-replay"
+            proof["role"] == "assembly-non-replay"
                 && proof["unit"] == *name
                 && proof["invocation_id"] == *iid
                 && matches!(proof["epoch"].as_u64(), Some(204 | 205))
                 && row["epoch"] == proof["epoch"]
-                && row["phase"] == "capped204205-continuation"
                 && row["current_stage"] == "assembly"
                 && row["live"] == true
                 && row["ownership_unresolved"] != true
                 && row["ordinary_replay_claim"] == false
                 && proof["frame"] == row["frame"]
-                && proof["launch"] == row["launch"]
-                && proof["producer_plan"] == row["producer_plan"]
                 && proof["sampled_at_utc"] == o["recorded_at_utc"]
                 && proof["phase"]["stage"] == "assembly"
                 && proof["phase"]["epoch"] == proof["epoch"]
@@ -480,6 +496,112 @@ mod assembly_tests {
         let mut bad = o.clone();
         bad["diagnostic_replays"][0]["observation"]["producer_after"]["rss"]["processes"][0]["pid"] =
             json!(55);
+        assert!(checked_with_assembly(&bad, &f, &proof).is_err());
+    }
+    fn recovery_fixture() -> (Value, Value, BTreeMap<String, Value>, u64) {
+        let (mut o, mut f, proof, old_rss) = fixture();
+        let mut proof = proof.into_values().next().unwrap();
+        let name = "horizon-qualify-204-assembly-only-recovery-v2.service";
+        // Saved cycle 412 process scalars; the ordinary lanes remain the
+        // existing synthetic fixture. No live process reads occur in tests.
+        let pid = 1714527;
+        let rss = 1313771520u64;
+        let guard_rss = 4870144u64;
+        let binding =
+            |name: &str| json!({"path":format!("/sealed/{name}.json"),"sha256":"b".repeat(64)});
+        let row = &mut f["active"][3];
+        row["phase"] = json!("assembly-recovery204");
+        row["unit"]["Id"] = json!(name);
+        row["unit"]["MainPID"] = json!(pid.to_string());
+        row.as_object_mut().unwrap().remove("launch");
+        row.as_object_mut().unwrap().remove("producer_plan");
+        proof["schema"] = json!("jetstreamer-typed-recovery204-assembly-memory-owner-v1");
+        proof["unit"] = json!(name);
+        proof["main_pid"] = json!(pid);
+        proof.as_object_mut().unwrap().remove("launch");
+        proof.as_object_mut().unwrap().remove("producer_plan");
+        for key in ["origin_launch", "actor_launch", "recovery_plan"] {
+            row[key] = binding(key);
+            proof[key] = binding(key);
+        }
+        for phase in ["before", "after"] {
+            let host = &mut o["host_resident_memory"][phase]["rss"];
+            host["aggregate_rss_bytes"] =
+                json!(host["aggregate_rss_bytes"].as_u64().unwrap() - old_rss + rss + guard_rss);
+            let process = host["processes"]
+                .as_array_mut()
+                .unwrap()
+                .last_mut()
+                .unwrap();
+            *process = json!({"pid":pid,"start_ticks":189365442,"rss_bytes":rss});
+            host["processes"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"pid":1714521,"start_ticks":189365436,"rss_bytes":guard_rss}));
+        }
+        (
+            o,
+            f,
+            BTreeMap::from([(name.into(), proof)]),
+            rss + guard_rss,
+        )
+    }
+    #[test]
+    fn recovery204_real_host_rss_and_guard_remain_non_replay_overhead_once() {
+        let (base_o, base_f) = super::tests::fixture();
+        let baseline = checked(&base_o, &base_f).unwrap();
+        let (o, f, proof, rss) = recovery_fixture();
+        let result = checked_with_assembly(&o, &f, &proof).unwrap();
+        assert_eq!(result["valid"], true, "{result}");
+        for key in [
+            "executing_lanes",
+            "aggregate_production_lane_rss_bytes",
+            "marginal_lane_rss_bytes",
+            "reservation_ceiling_bytes",
+        ] {
+            assert_eq!(result[key], baseline[key], "{key}");
+        }
+        assert_eq!(
+            result["non_lane_resident_planning_bytes"],
+            baseline["non_lane_resident_planning_bytes"]
+                .as_u64()
+                .unwrap()
+                + rss
+        );
+        assert_eq!(result["assembly_non_replay_owner_count"], 1);
+        assert_eq!(result["owner_census"].as_array().unwrap().len(), 4);
+        assert!(checked(&o, &f).is_err());
+    }
+    #[test]
+    fn recovery204_rejects_foreign_lineage_late_start_and_unproved_host_processes() {
+        let (o, f, proof, _) = recovery_fixture();
+        let name = proof.keys().next().unwrap();
+        for (path, value) in [
+            (
+                "/schema",
+                json!("jetstreamer-typed-capped-assembly-memory-owner-v1"),
+            ),
+            ("/origin_launch/sha256", json!("c".repeat(64))),
+            ("/actor_launch/sha256", json!("c".repeat(64))),
+            ("/recovery_plan/sha256", json!("c".repeat(64))),
+            ("/phase/started_unix_millis", json!(10001)),
+            ("/main_pid", json!(1714528)),
+            ("/fabricated_worker_rss", json!(true)),
+            ("/disk_or_hard_memory_growth_exempted", json!(true)),
+        ] {
+            let mut bad = proof.clone();
+            *bad.get_mut(name).unwrap().pointer_mut(path).unwrap() = value;
+            assert!(checked_with_assembly(&o, &f, &bad).is_err(), "{path}");
+        }
+        let mut bad = o.clone();
+        bad["host_resident_memory"]["before"]["rss"]["processes"][4]["start_ticks"] =
+            json!(189365443);
+        assert!(checked_with_assembly(&bad, &f, &proof).is_err());
+        let mut bad = o.clone();
+        bad["host_resident_memory"]["after"]["rss"]["processes"]
+            .as_array_mut()
+            .unwrap()
+            .remove(4);
         assert!(checked_with_assembly(&bad, &f, &proof).is_err());
     }
 }

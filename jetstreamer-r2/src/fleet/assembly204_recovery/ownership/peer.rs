@@ -73,6 +73,53 @@ pub(in crate::fleet) fn peer_observation(f: &Value, o: &Value) -> Result<()> {
     }
     Ok(())
 }
+pub(in crate::fleet) fn peer_memory_owners(
+    f: &Value,
+    o: &Value,
+) -> Result<BTreeMap<String, Value>> {
+    let mut owners = BTreeMap::new();
+    for p in accepted(f)?
+        .into_iter()
+        .filter(|p| p.stage == downstream::Stage::Assembly)
+    {
+        ensure!(
+            bound_json(&serde_json::from_value(p.frame["observer"].clone())?)? == *o,
+            "204 recovery memory uses another observer"
+        );
+        let at = utc_seconds(s(o, "recorded_at_utc")?)?
+            .checked_mul(1000)
+            .context("204 host sample clock overflow")?;
+        let started = n(&p.launch, "started_unix_millis")?;
+        ensure!(
+            started > 0 && started <= at && n(&p.frame, "sampled_unix_millis")? >= at,
+            "204 recovery actor did not cover the coordinated host sample"
+        );
+        let guard_bound: BoundFile = serde_json::from_value(p.frame["guard_snapshot"].clone())?;
+        let heartbeat = read(&guard_bound)?;
+        let plan = read(&p.claim.recovery_plan)?;
+        guard_shape(
+            &heartbeat,
+            &plan,
+            &p.claim.recovery_plan,
+            &p.launch,
+            n(&p.frame, "sampled_unix_millis")?,
+        )?;
+        let pid = s(&p.launch["owner"], "MainPID")?.parse::<u64>()?;
+        let proof = json!({"schema":"jetstreamer-typed-recovery204-assembly-memory-owner-v1",
+            "epoch":204,"role":"assembly-non-replay","unit":UNIT,"invocation_id":p.launch["invocation_id"],
+            "main_pid":pid,"sampled_at_utc":o["recorded_at_utc"],"window_begin_millis":at,"window_end_millis":at,
+            "phase":{"stage":"assembly","epoch":204,"invocation_id":p.launch["invocation_id"],"started_unix_millis":started},
+            "frame":p.claim.frame,"origin_launch":p.claim.launch,"actor_launch":p.claim.actor_launch,
+            "recovery_plan":p.claim.recovery_plan,"admission":p.claim.admission,"guard_snapshot":guard_bound,
+            "included_in_whole_host_resident_memory":true,"fabricated_worker_rss":false,
+            "disk_or_hard_memory_growth_exempted":false,"admission_authorized":false});
+        ensure!(
+            owners.insert(UNIT.into(), proof).is_none(),
+            "204 recovery memory owner duplicated"
+        );
+    }
+    Ok(owners)
+}
 pub(in crate::fleet) fn peer_guards(
     f: &Value,
     bounds: &BTreeMap<String, BoundFile>,

@@ -223,7 +223,14 @@ pub(super) fn capped_assembly_memory_owners(
     f: &Value,
     o: &Value,
 ) -> Result<BTreeMap<String, Value>> {
-    capped204205_work::peer_assembly_memory_owners(f, o)
+    let mut owners = capped204205_work::peer_assembly_memory_owners(f, o)?;
+    for (name, proof) in assembly204_recovery::peer_memory_owners(f, o)? {
+        ensure!(
+            owners.insert(name, proof).is_none(),
+            "duplicate typed assembly memory owner"
+        );
+    }
+    Ok(owners)
 }
 pub(super) fn demotion223_memory_views(
     f: &Value,

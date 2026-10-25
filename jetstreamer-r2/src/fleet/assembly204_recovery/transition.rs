@@ -44,6 +44,11 @@ fn derivative(x: &Prepare, old: &Value, previous: &Value) -> Result<Value> {
         recovery["original_terminal"].clone(),
     )?)?;
     custody::validate_terminal_saved(&failure)?;
+    active_projection(x, old, previous, &frame)
+}
+// No row/context recursion: historical event authentication reuses this exact
+// projection after checking the immutable claim and predecessor bindings.
+fn active_projection(x: &Prepare, old: &Value, previous: &Value, frame: &Value) -> Result<Value> {
     let mut next = old.clone();
     let mut tracked: BTreeSet<String> = serde_json::from_value(old["tracked_units"].clone())?;
     tracked.extend(
@@ -226,6 +231,9 @@ fn terminal_derivative(x: &TerminalPrepare, old: &Value, previous: &Value) -> Re
     } else {
         ownership::validate_failure_terminal(&t)?;
     }
+    terminal_projection(x, old, &claim)
+}
+fn terminal_projection(x: &TerminalPrepare, old: &Value, claim: &Claim) -> Result<Value> {
     let mut next = old.clone();
     let mut history = old
         .get("assembly204_recovery_history")
@@ -241,6 +249,68 @@ fn terminal_derivative(x: &TerminalPrepare, old: &Value, previous: &Value) -> Re
     next["admission_transition_guard"] = Value::Null;
     next["output"] = json!(x.output_directory.join("fleet.json"));
     Ok(next)
+}
+/// Reconstruct only the saved plan. Runtime row and terminal validation remain
+/// at their existing creation gates; this reader authenticates their lineage
+/// without recursively reopening work-context ancestors.
+pub(super) fn saved_event_plan(
+    event: &Value,
+    old: &Value,
+    previous: &Value,
+    frame: Option<&Value>,
+    directory: &Path,
+) -> Result<Value> {
+    let original_plan: BoundFile = serde_json::from_value(event["original_plan"].clone())?;
+    ensure!(
+        old["schema"] == "jetstreamer-horizon-campaign-fleet-plan-v1"
+            && old["first_epoch"] == 201
+            && old["last_epoch"] == 300
+            && previous["plan"] == original_plan.path.to_string_lossy().as_ref()
+            && previous["plan_sha256"] == original_plan.sha256,
+        "204 saved event original plan differs"
+    );
+    let previous_fleet = serde_json::from_value(event["previous_fleet"].clone())?;
+    let observer = serde_json::from_value(event["observer"].clone())?;
+    let expected = if event["action"] == "terminal" {
+        let x = TerminalPrepare {
+            schema: String::new(),
+            original_plan,
+            previous_fleet,
+            observer,
+            terminal: serde_json::from_value(event["terminal"].clone())?,
+            output_directory: directory.into(),
+        };
+        let claim: Claim = serde_json::from_value(old["assembly204_recovery"].clone())?;
+        terminal_projection(&x, old, &claim)?
+    } else {
+        ensure!(
+            event.get("action").is_none(),
+            "204 saved event action differs"
+        );
+        let x = Prepare {
+            schema: String::new(),
+            original_plan,
+            previous_fleet,
+            observer,
+            claim: serde_json::from_value(event["claim"].clone())?,
+            output_directory: directory.into(),
+        };
+        let frame = frame.context("204 saved event frame missing")?;
+        ensure!(
+            frame["schema"] == "jetstreamer-epoch204-assembly-recovery-work-v1"
+                && frame["epoch"] == 204
+                && frame["epoch_started_unix_millis"] == ORIGIN
+                && frame["recovery_plan"] == private157::binding(&x.claim.recovery_plan)
+                && frame["launch"] == private157::binding(&x.claim.launch)
+                && frame["actor_launch"] == private157::binding(&x.claim.actor_launch)
+                && frame["previous_fleet"] == private157::binding(&x.previous_fleet)
+                && frame["observer"] == private157::binding(&x.observer)
+                && frame["sampled_at_utc"] == event["sampled_at_utc"],
+            "204 saved event frame differs"
+        );
+        active_projection(&x, old, previous, frame)?
+    };
+    Ok(expected)
 }
 pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let x: TerminalPrepare = serde_json::from_value(v.clone())?;

@@ -17,7 +17,8 @@ pub(super) use transition::{EVENT_SCHEMA, event_predecessor, terminal_row};
 mod tests;
 pub(super) use ownership::{Claim, names, row, status_matches};
 pub(super) use ownership::{
-    peer_current, peer_guards, peer_limits, peer_names, peer_observation, peer_resources, peer_view,
+    peer_current, peer_guards, peer_limits, peer_memory_owners, peer_names, peer_observation,
+    peer_resources, peer_view,
 };
 
 const OLD_UNIT: &str = "horizon-qualify-204-capped-continuation-bounded8-v4-df57.service";
