@@ -496,6 +496,12 @@ fn check_inner_with(
     prefix223_live_peer::roster(&legacy)?;
     native210_peer_history::validate(&f)?;
     let floor = singleton227_admission::century_floor_for_maintenance(&f)?;
+    if candidate_context.is_some() {
+        ensure!(
+            candidate.minimum_protected_disk_bytes >= floor,
+            "223 local floor is below evidenced century floor"
+        );
+    }
     let mut names = f["unit_census"]
         .as_object()
         .context("Maintenance fleet units")?

@@ -20,6 +20,7 @@ pub(super) struct Actor {
 pub(super) struct Context {
     job_kind: String,
     phase: String,
+    local_floor_bytes: u64,
     runtime_plan: BoundFile,
     producer: Actor,
     guard: Actor,
@@ -65,6 +66,10 @@ impl Context {
                 && valid_unit(&self.issuer.unit, "horizon-admit-223-demotion-"),
             "foreign223candidate actors"
         );
+        ensure!(
+            self.local_floor_bytes > 0,
+            "223 candidate local floor missing"
+        );
         let actors = [&self.producer, &self.guard, &self.issuer];
         let mut pids = BTreeSet::new();
         let mut iids = BTreeSet::new();
@@ -95,7 +100,7 @@ impl Context {
             memory_max_bytes: main
                 .checked_add(2 * GIB)
                 .context("223candidate memory overflow")?,
-            minimum_protected_disk_bytes: 2_000_000_000_000,
+            minimum_protected_disk_bytes: self.local_floor_bytes,
         })
     }
     fn validate_plan(&self) -> Result<()> {
@@ -105,6 +110,7 @@ impl Context {
                 plan["schema"] == "jetstreamer-epoch223-demotion-runtime-plan-v3"
                     && plan["mode"] == "bracket"
                     && plan["plan"]["unit"] == self.producer.unit
+                    && plan["plan"]["minimum_free_bytes"] == self.local_floor_bytes
                     && plan["plan"]["terminal_slot"] == 96_544_588u64
                     && plan["plan"]["target_slot"] == 96_544_588u64,
                 "223bracket allocation plan changed"
@@ -322,6 +328,7 @@ mod tests {
         Context {
             job_kind: "bracket".into(),
             phase: "control".into(),
+            local_floor_bytes: 245_383_154_903,
             runtime_plan: b.clone(),
             producer: actor(
                 "horizon-qualify-223-demotion-bracket-fixture.service",
