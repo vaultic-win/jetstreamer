@@ -11,7 +11,7 @@ pub(super) fn validate(
 ) -> Result<()> {
     ensure!(recognized(f, owners), "not227 canary terminal status");
     let proof = bound_json(&serde_json::from_value(f["metadata_event"].clone())?)?;
-    let (name, iid, pid) = fleet::canary227_terminal_status_identity(&proof)?;
+    let (name, iid, _) = fleet::canary227_terminal_status_identity(&proof)?;
     ensure!(
         owners[0] == (name, iid.clone()),
         "227 status differs from typed canary terminal owner"
@@ -34,20 +34,8 @@ pub(super) fn validate(
                 && u["ExecMainStatus"] == proof["actual_terminal"]["ExecMainStatus"],
             "227 status canary live,replaced,or ambiguous"
         );
+        fleet::canary227_terminal_current(&proof, u)?;
     }
-    let out = ProcessCommand::new("/usr/bin/systemctl")
-        .args([
-            "show",
-            UNIT,
-            "--no-pager",
-            "--property=ExecMainPID",
-            "--value",
-        ])
-        .output()?;
-    ensure!(
-        out.status.success() && std::str::from_utf8(&out.stdout)?.trim().parse::<u64>()? == pid,
-        "227 latest terminal PID changed"
-    );
     Ok(())
 }
 #[cfg(test)]

@@ -513,6 +513,9 @@ pub(super) fn canary227_terminal_status_identity(proof: &Value) -> Result<(Strin
             .context("227 canary terminal PID")?,
     ))
 }
+pub(super) fn canary227_terminal_current(proof: &Value, current: &Value) -> Result<()> {
+    canary227_terminal::validate_current(proof, current)
+}
 pub(super) fn admit_canary227_v1625() -> Result<()> {
     canary227_admission::run()
 }

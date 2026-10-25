@@ -2,6 +2,7 @@
 use super::canary227 as c;
 use super::singleton227_capture::{journal, properties};
 use super::*;
+mod cleared;
 pub(super) const SCHEMA: &str = "jetstreamer-private-epoch227-v1625-canary-terminal-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -9,6 +10,8 @@ struct Spec {
     schema: String,
     launch: BoundFile,
     result: Option<BoundFile>,
+    #[serde(default)]
+    journal: Option<BoundFile>,
     output: PathBuf,
 }
 fn claim(b: &BoundFile, r: &Value) -> Result<DiagnosticClaim> {
@@ -137,7 +140,15 @@ pub(super) fn validate(p: &Value) -> Result<String> {
             && p["release_credit_bytes"] == 0,
         "227 terminal proof scope or authority differs"
     );
-    terminal(&p["actual_terminal"], &d.invocation_id, pid)?;
+    if cleared::recognized(p) {
+        cleared::validate_saved(p, &launch, &d.invocation_id, pid)?;
+    } else {
+        ensure!(
+            p.get("terminal_identity_policy").is_none() && p.get("cleared_journal").is_none(),
+            "227 terminal identity policy is unknown or partial"
+        );
+        terminal(&p["actual_terminal"], &d.invocation_id, pid)?;
+    }
     if p["runner_result_available"] == true {
         result_scope(&p["result"], &d, &launch)?;
         ensure!(
@@ -192,9 +203,19 @@ pub(super) fn capture() -> Result<()> {
         .context("227 terminal original PID")?;
     let mut before = unit(c::UNIT)?;
     let latest_pid = properties(c::UNIT, "ExecMainPID")?;
-    before["ExecMainPID"] = json!(latest_pid
-        .get("ExecMainPID")
-        .context("227 terminal latest PID")?);
+    before["ExecMainPID"] = json!(
+        latest_pid
+            .get("ExecMainPID")
+            .context("227 terminal latest PID")?
+    );
+
+    if before["ExecMainPID"] == "0" {
+        return cleared::capture(&s, &binding, &self_sha, &launch, &d, pid);
+    }
+    ensure!(
+        s.journal.is_none(),
+        "227 retained terminal must not substitute a cleared journal"
+    );
 
     terminal(&before, &d.invocation_id, pid)?;
     let result = runner_result(&s.result, &d, &launch)?;
@@ -241,13 +262,27 @@ pub(super) fn capture() -> Result<()> {
         {
             let mut after = unit(c::UNIT)?;
             let p = properties(c::UNIT, "ExecMainPID")?;
-            after["ExecMainPID"] =
-                json!(p.get("ExecMainPID").context("227 terminal latest PID")?);
+            after["ExecMainPID"] = json!(p.get("ExecMainPID").context("227 terminal latest PID")?);
             after == before
         } && runner_result(&s.result, &d, &launch)? == result,
         "227 terminal identity/result changed"
     );
     private157::immutable_receipt(&s.output, &p)
+}
+pub(super) fn validate_current(proof: &Value, current: &Value) -> Result<()> {
+    let iid = validate(proof)?;
+    if cleared::recognized(proof) {
+        cleared::current(proof, current)
+    } else {
+        let mut actual = current.clone();
+        let p = properties(c::UNIT, "ExecMainPID")?;
+        actual["ExecMainPID"] = json!(p.get("ExecMainPID").context("227 latest terminal PID")?);
+        terminal(
+            &actual,
+            &iid,
+            proof["main_pid"].as_u64().context("227 terminal PID")?,
+        )
+    }
 }
 pub(super) fn predecessor(
     previous: &Value,
@@ -339,18 +374,8 @@ pub(super) fn census_check(p: &Plan, current: &BTreeMap<String, Value>) -> Resul
     if let Some(b) = &p.metadata_event {
         let proof = bound_json(b)?;
         if proof["schema"] == SCHEMA {
-            let iid = validate(&proof)?;
-            let mut u = current
-                .get(c::UNIT)
-                .context("227 terminal owner omitted")?
-                .clone();
-            let p = properties(c::UNIT, "ExecMainPID")?;
-            u["ExecMainPID"] = json!(p.get("ExecMainPID").context("227 terminal latest PID")?);
-            terminal(
-                &u,
-                &iid,
-                proof["main_pid"].as_u64().context("227 terminal PID")?,
-            )?;
+            let u = current.get(c::UNIT).context("227 terminal owner omitted")?;
+            validate_current(&proof, u)?;
         }
     }
     Ok(())
