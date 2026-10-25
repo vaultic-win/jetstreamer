@@ -2,12 +2,12 @@
 //! cannot select a different invocation, borrow a guard or assert readback.
 use super::*;
 mod peer;
-pub(super) use peer::{
+pub(in crate::fleet) use peer::{
     peer_current, peer_guards, peer_limits, peer_names, peer_observation, peer_resources, peer_view,
 };
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Claim {
+pub(in crate::fleet) struct Claim {
     pub epoch: u64,
     pub recovery_plan: BoundFile,
     pub admission: BoundFile,
@@ -611,13 +611,13 @@ fn actual_transport_phase(owner: &Value) -> Result<String> {
     }
     Ok(phase.into())
 }
-pub(super) fn names(c: &Claim) -> Result<BTreeSet<String>> {
+pub(in crate::fleet) fn names(c: &Claim) -> Result<BTreeSet<String>> {
     ensure!(c.epoch == 204, "204 recovery claim epoch");
     let mut names = BTreeSet::from([OLD_UNIT.into(), OLD_GUARD.into(), UNIT.into(), GUARD.into()]);
     names.extend(downstream::Stage::all().iter().map(|s| s.unit().into()));
     Ok(names)
 }
-pub(super) fn row(
+pub(in crate::fleet) fn row(
     c: &Claim,
     observer: &Value,
     current: &BTreeMap<String, Value>,
@@ -730,7 +730,11 @@ pub(super) fn row(
         "ordinary_replay_claim":false,"source_failure_remains_failure":true,"authority":denied()}),
     )
 }
-pub(super) fn status_matches(r: &StatusPublicationReceipt, epoch: u64, rows: &[Value]) -> bool {
+pub(in crate::fleet) fn status_matches(
+    r: &StatusPublicationReceipt,
+    epoch: u64,
+    rows: &[Value],
+) -> bool {
     epoch == 204
         && r.authenticated_readback
         && rows.iter().any(|row| {

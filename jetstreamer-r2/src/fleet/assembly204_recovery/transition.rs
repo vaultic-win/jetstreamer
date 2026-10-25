@@ -1,7 +1,8 @@
 //! Rebuild the exact derivative plan from its accepted raw predecessor. Only
 //! epoch-204 recovery fields and authenticated old-claim history can change.
 use super::*;
-pub(super) const EVENT_SCHEMA: &str = "jetstreamer-epoch204-assembly-recovery-fleet-transition-v1";
+pub(in crate::fleet) const EVENT_SCHEMA: &str =
+    "jetstreamer-epoch204-assembly-recovery-fleet-transition-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Prepare {
@@ -118,7 +119,7 @@ pub(super) fn prepare(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()>
     write(&x.output_directory.join("plan.json"), &next)?;
     Ok(())
 }
-pub(super) fn event_predecessor(
+pub(in crate::fleet) fn event_predecessor(
     previous: &Value,
     plan: &Plan,
     binding: &BoundFile,
@@ -272,7 +273,10 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     write(&x.output_directory.join("plan.json"), &next)?;
     Ok(())
 }
-pub(super) fn terminal_row(bound: &BoundFile, current: &BTreeMap<String, Value>) -> Result<Value> {
+pub(in crate::fleet) fn terminal_row(
+    bound: &BoundFile,
+    current: &BTreeMap<String, Value>,
+) -> Result<Value> {
     let t = read(bound)?;
     let name = s(&t, "unit")?;
     let iid = s(&t, "invocation_id")?;
