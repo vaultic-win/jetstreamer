@@ -144,11 +144,12 @@ proof cannot be renamed into this schema.
 `RepairTask` requires an actual actor-launch capture, original clock, static
 admission policy and sidecar-inclusive ETA-policy binding. Its launch stage is
 `admission-rendezvous`; the status publisher must use wire phase `verification`.
-Only actual observed transaction execution permits wire phase `replay`. Native
-issuer, complete-fleet context qualification, task/status
-publisher and independent guard must be implemented and source/runtime-qualified
-in separate exact-223 branches. This consumer does not issue their evidence or
-extend the exact-204 recovery contract. Do not advertise a live repair merely
+Only actual observed transaction execution permits wire phase `replay`. The
+issuer, native supervisor, proof/task capture and independent guard now have
+concrete source. Complete-fleet context integration still needs the corrected
+coherent accounting merge/repin; every role still needs source/runtime
+qualification, and the real task/status publisher remains unimplemented. No
+exact204 contract has been widened. Do not advertise a live repair merely
 because this plan exists.
 
 The ETA retains the old epoch clock and includes native input, the bracket, new
