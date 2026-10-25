@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
+mod assembly204_recovery;
 mod assembly144_admission;
 mod assembly144_prepare;
 mod assembly223;
@@ -294,6 +295,12 @@ pub(super) fn deliver_singleton209_output() -> Result<()> {
 }
 pub(super) fn admit_singleton209_delivery() -> Result<()> {
     singleton209_delivery::admission::run()
+}
+pub(super) fn assembly204_recovery_command_name(command: &str) -> bool {
+    assembly204_recovery::command_name(command)
+}
+pub(super) async fn assembly204_recovery_command(command: &str) -> Result<()> {
+    assembly204_recovery::run(command).await
 }
 pub(super) fn admit_capped204_v4_delivery() -> Result<()> {
     capped204_v4_admission::run()
@@ -642,7 +649,7 @@ pub(super) fn prepare_assembly144_fleet() -> Result<()> {
     assembly144_prepare::run()
 }
 
-#[derive(Deserialize, serde::Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct BoundFile {
     path: PathBuf,

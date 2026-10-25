@@ -10,6 +10,7 @@ enum MemoryMode {
     Full209Delivery,
     FirstRoot233,
     Capped204V4,
+    AssemblyRecovery204,
 }
 
 #[derive(Deserialize)]
@@ -195,6 +196,14 @@ pub(super) fn check_capped204_v4_delivery(
         MemoryMode::Capped204V4,
     )
 }
+/// Closed recovery candidates always include a real hard-memory envelope and
+/// use the same complete owner/guard census and hard-growth bracket as delivery.
+pub(super) fn check_assembly204_recovery(value: &Value, candidate: Candidate) -> Result<Value> {
+    ensure!(candidate.minimum_protected_disk_bytes>0 && candidate.additional_bytes>0
+        && matches!(candidate.memory_max_bytes,n if n==(64<<30)+(128<<20) || n==64<<30 || n==16<<30),
+        "204 recovery candidate resource envelope differs");
+    check_inner(value,candidate,MemoryMode::AssemblyRecovery204)
+}
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
     check_candidate(
         value,
@@ -300,6 +309,16 @@ fn memory_sample(
     };
     let (required, policy) = match mode {
         MemoryMode::Existing => (memory_required(reserve, total, candidate)?, None),
+        MemoryMode::AssemblyRecovery204 => {
+            let required=memory_required(reserve,total,candidate)?;
+            (required,Some(("assembly204_recovery_memory_policy",json!({
+                "schema":"jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1",
+                "protected_existing_hard_memory_growth_bytes":reserve,
+                "host_available_floor_bytes":total.div_ceil(10),
+                "candidate_hard_memory_bytes":candidate,
+                "required_available_memory_bytes":required,
+                "available_floor_component_accounted_once_bytes":accounted_floor}))))
+        }
         MemoryMode::Full210 => {
             let (n, p) = singleton210_memory::required(f, total, reserve, candidate)?;
             (n, Some(("full210_memory_policy", p)))
