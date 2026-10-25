@@ -1,4 +1,4 @@
-//! Status metadata for the real prefix223_native20 diagnostic; never a pipeline impersonation.
+//! Status metadata for the real `prefix223_native20` diagnostic; never a pipeline impersonation.
 use super::prefix223_native20 as c;
 use super::*;
 mod jet;

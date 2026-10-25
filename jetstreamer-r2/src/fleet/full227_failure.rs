@@ -30,7 +30,11 @@ fn sealed_bytes(binding: &BoundFile) -> Result<Vec<u8>> {
             && binding.path.canonicalize()? == binding.path,
         "227 failure input is not sealed/canonical"
     );
-    let bytes = read_stable_bounded(&binding.path, 16 << 20, "full227failure sealed input")?;
+    let bytes = read_stable_bounded(
+        &binding.path,
+        16 << 20,
+        "full epoch 227 failure sealed input",
+    )?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == binding.sha256,
         "full 227 failure evidence SHA differs"

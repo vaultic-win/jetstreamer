@@ -421,7 +421,7 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
     };
     write_receipt(&plan.output, &receipt)?;
     println!(
-        "private225bootstrap resource measurement passed: {}",
+        "private epoch 225 bootstrap resource measurement passed: {}",
         plan.output.display()
     );
     Ok(())

@@ -340,7 +340,7 @@ fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
             && stopped["ActiveState"] == "inactive"
             && stopped["Result"] == "success"
             && stopped["ExecMainStatus"] == "0",
-        "203 cannot release a live/replaced/failed205 trial"
+        "203 cannot release a live/replaced/failed 205 trial"
     );
     Ok(())
 }

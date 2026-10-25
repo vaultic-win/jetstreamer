@@ -243,7 +243,7 @@ pub(in crate::fleet) fn terminal_predecessor(
     }
     ensure!(
         p.gates[&223].state == "failed-needs-repair",
-        "native20 terminal cannot close epoch223repair"
+        "native20 terminal cannot close epoch 223 repair"
     );
     Ok(())
 }

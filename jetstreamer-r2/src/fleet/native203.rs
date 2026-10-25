@@ -30,8 +30,8 @@ const NO_AUTHORITY: &[&str] = &[
 ];
 
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
-    // Recognize the whole prefix so foreign/native203 names cannot borrow a
-    // generic launch schema; shape() then admits exactly one sealed attempt.
+    // Recognize the whole prefix so foreign names for native epoch 203 cannot
+    // borrow a generic launch schema; shape() admits exactly one sealed attempt.
     c.unit.starts_with("horizon-native-203-")
 }
 fn command(v: &Value) -> Option<&str> {

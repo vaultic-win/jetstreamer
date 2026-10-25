@@ -1,4 +1,4 @@
-//! Exact private cold223-prefix no-worker proof. Never replay/admission authority.
+//! Exact private cold epoch 223 prefix no-worker proof. Never replay/admission authority.
 #[allow(dead_code)]
 #[path = "epoch223_tail_attest_bin.rs"]
 mod immutable;

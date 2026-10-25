@@ -77,7 +77,7 @@ pub(crate) fn validate_cli(
             && count == 1
             && destination
             && !forbidden,
-        "private203 continuation requires its dedicated build, only 203, one --verify, explicit private destination, and no ordinary override",
+        "private epoch 203 continuation requires its dedicated build, only 203, one --verify, explicit private destination, and no ordinary override",
     )
 }
 fn validate_plan(p: &Plan, destination: &Path) -> Result<(), String> {
