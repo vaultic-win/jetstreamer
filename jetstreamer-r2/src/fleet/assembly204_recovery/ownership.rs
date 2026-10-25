@@ -128,7 +128,8 @@ pub(super) fn current_actor(
     ensure!(
         is_live(&row)
             && row["InvocationID"] == env::var("INVOCATION_ID")?
-            && row["MainPID"] == std::process::id().to_string(),
+            && row["MainPID"].as_str().and_then(|s| s.parse::<u32>().ok())
+                == Some(std::process::id()),
         "204 runner is not exact systemd main owner"
     );
     let command = format!(
@@ -607,10 +608,10 @@ fn actual_transport_phase(owner: &Value) -> Result<String> {
         if let Some(message) = row["MESSAGE"]
             .as_str()
             .and_then(|m| serde_json::from_str::<Value>(m).ok())
+            && message["event"] == "r2-readback-start"
+            && message["key"] == "epoch-204.jet"
         {
-            if message["event"] == "r2-readback-start" && message["key"] == "epoch-204.jet" {
-                phase = "readback";
-            }
+            phase = "readback";
         }
     }
     Ok(phase.into())
