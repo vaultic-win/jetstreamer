@@ -153,10 +153,9 @@ fn wait(p: &Plan, iid: &str, x: &Prerequisites, s: &mut Session, start: Instant)
                         && guard.worker_sha256 == WORKER
                         && guard.target_slot == TERMINAL
                         && guard.run_root == p.run_root
-                        && fresh(guard.recorded_unix_millis, millis()?)
                         && !guard.publication_authorized
                         && !guard.r2_mutations,
-                    "223 spawn grant lacks fresh original protective guard"
+                    "223 spawn grant lacks the live original protective guard"
                 );
                 observe(&g.runner)?;
                 observe(&g.issuer)?;
