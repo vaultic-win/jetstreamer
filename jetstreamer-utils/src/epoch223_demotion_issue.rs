@@ -1,4 +1,4 @@
-//! Exact control issuance over a new complete-accounting calculation.
+// Exact control issuance over a new complete-accounting calculation.
 use super::*;
 
 #[derive(Deserialize)]

@@ -1,4 +1,4 @@
-//! Exact independently supervised protective guard; no fleet observation or R2.
+// Exact independently supervised protective guard; no fleet observation or R2.
 use super::*;
 use std::os::fd::{AsRawFd, FromRawFd};
 

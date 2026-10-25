@@ -1,5 +1,5 @@
-//! Exact new-harness supervisor. No production worker or entry replay is run.
-//! Native issuer/guard roles still require their own source/runtime qualification.
+// Exact new-harness supervisor. No production worker or entry replay is run.
+// Native issuer/guard roles still require their own source/runtime qualification.
 use super::*;
 const TEST: &str =
     "runtime::tests::native_epoch223_cold_input_matches_canonical_accounts_commitment";

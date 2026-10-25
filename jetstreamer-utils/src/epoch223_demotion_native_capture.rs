@@ -1,5 +1,5 @@
-//! Proof capture from actual new harness output and terminal manager evidence.
-//! This role never launches a harness or promotes an old cold-input proof.
+// Proof capture from actual new harness output and terminal manager evidence.
+// This role never launches a harness or promotes an old cold-input proof.
 use super::*;
 const TEST: &str =
     "runtime::tests::native_epoch223_cold_input_matches_canonical_accounts_commitment";

@@ -1,4 +1,4 @@
-//! Root-only metadata captures. These commands never execute native inputs.
+// Root-only metadata captures. These commands never execute native inputs.
 use super::*;
 
 #[derive(Deserialize)]
