@@ -158,6 +158,7 @@ struct GuardProof {
     protective_guard_proven: bool,
     producer_stop_enabled: bool,
     recorded_unix_millis: u64,
+    minimum_free_bytes: u64,
     publication_authorized: bool,
     r2_mutations: bool,
 }
@@ -1023,6 +1024,7 @@ fn validate_admission(
             && g.target_slot == TERMINAL
             && g.protective_guard_proven
             && g.producer_stop_enabled
+            && g.minimum_free_bytes == p.minimum_free_bytes
             && fresh(g.recorded_unix_millis, now)
             && !g.publication_authorized
             && !g.r2_mutations,
@@ -1383,6 +1385,7 @@ mod tests {
             target_slot: TERMINAL,
             protective_guard_proven: true,
             producer_stop_enabled: true,
+            minimum_free_bytes: p.minimum_free_bytes,
             recorded_unix_millis: 10,
             publication_authorized: false,
             r2_mutations: false,
@@ -1391,6 +1394,14 @@ mod tests {
             &p, &x, &root, &runner, &ready, &a, &origin, &task, &guard, 11,
         )
         .unwrap();
+        guard.minimum_free_bytes = p.minimum_free_bytes + 1;
+        assert!(
+            validate_admission(
+                &p, &x, &root, &runner, &ready, &a, &origin, &task, &guard, 11
+            )
+            .is_err()
+        );
+        guard.minimum_free_bytes = p.minimum_free_bytes;
         task.original_start_unix_millis = 10;
         assert!(
             validate_admission(
