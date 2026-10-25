@@ -284,7 +284,7 @@ pub(super) fn check(value: &Value, restoring: bool) -> Result<Value> {
     );
     let jobs = inactive_status::queued_job_units(&jobs.stdout)?;
     ensure!(
-        jobs.iter().all(|name| name == TOOL
+        jobs.iter().all(|name| *name == TOOL
             || !name
                 .split(|c: char| !c.is_ascii_digit())
                 .any(|n| n == "203")),
