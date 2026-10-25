@@ -296,8 +296,7 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
     tool_qa::validate(
         &qa,
         s(&proof, "source_revision")?,
-        component,
-        qa_target,
+        (component, qa_target),
         &logs,
         &qa_files,
         read,

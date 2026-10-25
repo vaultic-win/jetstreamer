@@ -163,13 +163,13 @@ fn resolve<'a>(wanted: &BoundFile, files: &'a [EvidenceFile]) -> Result<&'a Boun
 pub(super) fn validate(
     qa: &Value,
     source: &str,
-    component: &str,
-    target: Target,
+    requirement: (&str, Target),
     logs: &[BoundFile],
     files: &[EvidenceFile],
     mut read_result: impl FnMut(&BoundFile) -> Result<Value>,
     mut read_log: impl FnMut(&BoundFile) -> Result<Vec<u8>>,
 ) -> Result<()> {
+    let (component, target) = requirement;
     ensure!(is_lower_hex(source, 40), "204 tool QA source digest");
     let mut originals = BTreeSet::new();
     let mut copies = BTreeSet::new();
@@ -376,8 +376,7 @@ mod tests {
         validate(
             qa,
             &"e".repeat(40),
-            "jetstreamer-horizon",
-            Target::Example("verify_archive"),
+            ("jetstreamer-horizon", Target::Example("verify_archive")),
             logs,
             files,
             |b| {
@@ -496,7 +495,7 @@ mod tests {
         }
         nonzero_passed_tests(b"test result: ok. 2 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0s").unwrap();
         let (qa, logs, files, results) = fixture(false);
-        assert!(validate(&qa,&"e".repeat(40),"jetstreamer-horizon",Target::Example("verify_archive"),&logs,&files,
+        assert!(validate(&qa,&"e".repeat(40),("jetstreamer-horizon",Target::Example("verify_archive")),&logs,&files,
             |b|results.get(&b.path).cloned().context("missing result"),
             |_|Ok(b"test result: ok. 0 passed; 0 failed; 99 ignored; 0 measured; 0 filtered out; finished in 0s".to_vec())).is_err());
         for flag in ["--no-run", "--list"] {
