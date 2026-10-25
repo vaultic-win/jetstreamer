@@ -80,7 +80,8 @@ The independent guard command remains:
 
 `EXE guard-epoch223-demotion PLAN --plan-sha256 SHA --self-sha256 ELF_SHA`
 
-The native supervisor still requires source completion.
+The native supervisor now has a concrete source path, but native-specific issuer
+and protective-guard routes still require source completion.
 Every new role, including the guard, remains unbuilt and unqualified. Their interface types are not
 execution evidence. The current patch implements two root-only metadata
 capture commands in the private utility binary:
@@ -297,9 +298,9 @@ then independently checks clean unique PID1 start/completion and the actual
 zero-restart inactive/success/exit0 manager frame twice. Only then does it produce
 root immutable provenance and the strict native proof with every replay/root/
 repair-closure/publication/R2 authority false. Old harness proof is never accepted.
-The capture role is source-only and has not run. The native supervisor that must
-produce genuine launch/result/stdout and its admission/guard qualification is
-still not implemented; these strict input types do not pretend otherwise.
+The capture role is source-only and has not run. The native supervisor now has concrete source to produce genuine launch/result/
+stdout, but its independently qualified native-specific issuer/guard routes are
+still missing. Proof capture cannot manufacture their qualification.
 
 New223 floor separation is source-only. Cycle402's observed century floor was
 245,383,154,903 bytes; it is evidence, not a permanent constant. The live inherited
@@ -316,3 +317,34 @@ was reobserved, denies rollback/repeat spawn, and requires root reconciliation
 before next admission. If that receipt also fails, return both errors while
 retaining the original reservation, files and guard. An uncertain marker
 publication remains potentially committed under the same recovery rule.
+
+## Concrete native supervisor source
+
+`supervise-epoch223-demotion-native` implements the exact sealed new-harness
+supervisor, separate from the bracket/ordinary profiles. Its strict plan binds
+root native unit, sealed harness, hardcoded snapshot/genesis/source QA, empty
+uid1000 mode0700 scratch, original e70a clock, local floor and separately qualified
+issuer/guard/accounting paths. It captures a genuine root manager actor, accepts
+one bounded native control grant at14/16GiB, acknowledges read-only control,
+hashes the exact inputs without renewing that control, then writes the genuine
+post-hash request and accepts one fresh native spawn grant at112/128GiB. Both
+permissions reopen the actual full corrected native-input capacity result and
+compare exact actors/plan/phase, full18GiB or130GiB actor budgets and century floor.
+
+It requires the same original independently qualified native guard through the
+handoff. Only after the new grant and unchanged empty scratch checks does it spawn
+the exact new harness with the one exact ignored-test filter, uid/gid1000, cleared
+environment and no effective/ambient capabilities. It captures actual harness
+PID/start ticks/ELF/cgroup/credentials before issuing the launch receipt. It
+rechecks the live actor/guard/caps/local floor on the existing15-second protective
+cadence, enforces the execution bound, reaps the actual child and writes immutable
+stdout/result metadata. Manager terminal/proof capture remains separate after
+supervisor exit. The owned-child group backstop applies to all supervisor errors.
+It never runs the production worker or entries, writes a canonical sidecar,
+closes repair, promotes a runtime or performs R2 operations.
+
+This supervisor has not been built or run. Its native-specific independently
+qualified control/spawn issuer and guard source routes are still absent (the
+implemented bracket issuer/guard reject native plans); explicit qualification
+flags make that absence fail closed. The new supervisor is not executable campaign
+readiness until those real routes and all source/runtime checks are complete.

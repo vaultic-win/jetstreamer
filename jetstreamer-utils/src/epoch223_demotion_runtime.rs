@@ -6,6 +6,9 @@ const MAX_WAIT_MILLIS: u64 = 120_000;
 const MAX_ADMISSION_AGE_MILLIS: u64 = 120_000;
 const HASH_MEMORY_HIGH: u64 = 14 << 30;
 const HASH_MEMORY_MAX: u64 = 16 << 30;
+mod native_supervisor {
+    include!("epoch223_demotion_native_supervisor.rs");
+}
 mod native_capture {
     include!("epoch223_demotion_native_capture.rs");
 }
@@ -451,6 +454,7 @@ fn observe(a: &Actor) -> Result<()> {
     let row = properties(&a.unit)?;
     let expected_user = if a.unit.starts_with("horizon-admit-223-demotion-")
         || a.unit.starts_with("horizon-guard-223-demotion-")
+        || a.unit.starts_with("horizon-native-input-223-demotion-")
     {
         "root"
     } else {

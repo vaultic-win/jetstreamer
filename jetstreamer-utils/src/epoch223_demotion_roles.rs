@@ -35,6 +35,7 @@ pub(super) fn dispatch() -> Option<Result<()>> {
             | "issue-epoch223-demotion-control"
             | "issue-epoch223-demotion-spawn"
             | "capture-epoch223-demotion-native-proof"
+            | "supervise-epoch223-demotion-native"
     ) {
         return None;
     }
@@ -62,6 +63,9 @@ fn run(args: &[String]) -> Result<()> {
     };
     bound_file(&executable.path, &executable.sha256, 256 << 20)?;
     match args[1].as_str() {
+        "supervise-epoch223-demotion-native" => {
+            super::native_supervisor::run(&binding, &executable)?
+        }
         "capture-epoch223-demotion-native-proof" => {
             super::native_capture::run(&binding, &executable)?
         }
@@ -166,6 +170,8 @@ pub(super) fn own_role(
 ) -> Result<Actor> {
     ensure!(
         (unit.starts_with("horizon-admit-223-demotion-")
+            || (command == "supervise-epoch223-demotion-native"
+                && unit.starts_with("horizon-native-input-223-demotion-"))
             || (command == "guard-epoch223-demotion"
                 && unit.starts_with("horizon-guard-223-demotion-")))
             && unit.ends_with(".service")
