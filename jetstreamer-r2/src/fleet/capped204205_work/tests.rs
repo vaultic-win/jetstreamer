@@ -402,6 +402,115 @@ fn raw_manager_success_cannot_be_replaced_by_a_stop_or_another_invocation() {
         capture::manager_history(&encode(vec![start, replacement]), unit, &iid, false).is_err()
     );
 }
+
+const COMPAT_JOURNAL: &[u8] =
+    include_bytes!("../../../tests/fixtures/capped204-manager/complete-pid1-journal.jsonl");
+const COMPAT_UNIT: &str = "horizon-qualify-204-capped-continuation-e506rss-v2.service";
+const COMPAT_IID: &str = "55a098e8623b42f6bec931363172402c";
+fn compat_rows() -> Vec<Value> {
+    std::str::from_utf8(COMPAT_JOURNAL)
+        .unwrap()
+        .lines()
+        .map(|s| serde_json::from_str(s).unwrap())
+        .collect()
+}
+fn compat_encode(rows: &[Value]) -> Vec<u8> {
+    rows.iter()
+        .map(|v| serde_json::to_string(v).unwrap() + "\n")
+        .collect::<String>()
+        .into_bytes()
+}
+#[test]
+fn actual_complete_manager_journal_retains_exact_compat_warning_and_original_start() {
+    assert_eq!(
+        hex_lower(&Sha256::digest(COMPAT_JOURNAL)),
+        "1bc8caad92ef2c0e7c4645983577b18b9f949a5ffa8914463073d055b165f352"
+    );
+    let original = COMPAT_JOURNAL.to_vec();
+    assert_eq!(
+        capture::manager_history(COMPAT_JOURNAL, COMPAT_UNIT, COMPAT_IID, false).unwrap(),
+        1_792_886_526_243
+    );
+    assert_eq!(original, COMPAT_JOURNAL);
+    assert_eq!(compat_rows().len(), 4);
+    assert!(capture::manager_history(COMPAT_JOURNAL, COMPAT_UNIT, COMPAT_IID, true).is_err());
+    assert!(capture::manager_terminal(COMPAT_JOURNAL, COMPAT_UNIT, COMPAT_IID).is_err());
+}
+#[test]
+fn compat_exception_requires_every_exact_trusted_warning_field_and_absent_iid() {
+    for (key, value) in [
+        ("_PID", json!("7")),
+        ("_UID", json!("1000")),
+        ("_COMM", json!("other")),
+        ("_EXE", json!("/foreign/systemd")),
+        ("_BOOT_ID", json!("f".repeat(32))),
+        ("UNIT", json!("foreign.service")),
+        ("MESSAGE_ID", json!("different")),
+        ("CODE_FUNC", json!("different")),
+        ("CODE_FILE", json!("different")),
+        ("CODE_LINE", json!("21")),
+        ("MESSAGE", json!("arbitrary warning")),
+        ("INVOCATION_ID", Value::Null),
+        ("INVOCATION_ID", json!("")),
+        ("INVOCATION_ID", json!("f".repeat(32))),
+        ("__CURSOR", json!("")),
+        ("__REALTIME_TIMESTAMP", json!("1")),
+    ] {
+        let mut rows = compat_rows();
+        rows[3][key] = value;
+        assert!(
+            capture::manager_history(&compat_encode(&rows), COMPAT_UNIT, COMPAT_IID, false)
+                .is_err(),
+            "{key}"
+        );
+    }
+    let mut rows = compat_rows();
+    rows[3]["MESSAGE"] = json!(format!(
+        "/etc/systemd/system/{COMPAT_UNIT}:22: Support for option CPUAccounting= has been removed and it is ignored"
+    ));
+    assert!(
+        capture::manager_history(&compat_encode(&rows), COMPAT_UNIT, COMPAT_IID, false).is_err()
+    );
+}
+#[test]
+fn compat_warning_does_not_hide_missing_iid_lifecycle_or_foreign_invocations() {
+    for (message, id) in [
+        ("Starting foreign owner", "7d4958e842da4a758f6c1cdc7b36dcc5"),
+        (
+            "Stopping original owner",
+            "9d1aaa27d60140bd96365438aad20286",
+        ),
+        (
+            "original: Failed with result 'exit-code'.",
+            "be02cf6855d2428ba40df7e9d022f03d",
+        ),
+    ] {
+        for iid in [None, Some("ffffffffffffffffffffffffffffffff")] {
+            let mut rows = compat_rows();
+            rows[3]["MESSAGE"] = json!(message);
+            rows[3]["MESSAGE_ID"] = json!(id);
+            if let Some(iid) = iid {
+                rows[3]["INVOCATION_ID"] = json!(iid);
+            }
+            assert!(
+                capture::manager_history(&compat_encode(&rows), COMPAT_UNIT, COMPAT_IID, false)
+                    .is_err()
+            );
+        }
+    }
+    let mut rows = compat_rows();
+    rows[3]["__CURSOR"] = rows[2]["__CURSOR"].clone();
+    assert!(
+        capture::manager_history(&compat_encode(&rows), COMPAT_UNIT, COMPAT_IID, false).is_err()
+    );
+    let mut rows = compat_rows();
+    rows[3]["INVOCATION_ID"] = json!(COMPAT_IID);
+    rows[3]["MESSAGE_ID"] = json!("be02cf6855d2428ba40df7e9d022f03d");
+    rows[3]["MESSAGE"] = json!("original: Failed with result 'exit-code'.");
+    assert!(
+        capture::manager_history(&compat_encode(&rows), COMPAT_UNIT, COMPAT_IID, true).is_err()
+    );
+}
 #[test]
 fn continuation_binding_cannot_borrow_another_epoch_or_non_dashboard_phase() {
     let name = "horizon-qualify-204-capped-continuation-fixture.service";

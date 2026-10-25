@@ -100,6 +100,34 @@ fn journal(unit: &str) -> Result<Vec<u8>> {
         ],
     )
 }
+// This exact PID 1 parser diagnostic can follow Started during a reload. It
+// describes the installed configuration, not an invocation lifecycle event.
+// Keep the raw record and every ordinary journal check; never generalize this
+// to arbitrary missing-IID records or configuration warnings.
+fn exact_cpu_accounting_warning(v: &Value, unit: &str, start_boot: Option<&str>) -> bool {
+    const UNIT: &str = "horizon-qualify-204-capped-continuation-e506rss-v2.service";
+    unit == UNIT
+        && v["UNIT"] == UNIT
+        && v["_PID"] == "1"
+        && v["_UID"] == "0"
+        && v["_COMM"] == "systemd"
+        && v["_EXE"] == "/usr/lib/systemd/systemd"
+        && v.get("INVOCATION_ID").is_none()
+        && v["__CURSOR"].as_str().is_some_and(|s| !s.is_empty())
+        && start_boot.is_some_and(|boot| {
+            boot.len() == 32
+                && boot
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                && v["_BOOT_ID"] == boot
+        })
+        && v["MESSAGE_ID"] == "c772d24e9a884cbeb9ea12625c306c01"
+        && v["CODE_FUNC"] == "config_parse_warn_compat"
+        && v["CODE_FILE"] == "src/shared/conf-parser.c"
+        && v["CODE_LINE"] == "1391"
+        && v["MESSAGE"]
+            == "/etc/systemd/system/horizon-qualify-204-capped-continuation-e506rss-v2.service:21: Support for option CPUAccounting= has been removed and it is ignored"
+}
 pub(super) fn manager_history(raw: &[u8], unit: &str, iid: &str, success: bool) -> Result<u64> {
     let mut starts = Vec::new();
     let mut ends = Vec::new();
@@ -141,9 +169,19 @@ pub(super) fn manager_history(raw: &[u8], unit: &str, iid: &str, success: bool) 
             "actual natural PID 1 success missing"
         );
     }
+    let start_boot = rows
+        .iter()
+        .find(|(time, v)| {
+            *time == starts[0]
+                && v["INVOCATION_ID"] == iid
+                && v["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"
+        })
+        .and_then(|(_, v)| v["_BOOT_ID"].as_str())
+        .map(str::to_owned);
     for (time, v) in rows.into_iter().filter(|(time, _)| *time >= starts[0]) {
         ensure!(
-            v["INVOCATION_ID"] == iid,
+            v["INVOCATION_ID"] == iid
+                || exact_cpu_accounting_warning(&v, unit, start_boot.as_deref()),
             "replacement invocation follows original start"
         );
         if success {
