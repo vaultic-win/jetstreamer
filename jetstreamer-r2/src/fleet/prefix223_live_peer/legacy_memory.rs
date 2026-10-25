@@ -253,7 +253,7 @@ mod tests {
             total,
             rows.iter()
                 .map(|r| integer(r, "remaining_hard_memory_growth_bytes").unwrap())
-                .sum()
+                .sum::<u64>()
         );
         let once = total;
         append_or_complete(&mut total, &mut rows, &o209).unwrap();
