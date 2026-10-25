@@ -29,12 +29,14 @@ fn now_millis() -> Result<u64> {
         .context("204 clock overflow")
 }
 pub(super) fn command_matches(actual: &str, expected: &str) -> bool {
-    let actual = actual
-        .split(" ; start_time=")
-        .next()
-        .unwrap_or(actual)
-        .trim_end_matches(" }");
-    actual == expected.trim_end_matches(" }")
+    fn command_display(command: &str) -> &str {
+        command
+            .split(" ; start_time=")
+            .next()
+            .unwrap_or(command)
+            .trim_end_matches(" }")
+    }
+    command_display(actual) == command_display(expected)
 }
 pub(super) fn validate_closed_ownership(
     current: &BTreeMap<String, Value>,

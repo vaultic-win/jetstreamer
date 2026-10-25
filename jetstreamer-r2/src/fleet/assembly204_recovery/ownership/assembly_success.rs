@@ -255,6 +255,103 @@ pub(in crate::fleet::assembly204_recovery) fn capture(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn collected_terminal_owners() -> Value {
+        serde_json::from_str(include_str!("fixtures/collected-terminal-owners.json")).unwrap()
+    }
+    #[test]
+    fn collected_terminal_raw_commands_match_both_display_shapes_without_rewriting_owners() {
+        // Exact original launch and collected current rows from the actual
+        // producer/guard diagnosis; PID1 cleared their current IID and times.
+        let rows = collected_terminal_owners();
+        let unchanged = rows.clone();
+        for kind in ["owner", "guard"] {
+            let current = &rows[kind]["raw_current"];
+            let original = &rows[kind]["raw_original"];
+            let actual_command = s(current, "ExecStart").unwrap();
+            let original_command = s(original, "ExecStart").unwrap();
+            assert_ne!(actual_command, original_command);
+            assert!(command_matches(actual_command, original_command));
+            assert!(command_matches(original_command, actual_command));
+            let configured_command = format!(
+                "{} }}",
+                original_command.split(" ; start_time=").next().unwrap()
+            );
+            assert!(command_matches(actual_command, &configured_command));
+            assert!(command_matches(&configured_command, original_command));
+            terminal_owner(current, original).unwrap();
+            assert_eq!(current["InvocationID"], "");
+            assert_eq!(current["MainPID"], "0");
+            assert_ne!(current["InvocationID"], original["InvocationID"]);
+            assert_ne!(current["MainPID"], original["MainPID"]);
+        }
+        assert_eq!(rows, unchanged);
+    }
+    #[test]
+    fn collected_terminal_raw_commands_reject_executable_arguments_and_error_policy_changes() {
+        let rows = collected_terminal_owners();
+        for kind in ["owner", "guard"] {
+            let original = &rows[kind]["raw_original"];
+            let current = &rows[kind]["raw_current"];
+            let command = s(current, "ExecStart").unwrap();
+            for (old, new) in [
+                ("path=/var/lib/jetstreamer/", "path=/foreign/"),
+                ("argv[]=/var/lib/jetstreamer/", "argv[]=/foreign/"),
+                ("/plan.json", "/foreign-plan.json"),
+                ("--plan-sha256 fbe4", "--plan-sha256 0000"),
+                ("--self-sha256 2fe7", "--self-sha256 0000"),
+                ("ignore_errors=no", "ignore_errors=yes"),
+            ] {
+                let changed = command.replacen(old, new, 1);
+                assert_ne!(command, changed);
+                assert!(!command_matches(
+                    &changed,
+                    s(original, "ExecStart").unwrap()
+                ));
+                assert!(!command_matches(
+                    s(original, "ExecStart").unwrap(),
+                    &changed
+                ));
+                let mut bad = current.clone();
+                bad["ExecStart"] = json!(changed);
+                assert!(
+                    terminal_owner(&bad, original).is_err(),
+                    "accepted {kind} {old}"
+                );
+            }
+            let changed_guard = if kind == "guard" {
+                command.replacen(" --guard", "", 1)
+            } else {
+                command.replacen(" ; ignore_errors=", " --guard ; ignore_errors=", 1)
+            };
+            let mut bad = current.clone();
+            bad["ExecStart"] = json!(changed_guard);
+            assert!(terminal_owner(&bad, original).is_err());
+        }
+    }
+    #[test]
+    fn collected_terminal_raw_commands_keep_terminal_identity_and_success_gates() {
+        let rows = collected_terminal_owners();
+        for kind in ["owner", "guard"] {
+            for (field, value) in [
+                ("Id", "foreign.service"),
+                ("LoadState", "not-found"),
+                ("InvocationID", "ffffffffffffffffffffffffffffffff"),
+                ("MainPID", "1"),
+                ("NRestarts", "1"),
+                ("ActiveState", "active"),
+                ("SubState", "running"),
+                ("Result", "exit-code"),
+                ("ExecMainStatus", "1"),
+            ] {
+                let mut bad = rows[kind]["raw_current"].clone();
+                bad[field] = json!(value);
+                assert!(
+                    terminal_owner(&bad, &rows[kind]["raw_original"]).is_err(),
+                    "accepted {kind} {field}"
+                );
+            }
+        }
+    }
     fn b(name: &str) -> BoundFile {
         BoundFile {
             path: Path::new("/fixture").join(name),

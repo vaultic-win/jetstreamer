@@ -1,0 +1,58 @@
+{
+  "owner": {
+    "raw_current": {
+      "Id": "horizon-qualify-204-assembly-only-recovery-v2.service",
+      "LoadState": "loaded",
+      "ActiveState": "inactive",
+      "SubState": "dead",
+      "InvocationID": "",
+      "MainPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only ; argv[]=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only /var/lib/jetstreamer/horizon-204-assembly-control-aac7c8ca-v2/plan.json --plan-sha256 fbe4bbf7a47599abe12ec223162e1ad9b73fe71bdc1eefbd770ada8165f6f0d8 --self-sha256 2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+    },
+    "raw_original": {
+      "ActiveState": "active",
+      "ControlGroup": "/system.slice/horizon-qualify-204-assembly-only-recovery-v2.service",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only ; argv[]=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only /var/lib/jetstreamer/horizon-204-assembly-control-aac7c8ca-v2/plan.json --plan-sha256 fbe4bbf7a47599abe12ec223162e1ad9b73fe71bdc1eefbd770ada8165f6f0d8 --self-sha256 2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877 ; ignore_errors=no ; start_time=[Sun 2026-10-25 14:51:21 UTC] ; stop_time=[n/a] ; pid=1714527 ; code=(null) ; status=0/0 }",
+      "Id": "horizon-qualify-204-assembly-only-recovery-v2.service",
+      "InvocationID": "c011b66083a94a4e9fcedae3daa1b435",
+      "LoadState": "loaded",
+      "MainPID": "1714527",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "running",
+      "Type": "exec"
+    }
+  },
+  "guard": {
+    "raw_current": {
+      "Id": "horizon-guard-204-assembly-only-recovery-v2.service",
+      "LoadState": "loaded",
+      "ActiveState": "inactive",
+      "SubState": "dead",
+      "InvocationID": "",
+      "MainPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only ; argv[]=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only /var/lib/jetstreamer/horizon-204-assembly-control-aac7c8ca-v2/plan.json --plan-sha256 fbe4bbf7a47599abe12ec223162e1ad9b73fe71bdc1eefbd770ada8165f6f0d8 --self-sha256 2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877 --guard ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+    },
+    "raw_original": {
+      "ActiveState": "active",
+      "ControlGroup": "/system.slice/horizon-guard-204-assembly-only-recovery-v2.service",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only ; argv[]=/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2/jetstreamer-epoch204-assembly-only /var/lib/jetstreamer/horizon-204-assembly-control-aac7c8ca-v2/plan.json --plan-sha256 fbe4bbf7a47599abe12ec223162e1ad9b73fe71bdc1eefbd770ada8165f6f0d8 --self-sha256 2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877 --guard ; ignore_errors=no ; start_time=[Sun 2026-10-25 14:51:21 UTC] ; stop_time=[n/a] ; pid=1714521 ; code=(null) ; status=0/0 }",
+      "Id": "horizon-guard-204-assembly-only-recovery-v2.service",
+      "InvocationID": "b7ab152847504663a0735d89e26c3fcc",
+      "LoadState": "loaded",
+      "MainPID": "1714521",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "running",
+      "Type": "exec"
+    }
+  }
+}
