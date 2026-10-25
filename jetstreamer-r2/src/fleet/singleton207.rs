@@ -41,7 +41,6 @@ pub(super) const GUARD_RECEIPTS: &str =
 const BOOTSTRAP: u64 = 89_423_444;
 const FIRST: u64 = 89_424_000;
 const TERMINAL: u64 = 89_855_999;
-pub(super) const FLOOR: u64 = 2_000_000_000_000;
 pub(super) const MEMORY: u64 = 225_000_000_000;
 const DRAINAGE: u64 = 32 << 30;
 const TREE_STOP: u64 = 300_000_000_000 + (128 << 30);
@@ -254,7 +253,7 @@ pub(super) fn guard_matches(c: &DiagnosticClaim, v: &Value, p: &Value) -> bool {
         && p["filesystem"] == "/"
         && p["worker_root"] == ROOT
         && p["receipt_directory"] == GUARD_RECEIPTS
-        && floor.is_some_and(|n| n >= FLOOR + DRAINAGE)
+        && floor.is_some_and(|n| n > DRAINAGE)
         && p["minimum_free_bytes"] == v["guard_minimum_free_bytes"]
         && p["maximum_root_physical_bytes"] == TREE_STOP
         && p["maximum_worker_vmas"] == 3500000

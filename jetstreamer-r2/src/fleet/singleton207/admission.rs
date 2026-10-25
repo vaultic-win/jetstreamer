@@ -226,13 +226,14 @@ pub(super) fn validate_saved(a: &Value) -> Result<()> {
     let capacity = &a["capacity"];
     let minimum = capacity["minimum_free_bytes"]
         .as_u64()
-        .filter(|n| *n >= FLOOR)
+        .filter(|n| *n > 0)
         .context("singleton 207 protected disk floor absent")?;
     let required = minimum
         .checked_add(DISK_RESERVATION)
         .context("singleton 207 disk overflow")?;
     let calculated = capacity["century_floor_bytes"]
         .as_u64()
+        .filter(|n| *n > 0)
         .context("singleton 207 century floor absent")?
         .checked_add(
             capacity["protected_remaining_growth_bytes"]
@@ -244,8 +245,7 @@ pub(super) fn validate_saved(a: &Value) -> Result<()> {
             capacity["maximum_existing_guard_floor_bytes"]
                 .as_u64()
                 .context("singleton 207 inherited guard floor absent")?,
-        )
-        .max(FLOOR);
+        );
     ensure!(
         capacity["schema"] == "jetstreamer-horizon-maintenance-capacity-v1"
             && minimum == calculated

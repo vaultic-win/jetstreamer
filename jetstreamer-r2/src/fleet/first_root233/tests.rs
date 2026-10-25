@@ -1,5 +1,7 @@
 //! Positive examples and changed-evidence rejection; no production paths or I/O.
 use super::*;
+// An inherited legacy guard in these fixtures, never a new profile minimum.
+const FLOOR: u64 = 2_000_000_000_000;
 fn admission_fixture() -> Value {
     let minimum = FLOOR;
     let total = 1_200_000_000_000u64;
@@ -405,4 +407,48 @@ fn sandbox_refuses_thread_expansion_cpu_reuse_or_an_extra_write_root() {
         .unwrap()
         .push_str(" SOLANA_RAYON_THREADS=64");
     assert!(sandbox(&bad).is_err());
+}
+
+#[test]
+fn new_profile_uses_century_mean_and_growth_without_a_fixed_floor_and_retains_legacy_guards() {
+    for (century, growth, legacy, expected) in [
+        (250_000_000_000u64, 0u64, 0u64, 250_000_000_000u64),
+        (250_000_000_000, 1_000_000_000_000, 0, 1_250_000_000_000),
+        (
+            250_000_000_000,
+            1_000_000_000_000,
+            2_000_000_000_000,
+            2_000_000_000_000,
+        ),
+    ] {
+        let mut a = admission_fixture();
+        let required = expected + DISK_RESERVATION;
+        a["guard_minimum_free_bytes"] = json!(expected + DRAINAGE);
+        let c = &mut a["capacity"];
+        c["century_floor_bytes"] = json!(century);
+        c["protected_remaining_growth_bytes"] = json!(growth);
+        c["maximum_existing_guard_floor_bytes"] = json!(legacy);
+        c["minimum_free_bytes"] = json!(expected);
+        c["required_initial_free_bytes"] = json!(required);
+        c["sampled_available_bytes"] = json!(required + 1);
+        c["actual_available_bytes"] = json!(required + 1);
+        c["bracketed_obligations"]["disk_growth_before_bytes"] = json!(growth);
+        c["bracketed_obligations"]["disk_growth_after_bytes"] = json!(growth);
+        c["bracketed_obligations"]["protected_disk_growth_bytes"] = json!(growth);
+        admission::validate_saved(&a).unwrap();
+        let (p, g) = guard_fixture(&a);
+        capture::guard_valid(&a, &g, &p, &"d".repeat(64), 1020).unwrap();
+        let mut bad = a.clone();
+        bad["capacity"]["century_floor_bytes"] = json!(0);
+        assert!(admission::validate_saved(&bad).is_err());
+        let mut bad = a.clone();
+        bad["capacity"]["minimum_free_bytes"] = json!(expected - 1);
+        assert!(admission::validate_saved(&bad).is_err());
+        let mut bad = a.clone();
+        bad["guard_minimum_free_bytes"] = json!(expected + DRAINAGE - 1);
+        assert!(admission::validate_saved(&bad).is_err());
+        let mut bad = a;
+        bad["capacity"]["maximum_existing_guard_floor_bytes"] = json!(expected + 1);
+        assert!(admission::validate_saved(&bad).is_err());
+    }
 }

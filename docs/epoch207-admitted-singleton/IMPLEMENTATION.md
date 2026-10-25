@@ -6,7 +6,7 @@ The full output is exactly slots 89424000 through 89855999 (432000 slots). Boots
 
 ## Closed commands
 
-All commands use the existing `PLAN --plan-sha256 SHA --self-sha256 SHA` argument convention and independently validate immutable root-owned input plans.
+All commands use the existing `SPEC --spec-sha256 SHA --self-sha256 SHA` argument convention and independently validate immutable root-owned input plans.
 
 - `prepare-singleton207-inputs`: rehash the exact existing node, production worker, cached bootstrap and genesis. Bind and revalidate the genuine admitted metadata, actual preflight and original native proof. Emit `inputs.json` in `/var/lib/jetstreamer/horizon-singleton207-inputs-*`. No service launch, Bank restore, resource sample or R2 action.
 - `admit-singleton207`: require a separately root-reviewed source/sandbox/CPU readiness receipt and inputs from this exact R2 helper. Require the fresh complete fleet and observer, every guard, the real capped 204 continuation, all old failures and a clean coordinated expanded-fleet window. Emit a private admission only; do not start anything.
@@ -69,3 +69,10 @@ Two hash-bound accepted frames must identify the same producer/guard, admission,
 The a7b79ed2 generation passed both 993-test suites and strict Clippy before the linked fleet-memory planning defect was identified and preserved. The final successor shares the exact typed Assembly proof with a separate host-sample mode: the phase must already cover that sample, without claiming a complete scaling window. Its unchanged producer/guard identities, prior accepted Assembly frame, and current bound guard remain mandatory.
 
 An authenticated Assembly owner remains in the complete owner census and explicit evidence, but is not a historical replay lane. Its real PID must have the same positive start ticks and actual nonzero RSS in both whole-host snapshots. That RSS remains in whole-host overhead exactly once. It is neither invented as a worker sample nor subtracted as zero-growth capacity. Unknown, unresolved, foreign and phase-changing owners fail closed; ordinary replay census/RSS, the marginal average and 1.5x century maximum are unchanged. The actual new-lane admission separately still requires the complete clean 30-minute phase window and every conservative hard-memory/disk growth obligation.
+
+
+## Historical cadence and dynamic century-floor successors
+
+A current positive frame may legitimately name the normal cadence's intervening negative ledger as its immediate predecessor. Historical Assembly selection now follows a bounded, hash-bound predecessor chain. It retains each negative row and permits traversal only when the exact original claim/producer/guard reproduces the standard stale-frame observer mismatch; a genuinely positive Assembly ancestor must subsequently authenticate the exact same old claim. No current accepted-owner gate is relaxed, and arbitrary unresolved or failed history is never an exemption.
+
+The never-launched full-207 and first-root-233 profiles have no additional fixed 2 TB reserve. Their required protected floor is `max(2 × century mean .jet size + every protected remaining growth claim, highest inherited live guard floor)`, with their existing drainage and candidate envelopes added separately. Running legacy guard floors are preserved. Previously sealed static plans at a higher floor remain valid prelaunch plan evidence; actual admission and first-fire capture still bind the fresh exact computed floor. The unchanged cb0 inputs and CPU16–23 sandbox proofs remain historical evidence, not evidence that a new producer launched.

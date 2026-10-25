@@ -104,6 +104,8 @@ fn sampled(o: &Value, f: &Value, now: u64) -> Result<u64> {
 pub(super) struct Candidate {
     pub additional_bytes: u64,
     pub memory_max_bytes: u64,
+    // Zero requests only the derived century/growth and inherited live floors.
+    // Existing callers with an independently qualified fixed bound retain it.
     pub minimum_protected_disk_bytes: u64,
 }
 pub(super) fn check_candidate(value: &Value, candidate: Candidate) -> Result<Value> {
@@ -138,7 +140,7 @@ pub(super) fn check_first_root233(value: &Value) -> Result<Value> {
         Candidate {
             additional_bytes: first_root233::DISK_RESERVATION,
             memory_max_bytes: first_root233::MEMORY,
-            minimum_protected_disk_bytes: first_root233::FLOOR,
+            minimum_protected_disk_bytes: 0,
         },
         MemoryMode::FirstRoot233,
     )
@@ -151,7 +153,7 @@ pub(super) fn check_singleton207(value: &Value) -> Result<Value> {
         Candidate {
             additional_bytes: singleton207::DISK_RESERVATION,
             memory_max_bytes: singleton207::MEMORY,
-            minimum_protected_disk_bytes: singleton207::FLOOR,
+            minimum_protected_disk_bytes: 0,
         },
         MemoryMode::FirstRoot233,
     )
