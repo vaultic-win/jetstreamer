@@ -43,7 +43,12 @@ fn identity(metadata: &Metadata) -> FileIdentity {
 }
 
 fn validate_path(path: &Path) -> io::Result<Metadata> {
-    if !path.is_absolute() || path.to_str().is_none() || fs::canonicalize(path)? != path {
+    if !path.is_absolute()
+        || !path
+            .to_str()
+            .is_some_and(|value| !value.chars().any(char::is_control))
+        || fs::canonicalize(path)? != path
+    {
         return Err(reject(
             "binary must have an absolute canonical UTF-8 path without symlinks",
         ));
