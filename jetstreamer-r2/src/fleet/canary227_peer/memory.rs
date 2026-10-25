@@ -74,6 +74,26 @@ pub(in crate::fleet) fn validate_saved_memory_row(row: &Value) -> Result<()> {
     );
     let sample = &row["guard_observation"];
     let proof = &row["actual_guard_timer_proof"];
+    if proof["manager"].get("schema").is_some() {
+        manager::validate_saved(&proof["manager"], sample)?;
+        ensure!(
+            proof["completed"] == proof["manager"]["completed_guard"],
+            "canary saved peer manager selected another completed fire"
+        );
+    } else {
+        ensure!(
+            [
+                "successor",
+                "properties_after",
+                "process_before",
+                "process_after",
+                "manager_events"
+            ]
+            .iter()
+            .all(|key| proof["manager"].get(*key).is_none()),
+            "canary peer lifecycle evidence cannot masquerade as legacy launch proof"
+        );
+    }
     let binding: BoundFile = serde_json::from_value(row["guard"].clone())?;
     let expected_guard_max = GUARD.to_string();
     ensure!(
@@ -169,6 +189,40 @@ mod tests {
             bad["guard_hard_memory_reserved_bytes"] = json!(guard);
             bad["remaining_hard_memory_growth_bytes"] = json!(producer + top_up + guard);
             assert!(validate_saved_memory_row(&bad).is_err());
+        }
+    }
+    #[test]
+    fn completed_and_ongoing_peer_proofs_keep_exactly_one_independent_gibibyte() {
+        for ongoing in [false, true] {
+            let mut saved = fixture();
+            let (manager, sample) = manager::fixture(ongoing);
+            saved["guard"] = manager["completed_guard"]["binding"].clone();
+            saved["guard_observation"] = sample;
+            saved["actual_guard_timer_proof"] = json!({
+                "completed":manager["completed_guard"],"manager":manager});
+            validate_saved_memory_row(&saved).unwrap();
+            let producer = number(&saved, "producer_remaining_hard_memory_growth_bytes").unwrap();
+            let floor = number(&saved, "memory_floor_top_up_bytes").unwrap();
+            assert_eq!(
+                number(&saved, "remaining_hard_memory_growth_bytes").unwrap(),
+                producer + floor + (1 << 30)
+            );
+            for guard in [0, 2 << 30] {
+                let mut bad = saved.clone();
+                bad["guard_hard_memory_reserved_bytes"] = json!(guard);
+                bad["remaining_hard_memory_growth_bytes"] = json!(producer + floor + guard);
+                assert!(validate_saved_memory_row(&bad).is_err());
+            }
+            let mut changed = saved.clone();
+            changed["actual_guard_timer_proof"]["manager"]["properties_after"]["InvocationID"] =
+                json!("f".repeat(32));
+            assert!(validate_saved_memory_row(&changed).is_err());
+            let mut downgraded = saved.clone();
+            downgraded["actual_guard_timer_proof"]["manager"]
+                .as_object_mut()
+                .unwrap()
+                .remove("schema");
+            assert!(validate_saved_memory_row(&downgraded).is_err());
         }
     }
     #[test]

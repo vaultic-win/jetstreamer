@@ -2,6 +2,7 @@
 //! Raw fleet, failures and claims are preserved; only derived accounting removes it.
 use super::canary227 as c;
 use super::*;
+mod manager;
 mod memory;
 pub(super) use memory::validate_saved_memory_row;
 pub(super) const PROTECTIVE: &str = "horizon-canary227-v1625-protective-selection-v2.service";
@@ -490,7 +491,7 @@ fn protection(
     );
     let g = bound_json(&b)?;
     guard(&g, &p, peer, &plan.sha256, sample, now)?;
-    let manager = canary227_capture::manager(&g, &plan, now)
+    let manager = manager::capture(&g, &plan, &latest, sample, now)
         .context("bounded canary peer protective service or timer validation failed")?;
     Ok((b, g, json!({"completed":latest,"manager":manager})))
 }
