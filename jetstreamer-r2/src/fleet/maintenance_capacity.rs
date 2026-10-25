@@ -797,7 +797,7 @@ mod tests {
     #[test]
     fn other_maintenance_modes_keep_the_canonical_namespace_gate() {
         let canonical =
-            context_binding("/var/lib/jetstreamer/horizon-campaign-fleet-v1/fleet.json");
+            context_binding("/var/lib/jetstreamer/horizon-campaign-fleet/fixture-v1/fleet.json");
         let private = context_binding(
             "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-cycle414-refresh-v1/fleet.json",
         );
