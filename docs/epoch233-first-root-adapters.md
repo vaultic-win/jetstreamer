@@ -91,6 +91,8 @@ directory. Readiness uses schema `jetstreamer-first-root233-readiness-v1`, all
 fixed `scope()` fields, all denied-authority fields set false, and these required
 review results and evidence:
 
+- `r2_sha256` is the exact integrated qualified R2 executable digest. Admission,
+  capture, and initial status must use that one reviewed generation.
 - `source_review_passed`, `disposable_sandbox_passed`, and
   `cpu_assignment_owner_census_authenticated` are true.
 - `allowed_cpus` and `cpu_affinity` are `8-15`; `node_rebuilt`, `worker_rebuilt`,

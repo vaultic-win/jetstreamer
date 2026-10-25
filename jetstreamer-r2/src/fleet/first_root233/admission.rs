@@ -131,11 +131,12 @@ pub(super) fn clean_expanded_window(f: &Value, o: &Value) -> Result<()> {
     Ok(())
 }
 
-fn readiness(b: &BoundFile) -> Result<()> {
+fn readiness(b: &BoundFile, helper_sha: &str) -> Result<()> {
     let r = native209::immutable_json(b)?;
     ensure!(
         r["schema"] == "jetstreamer-first-root233-readiness-v1"
             && scope_matches(&r)
+            && r["r2_sha256"] == helper_sha
             && r["source_review_passed"] == true
             && r["disposable_sandbox_passed"] == true
             && r["allowed_cpus"] == "8-15"
@@ -370,7 +371,7 @@ pub(super) fn run() -> Result<()> {
         "horizon-first-root233-admission-",
     )?;
     prerequisites()?;
-    readiness(&s.readiness)?;
+    readiness(&s.readiness, &self_sha)?;
     prepared_root()?;
     let fleet_binding: BoundFile = serde_json::from_value(s.resources["fleet"].clone())?;
     let observer_binding: BoundFile = serde_json::from_value(s.resources["observer"].clone())?;

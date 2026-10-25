@@ -279,6 +279,10 @@ pub(super) fn run() -> Result<()> {
     admission::output(&s.output, "launch.json", "horizon-first-root233-capture-")?;
     prerequisites()?;
     let a = native209::immutable_json(&s.admission)?;
+    ensure!(
+        a["admission_helper_sha256"] == self_sha,
+        "first root 233 capture must use the same qualified R2 generation as admission"
+    );
     let g = bound_json(&s.guard)?;
     let p = native209::immutable_json(&s.guard_plan)?;
     let time = now()?;

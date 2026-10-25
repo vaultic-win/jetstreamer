@@ -294,6 +294,8 @@ pub(super) fn bindings(c: &DiagnosticClaim, v: &Value) -> Result<()> {
         .context("first root 233 capture clock absent")?;
     ensure!(
         capture::guard_valid(&a, &g, &p, &pb.sha256, captured)? == c.invocation_id
+            && v["capture_helper_sha256"] == a["admission_helper_sha256"]
+            && canonical_digest(&v["capture_helper_sha256"])
             && v["observer"] == a["observer"]
             && v["fleet"] == a["fleet"]
             && v["guard_minimum_free_bytes"] == a["guard_minimum_free_bytes"]

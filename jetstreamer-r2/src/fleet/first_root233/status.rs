@@ -252,6 +252,10 @@ fn frozen(r: &StatusPublicationReceipt) -> Result<DiagnosticClaim> {
         "first root 233 frozen model substituted its evidence"
     );
     let (d, launch) = claim(&p.launch)?;
+    ensure!(
+        launch["capture_helper_sha256"] == e["helper_sha256"],
+        "first root 233 status must use the same qualified R2 generation as launch capture"
+    );
     let f = bound_json(&p.fleet)?;
     let o = bound_json(&p.observer)?;
     let observed = accepted(&p, &f, &o)?;
@@ -313,6 +317,10 @@ pub(super) async fn run() -> Result<()> {
         "horizon-first-root233-status-",
     )?;
     let (d, launch) = claim(&p.launch)?;
+    ensure!(
+        launch["capture_helper_sha256"] == self_sha,
+        "first root 233 status must use the same qualified R2 generation as launch capture"
+    );
     let f = bound_json(&p.fleet)?;
     let o = bound_json(&p.observer)?;
     let observed = accepted(&p, &f, &o)?;
