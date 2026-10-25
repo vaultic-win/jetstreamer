@@ -282,6 +282,31 @@ mod bounded {
             next_guard: std::sync::Mutex::new(Instant::now()),
         });
     }
+    #[cfg(test)]
+    mod bracket_tests {
+        use super::*;
+        #[test]
+        fn manifest_cannot_borrow_original_runtime_or_full_root_authority() {
+            let runner = Bracket {
+                next_guard: std::sync::Mutex::new(Instant::now()),
+            };
+            let good = json!({"schema_version":1,"epoch":223,"worker_executable_sha256":WORKER,
+                "runtime":{"runtime_profile":"solana-v1.6.20-epoch223-called-program-demotion-candidate"},
+                "bootstrap":{"slot":96335538,"bank_hash":"8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F"},
+                "output_slot_start":96336000,"output_slot_count":208589,
+                "terminal":{"slot":96544588,"slot_complete":true},"archive_sha256":"a".repeat(64)});
+            assert!(runner.validate_manifest(&good).is_ok());
+            let mut old = good.clone();
+            old["runtime"]["runtime_profile"] = json!("solana-v1.6.20");
+            assert!(runner.validate_manifest(&old).is_err());
+            let mut root = good.clone();
+            root["terminal"]["slot"] = json!(96767522);
+            assert!(runner.validate_manifest(&root).is_err());
+            let mut worker = good;
+            worker["worker_executable_sha256"] = json!("1".repeat(64));
+            assert!(runner.validate_manifest(&worker).is_err());
+        }
+    }
 }
 fn main() {
     bounded::entry();

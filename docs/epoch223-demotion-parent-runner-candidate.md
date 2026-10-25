@@ -162,8 +162,8 @@ Request a fresh main-target lease and reviewed 16 GiB memory/total-artifact,
 two-job, sequential release/offline/locked, 30-minute-per-command source QA
 envelope. Preserve an actual allocation baseline and verbose compiler records;
 stop on native C/C++ rebuild or cap failure. Do not access a target owned by the
-lifecycle/227 agents. First typecheck default and exact feature, run the four
-pure adapter tests (five cases), selected existing default registry/IPC tests, scoped strict
+lifecycle/227 agents. First typecheck default and exact feature, run the five
+pure adapter tests, the private runner manifest-scope test, selected existing default registry/IPC tests, scoped strict
 Clippy and the compatible utils-feature checks. Run negative scope and missing
 proof/parent-pin tests without starting workers. The CI matrix adds the node
 feature explicitly, while compatible utils builds need no runtime proof env.
