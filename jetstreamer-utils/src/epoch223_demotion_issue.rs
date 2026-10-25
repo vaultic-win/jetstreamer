@@ -3,14 +3,14 @@ use super::*;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Basis {
-    schema: String,
-    observer: BoundFile,
-    fleet: BoundFile,
-    protected_guards: BTreeMap<String, BoundFile>,
-    driver_qualification: BoundFile,
-    guard_qualification: BoundFile,
-    legacy_nonparticipating_admissions_quiescent: bool,
+pub(super) struct Basis {
+    pub(super) schema: String,
+    pub(super) observer: BoundFile,
+    pub(super) fleet: BoundFile,
+    pub(super) protected_guards: BTreeMap<String, BoundFile>,
+    pub(super) driver_qualification: BoundFile,
+    pub(super) guard_qualification: BoundFile,
+    pub(super) legacy_nonparticipating_admissions_quiescent: bool,
 }
 pub(super) fn validate_control_capacity(grant: &ControlGrant, x: &Prerequisites) -> Result<()> {
     let result: Value = read_bound(&grant.context_qualification)?;
@@ -179,13 +179,15 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
     check_control_kernel(p)?;
     let capacity_binding = calculate(Calculation {
         phase: "control",
-        p,
+        run_root: &p.run_root,
+        local_floor_bytes: p.minimum_free_bytes,
+        job_kind: "bracket",
         plan: &spec.runtime_plan,
         producer: &task.actor,
         guard: &guard.actor,
         issuer: &issuer,
         basis: &basis,
-        x,
+        accounting_executable: &x.accounting_executable,
         directory: &spec.accounting_directory,
     })?;
     let grant = ControlGrant {
@@ -320,27 +322,31 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
     )
 }
 
-struct Calculation<'a> {
-    phase: &'a str,
-    p: &'a Plan,
-    plan: &'a BoundFile,
-    producer: &'a Actor,
-    guard: &'a Actor,
-    issuer: &'a Actor,
-    basis: &'a Basis,
-    x: &'a Prerequisites,
-    directory: &'a Path,
+pub(super) struct Calculation<'a> {
+    pub(super) phase: &'a str,
+    pub(super) run_root: &'a Path,
+    pub(super) local_floor_bytes: u64,
+    pub(super) job_kind: &'a str,
+    pub(super) plan: &'a BoundFile,
+    pub(super) producer: &'a Actor,
+    pub(super) guard: &'a Actor,
+    pub(super) issuer: &'a Actor,
+    pub(super) basis: &'a Basis,
+    pub(super) accounting_executable: &'a BoundFile,
+    pub(super) directory: &'a Path,
 }
-fn calculate(calculation: Calculation<'_>) -> Result<BoundFile> {
+pub(super) fn calculate(calculation: Calculation<'_>) -> Result<BoundFile> {
     let Calculation {
         phase,
-        p,
+        run_root,
+        local_floor_bytes,
+        job_kind,
         plan,
         producer,
         guard,
         issuer,
         basis,
-        x,
+        accounting_executable,
         directory,
     } = calculation;
     private_directory(directory)?;
@@ -349,20 +355,20 @@ fn calculate(calculation: Calculation<'_>) -> Result<BoundFile> {
         &directory.join(format!("{phase}-capacity-spec.json")),
         &json!({
         "schema":"jetstreamer-epoch223-demotion-capacity-spec-v1",
-        "context":{"job_kind":"bracket","phase":phase,"local_floor_bytes":p.minimum_free_bytes,"runtime_plan":plan,
+        "context":{"job_kind":job_kind,"phase":phase,"local_floor_bytes":local_floor_bytes,"runtime_plan":plan,
             "producer":producer,"guard":guard,"issuer":issuer,
             "driver_qualification":basis.driver_qualification,"guard_qualification":basis.guard_qualification},
         "resource_basis":{"observer":basis.observer,"fleet":basis.fleet,"protected_guards":basis.protected_guards},
         "output":capacity_path}),
     )?;
-    let mut child = Command::new(&x.accounting_executable.path)
+    let mut child = Command::new(&accounting_executable.path)
         .arg("compute-demotion223-capacity")
         .arg(&accounting_spec.path)
         .args([
             "--spec-sha256",
             &accounting_spec.sha256,
             "--self-sha256",
-            &x.accounting_executable.sha256,
+            &accounting_executable.sha256,
         ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -382,14 +388,14 @@ fn calculate(calculation: Calculation<'_>) -> Result<BoundFile> {
     }
     let bytes = read_owned(&capacity_path, 0)?;
     let capacity_binding = published_bytes(
-        &p.run_root.join(format!("receipts/{phase}-capacity.json")),
+        &run_root.join(format!("receipts/{phase}-capacity.json")),
         &bytes,
     )?;
     let result: Value = serde_json::from_slice(&bytes)?;
     ensure!(
         result["schema"] == "jetstreamer-epoch223-demotion-capacity-result-v1"
             && result["spec"] == binding_value(&accounting_spec)
-            && result["self_sha256"] == x.accounting_executable.sha256
+            && result["self_sha256"] == accounting_executable.sha256
             && result["context"]["producer"] == serde_json::to_value(producer)?
             && result["context"]["guard"] == serde_json::to_value(guard)?
             && result["context"]["issuer"] == serde_json::to_value(issuer)?
@@ -508,13 +514,15 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     check_control_kernel(p)?;
     let capacity = calculate(Calculation {
         phase: "spawn",
-        p,
+        run_root: &p.run_root,
+        local_floor_bytes: p.minimum_free_bytes,
+        job_kind: "bracket",
         plan: &spec.runtime_plan,
         producer: &spec.runner,
         guard: &guard.actor,
         issuer: &issuer,
         basis: &basis,
-        x,
+        accounting_executable: &x.accounting_executable,
         directory: &spec.accounting_directory,
     })?;
     ensure!(
@@ -636,7 +644,7 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
 // There are deliberately no fallible post-publication checks here. A marker's
 // appearance can be consumed immediately; later acknowledgment failure does
 // not undo it. The caller must retain original receipts/caps/owner and guard.
-fn commit_marker<T>(
+pub(super) fn commit_marker<T>(
     validate: impl FnOnce() -> Result<()>,
     publish: impl FnOnce() -> Result<T>,
 ) -> Result<T> {
@@ -644,7 +652,7 @@ fn commit_marker<T>(
     publish()
 }
 
-fn preserve_after_marker(
+pub(super) fn preserve_after_marker(
     root: &Path,
     stage: &str,
     marker: &BoundFile,

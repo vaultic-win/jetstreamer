@@ -36,6 +36,7 @@ pub(super) fn dispatch() -> Option<Result<()>> {
             | "issue-epoch223-demotion-spawn"
             | "capture-epoch223-demotion-native-proof"
             | "supervise-epoch223-demotion-native"
+            | "issue-epoch223-demotion-native"
     ) {
         return None;
     }
@@ -63,6 +64,7 @@ fn run(args: &[String]) -> Result<()> {
     };
     bound_file(&executable.path, &executable.sha256, 256 << 20)?;
     match args[1].as_str() {
+        "issue-epoch223-demotion-native" => super::native_supervisor::issue(&binding, &executable)?,
         "supervise-epoch223-demotion-native" => {
             super::native_supervisor::run(&binding, &executable)?
         }

@@ -131,9 +131,14 @@ fn stable_measure(root: &RunRoot, mut measurement: impl FnMut() -> Result<Value>
     }
     anyhow::bail!("223 guard stable measurement retry exhausted")
 }
-fn inspect(plan: &GuardPlan, custody: &Custody, root: &RunRoot) -> Result<Value> {
+fn inspect(
+    plan: &GuardPlan,
+    custody: &Custody,
+    root: &RunRoot,
+    maximum_private: u64,
+) -> Result<Value> {
     observe(&plan.watched_runner)?;
-    let total = stable_measure(root, || scratch_with_limit(&plan.run_root, 471_798_691_840))?;
+    let total = stable_measure(root, || scratch_with_limit(&plan.run_root, maximum_private))?;
     let bytes = total["physical_bytes"]
         .as_u64()
         .context("223 guard physical bytes")?;
@@ -174,27 +179,48 @@ fn inspect(plan: &GuardPlan, custody: &Custody, root: &RunRoot) -> Result<Value>
 }
 pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let plan: GuardPlan = read_bound(binding)?;
-    let runtime: RuntimePlan = read_bound(&plan.runtime_plan)?;
+    let value: Value = read_bound(&plan.runtime_plan)?;
+    let native = value["schema"] == "jetstreamer-epoch223-demotion-native-supervisor-plan-v1";
+    let maximum_private;
+    if native {
+        let context = native_supervisor::guard_context(&plan.runtime_plan)?;
+        ensure!(
+            plan.run_root == context.run_root
+                && plan.watched_runner.unit == context.unit
+                && plan.target_slot == 96_335_538
+                && plan.protected_floor_bytes == context.local_floor_bytes
+                && context.executable == *executable
+                && plan.admission_policy == context.admission_policy,
+            "223 native guard exact context differs"
+        );
+        maximum_private = 301u64 << 30;
+    } else {
+        let runtime: RuntimePlan = serde_json::from_value(value)?;
+        ensure!(
+            runtime.schema == "jetstreamer-epoch223-demotion-runtime-plan-v3"
+                && runtime.mode == "bracket"
+                && plan.run_root == runtime.plan.run_root
+                && plan.watched_runner.unit == runtime.plan.unit
+                && plan.target_slot == TERMINAL
+                && plan.protected_floor_bytes == runtime.plan.minimum_free_bytes,
+            "223 bracket guard exact context differs"
+        );
+        let prerequisites = runtime
+            .prerequisites
+            .context("223 guard prerequisites missing")?;
+        ensure!(
+            prerequisites.guard_executable == *executable
+                && prerequisites.admission_policy == plan.admission_policy,
+            "223 guard executable/policy differs"
+        );
+        maximum_private = 471_798_691_840;
+    }
     ensure!(
         plan.schema == "jetstreamer-epoch223-demotion-guard-plan-v1"
-            && runtime.schema == "jetstreamer-epoch223-demotion-runtime-plan-v3"
-            && runtime.mode == "bracket"
-            && plan.run_root == runtime.plan.run_root
-            && plan.watched_runner.unit == runtime.plan.unit
             && plan.worker_sha256 == WORKER
-            && plan.target_slot == TERMINAL
             && plan.maximum_scratch_bytes == MAX_SCRATCH
-            && plan.protected_floor_bytes > 0
-            && plan.protected_floor_bytes == runtime.plan.minimum_free_bytes,
-        "223 guard exact scope differs"
-    );
-    let prerequisites = runtime
-        .prerequisites
-        .context("223 guard prerequisites missing")?;
-    ensure!(
-        prerequisites.guard_executable == *executable
-            && prerequisites.admission_policy == plan.admission_policy,
-        "223 guard executable/policy differs"
+            && plan.protected_floor_bytes > 0,
+        "223 guard exact purpose/envelope differs"
     );
     let actor = roles::own_role(
         &plan.guard_unit,
@@ -222,20 +248,20 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             "223 independent guard kernel envelope differs"
         );
     }
-    check_control_kernel(&runtime.plan)?;
+    native_supervisor::caps(&plan.watched_runner.unit, 14u64 << 30, 16u64 << 30)?;
     let custody = Custody::open(&plan.watched_runner)?;
     // Verify that the independently sandboxed guard can open both original
     // controls without changing the producer during qualification/startup.
     custody.file("cgroup.freeze", true)?;
     custody.file("cgroup.kill", true)?;
     let root = RunRoot::open(&plan.run_root, 1000)?;
-    inspect(&plan, &custody, &root)?;
+    inspect(&plan, &custody, &root, maximum_private)?;
     issuance::published(
         &plan.ready_output,
         &json!({"schema":"jetstreamer-epoch223-demotion-guard-ready-v1",
         "actor":actor,"watched_runner":plan.watched_runner,"guard_plan":binding,
         "admission_policy":plan.admission_policy,"run_root":plan.run_root,"worker_sha256":WORKER,
-        "target_slot":TERMINAL,"protective_guard_proven":true,"producer_stop_enabled":true,
+        "target_slot":plan.target_slot,"protective_guard_proven":true,"producer_stop_enabled":true,
         "recorded_unix_millis":millis()?,"publication_authorized":false,"r2_mutations":false}),
     )?;
     loop {
@@ -244,7 +270,9 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         if custody.read("cgroup.procs")?.trim().is_empty() {
             return Ok(());
         }
-        if let Err(error) = inspect(&plan, &custody, &root).and_then(|_| observe(&actor)) {
+        if let Err(error) =
+            inspect(&plan, &custody, &root, maximum_private).and_then(|_| observe(&actor))
+        {
             persist(
                 &plan.stop_output,
                 &json!({"schema":"jetstreamer-epoch223-demotion-guard-stop-v1",

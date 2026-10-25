@@ -13,6 +13,7 @@ struct Plan {
     snapshot: BoundFile,
     genesis: BoundFile,
     origin_clock: BoundFile,
+    admission_policy: BoundFile,
     source_qa: BoundFile,
     run_root: PathBuf,
     bootstrap_slot: u64,
@@ -34,6 +35,7 @@ struct Grant {
     runtime_plan: BoundFile,
     runner: Actor,
     issuer: Actor,
+    issuer_spec: BoundFile,
     guard: BoundFile,
     request: Option<BoundFile>,
     control_grant: Option<BoundFile>,
@@ -44,7 +46,7 @@ struct Grant {
     publication_authorized: bool,
     r2_mutations: bool,
 }
-fn caps(unit: &str, high: u64, max: u64) -> Result<()> {
+pub(super) fn caps(unit: &str, high: u64, max: u64) -> Result<()> {
     let root = Path::new("/sys/fs/cgroup/system.slice").join(unit);
     for (name, value) in [
         ("memory.high", high),
@@ -93,6 +95,24 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
         };
         let grant: Grant = serde_json::from_slice(&bytes)?;
         let spawn = w.phase == "spawn";
+        let issue: IssueSpec = read_bound(&grant.issuer_spec)?;
+        ensure!(
+            issue.schema == "jetstreamer-epoch223-demotion-native-issue-spec-v1"
+                && issue.phase == w.phase
+                && issue.runtime_plan == *w.binding
+                && issue.runner == *w.actor
+                && issue.guard == grant.guard
+                && issue.request.as_ref() == w.request
+                && issue.control_grant.as_ref() == w.control
+                && grant.issuer.expected_exec_start
+                    == exact_helper_command(
+                        &grant.issuer,
+                        "issue-epoch223-demotion-native",
+                        &grant.issuer_spec,
+                        "--spec-sha256"
+                    ),
+            "223 native issuer command/spec differs"
+        );
         ensure!(
             grant.schema == "jetstreamer-epoch223-demotion-native-grant-v1"
                 && grant.phase == w.phase
@@ -135,6 +155,7 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
             guard.actor.executable == w.plan.guard_executable
                 && guard.watched_runner == *w.actor
                 && guard.run_root == w.plan.run_root
+                && guard.admission_policy == w.plan.admission_policy
                 && guard.target_slot == 96_335_538
                 && guard.protective_guard_proven
                 && guard.producer_stop_enabled
@@ -284,7 +305,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         "control_grant":control,"recorded_unix_millis":millis()?,"original_start_unix_millis":origin.original_start_unix_millis,
         "native_inputs_hashed":true,"worker_spawned":false,"native_execution_authorized":false}),
     )?;
-    let (spawn, _, spawn_guard) = permission(Wait {
+    let (spawn, spawn_grant, spawn_guard) = permission(Wait {
         plan: &plan,
         binding,
         actor: &actor,
@@ -335,6 +356,13 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         "--nocapture",
         "--test-threads=1",
     ];
+    observe(&actor)?;
+    observe(&spawn_guard.actor)?;
+    caps(&plan.unit, 112u64 << 30, 128u64 << 30)?;
+    ensure!(
+        fresh(spawn_grant.recorded_unix_millis, millis()?),
+        "223 native spawn grant expired before actual child start"
+    );
     let child = Command::new(&plan.harness.path)
         .args(args)
         .env_clear()
@@ -431,4 +459,318 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     )?;
     ensure!(status.success(), "223 new native harness failed");
     Ok(())
+}
+
+pub(super) struct GuardContext {
+    pub(super) unit: String,
+    pub(super) run_root: PathBuf,
+    pub(super) local_floor_bytes: u64,
+    pub(super) executable: BoundFile,
+    pub(super) admission_policy: BoundFile,
+}
+pub(super) fn guard_context(binding: &BoundFile) -> Result<GuardContext> {
+    let plan: Plan = read_bound(binding)?;
+    ensure!(
+        plan.schema == "jetstreamer-epoch223-demotion-native-supervisor-plan-v1"
+            && plan.harness.sha256 == HARNESS
+            && plan.bootstrap_slot == 96_335_538,
+        "223 native guard plan purpose differs"
+    );
+    Ok(GuardContext {
+        unit: plan.unit,
+        run_root: plan.run_root,
+        local_floor_bytes: plan.local_floor_bytes,
+        executable: plan.guard_executable,
+        admission_policy: plan.admission_policy,
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IssueSpec {
+    schema: String,
+    phase: String,
+    issuer_unit: String,
+    runtime_plan: BoundFile,
+    runner: Actor,
+    guard: BoundFile,
+    request: Option<BoundFile>,
+    control_grant: Option<BoundFile>,
+    accounting_basis: BoundFile,
+    accounting_directory: PathBuf,
+    maximum_lock_wait_millis: u64,
+    maximum_acknowledgment_wait_millis: u64,
+}
+pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
+    let spec: IssueSpec = read_bound(binding)?;
+    ensure!(
+        spec.schema == "jetstreamer-epoch223-demotion-native-issue-spec-v1"
+            && matches!(spec.phase.as_str(), "control" | "spawn")
+            && spec.maximum_acknowledgment_wait_millis > 0
+            && spec.maximum_acknowledgment_wait_millis <= 120_000,
+        "223 native issuer closed stage/wait differs"
+    );
+    let spawn = spec.phase == "spawn";
+    let plan: Plan = read_bound(&spec.runtime_plan)?;
+    let context = guard_context(&spec.runtime_plan)?;
+    ensure!(
+        plan.issuer_executable == *executable
+            && plan.unit == spec.runner.unit
+            && spec.runner.expected_exec_start
+                == exact_helper_command(
+                    &spec.runner,
+                    "supervise-epoch223-demotion-native",
+                    &spec.runtime_plan,
+                    "--spec-sha256"
+                )
+            && spec.request.is_some() == spawn
+            && spec.control_grant.is_some() == spawn,
+        "223 native issuer exact plan/runner/stage differs"
+    );
+    let issuer = roles::own_role(
+        &spec.issuer_unit,
+        "issue-epoch223-demotion-native",
+        binding,
+        executable,
+    )?;
+    let origin: OriginClock = read_bound(&plan.origin_clock)?;
+    validate_origin(&origin, millis()?)?;
+    validate_origin_journal(&origin)?;
+    let guard: GuardProof = read_bound(&spec.guard)?;
+    let guard_plan: GuardPlan = read_bound(&guard.guard_plan)?;
+    ensure!(
+        guard.actor.executable == context.executable
+            && guard.watched_runner == spec.runner
+            && guard.run_root == context.run_root
+            && guard.target_slot == 96_335_538
+            && guard.admission_policy == context.admission_policy
+            && guard.protective_guard_proven
+            && guard.producer_stop_enabled
+            && guard_plan.runtime_plan == spec.runtime_plan
+            && guard_plan.guard_unit == guard.actor.unit
+            && guard_plan.ready_output == spec.guard.path
+            && guard_plan.protected_floor_bytes == plan.local_floor_bytes
+            && guard.actor.expected_exec_start
+                == exact_helper_command(
+                    &guard.actor,
+                    "guard-epoch223-demotion",
+                    &guard.guard_plan,
+                    "--plan-sha256"
+                )
+            && guard.actor.pid != issuer.pid
+            && guard.actor.pid != spec.runner.pid
+            && issuer.pid != spec.runner.pid,
+        "223 native issuer lacks original exact independently armed guard"
+    );
+    let basis: issuance::Basis = read_bound(&spec.accounting_basis)?;
+    ensure!(
+        basis.schema == "jetstreamer-epoch223-demotion-accounting-basis-v1"
+            && basis.legacy_nonparticipating_admissions_quiescent,
+        "223 native basis/nonparticipating custody differs"
+    );
+    let own_qualification: Value = read_bound(&plan.issuer_qualification)?;
+    let guard_qualification: Value = read_bound(&plan.guard_qualification)?;
+    ensure!(
+        own_qualification["schema"] == "jetstreamer-epoch223-demotion-role-qualification-v1"
+            && own_qualification["executable_sha256"] == executable.sha256
+            && own_qualification[if spawn {
+                "native_spawn_issuer_qualified"
+            } else {
+                "native_control_issuer_qualified"
+            }] == true
+            && guard_qualification["schema"]
+                == "jetstreamer-epoch223-demotion-role-qualification-v1"
+            && guard_qualification["executable_sha256"] == guard.actor.executable.sha256
+            && guard_qualification["native_input_guard_qualified"] == true,
+        "223 native issuing/guard routes have not been independently qualified"
+    );
+    let qualification: Value = read_bound(&plan.accounting_qualification)?;
+    ensure!(
+        qualification["complete_memory_accounting_qualified"] == true
+            && qualification["executable_sha256"] == plan.accounting_executable.sha256
+            && qualification["upstream_accounting_source_commit"]
+                == "af09802051463086cf8f47de3bf200717d84e094",
+        "223 native corrected accounting unqualified"
+    );
+    bound_file(
+        &plan.accounting_executable.path,
+        &plan.accounting_executable.sha256,
+        512 << 20,
+    )?;
+    let requested = if spawn {
+        let control: Grant = read_bound(
+            spec.control_grant
+                .as_ref()
+                .context("223 native original control")?,
+        )?;
+        ensure!(
+            control.phase == "control"
+                && control.runtime_plan == spec.runtime_plan
+                && control.runner == spec.runner
+                && control.guard == spec.guard
+                && !control.native_execution_authorized
+                && control.original_start_unix_millis == origin.original_start_unix_millis,
+            "223 native control changed"
+        );
+        let accepted: Value = read_bound(&BoundFile {
+            path: plan.run_root.join("native-control-accepted.json"),
+            sha256: hex(&Sha256::digest(&read_owned(
+                &plan.run_root.join("native-control-accepted.json"),
+                0,
+            )?)),
+        })?;
+        ensure!(
+            accepted["runner"] == serde_json::to_value(&spec.runner)?
+                && accepted["grant"]
+                    == binding_value(
+                        spec.control_grant
+                            .as_ref()
+                            .context("223 native control binding")?
+                    ),
+            "223 native control not consumed"
+        );
+        let request: Value = read_bound(
+            spec.request
+                .as_ref()
+                .context("223 native hash-complete request")?,
+        )?;
+        ensure!(
+            spec.request.as_ref().context("223 native request")?.path
+                == plan.run_root.join("native-spawn-request.json")
+                && request["schema"] == "jetstreamer-epoch223-demotion-native-spawn-request-v1"
+                && request["runtime_plan"] == binding_value(&spec.runtime_plan)
+                && request["runner"] == serde_json::to_value(&spec.runner)?
+                && request["control_grant"]
+                    == binding_value(spec.control_grant.as_ref().context("223 native control")?)
+                && request["original_start_unix_millis"] == origin.original_start_unix_millis
+                && request["native_inputs_hashed"] == true
+                && request["worker_spawned"] == false,
+            "223 native actual post-hash request differs"
+        );
+        request["recorded_unix_millis"]
+            .as_u64()
+            .context("223 native request timestamp")?
+    } else {
+        millis()?
+    };
+    ensure!(
+        fresh(requested, millis()?),
+        "223 native request stale before admission"
+    );
+    let lock = custody::Custody::acquire(spec.maximum_lock_wait_millis)?;
+    observe(&spec.runner)?;
+    observe(&issuer)?;
+    observe(&guard.actor)?;
+    caps(&plan.unit, 14u64 << 30, 16u64 << 30)?;
+    let capacity = issuance::calculate(issuance::Calculation {
+        phase: &spec.phase,
+        run_root: &plan.run_root,
+        local_floor_bytes: plan.local_floor_bytes,
+        job_kind: "native-input",
+        plan: &spec.runtime_plan,
+        producer: &spec.runner,
+        guard: &guard.actor,
+        issuer: &issuer,
+        basis: &basis,
+        accounting_executable: &plan.accounting_executable,
+        directory: &spec.accounting_directory,
+    })?;
+    let result: Value = read_bound(&capacity)?;
+    ensure!(
+        fresh(requested, millis()?)
+            && free_bytes(&plan.run_root)?
+                >= result["capacity"]["required_initial_free_bytes"]
+                    .as_u64()
+                    .context("223 native full disk fit")?,
+        "223 native request/disk changed before commit"
+    );
+    let (high, max) = if spawn {
+        (112u64 << 30, 128u64 << 30)
+    } else {
+        (14u64 << 30, 16u64 << 30)
+    };
+    if spawn {
+        lock.validate()?;
+        observe(&spec.runner)?;
+        observe(&guard.actor)?;
+        caps(&plan.unit, 14u64 << 30, 16u64 << 30)?;
+        let target = protective::Custody::open(&spec.runner)?;
+        target
+            .file("memory.max", true)?
+            .write_all(format!("{max}\n").as_bytes())?;
+        target
+            .file("memory.high", true)?
+            .write_all(format!("{high}\n").as_bytes())?;
+    }
+    issuance::published(
+        &plan
+            .run_root
+            .join(format!("native-{}-custody.json", spec.phase)),
+        &lock.evidence()?,
+    )?;
+    let value = json!({"schema":"jetstreamer-epoch223-demotion-native-grant-v1","phase":spec.phase,
+        "runtime_plan":spec.runtime_plan,"runner":spec.runner,"issuer":issuer,"issuer_spec":binding,
+        "guard":spec.guard,"request":spec.request,"control_grant":spec.control_grant,"capacity_result":capacity,
+        "recorded_unix_millis":millis()?,"original_start_unix_millis":origin.original_start_unix_millis,
+        "native_execution_authorized":spawn,"publication_authorized":false,"r2_mutations":false});
+    // The native grant file itself is the final ready marker. Nothing can
+    // authorize native work until this no-clobber publication appears.
+    let marker = issuance::commit_marker(
+        || {
+            observe(&spec.runner)?;
+            observe(&issuer)?;
+            observe(&guard.actor)?;
+            caps(&plan.unit, high, max)?;
+            lock.validate()?;
+            ensure!(
+                fresh(requested, millis()?),
+                "223 native request expired at final commit"
+            );
+            Ok(())
+        },
+        || {
+            issuance::published(
+                &plan
+                    .run_root
+                    .join(format!("native-{}-grant.json", spec.phase)),
+                &value,
+            )
+        },
+    )?;
+    drop(lock); // never hold admission custody during long read-only hashing
+    let outcome = (|| -> Result<()> {
+        let started = Instant::now();
+        let path = plan
+            .run_root
+            .join(format!("native-{}-accepted.json", spec.phase));
+        loop {
+            match fs::symlink_metadata(&path) {
+                Ok(_) => {
+                    let accepted: Value = serde_json::from_slice(&read_owned(&path, 0)?)?;
+                    ensure!(
+                        accepted["runner"] == serde_json::to_value(&spec.runner)?
+                            && accepted["grant"] == binding_value(&marker),
+                        "223 native actual acknowledgment differs"
+                    );
+                    return Ok(());
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            ensure!(
+                elapsed(started)? < spec.maximum_acknowledgment_wait_millis,
+                "223 native acknowledgment timeout"
+            );
+            thread::sleep(Duration::from_millis(100));
+        }
+    })();
+    issuance::preserve_after_marker(
+        &plan.run_root,
+        &format!("native-{}", spec.phase),
+        &marker,
+        &marker,
+        &spec.runner,
+        &guard.actor,
+        outcome,
+    )
 }
