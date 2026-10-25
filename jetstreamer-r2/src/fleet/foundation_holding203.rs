@@ -131,6 +131,37 @@ fn staged_text(path: &Path, text: &str) -> Result<()> {
     }
     Ok(())
 }
+fn dangling_target(path: &Path, target: &Path) -> Result<PathBuf> {
+    let joined = if target.is_absolute() {
+        target.to_path_buf()
+    } else {
+        path.parent()
+            .context("holding203 staged link parent")?
+            .join(target)
+    };
+    let mut normalized = PathBuf::new();
+    for component in joined.components() {
+        match component {
+            std::path::Component::RootDir => normalized.push("/"),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            std::path::Component::Normal(name) => normalized.push(name),
+            std::path::Component::Prefix(_) => bail!("holding203 foreign staged link prefix"),
+        }
+    }
+    // Missing targets cannot be canonicalized. Lexical resolution still
+    // exposes relative links into either selected root without following them.
+    ensure!(
+        !normalized.starts_with(ROOT)
+            && !normalized.starts_with(RESTORES)
+            && !target.to_string_lossy().contains(ROOT)
+            && !target.to_string_lossy().contains(RESTORES),
+        "holding203 dangling staged source reference"
+    );
+    Ok(normalized)
+}
 fn staged_entry(path: &Path, after_read: impl FnOnce() -> Result<()>) -> Result<Value> {
     let before = entry_stamp(path)?;
     let md = fs::symlink_metadata(path)?;
@@ -169,12 +200,8 @@ fn staged_entry(path: &Path, after_read: impl FnOnce() -> Result<()>) -> Result<
         }
     } else {
         let target = fs::read_link(path)?;
-        ensure!(
-            !target.to_string_lossy().contains(ROOT)
-                && !target.to_string_lossy().contains(RESTORES),
-            "holding203 dangling staged source reference"
-        );
-        json!({"entry":before,"dangling":target})
+        let normalized = dangling_target(path, &target)?;
+        json!({"entry":before,"dangling":target,"lexical_target":normalized})
     };
     after_read()?;
     ensure!(
@@ -283,6 +310,26 @@ pub(super) fn check(value: &Value, restoring: bool) -> Result<Value> {
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+    #[test]
+    fn foundation203_relative_dangling_links_cannot_hide_selected_roots() {
+        let staged = Path::new("/home/ubuntu/.jetstreamer-private/systemd-staging/retry.service");
+        for target in [
+            "../root-prefix-resource-203-v1/missing.service",
+            "../r2-holding-foundation-node-01-v1/foundation203-restores/missing.service",
+            "../systemd-staging/../root-prefix-resource-203-v1/missing.service",
+            "../../../../home/ubuntu/.jetstreamer-private/root-prefix-resource-203-v1/missing.service",
+        ] {
+            assert!(!target.contains(ROOT) && !target.contains(RESTORES));
+            assert!(
+                dangling_target(staged, Path::new(target)).is_err(),
+                "{target}"
+            );
+        }
+        assert_eq!(
+            dangling_target(staged, Path::new("../unrelated/missing.service")).unwrap(),
+            Path::new("/home/ubuntu/.jetstreamer-private/unrelated/missing.service")
+        );
+    }
     fn staged_fixture() -> (tempfile::TempDir, PathBuf, PathBuf) {
         let dir = tempfile::tempdir().unwrap();
         let target = dir.path().join("producer.service");
