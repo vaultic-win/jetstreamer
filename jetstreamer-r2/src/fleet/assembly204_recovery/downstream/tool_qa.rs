@@ -20,19 +20,43 @@ fn argv(value: &Value) -> Result<Vec<&str>> {
         .map(|v| v.as_str().context("204 tool QA argv is not a string"))
         .collect()
 }
-fn relevant(args: &[&str], component: &str) -> Option<bool> {
-    let kind = match args.get(1).copied() {
+#[derive(Clone, Copy)]
+pub(super) enum Target {
+    Example(&'static str),
+    Binary(&'static str),
+    Package,
+}
+fn cargo_scope<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
+    &args[..args.iter().position(|a| *a == "--").unwrap_or(args.len())]
+}
+fn relevant(args: &[&str], component: &str, target: Target) -> Option<bool> {
+    let scope = cargo_scope(args);
+    let kind = match scope.get(1).copied() {
         Some("test") => false,
         Some("clippy") => true,
         _ => return None,
     };
-    let package = args
+    let package = scope
         .windows(2)
         .any(|p| matches!(p[0], "-p" | "--package") && p[1] == component)
-        || args
+        || scope
             .iter()
             .any(|a| a.strip_prefix("--package=") == Some(component));
-    package.then_some(kind)
+    let selected = scope.contains(&"--all-targets")
+        || match target {
+            Target::Package => true,
+            Target::Example(name) => {
+                scope.windows(2).any(|p| p == ["--example", name])
+                    || scope
+                        .iter()
+                        .any(|a| a.strip_prefix("--example=") == Some(name))
+            }
+            Target::Binary(name) => {
+                scope.windows(2).any(|p| p == ["--bin", name])
+                    || scope.iter().any(|a| a.strip_prefix("--bin=") == Some(name))
+            }
+        };
+    (package && selected).then_some(kind)
 }
 fn nonzero_passed_tests(bytes: &[u8]) -> Result<()> {
     let text = std::str::from_utf8(bytes).context("204 component test log is not UTF-8")?;
@@ -77,12 +101,13 @@ fn nonzero_passed_tests(bytes: &[u8]) -> Result<()> {
 fn completed(
     args: &[&str],
     component: &str,
+    target: Target,
     exit: &Value,
     log: &str,
     logs: &[BoundFile],
     read_log: &mut impl FnMut(&BoundFile) -> Result<Vec<u8>>,
 ) -> Result<Option<bool>> {
-    let Some(clippy) = relevant(args, component) else {
+    let Some(clippy) = relevant(args, component, target) else {
         return Ok(None);
     };
     ensure!(
@@ -91,7 +116,11 @@ fn completed(
     );
     ensure!(exit == 0, "204 component QA command failed");
     ensure!(
-        !clippy || args.windows(2).any(|p| p == ["-D", "warnings"]) || args.contains(&"-Dwarnings"),
+        !clippy
+            || args.iter().position(|a| *a == "--").is_some_and(|at| {
+                let lint = &args[at + 1..];
+                lint.windows(2).any(|p| p == ["-D", "warnings"]) || lint.contains(&"-Dwarnings")
+            }),
         "204 component Clippy did not deny warnings"
     );
     ensure!(
@@ -135,6 +164,7 @@ pub(super) fn validate(
     qa: &Value,
     source: &str,
     component: &str,
+    target: Target,
     logs: &[BoundFile],
     files: &[EvidenceFile],
     mut read_result: impl FnMut(&BoundFile) -> Result<Value>,
@@ -182,7 +212,7 @@ pub(super) fn validate(
     for row in rows {
         let (args, exit, log) = if shape == "commands" {
             let args = argv(&row["command"])?;
-            if relevant(&args, component).is_none() {
+            if relevant(&args, component, target).is_none() {
                 continue;
             }
             let log = row["log_sha256"]
@@ -239,6 +269,7 @@ pub(super) fn validate(
             if let Some(is_clippy) = completed(
                 &args,
                 component,
+                target,
                 &result["exit_code"],
                 &log_origin.sha256,
                 logs,
@@ -249,7 +280,9 @@ pub(super) fn validate(
             }
             continue;
         };
-        if let Some(is_clippy) = completed(&args, component, exit, log, logs, &mut read_log)? {
+        if let Some(is_clippy) =
+            completed(&args, component, target, exit, log, logs, &mut read_log)?
+        {
             clippy |= is_clippy;
             test |= !is_clippy;
         }
@@ -298,7 +331,15 @@ mod tests {
                 path: format!("/sealed/{index}.log").into(),
                 sha256: log.sha256.clone(),
             };
-            let mut args = vec![CARGO, command, "--release", "-p", "jetstreamer-horizon"];
+            let mut args = vec![
+                CARGO,
+                command,
+                "--release",
+                "-p",
+                "jetstreamer-horizon",
+                "--example",
+                "verify_archive",
+            ];
             if index == 1 {
                 args.extend(["--", "-D", "warnings"]);
             }
@@ -336,6 +377,7 @@ mod tests {
             qa,
             &"e".repeat(40),
             "jetstreamer-horizon",
+            Target::Example("verify_archive"),
             logs,
             files,
             |b| {
@@ -362,8 +404,8 @@ mod tests {
     fn legacy_completed_commands_still_require_component_tests_and_strict_clippy() {
         let log = bound("/sealed/legacy.log", 'a');
         let mut qa = json!({"commands":[
-            {"command":["cargo","test","-p","jetstreamer-horizon"],"exit_code":0,"log_sha256":log.sha256},
-            {"command":[CARGO,"clippy","-p","jetstreamer-horizon","--","-Dwarnings"],"exit_code":0,"log_sha256":log.sha256}]});
+            {"command":["cargo","test","-p","jetstreamer-horizon","--example","verify_archive"],"exit_code":0,"log_sha256":log.sha256},
+            {"command":[CARGO,"clippy","-p","jetstreamer-horizon","--example","verify_archive","--","-Dwarnings"],"exit_code":0,"log_sha256":log.sha256}]});
         check(&qa, std::slice::from_ref(&log), &[], &BTreeMap::new()).unwrap();
         qa["commands"][0]["exit_code"] = json!(101);
         assert!(check(&qa, &[log], &[], &BTreeMap::new()).is_err());
@@ -454,7 +496,7 @@ mod tests {
         }
         nonzero_passed_tests(b"test result: ok. 2 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0s").unwrap();
         let (qa, logs, files, results) = fixture(false);
-        assert!(validate(&qa,&"e".repeat(40),"jetstreamer-horizon",&logs,&files,
+        assert!(validate(&qa,&"e".repeat(40),"jetstreamer-horizon",Target::Example("verify_archive"),&logs,&files,
             |b|results.get(&b.path).cloned().context("missing result"),
             |_|Ok(b"test result: ok. 0 passed; 0 failed; 99 ignored; 0 measured; 0 filtered out; finished in 0s".to_vec())).is_err());
         for flag in ["--no-run", "--list"] {
@@ -473,5 +515,158 @@ mod tests {
         legacy["commands"][0]["command"] =
             json!(["cargo", "test", "-p", "jetstreamer-horizon", "--", "--list"]);
         assert!(check(&legacy, &[log], &[], &BTreeMap::new()).is_err());
+    }
+    #[test]
+    fn exact_package_target_and_cargo_separator_determine_component_scope() {
+        let full = Target::Example("verify_archive");
+        assert_eq!(
+            relevant(
+                &[
+                    CARGO,
+                    "test",
+                    "-p",
+                    "jetstreamer-horizon",
+                    "--example",
+                    "verify_archive"
+                ],
+                "jetstreamer-horizon",
+                full
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            relevant(
+                &[
+                    CARGO,
+                    "clippy",
+                    "-p",
+                    "jetstreamer-horizon",
+                    "--all-targets",
+                    "--",
+                    "-Dwarnings"
+                ],
+                "jetstreamer-horizon",
+                full
+            ),
+            Some(true)
+        );
+        for args in [
+            vec![CARGO, "test", "-p", "jetstreamer-horizon", "--lib"],
+            vec![
+                CARGO,
+                "test",
+                "-p",
+                "jetstreamer-horizon",
+                "--example",
+                "archive_boundaries",
+            ],
+            vec![
+                CARGO,
+                "test",
+                "-p",
+                "jetstreamer-r2",
+                "--",
+                "-p",
+                "jetstreamer-horizon",
+                "--example",
+                "verify_archive",
+            ],
+            vec![
+                CARGO,
+                "test",
+                "-p",
+                "jetstreamer-horizon",
+                "--",
+                "--example",
+                "verify_archive",
+            ],
+            vec![
+                CARGO,
+                "test",
+                "-p",
+                "jetstreamer-horizon",
+                "--lib",
+                "--",
+                "--all-targets",
+            ],
+        ] {
+            assert!(relevant(&args, "jetstreamer-horizon", full).is_none());
+        }
+        let plugin = Target::Binary("horizon_pipeline");
+        assert_eq!(
+            relevant(
+                &[
+                    CARGO,
+                    "test",
+                    "-p",
+                    "jetstreamer",
+                    "--bin",
+                    "horizon_pipeline"
+                ],
+                "jetstreamer",
+                plugin
+            ),
+            Some(false)
+        );
+        assert!(
+            relevant(
+                &[
+                    CARGO,
+                    "test",
+                    "-p",
+                    "jetstreamer-pipeline",
+                    "--bin",
+                    "horizon_pipeline"
+                ],
+                "jetstreamer",
+                plugin
+            )
+            .is_none()
+        );
+        assert!(
+            relevant(
+                &[CARGO, "test", "-p", "jetstreamer", "--lib"],
+                "jetstreamer",
+                plugin
+            )
+            .is_none()
+        );
+        assert!(
+            relevant(
+                &[CARGO, "test", "-p", "jetstreamer", "--bin", "jetstreamer"],
+                "jetstreamer",
+                plugin
+            )
+            .is_none()
+        );
+        assert_eq!(
+            relevant(
+                &[
+                    CARGO,
+                    "test",
+                    "-p",
+                    "jetstreamer-horizon",
+                    "--example",
+                    "archive_boundaries"
+                ],
+                "jetstreamer-horizon",
+                Target::Example("archive_boundaries")
+            ),
+            Some(false)
+        );
+    }
+    #[test]
+    fn strict_clippy_lints_are_not_cargo_package_or_target_arguments() {
+        let (qa, logs, files, mut results) = fixture(false);
+        results.get_mut(&files[2].copy.path).unwrap()["argv"] = json!([
+            CARGO,
+            "clippy",
+            "-p",
+            "jetstreamer-horizon",
+            "--example",
+            "verify_archive",
+            "-Dwarnings"
+        ]);
+        assert!(check(&qa, &logs, &files, &results).is_err());
     }
 }
