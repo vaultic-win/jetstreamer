@@ -398,7 +398,7 @@ mod tests {
         assert_eq!(profile(Stage::Full), (16 << 30, 32 << 30, 86400));
         assert_eq!(profile(Stage::Plugin), (32 << 30, 64 << 30, 86400));
         assert_eq!(profile(Stage::Upload), (8 << 30, 16 << 30, 172800));
-        assert!(4 * FILE_LIMIT < METADATA);
+        const { assert!(4 * FILE_LIMIT < METADATA) };
         for p in [
             "/tmp/bad%209",
             "/tmp/bad path",
