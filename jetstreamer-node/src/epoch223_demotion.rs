@@ -66,7 +66,7 @@ pub(crate) fn digest(s: &str) -> Result<[u8; 32], String> {
         return Err("private 223 requires exact nonzero lowercase SHA256".into());
     }
     let mut out = [0; 32];
-    for (i, pair) in s.as_bytes().chunks_exact(2).enumerate() {
+    for (i, pair) in s.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         out[i] = u8::from_str_radix(std::str::from_utf8(pair).map_err(|e| e.to_string())?, 16)
             .map_err(|e| e.to_string())?;
     }
