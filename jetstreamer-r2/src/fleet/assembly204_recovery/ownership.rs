@@ -94,7 +94,7 @@ pub(super) fn no_overlap_work(context: &context::WorkContext) -> Result<()> {
     let current = context.census(&context::closed_names())?;
     no_overlap_current(&current, None)
 }
-fn no_overlap_current(
+pub(super) fn no_overlap_current(
     current: &BTreeMap<String, Value>,
     actor: Option<downstream::Stage>,
 ) -> Result<()> {
@@ -347,7 +347,7 @@ pub(super) fn validate_launch(
     );
     deny(&l["authority"])
 }
-fn manager(name: &str) -> Result<Vec<u8>> {
+pub(super) fn manager(name: &str) -> Result<Vec<u8>> {
     let result = ProcessCommand::new("/usr/bin/journalctl")
         .args([
             "--no-pager",
@@ -426,8 +426,15 @@ pub(super) fn validate_success_terminal(t: &Value, name: &str, iid: &str) -> Res
             && (t["current_unit"]["InvocationID"] == iid
                 || (name == UNIT
                     && t["current_unit"]["InvocationID"] == ""
-                    && t.get("assembly_success_origin").is_some())),
+                    && t.get("assembly_success_origin").is_some())
+                || (name != UNIT
+                    && t["current_unit"]["InvocationID"] == ""
+                    && t.get("downstream_success_origin").is_some())),
         "204 distinct recovery success terminal required"
+    );
+    ensure!(
+        t.get("assembly_success_origin").is_none() || t.get("downstream_success_origin").is_none(),
+        "204 terminal cannot combine assembly and downstream origins"
     );
     let raw = sealed(
         &serde_json::from_value(t["manager_journal"].clone())?,
@@ -441,57 +448,14 @@ pub(super) fn validate_success_terminal(t: &Value, name: &str, iid: &str) -> Res
         );
         assembly_success::validate(t, &raw)?;
     }
+    if t.get("downstream_success_origin").is_some() {
+        ensure!(
+            name != UNIT,
+            "204 downstream proof cannot authorize assembly"
+        );
+        downstream::stage_success::validate(t, &raw)?;
+    }
     deny(&t["authority"])
-}
-pub(super) fn capture_success_terminal(
-    context: &AcceptedContext,
-    name: &str,
-    iid: &str,
-    outcome: &Path,
-    directory: &Path,
-    spec: &BoundFile,
-    self_sha: &str,
-) -> Result<()> {
-    private(directory)?;
-    no_overlap(context, None)?;
-    let before = unit(name)?;
-    ensure!(
-        is_idle(&before)
-            && before["InvocationID"] == iid
-            && before["Result"] == "success"
-            && before["ExecMainStatus"] == "0",
-        "204 actor did not naturally succeed"
-    );
-    inactive_status::no_pending_owner_trigger(name, false)?;
-    let group = capped204205_work::empty_terminal_cgroup(name)?;
-    let raw = manager(name)?;
-    manager_shape(&raw, name, iid, true)?;
-    let refs =
-        jetstreamer_horizon_observe::process_references::scan(Path::new("/proc"), Path::new(ROOT))?;
-    ensure!(
-        refs.references.is_empty(),
-        "204 terminal output retains live process references"
-    );
-    let file = custody::open_source(outcome)?;
-    ensure!(
-        file.metadata()?.len() <= 16 << 20
-            && file.metadata()?.uid() == 0
-            && file.metadata()?.nlink() == 1,
-        "204 outcome custody invalid"
-    );
-    file.set_permissions(fs::Permissions::from_mode(0o400))?;
-    file.sync_all()?;
-    custody::write_bytes(&directory.join("success-manager.jsonl"), &raw)?;
-    ensure!(
-        unit(name)? == before,
-        "204 success owner changed during capture"
-    );
-    let t = json!({"schema":"jetstreamer-epoch204-assembly-recovery-success-terminal-v1","unit":name,"invocation_id":iid,
-        "result":"natural_success","current_unit":before,"manager_journal":binding(&directory.join("success-manager.jsonl"))?,
-        "outcome":binding(outcome)?,"cgroup_empty":true,"cgroup":group,"issuer":issuer(spec,self_sha),"authority":denied()});
-    validate_success_terminal(&t, name, iid)?;
-    write(&directory.join("terminal.json"), &t)?;
-    Ok(())
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

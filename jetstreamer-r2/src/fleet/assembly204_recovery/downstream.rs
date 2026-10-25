@@ -1,6 +1,7 @@
 //! Closed post-assembly chain. Service success and operation evidence are
 //! independently captured; every read is against the same immutable tuple.
 use super::*;
+pub(super) mod stage_success;
 mod tool_qa;
 use std::io::Read;
 use std::os::fd::AsRawFd;
@@ -1025,21 +1026,12 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
     );
     let current = unit(c.stage.unit())?;
     let success = current["Result"] == "success" && current["ExecMainStatus"] == "0";
-    if assembly_success_context(c.stage, success, &c.observer_history)? {
+    terminal_success_context(success, &c.observer_history)?;
+    if c.stage == Stage::Assembly && success {
         return ownership::assembly_success::capture(&c, spec, self_sha);
     }
     if success {
-        ownership::capture_success_terminal(
-            &c.context,
-            c.stage.unit(),
-            iid,
-            c.outcome
-                .as_deref()
-                .context("204 successful stage outcome missing")?,
-            &c.output_directory,
-            spec,
-            self_sha,
-        )
+        stage_success::capture(&c, spec, self_sha)
     } else {
         ownership::capture_failure_terminal(
             &c.context,
@@ -1051,34 +1043,27 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
         )
     }
 }
-fn assembly_success_context(stage: Stage, success: bool, history: &[BoundFile]) -> Result<bool> {
-    let refreshed = stage == Stage::Assembly && success;
+fn terminal_success_context(success: bool, history: &[BoundFile]) -> Result<()> {
     ensure!(
-        refreshed || history.is_empty(),
-        "204 observer refresh belongs only to assembly success capture"
+        success || history.is_empty(),
+        "204 observer refresh belongs only to natural success capture"
     );
-    Ok(refreshed)
+    Ok(())
 }
 
 #[cfg(test)]
 mod terminal_capture_context_tests {
     use super::*;
     #[test]
-    fn refreshed_terminal_context_is_exclusive_to_assembly_natural_success() {
+    fn refreshed_terminal_context_is_exclusive_to_natural_success() {
         let history = [BoundFile {
             path: "/fixture/middle-observer.json".into(),
             sha256: "a".repeat(64),
         }];
-        for stage in Stage::all() {
-            for success in [false, true] {
-                let actual = assembly_success_context(stage, success, &[]).unwrap();
-                assert_eq!(actual, stage == Stage::Assembly && success);
-                assert_eq!(
-                    assembly_success_context(stage, success, &history).is_ok(),
-                    actual
-                );
-            }
-        }
+        assert!(terminal_success_context(true, &history).is_ok());
+        assert!(terminal_success_context(false, &history).is_err());
+        assert!(terminal_success_context(true, &[]).is_ok());
+        assert!(terminal_success_context(false, &[]).is_ok());
     }
 }
 
