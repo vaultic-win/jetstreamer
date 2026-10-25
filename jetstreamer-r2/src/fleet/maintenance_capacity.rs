@@ -449,6 +449,28 @@ pub(super) fn assembly204_native_terminal_fixture() -> Value {
     capped204_native223::terminal_fixture()
 }
 fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<Value> {
+    check_inner_with(value, candidate, mode, None)
+}
+pub(super) fn check_demotion223(
+    value: &Value,
+    candidate: Candidate,
+    context: &demotion223_capacity::Context,
+) -> Result<Value> {
+    let exact = context.candidate()?;
+    ensure!(
+        candidate.additional_bytes == exact.additional_bytes
+            && candidate.memory_max_bytes == exact.memory_max_bytes
+            && candidate.minimum_protected_disk_bytes == exact.minimum_protected_disk_bytes,
+        "223candidate envelope differs"
+    );
+    check_inner_with(value, candidate, MemoryMode::Existing, Some(context))
+}
+fn check_inner_with(
+    value: &Value,
+    candidate: Candidate,
+    mode: MemoryMode,
+    candidate_context: Option<&demotion223_capacity::Context>,
+) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "Maintenance capacity requires root"
@@ -474,13 +496,20 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
     prefix223_live_peer::roster(&legacy)?;
     native210_peer_history::validate(&f)?;
     let floor = singleton227_admission::century_floor_for_maintenance(&f)?;
-    let names = f["unit_census"]
+    let mut names = f["unit_census"]
         .as_object()
         .context("Maintenance fleet units")?
         .keys()
         .cloned()
         .collect::<BTreeSet<_>>();
-    let before = census(&names, 201, 300)?;
+    if let Some(context) = candidate_context {
+        names.extend(context.names()?);
+    }
+    let raw_before = census(&names, 201, 300)?;
+    let (before, candidate_before) = candidate_context
+        .map(|c| c.peer_view(&f, &raw_before))
+        .transpose()?
+        .unwrap_or_else(|| (raw_before.clone(), Value::Null));
     current_owners(&f, &before)?;
     // Share the already qualified sibling accounting policy, including the
     // complete guard-key union, genuine latest fires and independent guard caps.
@@ -512,7 +541,11 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
     )?;
     let actual_free = singleton227_admission::disk_free()?;
     envelope(minimum, candidate.additional_bytes, actual_free)?;
-    let after = census(&names, 201, 300)?;
+    let raw_after = census(&names, 201, 300)?;
+    let (after, candidate_after) = candidate_context
+        .map(|c| c.peer_view(&f, &raw_after))
+        .transpose()?
+        .unwrap_or_else(|| (raw_after.clone(), Value::Null));
     current_owners(&f, &after)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
@@ -553,7 +586,11 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
         candidate.memory_max_bytes,
         mode,
     )?;
-    let current = census(&names, 201, 300)?;
+    let raw_current = census(&names, 201, 300)?;
+    let (current, candidate_current) = candidate_context
+        .map(|c| c.peer_view(&f, &raw_current))
+        .transpose()?
+        .unwrap_or_else(|| (raw_current.clone(), Value::Null));
     current_owners(&f, &current)?;
     let final_caps =
         capped204205_admission::combined_limits(&f, &s.protected_guards, &current, now)?;
@@ -633,6 +670,20 @@ fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<
         "unit_census_after_memory_and_guard_checks":current,"memory_before":memory_before,"memory_after":memory_after,
         "capped_peer_accounting":{"raw_fleet_and_observer_preserved":true,"producer_and_independent_guard_hard_memory_charged":true,
             "full_admitted_disk_envelopes_charged":true,"allocation_credit_bytes":0}});
+    if candidate_context.is_some() {
+        ensure!(
+            raw_before == raw_after && raw_before == raw_current,
+            "223candidate identity changed across complete accounting"
+        );
+        capacity["candidate_accounting_before"] = candidate_before;
+        capacity["candidate_accounting_after"] = candidate_after;
+        capacity["candidate_accounting_final"] = candidate_current;
+        capacity["peer_unit_census_before"] = capacity["unit_census_before"].clone();
+        capacity["peer_unit_census_after"] = capacity["unit_census_after"].clone();
+        capacity["unit_census_before"] = serde_json::to_value(&raw_before)?;
+        capacity["unit_census_after"] = serde_json::to_value(&raw_after)?;
+        capacity["unit_census_after_memory_and_guard_checks"] = serde_json::to_value(&raw_current)?;
+    }
     if let Some(evidence) = accounting_o.get("terminal_observation_accounting") {
         capacity["terminal_observation_accounting"] = evidence.clone();
     }

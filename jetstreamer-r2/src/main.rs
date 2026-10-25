@@ -3677,6 +3677,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-full227-failure") {
         return fleet::capture_full227_failure();
     }
+    if env::args().nth(1).as_deref() == Some("compute-demotion223-capacity") {
+        return fleet::compute_demotion223_capacity();
+    }
     if env::args().nth(1).as_deref() == Some("capture-native223-input") {
         return fleet::capture_native223_input();
     }

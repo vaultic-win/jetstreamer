@@ -46,6 +46,11 @@ mod full210_terminal;
 mod full227_failure;
 mod full227_status;
 mod maintenance_capacity;
+mod demotion223_capacity;
+
+pub(super) fn compute_demotion223_capacity() -> Result<()> {
+    demotion223_capacity::run()
+}
 mod native141;
 mod native144;
 mod native203;
