@@ -58,14 +58,14 @@ impl Context {
         let prefix = match self.job_kind.as_str() {
             "bracket" => "horizon-qualify-223-demotion-bracket-",
             "native-input" => "horizon-native-input-223-demotion-",
-            _ => bail!("unknown223candidate purpose"),
+            _ => bail!("unknown epoch 223 candidate purpose"),
         };
         ensure!(
             matches!(self.phase.as_str(), "control" | "spawn")
                 && valid_unit(&self.producer.unit, prefix)
                 && valid_unit(&self.guard.unit, "horizon-guard-223-demotion-")
                 && valid_unit(&self.issuer.unit, "horizon-admit-223-demotion-"),
-            "foreign223candidate actors"
+            "foreign epoch 223 candidate actors"
         );
         ensure!(
             self.local_floor_bytes > 0,
@@ -83,7 +83,7 @@ impl Context {
                     && pids.insert(a.pid)
                     && iids.insert(a.invocation_id.clone())
                     && a.cgroup == format!("/system.slice/{}", a.unit),
-                "223candidate actor collision"
+                "epoch 223 candidate actor collision"
             );
         }
         Ok(())
@@ -94,13 +94,13 @@ impl Context {
             ("control", _) => (GIB, 16 * GIB),
             ("spawn", "bracket") => (471_798_691_840, 225_000_000_000),
             ("spawn", "native-input") => (301 * GIB, 128 * GIB),
-            _ => bail!("unclosed223candidate"),
+            _ => bail!("unclosed epoch 223 candidate"),
         };
         Ok(maintenance_capacity::Candidate {
             additional_bytes: disk,
             memory_max_bytes: main
                 .checked_add(2 * GIB)
-                .context("223candidate memory overflow")?,
+                .context("epoch 223 candidate memory overflow")?,
             minimum_protected_disk_bytes: self.local_floor_bytes,
         })
     }
@@ -114,7 +114,7 @@ impl Context {
                     && plan["plan"]["minimum_free_bytes"] == self.local_floor_bytes
                     && plan["plan"]["terminal_slot"] == 96_544_588u64
                     && plan["plan"]["target_slot"] == 96_544_588u64,
-                "223bracket allocation plan changed"
+                "epoch 223 bracket allocation plan changed"
             );
         } else {
             ensure!(
@@ -124,7 +124,7 @@ impl Context {
                     && plan["harness"]["sha256"]
                         == "a280b1f48f0bb430c482e01a03b4b800ee8f95f326590059e4cdf4873b14a22b"
                     && plan["bootstrap_slot"] == 96_335_538u64,
-                "223native allocation plan changed"
+                "epoch 223 native allocation plan changed"
             );
         }
         let q = bound_json(&self.driver_qualification)?;
@@ -136,7 +136,7 @@ impl Context {
                 && g["schema"] == "jetstreamer-epoch223-demotion-role-qualification-v1"
                 && g["executable_sha256"] == self.guard.executable.sha256
                 && g["protective_guard_qualified"] == true,
-            "223candidate producer/guard are not qualified immutable roles"
+            "epoch 223 candidate producer/guard are not qualified immutable roles"
         );
         Ok(())
     }
@@ -154,27 +154,27 @@ impl Context {
                 && row["ExecStart"]
                     .as_str()
                     .is_some_and(|s| same_command(s, &a.expected_exec_start)),
-            "223candidate actor changed"
+            "epoch 223 candidate actor changed"
         );
         let stat = fs::read_to_string(format!("/proc/{}/stat", a.pid))?;
         ensure!(
             stat.rsplit_once(')')
-                .context("223candidate stat")?
+                .context("epoch 223 candidate stat")?
                 .1
                 .split_whitespace()
                 .nth(19)
-                .context("223candidate start ticks")?
+                .context("epoch 223 candidate start ticks")?
                 .parse::<u64>()?
                 == a.start_ticks
                 && fs::read_to_string(format!("/proc/{}/cgroup", a.pid))?.trim()
                     == format!("0::{}", a.cgroup)
                 && fs::read_link(format!("/proc/{}/exe", a.pid))? == a.executable.path,
-            "223candidate process reused"
+            "epoch 223 candidate process reused"
         );
         let actual = private157::file_binding(&a.executable.path)?;
         ensure!(
             actual["sha256"] == a.executable.sha256,
-            "223candidate executable differs"
+            "epoch 223 candidate executable differs"
         );
         let props = singleton227_capture::properties(
             &a.unit,
@@ -192,7 +192,7 @@ impl Context {
         let root = Path::new("/sys/fs/cgroup").join(a.cgroup.trim_start_matches('/'));
         ensure!(
             root.canonicalize()? == root,
-            "223candidate cgroup redirected"
+            "epoch 223 candidate cgroup redirected"
         );
         let read = |name: &str| -> Result<u64> {
             Ok(fs::read_to_string(root.join(name))?.trim().parse()?)
@@ -203,7 +203,7 @@ impl Context {
                 && read("memory.high")? == high
                 && read("memory.swap.max")? == 0
                 && charge <= max,
-            "223candidate hard cap/high/swap changed"
+            "epoch 223 candidate hard cap/high/swap changed"
         );
         Ok(
             json!({"actor":a,"hard_cap_bytes":max,"memory_high_bytes":high,
@@ -228,7 +228,7 @@ impl Context {
             &self.producer,
             current
                 .get(&self.producer.unit)
-                .context("223candidate producer omitted")?,
+                .context("epoch 223 candidate producer omitted")?,
             16 * GIB,
             14 * GIB,
             main_user,
@@ -237,7 +237,7 @@ impl Context {
             &self.guard,
             current
                 .get(&self.guard.unit)
-                .context("223candidate guard omitted")?,
+                .context("epoch 223 candidate guard omitted")?,
             GIB,
             768 << 20,
             "root",
@@ -246,7 +246,7 @@ impl Context {
             &self.issuer,
             current
                 .get(&self.issuer.unit)
-                .context("223candidate issuer omitted")?,
+                .context("epoch 223 candidate issuer omitted")?,
             GIB,
             768 << 20,
             "root",
@@ -318,13 +318,13 @@ struct Spec {
 }
 pub(super) fn run() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("compute-demotion223-capacity")?;
-    ensure!(unsafe { libc::geteuid() } == 0, "223capacity requires root");
+    ensure!(unsafe { libc::geteuid() } == 0, "epoch 223 capacity requires root");
     let s: Spec = serde_json::from_value(bound_json(&binding)?)?;
     ensure!(
         s.schema == "jetstreamer-epoch223-demotion-capacity-spec-v1"
             && fs::read_to_string("/proc/self/cgroup")?.trim()
                 == format!("0::{}", s.context.issuer.cgroup),
-        "223capacity must run beneath the exact live issuer"
+        "epoch 223 capacity must run beneath the exact live issuer"
     );
     let candidate = s.context.candidate()?;
     let capacity =
