@@ -56,6 +56,7 @@ pub(crate) struct Plan {
 /// Plans cannot select an implementation. Existing binaries use DiskStorage;
 /// no RAM path, mount operation or relaxed resource gate is introduced here.
 pub(crate) trait StorageHooks {
+    fn validate_manifest(&self, manifest: &Value) -> Result<()> { root_manifest_valid(manifest) }
     fn progress_slot(&self,line:&str)->Option<u64> {progress_slot(line)}
     fn progress_counters(&self,line:&str)->Option<Value> {progress_counters(line)}
     fn target_stop_protocol(&self)->TargetStopProtocol {TargetStopProtocol::ResumeAndInterrupt}
@@ -873,7 +874,7 @@ fn measure_root(
             "{}.segment.json",
             archive.display()
         )))?;
-        root_manifest_valid(&pair.0)?;
+        storage.validate_manifest(&pair.0)?;
         manifest = pair.0;
         manifest_sha = pair.1;
         Ok(())

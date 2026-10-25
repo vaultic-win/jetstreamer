@@ -3,6 +3,8 @@ mod checkpoint_continuation144;
 mod checkpoint_continuation203;
 mod epoch141_original_entry;
 mod epoch207_singleton;
+#[cfg(feature = "epoch223-demotion-bracket")]
+mod epoch223_demotion;
 mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
@@ -5586,6 +5588,10 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch223-demotion-bracket")]
+    if focused_qualification && epoch223_demotion::selected(&range) {
+        return epoch223_demotion::select(range, focused_qualification, allow_candidate_runtime);
+    }
     if focused_qualification
         || epoch207_singleton::selected(&range)
         || singletons209_212::selected(&range)
@@ -5602,6 +5608,17 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch223-demotion-bracket")]
+    if focused_qualification && epoch223_demotion::selected(&output_range) {
+        if replay_start != epoch223_demotion::BOOTSTRAP + 1 {
+            return Err("private 223 demotion requires exact cold replay start".into());
+        }
+        return epoch223_demotion::select(
+            output_range,
+            focused_qualification,
+            allow_candidate_runtime,
+        );
+    }
     if focused_qualification
         || epoch207_singleton::selected(&output_range)
         || singletons209_212::selected(&output_range)
@@ -7700,6 +7717,10 @@ fn build_multi_runtime_provenance(
 fn historical_worker_profile(
     descriptor: &compatibility::RuntimeDescriptor,
 ) -> Result<historical::WorkerProfile, String> {
+    #[cfg(feature = "epoch223-demotion-bracket")]
+    if descriptor.identity.name == epoch223_demotion::BACKEND {
+        return epoch223_demotion::worker_profile(descriptor);
+    }
     let profile = match descriptor.backend {
         compatibility::RuntimeBackend::SolanaV1_0_7 => historical::SOLANA_V1_0_7_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_0_8 => historical::SOLANA_V1_0_8_CANDIDATE,
@@ -12437,6 +12458,13 @@ async fn run_geyser_replay(
                                 )
                             }
                         };
+                    #[cfg(feature = "epoch223-demotion-bracket")]
+                    let initialization = if worker_profile.backend_id == epoch223_demotion::BACKEND
+                    {
+                        epoch223_demotion::bind_initialization(initialization)?
+                    } else {
+                        initialization
+                    };
                     let spawn = historical::WorkerSpawn {
                         executable,
                         initialization,
@@ -14729,11 +14757,16 @@ fn add_runtime_handoff_expectations(
 /// span. The bootstrap filename must itself be present in the trusted list,
 /// and at least one independently generated checkpoint must follow it.
 fn qualification_expectations(
-    mut expected: BTreeMap<Slot, BankHashExpectation>,
+    expected: BTreeMap<Slot, BankHashExpectation>,
     plan: QualificationPlan,
     snapshot_archive: &Path,
     bootstrap: compatibility::BootstrapState,
 ) -> Result<BTreeMap<Slot, BankHashExpectation>, String> {
+    #[cfg(feature = "epoch223-demotion-bracket")]
+    if epoch223_demotion::exact(plan) {
+        return epoch223_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
+    }
+    let mut expected = expected;
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
     if snapshot_slot != plan.bootstrap_slot {

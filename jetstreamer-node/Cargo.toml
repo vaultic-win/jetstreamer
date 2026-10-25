@@ -10,7 +10,9 @@ keywords.workspace = true
 
 [features]
 default = []
-# Exact private207cohort through its own final slot; never ordinary support.
+# Exact private Bank/Vote comparison; never edits the ordinary era registry.
+epoch223-demotion-bracket = []
+# Exact private 207cohort through its own final slot; never ordinary support.
 epoch207-singleton-qualification = []
 # Exact private singleton209–212 profiles with their own canonical final root.
 epochs209-212-singleton-qualification = []

@@ -319,12 +319,26 @@ impl HistoricalReplay {
         progress: Arc<ReplayProgress>,
         live_start_slot: Slot,
     ) -> Result<Self, String> {
+        #[cfg(feature = "epoch223-demotion-bracket")]
+        let mut client = client;
+        #[cfg(feature = "epoch223-demotion-bracket")]
+        if crate::epoch223_demotion::is_candidate(&client) {
+            crate::epoch223_demotion::initialize(&mut client)?;
+        }
         let current_slot = client.initialized().slot;
         let initialized_source = client.initialized().source;
         let checkpoint_slots: BTreeSet<Slot> = snapshot_verifier
             .as_ref()
             .map(|verifier| verifier.legacy_checkpoint_slots().into_iter().collect())
             .unwrap_or_default();
+        #[cfg(feature = "epoch223-demotion-bracket")]
+        let checkpoint_slots = {
+            let mut slots = checkpoint_slots;
+            if crate::epoch223_demotion::active() {
+                slots.extend([96_544_586, 96_544_587, 96_544_588]);
+            }
+            slots
+        };
         let diagnostic_warmup_target = bounded_epoch223_warmup_target(
             client.executable_sha256(),
             current_slot,
@@ -1085,6 +1099,10 @@ impl HistoricalReplay {
                 apply_runtime_reconstructed_metadata(scheduled, actual);
             }
         }
+        #[cfg(feature = "epoch223-demotion-bracket")]
+        if crate::epoch223_demotion::active() {
+            crate::epoch223_demotion::outcomes(entry, outcomes)?;
+        }
         Ok(())
     }
 
@@ -1121,6 +1139,10 @@ impl HistoricalReplay {
             &checkpoint.writes,
         )?;
         let summary = HistoricalCheckpointSummary::try_from(&checkpoint)?;
+        #[cfg(feature = "epoch223-demotion-bracket")]
+        if crate::epoch223_demotion::active() {
+            crate::epoch223_demotion::checkpoint(&checkpoint)?;
+        }
         self.verify_checkpoint(&checkpoint);
         self.emit_writes(checkpoint.writes);
         state.emitted_write_versions = emitted_write_versions;

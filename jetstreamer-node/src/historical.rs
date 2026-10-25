@@ -208,6 +208,10 @@ const SOLANA_V1_8_11_RUST_TOOLCHAIN: &str = "rustc 1.52.1 (9bc8c42bb 2021-05-09)
 const SOLANA_V1_8_11_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 fn backend_supports_entry_batches(backend_id: &str) -> bool {
+    #[cfg(feature = "epoch223-demotion-bracket")]
+    if backend_id == crate::epoch223_demotion::BACKEND {
+        return true;
+    }
     matches!(
         backend_id,
         SOLANA_V1_0_7_BACKEND_ID
@@ -1374,6 +1378,11 @@ impl HistoricalRuntimeClient {
         // worker only the private, digest-bound copy. This closes the path
         // replacement window between parent admission and worker loading.
         let bound_executable = bind_worker_executable(&executable, private_work_dir.path())?;
+        #[cfg(feature = "epoch223-demotion-bracket")]
+        if profile.backend_id == crate::epoch223_demotion::BACKEND {
+            crate::epoch223_demotion::validate_worker_digest(bound_executable.sha256)
+                .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
+        }
         let (ledger_path, initial_state, expected_source) = match initialization {
             HistoricalInitialization::SnapshotArchive(initialization) => {
                 let ledger_path = canonical_directory(&initialization.ledger_path, "ledger")?;
