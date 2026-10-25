@@ -517,11 +517,15 @@ fn reject_replay_alias(p: &Peer, r: &Value) -> Result<()> {
     Ok(())
 }
 pub(in crate::fleet) fn peer_observation(f: &Value, o: &Value) -> Result<()> {
+    let peers = accepted(f)?;
+    if peers.is_empty() {
+        return Ok(());
+    }
     ensure!(
         f["sampled_at_utc"] == o["recorded_at_utc"],
         "completed peer observer clock differs"
     );
-    for p in accepted(f)? {
+    for p in peers {
         observation(&p, f, o)?;
     }
     Ok(())
@@ -622,6 +626,16 @@ mod tests {
         let host = json!({"status":"observed","rss":{"census_stable":true,"error":null,"processes":[process]}});
         let observer = json!({"recorded_at_utc":"1970-01-01T00:16:40Z","host_resident_memory":{"before":host,"after":host},"replays":[],"diagnostic_replays":[]});
         (peer, claim, fleet, observer)
+    }
+    #[test]
+    fn completed_peer_absent_keeps_legacy_observer_and_unknown_owner_policy_unchanged() {
+        let fleet = json!({"active":[{"epoch":205,"unit":{"Id":"legacy205.service"}}],"unit_census":{"legacy205.service":{"Id":"legacy205.service"}}});
+        let observer = json!({"recorded_at_utc":"2026-10-25T23:28:00Z"});
+        peer_observation(&fleet, &observer).unwrap();
+        let (view, sample, owners) = peer_memory_views(&fleet, &observer).unwrap();
+        assert_eq!(view, fleet);
+        assert_eq!(sample, observer);
+        assert!(owners.is_empty());
     }
     #[test]
     fn completed_peer_registered_row_binds_launch_claim_and_complete_census() {
