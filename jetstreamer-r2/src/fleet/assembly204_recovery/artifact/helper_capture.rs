@@ -1,6 +1,7 @@
 //! Exact aac capture facts; the seal does not turn a source QA pass into a
 //! runtime qualification or expand the capture's stated transitive audit scope.
 use super::*;
+mod integrity;
 const ROOT_RESULT: &str = "8a16139c2ea8122dad7133113aa8e7b8a7908581c3ab5c939302cf92fbca08ad";
 const ROOT_ELF: &str = "edd14b5d1765fbbc52c7c7ba211fbe5d68730efb0c44716d5c8f0c78652d2ab4";
 const CONFIG: &str = "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3";
@@ -149,10 +150,11 @@ pub(super) fn validate(seal: &Seal, candidate: &Value, qa: &Value) -> Result<Val
         "585aad1bca24688ec973bc6e047c38b7b06b278bac7334d6410a6ec8c80503af",
     )?;
     production_shape(&read(&build)?, &read(&capture)?)?;
+    let integrity = integrity::validate(seal, &read(&preflight)?, &read(&capture)?)?;
     Ok(
         json!({"genuine_root_test":result,"root_test_executable_binding":executable,"root_sandbox_proof":sandbox,
         "actual_pre_build_configuration_checkpoint":preflight,"captured_configuration_inputs":configuration,
-        "actual_production_build":build,"actual_capture_completion":capture,"capture_scope":candidate["scope"],
+        "actual_production_build":build,"actual_capture_completion":capture,"capture_scope":candidate["scope"],"before_after_integrity":integrity,
         "configuration_scope":"Actual pre-build checkpoint matched to captured configuration bytes; no invented old947 post-build audit schema.",
         "runtime_launch_qualified":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )

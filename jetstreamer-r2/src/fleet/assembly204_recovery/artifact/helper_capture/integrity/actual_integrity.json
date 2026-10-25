@@ -1,0 +1,289 @@
+{
+  "fixture_scope": "Actual sealed metadata; tracked source and final-recheck lists are scoped projections preserving original values, not new receipts.",
+  "inputs": {
+    "source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "source_tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "input_sha256": {
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/Cargo.lock": "65eda499d3a75bc61482e25460ba34109a359b19e23388c6dae0714fa1cb1e96",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/Cargo.toml": "359197196bbd2fb4323c96ca7e19ea2c916ed9836cc1c8f6ce48f64240e066ae",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/jetstreamer-node/Cargo.toml": "f506bf5442c089451e574172604e901fd5fd82e6712bc6b30b99a7e779d8b634",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/jetstreamer-horizon/Cargo.toml": "085dcbb26bc81799b82de25a6289b0947ef7840219c7b1de0f0db379ee893803",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/historical-runtime/protocol-current/Cargo.toml": "f71ac4643cbd2c15ff19d852b0d0dec900ecd8cd0ef76a270dc094812917a6b1",
+      "/home/ubuntu/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24",
+      "/home/ubuntu/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
+      "/home/ubuntu/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustfmt": "5005cdcd39ded526dca8fa6ccd716d42fc7da54469034e055dbf54649bec7877"
+    },
+    "script_sha256": {
+      "run-production-build-v1.py": "17c0c5149e7d28a6d55ce3bc9c725e84dc780e2f43c61705cce351f4c9d00877",
+      "capture-candidate-v1.py": "081a1f25a1e4947775652a692f76ea49924d35f4af3c70d048520bb48dfbc6b5",
+      "run-bounded-build-capture.py": "6396feecb1193a0c3fa3b220556af423a15d0ad20b283d5080dc66e797700eb0"
+    },
+    "original_cumulative_target_baseline": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-c8465cea-qa-v1/target-baseline.json",
+    "original_cumulative_target_baseline_sha256": "6e32307a85bf83ae8633955e6afede0e066bc160203755104c8ba19bcd465635",
+    "prior_evidence_directories": [
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-b3681953-production-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-c8465cea-qa-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-c8465cea-bounded-qa-v2",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-c8465cea-bounded-qa-v3",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-2b269247-bounded-clippy-v4",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-2b269247-production-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-complete-memory-8cfe2a3a-qa-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-complete-memory-af098020-qa-v2",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-source-handoff-20261025-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/r2-complete-memory-af098020-production-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-remaining-closure-proposal-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-root-writer-roundtrip-edd14b5d-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-remaining-qa-v2",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-remaining-closure-supplement-v2",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-remaining-qa-v3",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-horizon-clippy-graph-proposal-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-proposal-v1",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-horizon-clippy-v4"
+    ],
+    "unset_environment": [
+      "JETSTREAMER_CLICKHOUSE_BINARY",
+      "JETSTREAMER_CLICKHOUSE_SHA256",
+      "DOCS_RS"
+    ],
+    "reviewed_remaining_closure_sha256": "be1f29648597c285513eeaf428223157e9d531faa5c88b358655090f8fcd5599",
+    "original_qa_stop_sha256": "bb696e992f72e00e2906ef03625da14ef22aa78883b1f99361e2c56ac9c656e8",
+    "genuine_root_test_result_sha256": "8a16139c2ea8122dad7133113aa8e7b8a7908581c3ab5c939302cf92fbca08ad",
+    "second_stop_result_sha256": "2c90c28564d29b9bcfe1fc11a4e72ccd677253f0b320b5f57419bd9e62b2bd18",
+    "retained_successful_codec_result_sha256": "33b193ebc1d2de948376dcbc93f4d78804a8b1dd78f28063ce01434d0f1afac1",
+    "retained_successful_node_clippy_sha256": "457f8433eca3b16ec06f22345404897470fbd03cf14d3781d6f816efc3fa71d7",
+    "qa_report_sha256": "7c93606343449323791322db8cd4ecd170a2ad74a1ff43804b622142ca133240",
+    "cache_freshness_plan_sha256": "e1b13810af07293f9ed7997cd942eecfe546326894b8c894fe86f025d0b09d4c",
+    "candidate_must_be_absent": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3/candidate-v1",
+    "approved_cross_bindmount_plan_sha256": "739e0bb4422bda0ab49641376ada6c0a92bec583de48b1cbde2a5250c61609e7",
+    "preserved_pre_cargo_stop_sha256": "64bff263b8e76ce90b59b85cee99d9984f28c1d8972595f0eafa98d32241e73e"
+  },
+  "checkpoint": {
+    "commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "files": {
+      ".cargo/config.toml": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+      "Cargo.lock": "65eda499d3a75bc61482e25460ba34109a359b19e23388c6dae0714fa1cb1e96",
+      "Cargo.toml": "359197196bbd2fb4323c96ca7e19ea2c916ed9836cc1c8f6ce48f64240e066ae",
+      "historical-runtime/protocol-current/Cargo.toml": "f71ac4643cbd2c15ff19d852b0d0dec900ecd8cd0ef76a270dc094812917a6b1",
+      "jetstreamer-horizon/Cargo.toml": "085dcbb26bc81799b82de25a6289b0947ef7840219c7b1de0f0db379ee893803",
+      "jetstreamer-node/Cargo.toml": "f506bf5442c089451e574172604e901fd5fd82e6712bc6b30b99a7e779d8b634",
+      "jetstreamer-node/src/capped_assembly_recovery204.rs": "8a7bb4e1e41b96caa1aaba5fa267ac82cf9d8d7d117aa05604cb3e427f4a12d1"
+    }
+  },
+  "tracked": {
+    "commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "count": 3491,
+    "tracked_files": [
+      {
+        "relative_path": ".cargo/config.toml",
+        "git_mode": "100644",
+        "git_blob": "b1da11ceeca395bd2b13d299f6b9bb61a84d6c88",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489
+      },
+      {
+        "relative_path": "Cargo.lock",
+        "git_mode": "100644",
+        "git_blob": "5defb98b18036334f44f80654bf1ac679bbe18ab",
+        "sha256": "65eda499d3a75bc61482e25460ba34109a359b19e23388c6dae0714fa1cb1e96",
+        "bytes": 343834
+      },
+      {
+        "relative_path": "Cargo.toml",
+        "git_mode": "100644",
+        "git_blob": "eb4e8f515082b46095adef54ce8cd788e829b49f",
+        "sha256": "359197196bbd2fb4323c96ca7e19ea2c916ed9836cc1c8f6ce48f64240e066ae",
+        "bytes": 5995
+      },
+      {
+        "relative_path": "historical-runtime/protocol-current/Cargo.toml",
+        "git_mode": "100644",
+        "git_blob": "c9845c2065ae1222ee9431935711daeeead173d7",
+        "sha256": "f71ac4643cbd2c15ff19d852b0d0dec900ecd8cd0ef76a270dc094812917a6b1",
+        "bytes": 224
+      },
+      {
+        "relative_path": "jetstreamer-horizon/Cargo.toml",
+        "git_mode": "100644",
+        "git_blob": "41e7b04845f1f3884d02d61afe31f7517553d1a7",
+        "sha256": "085dcbb26bc81799b82de25a6289b0947ef7840219c7b1de0f0db379ee893803",
+        "bytes": 2197
+      },
+      {
+        "relative_path": "jetstreamer-node/Cargo.toml",
+        "git_mode": "100644",
+        "git_blob": "957d0765db5f94a8dfcca715ec75e98b2e1b7a60",
+        "sha256": "f506bf5442c089451e574172604e901fd5fd82e6712bc6b30b99a7e779d8b634",
+        "bytes": 6231
+      },
+      {
+        "relative_path": "jetstreamer-node/src/capped_assembly_recovery204.rs",
+        "git_mode": "100644",
+        "git_blob": "d9a84bad3eaac39fd1cdeeee0a4e7a7f34be2e62",
+        "sha256": "8a7bb4e1e41b96caa1aaba5fa267ac82cf9d8d7d117aa05604cb3e427f4a12d1",
+        "bytes": 20428
+      }
+    ]
+  },
+  "rechecks": {
+    "all_reopened_and_rehashed": true,
+    "records": [
+      {
+        "path": "/home/ubuntu/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/jetstreamer-node/src/capped_assembly_recovery204.rs",
+        "sha256": "8a7bb4e1e41b96caa1aaba5fa267ac82cf9d8d7d117aa05604cb3e427f4a12d1",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/Cargo.lock",
+        "sha256": "65eda499d3a75bc61482e25460ba34109a359b19e23388c6dae0714fa1cb1e96",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/Cargo.toml",
+        "sha256": "359197196bbd2fb4323c96ca7e19ea2c916ed9836cc1c8f6ce48f64240e066ae",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/historical-runtime/protocol-current/Cargo.toml",
+        "sha256": "f71ac4643cbd2c15ff19d852b0d0dec900ecd8cd0ef76a270dc094812917a6b1",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/jetstreamer-horizon/Cargo.toml",
+        "sha256": "085dcbb26bc81799b82de25a6289b0947ef7840219c7b1de0f0db379ee893803",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/jetstreamer-node/Cargo.toml",
+        "sha256": "f506bf5442c089451e574172604e901fd5fd82e6712bc6b30b99a7e779d8b634",
+        "identity_unchanged": true
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.cargo/config.toml",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "identity_unchanged": true
+      }
+    ]
+  },
+  "command": {
+    "argv": [
+      "sudo",
+      "-n",
+      "/usr/bin/systemd-run",
+      "--unit=horizon-build-capture-204-helper-aac7c8ca-v3.service",
+      "--service-type=exec",
+      "--property=User=ubuntu",
+      "--property=Group=ubuntu",
+      "--property=WorkingDirectory=/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1",
+      "--property=MemoryHigh=14G",
+      "--property=MemoryMax=16G",
+      "--property=MemorySwapMax=0",
+      "--property=CPUQuota=200%",
+      "--property=CPUQuotaPeriodSec=100ms",
+      "--property=TasksMax=512",
+      "--property=RuntimeMaxSec=1800",
+      "--property=PrivateNetwork=yes",
+      "--property=PrivateTmp=yes",
+      "--property=Restart=no",
+      "--property=KillMode=control-group",
+      "--property=OOMPolicy=kill",
+      "--property=NoNewPrivileges=yes",
+      "--property=ProtectSystem=strict",
+      "--property=ProtectHome=read-only",
+      "--property=ReadWritePaths=/home/ubuntu/workspace/jetstreamer/target /home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3",
+      "--property=UMask=0077",
+      "--property=UnsetEnvironment=JETSTREAMER_CLICKHOUSE_BINARY JETSTREAMER_CLICKHOUSE_SHA256 DOCS_RS",
+      "--setenv=PATH=/home/ubuntu/.cargo/bin:/usr/bin:/bin",
+      "--setenv=RUSTUP_TOOLCHAIN=1.98.0",
+      "--setenv=CARGO_TARGET_DIR=/home/ubuntu/workspace/jetstreamer/target",
+      "--setenv=CARGO_INCREMENTAL=0",
+      "--setenv=CARGO_BUILD_JOBS=2",
+      "--wait",
+      "--pipe",
+      "/usr/bin/python3",
+      "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3/run-bounded-build-capture.py"
+    ],
+    "source": {
+      "worktree": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1",
+      "commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+      "tree": "8a95eec50f7e89745a870f6da7c99d408b86090c"
+    },
+    "qualification_plan_sha256": "f30343f4a490170dad0b6167a6c9bc7cfa1d3942b9860c0211b3cd2d058ffe91",
+    "static_inputs_sha256": "50e5af49cb424b0d60da0add3430e9b598f76e8b4a1e7a83eae99124a411cb0e",
+    "script_sha256": {
+      "run-production-build-v1.py": "17c0c5149e7d28a6d55ce3bc9c725e84dc780e2f43c61705cce351f4c9d00877",
+      "capture-candidate-v1.py": "081a1f25a1e4947775652a692f76ea49924d35f4af3c70d048520bb48dfbc6b5",
+      "run-bounded-build-capture.py": "6396feecb1193a0c3fa3b220556af423a15d0ad20b283d5080dc66e797700eb0"
+    },
+    "candidate_executed": false,
+    "deployment_authorized": false,
+    "admission_authorized": false,
+    "r2_mutations_authorized": false,
+    "qa_report_sha256": "7c93606343449323791322db8cd4ecd170a2ad74a1ff43804b622142ca133240",
+    "approved_cache_freshness_plan_sha256": "e1b13810af07293f9ed7997cd942eecfe546326894b8c894fe86f025d0b09d4c",
+    "approved_cross_bindmount_plan_sha256": "739e0bb4422bda0ab49641376ada6c0a92bec583de48b1cbde2a5250c61609e7"
+  },
+  "capture": {
+    "source": {
+      "worktree": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1",
+      "commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+      "tree": "8a95eec50f7e89745a870f6da7c99d408b86090c"
+    },
+    "candidate": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3/candidate-v1",
+    "artifact": {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3/candidate-v1/jetstreamer-epoch204-assembly-only",
+      "sha256": "2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877",
+      "bytes": 4993664
+    },
+    "candidate_manifest_sha256": "c7b56a4d43bd072ff8b751bf6a1751775c71b91ae50199c1dd53d7cf983f3692",
+    "checksum_manifest_sha256": "304836b9927d4e97f04e8e59323c6c0905cc57392c0c8c4210af63482b2d555a",
+    "member_count_excluding_checksum": 1613,
+    "compiler_source_input_count": 175,
+    "tracked_source_count": 3491,
+    "final_charges": {
+      "original_baseline_changed_target_bytes": 1130381312,
+      "original_baseline_changed_target_inodes": 2902,
+      "all_prior_and_current_evidence_allocated_bytes": 1951297536,
+      "combined_charged_bytes": 3081678848,
+      "allowance_bytes": 4294967296
+    },
+    "all_members_independently_rehashed": true,
+    "capture_workflow_unchanged": true,
+    "actual_qa_source_view_sha256": "217548638ce42b7a05156fc779e625957a9e5e12985f814f3a3091a87c7e390c",
+    "candidate_executed": false,
+    "deployed": false,
+    "admission_attempted": false,
+    "r2_mutations": false
+  },
+  "preflight": {
+    "source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "source_tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "configuration": [
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.cargo/config.toml",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489
+      }
+    ],
+    "inherited_overrides": {},
+    "scope": "Actual pre-build current source/config checkpoint; no production Cargo has run. Wrapper rechecks these inputs before and after build/capture."
+  }
+}

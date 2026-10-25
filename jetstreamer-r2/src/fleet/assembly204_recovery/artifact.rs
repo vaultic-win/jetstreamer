@@ -118,7 +118,7 @@ pub(super) fn validate(bound: &BoundFile, assembler: &BoundFile) -> Result<Value
             && bound.sha256 == SEAL
             && assembler.path == Path::new(PACKAGE).join("jetstreamer-epoch204-assembly-only")
             && assembler.sha256 == ARTIFACT,
-        "204 assembler is not the actual frozen aac generation2 production capture"
+        "204 assembler is not the actual frozen aac generation 2 production capture"
     );
     let metadata = fs::symlink_metadata(PACKAGE)?;
     ensure!(
