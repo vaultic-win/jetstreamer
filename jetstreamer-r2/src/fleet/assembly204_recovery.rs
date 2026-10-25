@@ -39,7 +39,12 @@ pub(super) fn deployed_delivery_member(
 
 mod lineage;
 mod ownership;
+mod status_cleanup;
 mod transition;
+pub(super) use status_cleanup::{
+    cleanup_current as cleared_success_cleanup_current,
+    cleanup_time as cleared_success_cleanup_time,
+};
 pub(super) use transition::{EVENT_SCHEMA, event_predecessor, terminal_row};
 #[cfg(test)]
 mod tests;

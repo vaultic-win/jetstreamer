@@ -17,6 +17,21 @@ pub(super) struct Proof {
 }
 
 impl Proof {
+    pub(super) fn cleanup_identity(&self) -> Result<(String, String)> {
+        self.pins()?;
+        Ok((singleton209::UNIT.into(), IID.into()))
+    }
+    pub(super) fn cleanup_time(&self) -> Result<u64> {
+        self.pins()?;
+        let raw = sealed(&self.manager_journal, 8 << 20)?;
+        ownership::manager_shape(&raw, singleton209::UNIT, IID, true)?;
+        let rows = journal_values(&raw)?;
+        let end = rows
+            .iter()
+            .find(|row| row["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448")
+            .context("full209 cleanup natural terminal absent")?;
+        Ok(s(end, "__REALTIME_TIMESTAMP")?.parse::<u64>()? / 1_000_000)
+    }
     fn pins(&self) -> Result<()> {
         ensure!(
             self.launch.sha256 == LAUNCH

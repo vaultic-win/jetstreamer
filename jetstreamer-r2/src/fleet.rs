@@ -6378,3 +6378,16 @@ pub(super) fn qualification_recovery204_successor(
         &serde_json::from_value(actor_launch.clone())?,
     )
 }
+
+// Typed success cleanup keeps the generic inactive-owner predicate unchanged.
+pub(super) fn cleared_success_cleanup_time(epoch: u64, evidence: &Value) -> Result<Option<u64>> {
+    assembly204_recovery::cleared_success_cleanup_time(epoch, evidence)
+}
+pub(super) fn cleared_success_cleanup_current(
+    epoch: u64,
+    evidence: &Value,
+    current: &BTreeMap<String, Value>,
+    owners: &[(String, String)],
+) -> Result<bool> {
+    assembly204_recovery::cleared_success_cleanup_current(epoch, evidence, current, owners)
+}

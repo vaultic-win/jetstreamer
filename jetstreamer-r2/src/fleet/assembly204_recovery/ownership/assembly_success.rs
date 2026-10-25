@@ -157,6 +157,58 @@ pub(super) fn validate(t: &Value, producer: &[u8]) -> Result<()> {
     facts(t, &origin, &launch, &plan, &outcome, producer, &guard)
 }
 
+/// Status-only cleanup: authenticate the typed saved success, then compare the
+/// complete current PID1 histories and raw owners without inventing a cleared IID.
+pub(in crate::fleet::assembly204_recovery) fn cleanup(
+    t: &Value,
+    current: Option<&BTreeMap<String, Value>>,
+    owners: Option<&[(String, String)]>,
+) -> Result<u64> {
+    let iid = s(t, "invocation_id")?;
+    validate_success_terminal(t, UNIT, iid)?;
+    ensure!(
+        t.get("assembly_success_origin").is_some(),
+        "cleanup requires typed assembly success"
+    );
+    let origin: Origin = serde_json::from_value(t["assembly_success_origin"].clone())?;
+    let (_, launch, _) = origin_launch(&origin)?;
+    let producer = sealed(
+        &serde_json::from_value(t["manager_journal"].clone())?,
+        8 << 20,
+    )?;
+    let (_, finished) = completion_window(&producer, UNIT, iid)?;
+    if let Some(current) = current {
+        ensure!(
+            owners == Some(&[(UNIT.into(), iid.into())][..]),
+            "assembly cleanup owner differs from latest publication"
+        );
+        no_overlap_current(current, None)?;
+        for (name, expected, journal) in [
+            (UNIT, &launch["owner"], producer),
+            (
+                GUARD,
+                &launch["guard"],
+                sealed(&origin.guard_manager_journal, 8 << 20)?,
+            ),
+        ] {
+            let owner = current.get(name).context("assembly cleanup owner absent")?;
+            terminal_owner(owner, expected)?;
+            super::super::status_cleanup::owner_current(owner, expected, &journal)?;
+            capped204205_work::empty_terminal_cgroup(name)?;
+            inactive_status::no_pending_owner_trigger(name, false)?;
+        }
+        let refs = jetstreamer_horizon_observe::process_references::scan(
+            Path::new("/proc"),
+            Path::new(ROOT),
+        )?;
+        ensure!(
+            refs.references.is_empty(),
+            "assembly cleanup root still has process references"
+        );
+    }
+    Ok(finished / 1000)
+}
+
 pub(in crate::fleet::assembly204_recovery) fn capture(
     c: &super::super::downstream::Capture,
     spec: &BoundFile,
