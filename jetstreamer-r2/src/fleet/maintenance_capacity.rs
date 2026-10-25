@@ -754,7 +754,7 @@ mod tests {
     fn full210_uses_authenticated_context_for_canonical_and_private_fleets() {
         let observer = context_binding("/saved/observer.json");
         for path in [
-            "/var/lib/jetstreamer/horizon-campaign-fleet-v1/fleet.json",
+            "/var/lib/jetstreamer/horizon-campaign-fleet/fixture-v1/fleet.json",
             "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-cycle414-refresh-v1/fleet.json",
         ] {
             let fleet = context_binding(path);
