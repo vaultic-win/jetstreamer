@@ -4,6 +4,17 @@ use std::{collections::BTreeMap, sync::OnceLock};
 
 const MAX_WAIT_MILLIS: u64 = 120_000;
 const MAX_ADMISSION_AGE_MILLIS: u64 = 120_000;
+const HASH_MEMORY_HIGH: u64 = 14 << 30;
+const HASH_MEMORY_MAX: u64 = 16 << 30;
+mod roles {
+    include!("epoch223_demotion_roles.rs");
+}
+pub(super) fn role_entry() -> Option<Result<()>> {
+    roles::dispatch()
+}
+mod spawn {
+    include!("epoch223_demotion_spawn.rs");
+}
 const HARNESS: &str = "a280b1f48f0bb430c482e01a03b4b800ee8f95f326590059e4cdf4873b14a22b";
 const OLD_UNIT: &str = "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service";
 const OLD_IID: &str = "e70aaf097e7c4583b216aba454145910";
@@ -25,6 +36,9 @@ struct Prerequisites {
     guard_executable: BoundFile,
     issuer_executable: BoundFile,
     maximum_wait_millis: u64,
+    maximum_spawn_wait_millis: u64,
+    accounting_executable: BoundFile,
+    accounting_qualification: BoundFile,
 }
 #[derive(Clone, Debug, Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -134,7 +148,7 @@ struct GuardProof {
 }
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Admission {
+struct ControlGrant {
     schema: String,
     epoch: u64,
     runtime_plan: BoundFile,
@@ -153,11 +167,9 @@ struct Admission {
     repair_task: BoundFile,
     guard: BoundFile,
     recorded_unix_millis: u64,
-    requested_memory_high_bytes: u64,
-    requested_memory_max_bytes: u64,
-    effective_memory_high_bytes: u64,
-    effective_memory_max_bytes: u64,
     protected_floor_bytes: u64,
+    read_only_hashing_authorized: bool,
+    native_execution_authorized: bool,
     full_fleet_census_complete: bool,
     overlap_replacement_detected: bool,
     publication_authorized: bool,
@@ -540,14 +552,17 @@ impl NativeProof {
 struct Accepted {
     ready: BoundFile,
     admission_binding: BoundFile,
-    admission: Admission,
+    admission: ControlGrant,
     guard: GuardProof,
     actor: Actor,
     original_start_unix_millis: u64,
 }
 struct Session {
     gate: Rendezvous,
+    spawn_gate: Rendezvous,
     accepted: Option<Accepted>,
+    hashing_started: Option<Instant>,
+    spawn_accepted: Option<spawn::Accepted>,
 }
 pub(super) struct Runtime {
     decoded: OnceLock<(RuntimePlan, String)>,
@@ -559,19 +574,24 @@ impl Runtime {
             decoded: OnceLock::new(),
             session: std::sync::Mutex::new(Session {
                 gate: Rendezvous::new(),
+                spawn_gate: Rendezvous::new(),
                 accepted: None,
+                hashing_started: None,
+                spawn_accepted: None,
             }),
         }
     }
     pub fn decode(&self, bytes: &[u8]) -> Result<Plan> {
         let r: RuntimePlan = serde_json::from_slice(bytes)?;
         ensure!(
-            r.schema == "jetstreamer-epoch223-demotion-runtime-plan-v2"
+            r.schema == "jetstreamer-epoch223-demotion-runtime-plan-v3"
                 && ((r.mode == "capability" && r.prerequisites.is_none())
                     || (r.mode == "bracket"
-                        && r.prerequisites.as_ref().is_some_and(
-                            |x| (1..=MAX_WAIT_MILLIS).contains(&x.maximum_wait_millis)
-                        ))),
+                        && r.prerequisites
+                            .as_ref()
+                            .is_some_and(|x| (1..=MAX_WAIT_MILLIS)
+                                .contains(&x.maximum_wait_millis)
+                                && (1..=MAX_WAIT_MILLIS).contains(&x.maximum_spawn_wait_millis)))),
             "223 exact runtime plan required; legacy plans cannot launch"
         );
         let p = r.plan.clone();
@@ -668,7 +688,7 @@ impl Runtime {
                         sha256: hex(&Sha256::digest(&bytes)),
                     };
                     let ready: Ready = serde_json::from_slice(&bytes)?;
-                    let admission: Admission = read_bound(&ready.admission)?;
+                    let admission: ControlGrant = read_bound(&ready.admission)?;
                     let native: NativeProof = read_bound(&x.native_input)?;
                     native.validate()?;
                     // Proof inputs are immutable metadata, never snapshots or entries.
@@ -721,10 +741,11 @@ impl Runtime {
                     observe(&actor)?;
                     observe(&admission.issuer)?;
                     observe(&guard.actor)?;
-                    check_kernel(p, &admission)?;
+                    check_control_kernel(p)?;
                     session
                         .gate
                         .accept(elapsed(start)?, &ready_binding.sha256)?;
+                    session.gate.release(&ready_binding.sha256)?;
                     persist(
                         &p.run_root.join("receipts/admission-accepted.json"),
                         &json!({
@@ -733,6 +754,7 @@ impl Runtime {
                         "admission":binding_value(&ready.admission),"runner":actor,
                         "guard":guard.actor,"original_start_unix_millis":origin.original_start_unix_millis,
                         "native_input_read":false,"worker_spawned":false,
+                        "read_only_hashing_authorized":true,"native_execution_authorized":false,
                         "publication_authorized":false,"r2_mutations":false}),
                     )?;
                     session.accepted = Some(Accepted {
@@ -743,64 +765,20 @@ impl Runtime {
                         actor,
                         original_start_unix_millis: origin.original_start_unix_millis,
                     });
+                    session.hashing_started = Some(Instant::now());
                     return Ok(());
                 }
             }
         }
     }
     pub fn before_spawn(&self, p: &Plan, iid: &str) -> Result<Value> {
-        let mut s = self
-            .session
-            .lock()
-            .map_err(|_| anyhow::anyhow!("223 admission lock poisoned"))?;
-        let result: Result<Value> = (|| {
-            let a = s
-                .accepted
-                .as_ref()
-                .context("223 real admission not captured")?;
-            ensure!(
-                a.actor.invocation_id == iid && fresh(a.admission.recorded_unix_millis, millis()?),
-                "223 admission expired before spawn"
-            );
-            let _: Ready = read_bound(&a.ready)?;
-            let _: Admission = read_bound(&a.admission_binding)?;
-            observe(&a.actor)?;
-            observe(&a.guard.actor)?;
-            check_kernel(p, &a.admission)?;
-            let token = a.ready.sha256.clone();
-            let value = json!({"schema":"jetstreamer-epoch223-demotion-runtime-spawn-admission-v1",
-            "ready":binding_value(&a.ready),"admission":binding_value(&a.admission_binding),
-            "actual_runner":a.actor,"actual_guard":a.guard.actor,
-            "original_start_unix_millis":a.original_start_unix_millis,
-            "publication_authorized":false,"r2_mutations":false});
-            s.gate.release(&token)?;
-            Ok(value)
-        })();
-        if result.is_err() {
-            s.gate.phase = Phase::Closed;
-        }
-        result
+        spawn::admit(self, p, iid)
     }
     pub fn guard(&self) -> Result<()> {
-        let mut s = self
-            .session
-            .lock()
-            .map_err(|_| anyhow::anyhow!("223 admission lock poisoned"))?;
-        let result: Result<()> = (|| {
-            let a = s.accepted.as_ref().context("223 admitted guard absent")?;
-            ensure!(
-                s.gate.phase == Phase::Released(a.ready.sha256.clone()),
-                "223 guard before admitted spawn"
-            );
-            let _: Ready = read_bound(&a.ready)?;
-            observe(&a.guard.actor)
-        })();
-        if result.is_err() {
-            s.gate.phase = Phase::Closed;
-        }
-        result
+        spawn::guard(self)
     }
 }
+
 fn verify_reference(b: &BoundFile) -> Result<()> {
     ensure!(
         !bound_bytes(b, 0, 16 << 20)?.is_empty(),
@@ -871,7 +849,7 @@ fn exact_helper_command(actor: &Actor, command: &str, spec: &BoundFile, flag: &s
 fn validate_issue_and_guard_plan(
     p: &Plan,
     plan: &BoundFile,
-    a: &Admission,
+    a: &ControlGrant,
     t: &RepairTask,
     g: &GuardProof,
     i: &IssueSpec,
@@ -892,7 +870,7 @@ fn validate_issue_and_guard_plan(
             && a.issuer.expected_exec_start
                 == exact_helper_command(
                     &a.issuer,
-                    "issue-epoch223-demotion-admission",
+                    "issue-epoch223-demotion-control",
                     &a.issuer_spec,
                     "--spec-sha256"
                 ),
@@ -926,20 +904,20 @@ fn validate_admission(
     plan: &BoundFile,
     actor: &Actor,
     r: &Ready,
-    a: &Admission,
+    a: &ControlGrant,
     o: &OriginClock,
     t: &RepairTask,
     g: &GuardProof,
     now: u64,
 ) -> Result<()> {
     ensure!(
-        r.schema == "jetstreamer-epoch223-demotion-rendezvous-ready-v1"
+        r.schema == "jetstreamer-epoch223-demotion-control-ready-v1"
             && r.runtime_plan == *plan
             && r.runner == *actor,
         "223 ready token names another plan/actual actor"
     );
     ensure!(
-        a.schema == "jetstreamer-epoch223-demotion-bracket-admission-v2"
+        a.schema == "jetstreamer-epoch223-demotion-control-grant-v1"
             && a.epoch == 223
             && a.runtime_plan == *plan
             && a.runner == *actor
@@ -957,15 +935,11 @@ fn validate_admission(
         "223 admission scope/freshness differs"
     );
     ensure!(
-        a.requested_memory_high_bytes == 150_000_000_000
-            && a.requested_memory_max_bytes == 225_000_000_000
+        a.read_only_hashing_authorized
+            && !a.native_execution_authorized
             && a.protected_floor_bytes >= 2_000_000_000_000
-            && a.protected_floor_bytes <= p.minimum_free_bytes
-            && a.effective_memory_high_bytes > 0
-            && a.effective_memory_high_bytes <= a.requested_memory_high_bytes
-            && a.effective_memory_max_bytes > a.effective_memory_high_bytes
-            && a.effective_memory_max_bytes <= a.requested_memory_max_bytes,
-        "223 admission changes reviewed resource envelope"
+            && a.protected_floor_bytes <= p.minimum_free_bytes,
+        "223 control grant cannot authorize allocation or execution"
     );
     ensure!(
         a.issuer.unit.starts_with("horizon-admit-223-demotion-")
@@ -1010,7 +984,22 @@ fn validate_admission(
     );
     Ok(())
 }
-fn check_kernel(p: &Plan, a: &Admission) -> Result<()> {
+fn check_control_kernel(p: &Plan) -> Result<()> {
+    check_limits(
+        p,
+        HASH_MEMORY_HIGH,
+        HASH_MEMORY_MAX,
+        HASH_MEMORY_HIGH,
+        HASH_MEMORY_MAX,
+    )
+}
+fn check_limits(
+    p: &Plan,
+    high: u64,
+    max: u64,
+    effective_high: u64,
+    effective_max: u64,
+) -> Result<()> {
     let root = Path::new("/sys/fs/cgroup/system.slice").join(&p.unit);
     let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
     ensure!(
@@ -1018,13 +1007,12 @@ fn check_kernel(p: &Plan, a: &Admission) -> Result<()> {
         "223 invalid kernel page size"
     );
     ensure!(
-        a.effective_memory_high_bytes == a.requested_memory_high_bytes / page * page
-            && a.effective_memory_max_bytes == a.requested_memory_max_bytes / page * page,
+        effective_high == high / page * page && effective_max == max / page * page,
         "223 kernel rounding differs"
     );
     for (file, expected) in [
-        ("memory.high", a.effective_memory_high_bytes),
-        ("memory.max", a.effective_memory_max_bytes),
+        ("memory.high", effective_high),
+        ("memory.max", effective_max),
         ("memory.swap.max", 0),
     ] {
         ensure!(
@@ -1175,7 +1163,7 @@ mod tests {
                 .decode(&serde_json::to_vec(&base).unwrap())
                 .is_err()
         );
-        let envelope = json!({"schema":"jetstreamer-epoch223-demotion-runtime-plan-v2","mode":"capability","plan":base,"prerequisites":null});
+        let envelope = json!({"schema":"jetstreamer-epoch223-demotion-runtime-plan-v3","mode":"capability","plan":base,"prerequisites":null});
         let runtime = Runtime::new();
         runtime
             .decode(&serde_json::to_vec(&envelope).unwrap())
@@ -1210,7 +1198,7 @@ mod tests {
         DiskStorage
             .decode_plan(&serde_json::to_vec(&base).unwrap())
             .unwrap();
-        let envelope = json!({"schema":"jetstreamer-epoch223-demotion-runtime-plan-v2","mode":"capability","plan":base,"prerequisites":null});
+        let envelope = json!({"schema":"jetstreamer-epoch223-demotion-runtime-plan-v3","mode":"capability","plan":base,"prerequisites":null});
         assert!(
             DiskStorage
                 .decode_plan(&serde_json::to_vec(&envelope).unwrap())
@@ -1277,6 +1265,9 @@ mod tests {
             guard_executable: guard_actor.executable.clone(),
             issuer_executable: issuer.executable.clone(),
             maximum_wait_millis: 1000,
+            maximum_spawn_wait_millis: 1000,
+            accounting_executable: file("accountant"),
+            accounting_qualification: file("accountant-qualification"),
         };
         let origin = OriginClock {
             schema: "jetstreamer-epoch223-e70a-origin-clock-v1".into(),
@@ -1289,13 +1280,13 @@ mod tests {
             repair_closed: false,
         };
         let ready = Ready {
-            schema: "jetstreamer-epoch223-demotion-rendezvous-ready-v1".into(),
+            schema: "jetstreamer-epoch223-demotion-control-ready-v1".into(),
             runtime_plan: root.clone(),
             runner: runner.clone(),
             admission: file("admission"),
         };
-        let mut a = Admission {
-            schema: "jetstreamer-epoch223-demotion-bracket-admission-v2".into(),
+        let mut a = ControlGrant {
+            schema: "jetstreamer-epoch223-demotion-control-grant-v1".into(),
             epoch: 223,
             runtime_plan: root.clone(),
             runner: runner.clone(),
@@ -1313,11 +1304,9 @@ mod tests {
             repair_task: file("task"),
             guard: file("guard"),
             recorded_unix_millis: 10,
-            requested_memory_high_bytes: 150000000000,
-            requested_memory_max_bytes: 225000000000,
-            effective_memory_high_bytes: 149999996928,
-            effective_memory_max_bytes: 224999997440,
             protected_floor_bytes: 2000000000000,
+            read_only_hashing_authorized: true,
+            native_execution_authorized: false,
             full_fleet_census_complete: true,
             overlap_replacement_detected: false,
             publication_authorized: false,

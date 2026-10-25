@@ -13,13 +13,14 @@ decode their original `Plan` and use a default no-op `before_inputs` hook.
 
 ## Plan and actual startup
 
-The new outer schema is `jetstreamer-epoch223-demotion-runtime-plan-v2`. It contains
+The new outer schema is `jetstreamer-epoch223-demotion-runtime-plan-v3`. It contains
 the unchanged private v1 `plan`, a `mode`, and `prerequisites`. Capability mode
 requires no prerequisites; bracket mode requires all of:
 
 - `native_input`, `origin_clock`, `admission_policy`, `guard_executable`, and
-  `issuer_executable`, each an actual immutable root-owned path/SHA-256 binding;
-- `maximum_wait_millis`, a positive integer no larger than 120,000.
+  `issuer_executable`, `accounting_executable`, and `accounting_qualification`, each an actual immutable root-owned path/SHA-256 binding;
+- `maximum_wait_millis` and `maximum_spawn_wait_millis`, each a positive integer
+  no larger than 120,000.
 
 The CLI mode must match the outer plan. A legacy bare plan, an unconfigured parent
 pin, an unknown mode, or serialized hook selection cannot admit work.
@@ -39,65 +40,68 @@ journal and the `f1aa68c4...` retained open-repair receipt. A task's new start t
 cannot replace it. No original snapshot, partial archive or failure history is
 reclassified or deleted.
 
-## One bounded handoff
+## Two one-shot permissions
 
-The one-shot waiter looks only for the metadata event
-`receipts/admission-ready.json`; its 100 ms presence check is not a fleet/resource
-observation loop. Its monotonic deadline is fixed once. Timeout, malformed data,
-clock rewind in the state machine, a replacement token, repeated admission or
-repeated spawn permanently closes this invocation's gate. Manager identity
-commands have an independent two-second bound. Evidence reads and final checks
-cannot grant admission after the monotonic deadline.
+The control waiter looks only for `receipts/admission-ready.json`; its 100 ms
+presence check is a local metadata rendezvous, not a fleet/resource observation.
+Its fixed monotonic deadline is at most 120 seconds. The ready schema is
+`jetstreamer-epoch223-demotion-control-ready-v1`; it binds a new
+`jetstreamer-epoch223-demotion-control-grant-v1` to the actual runner, original
+clock, genuine repair task, independent guard and complete accounting context.
+The producer remains at MemoryHigh 14 GiB / MemoryMax 16 GiB with swap zero.
+This permission authorizes only read-only input hashing. It cannot authorize
+native execution or a native memory allocation.
 
-A reviewed root capture/issuer must verify the real start receipt and live actor,
-capture a genuine repair task, arm a separately qualified guard, then issue fresh
-admission and publish a root-owned read-only ready file atomically. The ready
-schema is `jetstreamer-epoch223-demotion-rendezvous-ready-v1`; it binds the actual
-runner, runtime plan and the exact late-created admission file/SHA. The waiter
-hashes and parses bytes from one stable no-follow file handle, checks metadata
-before and after, and rejects symlinks, hardlinks, writable evidence and drift.
+After exact shared input hashing completes, the consumer writes a genuine
+`receipts/spawn-request.json` carrying its actual actor, fixed control grant and
+original epoch clock. It then waits once for `receipts/spawn-ready.json`, under a
+separate maximum 120-second deadline. The root spawn issuer must issue a new
+`jetstreamer-epoch223-demotion-spawn-grant-v1` after that actual request. Its
+allocation proof must bind the separately qualified corrected accounting helper,
+current complete fleet and real kernel allocation. The native bracket envelope
+is MemoryHigh 150,000,000,000 / MemoryMax 225,000,000,000 bytes, page-rounded,
+swap zero. The separate guard and issuer each add a full 1 GiB obligation.
 
-Admission schema v2 binds the actual runner and independent live issuer, native
-proof, original clock, admission policy, accepted observer/fleet/context proof,
-real repair-task capture, actual guard, and requested/effective kernel limits.
-It is at most 120 seconds old. No hand-written optimistic JSON, queued plan,
-sleeping stand-in, or previous e70a IID can supply these interfaces. Both guard and
-issuer must have separate PIDs/IIDs and exact sealed executable/command bindings.
-The issuer's command is:
+The original control grant is never renewed or reused as a spawn grant. It need
+not remain younger than 120 seconds during slow input hashing. Only the new
+post-hash grant must be fresh at its one permitted consumption. The original
+epoch clock never resets. Later safety checks retain the immutable consumed
+spawn token and actual actor identities; long execution does not age-expire the
+consumed grant. Replacement tokens, repeated spawn, malformed data, actor changes
+or expired one-shot waits close the invocation gate.
 
-`EXE issue-epoch223-demotion-admission SPEC --spec-sha256 SHA --self-sha256 ELF_SHA`
+Issuer commands are separately bound:
 
-The independent guard's command is:
+`EXE issue-epoch223-demotion-control SPEC --spec-sha256 SHA --self-sha256 ELF_SHA`
+
+`EXE issue-epoch223-demotion-spawn SPEC --spec-sha256 SHA --self-sha256 ELF_SHA`
+
+The independent guard command remains:
 
 `EXE guard-epoch223-demotion PLAN --plan-sha256 SHA --self-sha256 ELF_SHA`
 
-Their closed spec/plan types are `IssueSpec` and `GuardPlan`. Root helpers beneath
-private user-owned ancestors need their reviewed sandbox traversal capability;
-do not relax those directories. The issuer must remain genuinely active through
-ready-file acceptance and wait for `admission-accepted.json` with its own bounded
-acknowledgment policy, then may terminate. No helper implements those commands in
-this patch: their exact source/capability/ownership qualification remains required.
+Actual control/spawn issuers, native supervisor, and guard implementations still
+require source completion and qualification. Their interface types are not
+execution evidence. The current patch implements two real root-only metadata
+capture commands in the private utility binary:
 
-All consumed root-owned metadata must be readable through the runner's reviewed
-sandbox. Use separately sealed readable copies of approved non-sensitive evidence
-or the already reviewed exact traversal capability; do not loosen the original
-private evidence tree merely to make a read pass.
+`EXE capture-epoch223-origin SPEC --spec-sha256 SHA --self-sha256 ELF_SHA`
 
-The runner independently compares live manager identity, PID start ticks, cgroup,
-boot, command, immutable executable bytes and zero restarts before/after capture.
-The root-issued guard receipt is responsible for actual `/proc/PID/exe` capture;
-the unprivileged runner does not assume it can dereference a root guard's proc
-symlink. Ready/admission/task/guard files must bind each other without circular
-hashes: task capture binds the static admission policy, while final admission
-binds the task capture. The issuer spec binds the already captured actor launch.
+`EXE capture-epoch223-task SPEC --spec-sha256 SHA --self-sha256 ELF_SHA`
 
-Acceptance writes a local non-authorizing receipt. Only then can the existing
-input validation run. Immediately before spawn, the runner repeats freshness,
-actor/guard identity, ready/admission byte bindings and actual kernel limits,
-then consumes the admission exactly once. Later guard checks use the fixed
-accepted token and actual guard identity; they do not renew admission or treat
-the original admission's age as a 36-hour lease. Identity failures close the
-gate. The existing 15-second safety cadence remains separate from the single
+Origin capture derives the old start from the uniquely pinned PID1 journal.
+Task capture independently verifies the live manager/PID/start ticks/cgroup/ELF,
+plan and small control kernel envelope before issuing no-clobber launch and task
+receipts. Both authenticate their own actual root systemd actor and immutable
+executable/spec bytes. They read metadata only and perform no native/R2 operation.
+The task receipt alone grants no execution or dashboard publication authority.
+
+Consumed root metadata must be readable through the runner's reviewed sandbox.
+Root capture outputs currently remain root-private; deployment must supply a
+separately sealed readable copy of approved non-sensitive evidence or an exact
+reviewed traversal capability. Do not loosen preserved private evidence. Every
+metadata handle is no-follow, bounded, immutable and checked before/after reads.
+The existing 15-second protective cadence stays separate from the single
 30-minute campaign observation.
 
 ## Proof, ownership and status interfaces still to qualify
@@ -115,7 +119,7 @@ proof cannot be renamed into this schema.
 admission policy and sidecar-inclusive ETA-policy binding. Its launch stage is
 `admission-rendezvous`; the status publisher must use wire phase `verification`.
 Only actual observed transaction execution permits wire phase `replay`. Native
-issuer, actor launch capture, complete-fleet context qualification, task/status
+issuer, complete-fleet context qualification, task/status
 publisher and independent guard must be implemented and source/runtime-qualified
 in separate exact-223 branches. This consumer does not issue their evidence or
 extend the exact-204 recovery contract. Do not advertise a live repair merely
@@ -142,7 +146,7 @@ gate. No canonical sidecar or R2 authority is introduced.
 ## Next source QA
 
 After explicit main-target lease transfer, run the new private
-`bounded::readiness::tests` filter (fixture-only, no native/manager/worker calls),
+`bounded::readiness::tests` and `bounded::readiness::spawn::tests` filters (fixture-only, no native/manager/worker calls),
 the original full runner Clippy selection, and a representative unchanged
 default bounded profile typecheck. Preserve the previous cumulative artifact
 charge, source/lock/tool/native closure pins and every failure. No successful

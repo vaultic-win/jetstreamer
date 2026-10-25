@@ -155,6 +155,13 @@ mod bounded {
         }
     }
     pub(super) fn entry() {
+        if let Some(result) = readiness::role_entry() {
+            if let Err(error) = result {
+                eprintln!("epoch223 role failed: {error:#}");
+                std::process::exit(1);
+            }
+            return;
+        }
         main_with_storage(&Bracket::new());
     }
     #[cfg(test)]
