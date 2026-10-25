@@ -211,7 +211,8 @@ pub(super) fn validate_saved(p: &Value, launch: &Value, iid: &str, pid: u64) -> 
     let d = claim(&launch_binding, launch)?;
     let result_binding: BoundFile = serde_json::from_value(p["result_binding"].clone())?;
     ensure!(
-        runner_result(&Some(result_binding), &d, launch)? == p["result"],
+        result_binding.path == Path::new(c::ROOT).join("receipts/resource.json")
+            && runner_result(&Some(result_binding), &d, launch)? == p["result"],
         "227 cleared original immutable runner result differs"
     );
     let bytes = journal_bytes(&binding)?;
@@ -292,7 +293,11 @@ pub(super) fn capture(
         .context("227 cleared terminal requires a sealed original journal")?;
     let result = runner_result(&s.result, d, launch)?;
     ensure!(
-        s.result.is_some() && result["success"] == true && result["target_reached"] == true,
+        s.result
+            .as_ref()
+            .is_some_and(|b| b.path == Path::new(c::ROOT).join("receipts/resource.json"))
+            && result["success"] == true
+            && result["target_reached"] == true,
         "227 cleared terminal cannot infer success from empty manager fields"
     );
     let before = observe()?;
