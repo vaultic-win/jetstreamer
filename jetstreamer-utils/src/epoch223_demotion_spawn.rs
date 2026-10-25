@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Grant {
+pub(super) struct Grant {
     schema: String,
     runtime_plan: BoundFile,
     control_grant: BoundFile,
@@ -35,15 +35,20 @@ struct Token {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Issue {
-    schema: String,
-    runtime_plan: BoundFile,
-    control_grant: BoundFile,
-    request: BoundFile,
-    runner: Actor,
-    native_input: BoundFile,
-    guard: BoundFile,
-    allocation_proof: BoundFile,
+pub(super) struct Issue {
+    pub(super) schema: String,
+    pub(super) runtime_plan: BoundFile,
+    pub(super) control_grant: BoundFile,
+    pub(super) request: BoundFile,
+    pub(super) runner: Actor,
+    pub(super) native_input: BoundFile,
+    pub(super) guard: BoundFile,
+    pub(super) allocation_proof: BoundFile,
+    pub(super) issuer_unit: String,
+    pub(super) accounting_basis: BoundFile,
+    pub(super) accounting_directory: PathBuf,
+    pub(super) maximum_lock_wait_millis: u64,
+    pub(super) maximum_acknowledgment_wait_millis: u64,
 }
 pub(super) struct Accepted {
     token: BoundFile,
@@ -138,7 +143,7 @@ fn wait(p: &Plan, iid: &str, x: &Prerequisites, s: &mut Session, start: Instant)
                         && issue.runner == g.runner
                         && issue.native_input == g.native_input
                         && issue.guard == g.guard
-                        && issue.allocation_proof == g.allocation_proof,
+                        && issue.maximum_acknowledgment_wait_millis > 0,
                     "223 spawn issuer spec differs"
                 );
                 validate_allocation(&g, x, requested)?;
@@ -244,8 +249,27 @@ fn validate(
     );
     Ok(())
 }
-fn validate_allocation(g: &Grant, x: &Prerequisites, requested: u64) -> Result<()> {
+pub(super) fn validate_allocation(g: &Grant, x: &Prerequisites, requested: u64) -> Result<()> {
     let proof: Value = read_bound(&g.allocation_proof)?;
+    let result_binding: BoundFile = serde_json::from_value(proof["capacity_result"].clone())?;
+    let result: Value = read_bound(&result_binding)?;
+    let guard: GuardProof = read_bound(&g.guard)?;
+    ensure!(
+        result["schema"] == "jetstreamer-epoch223-demotion-capacity-result-v1"
+            && result["self_sha256"] == x.accounting_executable.sha256
+            && result["upstream_accounting_source_commit"]
+                == "af09802051463086cf8f47de3bf200717d84e094"
+            && result["context"]["phase"] == "spawn"
+            && result["context"]["job_kind"] == "bracket"
+            && result["context"]["runtime_plan"] == binding_value(&g.runtime_plan)
+            && result["context"]["producer"] == serde_json::to_value(&g.runner)?
+            && result["context"]["issuer"] == serde_json::to_value(&g.issuer)?
+            && result["context"]["guard"] == serde_json::to_value(&guard.actor)?
+            && result["capacity"] == proof["capacity"]
+            && result["capacity"]["candidate_accounting_final"]["candidate_memory_max_bytes"]
+                == 225_000_000_000u64 + (2u64 << 30),
+        "223 spawn allocation lacks exact newly computed full candidate capacity"
+    );
     let qualification: Value = read_bound(&x.accounting_qualification)?;
     bound_file(
         &x.accounting_executable.path,

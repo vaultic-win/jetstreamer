@@ -80,7 +80,7 @@ The independent guard command remains:
 
 `EXE guard-epoch223-demotion PLAN --plan-sha256 SHA --self-sha256 ELF_SHA`
 
-The spawn issuer and native supervisor still require source completion.
+The native supervisor still requires source completion.
 Every new role, including the guard, remains unbuilt and unqualified. Their interface types are not
 execution evidence. The current patch implements two root-only metadata
 capture commands in the private utility binary:
@@ -219,7 +219,37 @@ clock and18GiB full candidate budget. No old399 capacity is authority.
 The issuer validates the same closed consumer interfaces before publishing the
 control grant, custody evidence and ready token. It retains host custody through
 final actor/kernel checks and durable publication, then releases it before its
-separate bounded local acknowledgment wait. This command authorizes read-only
-hashing only. It does not raise target caps, execute native inputs, renew an old
-grant, publish status, perform R2 operations or issue the later spawn grant.
+separate bounded local acknowledgment wait. This control command authorizes read-only hashing only. It does not raise target
+caps, execute native inputs, renew an old grant, publish status, perform R2
+operations or issue the later spawn grant.
 This source is formatted but has not been compiled, tested, sealed or executed.
+
+## Concrete post-hash spawn issuer source
+
+`issue-epoch223-demotion-spawn` now implements a separate issuing path. Its strict
+static spec binds runtime plan, original control grant, actual post-hash request,
+runner, native proof, original guard, issuer unit, accounting basis/directory and
+bounded lock/acknowledgment waits. It deliberately does not pre-bind its future
+allocation proof. It requires the original runner's consumed-control receipt and
+hash-complete request, unchanged original epoch clock, exact native proof, live
+original guard and a separately qualified fresh complete-accounting calculation.
+No control-grant age reset, repeat spawn or second request is allowed.
+
+Under shared host custody it recalculates the full225,000,000,000-byte producer
+plus two1GiB independent actor caps while the producer still has the small
+hashing envelope. It rechecks actual disk fit and identities, opens the original
+cgroup directory FD, and raises only that target's kernel caps to the closed
+native envelope. The immutable allocation proof, separate fresh spawn grant and
+ready token bind actual kernel limits, actual helper/result/qualification,
+request, custody and live actors. The consumer separately reopens the real
+capacity receipt and compares its entire capacity/context, not merely a boolean.
+The issuer retains custody through durable publication and final checks, then
+releases it and waits for the one bounded actual spawn acceptance.
+
+A failure after a cap increase must preserve that reservation and every receipt;
+never blindly lower caps after publishing a grant that the runner may already
+have consumed. Root must reconcile the actual target/guard and interrupted
+transaction before another admission. Existing nonparticipating paths remain
+quiescent throughout. This source remains unbuilt/unexecuted, grants no present
+launch authority, and does not substitute for new native-input proof, runtime
+qualification, original Bank/transaction gates, full-root work or R2 gates.

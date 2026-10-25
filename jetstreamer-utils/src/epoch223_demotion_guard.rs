@@ -2,13 +2,13 @@
 use super::*;
 use std::os::fd::{AsRawFd, FromRawFd};
 
-struct Custody {
+pub(super) struct Custody {
     directory: File,
     device: u64,
     inode: u64,
 }
 impl Custody {
-    fn open(actor: &Actor) -> Result<Self> {
+    pub(super) fn open(actor: &Actor) -> Result<Self> {
         observe(actor)?;
         let path = Path::new("/sys/fs/cgroup").join(actor.cgroup.trim_start_matches('/'));
         ensure!(path.canonicalize()? == path, "223 guard redirected cgroup");
@@ -29,7 +29,7 @@ impl Custody {
             directory,
         })
     }
-    fn file(&self, name: &str, write: bool) -> Result<File> {
+    pub(super) fn file(&self, name: &str, write: bool) -> Result<File> {
         let metadata = self.directory.metadata()?;
         ensure!(
             metadata.dev() == self.device && metadata.ino() == self.inode,
