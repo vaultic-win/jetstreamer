@@ -750,7 +750,10 @@ fn fleet_for_mode(
 ) -> Result<Value> {
     if matches!(
         mode,
-        MemoryMode::Full210 | MemoryMode::Foundation203 | MemoryMode::AssemblyRecovery204
+        MemoryMode::Full210
+            | MemoryMode::Foundation203
+            | MemoryMode::AssemblyRecovery204
+            | MemoryMode::Full209Delivery
     ) {
         return accepted(fleet, observer);
     }
@@ -769,6 +772,42 @@ mod tests {
         BoundFile {
             path: path.into(),
             sha256: "a".repeat(64),
+        }
+    }
+    #[test]
+    fn full209_delivery_authenticates_complete_context_and_never_falls_back() {
+        let observer = context_binding("/saved/observer.json");
+        for path in [
+            "/var/lib/jetstreamer/horizon-campaign-fleet/fixture-v1/fleet.json",
+            "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-terminal421-v1/fleet.json",
+        ] {
+            let fleet = context_binding(path);
+            let raw = json!({"active":[{"epoch":207},{"epoch":225}],"assembly204_recovery_history":[{"raw":true}],"terminal_replays":[{"epoch":209}]});
+            let accepted = fleet_for_mode(
+                MemoryMode::Full209Delivery,
+                &fleet,
+                &observer,
+                &|f, o| {
+                    assert_eq!(f.path, fleet.path);
+                    assert_eq!(f.sha256, fleet.sha256);
+                    assert_eq!(o.path, observer.path);
+                    assert_eq!(o.sha256, observer.sha256);
+                    Ok(raw.clone())
+                },
+                &|_| panic!("Full209 delivery cannot use the plain fleet reader"),
+            )
+            .unwrap();
+            assert_eq!(accepted, raw);
+            assert!(
+                fleet_for_mode(
+                    MemoryMode::Full209Delivery,
+                    &fleet,
+                    &observer,
+                    &|_, _| bail!("event schema, ancestry or observer binding rejected"),
+                    &|_| panic!("authentication failure cannot fall back"),
+                )
+                .is_err()
+            );
         }
     }
     #[test]
@@ -803,7 +842,6 @@ mod tests {
         );
         for mode in [
             MemoryMode::Existing,
-            MemoryMode::Full209Delivery,
             MemoryMode::FirstRoot233,
             MemoryMode::Capped204V4,
         ] {
@@ -926,7 +964,6 @@ mod tests {
         let observer = context_binding("/saved/observer.json");
         for mode in [
             MemoryMode::Existing,
-            MemoryMode::Full209Delivery,
             MemoryMode::FirstRoot233,
             MemoryMode::Capped204V4,
         ] {

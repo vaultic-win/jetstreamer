@@ -9,6 +9,8 @@ struct Origin {
     context: AcceptedContext,
     #[serde(default)]
     observer_history: Vec<BoundFile>,
+    #[serde(default)]
+    full209_terminal_peer: Option<full209_terminal_peer::Proof>,
     launch: BoundFile,
     guard_current: Value,
     guard_manager_journal: BoundFile,
@@ -128,7 +130,8 @@ fn origin_launch(origin: &Origin) -> Result<(context::WorkContext, Value, Value)
         origin.context.fleet.clone(),
         origin.context.observer.clone(),
         origin.observer_history.clone(),
-    )?;
+    )?
+    .with_full209_terminal_peer(origin.full209_terminal_peer.clone());
     let f = bound_json(&origin.context.fleet)?;
     let accepted_plan = bound_json(&BoundFile {
         path: s(&f, "plan")?.into(),
@@ -164,6 +167,7 @@ pub(in crate::fleet::assembly204_recovery) fn capture(
         schema: "jetstreamer-epoch204-assembly-success-origin-v1".into(),
         context: c.context.clone(),
         observer_history: c.observer_history.clone(),
+        full209_terminal_peer: c.full209_terminal_peer.clone(),
         launch: c.launch.clone(),
         guard_current: Value::Null,
         guard_manager_journal: BoundFile {
@@ -305,6 +309,7 @@ mod tests {
                 observer: b("observer.json"),
             },
             observer_history: vec![],
+            full209_terminal_peer: None,
             launch: b("launch.json"),
             guard_current: census[GUARD].clone(),
             guard_manager_journal: b("guard-journal.jsonl"),

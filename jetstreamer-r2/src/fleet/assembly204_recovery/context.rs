@@ -355,6 +355,7 @@ pub(super) struct WorkContext {
     accepted: AcceptedContext,
     observer: BoundFile,
     history: Vec<BoundFile>,
+    full209_terminal_peer: Option<full209_terminal_peer::Proof>,
 }
 impl WorkContext {
     pub(super) fn new(
@@ -374,9 +375,17 @@ impl WorkContext {
             accepted,
             observer,
             history,
+            full209_terminal_peer: None,
         };
         context.historical()?;
         Ok(context)
+    }
+    pub(super) fn with_full209_terminal_peer(
+        mut self,
+        proof: Option<full209_terminal_peer::Proof>,
+    ) -> Self {
+        self.full209_terminal_peer = proof;
+        self
     }
     pub(super) fn from_frame(frame: &Value) -> Result<Self> {
         let context = Self::new(
@@ -425,7 +434,7 @@ impl WorkContext {
     }
     pub(super) fn census(&self, hints: &BTreeSet<String>) -> Result<BTreeMap<String, Value>> {
         let f = self.fresh()?;
-        let current = census_for(&f, hints)?;
+        let current = census_for_peer(&f, hints, self.full209_terminal_peer.as_ref())?;
         ensure!(
             self.fresh()? == f,
             "204 refresh context changed during census"
@@ -440,7 +449,11 @@ impl WorkContext {
                 .all(|n| current.contains_key(n)),
             "204 refreshed work omits accepted or closed census names"
         );
-        validate_peer_bindings(&f, current)
+        let peers = match &self.full209_terminal_peer {
+            Some(proof) => proof.project(&f, current, false)?,
+            None => f,
+        };
+        validate_peer_bindings(&peers, current)
     }
     pub(super) fn accepted_binding(&self) -> Result<Value> {
         Ok(serde_json::to_value(&self.accepted)?)
@@ -502,12 +515,22 @@ fn observer_chain(
 }
 
 fn census_for(f: &Value, hints: &BTreeSet<String>) -> Result<BTreeMap<String, Value>> {
+    census_for_peer(f, hints, None)
+}
+fn census_for_peer(
+    f: &Value,
+    hints: &BTreeSet<String>,
+    terminal209: Option<&full209_terminal_peer::Proof>,
+) -> Result<BTreeMap<String, Value>> {
     let names = requested_names(f, hints)?;
     let current = census(&names, 201, 300)?;
-    validate_peer_bindings(f, &current)?;
+    let mut peers = match terminal209 {
+        Some(proof) => proof.project(f, &current, true)?,
+        None => f.clone(),
+    };
+    validate_peer_bindings(&peers, &current)?;
     // This derived comparison excludes only the exact epoch 204 subjects
     // being captured or handed off. Raw fleet and census remain unchanged.
-    let mut peers = f.clone();
     peers["active"]
         .as_array_mut()
         .context("204 context active roster")?
@@ -560,7 +583,7 @@ fn requested_names(f: &Value, hints: &BTreeSet<String>) -> Result<BTreeSet<Strin
     names.extend(closed_names());
     Ok(names)
 }
-fn validate_peer_bindings(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+pub(super) fn validate_peer_bindings(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     for row in f["active"]
         .as_array()
         .context("204 accepted context active roster missing")?

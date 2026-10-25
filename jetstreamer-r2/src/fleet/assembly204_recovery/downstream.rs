@@ -1007,6 +1007,8 @@ pub(super) struct Capture {
     pub(super) context: AcceptedContext,
     #[serde(default)]
     pub(super) observer_history: Vec<BoundFile>,
+    #[serde(default)]
+    pub(super) full209_terminal_peer: Option<full209_terminal_peer::Proof>,
     stage: Stage,
     pub(super) launch: BoundFile,
     pub(super) outcome: Option<PathBuf>,
@@ -1027,6 +1029,10 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
     let current = unit(c.stage.unit())?;
     let success = current["Result"] == "success" && current["ExecMainStatus"] == "0";
     terminal_success_context(success, &c.observer_history)?;
+    ensure!(
+        c.full209_terminal_peer.is_none() || (success && c.stage == Stage::Assembly),
+        "204 terminal Full209 peer belongs only to assembly natural success"
+    );
     if c.stage == Stage::Assembly && success {
         return ownership::assembly_success::capture(&c, spec, self_sha);
     }

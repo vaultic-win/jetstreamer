@@ -161,6 +161,12 @@ pub(in crate::fleet) fn event_predecessor(
             observer_history: serde_json::from_value(
                 event.get("observer_history").cloned().unwrap_or(json!([])),
             )?,
+            full209_terminal_peer: serde_json::from_value(
+                event
+                    .get("full209_terminal_peer")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            )?,
             terminal: serde_json::from_value(event["terminal"].clone())?,
             output_directory: binding
                 .path
@@ -207,6 +213,8 @@ struct TerminalPrepare {
     observer: BoundFile,
     #[serde(default)]
     observer_history: Vec<BoundFile>,
+    #[serde(default)]
+    full209_terminal_peer: Option<full209_terminal_peer::Proof>,
     terminal: BoundFile,
     output_directory: PathBuf,
 }
@@ -286,6 +294,12 @@ pub(super) fn saved_event_plan(
             observer_history: serde_json::from_value(
                 event.get("observer_history").cloned().unwrap_or(json!([])),
             )?,
+            full209_terminal_peer: serde_json::from_value(
+                event
+                    .get("full209_terminal_peer")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            )?,
             terminal: serde_json::from_value(event["terminal"].clone())?,
             output_directory: directory.into(),
         };
@@ -334,7 +348,8 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
             x.previous_fleet.clone(),
             x.observer.clone(),
             x.observer_history.clone(),
-        )?;
+        )?
+        .with_full209_terminal_peer(x.full209_terminal_peer.clone());
         ownership::no_overlap_work(&context)?;
     } else {
         let context = AcceptedContext {
@@ -358,7 +373,7 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     let event = write(
         &x.output_directory.join("event.json"),
         &json!({"schema":EVENT_SCHEMA,"action":"terminal",
-        "original_plan":x.original_plan,"previous_fleet":x.previous_fleet,"observer":x.observer,"observer_history":x.observer_history,"terminal":x.terminal,
+        "original_plan":x.original_plan,"previous_fleet":x.previous_fleet,"observer":x.observer,"observer_history":x.observer_history,"full209_terminal_peer":x.full209_terminal_peer,"terminal":x.terminal,
         "sampled_at_utc":sampled,"metadata_only":true,"resource_samples_taken":0,"issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     next["metadata_event"] = private157::binding(&event);
@@ -366,19 +381,30 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     Ok(())
 }
 fn terminal_context_join(x: &TerminalPrepare, terminal: &Value) -> Result<bool> {
-    if let Some(origin) = terminal.get("assembly_success_origin") {
+    let assembly = terminal.get("assembly_success_origin");
+    let downstream = terminal.get("downstream_success_origin");
+    ensure!(
+        assembly.is_none() || downstream.is_none(),
+        "204 terminal has ambiguous success origins"
+    );
+    if let Some(origin) = assembly.or(downstream) {
         ensure!(
-            terminal["unit"] == UNIT
-                && terminal["result"] == "natural_success"
+            (if assembly.is_some() {
+                terminal["unit"] == UNIT
+            } else {
+                terminal["unit"] != UNIT && x.full209_terminal_peer.is_none()
+            }) && terminal["result"] == "natural_success"
                 && origin["context"]["fleet"] == private157::binding(&x.previous_fleet)
                 && origin["context"]["observer"] == private157::binding(&x.observer)
-                && origin["observer_history"] == serde_json::to_value(&x.observer_history)?,
-            "204 terminal event changed its authenticated assembly observation context"
+                && origin["observer_history"] == serde_json::to_value(&x.observer_history)?
+                && origin.get("full209_terminal_peer").unwrap_or(&Value::Null)
+                    == &serde_json::to_value(&x.full209_terminal_peer)?,
+            "204 terminal event changed its authenticated success observation context"
         );
         return Ok(true);
     }
     ensure!(
-        x.observer_history.is_empty(),
+        x.observer_history.is_empty() && x.full209_terminal_peer.is_none(),
         "204 observer refresh requires exact assembly success origin"
     );
     Ok(false)
@@ -459,6 +485,44 @@ mod terminal_context_tests {
         nonempty["observer_history"] = json!([binding("intermediate.json")]);
         let with_history: TerminalPrepare = serde_json::from_value(nonempty).unwrap();
         assert!(terminal_context_join(&with_history, &json!({"result":"failed"})).is_err());
+    }
+    #[test]
+    fn full209_peer_terminal_join_requires_the_identical_saved_proof_and_assembly_scope() {
+        let mut raw = spec();
+        let peer = json!({"launch":binding("209-launch.json"),"manager_journal":binding("209-manager.jsonl"),"cohort_receipt":binding("209-cohort.json")});
+        raw["full209_terminal_peer"] = peer.clone();
+        let x: TerminalPrepare = serde_json::from_value(raw).unwrap();
+        let terminal = json!({"unit":UNIT,"result":"natural_success","assembly_success_origin":{
+            "context":{"fleet":x.previous_fleet,"observer":x.observer},"observer_history":[],"full209_terminal_peer":peer}});
+        assert!(terminal_context_join(&x, &terminal).unwrap());
+        let mut changed = terminal.clone();
+        changed["assembly_success_origin"]["full209_terminal_peer"]["manager_journal"]["sha256"] =
+            json!("f".repeat(64));
+        assert!(terminal_context_join(&x, &changed).is_err());
+        changed = terminal;
+        let origin = changed["assembly_success_origin"].take();
+        changed["downstream_success_origin"] = origin;
+        changed
+            .as_object_mut()
+            .unwrap()
+            .remove("assembly_success_origin");
+        changed["unit"] = json!(downstream::Stage::Full.unit());
+        assert!(terminal_context_join(&x, &changed).is_err());
+    }
+    #[test]
+    fn downstream_terminal_handoff_reuses_its_exact_refreshed_origin() {
+        let mut raw = spec();
+        raw["observer_history"] = json!([binding("middle-observer.json")]);
+        let x: TerminalPrepare = serde_json::from_value(raw).unwrap();
+        let terminal = json!({"unit":downstream::Stage::Full.unit(),"result":"natural_success","downstream_success_origin":{
+            "context":{"fleet":x.previous_fleet,"observer":x.observer},"observer_history":x.observer_history}});
+        assert!(terminal_context_join(&x, &terminal).unwrap());
+        let mut changed = terminal.clone();
+        changed["downstream_success_origin"]["observer_history"] = json!([]);
+        assert!(terminal_context_join(&x, &changed).is_err());
+        changed = terminal;
+        changed["result"] = json!("failed");
+        assert!(terminal_context_join(&x, &changed).is_err());
     }
     #[test]
     fn saved_terminal_projection_retains_explicit_history_without_fabricated_frames() {

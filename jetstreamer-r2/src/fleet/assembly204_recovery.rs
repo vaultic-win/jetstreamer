@@ -7,6 +7,7 @@ mod artifact;
 mod capacity;
 mod context;
 mod custody;
+mod full209_terminal_peer;
 use context::AcceptedContext;
 // Full210 shares the authenticated complete context reader. Its maintenance
 // admission retains the coordinated sample's own freshness and resource gates.
