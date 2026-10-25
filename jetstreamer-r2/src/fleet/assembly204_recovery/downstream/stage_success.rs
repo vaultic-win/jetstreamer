@@ -344,7 +344,7 @@ pub(super) fn capture(c: &Capture, spec: &BoundFile, self_sha: &str) -> Result<(
     origin.census_after = context.census(&context::closed_names())?;
     ownership::no_overlap_current(&origin.census_after, None)?;
     ensure!(
-        ownership::manager(c.stage.unit())? == raw,
+        ownership::manager_records_equal(&ownership::manager(c.stage.unit())?, &raw)?,
         "204 downstream manager lineage changed during capture"
     );
     let t = json!({"schema":"jetstreamer-epoch204-assembly-recovery-success-terminal-v1","unit":c.stage.unit(),

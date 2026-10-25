@@ -364,6 +364,22 @@ pub(super) fn manager(name: &str) -> Result<Vec<u8>> {
     );
     Ok(result.stdout)
 }
+/// Compare complete journal records without depending on JSON object key order.
+/// Callers still authenticate the saved records with `manager_shape`.
+pub(super) fn manager_records_equal(left: &[u8], right: &[u8]) -> Result<bool> {
+    fn records(raw: &[u8]) -> Result<Vec<Value>> {
+        ensure!(raw.len() <= 8 << 20, "204 manager comparison body bound");
+        let rows = serde_json::Deserializer::from_slice(raw)
+            .into_iter::<Value>()
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        ensure!(
+            !rows.is_empty() && rows.len() <= 16384 && rows.iter().all(Value::is_object),
+            "204 manager comparison record shape/bound"
+        );
+        Ok(rows)
+    }
+    Ok(records(left)? == records(right)?)
+}
 pub(super) fn manager_shape(raw: &[u8], name: &str, iid: &str, success: bool) -> Result<u64> {
     ensure!(id(iid), "204 manager invocation invalid");
     let mut start = None;
@@ -951,4 +967,89 @@ pub(super) fn capture_failure_terminal(
     validate_failure_terminal(&result)?;
     write(&directory.join("terminal.json"), &result)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod manager_record_tests {
+    use super::*;
+    const PRODUCER_FIRST: &[u8] =
+        include_bytes!("ownership/fixtures/manager204-producer-first.jsonl");
+    const PRODUCER_SECOND: &[u8] =
+        include_bytes!("ownership/fixtures/manager204-producer-second.jsonl");
+    const GUARD_FIRST: &[u8] = include_bytes!("ownership/fixtures/manager204-guard-first.jsonl");
+    const GUARD_SECOND: &[u8] = include_bytes!("ownership/fixtures/manager204-guard-second.jsonl");
+
+    #[test]
+    fn real_manager_reads_accept_only_json_key_order_differences() {
+        for (first, second, name, iid) in [
+            (
+                PRODUCER_FIRST,
+                PRODUCER_SECOND,
+                UNIT,
+                "c011b66083a94a4e9fcedae3daa1b435",
+            ),
+            (
+                GUARD_FIRST,
+                GUARD_SECOND,
+                GUARD,
+                "b7ab152847504663a0735d89e26c3fcc",
+            ),
+        ] {
+            assert_ne!(first, second);
+            assert!(manager_shape(first, name, iid, true).is_ok());
+            assert!(manager_shape(second, name, iid, true).is_ok());
+            assert!(manager_records_equal(first, second).unwrap());
+        }
+    }
+
+    #[test]
+    fn manager_record_comparison_rejects_changed_values_scope_and_sequence() {
+        let rows = serde_json::Deserializer::from_slice(PRODUCER_FIRST)
+            .into_iter::<Value>()
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .unwrap();
+        let encode = |values: &[Value]| {
+            values
+                .iter()
+                .map(Value::to_string)
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes()
+        };
+        for key in [
+            "_PID",
+            "_UID",
+            "UNIT",
+            "INVOCATION_ID",
+            "__REALTIME_TIMESTAMP",
+            "MESSAGE",
+            "EXIT_STATUS",
+        ] {
+            let mut changed = rows.clone();
+            changed[0][key] = json!("changed-value");
+            assert!(
+                !manager_records_equal(PRODUCER_FIRST, &encode(&changed)).unwrap(),
+                "{key}"
+            );
+        }
+        let mut changed = rows.clone();
+        changed.reverse();
+        assert!(!manager_records_equal(PRODUCER_FIRST, &encode(&changed)).unwrap());
+        changed = rows.clone();
+        changed.pop();
+        assert!(!manager_records_equal(PRODUCER_FIRST, &encode(&changed)).unwrap());
+        changed = rows.clone();
+        changed.push(rows[0].clone());
+        assert!(!manager_records_equal(PRODUCER_FIRST, &encode(&changed)).unwrap());
+    }
+
+    #[test]
+    fn manager_record_comparison_rejects_empty_malformed_and_oversized_input() {
+        for malformed in [b"".as_slice(), b"not JSON", b"0", b"{} trailing"] {
+            assert!(manager_records_equal(PRODUCER_FIRST, malformed).is_err());
+            assert!(manager_records_equal(malformed, PRODUCER_FIRST).is_err());
+        }
+        let oversized = vec![b' '; (8 << 20) + 1];
+        assert!(manager_records_equal(PRODUCER_FIRST, &oversized).is_err());
+    }
 }

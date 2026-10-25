@@ -229,7 +229,8 @@ pub(in crate::fleet::assembly204_recovery) fn capture(
     origin.census_after = context.census(&context::closed_names())?;
     no_overlap_current(&origin.census_after, None)?;
     ensure!(
-        manager(UNIT)? == producer && manager(GUARD)? == guard,
+        manager_records_equal(&manager(UNIT)?, &producer)?
+            && manager_records_equal(&manager(GUARD)?, &guard)?,
         "204 terminal manager lineage changed during capture"
     );
     let t = json!({"schema":"jetstreamer-epoch204-assembly-recovery-success-terminal-v1","unit":UNIT,
