@@ -396,3 +396,19 @@ fn saved_recovery_capacity_cannot_waive_native223_positive_terminal_gate() {
             .is_err()
     );
 }
+
+#[test]
+fn publication_keeps_initial_anchor_but_never_waits_for_retirement_only_successor() {
+    use downstream::Stage::*;
+    assert_eq!(downstream::required_gates(Import).unwrap(), &[Full, Plugin]);
+    assert_eq!(
+        downstream::required_gates(Upload).unwrap(),
+        &[Full, Plugin, Import]
+    );
+    assert!(
+        !downstream::required_gates(Upload)
+            .unwrap()
+            .contains(&Boundary)
+    );
+    assert_eq!(downstream::retirement_neighbor_epochs(), [203, 205]);
+}

@@ -760,3 +760,33 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod assembly204_floor_tests {
+    use super::*;
+    #[test]
+    fn recovery_candidate_guard_is_added_above_the_preserved_live_native223_floor() {
+        let total = 1u64 << 40;
+        let floor = 480u64 << 30;
+        let growth = 123u64;
+        let base = 64u64 << 30;
+        let guard = 128u64 << 20;
+        let required = floor + growth + base + guard;
+        let native = json!({"schema":"jetstreamer-capped204-v4-live-native223-memory-v1","native223_unit":prefix223_native20::UNIT,
+            "native223_invocation_id":"e70aaf097e7c4583b216aba454145910","host_baseline_bytes":total.div_ceil(10),
+            "effective_available_memory_floor_bytes":floor,"candidate_stage_hard_memory_bytes":base,"candidate_guard_hard_memory_bytes":0,
+            "protected_existing_hard_memory_growth_bytes":growth,"required_available_memory_bytes":required-guard,"floor_counted_once":true});
+        let mut p = json!({"native223_available_floor_policy":native,"host_available_floor_bytes":floor,"candidate_producer_hard_memory_bytes":base,
+            "candidate_guard_hard_memory_bytes":guard,"required_available_memory_bytes":required});
+        assert_eq!(
+            validate_assembly204_recovery_memory_policy(&p, total, growth, base + guard).unwrap(),
+            required
+        );
+        p["native223_available_floor_policy"]["effective_available_memory_floor_bytes"] =
+            json!(total.div_ceil(10));
+        p["host_available_floor_bytes"] = json!(total.div_ceil(10));
+        assert!(
+            validate_assembly204_recovery_memory_policy(&p, total, growth, base + guard).is_err()
+        );
+    }
+}

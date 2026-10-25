@@ -130,13 +130,15 @@ fn protection(p: &Peer, bounds: &BTreeMap<String, BoundFile>, now: u64) -> Resul
         );
         let g = read(bound)?;
         let plan = read(&p.claim.recovery_plan)?;
-        guard_shape(
-            &g,
-            &plan,
-            &p.claim.recovery_plan,
-            &p.launch,
-            now.checked_mul(1000).context("204 guard clock overflow")?,
-        )?;
+        let actual_millis: u64 = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_millis()
+            .try_into()?;
+        ensure!(
+            actual_millis / 1000 >= now && actual_millis / 1000 - now <= 900,
+            "204 resource transaction clock differs"
+        );
+        guard_shape(&g, &plan, &p.claim.recovery_plan, &p.launch, actual_millis)?;
         Ok(g)
     } else {
         ensure!(

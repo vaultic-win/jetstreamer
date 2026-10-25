@@ -146,18 +146,24 @@ pub(super) fn validate_stage_owner(v: &Value, spec: &BoundFile, stage: Stage) ->
     }
     Ok(())
 }
-fn gates(x: &StageSpec) -> Result<Vec<Value>> {
-    let required: &[Stage] = match x.stage {
+pub(super) fn required_gates(stage: Stage) -> Result<&'static [Stage]> {
+    // Strict Full proves the initial 203→204 anchor and expected V4 provenance.
+    // Both adjacent boundary receipts additionally authorize local retirement;
+    // they do not hold publication behind a missing full epoch205.
+    Ok(match stage {
         Stage::Full => &[],
         Stage::Plugin => &[Stage::Full],
         Stage::Boundary => &[Stage::Full, Stage::Plugin],
-        Stage::Import | Stage::Upload => &[Stage::Full, Stage::Plugin, Stage::Boundary],
+        Stage::Import => &[Stage::Full, Stage::Plugin],
+        Stage::Upload => &[Stage::Full, Stage::Plugin, Stage::Import],
         Stage::Assembly => bail!("204 standalone assembly has its own runner"),
-    };
-    let mut wanted = required.to_vec();
-    if x.stage == Stage::Upload {
-        wanted.push(Stage::Import);
-    }
+    })
+}
+pub(super) fn retirement_neighbor_epochs() -> [u64; 2] {
+    [203, 205]
+}
+fn gates(x: &StageSpec) -> Result<Vec<Value>> {
+    let wanted = required_gates(x.stage)?;
     ensure!(
         x.gates.len() == wanted.len(),
         "204 stage predecessor gate arity"
@@ -325,6 +331,7 @@ fn installed_stage(
         ("ProtectSystem", "strict"),
         ("ProtectHome", "read-only"),
         ("NoNewPrivileges", "yes"),
+        ("Environment", "TOKIO_WORKER_THREADS=4"),
         (
             "PrivateNetwork",
             if x.stage == Stage::Upload {
@@ -360,7 +367,7 @@ fn installed_stage(
     );
     let actual = singleton227_capture::properties(
         x.stage.unit(),
-        "FragmentPath,DropInPaths,NeedDaemonReload,Transient,ExecStart,MemoryMax,MemoryHigh,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,TasksMax,Type,User,Restart,ProtectSystem,ProtectHome,NoNewPrivileges,PrivateNetwork",
+        "FragmentPath,DropInPaths,NeedDaemonReload,Transient,ExecStart,MemoryMax,MemoryHigh,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,TasksMax,Type,User,Restart,ProtectSystem,ProtectHome,NoNewPrivileges,PrivateNetwork,Environment",
     )?;
     ensure!(
         actual
@@ -383,6 +390,7 @@ fn installed_stage(
         "ProtectHome",
         "NoNewPrivileges",
         "PrivateNetwork",
+        "Environment",
     ] {
         ensure!(
             actual.get(k).map(String::as_str) == keys.get(k).copied(),
@@ -548,6 +556,7 @@ fn child(tool: &BoundFile, args: &[String], directory: &Path, label: &str) -> Re
     let mut command = ProcessCommand::new(&tool.path);
     command
         .args(args)
+        .env("TOKIO_WORKER_THREADS", "4")
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -773,7 +782,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
         Stage::Boundary => {
             ensure!(x.neighbors.len() == 2, "204 needs both boundary neighbors");
             let t = tool(&x)?;
-            for epoch in [203, 205] {
+            for epoch in retirement_neighbor_epochs() {
                 let neighbors = x
                     .neighbors
                     .iter()
@@ -922,7 +931,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
         &json!({"schema":"jetstreamer-epoch204-assembly-recovery-stage-outcome-v1",
         "stage":x.stage,"source":x.source,"unit":x.stage.unit(),"invocation_id":current["InvocationID"],
         "spec":spec,"admission":admission,"archive_sha256":sha,"archive_bytes":bytes,"commands":commands,
-        "predecessor_gates":x.gates,"predecessor_outcomes":predecessors,"imported":imported,"passed":true,
+        "retirement_boundary_only":x.stage==Stage::Boundary,"local_retirement_authorized":false,"predecessor_gates":x.gates,"predecessor_outcomes":predecessors,"imported":imported,"passed":true,
         "issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     Ok(())

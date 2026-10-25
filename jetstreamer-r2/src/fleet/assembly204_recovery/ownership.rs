@@ -120,6 +120,10 @@ pub(super) fn current_actor(
     spec: &BoundFile,
     self_sha: &str,
 ) -> Result<Value> {
+    ensure!(
+        env::var("TOKIO_WORKER_THREADS").as_deref() == Ok("4"),
+        "204 stage runtime worker bound differs"
+    );
     let row = unit(stage.unit())?;
     ensure!(
         is_live(&row)
