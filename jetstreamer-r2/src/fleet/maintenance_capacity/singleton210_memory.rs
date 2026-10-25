@@ -1,5 +1,5 @@
 //! Closed full 210 memory policy with an exact live or terminal native 223 owner.
-//! Terminal ownership never lowers the preserved 480 GiB available floor.
+//! Only authenticated terminal ownership releases the native 223 480 GiB floor.
 use super::*;
 
 const NATIVE223_IID: &str = "e70aaf097e7c4583b216aba454145910";
@@ -192,7 +192,12 @@ fn required_with_terminal(
     // This preserved full 210 generation's peer memory function returns only
     // remaining hard-cgroup growth. It does not already include a floor top-up.
     let host_baseline = total.div_ceil(10);
-    let effective_floor = host_baseline.max(NATIVE223_FLOOR);
+    let native_floor = if terminal.is_some() {
+        0
+    } else {
+        NATIVE223_FLOOR
+    };
+    let effective_floor = host_baseline.max(native_floor);
     let required = effective_floor
         .checked_add(protected_growth)
         .and_then(|n| n.checked_add(producer_max))
@@ -200,7 +205,7 @@ fn required_with_terminal(
         .context("210 protected memory arithmetic overflow")?;
     let mut policy = json!({"schema":FULL210_LIVE_SCHEMA,
             "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
-            "host_baseline_bytes":host_baseline,"native223_available_memory_floor_bytes":NATIVE223_FLOOR,
+            "host_baseline_bytes":host_baseline,"native223_available_memory_floor_bytes":native_floor,
             "effective_available_memory_floor_bytes":effective_floor,
             "candidate_producer_hard_memory_bytes":producer_max,"candidate_guard_hard_memory_bytes":NEW_GUARD_MAX,
             "protected_existing_hard_memory_growth_bytes":protected_growth,
@@ -208,6 +213,7 @@ fn required_with_terminal(
             "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
     if let Some(proof) = terminal {
         policy["schema"] = json!(FULL210_TERMINAL_SCHEMA);
+        policy["native223_floor_state"] = json!("positively-terminal");
         policy["positive_terminal"] = proof;
     }
     Ok((required, policy))
@@ -262,19 +268,21 @@ pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
             .as_u64()
             .context("210 captured protected memory growth absent")?;
         let baseline = total.div_ceil(10);
-        let floor = baseline.max(NATIVE223_FLOOR);
-        let required = floor
-            .checked_add(growth)
-            .and_then(|n| n.checked_add(singleton210::MEMORY))
-            .and_then(|n| n.checked_add(NEW_GUARD_MAX))
-            .context("210 captured memory arithmetic overflow")?;
         let policy = &row["full210_memory_policy"];
-        match policy["schema"].as_str() {
-            Some(FULL210_LIVE_SCHEMA) => ensure!(
-                policy.get("positive_terminal").is_none(),
-                "210 live policy cannot borrow terminal evidence"
-            ),
+        let native_floor = match policy["schema"].as_str() {
+            Some(FULL210_LIVE_SCHEMA) => {
+                ensure!(
+                    policy.get("positive_terminal").is_none()
+                        && policy.get("native223_floor_state").is_none(),
+                    "210 live policy cannot borrow terminal evidence"
+                );
+                NATIVE223_FLOOR
+            }
             Some(FULL210_TERMINAL_SCHEMA) => {
+                ensure!(
+                    policy["native223_floor_state"] == "positively-terminal",
+                    "210 terminal floor release lacks its positive terminal state"
+                );
                 let proof = &policy["positive_terminal"];
                 capped204_native223::validate_terminal_saved(proof)?;
                 for census in [
@@ -291,14 +299,21 @@ pub(super) fn validate_capacity(capacity: &Value) -> Result<()> {
                         "210 terminal proof differs from saved raw census: {stage}:{census}"
                     );
                 }
+                0
             }
             _ => bail!("210 full memory policy needs exact live or terminal native 223 evidence"),
-        }
+        };
+        let floor = baseline.max(native_floor);
+        let required = floor
+            .checked_add(growth)
+            .and_then(|n| n.checked_add(singleton210::MEMORY))
+            .and_then(|n| n.checked_add(NEW_GUARD_MAX))
+            .context("210 captured memory arithmetic overflow")?;
         ensure!(
             policy["native223_unit"] == prefix223_native20::UNIT
                 && policy["native223_invocation_id"] == NATIVE223_IID
                 && policy["host_baseline_bytes"] == baseline
-                && policy["native223_available_memory_floor_bytes"] == NATIVE223_FLOOR
+                && policy["native223_available_memory_floor_bytes"] == native_floor
                 && policy["effective_available_memory_floor_bytes"] == floor
                 && policy["candidate_producer_hard_memory_bytes"] == singleton210::MEMORY
                 && policy["candidate_guard_hard_memory_bytes"] == NEW_GUARD_MAX
@@ -459,7 +474,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_issuer_and_shared_consumer_preserve_floor_guard_and_four_owner_growth() {
+    fn terminal_issuer_and_shared_consumer_release_only_old_floor_and_keep_all_growth_and_guard() {
         for proof in [terminal_proof(), capped204_native223::terminal_fixture()] {
             let f = terminal_fleet(&proof);
             let before = f.clone();
@@ -474,20 +489,66 @@ mod tests {
             assert_eq!(f, before, "all four owners and failed history survive");
             assert_eq!(
                 n,
-                NATIVE223_FLOOR + growth + singleton210::MEMORY + NEW_GUARD_MAX
+                total.div_ceil(10) + growth + singleton210::MEMORY + NEW_GUARD_MAX
             );
             assert_eq!(policy["schema"], FULL210_TERMINAL_SCHEMA);
+            assert_eq!(policy["native223_floor_state"], "positively-terminal");
+            assert_eq!(policy["native223_available_memory_floor_bytes"], 0);
             assert_eq!(policy["positive_terminal"], proof);
             assert_eq!(
                 policy["effective_available_memory_floor_bytes"],
-                NATIVE223_FLOOR
+                total.div_ceil(10)
             );
             assert_eq!(policy["candidate_guard_hard_memory_bytes"], NEW_GUARD_MAX);
             assert_eq!(
                 policy["protected_existing_hard_memory_growth_bytes"],
                 growth
             );
+            let (live, _) = required(&fleet(), total, growth, singleton210::MEMORY).unwrap();
+            assert_eq!(live - n, NATIVE223_FLOOR - total.div_ceil(10));
             validate_capacity(&capacity(policy, total, growth, n)).unwrap();
+        }
+    }
+
+    #[test]
+    fn terminal_release_keeps_a_larger_host_reserve_and_never_reduces_live_policy() {
+        let proof = terminal_proof();
+        let total = 10_000_000_000_001u64;
+        let growth = 12345;
+        let (n, policy) = required_with_terminal(
+            &terminal_fleet(&proof),
+            total,
+            growth,
+            singleton210::MEMORY,
+            |_| Ok(proof),
+        )
+        .unwrap();
+        assert_eq!(
+            n,
+            total.div_ceil(10) + growth + singleton210::MEMORY + NEW_GUARD_MAX
+        );
+        assert_eq!(
+            policy["effective_available_memory_floor_bytes"],
+            total.div_ceil(10)
+        );
+        validate_capacity(&capacity(policy, total, growth, n)).unwrap();
+
+        let total = 1_024_000_000_000;
+        let (n, live) = required(&fleet(), total, growth, singleton210::MEMORY).unwrap();
+        let original = capacity(live, total, growth, n);
+        for stage in ["memory_before", "memory_after"] {
+            for (key, value) in [
+                ("native223_available_memory_floor_bytes", json!(0)),
+                (
+                    "effective_available_memory_floor_bytes",
+                    json!(total.div_ceil(10)),
+                ),
+                ("native223_floor_state", json!("positively-terminal")),
+            ] {
+                let mut bad = original.clone();
+                bad[stage]["full210_memory_policy"][key] = value;
+                assert!(validate_capacity(&bad).is_err(), "{stage}:{key}");
+            }
         }
     }
 
@@ -554,6 +615,8 @@ mod tests {
             for (pointer, value) in [
                 ("schema", json!("unknown-policy")),
                 ("positive_terminal", Value::Null),
+                ("native223_floor_state", Value::Null),
+                ("native223_floor_state", json!("live")),
                 ("positive_terminal/invocation_id", json!("b".repeat(32))),
                 (
                     "positive_terminal/process_references/references",
@@ -561,9 +624,12 @@ mod tests {
                 ),
                 (
                     "native223_available_memory_floor_bytes",
-                    json!(NATIVE223_FLOOR - 1),
+                    json!(NATIVE223_FLOOR),
                 ),
-                ("effective_available_memory_floor_bytes", json!(total / 10)),
+                (
+                    "effective_available_memory_floor_bytes",
+                    json!(total.div_ceil(10) - 1),
+                ),
                 (
                     "candidate_guard_hard_memory_bytes",
                     json!(NEW_GUARD_MAX - 1),
