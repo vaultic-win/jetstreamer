@@ -103,6 +103,15 @@ mod bounded {
             "bracket admission differs from closed profile"
         );
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        ensure!(
+            a["boot_id"].as_str()
+                == Some(fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim()),
+            "admission belongs to another boot"
+        );
+        ensure!(
+            a["guard"]["watched_unit"] == p.unit,
+            "guard admission watches another unit"
+        );
         let sampled = a["recorded_unix_seconds"]
             .as_u64()
             .context("admission time")?;
