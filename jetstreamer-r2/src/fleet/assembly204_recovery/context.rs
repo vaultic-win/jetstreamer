@@ -365,12 +365,14 @@ fn observer_chain(
                 && cadence["previous_sample"] == binding.path.to_string_lossy().as_ref()
                 && cadence["previous_sample_sha256"] == binding.sha256
                 && cadence["previous_sample_recorded_at_utc"] == parent["recorded_at_utc"]
-                && cadence["observation_reason"] == "routine"
-                && cadence["routine_minimum_interval_enforced"] == true
                 && cadence["minimum_interval_seconds"] == 1800
-                && at - before >= 1800
+                && ((cadence["observation_reason"] == "routine"
+                    && cadence["routine_minimum_interval_enforced"] == true
+                    && at - before >= 1800)
+                    || (cadence["observation_reason"] == "user-requested-status"
+                        && cadence["routine_minimum_interval_enforced"] == false))
                 && cadence["observed_interval_seconds"] == at - before,
-            "204 work observer lost exact forward routine cadence lineage"
+            "204 work observer lost exact forward cadence lineage"
         );
         child = parent;
     }
@@ -595,6 +597,55 @@ mod tests {
         observer_chain(&old, &prior, &old, &prior, &[]).unwrap();
         assert!(observer_chain(&old, &prior, &old, &prior, &history).is_err());
         assert!(observer_chain(&new, &current, &new, &prior, &history).is_err());
+    }
+    #[test]
+    fn explicit_user_requested_status_can_advance_before_the_routine_interval() {
+        let old = b("/fixture/old.json");
+        let requested = b("/fixture/requested.json");
+        let new = b("/fixture/new.json");
+        let prior = observation(10_000, None);
+        let mut status = observation(10_060, Some((&old, &prior)));
+        status["cadence"]["observation_reason"] = json!("user-requested-status");
+        status["cadence"]["routine_minimum_interval_enforced"] = json!(false);
+        observer_chain(&requested, &status, &old, &prior, &[]).unwrap();
+        let current = observation(11_920, Some((&requested, &status)));
+        observer_chain(&new, &current, &old, &prior, &[(requested, status)]).unwrap();
+    }
+    #[test]
+    fn status_exception_requires_exact_reason_enforcement_and_forward_bindings() {
+        let old = b("/fixture/old.json");
+        let new = b("/fixture/new.json");
+        let prior = observation(10_000, None);
+        let mut status = observation(10_060, Some((&old, &prior)));
+        status["cadence"]["observation_reason"] = json!("user-requested-status");
+        status["cadence"]["routine_minimum_interval_enforced"] = json!(false);
+        for (path, value) in [
+            ("/cadence/observation_reason", json!("routine")),
+            ("/cadence/observation_reason", json!("manual")),
+            ("/cadence/routine_minimum_interval_enforced", json!(true)),
+            ("/cadence/routine_minimum_interval_enforced", Value::Null),
+            ("/cadence/previous_sample", json!("/foreign.json")),
+            ("/cadence/previous_sample_sha256", json!("b".repeat(64))),
+            (
+                "/cadence/previous_sample_recorded_at_utc",
+                json!("1970-01-01T00:00:00Z"),
+            ),
+            ("/cadence/minimum_interval_seconds", json!(60)),
+            ("/cadence/observed_interval_seconds", json!(59)),
+            ("/recorded_at_utc", prior["recorded_at_utc"].clone()),
+            ("/recorded_at_utc", json!("1970-01-01T00:00:00Z")),
+        ] {
+            let mut bad = status.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(
+                observer_chain(&new, &bad, &old, &prior, &[]).is_err(),
+                "{path}"
+            );
+        }
+        let mut unknown = status;
+        unknown["cadence"]["observation_reason"] = json!("manual");
+        unknown["cadence"]["routine_minimum_interval_enforced"] = json!(true);
+        assert!(observer_chain(&new, &unknown, &old, &prior, &[]).is_err());
     }
     fn event_fixture(count: usize) -> (BoundFile, BTreeMap<PathBuf, Value>) {
         let mut files = BTreeMap::new();
