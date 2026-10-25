@@ -113,6 +113,20 @@ fn plan_shape(p: &Startup) -> Result<()> {
 pub(super) fn validate_plan(s: &Spec, argv: &[String]) -> Result<Startup> {
     let p = read_plan(&s.startup_plan)?;
     plan_matches(s, &p, argv)?;
+    ensure!(
+        fs::symlink_metadata(&s.startup_plan.path)?.mode() & 0o777 == 0o444
+            && fs::symlink_metadata(&p.launcher.path)?.mode() & 0o777 == 0o555,
+        "completed startup plan/helper must be immutable and readable/executable by the phase user"
+    );
+    for path in [&s.startup_plan.path, &p.launcher.path] {
+        for parent in path.ancestors().skip(1) {
+            let m = fs::symlink_metadata(parent)?;
+            ensure!(
+                parent.canonicalize()? == parent && m.is_dir() && m.mode() & 0o001 != 0,
+                "completed startup public input has a nontraversable ancestor"
+            );
+        }
+    }
     Ok(p)
 }
 fn plan_matches(s: &Spec, p: &Startup, argv: &[String]) -> Result<()> {
@@ -621,10 +635,6 @@ pub(super) fn run() -> Result<()> {
         || std::thread::sleep(Duration::from_millis(100)),
     )?;
     let s = consume_shape(&p, &value, &actual, now()?)?;
-    warmup223::validate_completed_guard_history(
-        &value["guard_latest_completion"]["history"],
-        &value["guard_sample_contents"],
-    )?;
     ensure!(
         s.startup_plan == binding,
         "completed startup release names another startup plan"
