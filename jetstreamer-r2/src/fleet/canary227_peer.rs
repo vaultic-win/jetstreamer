@@ -205,6 +205,12 @@ fn accepted(f: &Value) -> Result<Option<Peer>> {
         owner: owner.clone(),
     }))
 }
+/// Authenticate delegation without measuring or removing the canary. Its
+/// existing disk and memory adapters still own all resource accounting.
+pub(super) fn validate_delegation(f: &Value) -> Result<()> {
+    accepted(f).context("full 227 adapter cannot delegate an unauthenticated canary")?;
+    Ok(())
+}
 fn launch_scope(d: &DiagnosticClaim, r: &Value, u: &Value) -> Result<()> {
     validate_diagnostic_launch(r, d)?;
     ensure!(
@@ -336,7 +342,8 @@ fn owner_current(peer: &Peer, p: &BTreeMap<String, String>) -> Result<()> {
         peer.launch["expected_exec_start"]
             .as_str()
             .context("canary peer command missing")?,
-    )?;
+    )
+    .context("bounded canary producer sandbox differs from its captured command")?;
     Ok(())
 }
 const PROPERTIES: &str = "Id,LoadState,InvocationID,MainPID,NRestarts,ControlGroup,ExecMainPID,ExecMainStartTimestampMonotonic,Type,User,Group,Restart,KillMode,Delegate,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,ProtectHome,ProtectSystem,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Transient,FragmentPath,RemainAfterExit,Result,ActiveState,SubState,ExecStart";
@@ -483,7 +490,8 @@ fn protection(
     );
     let g = bound_json(&b)?;
     guard(&g, &p, peer, &plan.sha256, sample, now)?;
-    let manager = canary227_capture::manager(&g, &plan, now)?;
+    let manager = canary227_capture::manager(&g, &plan, now)
+        .context("bounded canary peer protective service or timer validation failed")?;
     Ok((b, g, json!({"completed":latest,"manager":manager})))
 }
 fn sample_time(f: &Value) -> Result<u64> {
