@@ -385,23 +385,31 @@ pub(super) fn saved_predecessor(
     saved_plan_projection(old_plan, raw_plan)
 }
 pub(super) fn saved_plan_projection(old: &Value, new: &Value) -> Result<()> {
-    ensure!(old.is_object() && new.is_object(), "227 saved plans must be objects");
+    ensure!(
+        old.is_object() && new.is_object(),
+        "227 saved plans must be objects"
+    );
     let mut expected = old.clone();
     for key in ["output", "previous_fleet", "metadata_event"] {
-        ensure!(new.get(key).is_some(), "227 saved event plan member missing: {key}");
+        ensure!(
+            new.get(key).is_some(),
+            "227 saved event plan member missing: {key}"
+        );
         expected[key] = new[key].clone();
     }
     // The existing predecessor validator constrains these exact gate changes.
     // Every other field, including future unknown fields, must remain identical.
     for key in ["evidence", "next_action"] {
         ensure!(
-            old["gates"]["227"].get(key).is_some()
-                && new["gates"]["227"].get(key).is_some(),
+            old["gates"]["227"].get(key).is_some() && new["gates"]["227"].get(key).is_some(),
             "227 saved event gate member missing: {key}"
         );
         expected["gates"]["227"][key] = new["gates"]["227"][key].clone();
     }
-    ensure!(expected == *new, "227 saved terminal event changed unrelated raw plan fields");
+    ensure!(
+        expected == *new,
+        "227 saved terminal event changed unrelated raw plan fields"
+    );
     Ok(())
 }
 pub(super) fn census_check(p: &Plan, current: &BTreeMap<String, Value>) -> Result<()> {
