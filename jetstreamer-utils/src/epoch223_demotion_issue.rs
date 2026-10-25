@@ -249,15 +249,27 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
         &p.run_root.join("receipts/control-custody.json"),
         &lock.evidence()?,
     )?;
-    published(
-        &p.run_root.join("receipts/admission-ready.json"),
-        &json!({
+    commit_marker(
+        || {
+            observe(&task.actor)?;
+            observe(&issuer)?;
+            observe(&guard.actor)?;
+            check_control_kernel(p)?;
+            lock.validate()?;
+            ensure!(
+                fresh(grant.recorded_unix_millis, millis()?),
+                "223 control grant expired before commit"
+            );
+            Ok(())
+        },
+        || {
+            published(
+                &p.run_root.join("receipts/admission-ready.json"),
+                &json!({
         "schema":ready.schema,"runtime_plan":ready.runtime_plan,"runner":ready.runner,"admission":grant_binding}),
+            )
+        },
     )?;
-    observe(&task.actor)?;
-    observe(&issuer)?;
-    observe(&guard.actor)?;
-    lock.validate()?;
     drop(lock); // never reserve custody across read-only input hashing
     let started = Instant::now();
     loop {
@@ -541,17 +553,28 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let grant: super::spawn::Grant = serde_json::from_value(grant_value.clone())?;
     super::spawn::validate_allocation(&grant, x, requested)?;
     let grant_binding = published(&p.run_root.join("receipts/spawn-grant.json"), &grant_value)?;
-    published(
-        &p.run_root.join("receipts/spawn-ready.json"),
-        &json!({
+    commit_marker(
+        || {
+            observe(&spec.runner)?;
+            observe(&issuer)?;
+            observe(&guard.actor)?;
+            check_limits(p, 150_000_000_000, 225_000_000_000, high, max)?;
+            lock.validate()?;
+            ensure!(
+                fresh(requested, millis()?),
+                "223 spawn request expired before commit"
+            );
+            Ok(())
+        },
+        || {
+            published(
+                &p.run_root.join("receipts/spawn-ready.json"),
+                &json!({
         "schema":"jetstreamer-epoch223-demotion-spawn-ready-v1","runtime_plan":spec.runtime_plan,
         "request":spec.request,"runner":spec.runner,"grant":grant_binding}),
+            )
+        },
     )?;
-    observe(&spec.runner)?;
-    observe(&issuer)?;
-    observe(&guard.actor)?;
-    check_limits(p, 150_000_000_000, 225_000_000_000, high, max)?;
-    lock.validate()?;
     drop(lock);
     let started = Instant::now();
     loop {
@@ -575,5 +598,82 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             "223 spawn acknowledgment deadline"
         );
         thread::sleep(Duration::from_millis(100));
+    }
+}
+
+// There are deliberately no fallible post-publication checks here. A marker's
+// appearance can be consumed immediately; later acknowledgment failure does
+// not undo it. The caller must retain original receipts/caps/owner and guard.
+fn commit_marker<T>(
+    validate: impl FnOnce() -> Result<()>,
+    publish: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    validate()?;
+    publish()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn written_capacity_and_grant_do_not_authorize_when_final_checks_fail() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("capacity"), b"fixture").unwrap();
+        fs::write(directory.path().join("grant"), b"fixture").unwrap();
+        let marker = directory.path().join("ready");
+        let result = commit_marker(
+            || anyhow::bail!("actor changed before commit"),
+            || -> Result<()> {
+                fs::write(&marker, b"fixture-ready")?;
+                Ok(())
+            },
+        );
+        assert!(result.is_err());
+        assert!(!marker.exists());
+        assert!(directory.path().join("grant").exists());
+    }
+    #[test]
+    fn committed_marker_survives_missing_ack_and_cannot_be_reissued() {
+        let directory = tempfile::tempdir().unwrap();
+        let marker = directory.path().join("ready");
+        let commit = || -> Result<()> {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&marker)?;
+            file.write_all(b"original-actor-and-grant")?;
+            file.sync_all()?;
+            Ok(())
+        };
+        commit_marker(|| Ok(()), commit).unwrap();
+        // Missing/failed acknowledgment cannot retract the first marker or
+        // turn an exact old invocation into a second allocation permission.
+        assert!(!directory.path().join("ack").exists());
+        assert!(commit_marker(|| Ok(()), commit).is_err());
+        assert_eq!(fs::read(&marker).unwrap(), b"original-actor-and-grant");
+    }
+    #[test]
+    fn partial_kernel_allocation_keeps_reservation_without_a_ready_marker() {
+        let directory = tempfile::tempdir().unwrap();
+        let max = directory.path().join("memory.max");
+        let high = directory.path().join("memory.high");
+        fs::write(&max, b"17179869184").unwrap();
+        fs::write(&high, b"15032385536").unwrap();
+        // Disposable control files model max committed and high update failed.
+        fs::write(&max, b"225000000000").unwrap();
+        let marker = directory.path().join("ready");
+        let result = commit_marker(
+            || {
+                ensure!(fs::read(&high)? == b"150000000000", "partial cap update");
+                Ok(())
+            },
+            || -> Result<()> {
+                fs::write(&marker, b"must-not-appear")?;
+                Ok(())
+            },
+        );
+        assert!(result.is_err());
+        assert!(!marker.exists());
+        assert_eq!(fs::read(&max).unwrap(), b"225000000000");
     }
 }

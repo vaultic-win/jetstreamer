@@ -253,3 +253,44 @@ transaction before another admission. Existing nonparticipating paths remain
 quiescent throughout. This source remains unbuilt/unexecuted, grants no present
 launch authority, and does not substitute for new native-input proof, runtime
 qualification, original Bank/transaction gates, full-root work or R2 gates.
+
+## Authorization commit and interrupted transactions
+
+`admission-ready.json` and `spawn-ready.json` are the final authorization markers.
+The issuer writes non-authorizing capacity/grant evidence first, performs every
+final actor/kernel/custody/freshness check, then publishes the marker as its final
+authorization step under custody. No later check is claimed to retract it. A
+publication/fsync/readback error may happen after the filename becomes visible;
+treat uncertain marker publication as potentially committed until exact durable
+bytes and the original actor/acceptance state have been reconciled.
+
+Before a marker, a partial cap update or written grant is not launch permission.
+Keep the actual reservation and all original evidence; the consumer cannot
+proceed without its exact ready token. Do not automatically lower a possibly
+consumed allocation or start another issuer. Once a marker exists, missing or
+failed acknowledgment is an interrupted ownership transaction, not revocation.
+The original producer and guard remain responsible; root must preserve their
+allocation/guard/files, bind any recovery to their actual PID/IID/cgroup and exact
+grant, and complete/reconcile ownership before any next admission. Do not reuse,
+overwrite or delete the original marker/grant, renew timestamps, reset epoch
+clock, repeat spawn or claim the issuer's exit proves the child did not start.
+A stopped/changed guard closes the producer's native gate and its own-child
+termination backstop still applies. Disposable pre-marker, post-marker/no-ack,
+no-duplicate and partial-cap fixtures are present but unrun.
+
+## Concrete native proof capture source
+
+`capture-epoch223-demotion-native-proof` consumes the future qualified native
+supervisor's actual hash-bound launch/result, root-captured harness stdout and
+full PID1 journal, supervisor qualification, original clock and pinned source QA.
+It requires new harness `a280b1f4...`, exact `--exact --ignored --nocapture
+--test-threads=1` invocation, fixed native input paths, original e70a clock and
+real child PID/start identity. It validates exactly one ordered canonical tuple
+marker with exact u64 capitalization, followed by exactly1 passed/0failed/0ignored,
+then independently checks clean unique PID1 start/completion and the actual
+zero-restart inactive/success/exit0 manager frame twice. Only then does it produce
+root immutable provenance and the strict native proof with every replay/root/
+repair-closure/publication/R2 authority false. Old harness proof is never accepted.
+The capture role is source-only and has not run. The native supervisor that must
+produce genuine launch/result/stdout and its admission/guard qualification is
+still not implemented; these strict input types do not pretend otherwise.

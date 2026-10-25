@@ -34,6 +34,7 @@ pub(super) fn dispatch() -> Option<Result<()>> {
             | "guard-epoch223-demotion"
             | "issue-epoch223-demotion-control"
             | "issue-epoch223-demotion-spawn"
+            | "capture-epoch223-demotion-native-proof"
     ) {
         return None;
     }
@@ -61,6 +62,9 @@ fn run(args: &[String]) -> Result<()> {
     };
     bound_file(&executable.path, &executable.sha256, 256 << 20)?;
     match args[1].as_str() {
+        "capture-epoch223-demotion-native-proof" => {
+            super::native_capture::run(&binding, &executable)?
+        }
         "issue-epoch223-demotion-spawn" => super::issuance::spawn(&binding, &executable)?,
         "issue-epoch223-demotion-control" => super::issuance::control(&binding, &executable)?,
         "guard-epoch223-demotion" => super::protective::run(&binding, &executable)?,

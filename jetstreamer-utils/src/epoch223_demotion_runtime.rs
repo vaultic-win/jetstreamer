@@ -6,6 +6,9 @@ const MAX_WAIT_MILLIS: u64 = 120_000;
 const MAX_ADMISSION_AGE_MILLIS: u64 = 120_000;
 const HASH_MEMORY_HIGH: u64 = 14 << 30;
 const HASH_MEMORY_MAX: u64 = 16 << 30;
+mod native_capture {
+    include!("epoch223_demotion_native_capture.rs");
+}
 mod issuance {
     include!("epoch223_demotion_issue.rs");
 }
@@ -378,6 +381,12 @@ fn start_ticks(pid: u32) -> Result<u64> {
         .context("223 invalid start ticks")
 }
 fn properties(unit: &str) -> Result<BTreeMap<String, String>> {
+    properties_with(
+        unit,
+        "Id,ActiveState,SubState,MainPID,InvocationID,NRestarts,ControlGroup,ExecStart,User,Type,Restart",
+    )
+}
+fn properties_with(unit: &str, keys: &str) -> Result<BTreeMap<String, String>> {
     ensure!(
         unit.ends_with(".service")
             && unit
@@ -385,8 +394,11 @@ fn properties(unit: &str) -> Result<BTreeMap<String, String>> {
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
         "223 unsafe unit"
     );
-    let mut child = Command::new("/usr/bin/systemctl").args(["show", unit, "--no-pager", "--property=Id,ActiveState,SubState,MainPID,InvocationID,NRestarts,ControlGroup,ExecStart,User,Type,Restart"])
-        .stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    let mut child = Command::new("/usr/bin/systemctl")
+        .args(["show", unit, "--no-pager", &format!("--property={keys}")])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
     let started = Instant::now();
     while child.try_wait()?.is_none() {
         if started.elapsed() >= Duration::from_secs(2) {
