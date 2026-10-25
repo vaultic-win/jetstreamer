@@ -71,6 +71,7 @@ fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, Spec, Value)
             && admission["state_root"] == serde_json::to_value(&spec.state_root)?
             && admission["units"] == serde_json::to_value(&spec.units)?
             && admission["guard_units"] == serde_json::to_value(&spec.guard_units)?
+            && admission["startup_plan"] == private157::binding(&spec.startup_plan)
             && admission["argv"] == serde_json::to_value(command(&spec, &archive)?)?
             && admission["capacity"]["additional_bytes"] == METADATA
             && admission["capacity"]["memory_before"]["candidate_memory_max_bytes"]

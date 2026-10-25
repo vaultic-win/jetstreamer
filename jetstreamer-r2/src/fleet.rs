@@ -360,6 +360,12 @@ pub(super) fn deliver_singleton209_output() -> Result<()> {
 pub(super) fn capture_completed_archive_phase() -> Result<()> {
     completed_archive_phase::capture()
 }
+pub(super) fn release_completed_archive_phase() -> Result<()> {
+    completed_archive_phase::release()
+}
+pub(super) fn run_completed_archive_phase() -> Result<()> {
+    completed_archive_phase::run_guarded()
+}
 pub(super) fn admit_completed_archive_phase() -> Result<()> {
     completed_archive_phase::run()
 }

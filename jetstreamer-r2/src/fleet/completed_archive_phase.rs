@@ -2,6 +2,7 @@
 //! The downstream core has no epoch/tool pins. Origin variants retain their own
 //! native provenance gates. This command never launches a verifier or uploader.
 use super::*;
+mod barrier;
 mod decoder_capacity;
 mod launch;
 mod peer;
@@ -140,6 +141,12 @@ pub(super) fn guard_scope(unit: &str, first: u64, last: u64) -> bool {
 pub(super) fn capture() -> Result<()> {
     launch::run()
 }
+pub(super) fn release() -> Result<()> {
+    launch::release()
+}
+pub(super) fn run_guarded() -> Result<()> {
+    barrier::run()
+}
 
 #[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -207,6 +214,7 @@ struct Spec {
     tools: BTreeMap<String, Tool>,
     decoder_capacity: DecoderCapacity,
     programs: BTreeMap<String, Program>,
+    startup_plan: BoundFile,
     units: BTreeMap<String, String>,
     guard_units: BTreeMap<String, String>,
     state_root: PathBuf,
@@ -266,7 +274,14 @@ fn shape(s: &Spec) -> Result<()> {
                 .keys()
                 .map(String::as_str)
                 .collect::<BTreeSet<_>>()
-                == BTreeSet::from(["full", "plugin", "boundary", "progressive", "guard"])
+                == BTreeSet::from([
+                    "full",
+                    "plugin",
+                    "boundary",
+                    "progressive",
+                    "guard",
+                    "launcher"
+                ])
             && s.units.keys().map(String::as_str).collect::<BTreeSet<_>>()
                 == BTreeSet::from(["full", "plugin", "upload"])
             && s.guard_units
@@ -284,6 +299,7 @@ fn shape(s: &Spec) -> Result<()> {
         token(&program.artifact.path)?;
         token(&program.deployment_seal.path)?;
     }
+    token(&s.startup_plan.path)?;
     if let Some(environment) = &s.environment_file {
         token(&environment.path)?;
     }
@@ -498,6 +514,8 @@ fn idle(row: &Value) -> Result<()> {
     Ok(())
 }
 fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
+    barrier::validate_plan(s, argv)?;
+    let unit_argv = barrier::launcher_argv(s);
     let name = &s.units[s.phase.name()];
     ensure!(
         s.unit_file.path == Path::new("/etc/systemd/system").join(name),
@@ -509,7 +527,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
         text.lines()
             .filter(|l| l.starts_with("ExecStart="))
             .collect::<Vec<_>>()
-            == vec![format!("ExecStart={}", argv.join(" "))],
+            == vec![format!("ExecStart={}", unit_argv.join(" "))],
         "completed phase command differs"
     );
     let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
@@ -639,8 +657,8 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
     );
     let expected = format!(
         "{{ path={} ; argv[]={} ; ignore_errors=no }}",
-        argv[0],
-        argv.join(" ")
+        unit_argv[0],
+        unit_argv.join(" ")
     );
     ensure!(
         assembly204_recovery::delivery_command_matches(
@@ -858,6 +876,11 @@ pub(super) fn run() -> Result<()> {
     let (archive, original) = origin(&s)?;
     decoder_capacity::validate(&s, &original["producer"])?;
     let argv = command(&s, archive.archive_path.parent().context("archive parent")?)?;
+    ensure!(
+        s.programs["launcher"].artifact.sha256 == self_sha,
+        "completed phase launcher differs from admitting helper"
+    );
+    barrier::before_admission(&s, &argv)?;
     let effective = check_unit(&s, &argv)?;
     let mut names =
         bound_json(&serde_json::from_value(s.resource_basis["fleet"].clone())?)?["unit_census"]
@@ -928,7 +951,7 @@ pub(super) fn run() -> Result<()> {
     decoder_capacity::validate(&s, &original["producer"])?;
     private157::immutable_receipt(
         &s.output,
-        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"startup_plan":s.startup_plan,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
     )
 }
 
@@ -967,18 +990,26 @@ mod tests {
                 full: b("full-capacity"),
                 plugin: b("plugin-capacity"),
             },
-            programs: ["full", "plugin", "boundary", "progressive", "guard"]
-                .into_iter()
-                .map(|r| {
-                    (
-                        r.into(),
-                        Program {
-                            artifact: b(&format!("{r}-program")),
-                            deployment_seal: b("seal"),
-                        },
-                    )
-                })
-                .collect(),
+            programs: [
+                "full",
+                "plugin",
+                "boundary",
+                "progressive",
+                "guard",
+                "launcher",
+            ]
+            .into_iter()
+            .map(|r| {
+                (
+                    r.into(),
+                    Program {
+                        artifact: b(&format!("{r}-program")),
+                        deployment_seal: b("seal"),
+                    },
+                )
+            })
+            .collect(),
+            startup_plan: b("startup-plan"),
             units: ["full", "plugin", "upload"]
                 .into_iter()
                 .map(|r| {
@@ -1015,8 +1046,7 @@ mod tests {
             .into_iter()
             .map(|p| Prior {
                 phase: p,
-                admission: b("prior"),
-                invocation_id: "b".repeat(32),
+                launch: b("prior"),
             })
             .collect(),
             output: "/var/lib/jetstreamer/completed-phase-test/admission.json".into(),
