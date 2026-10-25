@@ -68,13 +68,13 @@ pub(super) fn authenticate(current: &Value, rows: &[Value]) -> Result<()> {
             original_boot = Some(boot);
             start = Some(at);
         }
-        if start.is_none() {
+        let Some(started) = start else {
             ensure!(
                 row["INVOCATION_ID"] != IID || !matches!(id.as_str(), Some(EXIT_ID | FAILURE_ID)),
                 "native 223 original exit/result precedes its authenticated start"
             );
             continue;
-        }
+        };
         let mono = decimal(row, "__MONOTONIC_TIMESTAMP")?;
         ensure!(
             row["INVOCATION_ID"] == IID
@@ -87,7 +87,7 @@ pub(super) fn authenticate(current: &Value, rows: &[Value]) -> Result<()> {
             ensure!(
                 exit.is_none()
                     && failed.is_none()
-                    && at > start.unwrap()
+                    && at > started
                     && row["EXIT_CODE"] == "exited"
                     && row["EXIT_STATUS"] == current["ExecMainStatus"]
                     && row["MESSAGE"]
@@ -317,6 +317,10 @@ mod tests {
             "58e40c27ef840b8843b531d4ce372e955ae55c878638651979672904706c627f"
         );
         let text = fs::read_to_string(base.join("terminal-properties.txt")).unwrap();
+        assert_eq!(
+            hex_lower(&Sha256::digest(text.as_bytes())),
+            "f788fba4257783ecb4b612405594a3aeadbdfbd2b419c78fa4d007bfbc027aa1"
+        );
         let properties = text
             .lines()
             .filter(|l| !l.is_empty())
