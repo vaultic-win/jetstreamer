@@ -315,9 +315,16 @@ pub(super) fn inactive_value(
         !scopes.is_empty(),
         "capped inactivity has no closed owner roster"
     );
+    let actors: Vec<Actor> = serde_json::from_value(
+        f.get("downstream_actors")
+            .cloned()
+            .unwrap_or_else(|| json!([])),
+    )?;
+    let historical = historical_terminal::validate(number(p, "epoch")?, p, &actors, f, census)?;
     for name in scopes {
         ensure!(
-            idle(&census[name]) && !jobs.iter().any(|v| v.as_str() == Some(name.as_str())),
+            (idle(&census[name]) || historical.contains(name))
+                && !jobs.iter().any(|v| v.as_str() == Some(name.as_str())),
             "capped owner is active/pending"
         );
         let group = &proof["cgroups"][name];

@@ -574,3 +574,24 @@ fn observer_generation_needs_the_exact_qualified_source_tuple() {
     );
     assert!(observer_revision(&"a".repeat(64)).is_none());
 }
+
+#[test]
+fn positive_inactivity_does_not_infer_release_from_a_failed_restarted_owner() {
+    let p = plan();
+    let l = launch();
+    let unit = string(&p, "producer_unit").unwrap();
+    let old = "horizon-qualify-204-replay.service";
+    let c = BTreeMap::from([
+        (unit.into(), inactive_owner(unit)),
+        (old.into(), json!({"Id":old,"LoadState":"loaded","InvocationID":"2".repeat(32),"MainPID":"0","NRestarts":"2","ActiveState":"failed","SubState":"failed","Result":"exit-code","ExecMainStatus":"1"})),
+    ]);
+    let f = json!({"sampled_at_utc":"2026-10-24T13:00:00Z","downstream_actors":[]});
+    let proof = json!({"schema":"jetstreamer-capped204205-positive-inactivity-v1","epoch":204,
+        "producer_invocation_id":l["invocation_id"],"sampled_at_utc":f["sampled_at_utc"],"unit_census":c,
+        "process_reference_census":{"references":[]},"pending_job_units":[],"cgroups":{unit:{"state":"absent"},old:{"state":"absent"}},
+        "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
+    assert!(evidence::inactive_value(&p, &l, &f, &c, &proof).is_err());
+    let mut foreign = f;
+    foreign["historical_terminal_owners"] = json!({old:{"schema":"jetstreamer-capped204205-historical-terminal-owner-v1","epoch":205}});
+    assert!(evidence::inactive_value(&p, &l, &foreign, &c, &proof).is_err());
+}

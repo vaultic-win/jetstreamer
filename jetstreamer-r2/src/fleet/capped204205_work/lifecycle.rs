@@ -261,6 +261,8 @@ pub(super) fn cleanup_current(
                     .any(|a| owners[0] == (a.unit.clone(), a.invocation_id.clone()))),
         "cleanup publication belongs to a different continuation or downstream owner"
     );
+    let historical = historical_terminal::validate(epoch, &p, &actors, &frame, &captured)?;
+    historical_terminal::current(&frame, current)?;
     for (name, old) in &captured {
         if !capture::epoch_scope(epoch, name) {
             continue;
@@ -269,7 +271,7 @@ pub(super) fn cleanup_current(
             .get(name)
             .context("capped cleanup owner omitted from fresh census")?;
         ensure!(
-            idle(fresh)
+            (idle(fresh) || (historical.contains(name) && fresh == old))
                 && (fresh == old
                     || (fresh["LoadState"] == "not-found" && fresh["InvocationID"] == "")),
             "capped cleanup owner changed or became active"
