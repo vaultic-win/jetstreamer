@@ -1,4 +1,4 @@
-//! Producer headroom, independent guard ceiling and native223 floor are
+//! Producer headroom, independent guard ceiling and native 223 floor are
 //! separate reservations. Saved proofs must reproduce all three exactly.
 use super::*;
 pub(super) const GUARD: u64 = 1 << 30;
@@ -45,14 +45,16 @@ pub(in crate::fleet) fn validate_saved_memory_row(row: &Value) -> Result<()> {
         page,
     )?;
     let properties = &caps["systemd_properties"];
+    let expected_max = c::MEMORY.to_string();
+    let expected_high = c::HIGH.to_string();
     ensure!(
         row["unit"] == c::UNIT
             && row["epoch"] == 227
             && iid(owner)
             && properties["Id"] == c::UNIT
             && properties["InvocationID"] == *owner
-            && properties["MemoryMax"] == c::MEMORY.to_string()
-            && properties["MemoryHigh"] == c::HIGH.to_string()
+            && properties["MemoryMax"].as_str() == Some(expected_max.as_str())
+            && properties["MemoryHigh"].as_str() == Some(expected_high.as_str())
             && properties["MemorySwapMax"] == "0"
             && number(caps, "requested_memory_max_bytes")? == c::MEMORY
             && number(caps, "requested_memory_high_bytes")? == c::HIGH
@@ -73,12 +75,14 @@ pub(in crate::fleet) fn validate_saved_memory_row(row: &Value) -> Result<()> {
     let sample = &row["guard_observation"];
     let proof = &row["actual_guard_timer_proof"];
     let binding: BoundFile = serde_json::from_value(row["guard"].clone())?;
+    let expected_guard_max = GUARD.to_string();
     ensure!(
         row["guard_unit"] == PROTECTIVE
             && sample["producer_invocation_id"] == *owner
             && sample["producer"]["invocation_id"] == *owner
             && iid(&sample["guard_invocation_id"])
-            && proof["manager"]["properties"]["MemoryMax"] == GUARD.to_string()
+            && proof["manager"]["properties"]["MemoryMax"].as_str()
+                == Some(expected_guard_max.as_str())
             && proof["manager"]["manager_completion"]["UNIT"] == PROTECTIVE
             && proof["manager"]["manager_completion"]["INVOCATION_ID"]
                 == sample["guard_invocation_id"]
@@ -92,7 +96,7 @@ pub(in crate::fleet) fn validate_saved_memory_row(row: &Value) -> Result<()> {
     let baseline = total / 10;
     let live = floor["native223_live"]
         .as_bool()
-        .context("canary saved native223 floor state")?;
+        .context("canary saved native 223 floor state")?;
     let native_floor = if live { PREFIX223_MEMORY_FLOOR } else { 0 };
     let top_up = baseline.max(native_floor) - baseline;
     ensure!(
@@ -243,6 +247,43 @@ mod tests {
                 assert!(
                     prefix223_live_peer::validate_saved_row(&bad).is_err(),
                     "accepted missing {phase}/{key}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn systemd_memory_properties_require_exact_strings() {
+        let valid = fixture();
+        validate_saved_memory_row(&valid).unwrap();
+        for (pointer, cap) in [
+            (
+                "/hard_memory_envelope/systemd_properties/MemoryMax",
+                c::MEMORY,
+            ),
+            (
+                "/hard_memory_envelope/systemd_properties/MemoryHigh",
+                c::HIGH,
+            ),
+            (
+                "/actual_guard_timer_proof/manager/properties/MemoryMax",
+                GUARD,
+            ),
+        ] {
+            for value in [
+                json!(cap),
+                json!(cap as f64),
+                json!(false),
+                Value::Null,
+                json!([cap.to_string()]),
+                json!({"value":cap.to_string()}),
+                json!(format!("0{cap}")),
+                json!(format!("{cap} ")),
+            ] {
+                let mut bad = valid.clone();
+                *bad.pointer_mut(pointer).unwrap() = value;
+                assert!(
+                    validate_saved_memory_row(&bad).is_err(),
+                    "accepted non-exact systemd string {pointer}"
                 );
             }
         }

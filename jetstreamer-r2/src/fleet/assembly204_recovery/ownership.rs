@@ -2,9 +2,11 @@
 //! cannot select a different invocation, borrow a guard or assert readback.
 use super::*;
 mod peer;
+mod work_input;
 pub(in crate::fleet) use peer::{
     peer_current, peer_guards, peer_limits, peer_names, peer_observation, peer_resources, peer_view,
 };
+use work_input::WorkInput;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::fleet) struct Claim {
@@ -472,7 +474,7 @@ pub(super) fn capture_success_terminal(
 #[serde(deny_unknown_fields)]
 struct WorkSpec {
     schema: String,
-    claim: Claim,
+    claim: WorkInput,
     observer: BoundFile,
     previous_fleet: BoundFile,
     output: PathBuf,
@@ -532,7 +534,7 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
     let launch = read(&w.claim.actor_launch)?;
     let stage: downstream::Stage = serde_json::from_value(launch["stage"].clone())?;
     no_overlap(&context, Some(stage))?;
-    let names = names(&w.claim)?;
+    let names = names_for_epoch(w.claim.epoch)?;
     let before = context.census(&names)?;
     let owner = before.get(stage.unit()).context("204 actor omitted")?;
     same_owner(&launch["owner"], owner)?;
@@ -655,7 +657,10 @@ fn actual_transport_phase(owner: &Value) -> Result<String> {
     Ok(phase.into())
 }
 pub(in crate::fleet) fn names(c: &Claim) -> Result<BTreeSet<String>> {
-    ensure!(c.epoch == 204, "204 recovery claim epoch");
+    names_for_epoch(c.epoch)
+}
+fn names_for_epoch(epoch: u64) -> Result<BTreeSet<String>> {
+    ensure!(epoch == 204, "204 recovery claim epoch");
     let mut names = BTreeSet::from([OLD_UNIT.into(), OLD_GUARD.into(), UNIT.into(), GUARD.into()]);
     names.extend(downstream::Stage::all().iter().map(|s| s.unit().into()));
     Ok(names)
