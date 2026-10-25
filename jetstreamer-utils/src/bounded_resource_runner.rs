@@ -28,7 +28,7 @@ use crate::profile::*;
 const GENESIS: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 static EXTERNAL_SIGNAL: AtomicI32 = AtomicI32::new(0);
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BoundFile {
     pub(crate) path: PathBuf,
@@ -66,6 +66,17 @@ pub(crate) trait StorageHooks {
     }
     fn decode_plan(&self, bytes: &[u8]) -> Result<Plan> {
         Ok(serde_json::from_slice(bytes)?)
+    }
+    // A binary-local rendezvous may capture the genuine main identity before
+    // reading native inputs. Existing profiles retain their no-op path.
+    fn before_inputs(
+        &self,
+        _plan: &Plan,
+        _invocation: &str,
+        _plan_binding: &BoundFile,
+        _self_sha256: &str,
+    ) -> Result<()> {
+        Ok(())
     }
     fn prepare(&self, _plan: &Plan) -> Result<()> { Ok(()) }
     fn configure_command(&self, _plan: &Plan, _command: &mut Command) -> Result<()> { Ok(()) }
@@ -576,6 +587,15 @@ fn run(storage: &dyn StorageHooks) -> Result<()> {
             );
         }
     }
+    storage.before_inputs(
+        &p,
+        &invocation,
+        &BoundFile {
+            path: PathBuf::from(&args[1]),
+            sha256: args[3].clone(),
+        },
+        &args[5],
+    )?;
     bound_file(&p.node.path, &p.node.sha256, 512 << 20)?;
     bound_file(&p.worker, WORKER, 256 << 20)?;
     bound_file(&p.snapshot, SNAPSHOT, 11 << 30)?;

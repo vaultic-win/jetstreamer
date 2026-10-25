@@ -1,7 +1,8 @@
 # Exact epoch 223 demotion parent and runner candidate
 
-Source preparation only. No Cargo, parent/worker execution, native input,
-replay, status publication or R2 action has qualified this adapter.
+Parent/runner source QA through `69ef773a` is recorded separately. The runtime
+rendezvous successor is source preparation only and awaits its own QA. No native
+input, replay, status publication or R2 action has qualified this adapter.
 The historical worker source is unchanged at
 551728fda72afd36ce6f8652ddb0020ec249e860.
 
@@ -92,13 +93,13 @@ scratch plus output margin, and the old protected floor. These are conservative
 proposals, not a fresh fit result or authorization to retain an obsolete floor.
 Root must review fresh complete-fleet/century admission before any invocation.
 
-Runner production compilation separately binds:
-`JETSTREAMER_EPOCH223_DEMOTION_PARENT_SHA256`,
-`JETSTREAMER_EPOCH223_DEMOTION_NATIVE_PROOF_PATH/SHA256`, and
-`JETSTREAMER_EPOCH223_DEMOTION_ADMISSION_PATH/SHA256`.
-Absent configuration still compiles for the compatible-feature CI lane but
-fails closed before any child launch. It is not a default credential or worker
-fallback. The production worker SHA is pinned directly in source.
+Runner production compilation binds only the static
+`JETSTREAMER_EPOCH223_DEMOTION_PARENT_SHA256`; the worker digest is pinned directly
+in source. The successor replaces compile-time native/admission binding with a
+strict runtime v2 envelope and a bounded one-shot pre-input rendezvous. See
+[the runtime contract](epoch223-demotion-runtime-rendezvous.md) for the exact
+schemas, real actor/issuer/guard bindings and source-only qualification status.
+Absent configuration still compiles for CI and fails closed before launch.
 
 An actual bracket requires a separately sealed
 `jetstreamer-epoch223-demotion-native-input-proof-v1` binding the exact sealed
@@ -154,19 +155,17 @@ implement or deploy that issuer and cannot authorize its own status.
 
 ## Next source QA gate
 
-No parent/runner Cargo command has run. Only pinned Rust 1.98 parsing/formatting
-and diff checks ran; the modified historical worker tree remains byte-unchanged.
-Existing code inside default-vs-private branches was mechanically indented.
-
-Request a fresh main-target lease and reviewed 16 GiB memory/total-artifact,
-two-job, sequential release/offline/locked, 30-minute-per-command source QA
-envelope. Preserve an actual allocation baseline and verbose compiler records;
-stop on native C/C++ rebuild or cap failure. Do not access a target owned by the
-lifecycle/227 agents. First typecheck default and exact feature, run the five
-pure adapter tests, the private runner manifest-scope test, selected existing default registry/IPC tests, scoped strict
-Clippy and the compatible utils-feature checks. Run negative scope and missing
-proof/parent-pin tests without starting workers. The CI matrix adds the node
-feature explicitly, while compatible utils builds need no runtime proof env.
+The previous source checks, failures and scoped fixes are recorded in
+`native223-offline96acf8c5-qa-v1/source-qa-final-report-v1.json`, ending at
+`69ef773a`. Their evidence retains the actual tested commits; it is not promoted
+to the rendezvous successor. The worker tree remains unchanged. After explicit
+target-lease transfer, qualify the new pure rendezvous/negative tests, original
+full runner Clippy selection and representative default-profile typecheck under
+the retained reviewed 16 GiB, two-job, sequential release/offline/locked envelope.
+Preserve every prior charge/failure and a fresh post-handoff allocation baseline;
+do not rerun unrelated successful scopes merely to refresh timestamps. Do not
+access a target owned by lifecycle/227 work. No native input or worker execution
+is part of this source gate.
 
 Only after review and real qualification may root build/seal the isolated parent,
 perform no-worker capability, issue the real native proof/admission/guard and
