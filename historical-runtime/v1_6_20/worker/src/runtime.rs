@@ -2978,3 +2978,55 @@ mod tests {
         assert_eq!(checkpoint.accounts_hash, expected_accounts_hash);
     }
 }
+
+// Exercise each runtime's public store path with the same actual wire and
+// synthetic loaded values; no production handler or replay behavior changes.
+#[cfg(test)]
+mod epoch223_parent432_store_regression {
+    use solana_runtime::{
+        accounts::{Accounts, LoadedTransaction, TransactionLoadResult},
+        accounts_index::AccountSecondaryIndexes,
+        bank::RentDebits,
+        rent_collector::RentCollector,
+    };
+    use solana_sdk::{
+        account::AccountSharedData,
+        fee_calculator::FeeCalculator,
+        genesis_config::ClusterType,
+        hash::Hash,
+        pubkey::Pubkey,
+        transaction::Transaction,
+    };
+    const EXPECT_PROGRAM_STORED: bool = true;
+    fn store_parent432_for_this_runtime(
+        accounts: &Accounts,
+        txs: &[Transaction],
+        loaded: &mut [TransactionLoadResult],
+    ) -> Vec<(Pubkey, AccountSharedData)> {
+        let outcomes = vec![(Ok(()), None); txs.len()];
+        let rent = RentCollector::default();
+        let recent = (Hash::default(), FeeCalculator::default());
+        accounts.store_cached(
+            1,
+            txs.iter(),
+            &outcomes,
+            loaded,
+            &rent,
+            &recent,
+            true,
+            true,
+            true,
+        );
+        let ancestors = vec![(1, 0)].into_iter().collect();
+        accounts
+            .scan_slot(1, |account| Some(*account.pubkey()))
+            .into_iter()
+            .map(|key| {
+                let (account, slot) = accounts.load_slow(&ancestors, &key).unwrap();
+                assert_eq!(slot, 1);
+                (key, account)
+            })
+            .collect()
+    }
+    include!("../../../fixtures/epoch223_parent432_account_store_regression.rs");
+}

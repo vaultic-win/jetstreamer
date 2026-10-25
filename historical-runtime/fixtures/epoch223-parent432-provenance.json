@@ -1,0 +1,32 @@
+{
+  "schema": "jetstreamer-epoch223-parent432-wire-fixtures-v1",
+  "source_sealed_package": "/var/lib/jetstreamer/horizon-native223-e70a-finalized-vote-diagnosis-v1",
+  "source_seal_plan_sha256": "591d6a1bb52a55db1b19087f9bf8c4c18833eabeada02d78adb9ddfc7df58d0e",
+  "finalized_diagnosis_sha256": "1f9320d32c2ccf51a45731a0084a1f9e25875fc808c2fb30abede5cea77b00a6",
+  "fixtures": [
+    {
+      "path": "epoch223-parent96544587-tx432.bin",
+      "sha256": "388daeef55ab81c31a44ddfc665cdc8b2dd12f2cbce1fd53849f4e6522faf8b4",
+      "slot": 96544587,
+      "transaction_index": 432,
+      "signature": "358YDY6TSXgU4X8Q1UzjPRrYTzBCz8CKE9tbS5neXZYWNPuo2bvWrcmji1RiWS8mbvokPxS5vF1TMP3Htymyruj8",
+      "wire_response_sha256": "e39e28ec197592f90034de7bd1b8f34d3e093047ef1392ccf1296c7b5dcc6406"
+    },
+    {
+      "path": "epoch223-failing96544588-vote.bin",
+      "sha256": "b5d7c6016a180405a5ad4e856dbfa0a98fd9179ab30930f24906ebc7a9b5b022",
+      "slot": 96544588,
+      "signature": "4P2u3JnCkqkaDMG4TC4o2mLVckYmt3MCYzdUvNpTu7RAz3kTfVyPrRzVnchncRpTdBv8nsrCJX9kxVXiAmUxrNtD",
+      "wire_response_sha256": "92cf68aff42393fc550c0dbed273f26e37d5d07f3c55cd529b53f4581b058456"
+    }
+  ],
+  "canonical_response_error": null,
+  "bank_hash_bracket": {
+    "last_matching_slot": 96544586,
+    "hash": "3PMZX37CYLF9Ay87r1aKREnf1cZoWDLRKXRAMx5TZYso",
+    "first_mismatching_slot": 96544587,
+    "canonical_voted_hash": "5UsE976GhKUXyUyKG1tUDiN7cT2BPYvKJN7Wx1ptJHm7",
+    "actual_replay_hash": "GRD2nwB5ADKJNu3oiKJibJysRLpMNw3aSkA4NhpKoHxX"
+  },
+  "test_scope": "Exact immutable transaction wire plus explicit synthetic loaded account values. Tests exercise native account collection, AccountsDb dirty-set hash and frozen Bank hash; they do not execute the historical transaction or recreate its mainnet state."
+}
