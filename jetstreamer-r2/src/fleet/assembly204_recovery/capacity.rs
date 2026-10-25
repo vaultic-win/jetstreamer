@@ -1,7 +1,7 @@
 //! The issuer calls complete maintenance admission; it never accepts available
 //! memory, growth, omitted owners or a caller's boolean as resource evidence.
 use super::*;
-const METADATA: u64 = 32 << 20;
+const METADATA: u64 = 128 << 20;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AdmissionSpec {
@@ -235,11 +235,12 @@ pub(super) fn validate_capacity(v: &Value, candidate_memory: u64, additional: u6
             "204 protected hard-memory growth understates owner evidence"
         );
         let total = n(m, "host_total_memory_bytes")?;
-        let required = total
-            .div_ceil(10)
-            .checked_add(growth)
-            .and_then(|n| n.checked_add(candidate_memory))
-            .context("204 hard memory overflow")?;
+        let required = maintenance_capacity::validate_assembly204_recovery_memory_policy(
+            policy,
+            total,
+            growth,
+            candidate_memory,
+        )?;
         ensure!(
             policy["schema"] == "jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1"
                 && policy["protected_existing_hard_memory_growth_bytes"] == growth

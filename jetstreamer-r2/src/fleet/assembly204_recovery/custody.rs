@@ -485,15 +485,7 @@ pub(super) fn issue_plan(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<
     old_idle()?;
     check_source_names(&capture)?;
     sealed(&x.assembler, 128 << 20)?;
-    let approved = read(&x.assembler_capture)?;
-    ensure!(
-        approved["schema"] == "jetstreamer-epoch204-assembly-recovery-production-binding-v1"
-            && approved["source_revision"] == "94705c5d546341f4fdfc6cc50c819c4031f9ab1d"
-            && approved["artifact"] == private157::binding(&x.assembler)
-            && approved["production_capture_verified"] == true
-            && approved["qa_verified"] == true,
-        "204 standalone 94705 production capture/seal is still required"
-    );
+    let production = artifact::validate(&x.assembler_capture, &x.assembler)?;
     let guard = read(&x.guard_spec)?;
     ensure!(
         guard["executable_sha256"] == x.assembler.sha256
@@ -511,7 +503,7 @@ pub(super) fn issue_plan(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<
     write(
         &x.output.with_extension("issuer.json"),
         &json!({"schema":"jetstreamer-epoch204-assembly-recovery-plan-issuance-v1",
-        "plan":private157::binding(&result),"assembler":x.assembler,"assembler_capture":x.assembler_capture,
+        "plan":private157::binding(&result),"assembler":x.assembler,"assembler_capture":x.assembler_capture,"actual_production_binding":production,
         "issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     Ok(())

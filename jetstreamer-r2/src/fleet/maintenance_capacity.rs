@@ -321,19 +321,12 @@ fn memory_sample(
     let (required, policy) = match mode {
         MemoryMode::Existing => (memory_required(reserve, total, candidate)?, None),
         MemoryMode::AssemblyRecovery204 => {
-            let required = memory_required(reserve, total, candidate)?;
+            let (required, mut policy) =
+                assembly204_recovery_memory_required(f, total, reserve, candidate)?;
+            policy["available_floor_component_accounted_once_bytes"] = json!(accounted_floor);
             (
                 required,
-                Some((
-                    "assembly204_recovery_memory_policy",
-                    json!({
-                "schema":"jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1",
-                "protected_existing_hard_memory_growth_bytes":reserve,
-                "host_available_floor_bytes":total.div_ceil(10),
-                "candidate_hard_memory_bytes":candidate,
-                "required_available_memory_bytes":required,
-                "available_floor_component_accounted_once_bytes":accounted_floor}),
-                )),
+                Some(("assembly204_recovery_memory_policy", policy)),
             )
         }
         MemoryMode::Full210 => {
@@ -367,6 +360,93 @@ fn memory_sample(
         result[key] = policy;
     }
     Ok(result)
+}
+fn assembly204_recovery_memory_required(
+    f: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    let base = if candidate == (64u64 << 30) + (128u64 << 20) {
+        64u64 << 30
+    } else {
+        candidate
+    };
+    let guard = candidate
+        .checked_sub(base)
+        .context("204 recovery guard memory arithmetic")?;
+    // This retains both the live 480 GiB floor and the exact positive terminal
+    // reader, including failed history, cgroups, references and repair ledgers.
+    let (native_required, native) = capped204_native223::required(f, total, growth, base)?;
+    let required = native_required
+        .checked_add(guard)
+        .context("204 recovery complete memory overflow")?;
+    let policy = json!({"schema":"jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1",
+        "protected_existing_hard_memory_growth_bytes":growth,"host_available_floor_bytes":native["effective_available_memory_floor_bytes"],
+        "candidate_hard_memory_bytes":candidate,"candidate_producer_hard_memory_bytes":base,"candidate_guard_hard_memory_bytes":guard,
+        "native223_available_floor_policy":native,"required_available_memory_bytes":required});
+    validate_assembly204_recovery_memory_policy(&policy, total, growth, candidate)?;
+    Ok((required, policy))
+}
+pub(super) fn validate_assembly204_recovery_memory_policy(
+    p: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<u64> {
+    let native = &p["native223_available_floor_policy"];
+    let baseline = total.div_ceil(10);
+    let floor = match native["schema"].as_str() {
+        Some("jetstreamer-capped204-v4-terminal-native223-memory-v1") => {
+            capped204_native223::validate_terminal_saved(&native["positive_terminal"])?;
+            baseline
+        }
+        Some("jetstreamer-capped204-v4-live-native223-memory-v1") => {
+            ensure!(
+                native["native223_unit"] == prefix223_native20::UNIT
+                    && native["native223_invocation_id"] == "e70aaf097e7c4583b216aba454145910",
+                "204 native223 live floor owner differs"
+            );
+            baseline.max(480u64 << 30)
+        }
+        _ => bail!("204 recovery lacks native223 live-floor or exact positive-terminal authority"),
+    };
+    let base = if candidate == (64u64 << 30) + (128u64 << 20) {
+        64u64 << 30
+    } else {
+        candidate
+    };
+    ensure!(
+        matches!(base,n if n==64u64<<30 || n==16u64<<30),
+        "204 recovery candidate memory profile differs"
+    );
+    let guard = candidate - base;
+    let native_required = floor
+        .checked_add(growth)
+        .and_then(|n| n.checked_add(base))
+        .context("204 native memory overflow")?;
+    let required = native_required
+        .checked_add(guard)
+        .context("204 complete memory overflow")?;
+    ensure!(
+        native["host_baseline_bytes"] == baseline
+            && native["effective_available_memory_floor_bytes"] == floor
+            && native["candidate_stage_hard_memory_bytes"] == base
+            && native["candidate_guard_hard_memory_bytes"] == 0
+            && native["protected_existing_hard_memory_growth_bytes"] == growth
+            && native["required_available_memory_bytes"] == native_required
+            && native["floor_counted_once"] == true
+            && p["host_available_floor_bytes"] == floor
+            && p["candidate_producer_hard_memory_bytes"] == base
+            && p["candidate_guard_hard_memory_bytes"] == guard
+            && p["required_available_memory_bytes"] == required,
+        "204 native-floor/guard policy was understated or changed"
+    );
+    Ok(required)
+}
+#[cfg(test)]
+pub(super) fn assembly204_native_terminal_fixture() -> Value {
+    capped204_native223::terminal_fixture()
 }
 fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<Value> {
     ensure!(

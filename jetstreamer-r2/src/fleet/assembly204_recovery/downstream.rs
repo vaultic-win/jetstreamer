@@ -2,6 +2,7 @@
 //! independently captured; every read is against the same immutable tuple.
 use super::*;
 use std::io::Read;
+use std::os::fd::AsRawFd;
 use std::os::unix::process::CommandExt;
 use std::sync::{
     Arc,
@@ -186,10 +187,81 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
         proof["schema"] == "jetstreamer-epoch204-assembly-recovery-tool-qualification-v1"
             && proof["stage"] == serde_json::to_value(x.stage)?
             && proof["artifact"] == private157::binding(&tool)
-            && proof["qa_verified"] == true
-            && proof["production_capture_verified"] == true
             && is_lower_hex(s(&proof, "source_revision")?, 40),
-        "204 stage tool lacks reviewed capture and QA"
+        "204 tool qualification scope differs"
+    );
+    let seal: BoundFile = serde_json::from_value(proof["deployment_seal"].clone())?;
+    artifact::validate_member_binding(&seal, &tool, 256 << 20)?;
+    let capture: BoundFile = serde_json::from_value(proof["source_capture"].clone())?;
+    let report: BoundFile = serde_json::from_value(proof["qa_report"].clone())?;
+    artifact::validate_member_binding(&seal, &capture, 16 << 20)?;
+    artifact::validate_member_binding(&seal, &report, 16 << 20)?;
+    let source = read(&capture)?;
+    let qa = read(&report)?;
+    for (v, key) in [
+        (&source, "source_revision_pointer"),
+        (&qa, "qa_revision_pointer"),
+    ] {
+        let pointer = s(&proof, key)?;
+        ensure!(
+            matches!(
+                pointer,
+                "/source/commit"
+                    | "/source_commit"
+                    | "/source_revision"
+                    | "/commit"
+                    | "/final_frozen_commit"
+            ) && v.pointer(pointer) == Some(&proof["source_revision"]),
+            "204 actual tool capture/QA source revision differs"
+        );
+    }
+    let component = match x.stage {
+        Stage::Full | Stage::Boundary => "jetstreamer-horizon",
+        Stage::Plugin => "jetstreamer-pipeline",
+        Stage::Upload => "jetstreamer-r2",
+        _ => bail!("204 stage has no child tool"),
+    };
+    let logs: Vec<BoundFile> = serde_json::from_value(proof["qa_logs"].clone())?;
+    for log in &logs {
+        artifact::validate_member_binding(&seal, log, 32 << 20)?;
+    }
+    let mut test = false;
+    let mut clippy = false;
+    for run in qa["commands"]
+        .as_array()
+        .context("204 tool QA lacks actual completed command records")?
+    {
+        let args = run["command"]
+            .as_array()
+            .context("204 tool QA command argv")?;
+        if run["exit_code"] != 0
+            || args.first() != Some(&json!("cargo"))
+            || !args.iter().any(|a| a == component)
+        {
+            continue;
+        }
+        let relevant = args.get(1).and_then(Value::as_str);
+        if relevant == Some("clippy")
+            && !args
+                .windows(2)
+                .any(|p| p == [json!("-D"), json!("warnings")])
+            && !args.iter().any(|v| v == "-Dwarnings")
+        {
+            continue;
+        }
+        if !matches!(relevant, Some("test" | "clippy")) {
+            continue;
+        }
+        ensure!(
+            logs.iter().any(|l| run["log_sha256"] == l.sha256),
+            "204 tool successful QA command lacks its actual sealed log"
+        );
+        test |= relevant == Some("test");
+        clippy |= relevant == Some("clippy");
+    }
+    ensure!(
+        test && clippy,
+        "204 tool lacks source-bound actual successful tests and strict Clippy records"
     );
     Ok(tool)
 }
@@ -275,6 +347,9 @@ fn installed_stage(
     if x.stage == Stage::Import {
         writes.insert(CANONICAL.into());
     }
+    if matches!(x.stage, Stage::Import | Stage::Upload) {
+        writes.insert("/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock".into());
+    }
     ensure!(
         keys.get("ReadWritePaths")
             .context("204 stage writable paths")?
@@ -339,6 +414,16 @@ pub(super) fn admit_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result
     let x = stage_spec(&read(&a.stage_spec)?)?;
     let (source, _) = lineage::load_source(&x.source)?;
     gates(&x)?;
+    if x.stage != Stage::Import {
+        tool(&x)?;
+    }
+    if x.stage == Stage::Full {
+        let mut anchor = x.clone();
+        anchor.stage = Stage::Boundary;
+        anchor.tool = x.anchor_tool.clone();
+        anchor.tool_qualification = x.anchor_tool_qualification.clone();
+        tool(&anchor)?;
+    }
     installed_stage(&x, &a.stage_spec, &a.runner, &a.unit_file, self_sha)?;
     ownership::no_overlap(None)?;
     let before = unit(x.stage.unit())?;
@@ -549,10 +634,42 @@ fn child(tool: &BoundFile, args: &[String], directory: &Path, label: &str) -> Re
         json!({"tool":tool,"arguments":args,"exit_code":status.code(),"stdout":binding(&stdout)?,"stderr":binding(&stderr)?}),
     )
 }
+fn mutation_lock() -> Result<File> {
+    let path = Path::new("/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock");
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(path)?;
+    let m = file.metadata()?;
+    ensure!(
+        path.canonicalize()? == path
+            && m.is_file()
+            && matches!(m.uid(), 0 | 1000)
+            && m.nlink() == 1
+            && m.mode() & 0o077 == 0
+            && unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "204 normal shared local-mutation/upload lease unsafe or occupied"
+    );
+    let named = fs::symlink_metadata(path)?;
+    ensure!(
+        m.dev() == named.dev() && m.ino() == named.ino(),
+        "204 shared mutation lease namespace changed"
+    );
+    Ok(file)
+}
 pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let x = stage_spec(v)?;
     let (c, l) = lineage::load_source(&x.source)?;
     let predecessors = gates(&x)?;
+    let _mutation_lease = if matches!(x.stage, Stage::Import | Stage::Upload) {
+        Some(mutation_lock()?)
+    } else {
+        None
+    };
+    if x.stage != Stage::Import {
+        tool(&x)?;
+    }
     let admission = issued_admission(&x, spec, n(&c, "archive_bytes")?)?;
     let current = ownership::current_actor(x.stage, spec, self_sha)?;
     ownership::no_overlap(Some(x.stage))?;

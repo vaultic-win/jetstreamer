@@ -145,23 +145,28 @@ fn capacity_fixture() -> Value {
     let total = 2u64 << 40;
     let growth = 123;
     let required = total.div_ceil(10) + growth + memory;
+    let native = json!({"schema":"jetstreamer-capped204-v4-terminal-native223-memory-v1","host_baseline_bytes":total.div_ceil(10),
+        "effective_available_memory_floor_bytes":total.div_ceil(10),"candidate_stage_hard_memory_bytes":MEMORY,"candidate_guard_hard_memory_bytes":0,
+        "protected_existing_hard_memory_growth_bytes":growth,"required_available_memory_bytes":required-GUARD_MEMORY,"floor_counted_once":true,
+        "positive_terminal":maintenance_capacity::assembly204_native_terminal_fixture()});
     let m = json!({"host_total_memory_bytes":total,"protected_existing_memory_growth_bytes":growth,
         "protected_memory_evidence":[{"unit":"protected.service","remaining_hard_memory_growth_bytes":growth}],
         "candidate_memory_max_bytes":memory,"minimum_available_memory_bytes":required,"sampled_available_memory_bytes":required,
         "actual_available_memory_bytes":required,"assembly204_recovery_memory_policy":{
         "schema":"jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1","protected_existing_hard_memory_growth_bytes":growth,
-        "candidate_hard_memory_bytes":memory,"required_available_memory_bytes":required}});
+        "candidate_hard_memory_bytes":memory,"candidate_producer_hard_memory_bytes":MEMORY,"candidate_guard_hard_memory_bytes":GUARD_MEMORY,
+        "host_available_floor_bytes":total.div_ceil(10),"native223_available_floor_policy":native,"required_available_memory_bytes":required}});
     json!({"schema":"jetstreamer-horizon-maintenance-capacity-v1","first_epoch":201,"last_epoch":300,
-        "additional_bytes":OUTPUT_MAX+(32u64<<20),"unit_census_before":{},"unit_census_after":{},"unit_census_after_memory_and_guard_checks":{},
+        "additional_bytes":OUTPUT_MAX+(128u64<<20),"unit_census_before":{},"unit_census_after":{},"unit_census_after_memory_and_guard_checks":{},
         "all_live_growth_and_century_floor_protected":true,"capped_peer_accounting":{"producer_and_independent_guard_hard_memory_charged":true,"allocation_credit_bytes":0},
-        "memory_before":m,"memory_after":m,"minimum_free_bytes":1000,"required_initial_free_bytes":1000+OUTPUT_MAX+(32u64<<20),
-        "sampled_available_bytes":1000+OUTPUT_MAX+(32u64<<20),"actual_available_bytes":1000+OUTPUT_MAX+(32u64<<20)})
+        "memory_before":m,"memory_after":m,"minimum_free_bytes":1000,"required_initial_free_bytes":1000+OUTPUT_MAX+(128u64<<20),
+        "sampled_available_bytes":1000+OUTPUT_MAX+(128u64<<20),"actual_available_bytes":1000+OUTPUT_MAX+(128u64<<20)})
 }
 #[test]
 fn complete_capacity_rejects_understated_owner_growth_guard_omission_and_census_races() {
     let fixture = capacity_fixture();
     let check =
-        |v: &Value| capacity::validate_capacity(v, MEMORY + GUARD_MEMORY, OUTPUT_MAX + (32 << 20));
+        |v: &Value| capacity::validate_capacity(v, MEMORY + GUARD_MEMORY, OUTPUT_MAX + (128 << 20));
     check(&fixture).unwrap();
     for (pointer, bad) in [
         (
@@ -372,4 +377,22 @@ fn recovery_output_cannot_borrow_native_or_final_verification_success() {
             "accepted {field}"
         );
     }
+}
+
+#[test]
+fn saved_recovery_capacity_cannot_waive_native223_positive_terminal_gate() {
+    let mut fixture = capacity_fixture();
+    fixture["memory_before"]["assembly204_recovery_memory_policy"]["native223_available_floor_policy"] =
+        Value::Null;
+    assert!(
+        capacity::validate_capacity(&fixture, MEMORY + GUARD_MEMORY, OUTPUT_MAX + (128 << 20))
+            .is_err()
+    );
+    let mut fixture = capacity_fixture();
+    fixture["memory_after"]["assembly204_recovery_memory_policy"]["native223_available_floor_policy"]
+        ["positive_terminal"]["failure_history_preserved"] = json!(false);
+    assert!(
+        capacity::validate_capacity(&fixture, MEMORY + GUARD_MEMORY, OUTPUT_MAX + (128 << 20))
+            .is_err()
+    );
 }

@@ -258,7 +258,6 @@ pub(super) struct Recipe {
     pub recovery_terminal: BoundFile,
 }
 pub(super) struct Loaded {
-    pub recipe: Recipe,
     pub outcome: Value,
     pub expected: Expected,
 }
@@ -322,11 +321,7 @@ pub(super) fn load_recipe(recipe: Recipe) -> Result<Loaded> {
     let (prefix, suffix, proof) = sources(&recipe.original_plan, &recipe.suffix_proof)?;
     let expected = derive(&prefix, &suffix, &proof)?;
     validate_outcome(&outcome, &recipe, &plan, &launch, &expected)?;
-    Ok(Loaded {
-        recipe,
-        outcome,
-        expected,
-    })
+    Ok(Loaded { outcome, expected })
 }
 pub(super) fn validate_outcome(
     o: &Value,

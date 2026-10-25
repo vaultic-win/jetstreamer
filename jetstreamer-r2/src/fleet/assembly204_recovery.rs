@@ -3,6 +3,7 @@
 //! The normal capped continuation natural-success validator is unchanged.
 use super::*;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+mod artifact;
 mod capacity;
 mod custody;
 mod downstream;
