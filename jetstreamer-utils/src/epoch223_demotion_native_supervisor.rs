@@ -40,6 +40,7 @@ struct Grant {
     request: Option<BoundFile>,
     control_grant: Option<BoundFile>,
     capacity_result: BoundFile,
+    allocation_proof: Option<BoundFile>,
     recorded_unix_millis: u64,
     original_start_unix_millis: u64,
     native_execution_authorized: bool,
@@ -200,6 +201,25 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
                 && result["capacity"]["all_live_growth_and_century_floor_protected"] == true,
             "223 native allocation lacks corrected complete-accounting context"
         );
+        ensure!(
+            grant.allocation_proof.is_some() == spawn,
+            "223 native control/spawn allocation proof mismatch"
+        );
+        if let Some(binding) = &grant.allocation_proof {
+            let allocation: Value = read_bound(binding)?;
+            ensure!(
+                allocation["schema"] == "jetstreamer-epoch223-demotion-native-allocation-proof-v1"
+                    && allocation["runner"] == serde_json::to_value(w.actor)?
+                    && allocation["issuer"] == serde_json::to_value(&grant.issuer)?
+                    && allocation["request"] == serde_json::to_value(&grant.request)?
+                    && allocation["control_grant"] == serde_json::to_value(&grant.control_grant)?
+                    && allocation["capacity_result"] == binding_value(&grant.capacity_result)
+                    && allocation["effective_memory_high_bytes"] == (112u64 << 30)
+                    && allocation["effective_memory_max_bytes"] == (128u64 << 30)
+                    && allocation["manager_configuration_not_changed_by_this_issuer"] == true,
+                "223 native immutable allocation does not bind actual kernel envelope"
+            );
+        }
         observe(w.actor)?;
         observe(&grant.issuer)?;
         observe(&guard.actor)?;
@@ -724,9 +744,23 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             .join(format!("native-{}-custody.json", spec.phase)),
         &lock.evidence()?,
     )?;
+    caps(&plan.unit, high, max)?;
+    let allocation = if spawn {
+        Some(issuance::published(
+            &plan.run_root.join("native-spawn-allocation.json"),
+            &json!({
+        "schema":"jetstreamer-epoch223-demotion-native-allocation-proof-v1","runner":spec.runner,"issuer":issuer,
+        "request":spec.request,"control_grant":spec.control_grant,"capacity_result":capacity,
+        "effective_memory_high_bytes":high,"effective_memory_max_bytes":max,"effective_memory_swap_max_bytes":0,
+        "manager_configuration_not_changed_by_this_issuer":true,"recorded_unix_millis":millis()?,
+        "native_execution_authorized":false,"publication_authorized":false,"r2_mutations":false}),
+        )?)
+    } else {
+        None
+    };
     let value = json!({"schema":"jetstreamer-epoch223-demotion-native-grant-v1","phase":spec.phase,
         "runtime_plan":spec.runtime_plan,"runner":spec.runner,"issuer":issuer,"issuer_spec":binding,
-        "guard":spec.guard,"request":spec.request,"control_grant":spec.control_grant,"capacity_result":capacity,
+        "guard":spec.guard,"request":spec.request,"control_grant":spec.control_grant,"capacity_result":capacity,"allocation_proof":allocation,
         "recorded_unix_millis":millis()?,"original_start_unix_millis":origin.original_start_unix_millis,
         "native_execution_authorized":spawn,"publication_authorized":false,"r2_mutations":false});
     // The native grant file itself is the final ready marker. Nothing can
