@@ -150,6 +150,15 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
     ] {
         verify_reference(b)?;
     }
+    validate_status_task(
+        &spec.status_task,
+        &task.actor,
+        &spec.runtime_plan,
+        &spec.origin_clock,
+        &spec.guard,
+        &x.accounting_executable,
+        &x.accounting_qualification,
+    )?;
     let basis: Basis = read_bound(&spec.accounting_basis)?;
     ensure!(
         basis.schema == "jetstreamer-epoch223-demotion-accounting-basis-v1"
@@ -207,6 +216,7 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
         accepted_fleet: spec.accepted_fleet.clone(),
         context_qualification: capacity_binding,
         repair_task: spec.repair_task.clone(),
+        status_task: spec.status_task.clone(),
         guard: spec.guard.clone(),
         recorded_unix_millis: millis()?,
         protected_floor_bytes: guard_plan.protected_floor_bytes,
@@ -488,6 +498,15 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             && accepted["native_execution_authorized"] == false,
         "223 spawn control was not consumed by the original runner"
     );
+    validate_status_task(
+        &control.status_task,
+        &spec.runner,
+        &spec.runtime_plan,
+        &x.origin_clock,
+        &spec.guard,
+        &x.accounting_executable,
+        &x.accounting_qualification,
+    )?;
     let basis: Basis = read_bound(&spec.accounting_basis)?;
     ensure!(
         basis.schema == "jetstreamer-epoch223-demotion-accounting-basis-v1"
@@ -567,12 +586,12 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         "schema":"jetstreamer-epoch223-demotion-allocation-proof-v1","request":spec.request,
         "accounting_executable":x.accounting_executable,"accounting_qualification":x.accounting_qualification,
         "capacity_result":capacity,"capacity":result["capacity"],"recorded_unix_millis":millis()?,
-        "runner":spec.runner,"issuer":issuer,"custody":lock.evidence()?,
+        "runner":spec.runner,"issuer":issuer,"status_task":control.status_task,"custody":lock.evidence()?,
         "effective_memory_high_bytes":high,"effective_memory_max_bytes":max,
         "publication_authorized":false,"r2_mutations":false}),
     )?;
     let grant_value = json!({"schema":"jetstreamer-epoch223-demotion-spawn-grant-v1",
-        "runtime_plan":spec.runtime_plan,"control_grant":spec.control_grant,"request":spec.request,
+        "runtime_plan":spec.runtime_plan,"status_task":control.status_task,"control_grant":spec.control_grant,"request":spec.request,
         "runner":spec.runner,"issuer":issuer,"issuer_spec":binding,"native_input":spec.native_input,
         "guard":spec.guard,"allocation_proof":allocation,"recorded_unix_millis":millis()?,
         "requested_memory_high_bytes":150_000_000_000u64,"requested_memory_max_bytes":225_000_000_000u64,
@@ -686,6 +705,46 @@ pub(super) fn preserve_after_marker(
             }
         }
     }
+}
+
+pub(super) fn validate_status_task(
+    task: &BoundFile,
+    actor: &Actor,
+    plan: &BoundFile,
+    origin: &BoundFile,
+    guard: &BoundFile,
+    accountant: &BoundFile,
+    qualification: &BoundFile,
+) -> Result<()> {
+    let value: Value = read_bound(task)?;
+    let q: Value = read_bound(qualification)?;
+    let clock: OriginClock = read_bound(origin)?;
+    validate_origin(&clock, millis()?)?;
+    validate_origin_journal(&clock)?;
+    ensure!(
+        value["schema"] == "jetstreamer-epoch223-demotion-active-task-v1"
+            && value["epoch"] == 223
+            && value["actor"] == serde_json::to_value(actor)?
+            && value["runtime_plan"] == binding_value(plan)
+            && value["origin_clock"] == binding_value(origin)
+            && value["guard"] == binding_value(guard)
+            && value["original_start_unix_millis"] == clock.original_start_unix_millis
+            && value["capture_executable_sha256"] == accountant.sha256
+            && q["executable_sha256"] == accountant.sha256
+            && q["demotion223_status_owner_capture_qualified"] == true
+            && value["publication_authorized"] == false
+            && value["r2_mutations"] == false,
+        "223 admission lacks the genuine independently captured status task/original clock"
+    );
+    let capture: BoundFile = serde_json::from_value(value["capture_spec"].clone())?;
+    let capture: Value = read_bound(&capture)?;
+    ensure!(
+        capture["output"].as_str() == task.path.to_str()
+            && capture["actor"] == serde_json::to_value(actor)?
+            && capture["runtime_plan"] == binding_value(plan),
+        "223 status task is not its actual captured destination"
+    );
+    Ok(())
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@ pub(super) struct Grant {
     schema: String,
     runtime_plan: BoundFile,
     control_grant: BoundFile,
+    status_task: BoundFile,
     request: BoundFile,
     runner: Actor,
     issuer: Actor,
@@ -219,6 +220,7 @@ fn validate(
     ensure!(
         g.schema == "jetstreamer-epoch223-demotion-spawn-grant-v1"
             && g.runtime_plan == c.admission.runtime_plan
+            && g.status_task == c.admission.status_task
             && g.control_grant == c.admission_binding
             && g.request == *request
             && g.runner == c.actor

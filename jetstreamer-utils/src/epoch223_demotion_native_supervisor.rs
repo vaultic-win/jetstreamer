@@ -33,6 +33,7 @@ struct Grant {
     schema: String,
     phase: String,
     runtime_plan: BoundFile,
+    status_task: BoundFile,
     runner: Actor,
     issuer: Actor,
     issuer_spec: BoundFile,
@@ -99,6 +100,7 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
         let issue: IssueSpec = read_bound(&grant.issuer_spec)?;
         ensure!(
             issue.schema == "jetstreamer-epoch223-demotion-native-issue-spec-v1"
+                && issue.status_task == grant.status_task
                 && issue.phase == w.phase
                 && issue.issuer_unit == grant.issuer.unit
                 && issue.runtime_plan == *w.binding
@@ -140,6 +142,15 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
                 "223 native spawn grant predates actual hash-complete request"
             );
         }
+        issuance::validate_status_task(
+            &grant.status_task,
+            w.actor,
+            w.binding,
+            &w.plan.origin_clock,
+            &grant.guard,
+            &w.plan.accounting_executable,
+            &w.plan.accounting_qualification,
+        )?;
         let issuer_qualification: Value = read_bound(&w.plan.issuer_qualification)?;
         ensure!(
             issuer_qualification["schema"] == "jetstreamer-epoch223-demotion-role-qualification-v1"
@@ -297,7 +308,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         "origin_clock":plan.origin_clock,"original_start_unix_millis":origin.original_start_unix_millis,
         "native_inputs_hashed":false,"native_execution_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     )?;
-    let (control, _, guard) = permission(Wait {
+    let (control, control_grant, guard) = permission(Wait {
         plan: &plan,
         binding,
         actor: &actor,
@@ -336,7 +347,9 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         control: Some(&control),
     })?;
     ensure!(
-        spawn_guard.actor == guard.actor && spawn_guard.guard_plan == guard.guard_plan,
+        spawn_guard.actor == guard.actor
+            && spawn_guard.guard_plan == guard.guard_plan
+            && spawn_grant.status_task == control_grant.status_task,
         "223 native original guard was replaced during hashing"
     );
     issuance::published(
@@ -447,7 +460,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let launch = issuance::published(
         &plan.run_root.join("native-launch.json"),
         &json!({
-        "schema":"jetstreamer-epoch223-demotion-native-launch-v1","supervisor":actor,"harness":plan.harness,
+        "schema":"jetstreamer-epoch223-demotion-native-launch-v1","status_task":control_grant.status_task,"supervisor":actor,"harness":plan.harness,
         "harness_pid":pid,"harness_start_ticks":ticks,"harness_argv":argv,"snapshot":plan.snapshot,"genesis":plan.genesis,
         "origin_clock":plan.origin_clock,"original_start_unix_millis":origin.original_start_unix_millis,
         "source_commit":"551728fda72afd36ce6f8652ddb0020ec249e860","worker_sha256":WORKER,
@@ -528,6 +541,7 @@ struct IssueSpec {
     phase: String,
     issuer_unit: String,
     runtime_plan: BoundFile,
+    status_task: BoundFile,
     runner: Actor,
     guard: BoundFile,
     request: Option<BoundFile>,
@@ -598,6 +612,15 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             && issuer.pid != spec.runner.pid,
         "223 native issuer lacks original exact independently armed guard"
     );
+    issuance::validate_status_task(
+        &spec.status_task,
+        &spec.runner,
+        &spec.runtime_plan,
+        &plan.origin_clock,
+        &spec.guard,
+        &plan.accounting_executable,
+        &plan.accounting_qualification,
+    )?;
     let basis: issuance::Basis = read_bound(&spec.accounting_basis)?;
     ensure!(
         basis.schema == "jetstreamer-epoch223-demotion-accounting-basis-v1"
@@ -641,6 +664,7 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         )?;
         ensure!(
             control.phase == "control"
+                && control.status_task == spec.status_task
                 && control.runtime_plan == spec.runtime_plan
                 && control.runner == spec.runner
                 && control.guard == spec.guard
@@ -750,7 +774,7 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             &plan.run_root.join("native-spawn-allocation.json"),
             &json!({
         "schema":"jetstreamer-epoch223-demotion-native-allocation-proof-v1","runner":spec.runner,"issuer":issuer,
-        "request":spec.request,"control_grant":spec.control_grant,"capacity_result":capacity,
+        "request":spec.request,"status_task":spec.status_task,"control_grant":spec.control_grant,"capacity_result":capacity,
         "effective_memory_high_bytes":high,"effective_memory_max_bytes":max,"effective_memory_swap_max_bytes":0,
         "manager_configuration_not_changed_by_this_issuer":true,"recorded_unix_millis":millis()?,
         "native_execution_authorized":false,"publication_authorized":false,"r2_mutations":false}),
@@ -759,7 +783,7 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         None
     };
     let value = json!({"schema":"jetstreamer-epoch223-demotion-native-grant-v1","phase":spec.phase,
-        "runtime_plan":spec.runtime_plan,"runner":spec.runner,"issuer":issuer,"issuer_spec":binding,
+        "runtime_plan":spec.runtime_plan,"status_task":spec.status_task,"runner":spec.runner,"issuer":issuer,"issuer_spec":binding,
         "guard":spec.guard,"request":spec.request,"control_grant":spec.control_grant,"capacity_result":capacity,"allocation_proof":allocation,
         "recorded_unix_millis":millis()?,"original_start_unix_millis":origin.original_start_unix_millis,
         "native_execution_authorized":spawn,"publication_authorized":false,"r2_mutations":false});

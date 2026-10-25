@@ -26,6 +26,7 @@ struct Spec {
 struct Launch {
     schema: String,
     supervisor: Actor,
+    status_task: BoundFile,
     harness: BoundFile,
     harness_pid: u32,
     harness_start_ticks: u64,
@@ -226,6 +227,14 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             && !launch.publication_authorized
             && !launch.r2_mutations,
         "223 capture is not exact new harness actual native launch"
+    );
+    let status_task: Value = read_bound(&launch.status_task)?;
+    ensure!(
+        status_task["schema"] == "jetstreamer-epoch223-demotion-active-task-v1"
+            && status_task["actor"] == serde_json::to_value(&launch.supervisor)?
+            && status_task["origin_clock"] == binding_value(&spec.origin_clock)
+            && status_task["original_start_unix_millis"] == origin.original_start_unix_millis,
+        "223 native proof has no genuine original-clock repair task"
     );
     let expected = vec![
         launch.harness.path.display().to_string(),

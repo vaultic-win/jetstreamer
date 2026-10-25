@@ -180,6 +180,7 @@ struct ControlGrant {
     accepted_fleet: BoundFile,
     context_qualification: BoundFile,
     repair_task: BoundFile,
+    status_task: BoundFile,
     guard: BoundFile,
     recorded_unix_millis: u64,
     protected_floor_bytes: u64,
@@ -203,6 +204,7 @@ struct IssueSpec {
     accepted_observer: BoundFile,
     accepted_fleet: BoundFile,
     repair_task: BoundFile,
+    status_task: BoundFile,
     guard: BoundFile,
     issuer_unit: String,
     accounting_basis: BoundFile,
@@ -773,6 +775,15 @@ impl Runtime {
                     observe(&actor)?;
                     observe(&admission.issuer)?;
                     observe(&guard.actor)?;
+                    issuance::validate_status_task(
+                        &admission.status_task,
+                        &actor,
+                        binding,
+                        &x.origin_clock,
+                        &admission.guard,
+                        &x.accounting_executable,
+                        &x.accounting_qualification,
+                    )?;
                     issuance::validate_control_capacity(&admission, x)?;
                     check_control_kernel(p)?;
                     session
@@ -897,6 +908,7 @@ fn validate_issue_and_guard_plan(
             && i.admission_policy == a.admission_policy
             && i.accepted_observer == a.accepted_observer
             && i.accepted_fleet == a.accepted_fleet
+            && i.status_task == a.status_task
             && i.repair_task == a.repair_task
             && i.guard == a.guard
             && a.issuer.expected_exec_start
@@ -1336,6 +1348,7 @@ mod tests {
             accepted_fleet: file("fleet"),
             context_qualification: file("context"),
             repair_task: file("task"),
+            status_task: file("status-task"),
             guard: file("guard"),
             recorded_unix_millis: 10,
             protected_floor_bytes: p.minimum_free_bytes,
