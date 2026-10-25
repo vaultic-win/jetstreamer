@@ -3716,6 +3716,15 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-prefix223-native20") {
         return fleet::capture_prefix223_native20();
     }
+    if env::args().nth(1).as_deref() == Some("capture-demotion223-repair-task") {
+        return fleet::capture_demotion223_task();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-demotion223-task-terminal") {
+        return fleet::capture_demotion223_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-demotion223-repair") {
+        return fleet::publish_demotion223_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-prefix223-native20") {
         return fleet::publish_prefix223_native20_status().await;
     }

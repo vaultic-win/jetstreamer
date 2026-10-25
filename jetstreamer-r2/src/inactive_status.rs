@@ -253,6 +253,7 @@ fn validate_fleet(fleet: &Value, plan: &Plan, now: u64) -> Result<()> {
 }
 
 fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, String)>> {
+    if let Some(owner) = fleet::demotion223_inactive_owner(publication)? { return Ok(vec![owner]); }
     if let Some(binding) = &publication.pipeline_binding {
         binding.validate(publication.epoch, &publication.status.phase)?;
         return Ok(vec![(binding.unit.clone(), binding.invocation_id.clone())]);
@@ -412,6 +413,7 @@ fn fresh_census(
     if let Some(delivery) = &preserved_delivery {
         preserved144::terminal_census(plan, delivery, &current)?;
     }
+    let demotion223 = fleet::demotion223_cleanup_current(plan.epoch, terminal_fleet, &current, owners)?;
     let preserved =
         terminal_fleet["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1";
     if preserved {
@@ -502,6 +504,7 @@ fn fresh_census(
             && !capped141
             && !terminal185
             && !native223
+            && !demotion223
             && !native207
             && !native209
             && !native210
@@ -686,7 +689,9 @@ pub(super) async fn run() -> Result<()> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     validate_fleet(&fleet, &plan, now)?;
     let original_capped_time = fleet::original_capped204205_terminal_time(plan.epoch, &history)?;
-    let history_time = if let Some(time) = original_capped_time {
+    let history_time = if let Some(time) = fleet::demotion223_cleanup_time(plan.epoch, &history)? {
+        time
+    } else if let Some(time) = original_capped_time {
         time
     } else if terminal185::recognized(&history) {
         terminal185::time(&plan, &history)?
