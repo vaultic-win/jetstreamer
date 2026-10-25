@@ -105,8 +105,26 @@ fn canary_terminal_suffix(path: &Path) -> Option<&str> {
 fn canary_terminal_fleet(path: &Path) -> bool {
     canary_terminal_suffix(path).is_some()
 }
+// Ordinary fleet-reconcile outputs are authenticated records, not metadata
+// events. Recognize only their direct private output namespace; never relabel
+// or copy a historical accepted record into another namespace.
+fn normal_fleet(path: &Path) -> bool {
+    path.file_name().is_some_and(|n| n == "fleet.json")
+        && path.parent().is_some_and(|p| {
+            p.parent() == Some(Path::new("/var/lib/jetstreamer"))
+                && p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                    n.strip_prefix("horizon-fleet-").is_some_and(|suffix| {
+                        !suffix.is_empty()
+                            && suffix
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                    })
+                })
+        })
+}
 fn accepted_namespace(path: &Path) -> bool {
     event_fleet(path)
+        || normal_fleet(path)
         || canary_terminal_fleet(path)
         || path.starts_with("/var/lib/jetstreamer/horizon-campaign-fleet")
 }
@@ -158,6 +176,34 @@ fn canary_terminal_fleet_value(binding: &BoundFile) -> Result<Value> {
     );
     Ok(value)
 }
+fn normal_fleet_value(binding: &BoundFile) -> Result<Value> {
+    ensure!(
+        normal_fleet(&binding.path),
+        "normal fleet namespace differs"
+    );
+    let parent = binding.path.parent().context("normal fleet parent")?;
+    let directory = fs::symlink_metadata(parent)?;
+    let before = fs::symlink_metadata(&binding.path)?;
+    ensure!(
+        parent.canonicalize()? == parent
+            && directory.is_dir()
+            && directory.uid() == 0
+            && directory.mode() & 0o777 == 0o700
+            && binding.path.canonicalize()? == binding.path
+            && before.is_file()
+            && before.uid() == 0
+            && before.nlink() == 1
+            && before.mode() & 0o022 == 0,
+        "normal fleet root file/parent custody differs"
+    );
+    let value = bound_json(binding)?;
+    ensure!(
+        identity(&before) == identity(&fs::symlink_metadata(&binding.path)?)
+            && identity(&directory) == identity(&fs::symlink_metadata(parent)?),
+        "normal fleet changed during read"
+    );
+    Ok(value)
+}
 fn event_fleet_value(binding: &BoundFile) -> Result<Value> {
     ensure!(
         event_fleet(&binding.path),
@@ -190,6 +236,8 @@ fn accepted_fleet(binding: &BoundFile) -> Result<Value> {
         &|b| {
             if event_fleet(&b.path) {
                 event_fleet_value(b)
+            } else if normal_fleet(&b.path) {
+                normal_fleet_value(b)
             } else if canary_terminal_fleet(&b.path) {
                 canary_terminal_fleet_value(b)
             } else {
@@ -231,6 +279,54 @@ fn accepted_fleet_with(
         }
         if canonical {
             return result.context("204 accepted fleet missing");
+        }
+        if normal_fleet(&next.path) {
+            let parent = next.path.parent().context("normal fleet parent")?;
+            let plan_binding = BoundFile {
+                path: s(&f, "plan")?.into(),
+                sha256: s(&f, "plan_sha256")?.into(),
+            };
+            ensure!(
+                plan_binding.path == parent.join("plan.json"),
+                "normal fleet paired plan differs"
+            );
+            let plan = metadata(&plan_binding, true)?;
+            let previous: BoundFile = serde_json::from_value(f["previous_fleet"].clone())?;
+            ensure!(
+                accepted_namespace(&previous.path) && !seen.contains(&previous.path),
+                "normal fleet predecessor namespace/cycle differs"
+            );
+            let predecessor = fleet(&previous)?;
+            let observer_binding: BoundFile = serde_json::from_value(plan["observer"].clone())?;
+            let observer = metadata(&observer_binding, false)?;
+            let sample = s(&observer, "recorded_at_utc")?;
+            let sampled_seconds = utc_seconds(sample)?;
+            let recorded = n(&f, "recorded_unix_seconds")?;
+            ensure!(
+                plan["schema"] == "jetstreamer-horizon-campaign-fleet-plan-v1"
+                    && plan["first_epoch"] == 201
+                    && plan["last_epoch"] == 300
+                    && plan["output"] == next.path.to_string_lossy().as_ref()
+                    && plan["previous_fleet"] == private157::binding(&previous)
+                    && plan["observer"]["path"] == f["observer_receipt"]
+                    && plan["observer"]["sha256"] == f["observer_sha256"]
+                    && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+                    && f["sampled_at_utc"] == sample
+                    && sampled_seconds <= recorded
+                    && recorded - sampled_seconds <= 1800
+                    && plan["metadata_event"].is_null()
+                    && f["metadata_event"].is_null()
+                    && f["metadata_event_sampled_at_utc"].is_null()
+                    && plan["admission_transition_guard"].is_null()
+                    && f["admission_transition_guard"].is_null()
+                    && f["remote_mutations"] == false
+                    && f["producer_mutations"] == false
+                    && f["publication_authorized"] == false,
+                "normal fleet lost exact plan/observer lineage or borrowed authority"
+            );
+            validate_previous_fleet(&predecessor, 201, 300, sample)?;
+            next = previous;
+            continue;
         }
         if canary_terminal_fleet(&next.path) {
             let (plan_binding, proof_binding) = canary_terminal_members(&next, &f)?;
@@ -1138,5 +1234,178 @@ mod tests {
         stale.get_mut(&binding.path).unwrap()["recorded_unix_seconds"] =
             json!(files[&proof]["recorded_unix_seconds"].as_u64().unwrap() + 301);
         assert!(saved_canary_fixture(&binding, &stale).is_err());
+    }
+    fn normal_reconcile_fixture() -> (BoundFile, BTreeMap<PathBuf, Value>) {
+        let (previous, mut files) = event_fixture(1);
+        let prior = files[&previous.path].clone();
+        let old_plan = PathBuf::from(prior["plan"].as_str().unwrap());
+        let fleet = b("/var/lib/jetstreamer/horizon-fleet-cycle425-post-terminal-v1/fleet.json");
+        let plan = b("/var/lib/jetstreamer/horizon-fleet-cycle425-post-terminal-v1/plan.json");
+        let observer = b("/fixture/observer425.json");
+        let at = prior["recorded_unix_seconds"].as_u64().unwrap() + 1860;
+        let observed = observation(at, None);
+        let mut next = files[&old_plan].clone();
+        next["output"] = json!(fleet.path);
+        next["observer"] = private157::binding(&observer);
+        next["previous_fleet"] = private157::binding(&previous);
+        next["metadata_event"] = Value::Null;
+        let mut ledger = prior;
+        ledger["plan"] = json!(plan.path);
+        ledger["plan_sha256"] = json!(plan.sha256);
+        ledger["previous_fleet"] = private157::binding(&previous);
+        ledger["observer_receipt"] = json!(observer.path);
+        ledger["observer_sha256"] = json!(observer.sha256);
+        ledger["sampled_at_utc"] = observed["recorded_at_utc"].clone();
+        ledger["recorded_unix_seconds"] = json!(at + 138);
+        ledger["metadata_event"] = Value::Null;
+        ledger
+            .as_object_mut()
+            .unwrap()
+            .remove("metadata_event_sampled_at_utc");
+        for key in [
+            "remote_mutations",
+            "producer_mutations",
+            "publication_authorized",
+        ] {
+            ledger[key] = json!(false);
+        }
+        files.insert(fleet.path.clone(), ledger);
+        files.insert(plan.path, next);
+        files.insert(observer.path, observed);
+        (fleet, files)
+    }
+    #[test]
+    fn normal425_reconcile_keeps_authentic_event_predecessor_and_closed_gates() {
+        let (binding, files) = normal_reconcile_fixture();
+        let saved = saved_fleet(&binding, &files).unwrap();
+        assert_eq!(saved, files[&binding.path]);
+        let prior = &files[&PathBuf::from(saved["previous_fleet"]["path"].as_str().unwrap())];
+        let old = &files[&PathBuf::from(prior["plan"].as_str().unwrap())];
+        let plan = &files[&binding.path.parent().unwrap().join("plan.json")];
+        assert_eq!(plan["gates"], old["gates"]);
+        assert_eq!(plan["assembly204_recovery"], old["assembly204_recovery"]);
+        assert_eq!(
+            plan["assembly204_recovery_history"],
+            old["assembly204_recovery_history"]
+        );
+        for path in [
+            "/var/lib/jetstreamer/horizon-fleet-/fleet.json",
+            "/var/lib/jetstreamer/horizon-fleet-cycle425_v1/fleet.json",
+            "/var/lib/jetstreamer/horizon-fleet-cycle425/fleet-other.json",
+            "/var/lib/jetstreamer/horizon-fleet-cycle425/nested/fleet.json",
+            "/tmp/horizon-fleet-cycle425/fleet.json",
+        ] {
+            assert!(!normal_fleet(Path::new(path)), "{path}");
+        }
+    }
+    #[test]
+    fn normal425_reconcile_rejects_foreign_bindings_events_guards_authority_and_time() {
+        let (binding, files) = normal_reconcile_fixture();
+        let plan = binding.path.parent().unwrap().join("plan.json");
+        let observer = PathBuf::from(files[&binding.path]["observer_receipt"].as_str().unwrap());
+        for (file, key, value) in [
+            (plan.clone(), "schema", json!("foreign")),
+            (plan.clone(), "first_epoch", json!(200)),
+            (plan.clone(), "last_epoch", json!(301)),
+            (plan.clone(), "output", json!("/foreign/fleet.json")),
+            (
+                plan.clone(),
+                "previous_fleet",
+                private157::binding(&binding),
+            ),
+            (
+                plan.clone(),
+                "observer",
+                json!({"path":"/foreign/observer.json","sha256":"a".repeat(64)}),
+            ),
+            (
+                plan.clone(),
+                "metadata_event",
+                json!({"path":"/foreign/event.json","sha256":"a".repeat(64)}),
+            ),
+            (
+                plan.clone(),
+                "admission_transition_guard",
+                json!({"path":"/guard.json","sha256":"a".repeat(64)}),
+            ),
+            (observer.clone(), "schema", json!("foreign")),
+            (binding.path.clone(), "plan", json!("/foreign/plan.json")),
+            (
+                binding.path.clone(),
+                "previous_fleet",
+                private157::binding(&binding),
+            ),
+            (
+                binding.path.clone(),
+                "observer_sha256",
+                json!("b".repeat(64)),
+            ),
+            (
+                binding.path.clone(),
+                "metadata_event",
+                json!({"path":"/unknown/event.json","sha256":"a".repeat(64)}),
+            ),
+            (
+                binding.path.clone(),
+                "metadata_event_sampled_at_utc",
+                json!("2026-10-25T21:55:00Z"),
+            ),
+            (
+                binding.path.clone(),
+                "admission_transition_guard",
+                json!({"path":"/guard.json","sha256":"a".repeat(64)}),
+            ),
+            (binding.path.clone(), "remote_mutations", json!(true)),
+            (binding.path.clone(), "producer_mutations", json!(true)),
+            (binding.path.clone(), "publication_authorized", json!(true)),
+            (
+                binding.path.clone(),
+                "sampled_at_utc",
+                json!("1970-01-01T00:00:00Z"),
+            ),
+            (binding.path.clone(), "recorded_unix_seconds", json!(11859)),
+            (binding.path.clone(), "recorded_unix_seconds", json!(13661)),
+        ] {
+            let mut bad = files.clone();
+            bad.get_mut(&file).unwrap()[key] = value;
+            assert!(
+                saved_fleet(&binding, &bad).is_err(),
+                "{}:{key}",
+                file.display()
+            );
+        }
+    }
+    #[test]
+    fn normal_reconcile_predecessors_are_authenticated_inside_event_lineage() {
+        let (previous, mut files) = normal_reconcile_fixture();
+        let prior = files[&previous.path].clone();
+        let old_path = PathBuf::from(prior["plan"].as_str().unwrap());
+        let old = files[&old_path].clone();
+        let directory =
+            Path::new("/var/lib/jetstreamer/horizon-204-assembly-fleet-event-after-normal425");
+        let fleet = b(directory.join("fleet.json").to_str().unwrap());
+        let plan = b(directory.join("plan.json").to_str().unwrap());
+        let event_binding = b(directory.join("event.json").to_str().unwrap());
+        let observer = b("/fixture/observer426.json");
+        let sample = observation(13720, None);
+        let event = json!({"schema":transition::EVENT_SCHEMA,"action":"terminal",
+            "original_plan":{"path":prior["plan"],"sha256":prior["plan_sha256"]},
+            "previous_fleet":previous,"observer":observer,"sampled_at_utc":sample["recorded_at_utc"],
+            "metadata_only":true,"resource_samples_taken":0,"authority":denied(),
+            "terminal":b("/fixture/terminal.json")});
+        let mut next = transition::saved_event_plan(&event, &old, &prior, None, directory).unwrap();
+        next["metadata_event"] = private157::binding(&event_binding);
+        let ledger = json!({"schema":SCHEMA,"first_epoch":201,"last_epoch":300,
+            "plan":plan.path,"plan_sha256":plan.sha256,"metadata_event":event_binding,
+            "previous_fleet":previous,"observer_receipt":observer.path,"observer_sha256":observer.sha256,
+            "sampled_at_utc":sample["recorded_at_utc"],"metadata_event_sampled_at_utc":sample["recorded_at_utc"],
+            "recorded_unix_seconds":13720,"unit_census":{}});
+        files.insert(fleet.path.clone(), ledger);
+        files.insert(plan.path, next);
+        files.insert(event_binding.path, event);
+        files.insert(observer.path, sample);
+        saved_fleet(&fleet, &files).unwrap();
+        files.get_mut(&previous.path).unwrap()["remote_mutations"] = json!(true);
+        assert!(saved_fleet(&fleet, &files).is_err());
     }
 }
