@@ -265,10 +265,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             && launch.snapshot.path
                 == Path::new("/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1")
                     .join(SNAPSHOT_NAME)
-            && launch.genesis.path
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.bin"
-                ),
+            && native_genesis_archive_matches(&launch.genesis),
         "223 native launch boot or actual pinned input paths differ"
     );
     bound_file(

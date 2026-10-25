@@ -196,7 +196,7 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
                 && result["schema"] == "jetstreamer-epoch223-demotion-capacity-result-v1"
                 && result["self_sha256"] == w.plan.accounting_executable.sha256
                 && result["upstream_accounting_source_commit"]
-                    == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
+                    == "eaa8f5ac1893524e06100dc4ce4e5d53e8290128"
                 && result["context"]["phase"] == w.phase
                 && result["context"]["job_kind"] == "native-input"
                 && result["context"]["runtime_plan"] == binding_value(w.binding)
@@ -253,7 +253,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         plan.schema == "jetstreamer-epoch223-demotion-native-supervisor-plan-v1"
             && plan.harness.sha256 == HARNESS
             && plan.snapshot.sha256 == SNAPSHOT
-            && plan.genesis.sha256 == GENESIS
+            && native_genesis_archive_matches(&plan.genesis)
             && plan.bootstrap_slot == 96_335_538
             && plan.local_floor_bytes > 0
             && plan.maximum_wait_millis > 0
@@ -272,7 +272,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
                     .join(SNAPSHOT_NAME)
             && plan.genesis.path
                 == Path::new(
-                    "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.bin"
+                    "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2"
                 )
             && plan.source_qa.sha256
                 == "3d5ea04ae0658070be51a8b410e2d6af8e0305bade8b7df455957e9db77a2f0f",
@@ -648,7 +648,7 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         qualification["complete_memory_accounting_qualified"] == true
             && qualification["executable_sha256"] == plan.accounting_executable.sha256
             && qualification["upstream_accounting_source_commit"]
-                == "8289bc65aab9d495071ac81f932d3ae71c6bad38",
+                == "eaa8f5ac1893524e06100dc4ce4e5d53e8290128",
         "223 native corrected accounting unqualified"
     );
     bound_file(

@@ -1,4 +1,4 @@
-//! Exact epoch 223 candidates over the coherent 8289bc65 complete ledger.
+//! Exact epoch 223 candidates over the coherent eaa8f5ac complete ledger.
 //! Pending candidate actors are charged in full, never hidden as free capacity.
 use super::*;
 
@@ -332,7 +332,7 @@ pub(super) fn run() -> Result<()> {
         &s.output,
         &json!({"schema":"jetstreamer-epoch223-demotion-capacity-result-v1",
         "spec":private157::binding(&binding),"self_sha256":self_sha,"context":s.context,
-        "upstream_accounting_source_commit":"8289bc65aab9d495071ac81f932d3ae71c6bad38","capacity":capacity,
+        "upstream_accounting_source_commit":"eaa8f5ac1893524e06100dc4ce4e5d53e8290128","capacity":capacity,
         "native_execution_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     )?;
     println!("{}", private157::file_binding(&s.output)?);
@@ -439,6 +439,44 @@ mod tests {
             changed.get_mut(&c.producer.unit).unwrap()[key] = value;
             assert!(c.retained_peer_view(&f, &changed, &guards).is_err());
         }
+    }
+    #[test]
+    fn bracket_candidate_never_exempts_canary_owner_guard_or_cleared_terminal_uncertainty() {
+        let c = context();
+        let row = |a: &Actor| json!({"Id":a.unit,"InvocationID":a.invocation_id,"MainPID":a.pid.to_string(),"ControlGroup":a.cgroup,"NRestarts":"0","ActiveState":"active","SubState":"running","ExecStart":a.expected_exec_start});
+        let canary = json!({"epoch":227,"phase":"diagnostic-qualification","ordinary_replay_claim":false,
+            "scratch_path":canary227::ROOT,"launch_receipt":"/var/lib/jetstreamer/horizon-227-v1625-canary-capture-selection-v2/launch.json","launch_receipt_sha256":"d".repeat(64),
+            "producer":{"Id":canary227::UNIT,"InvocationID":"e".repeat(32),"MainPID":"42","NRestarts":"0","LoadState":"loaded","Type":"exec","Result":"success","ActiveState":"active","SubState":"running","ControlGroup":format!("/system.slice/{}",canary227::UNIT)}});
+        canary227_peer::row_scope(&canary).unwrap();
+        let guard = json!({"Id":canary227_peer::PROTECTIVE,"InvocationID":"f".repeat(32),"MainPID":"43","ActiveState":"activating","SubState":"start"});
+        let mut census = BTreeMap::from([
+            (c.producer.unit.clone(), row(&c.producer)),
+            (c.guard.unit.clone(), row(&c.guard)),
+            (c.issuer.unit.clone(), row(&c.issuer)),
+            (canary227::UNIT.into(), canary["producer"].clone()),
+            (canary227_peer::PROTECTIVE.into(), guard.clone()),
+        ]);
+        let f = json!({"active":[{"unit":row(&c.producer)},canary],"unit_census":census,"failed_history":{"227":"original failure retained"}});
+        let before = f.clone();
+        let root_guards = BTreeSet::from([c.guard.unit.clone()]);
+        let view = c.retained_peer_view(&f, &census, &root_guards).unwrap();
+        assert_eq!(view.get(canary227::UNIT), census.get(canary227::UNIT));
+        assert_eq!(view.get(canary227_peer::PROTECTIVE), Some(&guard));
+        assert_eq!(f, before);
+        assert!(!view.contains_key(&c.issuer.unit));
+        for key in ["MainPID", "ExecMainPID", "ExecMainStartTimestampMonotonic"] {
+            census.get_mut(canary227::UNIT).unwrap()[key] = json!("0");
+        }
+        census.get_mut(canary227::UNIT).unwrap()["InvocationID"] = json!("");
+        census.get_mut(canary227::UNIT).unwrap()["ActiveState"] = json!("inactive");
+        census.get_mut(canary227::UNIT).unwrap()["SubState"] = json!("dead");
+        let uncertain = c.retained_peer_view(&f, &census, &root_guards).unwrap();
+        assert_eq!(uncertain.get(canary227::UNIT), census.get(canary227::UNIT));
+        assert!(uncertain.contains_key(canary227_peer::PROTECTIVE));
+        let mut invalid = f["active"][1].clone();
+        invalid["producer"] = census[canary227::UNIT].clone();
+        assert!(canary227_peer::row_scope(&invalid).is_err());
+        assert_eq!(f, before);
     }
     #[test]
     fn foreign_legacy_or_borrowed_actor_cannot_be_a_candidate_exemption() {

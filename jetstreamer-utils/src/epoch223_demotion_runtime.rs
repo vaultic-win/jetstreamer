@@ -31,6 +31,14 @@ mod spawn {
     include!("epoch223_demotion_spawn.rs");
 }
 const HARNESS: &str = "a280b1f48f0bb430c482e01a03b4b800ee8f95f326590059e4cdf4873b14a22b";
+// GENESIS is the known genesis.tar.bz2 archive digest, not a raw-bin digest.
+fn native_genesis_archive_matches(binding: &BoundFile) -> bool {
+    binding.path
+        == Path::new(
+            "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2",
+        )
+        && binding.sha256 == GENESIS
+}
 const OLD_UNIT: &str = "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service";
 const OLD_IID: &str = "e70aaf097e7c4583b216aba454145910";
 
@@ -1202,6 +1210,21 @@ mod tests {
         assert!(origin_start(&serde_json::to_vec(&other).unwrap()).is_err());
         let duplicate = [bytes.clone(), b"\n".to_vec(), bytes].concat();
         assert!(origin_start(&duplicate).is_err());
+    }
+    #[test]
+    fn native_genesis_binding_rejects_raw_bin_with_archive_digest() {
+        let archive = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.tar.bz2"
+                .into(),
+            sha256: GENESIS.into(),
+        };
+        assert!(native_genesis_archive_matches(&archive));
+        let mut raw = archive.clone();
+        raw.path.set_file_name("genesis.bin");
+        assert!(!native_genesis_archive_matches(&raw));
+        let mut wrong = archive;
+        wrong.sha256 = "a".repeat(64);
+        assert!(!native_genesis_archive_matches(&wrong));
     }
     #[test]
     fn legacy_plan_and_serialized_hook_selection_are_rejected() {
