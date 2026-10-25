@@ -171,22 +171,13 @@ fn protection(p: &Peer, bounds: &BTreeMap<String, BoundFile>, now: u64) -> Resul
         .get(p.stage.unit())
         .context("204 recovery protection omitted")?;
     if p.stage == downstream::Stage::Assembly {
-        ensure!(
-            p.frame["guard_snapshot"] == private157::binding(bound),
-            "204 protected guard is not the actual issued frame snapshot"
-        );
-        let g = read(bound)?;
         let plan = read(&p.claim.recovery_plan)?;
-        let actual_millis: u64 = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_millis()
-            .try_into()?;
+        let actual_millis = now_millis()?;
         ensure!(
             actual_millis / 1000 >= now && actual_millis / 1000 - now <= 900,
             "204 resource transaction clock differs"
         );
-        guard_shape(&g, &plan, &p.claim.recovery_plan, &p.launch, actual_millis)?;
-        Ok(g)
+        assembly_protection_with(p, bound, &plan, &read, &live_guard::load)
     } else {
         ensure!(
             private157::binding(bound) == private157::binding(&p.claim.frame),
@@ -200,6 +191,32 @@ fn protection(p: &Peer, bounds: &BTreeMap<String, BoundFile>, now: u64) -> Resul
         );
         Ok(frame)
     }
+}
+fn assembly_protection_with(
+    p: &Peer,
+    bound: &BoundFile,
+    plan: &Value,
+    historical: &impl Fn(&BoundFile) -> Result<Value>,
+    current: &impl Fn(&Value, &BoundFile, &Value) -> Result<live_guard::Heartbeat>,
+) -> Result<Value> {
+    ensure!(
+        p.frame["guard_snapshot"] == private157::binding(bound),
+        "204 protected guard is not the actual issued frame snapshot"
+    );
+    let origin = historical(bound)?;
+    let captured = n(&p.frame, "sampled_unix_millis")?;
+    guard_shape(&origin, plan, &p.claim.recovery_plan, &p.launch, captured)?;
+    let live = current(plan, &p.claim.recovery_plan, &p.launch)?;
+    ensure!(
+        live.value["started_unix_millis"] == origin["started_unix_millis"]
+            && n(&live.value, "recorded_unix_millis")? >= n(&origin, "recorded_unix_millis")?,
+        "204 current heartbeat changed its guard origin or moved backwards"
+    );
+    Ok(
+        json!({"schema":"jetstreamer-recovery204-live-resource-protection-v1",
+        "historical_guard_snapshot":private157::binding(bound),"historical_guard":origin,
+        "historical_frame_sampled_unix_millis":captured,"current_heartbeat":live.evidence()?}),
+    )
 }
 pub(in crate::fleet) fn peer_limits(
     f: &Value,
@@ -249,16 +266,6 @@ pub(in crate::fleet) fn peer_resources(
         } else {
             Value::Null
         };
-        let growth = n(&actor, "remaining_hard_memory_growth_bytes")?
-            .checked_add(if guard.is_null() {
-                0
-            } else {
-                n(&guard, "remaining_hard_memory_growth_bytes")?
-            })
-            .context("204 peer memory overflow")?;
-        memory = memory
-            .checked_add(growth)
-            .context("204 peer total memory overflow")?;
         // Retain the full admitted disk envelope even when files have already
         // allocated blocks. No caller-asserted or RSS credit is available.
         let admitted = if p.stage == downstream::Stage::Assembly {
@@ -275,11 +282,40 @@ pub(in crate::fleet) fn peer_resources(
         disk = disk
             .checked_add(admitted)
             .context("204 peer disk total overflow")?;
-        me.push(json!({"epoch":204,"unit":p.stage.unit(),"invocation_id":p.launch["invocation_id"],"producer":actor,"guard":guard,"remaining_hard_memory_growth_bytes":growth,
-            "accounting":"actual actor and independent guard memory.max minus memory.current; no RSS credit"}));
-        de.push(json!({"epoch":204,"unit":p.stage.unit(),"remaining_growth_bytes":admitted,"allocation_credit_bytes":0,"protection":proof}));
+        let (disk_evidence, memory_evidence, growth) =
+            resource_evidence(&p, proof, actor, guard, admitted)?;
+        memory = memory
+            .checked_add(growth)
+            .context("204 peer total memory overflow")?;
+        me.push(memory_evidence);
+        de.push(disk_evidence);
     }
     Ok((disk, de, memory, me))
+}
+fn resource_evidence(
+    p: &Peer,
+    proof: Value,
+    actor: Value,
+    guard: Value,
+    admitted: u64,
+) -> Result<(Value, Value, u64)> {
+    let growth = n(&actor, "remaining_hard_memory_growth_bytes")?
+        .checked_add(if guard.is_null() {
+            0
+        } else {
+            n(&guard, "remaining_hard_memory_growth_bytes")?
+        })
+        .context("204 peer memory overflow")?;
+    let mut memory = json!({"epoch":204,"unit":p.stage.unit(),"invocation_id":p.launch["invocation_id"],"producer":actor,"guard":guard,"remaining_hard_memory_growth_bytes":growth,
+        "accounting":"actual actor and independent guard memory.max minus memory.current; no RSS credit"});
+    if p.stage == downstream::Stage::Assembly {
+        memory["live_guard_protection"] = proof.clone();
+    }
+    Ok((
+        json!({"epoch":204,"unit":p.stage.unit(),"remaining_growth_bytes":admitted,"allocation_credit_bytes":0,"protection":proof}),
+        memory,
+        growth,
+    ))
 }
 
 pub(in crate::fleet) fn qualification_successor(
@@ -290,7 +326,10 @@ pub(in crate::fleet) fn qualification_successor(
     actor_launch: &BoundFile,
 ) -> Result<()> {
     let peers = accepted(f)?;
-    ensure!(peers.len() == 1, "qualification requires one authenticated recovery 204 owner");
+    ensure!(
+        peers.len() == 1,
+        "qualification requires one authenticated recovery 204 owner"
+    );
     let p = &peers[0];
     ensure!(
         p.claim.epoch == 204
@@ -307,4 +346,238 @@ pub(in crate::fleet) fn qualification_successor(
         "qualification recovery 204 row changed or became stale"
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod live_guard_tests {
+    use super::*;
+    fn bound(name: &str) -> BoundFile {
+        BoundFile {
+            path: Path::new("/sealed").join(name),
+            sha256: "a".repeat(64),
+        }
+    }
+    fn live_owner(name: &str, invocation: &str, pid: &str) -> Value {
+        json!({"Id":name,"InvocationID":invocation,"MainPID":pid,"NRestarts":"0",
+            "LoadState":"loaded","ActiveState":"active","SubState":"running",
+            "ControlGroup":format!("/system.slice/{name}"),"ExecStart":"{ path=/sealed/helper ; argv[]=/sealed/helper ; ignore_errors=no }"})
+    }
+    fn fixture() -> (Peer, BoundFile, Value, Value) {
+        let snapshot = bound("frame.guard.json");
+        let plan = json!({"source_capture":private157::binding(&bound("sources.json")),
+            "guard_spec":private157::binding(&bound("guard-spec.json"))});
+        let launch = json!({"invocation_id":"d".repeat(32),"guard_invocation_id":"e".repeat(32),
+            "owner":live_owner(UNIT,&"d".repeat(32),"10"),
+            "guard":live_owner(GUARD,&"e".repeat(32),"11")});
+        let peer = Peer {
+            claim: Claim {
+                epoch: 204,
+                recovery_plan: bound("plan.json"),
+                admission: bound("admission.json"),
+                launch: bound("launch.json"),
+                actor_launch: bound("actor-launch.json"),
+                frame: bound("frame.json"),
+                eta_policy: bound("eta.json"),
+            },
+            row: Value::Null,
+            frame: json!({"guard_snapshot":private157::binding(&snapshot),"sampled_unix_millis":1_000_000}),
+            launch,
+            stage: downstream::Stage::Assembly,
+        };
+        let guard = json!({"schema":"jetstreamer-epoch204-assembly-recovery-guard-heartbeat-v1","epoch":204,
+            "plan_sha256":peer.claim.recovery_plan.sha256,"source_capture":plan["source_capture"],"guard_spec":plan["guard_spec"],
+            "producer_unit":UNIT,"guard_unit":GUARD,"producer_invocation_id":peer.launch["invocation_id"],
+            "guard_invocation_id":peer.launch["guard_invocation_id"],"recorded_unix_millis":1_000_000,
+            "started_unix_millis":900_000,"trip":false,"producer_stop_enabled":true,"source_custody_unchanged":true,
+            "original_owner_idle":true,"kernel_memory_max_bytes":MEMORY,"kernel_memory_high_bytes":48u64<<30,
+            "memory_swap_max_bytes":0,"cpu_quota_usec_per_second":8_000_000,"tasks_max":512,
+            "maximum_millis":DURATION,"maximum_output_bytes":OUTPUT_MAX});
+        (peer, snapshot, plan, guard)
+    }
+    fn prove(
+        p: &Peer,
+        snapshot: &BoundFile,
+        plan: &Value,
+        origin: &Value,
+        live: &Value,
+        now: u64,
+    ) -> Result<Value> {
+        assembly_protection_with(
+            p,
+            snapshot,
+            plan,
+            &|b| {
+                ensure!(
+                    private157::binding(b) == private157::binding(snapshot),
+                    "unexpected historical binding"
+                );
+                Ok(origin.clone())
+            },
+            &|plan, b, launch| live_guard::fixture_heartbeat(live, plan, b, launch, now),
+        )
+    }
+    #[test]
+    fn old_legitimate_frame_uses_fresh_exact_current_heartbeat_and_preserves_raw_evidence() {
+        let (p, snapshot, plan, origin) = fixture();
+        let mut live = origin.clone();
+        live["recorded_unix_millis"] = json!(1_600_000);
+        assert!(guard_shape(&origin, &plan, &p.claim.recovery_plan, &p.launch, 1_600_000).is_err());
+        let proof = prove(&p, &snapshot, &plan, &origin, &live, 1_600_001).unwrap();
+        assert_eq!(
+            proof["historical_guard_snapshot"],
+            private157::binding(&snapshot)
+        );
+        assert_eq!(proof["historical_guard"], origin);
+        assert_eq!(proof["current_heartbeat"]["heartbeat"], live);
+        let raw = proof["current_heartbeat"]["raw_json"].as_str().unwrap();
+        assert_eq!(serde_json::from_str::<Value>(raw).unwrap(), live);
+        assert_eq!(
+            proof["current_heartbeat"]["binding"]["sha256"],
+            hex_lower(&Sha256::digest(raw.as_bytes()))
+        );
+        assert_eq!(
+            proof["current_heartbeat"]["binding"]["path"],
+            format!("{ROOT}/guard-heartbeat.json")
+        );
+        assert_eq!(proof["current_heartbeat"]["checked_unix_millis"], 1_600_001);
+    }
+    #[test]
+    fn current_heartbeat_failures_never_fall_back_to_history() {
+        let (p, snapshot, plan, origin) = fixture();
+        let mut live = origin.clone();
+        live["recorded_unix_millis"] = json!(1_600_000);
+        assert!(
+            assembly_protection_with(
+                &p,
+                &snapshot,
+                &plan,
+                &|_| Ok(origin.clone()),
+                &|_, _, _| bail!("live heartbeat absent")
+            )
+            .is_err()
+        );
+        prove(&p, &snapshot, &plan, &origin, &live, 1_615_000).unwrap();
+        assert!(prove(&p, &snapshot, &plan, &origin, &live, 1_615_001).is_err());
+        assert!(prove(&p, &snapshot, &plan, &origin, &Value::Null, 1_600_000).is_err());
+        for (key, value) in [
+            ("trip", json!(true)),
+            ("producer_stop_enabled", json!(false)),
+            ("source_custody_unchanged", json!(false)),
+            ("original_owner_idle", json!(false)),
+            ("producer_unit", json!(OLD_UNIT)),
+            ("guard_unit", json!(OLD_GUARD)),
+            ("producer_invocation_id", json!("f".repeat(32))),
+            ("guard_invocation_id", json!("f".repeat(32))),
+            ("source_capture", json!({})),
+            ("guard_spec", json!({})),
+            ("plan_sha256", json!("b".repeat(64))),
+            ("kernel_memory_max_bytes", json!(MEMORY + 1)),
+            ("kernel_memory_high_bytes", json!((48u64 << 30) - 1)),
+            ("memory_swap_max_bytes", json!(1)),
+            ("tasks_max", json!(513)),
+            ("cpu_quota_usec_per_second", json!(8_000_001)),
+            ("started_unix_millis", json!(900_001)),
+            ("recorded_unix_millis", json!(1_600_002)),
+            ("maximum_millis", json!(DURATION + 1)),
+            ("maximum_output_bytes", json!(OUTPUT_MAX + 1)),
+        ] {
+            let mut changed = live.clone();
+            changed[key] = value;
+            assert!(
+                prove(&p, &snapshot, &plan, &origin, &changed, 1_600_001).is_err(),
+                "accepted {key}"
+            );
+        }
+        live["recorded_unix_millis"] = json!(999_999);
+        assert!(prove(&p, &snapshot, &plan, &origin, &live, 1_000_001).is_err());
+    }
+    #[test]
+    fn historical_snapshot_binding_time_and_identity_cannot_be_replaced() {
+        let (mut p, snapshot, plan, origin) = fixture();
+        let mut live = origin.clone();
+        live["recorded_unix_millis"] = json!(1_600_000);
+        let mut foreign = snapshot.clone();
+        foreign.sha256 = "b".repeat(64);
+        assert!(prove(&p, &foreign, &plan, &origin, &live, 1_600_000).is_err());
+        for (key, value) in [
+            ("recorded_unix_millis", json!(984_999)),
+            ("source_capture", json!({})),
+            ("guard_invocation_id", json!("f".repeat(32))),
+            ("trip", json!(true)),
+            ("kernel_memory_max_bytes", json!(MEMORY - 1)),
+        ] {
+            let mut changed = origin.clone();
+            changed[key] = value;
+            assert!(
+                prove(&p, &snapshot, &plan, &changed, &live, 1_600_000).is_err(),
+                "accepted historical {key}"
+            );
+        }
+        p.frame["sampled_unix_millis"] = json!(1_015_001);
+        assert!(prove(&p, &snapshot, &plan, &origin, &live, 1_600_000).is_err());
+    }
+    #[test]
+    fn both_resource_brackets_retain_distinct_live_proofs_and_all_disk_actor_and_guard_charges() {
+        let (p, snapshot, plan, origin) = fixture();
+        let admitted = 171_932_909_568u64;
+        let mut proofs = Vec::new();
+        for (at, actor_current, guard_current) in [
+            (1_600_000u64, 28u64 << 30, 6u64 << 20),
+            (1_601_000, 29u64 << 30, 7u64 << 20),
+        ] {
+            let mut live = origin.clone();
+            live["recorded_unix_millis"] = json!(at);
+            let proof = prove(&p, &snapshot, &plan, &origin, &live, at + 1).unwrap();
+            let actor = json!({"memory_max_bytes":MEMORY,"memory_current_bytes":actor_current,"remaining_hard_memory_growth_bytes":MEMORY-actor_current});
+            let guard = json!({"memory_max_bytes":GUARD_MEMORY,"memory_current_bytes":guard_current,"remaining_hard_memory_growth_bytes":GUARD_MEMORY-guard_current});
+            let (disk, memory, growth) =
+                resource_evidence(&p, proof.clone(), actor, guard, admitted).unwrap();
+            assert_eq!(disk["remaining_growth_bytes"], admitted);
+            assert_eq!(disk["allocation_credit_bytes"], 0);
+            assert_eq!(disk["protection"], proof);
+            assert_eq!(memory["live_guard_protection"], proof);
+            assert_eq!(memory["producer"]["memory_max_bytes"], MEMORY);
+            assert_eq!(memory["guard"]["memory_max_bytes"], GUARD_MEMORY);
+            assert_eq!(
+                growth,
+                (MEMORY - actor_current) + (GUARD_MEMORY - guard_current)
+            );
+            proofs.push(proof);
+        }
+        assert_ne!(
+            proofs[0]["current_heartbeat"]["binding"]["sha256"],
+            proofs[1]["current_heartbeat"]["binding"]["sha256"]
+        );
+        assert_eq!(
+            proofs[0]["historical_guard_snapshot"],
+            proofs[1]["historical_guard_snapshot"]
+        );
+    }
+    #[test]
+    fn fresh_heartbeat_cannot_cover_changed_or_restarted_current_kernel_owners() {
+        let (p, _, _, _) = fixture();
+        let mut census = BTreeMap::from([
+            (UNIT.into(), p.launch["owner"].clone()),
+            (GUARD.into(), p.launch["guard"].clone()),
+            (
+                OLD_UNIT.into(),
+                json!({"InvocationID":OLD_IID,"MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead"}),
+            ),
+        ]);
+        current(&p, &census).unwrap();
+        for name in [UNIT, GUARD] {
+            for (key, value) in [
+                ("NRestarts", json!("1")),
+                ("InvocationID", json!("f".repeat(32))),
+                ("MainPID", json!("99")),
+                ("ControlGroup", json!("/system.slice/foreign.service")),
+            ] {
+                let mut changed = census.clone();
+                changed.get_mut(name).unwrap()[key] = value;
+                assert!(current(&p, &changed).is_err(), "accepted {name} {key}");
+            }
+        }
+        census.remove(GUARD);
+        assert!(current(&p, &census).is_err());
+    }
 }

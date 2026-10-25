@@ -1,12 +1,12 @@
 //! Positive recovery owner frames preserve the original epoch clock. A caller
 //! cannot select a different invocation, borrow a guard or assert readback.
 use super::*;
+mod live_guard;
 mod peer;
 mod work_input;
 pub(in crate::fleet) use peer::{
     peer_current, peer_guards, peer_limits, peer_memory_owners, peer_names, peer_observation,
-    qualification_successor,
-    peer_resources, peer_view,
+    peer_resources, peer_view, qualification_successor,
 };
 use work_input::WorkInput;
 #[derive(Clone, Deserialize, Serialize)]
@@ -563,26 +563,9 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
         Value::Null
     };
     let guard_snapshot = if stage == downstream::Stage::Assembly {
-        let path = Path::new(ROOT).join("guard-heartbeat.json");
-        let before = fs::symlink_metadata(&path)?;
-        ensure!(
-            before.is_file()
-                && before.uid() == 0
-                && before.nlink() == 1
-                && before.mode() & 0o022 == 0,
-            "204 live guard heartbeat custody"
-        );
-        let bytes = read_stable_bounded(&path, 1 << 20, "204 actual live guard heartbeat")?;
-        let heartbeat: Value = serde_json::from_slice(&bytes)?;
-        guard_shape(
-            &heartbeat,
-            &p,
-            &w.claim.recovery_plan,
-            &launch,
-            now_millis()?,
-        )?;
+        let heartbeat = live_guard::load(&p, &w.claim.recovery_plan, &launch)?;
         let output = w.output.with_extension("guard.json");
-        custody::write_bytes(&output, &bytes)?;
+        custody::write_bytes(&output, &heartbeat.bytes)?;
         Some(binding(&output)?)
     } else {
         None
