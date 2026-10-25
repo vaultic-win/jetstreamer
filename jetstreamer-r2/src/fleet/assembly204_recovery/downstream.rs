@@ -34,11 +34,11 @@ impl Stage {
     pub(super) fn unit(self) -> &'static str {
         match self {
             Self::Assembly => UNIT,
-            Self::Full => "horizon-full-verify-204-assembly-recovery-v1.service",
-            Self::Plugin => "horizon-plugin-verify-204-assembly-recovery-v1.service",
-            Self::Boundary => "horizon-boundary-verify-204-assembly-recovery-v1.service",
-            Self::Import => "horizon-import-204-assembly-recovery-v1.service",
-            Self::Upload => "horizon-upload-204-assembly-recovery-v1.service",
+            Self::Full => "horizon-full-verify-204-assembly-recovery-v2.service",
+            Self::Plugin => "horizon-plugin-verify-204-assembly-recovery-v2.service",
+            Self::Boundary => "horizon-boundary-verify-204-assembly-recovery-v2.service",
+            Self::Import => "horizon-import-204-assembly-recovery-v2.service",
+            Self::Upload => "horizon-upload-204-assembly-recovery-v2.service",
         }
     }
     pub(super) fn memory(self) -> u64 {

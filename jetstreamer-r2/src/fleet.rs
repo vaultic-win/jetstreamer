@@ -526,17 +526,7 @@ pub(super) fn assembly204_recovery_binding_scope(
     origin: &str,
     phase: &str,
 ) -> Result<()> {
-    ensure!(
-        epoch == 204
-            && origin == "horizon-qualify-204-assembly-only-recovery-v1.service"
-            && assembly204_recovery::scope(unit, 204, 204)
-            && !unit.starts_with("horizon-guard-")
-            && matches!(phase, "verification" | "upload" | "readback")
-            && (unit == "horizon-upload-204-assembly-recovery-v1.service"
-                || phase == "verification"),
-        "204 recovery status scope differs"
-    );
-    Ok(())
+    assembly204_recovery::binding_scope(epoch, unit, origin, phase)
 }
 pub(super) fn capped204205_binding_scope(epoch: u64, unit: &str, phase: &str) -> Result<()> {
     capped204205_work::binding_scope(epoch, unit, phase)

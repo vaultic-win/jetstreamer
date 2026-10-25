@@ -2,9 +2,11 @@
 //! cannot select a different invocation, borrow a guard or assert readback.
 use super::*;
 mod peer;
+mod work_input;
 pub(in crate::fleet) use peer::{
     peer_current, peer_guards, peer_limits, peer_names, peer_observation, peer_resources, peer_view,
 };
+use work_input::WorkInput;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::fleet) struct Claim {
@@ -44,6 +46,17 @@ pub(super) fn validate_closed_ownership(
         is_idle(current.get(OLD_GUARD).context("204 old guard omitted")?),
         "204 old guard live"
     );
+    for (name, iid) in [
+        (FAILED_V1_UNIT, FAILED_V1_IID),
+        (FAILED_V1_GUARD, FAILED_V1_GUARD_IID),
+    ] {
+        let previous = current.get(name).context("204 failed v1 owner omitted")?;
+        ensure!(
+            is_idle(previous)
+                && (previous["InvocationID"] == iid || previous["InvocationID"] == ""),
+            "204 failed v1 owner is live, replaced or restarted"
+        );
+    }
     ensure!(
         context::closed_names()
             .iter()
@@ -461,7 +474,7 @@ pub(super) fn capture_success_terminal(
 #[serde(deny_unknown_fields)]
 struct WorkSpec {
     schema: String,
-    claim: Claim,
+    claim: WorkInput,
     observer: BoundFile,
     previous_fleet: BoundFile,
     output: PathBuf,
@@ -521,7 +534,7 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
     let launch = read(&w.claim.actor_launch)?;
     let stage: downstream::Stage = serde_json::from_value(launch["stage"].clone())?;
     no_overlap(&context, Some(stage))?;
-    let names = names(&w.claim)?;
+    let names = names_for_epoch(w.claim.epoch)?;
     let before = context.census(&names)?;
     let owner = before.get(stage.unit()).context("204 actor omitted")?;
     same_owner(&launch["owner"], owner)?;
@@ -644,7 +657,10 @@ fn actual_transport_phase(owner: &Value) -> Result<String> {
     Ok(phase.into())
 }
 pub(in crate::fleet) fn names(c: &Claim) -> Result<BTreeSet<String>> {
-    ensure!(c.epoch == 204, "204 recovery claim epoch");
+    names_for_epoch(c.epoch)
+}
+fn names_for_epoch(epoch: u64) -> Result<BTreeSet<String>> {
+    ensure!(epoch == 204, "204 recovery claim epoch");
     let mut names = BTreeSet::from([OLD_UNIT.into(), OLD_GUARD.into(), UNIT.into(), GUARD.into()]);
     names.extend(downstream::Stage::all().iter().map(|s| s.unit().into()));
     Ok(names)

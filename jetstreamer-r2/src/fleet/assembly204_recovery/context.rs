@@ -96,10 +96,21 @@ impl AcceptedContext {
     }
 }
 pub(super) fn subject(name: &str) -> bool {
-    name == OLD_UNIT || name == OLD_GUARD || scope(name, 204, 204)
+    name == OLD_UNIT
+        || name == OLD_GUARD
+        || name == FAILED_V1_UNIT
+        || name == FAILED_V1_GUARD
+        || scope(name, 204, 204)
 }
 pub(super) fn closed_names() -> BTreeSet<String> {
-    let mut names = BTreeSet::from([OLD_UNIT.into(), OLD_GUARD.into(), UNIT.into(), GUARD.into()]);
+    let mut names = BTreeSet::from([
+        OLD_UNIT.into(),
+        OLD_GUARD.into(),
+        FAILED_V1_UNIT.into(),
+        FAILED_V1_GUARD.into(),
+        UNIT.into(),
+        GUARD.into(),
+    ]);
     names.extend(
         downstream::Stage::all()
             .iter()
@@ -181,6 +192,16 @@ mod tests {
         }
         complete.get_mut(OLD_UNIT).unwrap()["InvocationID"] = json!(OLD_IID);
         ownership::validate_closed_ownership(&complete, None).unwrap();
+        let mut prior_live = complete.clone();
+        prior_live.insert(FAILED_V1_UNIT.into(), live(FAILED_V1_UNIT, 204));
+        assert!(ownership::validate_closed_ownership(&prior_live, None).is_err());
+        assert!(subject(FAILED_V1_UNIT) && subject(FAILED_V1_GUARD));
+        assert_ne!(UNIT, FAILED_V1_UNIT);
+        assert_eq!(
+            ROOT,
+            "/var/lib/jetstreamer/horizon-204-assembly-only-recovery-v2"
+        );
+        assert_eq!(ORIGIN, 1792749926759);
         complete.insert(
             "horizon-qualify-204-unknown-replacement.service".into(),
             live("horizon-qualify-204-unknown-replacement.service", 204),

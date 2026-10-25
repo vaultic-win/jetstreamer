@@ -39,6 +39,9 @@ fn expected_caps(unit: &str) -> Result<(u64, u64)> {
 /// the producer roster is complete. Live completion never repairs old receipts.
 pub(in crate::fleet) fn validate_saved_row(row: &Value) -> Result<()> {
     let unit = row["unit"].as_str().context("saved legacy memory owner")?;
+    if unit == canary227::UNIT {
+        return canary227_peer::validate_saved_memory_row(row);
+    }
     if unit != LEGACY225 && unit != singleton209::UNIT {
         return Ok(());
     }
@@ -103,11 +106,9 @@ fn append_or_complete(total: &mut u64, rows: &mut Vec<Value>, o: &Observation) -
                 .checked_add(GUARD)
                 .context("legacy complete memory overflow")?;
             row["guard_hard_memory_reserved_bytes"] = json!(GUARD);
-            row["remaining_hard_memory_growth_bytes"] = json!(
-                producer
-                    .checked_add(GUARD)
-                    .context("legacy memory overflow")?
-            );
+            row["remaining_hard_memory_growth_bytes"] = json!(producer
+                .checked_add(GUARD)
+                .context("legacy memory overflow")?);
         }
         row["memory_swap_max_bytes"] = json!(o.swap);
         validate_saved_row(row)?;

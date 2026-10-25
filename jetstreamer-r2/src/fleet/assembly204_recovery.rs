@@ -33,17 +33,22 @@ const PREFIX_PATH: &str = "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-
 const OLD_ROOT: &str =
     "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-204-bounded8-v4-df57";
 const SUFFIX_PATH: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-204-bounded8-v4-df57/output/epoch-204-suffix.jet";
-const UNIT: &str = "horizon-qualify-204-assembly-only-recovery-v1.service";
-const GUARD: &str = "horizon-guard-204-assembly-only-recovery-v1.service";
-const ROOT: &str = "/var/lib/jetstreamer/horizon-204-assembly-only-recovery-v1";
-const OUTPUT: &str = "/var/lib/jetstreamer/horizon-204-assembly-only-recovery-v1/epoch-204-assembly-only-recovery-v4.jet";
+const FAILED_V1_UNIT: &str = "horizon-qualify-204-assembly-only-recovery-v1.service";
+const FAILED_V1_GUARD: &str = "horizon-guard-204-assembly-only-recovery-v1.service";
+const FAILED_V1_IID: &str = "2acdd92edcf5410293e8bfda15f92a63";
+const FAILED_V1_GUARD_IID: &str = "55d49be3ebd74fc991524a163e3874ea";
+const RETRY_HELPER_SOURCE: &str = "aac7c8ca42bfc1153a33c1515062911d7c2cb292";
+const UNIT: &str = "horizon-qualify-204-assembly-only-recovery-v2.service";
+const GUARD: &str = "horizon-guard-204-assembly-only-recovery-v2.service";
+const ROOT: &str = "/var/lib/jetstreamer/horizon-204-assembly-only-recovery-v2";
+const OUTPUT: &str = "/var/lib/jetstreamer/horizon-204-assembly-only-recovery-v2/epoch-204-assembly-only-recovery-v4.jet";
 const ORIGIN: u64 = 1792749926759;
 const MEMORY: u64 = 64 << 30;
 const GUARD_MEMORY: u64 = 128 << 20;
 const OUTPUT_MAX: u64 = 160 << 30;
 const DURATION: u64 = 28_800_000;
 const GENERATION: &str =
-    "jetstreamer-epoch204-assembly-only-recovery-v1/epoch204-capped-checkpoint-continuation-v1";
+    "jetstreamer-epoch204-assembly-only-recovery-v2/epoch204-capped-checkpoint-continuation-v1";
 const STATUS_DIRECTORY: &str = "/home/ubuntu/.jetstreamer-private/r2-status-receipts";
 const CANONICAL: &str = "/home/ubuntu/horizon";
 
@@ -195,6 +200,18 @@ pub(super) fn scope(name: &str, first: u64, last: u64) -> bool {
         && (name == UNIT
             || name == GUARD
             || downstream::Stage::all().iter().any(|x| x.unit() == name))
+}
+pub(super) fn binding_scope(epoch: u64, unit: &str, origin: &str, phase: &str) -> Result<()> {
+    ensure!(
+        epoch == 204
+            && origin == UNIT
+            && scope(unit, 204, 204)
+            && unit != GUARD
+            && matches!(phase, "verification" | "upload" | "readback")
+            && (unit == downstream::Stage::Upload.unit() || phase == "verification"),
+        "204 recovery status scope differs"
+    );
+    Ok(())
 }
 pub(super) fn command_name(name: &str) -> bool {
     matches!(
