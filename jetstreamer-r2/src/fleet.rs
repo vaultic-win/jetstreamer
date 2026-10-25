@@ -260,6 +260,12 @@ pub(super) fn demotion223_memory_views(
 ) -> Result<(Value, Value, BTreeMap<String, Value>)> {
     demotion223_live_peer::memory_views(f, o)
 }
+pub(super) fn completed_phase_memory_views(
+    f: &Value,
+    o: &Value,
+) -> Result<(Value, Value, BTreeMap<String, Value>)> {
+    completed_archive_phase::peer_memory_views(f, o)
+}
 
 pub(super) fn admit_singleton207() -> Result<()> {
     singleton207::admit()
@@ -2574,6 +2580,7 @@ pub(super) fn census(
         if name.starts_with("jetstreamer-root-sweep-")
             || name.starts_with("horizon-controller-")
             || name.starts_with("horizon-qualify-")
+            || completed_archive_phase::guard_scope(name,first_epoch,last_epoch)
             || assigned_singleton_owner(name, first_epoch, last_epoch)
             || original_capped204205::repair_unit(name, first_epoch, last_epoch)
             // Private RAM supervisors are entry owners too. Until the explicit
@@ -3268,6 +3275,7 @@ pub(super) async fn run() -> Result<()> {
         if demotion223_status::scope(&claim.phase, &claim.unit) {
             names.extend(demotion223_status::claim_names(claim)?);
         }
+        names.extend(completed_archive_phase::claim_names(claim)?);
         for evidence in &claim.evidence {
             bound_json(evidence)?;
         }

@@ -245,13 +245,15 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
     // can leave the legacy-only resource view. Raw evidence is never modified.
     capped204205_work::peer_observation(f, o)?;
     assembly204_recovery::peer_observation(f, o)?;
+    completed_archive_phase::peer_observation(f, o)?;
     let (_, repair_observer, repair) = demotion223_live_peer::memory_views(f, o)?;
     let mut names = capped204205_work::peer_names(f)?;
     names.extend(assembly204_recovery::peer_names(f)?);
+    names.extend(completed_archive_phase::peer_names(f)?);
     names.extend(repair.keys().cloned());
     Ok((
-        demotion223_live_peer::without(&assembly204_recovery::peer_view(
-            &capped204205_work::peer_legacy_view(f)?,
+        demotion223_live_peer::without(&completed_archive_phase::peer_view(
+            &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
         )?)?,
         legacy_observer(&repair_observer, &names)?,
     ))
@@ -259,14 +261,19 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
 pub(super) fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     native210_peer_history::current(f, current)?;
     prefix223_live_peer::current(
-        &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
+        &completed_archive_phase::peer_view(&assembly204_recovery::peer_view(
+            &capped204205_work::peer_legacy_view(f)?,
+        )?)?,
         current,
     )?;
     // Only proven auxiliary guards leave this comparison. Every producer stays
     // in the raw active roster, so an omitted or changed actor still fails.
     singleton227_admission::owners(
         f,
-        &assembly204_recovery::peer_current(f, &capped204205_work::peer_current(f, current)?)?,
+        &completed_archive_phase::peer_current(
+            f,
+            &assembly204_recovery::peer_current(f, &capped204205_work::peer_current(f, current)?)?,
+        )?,
     )
 }
 fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {

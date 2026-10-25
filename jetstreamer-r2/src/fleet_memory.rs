@@ -295,7 +295,21 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
         let assembly=crate::fleet::capped_assembly_memory_owners(ledger,o)?;
         let accounting=crate::fleet::native227_terminal_observer_view(ledger,o)?;
         let (memory_ledger,memory_observer,repair)=crate::fleet::demotion223_memory_views(ledger,&accounting)?;
+        let (memory_ledger,memory_observer,delivery)=crate::fleet::completed_phase_memory_views(&memory_ledger,&memory_observer)?;
         let mut result=checked_with_assembly(&memory_observer,&memory_ledger,&assembly)?;
+        if !delivery.is_empty() {
+            let owners=result["owner_census"].as_array_mut().context("memory owner census")?;
+            owners.extend(delivery.keys().map(|name|json!(name)));
+            result["completed_delivery_non_replay_overhead"]=json!(delivery.values().collect::<Vec<_>>());
+            result["completed_delivery_non_replay_owner_count"]=json!(delivery.len());
+            result["completed_delivery_rss_already_in_whole_host_census"]=json!(delivery.values().all(|p| p["included_in_whole_host_resident_memory"]==true));
+            result["completed_delivery_post_sample_full_hard_memory_reserved_bytes"]=json!(delivery.values()
+                .filter(|p| p["post_sample_initial_event"]==true)
+                .try_fold(0u64,|total,p| -> Result<u64> {
+                    total.checked_add(p["full_hard_memory_reserved_bytes"].as_u64().context("completed delivery hard reserve absent")?)
+                        .context("completed delivery post-sample hard reserve overflow")
+                })?);
+        }
         if !repair.is_empty() {
             let owners=result["owner_census"].as_array_mut().context("memory owner census")?;
             owners.extend(repair.keys().map(|name|json!(name)));

@@ -4,6 +4,11 @@
 use super::*;
 mod decoder_capacity;
 mod launch;
+mod peer;
+pub(super) use peer::{
+    claim_names, peer_current, peer_guards, peer_limits, peer_memory_views, peer_names,
+    peer_observation, peer_resources, peer_view, peer_window_names,
+};
 
 const SCHEMA: &str = "jetstreamer-completed-archive-phase-spec-v1";
 const RECEIPT: &str = "jetstreamer-completed-archive-phase-admission-v1";
@@ -108,6 +113,29 @@ pub(super) fn pipeline_scope(phase: &str, unit: &str) -> Option<u64> {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)))
     .then_some(epoch)
+}
+pub(super) fn guard_scope(unit: &str, first: u64, last: u64) -> bool {
+    let Some(rest) = unit.strip_prefix("horizon-generic") else {
+        return false;
+    };
+    let Some((number, tail)) = rest.split_once('-') else {
+        return false;
+    };
+    let Ok(epoch) = number.parse::<u64>() else {
+        return false;
+    };
+    number == epoch.to_string()
+        && (first..=last).contains(&epoch)
+        && ["full", "plugin", "upload"].iter().any(|role| {
+            tail.strip_prefix(&format!("{role}-protective-"))
+                .and_then(|suffix| suffix.strip_suffix(".service"))
+                .is_some_and(|suffix| {
+                    !suffix.is_empty()
+                        && suffix
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+                })
+        })
 }
 pub(super) fn capture() -> Result<()> {
     launch::run()
@@ -288,6 +316,7 @@ fn shape(s: &Spec) -> Result<()> {
     for (phase, name) in &s.guard_units {
         ensure!(
             name.starts_with(&format!("horizon-generic{}-{phase}-protective-", s.epoch))
+                && guard_scope(name, s.epoch, s.epoch)
                 && name.ends_with(".service")
                 && name
                     .bytes()
@@ -600,6 +629,13 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
             .collect::<Vec<_>>()
             == vec![log],
         "completed phase log destination differs"
+    );
+    ensure!(
+        text.lines()
+            .filter(|l| l.starts_with("StandardError="))
+            .collect::<Vec<_>>()
+            == vec!["StandardError=inherit"],
+        "completed phase errors escape its bounded metadata log"
     );
     let expected = format!(
         "{{ path={} ; argv[]={} ; ignore_errors=no }}",
@@ -1160,6 +1196,18 @@ mod tests {
     }
     #[test]
     fn completed_phase_pipeline_namespace_remains_observational_and_phase_exact() {
+        assert!(guard_scope(
+            "horizon-generic209-full-protective-v1.service",
+            201,
+            300
+        ));
+        for name in [
+            "horizon-generic0209-full-protective-v1.service",
+            "horizon-generic209-full-protective-.service",
+            "horizon-generic209-replay-protective-v1.service",
+        ] {
+            assert!(!guard_scope(name, 201, 300));
+        }
         assert_eq!(
             pipeline_scope(
                 "full-verification",

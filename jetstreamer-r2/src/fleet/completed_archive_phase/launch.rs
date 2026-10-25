@@ -53,11 +53,50 @@ fn start_ticks(raw: &str) -> Result<u64> {
         .parse()
         .context("completed launch process start time invalid")
 }
-fn process(s: &Spec, owner: &Value, argv: &[String]) -> Result<Value> {
+fn native_start_clock(ticks: u64) -> Result<Value> {
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .to_owned();
+    let seconds = fs::read_to_string("/proc/stat")?
+        .lines()
+        .find_map(|line| line.strip_prefix("btime "))
+        .context("completed launch native boot clock absent")?
+        .parse::<u64>()?;
+    let hz = u64::try_from(unsafe { libc::sysconf(libc::_SC_CLK_TCK) })?;
+    ensure!(hz > 0, "completed launch native tick frequency absent");
+    let started = seconds
+        .checked_add(ticks / hz)
+        .context("completed launch native start overflow")?;
+    Ok(
+        json!({"boot_id":boot,"boot_unix_seconds":seconds,"clock_ticks_per_second":hz,"started_unix_seconds":started}),
+    )
+}
+fn clock_shape(process: &Value) -> Result<()> {
+    let clock = &process["native_start_clock"];
+    let hz = n(clock, "clock_ticks_per_second")?;
+    let boot = string(clock, "boot_id")?;
+    ensure!(
+        hz > 0
+            && boot.len() == 36
+            && boot.bytes().enumerate().all(|(i, b)| {
+                if [8, 13, 18, 23].contains(&i) {
+                    b == b'-'
+                } else {
+                    b.is_ascii_digit() || (b'a'..=b'f').contains(&b)
+                }
+            })
+            && n(clock, "boot_unix_seconds")?.checked_add(n(process, "start_ticks")? / hz)
+                == Some(n(clock, "started_unix_seconds")?),
+        "completed launch native start clock is inconsistent"
+    );
+    Ok(())
+}
+pub(super) fn process(s: &Spec, owner: &Value, argv: &[String]) -> Result<Value> {
     let pid = string(owner, "MainPID")?.parse::<u32>()?;
     ensure!(pid > 1, "completed launch has no live main process");
     let proc = Path::new("/proc").join(pid.to_string());
     let tick = start_ticks(&fs::read_to_string(proc.join("stat"))?)?;
+    let native_start_clock = native_start_clock(tick)?;
     let exe = fs::read_link(proc.join("exe"))?;
     let raw = fs::read(proc.join("cmdline"))?;
     ensure!(
@@ -185,10 +224,10 @@ fn process(s: &Spec, owner: &Value, argv: &[String]) -> Result<Value> {
         "completed launch main process changed during capture"
     );
     Ok(
-        json!({"pid":pid,"executable":exe,"executable_sha256":executable_sha256,"cmdline":args,"start_ticks":tick,"cgroup":cgroup,"native_limits":limits,"credential_values_not_recorded":true,"credential_environment_sha256":credential_digest,"source_read_only_mount":true,"source_reference_census":references,"native_memory_current":fs::read_to_string(group.join("memory.current"))?.trim(),"native_memory_peak":fs::read_to_string(group.join("memory.peak"))?.trim()}),
+        json!({"pid":pid,"executable":exe,"executable_sha256":executable_sha256,"cmdline":args,"start_ticks":tick,"native_start_clock":native_start_clock,"cgroup":cgroup,"native_limits":limits,"credential_values_not_recorded":true,"credential_environment_sha256":credential_digest,"source_read_only_mount":true,"source_reference_census":references,"native_memory_current":fs::read_to_string(group.join("memory.current"))?.trim(),"native_memory_peak":fs::read_to_string(group.join("memory.peak"))?.trim()}),
     )
 }
-fn read_sample(binding: &BoundFile, plan: &Value) -> Result<Value> {
+pub(super) fn read_sample(binding: &BoundFile, plan: &Value) -> Result<Value> {
     let raw = bound_bytes(binding, 4 << 20, 0)?;
     let sample: Value = serde_json::from_slice(&raw)?;
     let iid = string(&sample, "guard_invocation_id")?;
@@ -211,7 +250,6 @@ fn guard_shape(
     let at = n(admission, "recorded_unix_seconds")?;
     let guarded = n(sample, "recorded_unix_seconds")?;
     let iid = string(owner, "InvocationID")?;
-    let pid = string(owner, "MainPID")?.parse::<u64>()?;
     ensure!(
         is_lower_hex(iid, 32)
             && is_lower_hex(string(sample, "guard_invocation_id")?, 32)
@@ -219,6 +257,40 @@ fn guard_shape(
             && guarded <= now
             && now - at <= 900,
         "completed launch admission/first guard clock or IID differs"
+    );
+    sample_shape(s, admission, plan, sample, owner)
+}
+pub(super) fn current_guard_shape(
+    s: &Spec,
+    admission: &Value,
+    plan: &Value,
+    sample: &Value,
+    owner: &Value,
+    minimum: u64,
+    now: u64,
+) -> Result<()> {
+    let guarded = n(sample, "recorded_unix_seconds")?;
+    ensure!(
+        guarded >= minimum
+            && guarded >= n(admission, "recorded_unix_seconds")?
+            && guarded <= now
+            && now - guarded <= 1800,
+        "completed peer latest guard is stale or predates the coordinated sample"
+    );
+    sample_shape(s, admission, plan, sample, owner)
+}
+fn sample_shape(
+    s: &Spec,
+    admission: &Value,
+    plan: &Value,
+    sample: &Value,
+    owner: &Value,
+) -> Result<()> {
+    let iid = string(owner, "InvocationID")?;
+    let pid = string(owner, "MainPID")?.parse::<u64>()?;
+    ensure!(
+        is_lower_hex(iid, 32) && is_lower_hex(string(sample, "guard_invocation_id")?, 32),
+        "completed guard IID differs"
     );
     ensure!(
         plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
@@ -379,6 +451,13 @@ fn guard_manager(
     Ok(json!({"properties":p,"timer":timer,"manager_completion":success[0],"journal_sha256":sha}))
 }
 fn saved_shape(v: &Value, s: &Spec, phase: Phase, self_sha: &str, a: &Value) -> Result<()> {
+    clock_shape(&v["process"])?;
+    let started = n(&v["process"]["native_start_clock"], "started_unix_seconds")?;
+    ensure!(
+        started.saturating_add(1) >= n(a, "recorded_unix_seconds")?
+            && started <= n(&v["guard_sample_contents"], "recorded_unix_seconds")?,
+        "completed phase native process started outside its admission/first guard interval"
+    );
     ensure!(
         v["schema"] == LAUNCH
             && v["epoch"] == s.epoch
@@ -587,7 +666,7 @@ mod tests {
         let mut process_args = vec!["bash".to_owned()];
         process_args.extend(argv.clone());
         let launch = json!({"schema":LAUNCH,"epoch":209,"phase":"full","issuer_sha256":helper,"unit":name,"invocation_id":iid,"owner":owner,"phase_spec":admission["spec"],"admission":admission["binding"],"argv":argv,
-            "process":{"pid":42,"executable":"/usr/bin/bash","executable_sha256":s.interpreter.as_ref().unwrap().sha256,"cmdline":process_args,"start_ticks":123,"source_read_only_mount":true,"native_limits":{"memory.high":(16u64<<30).to_string(),"memory.max":(32u64<<30).to_string(),"memory.swap.max":"0","pids.max":"512","cpu.max":"800000 100000"}},
+            "process":{"pid":42,"executable":"/usr/bin/bash","executable_sha256":s.interpreter.as_ref().unwrap().sha256,"cmdline":process_args,"start_ticks":123,"native_start_clock":{"boot_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","boot_unix_seconds":900,"clock_ticks_per_second":100,"started_unix_seconds":901},"source_read_only_mount":true,"native_limits":{"memory.high":(16u64<<30).to_string(),"memory.max":(32u64<<30).to_string(),"memory.swap.max":"0","pids.max":"512","cpu.max":"800000 100000"}},
             "guard_unit":s.guard_units["full"],"guard_plan_contents":plan,"guard_sample_contents":sample,"captured_unix_seconds":920,
             "guard_manager":{"manager_completion":{"_PID":"1","_UID":"0","UNIT":s.guard_units["full"],"INVOCATION_ID":guard_iid,"MESSAGE":format!("{}: Deactivated successfully.",s.guard_units["full"])}}});
         (s, admission, launch, helper)
@@ -634,6 +713,46 @@ mod tests {
         let mut bad = good;
         bad["guard_manager"]["manager_completion"]["INVOCATION_ID"] = json!("d".repeat(32));
         assert!(saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err());
+    }
+    #[test]
+    fn completed_launch_native_start_clock_cannot_invent_postsample_process_presence() {
+        let (_, _, good, _) = fixture();
+        clock_shape(&good["process"]).unwrap();
+        for (key, value) in [
+            ("started_unix_seconds", json!(1001)),
+            ("clock_ticks_per_second", json!(0)),
+            ("boot_id", json!("foreign")),
+        ] {
+            let mut changed = good["process"].clone();
+            changed["native_start_clock"][key] = value;
+            assert!(clock_shape(&changed).is_err(), "accepted {key}");
+        }
+    }
+    #[test]
+    fn completed_launch_current_guard_requires_fresh_same_owner_no_worker_protection() {
+        let (s, a, good, _) = fixture();
+        let plan = &good["guard_plan_contents"];
+        let owner = &good["owner"];
+        let mut sample = good["guard_sample_contents"].clone();
+        assert!(current_guard_shape(&s, &a, plan, &sample, owner, 9000, 10000).is_err());
+        sample["recorded_unix_seconds"] = json!(9990);
+        current_guard_shape(&s, &a, plan, &sample, owner, 9000, 10000).unwrap();
+        for (key, value) in [
+            ("recorded_unix_seconds", json!(8999)),
+            ("producer_invocation_id", json!("f".repeat(32))),
+            ("producer_stop_enabled", json!(false)),
+            ("workers", json!([[42, 100]])),
+            ("trip_reason", json!("floor")),
+            ("maximum_root_physical_bytes", json!(METADATA + 1)),
+            ("worker_observation_error", json!("failed")),
+        ] {
+            let mut changed = sample.clone();
+            changed[key] = value;
+            assert!(
+                current_guard_shape(&s, &a, plan, &changed, owner, 9000, 10000).is_err(),
+                "accepted {key}"
+            );
+        }
     }
     #[test]
     fn completed_launch_cannot_use_a_caller_iid_in_place_of_actual_launch_capture() {

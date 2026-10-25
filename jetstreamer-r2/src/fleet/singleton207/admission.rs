@@ -11,8 +11,11 @@ struct Spec {
 }
 
 pub(super) fn roster(f: &Value) -> Result<()> {
-    let mut allowed = prefix223_live_peer::roster(&capped204205_work::peer_legacy_view(f)?)?;
+    let mut allowed = prefix223_live_peer::roster(&completed_archive_phase::peer_view(
+        &capped204205_work::peer_legacy_view(f)?,
+    )?)?;
     allowed.extend(capped204205_work::peer_names(f)?);
+    allowed.extend(completed_archive_phase::peer_names(f)?);
     let mut seen = BTreeSet::new();
     for a in f["active"]
         .as_array()
@@ -65,6 +68,7 @@ pub(super) fn clean_expanded_window(f: &Value, o: &Value) -> Result<()> {
         );
     }
     let assembly = capped204205_work::peer_clean_assembly_window(f, o)?;
+    let delivery = completed_archive_phase::peer_window_names(f, o)?;
     let mut rows = o["replays"]
         .as_array()
         .context("singleton 207 ordinary observer census absent")?
@@ -86,7 +90,7 @@ pub(super) fn clean_expanded_window(f: &Value, o: &Value) -> Result<()> {
         let name = owner["Id"]
             .as_str()
             .context("singleton 207 expanded owner absent")?;
-        if assembly.contains(name) {
+        if assembly.contains(name) || delivery.contains(name) {
             // Its fresh protective heartbeat, complete disk claim and both
             // producer/guard hard limits remain checked by capacity admission.
             continue;
