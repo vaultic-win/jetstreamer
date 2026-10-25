@@ -10,9 +10,11 @@ The combined source checkpoint is `2bf7a3f2d5ed0f8c6307254d67216055f2558b4b`
 (tree `80e53e956b8d61f902e9e18d803ab29c430d2ddb`). It is frozen bracket checkpoint
 `87f98a80` plus exact full 210 commits `1d0ab837`, `74b0699a`, `63a5e385`.
 Their sole added source change is `maintenance_capacity/singleton210_memory.rs`.
+Reviewed terminal 227 commits e3d84732, c6992980 and 511fbc75 are now also
+integrated, with only the separately requested two error-message spacing edits.
 All eight shared eaa files remain byte-identical to eaa8f5ac. Later full-root
-source is preserved separately. Unfrozen terminal 227 and epoch 204 refresh
-repairs are excluded; this checkpoint is not claimed operationally complete.
+source is preserved separately. The epoch 204 refresh
+repair remains pending; this checkpoint is not claimed operationally complete.
 
 Static comparison against reviewed closure 688aa576 found every reviewed path
 package manifest unchanged. Workspace/R2 manifests, lock and Cargo config SHA-256
@@ -59,11 +61,13 @@ All commands use `--release --frozen --locked --offline -j2 -p jetstreamer-r2`.
 1. Strict Clippy: `--all-targets --all-features -- -D warnings`.
 2. Focused all-feature test group `demotion223`.
 3. Focused all-feature test group `canary227`.
-4. Focused all-feature test group `prefix223_live_peer`.
-5. Focused all-feature test group `singleton210_memory`.
-6. Focused all-feature test group `maintenance_capacity`.
-7. Complete all-feature package suite.
-8. Complete default-feature package suite.
+4. Focused all-feature test group `canary227_terminal`.
+5. Focused all-feature test group `inactive_status` (including canary cleanup).
+6. Focused all-feature test group `prefix223_live_peer`.
+7. Focused all-feature test group `singleton210_memory`.
+8. Focused all-feature test group `maintenance_capacity`.
+9. Complete all-feature package suite.
+10. Complete default-feature package suite.
 
 Tests use `-- --test-threads=1`; no ignored tests are forced to run. Record exact
 matched test names/counts; a zero-match focused group is a failure of the plan.
@@ -86,3 +90,24 @@ harness a280 still needs its actual cold-input execution. Production helper
 build/capture/seal requires separate root authorization and fresh real artifact
 pins. Source QA cannot release producer ownership, prove live fit, publish a
 sidecar or upload an archive.
+
+## Integrated cleared-terminal epoch 227 policy
+
+The root-reviewed source series is based on eaa and keeps all eight original
+shared eaa files unchanged. Fleet capture and inactive cleanup use the same
+typed current-terminal validator. Raw zero PID/start/exit properties stay raw;
+origin PID/start and exact original success require separately authenticated
+launch/result/journal evidence, plus before/after idle census and journal-tail
+checks. Empty properties cannot create success. Existing failed history, pending
+trigger rejection and zero release credit remain intact. Cleanup still requires
+exact publication identity, conditional ETag and durable intent/completion; this
+is not archive/sidecar or resource-release authority. The retained-PID predicate
+is unchanged. New tests cover exact successful original manager/producer
+witnesses, missing/duplicate/foreign or newer history, and result-bound child
+identity. The focused inactive-status suite checks unchanged cleanup scope;
+actual systemd/R2 cleanup remains outside source QA.
+
+The source checkpoint in the machine plan predates only the requested wording
+changes and this proposal update. Root must pin the final document commit and
+full tracked source census before execution. No production/native artifact pin
+has been created, and the epoch 204 source fix is still awaited.

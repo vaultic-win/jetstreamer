@@ -1,8 +1,8 @@
 {
   "schema": "jetstreamer-native223-full210-combined-helper-qa-proposal-v1",
   "authorization": "Source-only proposal; no Cargo, target/cache access or production/runtime execution authorized.",
-  "source_commit": "2bf7a3f2d5ed0f8c6307254d67216055f2558b4b",
-  "source_tree": "80e53e956b8d61f902e9e18d803ab29c430d2ddb",
+  "source_commit": "9279333d577dee48d6c0a49b95e4d8c8ca1c4291",
+  "source_tree": "4348055c968d9c7b28c2c1fdfc156f8542031211",
   "source_worktree": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/native223-full210-combined-helper-qa-worktree",
   "base": "87f98a8096323786fe66fe76b590dec7d9896342",
   "exact_cherry_picked_sources": [
@@ -23,7 +23,6 @@
     "warmup223/guard_receipt.rs": "15bfb669342dea1469d076feb5e8242fcaead4d3a031bf239cad2e526e5ed500"
   },
   "excluded": [
-    "unfrozen terminal 227 repair",
     "unfrozen epoch 204 refresh repair",
     "all later full-root source"
   ],
@@ -138,7 +137,43 @@
       ]
     },
     {
-      "id": "04-prefix223_live_peer",
+      "id": "04-terminal-227",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "canary227_terminal",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "05-inactive-status-cleanup",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "inactive_status",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "06-prefix223_live_peer",
       "argv": [
         "/home/ubuntu/.cargo/bin/cargo",
         "test",
@@ -156,7 +191,7 @@
       ]
     },
     {
-      "id": "05-singleton210_memory",
+      "id": "07-singleton210_memory",
       "argv": [
         "/home/ubuntu/.cargo/bin/cargo",
         "test",
@@ -174,7 +209,7 @@
       ]
     },
     {
-      "id": "06-maintenance_capacity",
+      "id": "08-maintenance_capacity",
       "argv": [
         "/home/ubuntu/.cargo/bin/cargo",
         "test",
@@ -192,7 +227,7 @@
       ]
     },
     {
-      "id": "07-full-all-features",
+      "id": "09-full-all-features",
       "argv": [
         "/home/ubuntu/.cargo/bin/cargo",
         "test",
@@ -209,7 +244,7 @@
       ]
     },
     {
-      "id": "08-full-default",
+      "id": "10-full-default",
       "argv": [
         "/home/ubuntu/.cargo/bin/cargo",
         "test",
@@ -227,11 +262,18 @@
   ],
   "required_before_execution": [
     "Root transfers exclusive shared target/cache lease; no competing Cargo process",
-    "Freeze/review complete final successor including owner-provided terminal 227 and epoch 204 fixes if needed, then regenerate exact source census and pins",
+    "Freeze/review complete final successor including pending owner-provided epoch 204 fix if needed, then regenerate exact source census and pins. Terminal 227 source is integrated but unqualified.",
     "Authenticate actual sandbox and offline tool/config/source/cache identity",
     "Recompute original cumulative charge including every failed/retry artifact and evidence; stop before exceeding 4 GiB",
     "Confirm package graph/features and actual compiler artifacts stay inside reviewed closure; stop before unreviewed native/dependency/network rebuild"
   ],
   "failure_policy": "Stop on first failed command, preserve exact source/log/exit and all cumulative charges; no automatic retry or success inference.",
-  "qualification_limit": "R2 helper source only. Does not qualify native utility/parent, actual a280 cold execution, terminal producer commitment, capacity, production build/seal or R2 upload."
+  "qualification_limit": "R2 helper source only. Does not qualify native utility/parent, actual a280 cold execution, terminal producer commitment, capacity, production build/seal or R2 upload.",
+  "source_note": "This checkpoint precedes the two root-requested human-readable error spacing edits and this proposal update; final frozen document commit must also be included in the QA source census.",
+  "reviewed_terminal_227_sources": [
+    "e3d847322eefb8ea79aff2d7e79b2c387dd62ae2",
+    "c69929806b17c88f4ebc67c54f959510e42bff8d",
+    "511fbc75e66bfa3012ddfce1a29592c4e56fd155"
+  ],
+  "terminal_227_review_record": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/canary227-cleared-terminal-source-review-v1/source-review.json"
 }

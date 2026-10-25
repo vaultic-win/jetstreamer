@@ -9,7 +9,7 @@ pub(super) fn validate(
     f: &Value,
     owners: &[(String, String)],
 ) -> Result<()> {
-    ensure!(recognized(f, owners), "not227 canary terminal status");
+    ensure!(recognized(f, owners), "not a terminal epoch 227 canary status");
     let proof = bound_json(&serde_json::from_value(f["metadata_event"].clone())?)?;
     let (name, iid, _) = fleet::canary227_terminal_status_identity(&proof)?;
     ensure!(
@@ -32,7 +32,7 @@ pub(super) fn validate(
                     || (u["ActiveState"] == "failed" && u["SubState"] == "failed"))
                 && u["Result"] == proof["actual_terminal"]["Result"]
                 && u["ExecMainStatus"] == proof["actual_terminal"]["ExecMainStatus"],
-            "227 status canary live,replaced,or ambiguous"
+            "227 status canary live, replaced, or ambiguous"
         );
         fleet::canary227_terminal_current(&proof, u)?;
     }
