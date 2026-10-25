@@ -1,65 +1,24 @@
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::{env, fs};
+#[path = "build_support/clickhouse_embed.rs"]
+mod clickhouse_embed;
 
 fn main() {
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let embed_clickhouse_rs = Path::new(&out_dir).join("embed_clickhouse.rs");
-
-    if env::var("DOCS_RS").is_ok() {
-        println!("cargo:warning=Skipping ClickHouse download while building on docs.rs");
-        fs::write(
-            &embed_clickhouse_rs,
-            "/// ClickHouse binary bytes are not bundled when building on docs.rs.\n\
-             pub const CLICKHOUSE_BINARY: &[u8] = &[];\n",
-        )
-        .unwrap();
-        return;
+    for name in [
+        "JETSTREAMER_CLICKHOUSE_BINARY",
+        "JETSTREAMER_CLICKHOUSE_SHA256",
+    ] {
+        println!("cargo:rerun-if-env-changed={name}");
     }
-
-    let clickhouse_binary = out_dir.join("clickhouse");
-
-    // Check if the ClickHouse binary exists
-    if !clickhouse_binary.exists() {
-        println!("ClickHouse binary not found. Downloading ClickHouse...");
-
-        // Run the curl command to download and install ClickHouse
-        let status = Command::new("sh")
-            .arg("-c")
-            .arg("curl https://clickhouse.com/ | sh")
-            .current_dir(&out_dir)
-            .status()
-            .expect("Failed to download and install ClickHouse");
-
-        if !status.success() {
-            panic!("ClickHouse installation failed with status: {}", status);
-        }
-
-        // Mark the ClickHouse binary as executable
-        if clickhouse_binary.exists() {
-            println!("Setting ClickHouse binary as executable...");
-            let mut permissions = fs::metadata(&clickhouse_binary)
-                .expect("Failed to get ClickHouse binary metadata")
-                .permissions();
-            permissions.set_mode(0o755); // rwxr-xr-x
-            fs::set_permissions(&clickhouse_binary, permissions)
-                .expect("Failed to set ClickHouse binary as executable");
-        } else {
-            panic!("ClickHouse binary was not downloaded correctly.");
-        }
-    } else {
-        println!("ClickHouse binary already exists. Skipping installation.");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=build_support/clickhouse_embed.rs");
+    let source = std::env::var_os("JETSTREAMER_CLICKHOUSE_BINARY");
+    let digest = std::env::var_os("JETSTREAMER_CLICKHOUSE_SHA256");
+    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("Cargo OUT_DIR"));
+    clickhouse_embed::generate(source.as_deref(), digest.as_deref(), &out)
+        .unwrap_or_else(|error| panic!("ClickHouse embedding rejected: {error}"));
+    if let Some(source) = source {
+        println!(
+            "cargo:rerun-if-changed={}",
+            source.to_str().expect("validated UTF-8 source")
+        );
     }
-
-    fs::write(
-        &embed_clickhouse_rs,
-        format!(
-            "/// Raw bytes of clickhouse binary ({} bytes)\n\
-             pub const CLICKHOUSE_BINARY: &[u8] = include_bytes!(r#\"{}\"#);\n",
-            fs::metadata(&clickhouse_binary).unwrap().len(),
-            clickhouse_binary.display()
-        ),
-    )
-    .unwrap();
 }

@@ -386,8 +386,24 @@ remaining slots — so every connection stays busy to the end of the run. Tune w
 
 ### ClickHouse Integration
 
-Jetstreamer Runner has a built-in ClickHouse integration (by default a clickhouse server is
-spawned running out of the `bin` directory in the repo)
+Jetstreamer Runner can launch a bundled ClickHouse server using the `bin` directory in the repo.
+
+Builds do not download, install, or execute ClickHouse. Generic utility and offline builds
+embed no binary. To bundle ClickHouse, obtain a trusted local binary independently and provide
+both its absolute canonical path and a separately verified lowercase SHA-256 at build time:
+
+```bash
+JETSTREAMER_CLICKHOUSE_BINARY=/absolute/path/to/clickhouse \
+JETSTREAMER_CLICKHOUSE_SHA256=VERIFIED_LOWERCASE_SHA256 \
+cargo build --release -p jetstreamer-utils
+```
+
+The build rejects partial configuration, symlinks, multiply linked files, group/other-writable
+files, empty files, inputs larger than 1 GiB, digest mismatches, and sources that change during
+capture. It hashes the opened source while copying it into `OUT_DIR`, then embeds that captured
+read-only copy. Without an embedded binary, the client/server startup functions return an
+actionable error before writing files or starting processes. An external ClickHouse instance
+remains available through `--clickhouse-dsn`.
 
 To manage the ClickHouse integration with ease, the following bundled Cargo aliases are
 provided when within the `jetstreamer` workspace:
