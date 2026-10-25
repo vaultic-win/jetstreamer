@@ -317,7 +317,6 @@ mod tests {
             "../root-prefix-resource-203-v1/missing.service",
             "../r2-holding-foundation-node-01-v1/foundation203-restores/missing.service",
             "../systemd-staging/../root-prefix-resource-203-v1/missing.service",
-            "../../../../home/ubuntu/.jetstreamer-private/root-prefix-resource-203-v1/missing.service",
         ] {
             assert!(!target.contains(ROOT) && !target.contains(RESTORES));
             assert!(
@@ -325,6 +324,14 @@ mod tests {
                 "{target}"
             );
         }
+        // A traversal containing the literal root must also be rejected.
+        assert!(
+            dangling_target(
+                staged,
+                Path::new("../../../../home/ubuntu/.jetstreamer-private/root-prefix-resource-203-v1/missing.service")
+            )
+            .is_err()
+        );
         assert_eq!(
             dangling_target(staged, Path::new("../unrelated/missing.service")).unwrap(),
             Path::new("/home/ubuntu/.jetstreamer-private/unrelated/missing.service")
