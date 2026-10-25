@@ -277,6 +277,14 @@ pub(super) fn current(p: &Value, supplied: &Value) -> Result<()> {
         observe()? == before && unit(c::UNIT)? == base,
         "227 cleared idle owner changed during revalidation"
     );
+    let (after_journal, _) = super::journal(c::UNIT)?;
+    tail(
+        &after_journal,
+        &p["manager_completion"],
+        p["invocation_id"].as_str().context("227 IID")?,
+        p["terminal_boot_id"].as_str().context("227 boot")?,
+    )?;
+    inactive_status::no_pending_owner_trigger(c::UNIT, false)?;
     Ok(())
 }
 pub(super) fn capture(
