@@ -233,16 +233,40 @@ fn gates(x: &StageSpec) -> Result<Vec<Value>> {
         .collect()
 }
 fn tool(x: &StageSpec) -> Result<BoundFile> {
-    let tool = x.tool.clone().context("204 stage tool missing")?;
-    sealed(&tool, 256 << 20)?;
-    let proof = read(
+    validate_tool_qualification(
+        x.stage,
+        x.tool.as_ref().context("204 stage tool missing")?,
         x.tool_qualification
             .as_ref()
             .context("204 stage tool qualification missing")?,
-    )?;
+    )
+}
+pub(in crate::fleet) fn qualified_tool(
+    role: &str,
+    tool: &BoundFile,
+    qualification: &BoundFile,
+) -> Result<BoundFile> {
+    let stage: Stage = serde_json::from_value(json!(role))?;
+    ensure!(
+        matches!(
+            stage,
+            Stage::Full | Stage::Plugin | Stage::Boundary | Stage::Upload
+        ),
+        "unsupported completed archive tool role"
+    );
+    validate_tool_qualification(stage, tool, qualification)
+}
+fn validate_tool_qualification(
+    stage: Stage,
+    artifact: &BoundFile,
+    qualification: &BoundFile,
+) -> Result<BoundFile> {
+    let tool = artifact.clone();
+    sealed(&tool, 256 << 20)?;
+    let proof = read(qualification)?;
     ensure!(
         proof["schema"] == "jetstreamer-epoch204-assembly-recovery-tool-qualification-v1"
-            && proof["stage"] == serde_json::to_value(x.stage)?
+            && proof["stage"] == serde_json::to_value(stage)?
             && proof["artifact"] == private157::binding(&tool)
             && is_lower_hex(s(&proof, "source_revision")?, 40),
         "204 tool qualification scope differs"
@@ -272,7 +296,7 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
             "204 actual tool capture/QA source revision differs"
         );
     }
-    let (component, qa_target) = match x.stage {
+    let (component, qa_target) = match stage {
         Stage::Full => (
             "jetstreamer-horizon",
             tool_qa::Target::Example("verify_archive"),

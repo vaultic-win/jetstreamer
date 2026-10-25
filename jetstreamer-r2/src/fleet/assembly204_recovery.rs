@@ -19,6 +19,24 @@ pub(super) fn accepted_context(fleet: &BoundFile, observer: &BoundFile) -> Resul
     .historical()
 }
 mod downstream;
+pub(super) fn delivery_command_matches(actual: &str, expected: &str) -> bool {
+    ownership::command_matches(actual, expected)
+}
+pub(super) fn qualified_delivery_tool(
+    role: &str,
+    tool: &BoundFile,
+    proof: &BoundFile,
+) -> Result<BoundFile> {
+    downstream::qualified_tool(role, tool, proof)
+}
+pub(super) fn deployed_delivery_member(
+    seal: &BoundFile,
+    member: &BoundFile,
+    maximum: u64,
+) -> Result<()> {
+    artifact::validate_member_binding(seal, member, maximum)
+}
+
 mod lineage;
 mod ownership;
 mod transition;

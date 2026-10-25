@@ -52,14 +52,14 @@ fn bytes32(s: &str) -> Result<Value> {
     ensure!(decoded.len() == 32, "209 consensus hash length differs");
     Ok(serde_json::to_value(decoded)?)
 }
-fn pair_identity(a: &LocalArchive) -> Value {
+pub(super) fn pair_identity(a: &LocalArchive) -> Value {
     json!({"path":a.archive_path,"sha256":a.sha256_hex,"bytes":a.length,
         "device":a.identity.device,"inode":a.identity.inode,"modified_seconds":a.identity.modified_seconds,
         "modified_nanoseconds":a.identity.modified_nanoseconds,"sidecar_device":a.sidecar_identity.device,
         "sidecar_inode":a.sidecar_identity.inode,"sidecar_modified_seconds":a.sidecar_identity.modified_seconds,
         "sidecar_modified_nanoseconds":a.sidecar_identity.modified_nanoseconds})
 }
-fn cohort(v: &Value, a: &LocalArchive) -> Result<()> {
+pub(super) fn cohort(v: &Value, a: &LocalArchive) -> Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let gate = &v["root_checkpoint_gate"];
     let checkpoints = gate["verified_manifest_checkpoints"]
@@ -153,7 +153,7 @@ fn cohort(v: &Value, a: &LocalArchive) -> Result<()> {
     );
     Ok(())
 }
-fn source_terminal(launch: &Value) -> Result<Value> {
+pub(super) fn source_terminal(launch: &Value) -> Result<Value> {
     let iid = launch["evidence"]["units"][0]["invocation_id"]
         .as_str()
         .context("209 source IID")?;
@@ -194,13 +194,16 @@ fn source_terminal(launch: &Value) -> Result<Value> {
     )
 }
 fn terminal_history(rows: &[Value], iid: &str) -> Result<Vec<Value>> {
+    terminal_history_for(rows, c::UNIT, iid)
+}
+pub(super) fn terminal_history_for(rows: &[Value], name: &str, iid: &str) -> Result<Vec<Value>> {
     ensure!(
         !rows.is_empty() && rows.len() < 256,
         "209 manager history truncated/empty"
     );
     let own = rows
         .iter()
-        .filter(|r| r["_PID"] == "1" && r["_UID"] == "0" && r["UNIT"] == c::UNIT)
+        .filter(|r| r["_PID"] == "1" && r["_UID"] == "0" && r["UNIT"] == name)
         .collect::<Vec<_>>();
     let starts = own
         .iter()
@@ -208,14 +211,14 @@ fn terminal_history(rows: &[Value], iid: &str) -> Result<Vec<Value>> {
             r["INVOCATION_ID"] == iid
                 && r["MESSAGE"]
                     .as_str()
-                    .is_some_and(|s| s.starts_with(&format!("Started {} -", c::UNIT)))
+                    .is_some_and(|s| s.starts_with(&format!("Started {} -", name)))
         })
         .collect::<Vec<_>>();
     let ends = own
         .iter()
         .filter(|r| {
             r["INVOCATION_ID"] == iid
-                && r["MESSAGE"] == format!("{}: Deactivated successfully.", c::UNIT)
+                && r["MESSAGE"] == format!("{}: Deactivated successfully.", name)
         })
         .collect::<Vec<_>>();
     ensure!(
@@ -385,7 +388,7 @@ fn full_span(log: &Path) -> Result<()> {
     );
     Ok(())
 }
-fn lock() -> Result<File> {
+pub(super) fn lock() -> Result<File> {
     let path = Path::new(LOCK);
     let file = OpenOptions::new()
         .read(true)

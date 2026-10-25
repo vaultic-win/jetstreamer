@@ -88,6 +88,7 @@ pub(super) fn demotion223_cleanup_current(
 pub(super) fn compute_demotion223_capacity() -> Result<()> {
     demotion223_capacity::run()
 }
+mod completed_archive_phase;
 mod demotion223_live_peer;
 mod native141;
 mod native144;
@@ -349,6 +350,9 @@ pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
 }
 pub(super) fn deliver_singleton209_output() -> Result<()> {
     singleton209_delivery::run()
+}
+pub(super) fn admit_completed_archive_phase() -> Result<()> {
+    completed_archive_phase::run()
 }
 pub(super) fn admit_singleton209_delivery() -> Result<()> {
     singleton209_delivery::admission::run()

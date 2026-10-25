@@ -19,6 +19,14 @@ pub(super) fn first_root233_required(
         candidate == first_root233::MEMORY && total >= candidate,
         "first root 233 hard memory candidate differs"
     );
+    first_root233_recompute(
+        &native223_policy(fleet)?,
+        total,
+        protected_growth,
+        candidate,
+    )
+}
+fn native223_policy(fleet: &Value) -> Result<Value> {
     let owners = fleet["active"]
         .as_array()
         .context("first root 233 complete active census absent")?
@@ -34,10 +42,49 @@ pub(super) fn first_root233_required(
     } else {
         Some(capped204_native223::prove_terminal(fleet)?)
     };
-    let policy = json!({"schema":"jetstreamer-first-root233-native223-memory-policy-v1",
+    Ok(
+        json!({"schema":"jetstreamer-first-root233-native223-memory-policy-v1",
         "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
-        "native223_floor_state":if live {"live"}else{"positively-terminal"},"native223_release_proof":terminal});
-    first_root233_recompute(&policy, total, protected_growth, candidate)
+        "native223_floor_state":if live {"live"}else{"positively-terminal"},"native223_release_proof":terminal}),
+    )
+}
+
+pub(super) fn completed_phase_required(
+    fleet: &Value,
+    total: u64,
+    growth: u64,
+    stage: u64,
+) -> Result<(u64, Value)> {
+    let policy = json!({"schema":"jetstreamer-completed-archive-phase-memory-policy-v1", "native223_floor_policy":native223_policy(fleet)?});
+    completed_phase_recompute(&policy, total, growth, stage)
+}
+pub(super) fn completed_phase_recompute(
+    policy: &Value,
+    total: u64,
+    growth: u64,
+    stage: u64,
+) -> Result<(u64, Value)> {
+    ensure!(
+        matches!(stage, n if n == 16 << 30 || n == 32 << 30 || n == 64 << 30)
+            && stage <= total
+            && policy["schema"] == "jetstreamer-completed-archive-phase-memory-policy-v1",
+        "completed archive phase memory profile differs"
+    );
+    let floor = first_root233_saved_floor(&policy["native223_floor_policy"], total)?;
+    let extra = 2u64 << 30; // One independent guard plus one bounded metadata issuer.
+    let required = floor
+        .checked_add(growth)
+        .and_then(|n| n.checked_add(stage))
+        .and_then(|n| n.checked_add(extra))
+        .context("completed archive phase memory overflow")?;
+    let mut result = policy.clone();
+    result["effective_available_memory_floor_bytes"] = json!(floor);
+    result["candidate_stage_hard_memory_bytes"] = json!(stage);
+    result["candidate_guard_and_metadata_hard_memory_bytes"] = json!(extra);
+    result["protected_existing_hard_memory_growth_bytes"] = json!(growth);
+    result["required_available_memory_bytes"] = json!(required);
+    result["floor_counted_once"] = json!(true);
+    Ok((required, result))
 }
 
 pub(super) fn first_root233_recompute(
@@ -941,5 +988,43 @@ mod tests {
                 assert!(validate_capacity(&bad).is_err(), "{stage}:{key}");
             }
         }
+    }
+    #[test]
+    fn completed_phase_keeps_live_native_floor_hard_growth_and_guard_metadata_once() {
+        let total = 1_024_000_000_000u64;
+        for stage in [16u64 << 30, 32u64 << 30, 64u64 << 30] {
+            let (required, p) = completed_phase_required(&fleet(), total, 123, stage).unwrap();
+            assert_eq!(required, (480u64 << 30) + 123 + stage + (2u64 << 30));
+            assert_eq!(
+                p["candidate_guard_and_metadata_hard_memory_bytes"],
+                2u64 << 30
+            );
+            assert_eq!(p["floor_counted_once"], true);
+            let (again, _) = completed_phase_recompute(&p, total, 456, stage).unwrap();
+            assert_eq!(again, required + 333);
+            assert!(completed_phase_recompute(&p, total, u64::MAX, stage).is_err());
+        }
+        assert!(completed_phase_required(&fleet(), total, 0, 225_000_000_000).is_err());
+    }
+    #[test]
+    fn completed_phase_releases_native_floor_only_with_saved_exact_terminal_proof() {
+        let total = 1_024_000_000_000u64;
+        let native = json!({"schema":"jetstreamer-first-root233-native223-memory-policy-v1",
+            "native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,
+            "native223_floor_state":"positively-terminal","native223_release_proof":capped204_native223::terminal_fixture()});
+        let p = json!({"schema":"jetstreamer-completed-archive-phase-memory-policy-v1","native223_floor_policy":native});
+        let (required, _) = completed_phase_recompute(&p, total, 123, 32u64 << 30).unwrap();
+        assert_eq!(
+            required,
+            total.div_ceil(10) + 123 + (32u64 << 30) + (2u64 << 30)
+        );
+        for value in [Value::Null, json!({"released_owner_only":true})] {
+            let mut bad = p.clone();
+            bad["native223_floor_policy"]["native223_release_proof"] = value;
+            assert!(completed_phase_recompute(&bad, total, 123, 32u64 << 30).is_err());
+        }
+        let mut bad = p;
+        bad["native223_floor_policy"]["native223_invocation_id"] = json!("f".repeat(32));
+        assert!(completed_phase_recompute(&bad, total, 123, 32u64 << 30).is_err());
     }
 }

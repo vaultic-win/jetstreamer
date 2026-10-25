@@ -9,6 +9,7 @@ enum MemoryMode {
     Foundation203,
     Full210,
     Full209Delivery,
+    CompletedArchivePhase,
     FirstRoot233,
     Capped204V4,
     AssemblyRecovery204,
@@ -172,6 +173,15 @@ pub(super) fn check_singleton209_delivery(value: &Value, candidate: Candidate) -
         "209 delivery memory or metadata envelope differs"
     );
     check_inner(value, candidate, MemoryMode::Full209Delivery)
+}
+pub(super) fn check_completed_archive_phase(value: &Value, candidate: Candidate) -> Result<Value> {
+    ensure!(
+        candidate.additional_bytes == 1 << 30
+            && matches!(candidate.memory_max_bytes, n if n == 16 << 30 || n == 32 << 30 || n == 64 << 30)
+            && candidate.minimum_protected_disk_bytes > 0,
+        "completed archive phase envelope differs"
+    );
+    check_inner(value, candidate, MemoryMode::CompletedArchivePhase)
 }
 pub(super) fn check_capped204_v4_delivery(
     value: &Value,
@@ -344,6 +354,11 @@ fn memory_sample(
         MemoryMode::Full209Delivery => {
             let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
             (n, Some(("full209_delivery_memory_policy", p)))
+        }
+        MemoryMode::CompletedArchivePhase => {
+            let (n, p) =
+                singleton210_memory::completed_phase_required(f, total, reserve, candidate)?;
+            (n, Some(("completed_archive_phase_memory_policy", p)))
         }
         MemoryMode::Capped204V4 => {
             let (n, p) = capped204_native223::required(f, total, reserve, candidate)?;
@@ -601,7 +616,10 @@ fn check_inner_with(
             t,
             now,
         )?;
-    let bracketed = matches!(mode, MemoryMode::FirstRoot233);
+    let bracketed = matches!(
+        mode,
+        MemoryMode::FirstRoot233 | MemoryMode::CompletedArchivePhase
+    );
     ensure!(
         bracketed || (after_growth <= growth && after_memory_growth <= memory_growth),
         "Maintenance protected resource growth increased during admission"
@@ -645,12 +663,21 @@ fn check_inner_with(
         };
         let hard = n(&memory_before, "protected_existing_memory_growth_bytes")?
             .max(n(&memory_after, "protected_existing_memory_growth_bytes")?);
-        let (recomputed_memory, policy) = singleton210_memory::first_root233_recompute(
-            &memory_after["first_root233_memory_policy"],
-            n(&memory_after, "host_total_memory_bytes")?,
-            hard,
-            candidate.memory_max_bytes,
-        )?;
+        let (recomputed_memory, policy) = if matches!(mode, MemoryMode::CompletedArchivePhase) {
+            singleton210_memory::completed_phase_recompute(
+                &memory_after["completed_archive_phase_memory_policy"],
+                n(&memory_after, "host_total_memory_bytes")?,
+                hard,
+                candidate.memory_max_bytes,
+            )?
+        } else {
+            singleton210_memory::first_root233_recompute(
+                &memory_after["first_root233_memory_policy"],
+                n(&memory_after, "host_total_memory_bytes")?,
+                hard,
+                candidate.memory_max_bytes,
+            )?
+        };
         let (required, required_memory) = capped204205_admission::bracketed_requirements(
             required,
             recomputed_disk,
@@ -754,6 +781,7 @@ fn fleet_for_mode(
             | MemoryMode::Foundation203
             | MemoryMode::AssemblyRecovery204
             | MemoryMode::Full209Delivery
+            | MemoryMode::CompletedArchivePhase
     ) {
         return accepted(fleet, observer);
     }
@@ -1115,6 +1143,44 @@ mod assembly204_floor_tests {
         p["host_available_floor_bytes"] = json!(total.div_ceil(10));
         assert!(
             validate_assembly204_recovery_memory_policy(&p, total, growth, base + guard).is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod completed_phase_context_tests {
+    use super::*;
+    #[test]
+    fn completed_phase_context_never_falls_back_after_failed_authentication() {
+        let fleet = BoundFile {
+            path: "/saved/accepted/fleet.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let observer = BoundFile {
+            path: "/saved/observer.json".into(),
+            sha256: "b".repeat(64),
+        };
+        assert!(
+            fleet_for_mode(
+                MemoryMode::CompletedArchivePhase,
+                &fleet,
+                &observer,
+                &|_, _| bail!("context rejected"),
+                &|_| panic!("no fallback allowed")
+            )
+            .is_err()
+        );
+        let raw = json!({"active":[],"history":[{"raw":true}]});
+        assert_eq!(
+            fleet_for_mode(
+                MemoryMode::CompletedArchivePhase,
+                &fleet,
+                &observer,
+                &|_, _| Ok(raw.clone()),
+                &|_| panic!("no plain reader allowed")
+            )
+            .unwrap(),
+            raw
         );
     }
 }
