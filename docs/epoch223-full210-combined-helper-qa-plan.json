@@ -1,0 +1,237 @@
+{
+  "schema": "jetstreamer-native223-full210-combined-helper-qa-proposal-v1",
+  "authorization": "Source-only proposal; no Cargo, target/cache access or production/runtime execution authorized.",
+  "source_commit": "2bf7a3f2d5ed0f8c6307254d67216055f2558b4b",
+  "source_tree": "80e53e956b8d61f902e9e18d803ab29c430d2ddb",
+  "source_worktree": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/native223-full210-combined-helper-qa-worktree",
+  "base": "87f98a8096323786fe66fe76b590dec7d9896342",
+  "exact_cherry_picked_sources": [
+    "1d0ab8374e5668d1209369bebd2346940f65e516",
+    "74b0699a89a434a71192ba0d3a7ad7e78b1471d4",
+    "63a5e385b0d3cfb1115ec0643f60f5b1ad4413e6"
+  ],
+  "additional_source_delta_only": "jetstreamer-r2/src/fleet/maintenance_capacity/singleton210_memory.rs",
+  "shared_eaa_source": "eaa8f5ac1893524e06100dc4ce4e5d53e8290128",
+  "shared_eaa_file_hashes": {
+    "canary227_capture.rs": "2dd209e2a5526f296da996e7aec65983924d861d9afc9a504b5b4325491158ce",
+    "canary227_peer.rs": "0d7db7d82886c63b324ba7a4f5cf79dade050e892b4ca7876662684a525adb3d",
+    "canary227_peer/manager.rs": "8e21fc76651b4ff03da4288a9424c75f0695f6ecd630c162aca755203af8219f",
+    "canary227_peer/memory.rs": "c4aa87df0b2d92ec5d982ba1776b428b5d3460fbb53bf8828a9199fbbb161b71",
+    "native209_full227.rs": "43179f2ef1ddbdfad80740a669b5ce0a5aaaf2fd80863302627f15b43dd09f2a",
+    "singleton227_capture.rs": "57c3f358cb82d1c61cd11f6dcc345b0c96bb885a9d1405228d451d90928652eb",
+    "warmup223.rs": "565d518b138c448c9467ba0f28df51b334267c8a6c8a94e710d08f9dafb64c28",
+    "warmup223/guard_receipt.rs": "15bfb669342dea1469d076feb5e8242fcaead4d3a031bf239cad2e526e5ed500"
+  },
+  "excluded": [
+    "unfrozen terminal 227 repair",
+    "unfrozen epoch 204 refresh repair",
+    "all later full-root source"
+  ],
+  "reviewed_closure": {
+    "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-complete-memory-af098020-qa-v2/reviewed-rust-closure.json",
+    "sha256": "688aa5763bbafe80c8f3915e56c4ad99385f7dd5a3a881e803414b180b76817c",
+    "static_comparison": "All path-package reviewed manifests match; Cargo.lock, workspace manifest, R2 manifest and config hashes match; vendor/lock/config git objects match. No Cargo metadata or cache read performed.",
+    "revalidate_before_cargo": true
+  },
+  "original_cumulative_baseline": {
+    "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch227-collected-c8465cea-qa-v1/target-baseline.json",
+    "sha256": "6e32307a85bf83ae8633955e6afede0e066bc160203755104c8ba19bcd465635",
+    "max_all_prior_current_target_and_evidence_bytes": 4294967296,
+    "reset_allowed": false,
+    "current_charge_known": false
+  },
+  "bounds": {
+    "memory_high_bytes": 15032385536,
+    "memory_max_bytes": 17179869184,
+    "memory_swap_max_bytes": 0,
+    "cpu_percent": 200,
+    "tasks_max": 512,
+    "per_command_runtime_max_seconds": 1800,
+    "restart": "no",
+    "kill_mode": "control-group",
+    "oom_policy": "kill",
+    "user": "ubuntu",
+    "group": "ubuntu",
+    "private_network": true,
+    "private_tmp": true,
+    "no_new_privileges": true,
+    "protect_system": "strict",
+    "protect_home": "read-only",
+    "umask": "0077",
+    "inaccessible_paths": [
+      "/home/ubuntu/.jetstreamer-private",
+      "/home/ubuntu/horizon",
+      "/var/lib/jetstreamer"
+    ],
+    "writes": "Only actual leased shared target and new root-approved QA evidence directory; no source writes"
+  },
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.0",
+    "CARGO_TARGET_DIR": "/home/ubuntu/workspace/jetstreamer/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "PATH": "/home/ubuntu/.cargo/bin:/usr/bin:/bin"
+  },
+  "unset_environment": [
+    "DOCS_RS",
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "CC",
+    "CXX",
+    "AR",
+    "unreviewed ClickHouse inputs"
+  ],
+  "commands": [
+    {
+      "id": "01-strict-clippy",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "clippy",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ]
+    },
+    {
+      "id": "02-demotion223",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "demotion223",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "03-canary227",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "canary227",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "04-prefix223_live_peer",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "prefix223_live_peer",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "05-singleton210_memory",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "singleton210_memory",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "06-maintenance_capacity",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "maintenance_capacity",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "07-full-all-features",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--all-features",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "id": "08-full-default",
+      "argv": [
+        "/home/ubuntu/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--frozen",
+        "--locked",
+        "--offline",
+        "-j2",
+        "-p",
+        "jetstreamer-r2",
+        "--",
+        "--test-threads=1"
+      ]
+    }
+  ],
+  "required_before_execution": [
+    "Root transfers exclusive shared target/cache lease; no competing Cargo process",
+    "Freeze/review complete final successor including owner-provided terminal 227 and epoch 204 fixes if needed, then regenerate exact source census and pins",
+    "Authenticate actual sandbox and offline tool/config/source/cache identity",
+    "Recompute original cumulative charge including every failed/retry artifact and evidence; stop before exceeding 4 GiB",
+    "Confirm package graph/features and actual compiler artifacts stay inside reviewed closure; stop before unreviewed native/dependency/network rebuild"
+  ],
+  "failure_policy": "Stop on first failed command, preserve exact source/log/exit and all cumulative charges; no automatic retry or success inference.",
+  "qualification_limit": "R2 helper source only. Does not qualify native utility/parent, actual a280 cold execution, terminal producer commitment, capacity, production build/seal or R2 upload."
+}
