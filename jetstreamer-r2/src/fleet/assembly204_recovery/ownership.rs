@@ -67,7 +67,10 @@ pub(super) fn validate_closed_ownership(
     }
     Ok(())
 }
-pub(super) fn no_overlap(context: &Context, actor: Option<downstream::Stage>) -> Result<()> {
+pub(super) fn no_overlap(
+    context: &AcceptedContext,
+    actor: Option<downstream::Stage>,
+) -> Result<()> {
     let current = context.census(&context::closed_names())?;
     validate_closed_ownership(&current, actor)?;
     for name in current.keys().filter(|name| {
@@ -169,7 +172,7 @@ pub(super) fn current_actor(
 #[serde(deny_unknown_fields)]
 struct LaunchSpec {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     stage: downstream::Stage,
     recovery_plan: BoundFile,
     admission: BoundFile,
@@ -405,7 +408,7 @@ pub(super) fn validate_success_terminal(t: &Value, name: &str, iid: &str) -> Res
     deny(&t["authority"])
 }
 pub(super) fn capture_success_terminal(
-    context: &Context,
+    context: &AcceptedContext,
     name: &str,
     iid: &str,
     outcome: &Path,
@@ -511,7 +514,7 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
     custody::plan_scope(&p)?;
     let origin = read(&w.claim.launch)?;
     validate_launch(&origin, &w.claim.recovery_plan, &p, &w.claim.admission)?;
-    let context = Context {
+    let context = AcceptedContext {
         fleet: w.previous_fleet.clone(),
         observer: w.observer.clone(),
     };
@@ -793,7 +796,7 @@ pub(super) async fn publish(v: &Value, _spec: &BoundFile, self_sha: &str) -> Res
     );
     let frame = read(&x.claim.frame)?;
     let observer = bound_json(&serde_json::from_value(frame["observer"].clone())?)?;
-    let context = Context {
+    let context = AcceptedContext {
         fleet: serde_json::from_value(frame["previous_fleet"].clone())?,
         observer: serde_json::from_value(frame["observer"].clone())?,
     };
@@ -935,7 +938,7 @@ fn failure_shape(raw: &[u8], name: &str, iid: &str) -> Result<()> {
     Ok(())
 }
 pub(super) fn capture_failure_terminal(
-    context: &Context,
+    context: &AcceptedContext,
     name: &str,
     iid: &str,
     directory: &Path,

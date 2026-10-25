@@ -7,7 +7,7 @@ mod artifact;
 mod capacity;
 mod context;
 mod custody;
-use context::Context;
+use context::AcceptedContext;
 mod downstream;
 mod lineage;
 mod ownership;

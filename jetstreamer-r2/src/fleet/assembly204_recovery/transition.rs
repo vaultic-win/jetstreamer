@@ -249,7 +249,7 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
         "204 terminal prepare spec"
     );
     private(&x.output_directory)?;
-    let context = Context {
+    let context = AcceptedContext {
         fleet: x.previous_fleet.clone(),
         observer: x.observer.clone(),
     };

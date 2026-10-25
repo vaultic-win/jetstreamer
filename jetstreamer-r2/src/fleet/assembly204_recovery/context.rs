@@ -4,11 +4,11 @@ use super::*;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Context {
+pub(super) struct AcceptedContext {
     pub fleet: BoundFile,
     pub observer: BoundFile,
 }
-impl Context {
+impl AcceptedContext {
     pub(super) fn from_basis(v: &Value) -> Result<Self> {
         Ok(Self {
             fleet: serde_json::from_value(v["fleet"].clone())?,

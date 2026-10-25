@@ -154,7 +154,7 @@ pub(super) fn admit(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
         a.schema == "jetstreamer-epoch204-assembly-recovery-admission-spec-v1",
         "204 admission spec"
     );
-    let context = Context::from_basis(&a.resource_basis)?;
+    let context = AcceptedContext::from_basis(&a.resource_basis)?;
     let p = read(&a.recovery_plan)?;
     custody::plan_scope(&p)?;
     let issuance = read(&a.plan_issuance)?;

@@ -373,7 +373,7 @@ pub(super) fn validate_outcome(
 #[serde(deny_unknown_fields)]
 struct CompletionSpec {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     launch: BoundFile,
     recovery_terminal: BoundFile,
     output: PathBuf,

@@ -73,7 +73,7 @@ struct Neighbor {
 #[serde(deny_unknown_fields)]
 pub(super) struct StageSpec {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     pub stage: Stage,
     pub source: lineage::DownstreamSource,
     gates: Vec<Gate>,
@@ -948,7 +948,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
 #[serde(deny_unknown_fields)]
 struct Capture {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     stage: Stage,
     launch: BoundFile,
     outcome: Option<PathBuf>,

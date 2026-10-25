@@ -153,7 +153,7 @@ pub(super) fn terminal_shape(current: &Value, raw: &[u8]) -> Result<u64> {
     );
     finished.context("204 has no actual failed/stopped terminal")
 }
-pub(super) fn old_idle(context: &Context) -> Result<Value> {
+pub(super) fn old_idle(context: &AcceptedContext) -> Result<Value> {
     let names = context::closed_names();
     let before = context.census(&names)?;
     let original = before.get(OLD_UNIT).context("204 old owner omitted")?;
@@ -199,7 +199,7 @@ pub(super) fn old_idle(context: &Context) -> Result<Value> {
 #[serde(deny_unknown_fields)]
 struct TerminalSpec {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     original_plan: BoundFile,
     suffix_proof: BoundFile,
     output_directory: PathBuf,
@@ -244,7 +244,7 @@ pub(super) fn capture_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     Ok(())
 }
 fn validate_saved_custody(receipt: &Value, before: &str, after: &str) -> Result<()> {
-    let context: Context = serde_json::from_value(receipt["accepted_context"].clone())?;
+    let context: AcceptedContext = serde_json::from_value(receipt["accepted_context"].clone())?;
     for field in [before, after] {
         let evidence = read(&serde_json::from_value(receipt[field].clone())?)?;
         ensure!(
@@ -343,7 +343,7 @@ fn raw_proof(b: &BoundFile) -> Result<Vec<u8>> {
 #[serde(deny_unknown_fields)]
 struct CaptureSpec {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     original_plan: BoundFile,
     original_terminal: BoundFile,
     suffix_proof: BoundFile,
@@ -494,7 +494,7 @@ pub(super) fn plan_scope(p: &Value) -> Result<()> {
 #[serde(deny_unknown_fields)]
 struct PlanSpec {
     schema: String,
-    context: Context,
+    context: AcceptedContext,
     original_plan: BoundFile,
     original_terminal: BoundFile,
     source_capture: BoundFile,
@@ -624,7 +624,7 @@ mod saved_custody_tests {
                 .into(),
             sha256: env::var(hash_var).expect("independently supplied accepted metadata hash"),
         };
-        let context = Context {
+        let context = AcceptedContext {
             fleet: supplied(
                 "JETSTREAMER_204_ACCEPTED_FLEET",
                 "JETSTREAMER_204_ACCEPTED_FLEET_SHA256",
