@@ -169,14 +169,22 @@ pub(super) fn registration(claim: &Claim, input: &Inputs, observer: &Value) -> R
             && registration["origin_launch"] == private157::binding(&claim.launch),
         "capped observer registration detached from actual launch"
     );
-    let journal: BoundFile = serde_json::from_value(input.launch["manager_journal"].clone())?;
+    captured_registration(&input.plan, &input.launch, &registration, observer)
+}
+pub(super) fn captured_registration(
+    plan: &Value,
+    launch: &Value,
+    registration: &Value,
+    observer: &Value,
+) -> Result<()> {
+    let journal: BoundFile = serde_json::from_value(launch["manager_journal"].clone())?;
     let start = capture::manager_history(
         &evidence::bytes(&journal, true)?,
-        string(&input.plan, "producer_unit")?,
-        string(&input.launch, "invocation_id")?,
+        string(plan, "producer_unit")?,
+        string(launch, "invocation_id")?,
         false,
     )?;
-    observation_binding(&input.plan, &input.launch, &registration, observer, start)
+    observation_binding(plan, launch, registration, observer, start)
 }
 pub(in crate::fleet) fn peer_observation(f: &Value, observer: &Value) -> Result<()> {
     for peer in accepted(f)? {

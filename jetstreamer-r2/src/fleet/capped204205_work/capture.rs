@@ -468,8 +468,6 @@ pub(super) fn run() -> Result<()> {
         prior["schema"] == SCHEMA
             && prior["first_epoch"] == 201
             && prior["last_epoch"] == 300
-            && prior["observer_sha256"] == s.observer.sha256
-            && prior["observer_receipt"].as_str() == s.observer.path.to_str()
             && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2",
         "capped capture lacks the accepted coordinated observation"
     );
@@ -487,6 +485,20 @@ pub(super) fn run() -> Result<()> {
     original_capped204205::idle_for_plan(&before[profile(epoch)?.0], &p)?;
     let launched = launch(&s, &p, &a, &before)?;
     let l = evidence::bound(&launched, true)?;
+    ensure!(
+        s.launch.is_some()
+            || (prior["observer_sha256"] == s.observer.sha256
+                && prior["observer_receipt"].as_str() == s.observer.path.to_str()),
+        "successor observation requires an existing actual launch capture"
+    );
+    observer_handoff::validate(
+        &s.previous_fleet,
+        &s.observer,
+        &observer,
+        &s.producer_plan,
+        &s.admission,
+        &l,
+    )?;
     let registration = observer_registration(&p, &l)?;
     let registration_path = s.output_directory.join("next-observer-registration.json");
     write_sealed(
@@ -496,6 +508,12 @@ pub(super) fn run() -> Result<()> {
         "replace_overlapping_epoch_diagnostic":true,"preserve_all_other_config_fields":true,
         "next_sole_30_minute_observer_must_include_producer":true,"observer_config_modified":false,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
+    )?;
+    peer::captured_registration(
+        &p,
+        &l,
+        &evidence::bound(&binding(&registration_path)?, true)?,
+        &observer,
     )?;
     let mut actors = s.downstream_actors;
     for actor in &mut actors {

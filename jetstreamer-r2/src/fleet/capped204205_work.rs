@@ -5,6 +5,7 @@ mod capture;
 mod evidence;
 mod historical_terminal;
 mod lifecycle;
+mod observer_handoff;
 mod peer;
 pub(super) use peer::{
     peer_assembly_memory_owners, peer_clean_assembly_window, peer_current, peer_disk,
@@ -360,6 +361,14 @@ fn evaluate(
         "capped work frame is stale, changed, or detached from the coordinated complete census"
     );
     denied(f)?;
+    observer_handoff::validate(
+        &serde_json::from_value(f["previous_fleet"].clone())?,
+        &observed,
+        observer,
+        &c.producer_plan,
+        &c.admission,
+        &i.launch,
+    )?;
     peer::registration(c, i, observer)?;
     let handoffs: Vec<BoundFile> =
         serde_json::from_value(f["authenticated_other_host_handoffs"].clone())?;
