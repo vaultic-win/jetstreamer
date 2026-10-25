@@ -482,6 +482,7 @@ mod tests {
     fn private_archive_measurement_accepts_absence_and_rejects_links_or_public_modes() {
         use std::os::unix::fs::PermissionsExt;
         let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
         let output = root.path().join("output");
         fs::create_dir(&output).unwrap();
         fs::set_permissions(&output, fs::Permissions::from_mode(0o700)).unwrap();
