@@ -35,6 +35,34 @@ fn expected_caps(unit: &str) -> Result<(u64, u64)> {
         Ok((225_000_000_000 / page * page, 150_000_000_000 / page * page))
     }
 }
+/// Saved provenance must replay the independent guard arithmetic, even when
+/// the producer roster is complete. Live completion never repairs old receipts.
+pub(in crate::fleet) fn validate_saved_row(row: &Value) -> Result<()> {
+    let unit = row["unit"].as_str().context("saved legacy memory owner")?;
+    if unit != LEGACY225 && unit != singleton209::UNIT {
+        return Ok(());
+    }
+    let (cap, high) = expected_caps(unit)?;
+    let charge = integer(row, "current_cgroup_charge_bytes")?;
+    let high_key = if unit == LEGACY225 {
+        "memory_high_bytes"
+    } else {
+        "kernel_memory_high_bytes"
+    };
+    ensure!(
+        integer(row, "hard_memory_cap_bytes")? == cap
+            && integer(row, high_key)? == high
+            && integer(row, "memory_swap_max_bytes")? == 0
+            && charge <= cap
+            && integer(row, "guard_hard_memory_reserved_bytes")? == GUARD
+            && integer(row, "remaining_hard_memory_growth_bytes")?
+                == (cap - charge)
+                    .checked_add(GUARD)
+                    .context("saved legacy memory overflow")?,
+        "saved legacy producer or independent guard memory reservation differs"
+    );
+    Ok(())
+}
 fn append_or_complete(total: &mut u64, rows: &mut Vec<Value>, o: &Observation) -> Result<()> {
     let (cap, high) = expected_caps(&o.unit)?;
     ensure!(
@@ -81,6 +109,8 @@ fn append_or_complete(total: &mut u64, rows: &mut Vec<Value>, o: &Observation) -
                     .context("legacy memory overflow")?
             );
         }
+        row["memory_swap_max_bytes"] = json!(o.swap);
+        validate_saved_row(row)?;
     } else {
         ensure!(
             o.unit == LEGACY225,
@@ -96,6 +126,7 @@ fn append_or_complete(total: &mut u64, rows: &mut Vec<Value>, o: &Observation) -
             "memory_high_bytes":high,"current_cgroup_charge_bytes":o.charge,"memory_swap_max_bytes":0,
             "guard_hard_memory_reserved_bytes":GUARD,"remaining_hard_memory_growth_bytes":remaining,
             "accounting":"exact closed natural225 producer remaining hard cap plus full independent protective guard ceiling"}));
+        validate_saved_row(rows.last().context("new legacy memory row missing")?)?;
     }
     Ok(())
 }
@@ -228,6 +259,38 @@ mod tests {
         append_or_complete(&mut total, &mut rows, &o209).unwrap();
         append_or_complete(&mut total, &mut rows, &o225).unwrap();
         assert_eq!(total, once);
+    }
+    #[test]
+    fn actual399_full209_guard_omission_is_rejected_independently_of225_roster() {
+        let saved = actual();
+        for phase in ["memory_before", "memory_after"] {
+            let row = saved[phase]["protected_memory_evidence"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["unit"] == singleton209::UNIT)
+                .unwrap();
+            assert!(validate_saved_row(row).is_err());
+            let mut corrected = row.clone();
+            let charge = integer(row, "current_cgroup_charge_bytes").unwrap();
+            let (cap, _) = expected_caps(singleton209::UNIT).unwrap();
+            corrected["memory_swap_max_bytes"] = json!(0);
+            corrected["guard_hard_memory_reserved_bytes"] = json!(GUARD);
+            corrected["remaining_hard_memory_growth_bytes"] = json!(cap - charge + GUARD);
+            validate_saved_row(&corrected).unwrap();
+            for key in [
+                "guard_hard_memory_reserved_bytes",
+                "remaining_hard_memory_growth_bytes",
+                "memory_swap_max_bytes",
+            ] {
+                let mut changed = corrected.clone();
+                changed[key] = json!(if key == "memory_swap_max_bytes" { 1 } else { 0 });
+                assert!(
+                    validate_saved_row(&changed).is_err(),
+                    "accepted changed {phase}/{key}"
+                );
+            }
+        }
     }
     #[test]
     fn closed_legacy_memory_rejects_changed_caps_iid_duplicate_and_understatement() {

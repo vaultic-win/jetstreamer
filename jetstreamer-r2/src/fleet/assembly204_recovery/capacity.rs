@@ -349,6 +349,7 @@ fn owner_sets(
             seen.insert(s(e, "unit")?.to_owned()),
             "204 duplicate protected memory owner"
         );
+        prefix223_live_peer::validate_saved_row(e)?;
     }
     ensure!(
         expected == guards && expected == &seen,
@@ -397,6 +398,13 @@ pub(super) fn validate_provenance(v: &Value) -> Result<()> {
         .collect();
     for phase in ["memory_before", "memory_after"] {
         owner_sets(&expected, &guard_names, &v[phase])?;
+        for row in v[phase]["protected_memory_evidence"].as_array().unwrap() {
+            let name = s(row, "unit")?;
+            ensure!(
+                row["invocation_id"] == v["unit_census_before"][name]["InvocationID"],
+                "204 saved memory evidence belongs to another invocation"
+            );
+        }
     }
     for bound in basis["protected_guards"]
         .as_object()
@@ -429,6 +437,76 @@ mod roster_tests {
             .collect();
         for phase in ["memory_before", "memory_after"] {
             assert!(owner_sets(&expected, &guards, &saved[phase]).is_err());
+        }
+    }
+    #[test]
+    fn complete399_roster_still_requires_every_independent_guard_reservation() {
+        let saved: Value =
+            serde_json::from_str(include_str!("fixtures/actual399_incomplete_memory.json"))
+                .unwrap();
+        let expected: BTreeSet<String> = saved["accepted_primary_names"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        for phase in ["memory_before", "memory_after"] {
+            // Keep genuine399 rows, and label the extra225 observation synthetic.
+            // This tests the gate; it never repairs the historical receipt.
+            let mut memory = saved[phase].clone();
+            let rows = memory["protected_memory_evidence"].as_array_mut().unwrap();
+            let full209 = rows
+                .iter_mut()
+                .find(|r| r["unit"] == singleton209::UNIT)
+                .unwrap();
+            let producer = full209["remaining_hard_memory_growth_bytes"]
+                .as_u64()
+                .unwrap();
+            full209["memory_swap_max_bytes"] = json!(0);
+            full209["guard_hard_memory_reserved_bytes"] = json!(1u64 << 30);
+            full209["remaining_hard_memory_growth_bytes"] = json!(producer + (1u64 << 30));
+            rows.push(json!({
+                "unit":"horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+                "invocation_id":"4cd76ae1353a4411885b997f04306402",
+                "hard_memory_cap_bytes":192u64 << 30,"memory_high_bytes":160u64 << 30,
+                "current_cgroup_charge_bytes":160u64 << 30,"memory_swap_max_bytes":0,
+                "guard_hard_memory_reserved_bytes":1u64 << 30,
+                "remaining_hard_memory_growth_bytes":33u64 << 30,
+                "fixture_scope":"synthetic225 observation; never historical capacity authority"
+            }));
+            owner_sets(&expected, &expected, &memory).unwrap();
+            for name in &expected {
+                let mut missing = memory.clone();
+                missing["protected_memory_evidence"]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|row| row["unit"] != *name);
+                assert!(owner_sets(&expected, &expected, &missing).is_err());
+                let mut guards = expected.clone();
+                guards.remove(name);
+                assert!(owner_sets(&expected, &guards, &memory).is_err());
+            }
+            for name in [
+                singleton209::UNIT,
+                "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+            ] {
+                let mut missing = memory.clone();
+                let row = missing["protected_memory_evidence"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|row| row["unit"] == name)
+                    .unwrap();
+                row["guard_hard_memory_reserved_bytes"] = json!(0);
+                assert!(owner_sets(&expected, &expected, &missing).is_err());
+            }
+            let mut duplicate = memory.clone();
+            let row = duplicate["protected_memory_evidence"][0].clone();
+            duplicate["protected_memory_evidence"]
+                .as_array_mut()
+                .unwrap()
+                .push(row);
+            assert!(owner_sets(&expected, &expected, &duplicate).is_err());
         }
     }
     #[test]

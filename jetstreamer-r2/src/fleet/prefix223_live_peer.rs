@@ -4,6 +4,7 @@ use super::{verification223_live_peer as base, *};
 mod legacy_memory;
 #[cfg(test)]
 pub(super) use base::fixture_row;
+pub(super) use legacy_memory::validate_saved_row;
 fn profile(name: &str) -> Option<(u64, &'static str)> {
     match name {
         singleton207::UNIT => Some((207, "private-full-epoch-qualification")),
