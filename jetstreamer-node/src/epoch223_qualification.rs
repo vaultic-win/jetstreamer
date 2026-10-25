@@ -1,10 +1,13 @@
 //! Private epoch 223 era comparisons. Never an ordinary runtime promotion.
-use crate::{BankHashExpectation, QualificationPlan, compatibility, snapshot_path_expectation};
+#[cfg(not(feature = "epoch223-demotion-bracket"))]
+use crate::snapshot_path_expectation;
+use crate::{BankHashExpectation, QualificationPlan, compatibility};
 use std::collections::BTreeMap;
 use std::path::Path;
 
 pub(crate) const COLD_BOOTSTRAP: u64 = 96_335_538;
 pub(crate) const TAIL_BOOTSTRAP: u64 = 96_767_522;
+#[cfg(not(feature = "epoch223-demotion-bracket"))]
 pub(crate) const OUTPUT_END: u64 = 96_767_999;
 
 pub(crate) fn private_build_enabled() -> bool {
