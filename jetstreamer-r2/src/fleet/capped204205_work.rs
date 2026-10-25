@@ -658,6 +658,14 @@ pub(super) fn capture() -> Result<()> {
 pub(super) fn prepare() -> Result<()> {
     evidence::prepare()
 }
+// Shared strict PID 1 parsing, not a new terminal or resource authority.
+pub(super) fn exact_terminal_manager(raw: &[u8], unit: &str, iid: &str) -> Result<()> {
+    capture::manager_history(raw, unit, iid, false)?;
+    capture::manager_terminal(raw, unit, iid)
+}
+pub(super) fn empty_terminal_cgroup(unit: &str) -> Result<Value> {
+    capture::group(unit)
+}
 pub(super) async fn publish() -> Result<()> {
     evidence::publish().await
 }

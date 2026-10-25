@@ -24,6 +24,7 @@ mod canary227_status;
 mod canary227_terminal;
 mod capped204205_admission;
 mod capped204205_work;
+mod capped204_v4_admission;
 mod census141_poh;
 mod cold223_scan;
 mod continuation144;
@@ -264,6 +265,9 @@ pub(super) fn deliver_singleton209_output() -> Result<()> {
 }
 pub(super) fn admit_singleton209_delivery() -> Result<()> {
     singleton209_delivery::admission::run()
+}
+pub(super) fn admit_capped204_v4_delivery() -> Result<()> {
+    capped204_v4_admission::run()
 }
 pub(super) fn admit_singleton209() -> Result<()> {
     singleton209_admission::run()

@@ -3560,6 +3560,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-singleton209-delivery") {
         return fleet::admit_singleton209_delivery();
     }
+    if env::args().nth(1).as_deref() == Some("admit-capped204-v4-delivery") {
+        return fleet::admit_capped204_v4_delivery();
+    }
     if env::args().nth(1).as_deref() == Some("admit-singleton209") {
         return fleet::admit_singleton209();
     }

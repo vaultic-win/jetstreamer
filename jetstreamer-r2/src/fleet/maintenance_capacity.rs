@@ -1,6 +1,7 @@
 //! Fresh bounded private epoch 223 maintenance with every accepted owner protected.
 //! Capped peers retain their raw fleet/observer history and full hard limits.
 use super::*;
+mod capped204_native223;
 mod singleton210_memory;
 #[derive(Clone, Copy)]
 enum MemoryMode {
@@ -8,6 +9,7 @@ enum MemoryMode {
     Full210,
     Full209Delivery,
     FirstRoot233,
+    Capped204V4,
 }
 
 #[derive(Deserialize)]
@@ -151,6 +153,30 @@ pub(super) fn check_singleton209_delivery(value: &Value, candidate: Candidate) -
     );
     check_inner(value, candidate, MemoryMode::Full209Delivery)
 }
+pub(super) fn check_capped204_v4_delivery(
+    value: &Value,
+    phase: &str,
+    minimum_disk: u64,
+) -> Result<Value> {
+    let (additional_bytes, memory_max_bytes) = match phase {
+        "verify" => (129 << 30, 64 << 30),
+        "publish" | "capability" | "recover" => (1 << 30, 16 << 30),
+        _ => bail!("unsupported epoch 204 V4 delivery resource phase"),
+    };
+    ensure!(
+        minimum_disk > 0,
+        "epoch 204 delivery inherited floor missing"
+    );
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes,
+            memory_max_bytes,
+            minimum_protected_disk_bytes: minimum_disk,
+        },
+        MemoryMode::Capped204V4,
+    )
+}
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
     check_candidate(
         value,
@@ -263,6 +289,10 @@ fn memory_sample(
         MemoryMode::Full209Delivery => {
             let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
             (n, Some(("full209_delivery_memory_policy", p)))
+        }
+        MemoryMode::Capped204V4 => {
+            let (n, p) = capped204_native223::required(f, total, reserve, candidate)?;
+            (n, Some(("capped204_v4_memory_policy", p)))
         }
         MemoryMode::FirstRoot233 => {
             let (n, p) = singleton210_memory::first_root233_required(f, total, reserve, candidate)?;
