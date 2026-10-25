@@ -1,0 +1,681 @@
+{
+  "fixture_scope": "Extracted actual sealed aac capture fields for pure regression tests; not a deployment/admission receipt.",
+  "candidate": {
+    "schema": "jetstreamer-epoch204-assembly-recovery-frozen-candidate-v1",
+    "source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "source_tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "source_clean_before_and_after": true,
+    "artifacts": [
+      {
+        "name": "jetstreamer-epoch204-assembly-only",
+        "candidate_path": "jetstreamer-epoch204-assembly-only",
+        "sha256": "2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877",
+        "bytes": 4993664
+      }
+    ],
+    "scope": {
+      "captured": "One production epoch 204 assembly-only recovery executable and its actual same-package node-library dependency invocation; no node main, R2 helper, observer or worker executable. Exact Cargo executable records, compiler invocations and dep-info, direct extern artifacts, native search-directory inventory, source/configuration inputs, build logs and ELF metadata are captured by the retained node-helper capture workflow.",
+      "limits": "Registry versions/checksums are Cargo.lock provenance. Transitive registry source and artifacts beyond the direct extern lists, standard library and compiler shared libraries, system dynamic libraries, exact linker-selected native archive members, and complete compiler environment were not independently audited. Native search directory inventory is not an actual linker map. Cached artifacts, if any, lack fresh invocation provenance as recorded in production-inputs.json. Explicit cached cross-worktree source records preserve literal dep-info paths and actual frozen-equivalent bytes without claiming a fresh local compilation.",
+      "deployment_sealed": false,
+      "operational_actions": false,
+      "r2_mutations": false
+    }
+  },
+  "qa": {
+    "schema": "jetstreamer-epoch204-assembly-recovery-focused-qa-result-v1",
+    "checkout": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1",
+    "final_frozen_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "final_tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "worktree_clean": true,
+    "source_qa_passed": true,
+    "production_or_runtime_qualification_passed": false,
+    "actual_results": [
+      {
+        "id": "02-helper-pure-tests",
+        "actual_source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+        "argv": [
+          "/home/ubuntu/.cargo/bin/cargo",
+          "test",
+          "--release",
+          "--frozen",
+          "--locked",
+          "--offline",
+          "-j2",
+          "-p",
+          "jetstreamer-node",
+          "--bin",
+          "jetstreamer-epoch204-assembly-only",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "raw_result": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/02-helper-pure-tests.json",
+          "sha256": "d3248cbf449300233edff7da2468479655e3774bb8a903e94232e69e40a91d52"
+        },
+        "log": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/02-helper-pure-tests.log",
+          "sha256": "9e5a663763a3c120a77738fd98d47683ee34c972993edb6b32f067acda3d8e0b"
+        },
+        "summary": [
+          "test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "id": "03-recovery-library",
+        "actual_source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+        "argv": [
+          "/home/ubuntu/.cargo/bin/cargo",
+          "test",
+          "--release",
+          "--frozen",
+          "--locked",
+          "--offline",
+          "-j2",
+          "-p",
+          "jetstreamer-node",
+          "--lib",
+          "capped_assembly_recovery204",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "raw_result": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/03-recovery-library.json",
+          "sha256": "a7e9a66a70205d10075dbb1a1afec1fdc76199ffa2466fec7f8870d5b2d1b68e"
+        },
+        "log": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/03-recovery-library.log",
+          "sha256": "47e1ae480e96de35280fd2c3d3fc4d117ff72014ccaaefed56c147fd8bf84f3b"
+        },
+        "summary": [
+          "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 138 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "id": "04-prefix-regressions",
+        "actual_source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+        "argv": [
+          "/home/ubuntu/.cargo/bin/cargo",
+          "test",
+          "--release",
+          "--frozen",
+          "--locked",
+          "--offline",
+          "-j2",
+          "-p",
+          "jetstreamer-node",
+          "--lib",
+          "capped_prefix204205",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "raw_result": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/04-prefix-regressions.json",
+          "sha256": "9cbbe6cace5d831c9773d9f4c360c43846d7053a73bdead881c9ffa9c1ad7814"
+        },
+        "log": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/04-prefix-regressions.log",
+          "sha256": "7643a90b6df39f006b3da11512eb8e3dcca344515dfbe36eb322bfa4c3093443"
+        },
+        "summary": [
+          "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 135 filtered out; finished in 0.46s"
+        ]
+      },
+      {
+        "id": "05-checkpoint-codec",
+        "actual_source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+        "argv": [
+          "/home/ubuntu/.cargo/bin/cargo",
+          "test",
+          "--release",
+          "--frozen",
+          "--locked",
+          "--offline",
+          "-j2",
+          "-p",
+          "jetstreamer-horizon",
+          "--lib",
+          "checkpoint_restart_",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "raw_result": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-remaining-qa-v3/05-checkpoint-codec.json",
+          "sha256": "33b193ebc1d2de948376dcbc93f4d78804a8b1dd78f28063ce01434d0f1afac1"
+        },
+        "log": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-remaining-qa-v3/05-checkpoint-codec.log",
+          "sha256": "d64cce349912f30b494c56cf96a7fb777473baf968953f36c2c8095aba60de2b"
+        },
+        "summary": [
+          "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 238 filtered out; finished in 0.05s"
+        ]
+      },
+      {
+        "id": "06-node-scoped-clippy",
+        "actual_source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+        "argv": [
+          "/home/ubuntu/.cargo/bin/cargo",
+          "clippy",
+          "--release",
+          "--frozen",
+          "--locked",
+          "--offline",
+          "-j2",
+          "-p",
+          "jetstreamer-node",
+          "--lib",
+          "--bin",
+          "jetstreamer-epoch204-assembly-only",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "raw_result": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-remaining-qa-v3/06-node-scoped-clippy.json",
+          "sha256": "457f8433eca3b16ec06f22345404897470fbd03cf14d3781d6f816efc3fa71d7"
+        },
+        "log": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-remaining-qa-v3/06-node-scoped-clippy.log",
+          "sha256": "fbc279be820e7a87104db30579938fb7aaa7d6757a755f39d0f0206aac2f60ae"
+        },
+        "summary": []
+      },
+      {
+        "id": "07-horizon-scoped-clippy",
+        "actual_source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+        "argv": [
+          "/home/ubuntu/.cargo/bin/cargo",
+          "clippy",
+          "--release",
+          "--frozen",
+          "--locked",
+          "--offline",
+          "-j2",
+          "-p",
+          "jetstreamer-horizon",
+          "--lib",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "raw_result": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-horizon-clippy-v4/07-horizon-scoped-clippy.json",
+          "sha256": "d4c625b01b8d03fed3618b495dcd183277930df8e62177761a9976a40f5550d9"
+        },
+        "log": {
+          "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-horizon-clippy-v4/07-horizon-scoped-clippy.log",
+          "sha256": "3114acceeb9af84219b3b1777c4a129cadf04b1db68fee7d5200e3b8b2a98054"
+        },
+        "summary": []
+      }
+    ],
+    "strict_clippy": {
+      "node_library_and_recovery_binary": "passed",
+      "horizon_library": "passed"
+    },
+    "test_counts": {
+      "recovery_binary": 4,
+      "recovery_evidence": 8,
+      "existing_capped_prefix_native_regressions": 11,
+      "checkpoint_provenance_codec": 9,
+      "genuine_root_writer_reader": 1,
+      "total_distinct_passed": 33
+    },
+    "root_test": {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-root-writer-roundtrip-edd14b5d-v1/root-test-result.json",
+      "sha256": "8a16139c2ea8122dad7133113aa8e7b8a7908581c3ab5c939302cf92fbca08ad",
+      "exact_executable_sha256": "edd14b5d1765fbbc52c7c7ba211fbe5d68730efb0c44716d5c8f0c78652d2ab4",
+      "selected_test_passed": true,
+      "unit": "horizon-test-204-atomic-writer-edd14b5d-v1.service",
+      "invocation_id": "8d6c409261fc4fba85e325bb977050e3",
+      "effective_capability_mask_only": 2,
+      "actual_inaccessible_campaign_mounts": 3
+    },
+    "final_actual_unit": {
+      "unit": "horizon-qa-204-helper-aac7c8ca-horizon-clippy-v4.service",
+      "invocation_id": "9e46ee5a887b487cb2aaa5ae12efff91",
+      "initial_pid": 1576827,
+      "session_id": 54429,
+      "exit_code": 0,
+      "terminal": {
+        "Id": "horizon-qa-204-helper-aac7c8ca-horizon-clippy-v4.service",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "InvocationID": "",
+        "MainPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainCode": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": ""
+      },
+      "actual_runtime_seconds": 27.121
+    },
+    "preserved_stops": [
+      {
+        "unit": "horizon-qa-204-helper-aac7c8ca-v1.service",
+        "session_id": 49834,
+        "exit_code": 86,
+        "reason": "zerocopy-derive0.8.48 outside original closure"
+      },
+      {
+        "unit": "horizon-qa-204-helper-aac7c8ca-remaining-v2.service",
+        "session_id": 25748,
+        "exit_code": 86,
+        "reason": "sha20.9.9 outside184 supplement"
+      },
+      {
+        "unit": "horizon-qa-204-helper-aac7c8ca-remaining-v3.service",
+        "session_id": 40377,
+        "exit_code": 86,
+        "reason": "getrandom0.3.4 outside244 closure; codecs and NodeClippy already passed"
+      }
+    ],
+    "final_cumulative_charges": {
+      "original_changed_target_bytes": 961605632,
+      "all_prior_current_evidence_bytes": 1318350848,
+      "combined_charged_bytes": 2279956480,
+      "allowance_bytes": 4294967296
+    },
+    "original_target_baseline_sha256": "6e32307a85bf83ae8633955e6afede0e066bc160203755104c8ba19bcd465635",
+    "blake3_gate": "No Compiling blake3; exact cached build/native file identities/hashes unchanged and no build-script/native execution observed in own QA cgroup.",
+    "passed_tests_rerun": false,
+    "production_cargo_capture_admission_runtime_r2_actions": false
+  },
+  "annex": {
+    "schema": "jetstreamer-epoch204-recovery-qa-exec-completion-v1",
+    "final_frozen_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "qa_report": {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-horizon-clippy-v4/qa-result.json",
+      "sha256": "7c93606343449323791322db8cd4ecd170a2ad74a1ff43804b622142ca133240"
+    },
+    "all_cargo_commands_completed": true,
+    "detached_cargo_jobs_started": false,
+    "actual_exec_sessions": [
+      {
+        "session_id": 49834,
+        "completed": true,
+        "final_exit_code": 86
+      },
+      {
+        "session_id": 25748,
+        "completed": true,
+        "final_exit_code": 86
+      },
+      {
+        "session_id": 40377,
+        "completed": true,
+        "final_exit_code": 86
+      },
+      {
+        "session_id": 54429,
+        "completed": true,
+        "final_exit_code": 0
+      }
+    ],
+    "root_only_test": {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-root-writer-roundtrip-edd14b5d-v1/root-test-result.json",
+      "sha256": "8a16139c2ea8122dad7133113aa8e7b8a7908581c3ab5c939302cf92fbca08ad",
+      "exact_executable_sha256": "edd14b5d1765fbbc52c7c7ba211fbe5d68730efb0c44716d5c8f0c78652d2ab4",
+      "selected_test_passed": true,
+      "unit": "horizon-test-204-atomic-writer-edd14b5d-v1.service",
+      "invocation_id": "8d6c409261fc4fba85e325bb977050e3",
+      "effective_capability_mask_only": 2,
+      "actual_inaccessible_campaign_mounts": 3
+    },
+    "scope": "All actual Cargo attempts reached terminal state. Failed closure stops remain failed facts; passing tests and Clippy are bound to their genuine current-source result files. No runtime qualification claimed.",
+    "target_lease": "No Cargo active. Root coordinates any subsequent production lease; only static proposal/cache inventory preparation follows."
+  },
+  "root_result": {
+    "source_revision": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "test_executable_sha256": "edd14b5d1765fbbc52c7c7ba211fbe5d68730efb0c44716d5c8f0c78652d2ab4",
+    "exit_code": 0,
+    "selected_test_passed": true,
+    "summary": [
+      [
+        "1",
+        "0",
+        "0"
+      ]
+    ],
+    "stdout_sha256": "10a2c0e23dbadf0fcefead65f8754d1788ead85fc7e551d9bcd098d890b14bc5",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "archive_inputs": false,
+    "production_or_campaign_runtime_actions": false
+  },
+  "root_executable": {
+    "source": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-bounded-qa-v1/jetstreamer-epoch204-assembly-only-tests",
+    "source_identity": [
+      66305,
+      8536912,
+      33133,
+      1000,
+      1000,
+      1,
+      1180496,
+      1792921274650318999,
+      1792921274650752501
+    ],
+    "source_revision": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "sha256": "edd14b5d1765fbbc52c7c7ba211fbe5d68730efb0c44716d5c8f0c78652d2ab4",
+    "bytes": 1180496,
+    "immutable_memfd_seals": 15,
+    "argv": [
+      "/proc/self/fd/4",
+      "--ignored",
+      "--exact",
+      "tests::atomic_runtime_writer_and_guard_readers_roundtrip_all_published_modes",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "production_or_campaign_command": false
+  },
+  "sandbox": {
+    "effective_uid": 0,
+    "actual_capabilities": {
+      "CapInh": 2,
+      "CapPrm": 2,
+      "CapEff": 2,
+      "CapBnd": 2,
+      "CapAmb": 2
+    },
+    "campaign_inaccessible_mounts": [
+      "520 483 0:28 /systemd/inaccessible/dir /home/ubuntu/.jetstreamer-private ro,nosuid,nodev,noexec shared:408 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64",
+      "521 483 0:28 /systemd/inaccessible/dir /home/ubuntu/horizon ro,nosuid,nodev,noexec shared:409 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64",
+      "514 483 0:28 /systemd/inaccessible/dir /var/lib/jetstreamer ro,nosuid,nodev,noexec shared:421 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64"
+    ],
+    "unit": "horizon-test-204-atomic-writer-edd14b5d-v1.service",
+    "pid": 1557429,
+    "kernel_limits": {
+      "memory.high": "536870912",
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "cpu.max": "200000 100000",
+      "pids.max": "32"
+    },
+    "manager_properties": {
+      "Id": "horizon-test-204-atomic-writer-edd14b5d-v1.service",
+      "InvocationID": "8d6c409261fc4fba85e325bb977050e3",
+      "Restart": "no",
+      "RuntimeMaxUSec": "2min",
+      "MainPID": "1557429",
+      "NRestarts": "0",
+      "CPUQuotaPerSecUSec": "2s",
+      "MemoryHigh": "536870912",
+      "MemoryMax": "1073741824",
+      "MemorySwapMax": "0",
+      "TasksMax": "32",
+      "CapabilityBoundingSet": "cap_dac_override",
+      "AmbientCapabilities": "cap_dac_override",
+      "User": "root",
+      "Group": "root",
+      "ReadWritePaths": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-root-writer-roundtrip-edd14b5d-v1",
+      "InaccessiblePaths": "/home/ubuntu/.jetstreamer-private /home/ubuntu/horizon /var/lib/jetstreamer",
+      "PrivateTmp": "yes",
+      "PrivateNetwork": "yes",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict"
+    },
+    "network_namespace": "net:[4026533887]",
+    "scope": "Only the exact ignored atomic publisher/reader test; private temporary metadata files, no archive inputs."
+  },
+  "preflight": {
+    "source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "source_tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "configuration": [
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489
+      },
+      {
+        "path": "/home/ubuntu/workspace/jetstreamer/.cargo/config.toml",
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489
+      }
+    ],
+    "inherited_overrides": {},
+    "scope": "Actual pre-build current source/config checkpoint; no production Cargo has run. Wrapper rechecks these inputs before and after build/capture."
+  },
+  "configuration": [
+    {
+      "relative_path": ".cargo/config.toml",
+      "input": {
+        "literal_path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "absolute_path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "canonical_path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "identity_before": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "identity_open": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "identity_after": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "namespace_after": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489,
+        "blob": "blobs/9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3"
+      }
+    },
+    {
+      "inherited_configuration": true,
+      "input": {
+        "literal_path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "absolute_path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "canonical_path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1/.cargo/config.toml",
+        "identity_before": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "identity_open": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "identity_after": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "namespace_after": {
+          "st_dev": 66305,
+          "st_ino": 8293324,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792917787987473277,
+          "st_ctime_ns": 1792917787987473277
+        },
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489,
+        "blob": "blobs/9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3"
+      }
+    },
+    {
+      "inherited_configuration": true,
+      "input": {
+        "literal_path": "/home/ubuntu/workspace/jetstreamer/.cargo/config.toml",
+        "absolute_path": "/home/ubuntu/workspace/jetstreamer/.cargo/config.toml",
+        "canonical_path": "/home/ubuntu/workspace/jetstreamer/.cargo/config.toml",
+        "identity_before": {
+          "st_dev": 66305,
+          "st_ino": 523616,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792138665716856254,
+          "st_ctime_ns": 1792138665716856254
+        },
+        "identity_open": {
+          "st_dev": 66305,
+          "st_ino": 523616,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792138665716856254,
+          "st_ctime_ns": 1792138665716856254
+        },
+        "identity_after": {
+          "st_dev": 66305,
+          "st_ino": 523616,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792138665716856254,
+          "st_ctime_ns": 1792138665716856254
+        },
+        "namespace_after": {
+          "st_dev": 66305,
+          "st_ino": 523616,
+          "st_mode": 33204,
+          "st_uid": 1000,
+          "st_gid": 1000,
+          "st_nlink": 1,
+          "st_size": 489,
+          "st_mtime_ns": 1792138665716856254,
+          "st_ctime_ns": 1792138665716856254
+        },
+        "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+        "bytes": 489,
+        "blob": "blobs/9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3"
+      }
+    }
+  ],
+  "build": {
+    "schema": "jetstreamer-epoch204-assembly-recovery-production-build-result-v1",
+    "recorded_utc": "2026-10-25T10:48:54.262759+00:00",
+    "source_commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+    "source_tree": "8a95eec50f7e89745a870f6da7c99d408b86090c",
+    "argv": [
+      "/home/ubuntu/.cargo/bin/cargo",
+      "build",
+      "--frozen",
+      "--locked",
+      "--offline",
+      "--release",
+      "-j2",
+      "-p",
+      "jetstreamer-node",
+      "--bin",
+      "jetstreamer-epoch204-assembly-only",
+      "--verbose",
+      "--message-format=json-render-diagnostics"
+    ],
+    "environment": {
+      "CARGO_TARGET_DIR": "/home/ubuntu/workspace/jetstreamer/target",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_BUILD_JOBS": "2",
+      "RUSTUP_TOOLCHAIN": "1.98.0",
+      "PATH": "/home/ubuntu/.cargo/bin:/usr/bin:/bin"
+    },
+    "exit_code": 0,
+    "elapsed_seconds": 111.198,
+    "stop_reason": null,
+    "artifact_new_or_changed_allocated_bytes": 168804352,
+    "artifact_new_or_changed_inodes": 244,
+    "allowance_bytes": 4294967296,
+    "candidate_executed": false,
+    "operational_actions": false
+  },
+  "capture": {
+    "source": {
+      "worktree": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-immutable-reader-source-v1",
+      "commit": "aac7c8ca42bfc1153a33c1515062911d7c2cb292",
+      "tree": "8a95eec50f7e89745a870f6da7c99d408b86090c"
+    },
+    "candidate": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3/candidate-v1",
+    "artifact": {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/epoch204-helper-aac7c8ca-production-v3/candidate-v1/jetstreamer-epoch204-assembly-only",
+      "sha256": "2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877",
+      "bytes": 4993664
+    },
+    "candidate_manifest_sha256": "c7b56a4d43bd072ff8b751bf6a1751775c71b91ae50199c1dd53d7cf983f3692",
+    "checksum_manifest_sha256": "304836b9927d4e97f04e8e59323c6c0905cc57392c0c8c4210af63482b2d555a",
+    "member_count_excluding_checksum": 1613,
+    "compiler_source_input_count": 175,
+    "tracked_source_count": 3491,
+    "final_charges": {
+      "original_baseline_changed_target_bytes": 1130381312,
+      "original_baseline_changed_target_inodes": 2902,
+      "all_prior_and_current_evidence_allocated_bytes": 1951297536,
+      "combined_charged_bytes": 3081678848,
+      "allowance_bytes": 4294967296
+    },
+    "all_members_independently_rehashed": true,
+    "capture_workflow_unchanged": true,
+    "actual_qa_source_view_sha256": "217548638ce42b7a05156fc779e625957a9e5e12985f814f3a3091a87c7e390c",
+    "candidate_executed": false,
+    "deployed": false,
+    "admission_attempted": false,
+    "r2_mutations": false
+  }
+}

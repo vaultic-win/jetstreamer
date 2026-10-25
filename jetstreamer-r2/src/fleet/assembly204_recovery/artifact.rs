@@ -1,12 +1,13 @@
 //! The exact production capture and source QA are independent immutable facts.
-//! In particular the actual post-build configuration audit is not a preflight.
+//! Configuration checkpoints keep their actual pre-build/capture scope.
 use super::*;
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon-204-assembly-recovery-94705c5d-v1";
-const SEAL: &str = "650dd82061693363e5fd94cc6e76a28b808a3e301da864ffda90483f4d7f9a04";
-const ARTIFACT: &str = "226f9a6c7b6b54a181b3795cf644efa67161289935371f787fe2a378c61ac215";
-const REVISION: &str = "94705c5d546341f4fdfc6cc50c819c4031f9ab1d";
-const TREE: &str = "c591128f9828f3206a9d7dfb5ae6f4fce63fb2d7";
-const QA: &str = "cdcba0fd6e8d86eeefc6e03ee73c06fd4218f68c202cd52fed52e60b64d52b76";
+mod helper_capture;
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon-204-assembly-recovery-aac7c8ca-v2";
+const SEAL: &str = "4fbda2b98a08bd46cb1ee9636b4b2ec83aa489495cafd10773e9215aa24770c8";
+const ARTIFACT: &str = "2fe7aa3ffa3acabbb0454c0aa9a65d6fba606dd27216d57283af5004db1cf877";
+const REVISION: &str = RETRY_HELPER_SOURCE;
+const TREE: &str = "8a95eec50f7e89745a870f6da7c99d408b86090c";
+const QA: &str = "7c93606343449323791322db8cd4ecd170a2ad74a1ff43804b622142ca133240";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Member {
@@ -30,7 +31,7 @@ struct Seal {
     remote_mutations: bool,
     r2_mutations: bool,
 }
-fn member(seal: &Seal, name: &str, sha: &str, maximum: u64) -> Result<BoundFile> {
+fn selected_member<'a>(seal: &'a Seal, name: &str, sha: &str, maximum: u64) -> Result<&'a Member> {
     let matches = seal
         .members
         .iter()
@@ -51,6 +52,11 @@ fn member(seal: &Seal, name: &str, sha: &str, maximum: u64) -> Result<BoundFile>
             && matches!(mode, 0o400 | 0o444 | 0o500 | 0o555),
         "204 production member identity/mode differs: {name}"
     );
+    Ok(m)
+}
+fn member(seal: &Seal, name: &str, sha: &str, maximum: u64) -> Result<BoundFile> {
+    let m = selected_member(seal, name, sha, maximum)?;
+    let mode = u32::from_str_radix(&m.mode, 8)?;
     let b = BoundFile {
         path: Path::new(PACKAGE).join(name),
         sha256: sha.into(),
@@ -70,7 +76,12 @@ fn qa_shape(qa: &Value, annex: &Value) -> Result<()> {
             && qa["final_tree"] == TREE
             && qa["source_qa_passed"] == true
             && qa["production_or_runtime_qualification_passed"] == false
-            && qa["test_counts"]["total_distinct_passed"] == 31
+            && qa["test_counts"]["total_distinct_passed"] == 33
+            && qa["test_counts"]["recovery_binary"] == 4
+            && qa["test_counts"]["recovery_evidence"] == 8
+            && qa["test_counts"]["existing_capped_prefix_native_regressions"] == 11
+            && qa["test_counts"]["checkpoint_provenance_codec"] == 9
+            && qa["test_counts"]["genuine_root_writer_reader"] == 1
             && qa["strict_clippy"]["horizon_library"] == "passed"
             && qa["strict_clippy"]["node_library_and_recovery_binary"] == "passed"
             && annex["schema"] == "jetstreamer-epoch204-recovery-qa-exec-completion-v1"
@@ -85,13 +96,29 @@ fn qa_shape(qa: &Value, annex: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn seal_shape(seal: &Seal) -> Result<()> {
+    ensure!(
+        seal.schema == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal.destination == Path::new(PACKAGE)
+            && seal.plan_sha256
+                == "97503ed4e13c27c95ce56e442d63e4975c0505524bf387ea4415225156b03773"
+            && is_lower_hex(&seal.sealer_sha256, 64)
+            && seal.created_unix_seconds > 0
+            && !seal.publication_authorized
+            && !seal.replay_launch_authorized
+            && !seal.remote_mutations
+            && !seal.r2_mutations,
+        "204 deployment seal scope/authority differs"
+    );
+    Ok(())
+}
 pub(super) fn validate(bound: &BoundFile, assembler: &BoundFile) -> Result<Value> {
     ensure!(
         bound.path == Path::new(PACKAGE).join("deployment-seal-receipt.json")
             && bound.sha256 == SEAL
             && assembler.path == Path::new(PACKAGE).join("jetstreamer-epoch204-assembly-only")
             && assembler.sha256 == ARTIFACT,
-        "204 assembler is not the actual frozen947 production capture"
+        "204 assembler is not the actual frozen aac generation2 production capture"
     );
     let metadata = fs::symlink_metadata(PACKAGE)?;
     ensure!(
@@ -102,18 +129,7 @@ pub(super) fn validate(bound: &BoundFile, assembler: &BoundFile) -> Result<Value
         "204 production package custody differs"
     );
     let seal: Seal = serde_json::from_value(read(bound)?)?;
-    ensure!(
-        seal.schema == "jetstreamer-sealed-deployment-receipt-v1"
-            && seal.destination == Path::new(PACKAGE)
-            && is_lower_hex(&seal.plan_sha256, 64)
-            && is_lower_hex(&seal.sealer_sha256, 64)
-            && seal.created_unix_seconds > 0
-            && !seal.publication_authorized
-            && !seal.replay_launch_authorized
-            && !seal.remote_mutations
-            && !seal.r2_mutations,
-        "204 deployment seal scope/authority differs"
-    );
+    seal_shape(&seal)?;
     ensure!(
         private157::binding(&member(
             &seal,
@@ -125,38 +141,31 @@ pub(super) fn validate(bound: &BoundFile, assembler: &BoundFile) -> Result<Value
     );
     let candidate = member(
         &seal,
-        "capture-1518",
-        "8864e04a814d7b6ccd4d65c2c4e93ec2f583fb52ef1c22a260615ebed4db39aa",
+        "candidate-manifest.json",
+        "c7b56a4d43bd072ff8b751bf6a1751775c71b91ae50199c1dd53d7cf983f3692",
         16 << 20,
     )?;
-    let qa = member(&seal, "capture-1539", QA, 16 << 20)?;
+    let qa = member(&seal, "candidate-evidence--qa-result.json", QA, 16 << 20)?;
     let annex = member(
         &seal,
-        "capture-1538",
-        "b07fb22f654b5021f1a2b61eb6a57025814a1f5adaf6abf23118d72ce8f57099",
+        "candidate-evidence--qa-exec-completion.json",
+        "4b27307d32a639c268446ace62e61c83a21cb00c4484986a8e0545dc6d7e1b40",
         16 << 20,
     )?;
-    let audit = member(
+    let qa_value = read(&qa)?;
+    qa_shape(&qa_value, &read(&annex)?)?;
+    let facts = helper_capture::validate(&seal, &read(&candidate)?, &qa_value)?;
+    let top = member(
         &seal,
-        "capture-1530",
-        "28a42f3f71462956b0bb0b27f8357c207d457210116197a71ca5c699657b67cb",
+        "CANDIDATE-SHA256.json",
+        "304836b9927d4e97f04e8e59323c6c0905cc57392c0c8c4210af63482b2d555a",
         16 << 20,
     )?;
-    ensure!(
-        read(&candidate)?["schema"] == "jetstreamer-epoch204-assembly-recovery-frozen-candidate-v1",
-        "204 frozen production candidate schema differs"
-    );
-    qa_shape(&read(&qa)?, &read(&annex)?)?;
-    read(&audit)?;
-    let top = BoundFile {
-        path: Path::new(PACKAGE).join("CANDIDATE-SHA256.json"),
-        sha256: "082c116be1481cb54d78f312922392b8dfe3de8fb3acafdebd7648b22945d62f".into(),
-    };
     read(&top)?;
     Ok(
         json!({"deployment_seal":bound,"artifact":assembler,"source_revision":REVISION,"source_tree":TREE,"frozen_candidate":candidate,
-        "source_qa":qa,"qa_exec_completion":annex,"actual_post_build_config_audit":audit,"candidate_sha256":top,
-        "config_audit_scope":"actual post-build configuration audit; not a retroactive preflight","runtime_launch_qualified":false}),
+        "source_qa":qa,"qa_exec_completion":annex,"capture_facts":facts,"candidate_sha256":top,
+        "runtime_launch_qualified":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )
 }
 /// A downstream tool, its raw source capture, raw QA report and logs must be
