@@ -89,7 +89,7 @@ fn command_output(program: &str, args: &[&str]) -> Result<Vec<u8>> {
     );
     Ok(result.stdout)
 }
-fn journal(unit: &str) -> Result<Vec<u8>> {
+pub(super) fn journal(unit: &str) -> Result<Vec<u8>> {
     command_output(
         "/usr/bin/journalctl",
         &[
@@ -534,6 +534,8 @@ pub(super) fn run() -> Result<()> {
             actor.evidence.push(binding(&path)?);
         }
     }
+    let historical_terminal =
+        historical_terminal::capture(epoch, &p, &actors, &before, &s.output_directory)?;
     let producer = &before[string(&p, "producer_unit")?];
     let mut guard_binding = Value::Null;
     if live(producer) {
@@ -559,7 +561,7 @@ pub(super) fn run() -> Result<()> {
     let all_idle = names
         .iter()
         .filter(|n| epoch_scope(epoch, n))
-        .all(|n| idle(&before[n]));
+        .all(|n| idle(&before[n]) || historical_terminal.get(n.as_str()).is_some());
     let mut inactivity = Value::Null;
     let (stamp, ms) = current_stamp()?;
     let mut terminal_binding = Value::Null;
@@ -657,7 +659,7 @@ pub(super) fn run() -> Result<()> {
         "previous_fleet":private157::binding(&s.previous_fleet),
         "next_observer_registration":private157::binding(&binding(&registration_path)?),
         "accepted_observer_is_context_not_new_producer_measurement":true,
-        "guard_snapshot":guard_binding,"downstream_actors":actors,"generated_archives":artifacts,"inactivity_snapshot":inactivity,
+        "historical_terminal_owners":historical_terminal,"guard_snapshot":guard_binding,"downstream_actors":actors,"generated_archives":artifacts,"inactivity_snapshot":inactivity,
         "terminal_snapshot":terminal_binding,
         "authenticated_other_host_handoffs":s.authenticated_other_host_handoffs,
         "resource_samples_taken":0,"archive_body_reads":0,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});

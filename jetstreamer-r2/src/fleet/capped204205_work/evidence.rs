@@ -657,6 +657,7 @@ pub(super) async fn publish() -> Result<()> {
         &before,
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
     )?;
+    historical_terminal::current(f, &before)?;
     let status = result.status.context(
         "positively inactive epoch has no new countdown; use exact-owner inactive cleanup",
     )?;

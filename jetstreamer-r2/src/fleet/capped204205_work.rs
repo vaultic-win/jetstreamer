@@ -3,6 +3,7 @@
 use super::*;
 mod capture;
 mod evidence;
+mod historical_terminal;
 mod lifecycle;
 mod peer;
 pub(super) use peer::{
@@ -383,13 +384,15 @@ fn evaluate(
         .context("capped producer absent from census")?;
     let actors: Vec<Actor> = serde_json::from_value(f["downstream_actors"].clone())?;
     let mut active: Vec<(&str, &str, &str, Stage, u64)> = Vec::new();
+    let historical = historical_terminal::validate(c.epoch, p, &actors, f, census)?;
     for (name, current) in census {
         ensure!(
             !capture::epoch_scope(c.epoch, name)
                 || idle(current)
                 || name == unit
                 || name == string(p, "guard_unit")?
-                || actors.iter().any(|a| a.unit == *name),
+                || actors.iter().any(|a| a.unit == *name)
+                || historical.contains(name),
             "an unregistered live continuation/downstream owner holds this epoch"
         );
     }
