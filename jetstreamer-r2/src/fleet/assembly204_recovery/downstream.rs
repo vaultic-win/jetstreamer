@@ -1,6 +1,7 @@
 //! Closed post-assembly chain. Service success and operation evidence are
 //! independently captured; every read is against the same immutable tuple.
 use super::*;
+mod tool_qa;
 use std::io::Read;
 use std::os::fd::AsRawFd;
 use std::os::unix::process::CommandExt;
@@ -142,6 +143,48 @@ fn neighbor_ready(n: &Neighbor) -> Result<()> {
     );
     Ok(())
 }
+const ANCHOR203: &str = "/home/ubuntu/horizon/epoch-203.jet";
+fn full_anchor(x: &StageSpec) -> Result<&Neighbor> {
+    ensure!(
+        x.stage == Stage::Full && x.neighbors.len() == 1,
+        "204 Full needs one exact203 anchor"
+    );
+    let n = &x.neighbors[0];
+    ensure!(
+        n.epoch == 203
+            && n.archive.path == Path::new(ANCHOR203)
+            && n.bytes > 0
+            && n.bytes <= OUTPUT_MAX,
+        "204 Full anchor scope/length differs"
+    );
+    neighbor_ready(n)?;
+    let input = custody::open_source(&n.archive.path)?;
+    anchor_stamp(
+        &n.archive.path,
+        &custody::FileStamp::of(&input.metadata()?),
+        n.bytes,
+    )?;
+    Ok(n)
+}
+fn anchor_reserve(x: &StageSpec) -> Result<u64> {
+    if x.stage == Stage::Full {
+        Ok(full_anchor(x)?.bytes)
+    } else {
+        Ok(0)
+    }
+}
+fn anchor_stamp(path: &Path, stamp: &custody::FileStamp, bytes: u64) -> Result<()> {
+    ensure!(
+        path == Path::new(ANCHOR203)
+            && stamp.bytes == bytes
+            && matches!(stamp.uid, 0 | 1000)
+            && stamp.links == 1
+            && stamp.mode & libc::S_IFMT == libc::S_IFREG
+            && stamp.mode & 0o222 == 0,
+        "204 canonical203 anchor is not exact readonly regular single-link root/ubuntu data"
+    );
+    Ok(())
+}
 pub(super) fn validate_stage_owner(v: &Value, spec: &BoundFile, stage: Stage) -> Result<()> {
     let x = stage_spec(v)?;
     ensure!(x.stage == stage, "204 stage owner phase differs");
@@ -238,44 +281,19 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
     for log in &logs {
         artifact::validate_member_binding(&seal, log, 32 << 20)?;
     }
-    let mut test = false;
-    let mut clippy = false;
-    for run in qa["commands"]
-        .as_array()
-        .context("204 tool QA lacks actual completed command records")?
-    {
-        let args = run["command"]
-            .as_array()
-            .context("204 tool QA command argv")?;
-        if run["exit_code"] != 0
-            || args.first() != Some(&json!("cargo"))
-            || !args.iter().any(|a| a == component)
-        {
-            continue;
-        }
-        let relevant = args.get(1).and_then(Value::as_str);
-        if relevant == Some("clippy")
-            && !args
-                .windows(2)
-                .any(|p| p == [json!("-D"), json!("warnings")])
-            && !args.iter().any(|v| v == "-Dwarnings")
-        {
-            continue;
-        }
-        if !matches!(relevant, Some("test" | "clippy")) {
-            continue;
-        }
-        ensure!(
-            logs.iter().any(|l| run["log_sha256"] == l.sha256),
-            "204 tool successful QA command lacks its actual sealed log"
-        );
-        test |= relevant == Some("test");
-        clippy |= relevant == Some("clippy");
+    let qa_files: Vec<tool_qa::EvidenceFile> =
+        serde_json::from_value(proof.get("qa_files").cloned().unwrap_or_else(|| json!([])))?;
+    for file in &qa_files {
+        artifact::validate_member_binding(&seal, &file.copy, 32 << 20)?;
     }
-    ensure!(
-        test && clippy,
-        "204 tool lacks source-bound actual successful tests and strict Clippy records"
-    );
+    tool_qa::validate(
+        &qa,
+        s(&proof, "source_revision")?,
+        component,
+        &logs,
+        &qa_files,
+        read,
+    )?;
     Ok(tool)
 }
 #[derive(Deserialize)]
@@ -445,8 +463,12 @@ pub(super) fn admit_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result
     let before = unit(x.stage.unit())?;
     ensure!(is_idle(&before), "204 stage is already running");
     inactive_status::no_pending_owner_trigger(x.stage.unit(), false)?;
-    let capacity =
-        capacity::stage_capacity(&a.resource_basis, x.stage, n(&source, "archive_bytes")?)?;
+    let capacity = capacity::stage_capacity(
+        &a.resource_basis,
+        x.stage,
+        n(&source, "archive_bytes")?,
+        anchor_reserve(&x)?,
+    )?;
     let cap = write(&a.capacity_output, &capacity)?;
     ownership::no_overlap(&x.context, None)?;
     ensure!(
@@ -480,7 +502,7 @@ fn issued_admission(x: &StageSpec, spec: &BoundFile, bytes: u64) -> Result<Bound
         "204 stage admission expired before launch"
     );
     let cap = read(&serde_json::from_value(a["capacity"].clone())?)?;
-    let candidate = capacity::candidate(x.stage, bytes)?;
+    let candidate = capacity::candidate_with_anchor(x.stage, bytes, anchor_reserve(x)?)?;
     capacity::validate_capacity(&cap, candidate.memory_max_bytes, candidate.additional_bytes)?;
     capacity::validate_provenance(&cap)?;
     Ok(b)
@@ -497,9 +519,22 @@ fn copy_verified(
     bytes: u64,
     sha: &str,
 ) -> Result<custody::FileStamp> {
+    copy_verified_with_policy(source, target, bytes, sha, false)
+}
+fn copy_verified_with_policy(
+    source: &Path,
+    target: &Path,
+    bytes: u64,
+    sha: &str,
+    canonical_anchor: bool,
+) -> Result<custody::FileStamp> {
     let mut input = custody::open_source(source)?;
     let before = custody::FileStamp::of(&input.metadata()?);
-    before.frozen(bytes)?;
+    if canonical_anchor {
+        anchor_stamp(source, &before, bytes)?;
+    } else {
+        before.frozen(bytes)?;
+    }
     let mut output = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -530,7 +565,13 @@ fn copy_verified(
     );
     output.sync_all()?;
     File::open(target.parent().context("204 copy parent")?)?.sync_all()?;
-    Ok(custody::FileStamp::of(&output.metadata()?))
+    let result = custody::FileStamp::of(&output.metadata()?);
+    result.frozen(bytes)?;
+    ensure!(
+        result.mode & 0o7777 == 0o400,
+        "204 copied input is not root readonly0400"
+    );
+    Ok(result)
 }
 fn hash_tuple(b: &BoundFile, bytes: u64) -> Result<()> {
     let mut f = custody::open_source(&b.path)?;
@@ -704,25 +745,31 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
             no_file(&scan)?;
             copy_verified(Path::new(OUTPUT), &scan, bytes, sha)?;
             let t = tool(&x)?;
-            let neighbors = x
-                .neighbors
-                .iter()
-                .filter(|n| n.epoch == 203)
-                .collect::<Vec<_>>();
-            ensure!(
-                neighbors.len() == 1,
-                "204 strict full verification needs genuine epoch203 anchor source"
-            );
-            let neighbor = neighbors[0];
-            neighbor_ready(neighbor)?;
-            hash_tuple(&neighbor.archive, neighbor.bytes)?;
+            let neighbor = full_anchor(&x)?;
+            let anchor_copy = x.scan_directory.join("epoch-203.jet");
+            no_file(&anchor_copy)?;
+            copy_verified_with_policy(
+                &neighbor.archive.path,
+                &anchor_copy,
+                neighbor.bytes,
+                &neighbor.archive.sha256,
+                true,
+            )?;
+            // Keep the original root-only frozen-input hash and decoder gates.
+            hash_tuple(
+                &BoundFile {
+                    path: anchor_copy.clone(),
+                    sha256: neighbor.archive.sha256.clone(),
+                },
+                neighbor.bytes,
+            )?;
             let mut anchor_spec = x.clone();
             anchor_spec.stage = Stage::Boundary;
             anchor_spec.tool = x.anchor_tool.clone();
             anchor_spec.tool_qualification = x.anchor_tool_qualification.clone();
             let anchor_result = child(
                 &tool(&anchor_spec)?,
-                &[neighbor.archive.path.display().to_string()],
+                &[anchor_copy.display().to_string()],
                 &x.output_directory,
                 "anchor203",
             )?;
@@ -736,7 +783,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
             let fields = lines[0].split('\t').collect::<Vec<_>>();
             ensure!(
                 fields.len() == 12
-                    && fields[0] == neighbor.archive.path.to_string_lossy()
+                    && fields[0] == anchor_copy.to_string_lossy()
                     && fields[1] == "203"
                     && fields[2] == "87696000"
                     && fields[3] == "432000"
@@ -1024,5 +1071,55 @@ mod terminal_capture_context_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod full_anchor_tests {
+    use super::*;
+    fn stamp() -> custody::FileStamp {
+        custody::FileStamp {
+            device: 1,
+            inode: 2,
+            bytes: 103_802_397_352,
+            uid: 1000,
+            gid: 1000,
+            mode: libc::S_IFREG | 0o440,
+            links: 1,
+            mtime: 3,
+            mtime_nanos: 4,
+            ctime: 5,
+            ctime_nanos: 6,
+        }
+    }
+    #[test]
+    fn exact_readonly_canonical203_custody_accepts_only_root_or_ubuntu_single_link() {
+        let path = Path::new(ANCHOR203);
+        let original = stamp();
+        anchor_stamp(path, &original, original.bytes).unwrap();
+        let mut root = original.clone();
+        root.uid = 0;
+        anchor_stamp(path, &root, root.bytes).unwrap();
+        assert!(
+            anchor_stamp(
+                Path::new("/private/epoch-203.jet"),
+                &original,
+                original.bytes
+            )
+            .is_err()
+        );
+        assert!(anchor_stamp(path, &original, original.bytes + 1).is_err());
+        let mut foreign = original;
+        foreign.uid = 1001;
+        assert!(anchor_stamp(path, &foreign, foreign.bytes).is_err());
+        let mut bad = stamp();
+        bad.links = 2;
+        assert!(anchor_stamp(path, &bad, bad.bytes).is_err());
+        bad = stamp();
+        bad.mode |= 0o200;
+        assert!(anchor_stamp(path, &bad, bad.bytes).is_err());
+        bad = stamp();
+        bad.mode = libc::S_IFLNK | 0o440;
+        assert!(anchor_stamp(path, &bad, bad.bytes).is_err());
     }
 }

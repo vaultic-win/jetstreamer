@@ -580,4 +580,27 @@ mod live_guard_tests {
         census.remove(GUARD);
         assert!(current(&p, &census).is_err());
     }
+    #[test]
+    fn full_peer_retains_entire_admitted203_copy_without_allocation_credit() {
+        let (mut peer, _, _, _) = fixture();
+        peer.stage = downstream::Stage::Full;
+        let anchor = 103_802_397_352;
+        let admitted = capacity::candidate_with_anchor(peer.stage, 114_228_848_867, anchor)
+            .unwrap()
+            .additional_bytes;
+        let (disk, _, growth) = resource_evidence(
+            &peer,
+            Value::Null,
+            json!({"remaining_hard_memory_growth_bytes":17}),
+            Value::Null,
+            admitted,
+        )
+        .unwrap();
+        assert_eq!(
+            disk["remaining_growth_bytes"],
+            (160u64 << 30) + (128u64 << 20) + anchor
+        );
+        assert_eq!(disk["allocation_credit_bytes"], 0);
+        assert_eq!(growth, 17);
+    }
 }

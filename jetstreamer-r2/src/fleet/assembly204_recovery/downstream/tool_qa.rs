@@ -336,6 +336,10 @@ mod tests {
             bad_results.get_mut(&files[0].copy.path).unwrap()[key] = bad;
             assert!(check(&qa, &logs, &files, &bad_results).is_err(), "{key}");
         }
+        let mut loose_clippy = results.clone();
+        loose_clippy.get_mut(&files[2].copy.path).unwrap()["argv"] =
+            json!([CARGO, "clippy", "-p", "jetstreamer-horizon"]);
+        assert!(check(&qa, &logs, &files, &loose_clippy).is_err());
         let mut stopped = results.clone();
         stopped
             .get_mut(&files[0].copy.path)

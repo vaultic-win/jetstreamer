@@ -18,6 +18,18 @@ pub(super) fn candidate(
     stage: downstream::Stage,
     bytes: u64,
 ) -> Result<maintenance_capacity::Candidate> {
+    candidate_with_anchor(stage, bytes, 0)
+}
+pub(super) fn candidate_with_anchor(
+    stage: downstream::Stage,
+    bytes: u64,
+    anchor_bytes: u64,
+) -> Result<maintenance_capacity::Candidate> {
+    ensure!(
+        (stage == downstream::Stage::Full && anchor_bytes > 0 && anchor_bytes <= OUTPUT_MAX)
+            || (stage != downstream::Stage::Full && anchor_bytes == 0),
+        "204 Full anchor reservation missing or charged to another stage"
+    );
     let (additional, memory) = match stage {
         downstream::Stage::Assembly => (
             OUTPUT_MAX
@@ -28,7 +40,8 @@ pub(super) fn candidate(
         downstream::Stage::Full => (
             OUTPUT_MAX
                 .checked_add(METADATA)
-                .context("204 scan disk overflow")?,
+                .and_then(|v| v.checked_add(anchor_bytes))
+                .context("204 scan plus203 anchor disk overflow")?,
             MEMORY,
         ),
         downstream::Stage::Plugin => (128 << 20, MEMORY),
@@ -328,8 +341,13 @@ pub(super) fn validate_issued(v: &Value, plan: &BoundFile, p: &Value) -> Result<
     );
     Ok(())
 }
-pub(super) fn stage_capacity(basis: &Value, stage: downstream::Stage, bytes: u64) -> Result<Value> {
-    let c = candidate(stage, bytes)?;
+pub(super) fn stage_capacity(
+    basis: &Value,
+    stage: downstream::Stage,
+    bytes: u64,
+    anchor_bytes: u64,
+) -> Result<Value> {
+    let c = candidate_with_anchor(stage, bytes, anchor_bytes)?;
     let result = maintenance_capacity::check_assembly204_recovery(basis, c)?;
     validate_capacity(&result, c.memory_max_bytes, c.additional_bytes)?;
     validate_provenance(&result)?;
@@ -528,5 +546,29 @@ mod roster_tests {
         assert!(owner_sets(&expected, &expected, &missing_owner).is_err());
         let changed = json!({"protected_memory_evidence":[{"unit":"primary.service"},{"unit":"replacement.service"}]});
         assert!(owner_sets(&expected, &expected, &changed).is_err());
+    }
+}
+
+#[cfg(test)]
+mod full_anchor_reservation_tests {
+    use super::*;
+    #[test]
+    fn full_anchor_copy_is_charged_without_weakening_other_stages() {
+        let anchor = 103_802_397_352;
+        let c = candidate_with_anchor(downstream::Stage::Full, 114_228_848_867, anchor).unwrap();
+        assert_eq!(c.additional_bytes, OUTPUT_MAX + METADATA + anchor);
+        assert_eq!(c.memory_max_bytes, MEMORY);
+        assert!(candidate(downstream::Stage::Full, 114_228_848_867).is_err());
+        assert!(candidate_with_anchor(downstream::Stage::Full, 0, 0).is_err());
+        assert!(candidate_with_anchor(downstream::Stage::Full, 0, OUTPUT_MAX + 1).is_err());
+        for stage in downstream::Stage::all() {
+            if stage != downstream::Stage::Full {
+                assert!(candidate_with_anchor(stage, 0, anchor).is_err());
+                assert_eq!(
+                    candidate(stage, 0).unwrap().additional_bytes,
+                    candidate_with_anchor(stage, 0, 0).unwrap().additional_bytes
+                );
+            }
+        }
     }
 }

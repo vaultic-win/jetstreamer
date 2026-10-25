@@ -748,7 +748,10 @@ fn fleet_for_mode(
     accepted: &impl Fn(&BoundFile, &BoundFile) -> Result<Value>,
     canonical: &impl Fn(&BoundFile) -> Result<Value>,
 ) -> Result<Value> {
-    if matches!(mode, MemoryMode::Full210 | MemoryMode::Foundation203) {
+    if matches!(
+        mode,
+        MemoryMode::Full210 | MemoryMode::Foundation203 | MemoryMode::AssemblyRecovery204
+    ) {
         return accepted(fleet, observer);
     }
     ensure!(
@@ -766,6 +769,54 @@ mod tests {
         BoundFile {
             path: path.into(),
             sha256: "a".repeat(64),
+        }
+    }
+    #[test]
+    fn assembly204_uses_authenticated_context_and_other_modes_keep_canonical_restriction() {
+        let observer = context_binding("/saved/observer.json");
+        let fleet = context_binding(
+            "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-terminal-v1/fleet.json",
+        );
+        let expected = json!({"history":[{"terminal204":true}],"active":[]});
+        let actual = fleet_for_mode(
+            MemoryMode::AssemblyRecovery204,
+            &fleet,
+            &observer,
+            &|f, o| {
+                assert_eq!(f.path, fleet.path);
+                assert_eq!(o.path, observer.path);
+                Ok(expected.clone())
+            },
+            &|_| panic!("assembly204 cannot bypass context validation"),
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        assert!(
+            fleet_for_mode(
+                MemoryMode::AssemblyRecovery204,
+                &fleet,
+                &observer,
+                &|_, _| bail!("foreign context"),
+                &|_| panic!("no fallback")
+            )
+            .is_err()
+        );
+        for mode in [
+            MemoryMode::Existing,
+            MemoryMode::Full209Delivery,
+            MemoryMode::FirstRoot233,
+            MemoryMode::Capped204V4,
+        ] {
+            assert!(
+                fleet_for_mode(
+                    mode,
+                    &fleet,
+                    &observer,
+                    &|_, _| panic!("unexpected context route"),
+                    &|_| panic!("foreign canonical namespace must fail first")
+                )
+                .is_err()
+            );
         }
     }
     #[test]
