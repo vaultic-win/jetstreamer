@@ -678,8 +678,8 @@ pub(super) fn run() -> Result<()> {
         memory_requirement(&f, &o, &proposal, after_auxiliary, &after_memory_evidence)?;
     let disk_after = singleton227_admission::disk_free()?;
     let memory_after = actual_memory(&o)?;
-    let free = free_before.min(disk_after);
-    let memory = memory_before.min(memory_after);
+    let free = sampled_free.min(free_before).min(disk_after);
+    let memory = sampled_memory.min(memory_before).min(memory_after);
     let after_caps = combined_limits(&f, &s.protected_guards, &after, now)?;
     let late_values = envelope::LateValues {
         growth_before: growth,
@@ -696,77 +696,78 @@ pub(super) fn run() -> Result<()> {
         memory_before,
         memory_after,
     };
-    let late_predicates = envelope::predicates(&late_values, before == after, caps == after_caps);
-    if !late_predicates.passed() {
-        // Preview only: retain the original seven admission predicates until
-        // the conservative-bracket policy receives separate source review.
-        // Recompute existing floors/policies first; never max partial totals
-        // while silently dropping a native223/canary top-up.
-        let recomputed_disk = native228_admission::protected_floor(
-            century,
-            growth.max(after_growth),
-            &s.protected_guards,
+    // Historical heuristic retained as diagnostic evidence only. Current cache
+    // release can increase remaining hard-cap growth without changing a cap.
+    let legacy_predicates = envelope::predicates(&late_values, before == after, caps == after_caps);
+    let resolved = envelope::resolve(&envelope::BracketInputs {
+        plan: &p,
+        fleet: &f,
+        observer: &o,
+        proposal: &proposal,
+        guards: &s.protected_guards,
+        century,
+        protected_before: protected,
+        guard_floor_before: existing_guard_floor,
+        growth_before: growth,
+        growth_after: after_growth,
+        auxiliary_before: auxiliary,
+        auxiliary_after: after_auxiliary,
+        disk_required_before: required,
+        memory_required_before: required_memory,
+        memory_required_after: after_required_memory,
+        memory_evidence_after: &after_memory_evidence,
+    });
+    let resource_predicates = match &resolved {
+        Ok(bracket) => json!({"exact_census_unchanged":before==after,
+            "exact_caps_unchanged":caps==after_caps,"complete_recomputation_succeeded":true,
+            "disk_fits_accepted_and_both_brackets":free>=bracket.disk_required_max,
+            "memory_fits_accepted_and_both_brackets":memory>=bracket.memory_required_max}),
+        Err(_) => json!({"exact_census_unchanged":before==after,
+            "exact_caps_unchanged":caps==after_caps,"complete_recomputation_succeeded":false,
+            "disk_fits_accepted_and_both_brackets":false,
+            "memory_fits_accepted_and_both_brackets":false}),
+    };
+    let fits = resolved.as_ref().is_ok_and(|bracket| {
+        bracketed_fit(
+            before == after,
+            caps == after_caps,
+            bracket.disk_required_max,
+            bracket.memory_required_max,
+            [sampled_free, free_before, disk_after],
+            [sampled_memory, memory_before, memory_after],
         )
-        .and_then(|(floor, _)| disk_requirement(&p, floor));
-        let recomputed_memory = memory_requirement(
-            &f,
-            &o,
-            &proposal,
-            auxiliary.max(after_auxiliary),
-            &after_memory_evidence,
-        );
-        let bracket_preview = match (&recomputed_disk, &recomputed_memory) {
-            (Ok(disk), Ok((memory, policy))) => {
-                let (required_disk, required_memory) = bracketed_requirements(
-                    required,
-                    *disk,
-                    required_memory,
-                    after_required_memory,
-                    *memory,
-                );
-                json!({"diagnostic_preview_only":true,"admission_policy_changed":false,
-                    "growth_max":growth.max(after_growth),"auxiliary_max":auxiliary.max(after_auxiliary),
-                    "disk_required":required_disk,"memory_required":required_memory,
-                    "memory_policy_after_max_auxiliary_recompute":policy,
-                    "would_fit":bracketed_fit(before==after,caps==after_caps,required_disk,required_memory,
-                        [sampled_free,free_before,disk_after],[sampled_memory,memory_before,memory_after])})
-            }
-            _ => json!({"diagnostic_preview_only":true,"admission_policy_changed":false,
-                "would_fit":false,
-                "disk_recomputation_error":recomputed_disk.as_ref().err().map(|e|format!("{e:#}")),
-                "memory_recomputation_error":recomputed_memory.as_ref().err().map(|e|format!("{e:#}"))}),
-        };
-        let at = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-        let at = u64::try_from(at).context("failed admission audit clock overflow")?;
-        let report = json!({
-            "schema":"jetstreamer-capped204205-failed-admission-audit-v1",
-            "epoch":p["epoch"],"spec":private157::binding(&spec_binding),"self_sha256":self_sha,
-            "producer_plan":private157::binding(&s.producer_plan),
-            "resource_proposal":private157::binding(&s.resource_proposal),
-            "fleet":private157::binding(&s.fleet),"observer":private157::binding(&s.observer),
-            "protected_guards":s.protected_guards,
-            "recorded_unix_millis":at,"predicates":late_predicates,"values":late_values,
-            "conservative_bracket_preview":bracket_preview,
-            "unit_census_before":before,"unit_census_after":after,
-            "protected_caps_before":caps,"protected_caps_after":after_caps,
-            "guard_evidence_before":guard_before,"guard_evidence_after":after_guard,
-            "growth_evidence_before":growth_evidence,"growth_evidence_after":after_growth_evidence,
-            "memory_evidence_before":memory_evidence,"memory_evidence_after":after_memory_evidence,
-            "memory_policy_before":memory_policy,"memory_policy_after":after_memory_policy,
-            "century_floor_bytes":century,"computed_protected_floor_bytes":protected,
-            "maximum_existing_guard_floor_bytes":existing_guard_floor,
-            "admitted":false,"resource_samples_taken":0,"producer_started":false,
-            "native_initialized":false,"replay_launch_authorized":false,
-            "publication_authorized":false,"canonical_sidecar_authorized":false,
-            "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false,
-        });
-        let path = envelope::persist_failure(&s.output, at, std::process::id(), &report)
-            .with_context(|| format!("capped mutable owner/resource envelope changed during admission; failed to persist diagnostic; predicates={late_predicates:?}"))?;
-        bail!(
-            "capped mutable owner/resource envelope changed during admission; diagnostic={}",
-            path.display()
-        );
+    });
+    let late_audit = json!({
+        "schema":"jetstreamer-capped204205-failed-admission-audit-v1",
+        "epoch":p["epoch"],"spec":private157::binding(&spec_binding),"self_sha256":self_sha,
+        "producer_plan":private157::binding(&s.producer_plan),
+        "resource_proposal":private157::binding(&s.resource_proposal),
+        "fleet":private157::binding(&s.fleet),"observer":private157::binding(&s.observer),
+        "protected_guards":s.protected_guards,"predicates":resource_predicates,
+        "legacy_monotonic_predicates":legacy_predicates,"values":late_values,
+        "conservative_bracket":resolved.as_ref().ok(),
+        "complete_recomputation_error":resolved.as_ref().err().map(|e|format!("{e:#}")),
+        "unit_census_before":before,"unit_census_after":after,
+        "protected_caps_before":caps,"protected_caps_after":after_caps,
+        "guard_evidence_before":guard_before,"guard_evidence_after":after_guard,
+        "growth_evidence_before":growth_evidence,"growth_evidence_after":after_growth_evidence,
+        "memory_evidence_before":memory_evidence,"memory_evidence_after":after_memory_evidence,
+        "memory_policy_before":memory_policy,"memory_policy_after":after_memory_policy,
+        "century_floor_bytes":century,"computed_protected_floor_before_bytes":protected,
+        "maximum_existing_guard_floor_before_bytes":existing_guard_floor,
+        "admitted":false,"resource_samples_taken":0,"producer_started":false,
+        "native_initialized":false,"replay_launch_authorized":false,
+        "publication_authorized":false,"canonical_sidecar_authorized":false,
+        "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false,
+    });
+    if !fits {
+        return envelope::refuse(&s.output, "complete_resource_brackets", late_audit);
     }
+    let bracket = resolved?;
+    let required = bracket.disk_required_max;
+    let required_memory = bracket.memory_required_max;
+    let protected = bracket.protected_floor_max;
+    let existing_guard_floor = bracket.existing_guard_floor_max;
     let recorded = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
     let recorded = u64::try_from(recorded).context("capped admission clock overflow")?;
     ensure!(
@@ -777,12 +778,19 @@ pub(super) fn run() -> Result<()> {
     );
     sample::validate(&s, &p, &proposal, &o, &f, recorded / 1000)?;
     let readable_mirror = mirror(&s)?;
-    let free = free.min(singleton227_admission::disk_free()?);
-    let memory = memory.min(actual_memory(&o)?);
-    ensure!(
-        free >= required && memory >= required_memory,
-        "capped resources no longer fit after exact runtime mirror staging"
-    );
+    let disk_after_mirror = singleton227_admission::disk_free()?;
+    let memory_after_mirror = actual_memory(&o)?;
+    let free = free.min(disk_after_mirror);
+    let memory = memory.min(memory_after_mirror);
+    if free < required || memory < required_memory {
+        let mut report = late_audit;
+        report["post_mirror"] = json!({"disk_available":disk_after_mirror,
+            "memory_available":memory_after_mirror,"conservative_disk_available":free,
+            "conservative_memory_available":memory,"disk_required":required,
+            "memory_required":required_memory,"disk_fits":free>=required,
+            "memory_fits":memory>=required_memory});
+        return envelope::refuse(&s.output, "post_mirror_capacity", report);
+    }
     let mut receipt = json!({"schema":"jetstreamer-capped204205-continuation-admission-v1","admitted":true,
         "epoch":p["epoch"],"plan_sha256":s.producer_plan.sha256,"producer_plan":private157::binding(&s.producer_plan),
         "node_sha256":p["node_sha256"],"source_capture_sha256":p["source_capture"]["sha256"],
@@ -799,11 +807,17 @@ pub(super) fn run() -> Result<()> {
         "fleet_observation":private157::binding(&s.fleet),"fleet_observation_readable_mirror":private157::binding(&readable_mirror),
         "readable_mirror_is_same_host_runtime_input_not_new_accepted_fleet":true,
         "observer":private157::binding(&s.observer),"protected_guards":s.protected_guards,
-        "century_floor_bytes":century,"protected_remaining_growth_bytes":growth,"computed_protected_floor_bytes":protected,"maximum_existing_guard_floor_bytes":existing_guard_floor});
+        "century_floor_bytes":century,"protected_remaining_growth_bytes":bracket.growth_max,"computed_protected_floor_bytes":protected,"maximum_existing_guard_floor_bytes":existing_guard_floor});
     let audit = json!({
         "guard_evidence_before":guard_before,"guard_evidence_after":after_guard,"growth_before":growth_evidence,"growth_after":after_growth_evidence,
         "memory_before":memory_evidence,"memory_after":after_memory_evidence,"memory_policy_before":memory_policy,"memory_policy_after":after_memory_policy,
-        "unit_census_before":before,"unit_census_after":after,"protected_memory_limits":caps,"spec_sha256":spec_binding.sha256,"self_sha256":self_sha,
+        "conservative_resource_bracket":bracket,"bracket_predicates":resource_predicates,
+        "legacy_monotonic_predicates":legacy_predicates,
+        "resource_bracket_values":late_values,
+        "availability_after_mirror":{"disk_bytes":disk_after_mirror,"memory_bytes":memory_after_mirror},
+        "required_available_disk_bytes":required,"required_available_memory_bytes":required_memory,
+        "unit_census_before":before,"unit_census_after":after,"protected_memory_limits":caps,
+        "protected_memory_limits_after":after_caps,"spec_sha256":spec_binding.sha256,"self_sha256":self_sha,
         "raw_fleet_and_failure_history_preserved":true,"original_native_tuple_and_cursor_rules_preserved":true,
         "ordinary_replay_authorized":false,"canonical_sidecar_authorized":false,"publication_authorized":false,
         "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false,"producer_started":false,"native_initialized":false});

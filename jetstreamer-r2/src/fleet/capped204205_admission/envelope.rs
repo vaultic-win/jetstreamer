@@ -1,4 +1,4 @@
-//! Audit the existing late admission decision without changing its policy.
+//! Conservative complete obligations and exact admission failure evidence.
 use super::*;
 use std::os::unix::fs::PermissionsExt;
 
@@ -30,6 +30,7 @@ pub(super) struct Predicates {
     pub memory_fits: bool,
 }
 impl Predicates {
+    #[cfg(test)]
     pub fn passed(&self) -> bool {
         self.exact_census_unchanged
             && self.exact_caps_unchanged
@@ -91,6 +92,106 @@ pub(in crate::fleet) fn bracketed_fit(
             .min(memory_available[1])
             .min(memory_available[2])
             >= memory_required
+}
+
+pub(super) struct BracketInputs<'a> {
+    pub plan: &'a Value,
+    pub fleet: &'a Value,
+    pub observer: &'a Value,
+    pub proposal: &'a Value,
+    pub guards: &'a BTreeMap<String, BoundFile>,
+    pub century: u64,
+    pub protected_before: u64,
+    pub guard_floor_before: u64,
+    pub growth_before: u64,
+    pub growth_after: u64,
+    pub auxiliary_before: u64,
+    pub auxiliary_after: u64,
+    pub disk_required_before: u64,
+    pub memory_required_before: u64,
+    pub memory_required_after: u64,
+    pub memory_evidence_after: &'a [Value],
+}
+#[derive(Debug, Serialize)]
+pub(super) struct ResolvedBracket {
+    pub growth_max: u64,
+    pub auxiliary_max: u64,
+    pub protected_floor_before: u64,
+    pub protected_floor_after: u64,
+    pub protected_floor_recomputed: u64,
+    pub protected_floor_max: u64,
+    pub existing_guard_floor_max: u64,
+    pub disk_required_before: u64,
+    pub disk_required_after: u64,
+    pub disk_required_recomputed: u64,
+    pub disk_required_max: u64,
+    pub memory_required_before: u64,
+    pub memory_required_after: u64,
+    pub memory_required_recomputed: u64,
+    pub memory_required_max: u64,
+    pub memory_policy_after_max_auxiliary_recompute: Value,
+}
+pub(super) fn resolve(i: &BracketInputs<'_>) -> Result<ResolvedBracket> {
+    let growth_max = i.growth_before.max(i.growth_after);
+    let auxiliary_max = i.auxiliary_before.max(i.auxiliary_after);
+    let (protected_after, guard_after) =
+        native228_admission::protected_floor(i.century, i.growth_after, i.guards)?;
+    let disk_after = disk_requirement(i.plan, protected_after)?;
+    let (protected_recomputed, guard_recomputed) =
+        native228_admission::protected_floor(i.century, growth_max, i.guards)?;
+    // Even when helper policies are non-monotone, no complete bracket floor
+    // may disappear behind the maximum of the partial growth operands.
+    let protected_max = i
+        .protected_before
+        .max(protected_after)
+        .max(protected_recomputed);
+    let disk_recomputed = disk_requirement(i.plan, protected_max)?;
+    let (memory_recomputed, memory_policy) = memory_requirement(
+        i.fleet,
+        i.observer,
+        i.proposal,
+        auxiliary_max,
+        i.memory_evidence_after,
+    )?;
+    let (disk_max, memory_max) = super::bracketed_requirements(
+        i.disk_required_before.max(disk_after),
+        disk_recomputed,
+        i.memory_required_before,
+        i.memory_required_after,
+        memory_recomputed,
+    );
+    Ok(ResolvedBracket {
+        growth_max,
+        auxiliary_max,
+        protected_floor_before: i.protected_before,
+        protected_floor_after: protected_after,
+        protected_floor_recomputed: protected_recomputed,
+        protected_floor_max: protected_max,
+        existing_guard_floor_max: i.guard_floor_before.max(guard_after).max(guard_recomputed),
+        disk_required_before: i.disk_required_before,
+        disk_required_after: disk_after,
+        disk_required_recomputed: disk_recomputed,
+        disk_required_max: disk_max,
+        memory_required_before: i.memory_required_before,
+        memory_required_after: i.memory_required_after,
+        memory_required_recomputed: memory_recomputed,
+        memory_required_max: memory_max,
+        memory_policy_after_max_auxiliary_recompute: memory_policy,
+    })
+}
+
+pub(super) fn refuse(output: &Path, phase: &str, mut evidence: Value) -> Result<()> {
+    let at = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+    let at = u64::try_from(at).context("failed admission audit clock overflow")?;
+    evidence["recorded_unix_millis"] = json!(at);
+    evidence["failure_phase"] = json!(phase);
+    let path = persist_failure(output, at, std::process::id(), &evidence).with_context(|| {
+        format!("capped admission refused at {phase}; failed to persist detailed diagnostic")
+    })?;
+    bail!(
+        "capped admission refused at {phase}; diagnostic={}",
+        path.display()
+    );
 }
 
 /// Caller has already refused admission. A private durable diagnostic never
@@ -243,6 +344,122 @@ mod tests {
             bracketed_requirements(900, 850, 1000, 800, 820),
             (900, 1000)
         );
+    }
+    fn recomputation_fixture(native223: bool) -> (Value, Value, Value, Value) {
+        let mut fleet = json!({"active":[],"unit_census":{}});
+        if native223 {
+            let row = prefix223_live_peer::fixture_row();
+            fleet["unit_census"][prefix223_native20::UNIT] =
+                singleton227_admission::active_owner(&row).unwrap().clone();
+            fleet["active"].as_array_mut().unwrap().push(row);
+        }
+        (
+            json!({"protected_existing_floor_bytes":1000,"candidate_incremental_peak_bytes":500}),
+            fleet,
+            json!({"host_memory":{"total_kib":976562500u64}}),
+            json!({"kernel_limits":{"requested_memory_max_bytes":100},"guard_memory_max_bytes":10}),
+        )
+    }
+    fn recompute<'a>(
+        p: &'a Value,
+        f: &'a Value,
+        o: &'a Value,
+        r: &'a Value,
+        guards: &'a BTreeMap<String, BoundFile>,
+    ) -> BracketInputs<'a> {
+        let (protected, guard_floor) =
+            native228_admission::protected_floor(80, 100, guards).unwrap();
+        BracketInputs {
+            plan: p,
+            fleet: f,
+            observer: o,
+            proposal: r,
+            guards,
+            century: 80,
+            protected_before: protected,
+            guard_floor_before: guard_floor,
+            growth_before: 100,
+            growth_after: 120,
+            auxiliary_before: 200,
+            auxiliary_after: 300,
+            disk_required_before: disk_requirement(p, protected).unwrap(),
+            memory_required_before: memory_requirement(f, o, r, 200, &[]).unwrap().0,
+            memory_required_after: memory_requirement(f, o, r, 300, &[]).unwrap().0,
+            memory_evidence_after: &[],
+        }
+    }
+    #[test]
+    fn actual_recomputation_admits_cache_release_and_disk_growth_only_when_all_brackets_fit() {
+        let (p, f, o, r) = recomputation_fixture(false);
+        let guards = BTreeMap::new();
+        let input = recompute(&p, &f, &o, &r, &guards);
+        let bracket = resolve(&input).unwrap();
+        assert_eq!(bracket.growth_max, 120);
+        assert_eq!(bracket.auxiliary_max, 300);
+        assert!(bracket.protected_floor_after > bracket.protected_floor_before);
+        assert!(bracket.memory_required_after > bracket.memory_required_before);
+        let disk = bracket.disk_required_max;
+        let memory = bracket.memory_required_max;
+        assert!(bracketed_fit(
+            true,
+            true,
+            disk,
+            memory,
+            [disk; 3],
+            [memory; 3]
+        ));
+        assert!(!bracketed_fit(
+            false,
+            true,
+            disk,
+            memory,
+            [disk; 3],
+            [memory; 3]
+        ));
+        assert!(!bracketed_fit(
+            true,
+            false,
+            disk,
+            memory,
+            [disk; 3],
+            [memory; 3]
+        ));
+        for index in 0..3 {
+            let mut values = [memory; 3];
+            values[index] = memory - 1;
+            assert!(!bracketed_fit(true, true, disk, memory, [disk; 3], values));
+            let mut values = [disk; 3];
+            values[index] = disk - 1;
+            assert!(!bracketed_fit(
+                true,
+                true,
+                disk,
+                memory,
+                values,
+                [memory; 3]
+            ));
+        }
+    }
+    #[test]
+    fn actual_recomputation_retains_live_native223_floor_and_checked_declared_disk_reserve() {
+        let (p, f, o, r) = recomputation_fixture(true);
+        let guards = BTreeMap::new();
+        let input = recompute(&p, &f, &o, &r, &guards);
+        let bracket = resolve(&input).unwrap();
+        let floor = 480u64 << 30;
+        assert_eq!(
+            bracket.memory_policy_after_max_auxiliary_recompute["floor_policy"]["native223_available_memory_floor_bytes"],
+            floor
+        );
+        assert_eq!(bracket.memory_required_max, floor + 110 + 300);
+        // Ample free disk never authorizes exceeding the immutable declared floor.
+        let small =
+            json!({"protected_existing_floor_bytes":190,"candidate_incremental_peak_bytes":500});
+        let input = recompute(&small, &f, &o, &r, &guards);
+        assert!(resolve(&input).is_err());
+        let mut input = recompute(&p, &f, &o, &r, &guards);
+        input.century = u64::MAX;
+        assert!(resolve(&input).is_err());
     }
     #[test]
     #[ignore = "root-only isolated metadata fixture beneath /var/lib/jetstreamer; no campaign or remote operations"]

@@ -8,16 +8,19 @@ inspection. Normal live cgroup cache release is a plausible cause: remaining har
 memory growth is `hard cap - current cgroup charge`, so that obligation increases
 when current charge shrinks. That fact is not proof of the actual failing term.
 
-This source change preserves the original seven admission predicates. A failed
-late gate now writes a root-owned 0400, bounded, no-clobber, fsynced diagnostic
+The successor now uses complete conservative bracket recomputation for REAL
+admission. Exact census and cap equality remain mandatory; the previous three
+monotonicity booleans remain explicit diagnostic evidence, not admission gates. A failed
+late gate writes a root-owned 0400, bounded, no-clobber, fsynced diagnostic
 alongside the uncreated admission output. It records every boolean and its numeric
 operands, both exact raw censuses and cap sets, both guard/growth/memory evidence
 and memory policies, and all immutable input/self bindings. It makes no new resource
 observation and never asserts admission, archive completion, replay or publication.
-The diagnostic additionally previews the conservative arithmetic below. Preview
-success does not change admission policy or authorize a retry.
+The same resolved obligations and policies are bound into successful receipts.
+Final post-mirror availability must fit those SAME maxima. Failed recomputation or
+post-mirror capacity produces private diagnostics and no positive receipt.
 
-## Proposed replacement of the monotonicity heuristic
+## Reviewed replacement of the monotonicity heuristic
 
 Let G0/G1 be before/after protected disk growth, A0/A1 before/after remaining hard
 memory growth, and Fd/Fm the accepted conservative disk/memory availability.
@@ -63,14 +66,14 @@ The first maxes complete recomputed obligations; the second requires exact censu
 and caps plus minimum of accepted/before/after availability. Neither computes or
 replaces profile-specific floors. maintenance_capacity.rs is NOT edited here.
 Tests cover cache shrink, ordinary disk growth, changed floor components, every
-availability bracket, actual insufficiency and owner/cap changes. The live capped
-admission policy remains unchanged until this equivalence is reviewed and the
-recomputed maxima are explicitly wired into its receipt and final post-mirror gate.
+availability bracket, actual insufficiency and owner/cap changes. The live capped admission source wires these maxima into both its positive
+receipt and final post-mirror gate. Production use remains blocked until the
+integrated R2 source has passed qualification, production capture and root review.
 
 ## Smallest next safe path and provenance
 
-Review the bracket equivalence, wire it into capped admission (and only the closed
-233 mode in the separately owned maintenance module), then qualify the frozen
+The parent reviewed the equivalence and authorized real capped wiring. Integrate
+the separately owned closed 233 mode and reviewed V4 delivery adapters, then qualify the frozen
 combined R2 source with meaningful focused/default/all-feature tests and strict
 Clippy. No Cargo has run for this change. Freeze new production R2 bytes, capture
 actual compiler/source/extern/native inputs before target reuse, independently
