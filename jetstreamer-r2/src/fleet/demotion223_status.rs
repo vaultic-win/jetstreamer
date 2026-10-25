@@ -814,7 +814,7 @@ fn partial_bytes(t: &Task) -> Result<u64> {
     Ok(before.len())
 }
 fn parsed_progress(bytes: &[u8], t: &Task, sampled: u64) -> Result<Vec<Progress>> {
-    let rows = serde_json::Deserializer::from_slice(&bytes)
+    let rows = serde_json::Deserializer::from_slice(bytes)
         .into_iter::<Value>()
         .collect::<std::result::Result<Vec<_>, _>>()?;
     ensure!(
