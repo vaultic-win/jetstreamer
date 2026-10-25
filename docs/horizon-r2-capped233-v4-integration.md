@@ -22,13 +22,14 @@ maintenance_capacity::capped204_native223::prove_terminal(f) -> Result<Value>.
 Its visibility is exposed to the maintenance subtree; its original manager,
 empty-cgroup, process-reference, pending-job/trigger, no-replacement and repair
 ledger protections are unchanged. No terminal implementation was duplicated.
-The separately owned233 memory-policy successor can consume it and add a strict
-pure saved-proof validator here; it must keep the live480GiB floor, and release
-that floor only under the full positive proof. This integration must receive that
-reviewed successor before a233 policy is represented as supporting terminal223.
+The separately owned233 successor59881d51 now consumes it and adds strict pure
+validate_terminal_saved custody validation. It keeps the live480GiB floor and
+releases it only under the full positive proof. Final bracket recomputation
+revalidates the frozen after proof without performing a third live scan.
 The204 delivery stage whitelist remains16/64GiB;233's225GB+2GiB profile is separate.
 
-Source-only so far. No Cargo/target access, runtime retries, resource observations,
+The233 generation-pin successorddab6344 is also included. Source-only so far.
+No Cargo/target access, runtime retries, resource observations,
 canonical publication or R2 mutations were performed for this integration. Run
 all focused tests (capped204205_admission, maintenance_capacity, first_root233,
 private_prefix, capped204_v4_admission), both complete R2 feature suites and strict
