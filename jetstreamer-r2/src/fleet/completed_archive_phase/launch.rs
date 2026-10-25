@@ -1,0 +1,644 @@
+//! Capture actual execution identity before a completed phase can gate its peer.
+use super::*;
+const LAUNCH: &str = "jetstreamer-completed-archive-phase-launch-v1";
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Capture {
+    schema: String,
+    phase_spec: BoundFile,
+    admission: BoundFile,
+    guard_plan: BoundFile,
+    guard_sample: BoundFile,
+    output: PathBuf,
+}
+fn n(v: &Value, k: &str) -> Result<u64> {
+    v[k].as_u64()
+        .with_context(|| format!("completed launch integer missing: {k}"))
+}
+fn string<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
+    v[k].as_str()
+        .with_context(|| format!("completed launch string missing: {k}"))
+}
+fn process_matches(
+    phase: Phase,
+    expected: &[String],
+    executable: &Path,
+    actual: &[String],
+) -> Result<()> {
+    ensure!(!expected.is_empty(), "completed launch argv missing");
+    let matches = if phase == Phase::Upload {
+        executable == Path::new(&expected[0]) && actual == expected
+    } else {
+        executable == Path::new("/usr/bin/bash")
+            && actual.len() == expected.len() + 1
+            && matches!(
+                actual.first().map(String::as_str),
+                Some("bash" | "/bin/bash" | "/usr/bin/bash")
+            )
+            && actual[1..] == *expected
+    };
+    ensure!(
+        matches,
+        "completed launch actual process executable/argv differs"
+    );
+    Ok(())
+}
+fn start_ticks(raw: &str) -> Result<u64> {
+    let (_, rest) = raw
+        .rsplit_once(") ")
+        .context("completed launch malformed process stat")?;
+    rest.split_whitespace()
+        .nth(19)
+        .context("completed launch process start time absent")?
+        .parse()
+        .context("completed launch process start time invalid")
+}
+fn process(s: &Spec, owner: &Value, argv: &[String]) -> Result<Value> {
+    let pid = string(owner, "MainPID")?.parse::<u32>()?;
+    ensure!(pid > 1, "completed launch has no live main process");
+    let proc = Path::new("/proc").join(pid.to_string());
+    let tick = start_ticks(&fs::read_to_string(proc.join("stat"))?)?;
+    let exe = fs::read_link(proc.join("exe"))?;
+    let raw = fs::read(proc.join("cmdline"))?;
+    ensure!(
+        raw.len() <= 64 << 10 && raw.last() == Some(&0),
+        "completed launch cmdline unavailable"
+    );
+    let args = raw[..raw.len() - 1]
+        .split(|b| *b == 0)
+        .map(|b| Ok(std::str::from_utf8(b)?.to_owned()))
+        .collect::<Result<Vec<String>>>()?;
+    process_matches(s.phase, argv, &exe, &args)?;
+    let executable_sha256 = hex_lower(&Sha256::digest(fs::read(proc.join("exe"))?));
+    let expected_executable = if s.phase == Phase::Upload {
+        &s.programs["progressive"].artifact
+    } else {
+        s.interpreter
+            .as_ref()
+            .context("completed launch interpreter is unbound")?
+    };
+    ensure!(
+        exe == expected_executable.path && executable_sha256 == expected_executable.sha256,
+        "completed launch running executable digest differs"
+    );
+
+    let environment = fs::read(proc.join("environ"))?;
+    ensure!(
+        environment.len() <= 1 << 20,
+        "completed launch environment exceeds bound"
+    );
+    let mut actual = BTreeMap::new();
+    for entry in environment.split(|b| *b == 0).filter(|b| !b.is_empty()) {
+        let entry =
+            std::str::from_utf8(entry).context("completed launch environment encoding differs")?;
+        let (key, value) = entry
+            .split_once('=')
+            .context("completed launch environment assignment differs")?;
+        ensure!(
+            actual.insert(key.to_owned(), value.to_owned()).is_none(),
+            "completed launch environment repeats a key"
+        );
+    }
+    ensure!(
+        UNSAFE_ENVIRONMENT
+            .iter()
+            .all(|key| !actual.contains_key(*key)),
+        "completed launch inherited an unsafe execution variable"
+    );
+    let credential_digest = if let Some(binding) = &s.environment_file {
+        let wanted = credential_values(&bound_bytes(binding, 64 << 10, 0)?)?;
+        ensure!(
+            wanted
+                .iter()
+                .all(|(key, value)| actual.get(key) == Some(value)),
+            "completed launch credential environment differs from its bound file"
+        );
+        Some(hex_lower(&Sha256::digest(serde_json::to_vec(&wanted)?)))
+    } else {
+        None
+    };
+    let name = &s.units[s.phase.name()];
+    let cgroup = format!("/system.slice/{name}");
+    ensure!(
+        owner["ControlGroup"] == cgroup
+            && fs::read_to_string(proc.join("cgroup"))? == format!("0::{cgroup}\n"),
+        "completed launch process cgroup differs"
+    );
+    let group = Path::new("/sys/fs/cgroup").join(cgroup.trim_start_matches('/'));
+    let (high, max, _) = s.phase.profile();
+    let mut limits = BTreeMap::new();
+    for (key, want) in [
+        ("memory.high", high.to_string()),
+        ("memory.max", max.to_string()),
+        ("memory.swap.max", "0".into()),
+        ("pids.max", "512".into()),
+        ("cpu.max", "800000 100000".into()),
+    ] {
+        let actual = fs::read_to_string(group.join(key))?.trim().to_owned();
+        ensure!(
+            actual == want,
+            "completed launch native limit differs: {key}"
+        );
+        limits.insert(key, actual);
+    }
+    let pids = fs::read_to_string(group.join("cgroup.procs"))?
+        .split_whitespace()
+        .map(str::parse::<u32>)
+        .collect::<std::result::Result<BTreeSet<_>, _>>()?;
+    ensure!(
+        pids.contains(&pid) && pids.len() <= 512,
+        "completed launch main process is outside native task census"
+    );
+    let archive = match &s.origin {
+        Origin::Singleton209 { .. } => Path::new(singleton209::ROOT).join("output"),
+    };
+    let mounts = fs::read_to_string(proc.join("mountinfo"))?;
+    ensure!(
+        mounts.lines().any(|line| {
+            let fields = line.split_whitespace().collect::<Vec<_>>();
+            fields.get(4).copied() == archive.to_str()
+                && fields
+                    .get(5)
+                    .is_some_and(|v| v.split(',').any(|f| f == "ro"))
+        }),
+        "completed launch actual archive mount is not read-only"
+    );
+    let references = jetstreamer_horizon_observe::process_references::scan(
+        Path::new("/proc"),
+        Path::new(singleton209::ROOT),
+    )?;
+    for reference in &references.references {
+        let words = reference.split_whitespace().collect::<Vec<_>>();
+        ensure!(
+            words.first() == Some(&"pid")
+                && words
+                    .get(1)
+                    .and_then(|p| p.parse::<u32>().ok())
+                    .is_some_and(|p| pids.contains(&p)),
+            "completed archive has an unowned live process reference"
+        );
+    }
+    ensure!(
+        start_ticks(&fs::read_to_string(proc.join("stat"))?)? == tick
+            && fs::read_link(proc.join("exe"))? == exe
+            && fs::read(proc.join("cmdline"))? == raw,
+        "completed launch main process changed during capture"
+    );
+    Ok(
+        json!({"pid":pid,"executable":exe,"executable_sha256":executable_sha256,"cmdline":args,"start_ticks":tick,"cgroup":cgroup,"native_limits":limits,"credential_values_not_recorded":true,"credential_environment_sha256":credential_digest,"source_read_only_mount":true,"source_reference_census":references,"native_memory_current":fs::read_to_string(group.join("memory.current"))?.trim(),"native_memory_peak":fs::read_to_string(group.join("memory.peak"))?.trim()}),
+    )
+}
+fn read_sample(binding: &BoundFile, plan: &Value) -> Result<Value> {
+    let raw = bound_bytes(binding, 4 << 20, 0)?;
+    let sample: Value = serde_json::from_slice(&raw)?;
+    let iid = string(&sample, "guard_invocation_id")?;
+    ensure!(
+        is_lower_hex(iid, 32)
+            && binding.path
+                == Path::new(string(plan, "receipt_directory")?).join(format!("sample-{iid}.json")),
+        "completed launch sample is outside its actual guard receipt namespace"
+    );
+    Ok(sample)
+}
+fn guard_shape(
+    s: &Spec,
+    admission: &Value,
+    plan: &Value,
+    sample: &Value,
+    owner: &Value,
+    now: u64,
+) -> Result<()> {
+    let at = n(admission, "recorded_unix_seconds")?;
+    let guarded = n(sample, "recorded_unix_seconds")?;
+    let iid = string(owner, "InvocationID")?;
+    let pid = string(owner, "MainPID")?.parse::<u64>()?;
+    ensure!(
+        is_lower_hex(iid, 32)
+            && is_lower_hex(string(sample, "guard_invocation_id")?, 32)
+            && at <= guarded
+            && guarded <= now
+            && now - at <= 900,
+        "completed launch admission/first guard clock or IID differs"
+    );
+    ensure!(
+        plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
+            && plan["unit"] == s.units[s.phase.name()]
+            && plan["invocation_id"] == iid
+            && plan["filesystem"] == "/"
+            && plan["worker_root"] == serde_json::to_value(&s.state_root)?
+            && plan["minimum_free_bytes"] == admission["capacity"]["minimum_free_bytes"]
+            && plan["maximum_root_physical_bytes"] == METADATA
+            && plan["maximum_worker_vmas"] == 3500000
+            && ["native_main", "bounded_measurement", "bounded_canary"]
+                .iter()
+                .all(|k| plan.get(*k).is_none_or(Value::is_null)),
+        "completed launch guard plan differs"
+    );
+    ensure!(
+        sample["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && sample["guard_sha256"] == s.programs["guard"].artifact.sha256
+            && sample["producer_invocation_id"] == iid
+            && sample["producer"]["invocation_id"] == iid
+            && sample["producer"]["pid"] == pid
+            && sample["producer"]["restarts"] == 0
+            && sample["producer"]["restart_policy"] == "no"
+            && sample["producer"]["kill_mode"] == "control-group"
+            && sample["producer"]["delegated"] == false
+            && sample["producer"]["active"] == "active"
+            && sample["producer"]["sub"] == "running"
+            && sample["producer"]["cgroup"] == owner["ControlGroup"]
+            && sample["producer_stop_enabled"] == true
+            && sample["minimum_free_bytes"] == plan["minimum_free_bytes"]
+            && sample["available_bytes"]
+                .as_u64()
+                .is_some_and(|n| plan["minimum_free_bytes"].as_u64().is_some_and(|f| n >= f))
+            && sample["workers"].as_array().is_some_and(Vec::is_empty)
+            && [
+                "trip_reason",
+                "worker_observation_error",
+                "root_physical_observation_error",
+                "canary_target_error",
+                "target_handoff_error",
+                "native_main",
+                "bounded_canary"
+            ]
+            .iter()
+            .all(|k| sample.get(*k).is_some_and(Value::is_null))
+            && sample["bounded_measurement"] == false
+            && sample["maximum_worker_vmas"] == 3500000
+            && sample["maximum_root_physical_bytes"] == METADATA
+            && sample["remote_mutations"] == false
+            && sample["r2_mutations"] == false
+            && sample["root_physical_observation"]["maximum_physical_bytes"] == METADATA
+            && sample["root_physical_observation"]["exceeds_budget"] == false
+            && sample["root_physical_observation"]["conservative_physical_bytes"]
+                .as_u64()
+                .is_some_and(|n| n <= METADATA),
+        "completed launch lacks a successful stop-enabled no-worker guard"
+    );
+    Ok(())
+}
+fn guard_manager(
+    s: &Spec,
+    plan_binding: &BoundFile,
+    plan: &Value,
+    sample: &Value,
+    admitted: u64,
+) -> Result<Value> {
+    let name = &s.guard_units[s.phase.name()];
+    let p = singleton227_capture::properties(
+        name,
+        "Id,InvocationID,MainPID,NRestarts,Type,User,Restart,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,Result,ExecMainStatus,ActiveState,SubState,DropInPaths,NeedDaemonReload,Transient",
+    )?;
+    singleton227_capture::require(
+        &p,
+        &[
+            ("Id", name),
+            ("Type", "oneshot"),
+            ("User", "root"),
+            ("Restart", "no"),
+            ("NRestarts", "0"),
+            ("MainPID", "0"),
+            ("ProtectSystem", "strict"),
+            ("ProtectHome", "read-only"),
+            ("PrivateNetwork", "yes"),
+            ("NoNewPrivileges", "yes"),
+            ("MemoryMax", "1073741824"),
+            ("TasksMax", "256"),
+            ("CPUQuotaPerSecUSec", "1s"),
+            ("Result", "success"),
+            ("ExecMainStatus", "0"),
+            ("ActiveState", "inactive"),
+            ("SubState", "dead"),
+            ("DropInPaths", ""),
+            ("NeedDaemonReload", "no"),
+            ("Transient", "no"),
+        ],
+    )?;
+    ensure!(
+        p["InvocationID"] == sample["guard_invocation_id"] || p["InvocationID"].is_empty(),
+        "completed launch first guard has been replaced"
+    );
+    ensure!(
+        p["ReadWritePaths"] == string(plan, "receipt_directory")?,
+        "completed launch guard writable namespace differs"
+    );
+    let artifact = &s.programs["guard"].artifact;
+    let expected = format!(
+        "{{ path={} ; argv[]={} {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no }}",
+        artifact.path.display(),
+        artifact.path.display(),
+        plan_binding.path.display(),
+        plan_binding.sha256,
+        artifact.sha256
+    );
+    ensure!(
+        assembly204_recovery::delivery_command_matches(&p["ExecStart"], &expected),
+        "completed launch guard command differs"
+    );
+    let timer = singleton227_capture::properties(
+        &name.replace(".service", ".timer"),
+        "ActiveState,SubState",
+    )?;
+    singleton227_capture::require(
+        &timer,
+        &[("ActiveState", "active"), ("SubState", "waiting")],
+    )?;
+    let (rows, sha) = singleton227_capture::journal(name)?;
+    ensure!(
+        !rows.is_empty() && rows.len() < 256,
+        "completed launch guard manager history truncated"
+    );
+    let success = rows
+        .iter()
+        .filter(|r| {
+            r["_PID"] == "1"
+                && r["_UID"] == "0"
+                && r["UNIT"] == *name
+                && r["INVOCATION_ID"] == sample["guard_invocation_id"]
+                && r["MESSAGE"] == format!("{name}: Deactivated successfully.")
+        })
+        .collect::<Vec<_>>();
+    ensure!(
+        success.len() == 1
+            && rows
+                .iter()
+                .filter(|r| r["_PID"] == "1" && r["_UID"] == "0" && r["UNIT"] == *name)
+                .all(|r| {
+                    r["__REALTIME_TIMESTAMP"]
+                        .as_str()
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .is_some_and(|t| {
+                            t / 1_000_000 < admitted
+                                || (r["MESSAGE_ID"] != "be02cf6855d2428ba40df7e9d022f03d"
+                                    && !r["MESSAGE"].as_str().unwrap_or("").contains("Failed"))
+                        })
+                }),
+        "completed launch first guard did not finish cleanly"
+    );
+    Ok(json!({"properties":p,"timer":timer,"manager_completion":success[0],"journal_sha256":sha}))
+}
+fn saved_shape(v: &Value, s: &Spec, phase: Phase, self_sha: &str, a: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == LAUNCH
+            && v["epoch"] == s.epoch
+            && v["phase"] == phase.name()
+            && v["issuer_sha256"] == self_sha
+            && v["unit"] == s.units[phase.name()]
+            && v["phase_spec"] == a["spec"]
+            && v["admission"] == a["binding"]
+            && v["argv"] == a["argv"]
+            && v["owner"]["InvocationID"] == v["invocation_id"]
+            && v["owner"]["Id"] == s.units[phase.name()]
+            && v["owner"]["NRestarts"] == "0"
+            && v["owner"]["ActiveState"] == "active"
+            && v["owner"]["SubState"] == "running"
+            && v["owner"]["MainPID"]
+                .as_str()
+                .and_then(|p| p.parse::<u64>().ok())
+                == v["process"]["pid"].as_u64()
+            && v["process"]["start_ticks"].as_u64().is_some_and(|n| n > 0)
+            && v["process"]["source_read_only_mount"] == true,
+        "completed phase launch did not capture its admitted actual owner"
+    );
+    let argv: Vec<String> = serde_json::from_value(v["argv"].clone())?;
+    let args: Vec<String> = serde_json::from_value(v["process"]["cmdline"].clone())?;
+    process_matches(
+        phase,
+        &argv,
+        Path::new(string(&v["process"], "executable")?),
+        &args,
+    )?;
+    let expected_executable = if phase == Phase::Upload {
+        &s.programs["progressive"].artifact
+    } else {
+        s.interpreter
+            .as_ref()
+            .context("completed launch interpreter missing")?
+    };
+    ensure!(
+        v["process"]["executable_sha256"] == expected_executable.sha256,
+        "completed phase saved running executable differs"
+    );
+    let profile = phase.profile();
+    for (key, value) in [
+        ("memory.high", profile.0.to_string()),
+        ("memory.max", profile.1.to_string()),
+        ("memory.swap.max", "0".into()),
+        ("pids.max", "512".into()),
+        ("cpu.max", "800000 100000".into()),
+    ] {
+        ensure!(
+            v["process"]["native_limits"][key] == value,
+            "completed phase saved native limit differs"
+        );
+    }
+    ensure!(
+        v["guard_unit"] == s.guard_units[phase.name()]
+            && v["guard_manager"]["manager_completion"]["_PID"] == "1"
+            && v["guard_manager"]["manager_completion"]["_UID"] == "0"
+            && v["guard_manager"]["manager_completion"]["UNIT"] == s.guard_units[phase.name()]
+            && v["guard_manager"]["manager_completion"]["INVOCATION_ID"]
+                == v["guard_sample_contents"]["guard_invocation_id"]
+            && v["guard_manager"]["manager_completion"]["MESSAGE"]
+                == format!("{}: Deactivated successfully.", s.guard_units[phase.name()]),
+        "completed phase saved first guard manager binding differs"
+    );
+    let mut prior = s.clone();
+    prior.phase = phase;
+    guard_shape(
+        &prior,
+        a,
+        &v["guard_plan_contents"],
+        &v["guard_sample_contents"],
+        &v["owner"],
+        n(v, "captured_unix_seconds")?,
+    )?;
+    Ok(())
+}
+pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) -> Result<Value> {
+    let admission: BoundFile = serde_json::from_value(v["admission"].clone())?;
+    let mut a = read(&admission)?;
+    a["binding"] = private157::binding(&admission);
+    let prior_binding: BoundFile = serde_json::from_value(v["phase_spec"].clone())?;
+    let prior: Spec = serde_json::from_value(read(&prior_binding)?)?;
+    shape(&prior)?;
+    let left = serde_json::to_value(&prior)?;
+    let right = serde_json::to_value(s)?;
+    for key in [
+        "epoch",
+        "origin",
+        "tools",
+        "decoder_capacity",
+        "programs",
+        "units",
+        "guard_units",
+        "state_root",
+        "r2_receipt_directory",
+        "upload_lock",
+    ] {
+        ensure!(
+            left[key] == right[key],
+            "completed phase captured launch belongs to a different delivery core"
+        );
+    }
+    ensure!(
+        prior.phase == phase,
+        "completed phase captured phase differs"
+    );
+    saved_shape(v, &prior, phase, self_sha, &a)?;
+    let plan: BoundFile = serde_json::from_value(v["guard_plan"].clone())?;
+    let sample: BoundFile = serde_json::from_value(v["guard_sample"].clone())?;
+    ensure!(
+        read(&plan)? == v["guard_plan_contents"]
+            && read_sample(&sample, &v["guard_plan_contents"])? == v["guard_sample_contents"],
+        "completed phase saved first guard binding changed"
+    );
+    ensure!(
+        v["guard_sample_contents"]["plan_sha256"] == plan.sha256
+            && v["guard_sample_contents"]["plan"] == serde_json::to_value(&plan.path)?,
+        "completed phase saved guard plan identity differs"
+    );
+    Ok(v.clone())
+}
+pub(super) fn run() -> Result<()> {
+    let (binding, self_sha) = publication203::parsed_args("capture-completed-archive-phase")?;
+    let c: Capture = serde_json::from_value(read(&binding)?)?;
+    ensure!(
+        c.schema == "jetstreamer-completed-archive-phase-capture-spec-v1",
+        "completed launch capture schema differs"
+    );
+    validate_output_destination(&c.output)?;
+    let s: Spec = serde_json::from_value(read(&c.phase_spec)?)?;
+    shape(&s)?;
+    let mut admission = read(&c.admission)?;
+    admission["binding"] = private157::binding(&c.admission);
+    ensure!(
+        admission["schema"] == RECEIPT
+            && admission["admitted"] == true
+            && admission["issuer_sha256"] == self_sha
+            && admission["spec"] == private157::binding(&c.phase_spec)
+            && admission["epoch"] == s.epoch
+            && admission["phase"] == s.phase.name(),
+        "completed launch admission binding differs"
+    );
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let owner = unit(&s.units[s.phase.name()])?;
+    ensure!(
+        owner["LoadState"] == "loaded"
+            && owner["ActiveState"] == "active"
+            && owner["SubState"] == "running"
+            && owner["NRestarts"] == "0",
+        "completed launch is not an active zero-restart owner"
+    );
+    let argv: Vec<String> = serde_json::from_value(admission["argv"].clone())?;
+    let effective = check_unit(&s, &argv)?;
+    let snapshot = process(&s, &owner, &argv)?;
+    let plan = read(&c.guard_plan)?;
+    let sample = read_sample(&c.guard_sample, &plan)?;
+    ensure!(
+        sample["plan_sha256"] == c.guard_plan.sha256
+            && sample["plan"] == serde_json::to_value(&c.guard_plan.path)?,
+        "completed launch first guard plan binding differs"
+    );
+    guard_shape(&s, &admission, &plan, &sample, &owner, now)?;
+    let manager = guard_manager(
+        &s,
+        &c.guard_plan,
+        &plan,
+        &sample,
+        n(&admission, "recorded_unix_seconds")?,
+    )?;
+    ensure!(
+        owner == unit(&s.units[s.phase.name()])?
+            && effective == check_unit(&s, &argv)?
+            && snapshot["start_ticks"] == process(&s, &owner, &argv)?["start_ticks"],
+        "completed launch owner changed during first guard capture"
+    );
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    guard_shape(&s, &admission, &plan, &sample, &owner, now)?;
+    let launch = json!({"schema":LAUNCH,"epoch":s.epoch,"phase":s.phase,"issuer_sha256":self_sha,"capture_spec":private157::binding(&binding),"phase_spec":c.phase_spec,"admission":c.admission,
+        "unit":s.units[s.phase.name()],"invocation_id":owner["InvocationID"],"owner":owner,"effective_unit":effective,"argv":argv,"process":snapshot,
+        "guard_unit":s.guard_units[s.phase.name()],"guard_plan":c.guard_plan,"guard_sample":c.guard_sample,"guard_plan_contents":plan,"guard_sample_contents":sample,"guard_manager":manager,"captured_unix_seconds":now,
+        "publication_authorized":false,"local_retirement_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    saved_shape(&launch, &s, s.phase, &self_sha, &admission)?;
+    private157::immutable_receipt(&c.output, &launch)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn fixture() -> (Spec, Value, Value, String) {
+        let s = super::super::tests::fixture(Phase::Full);
+        let helper = "f".repeat(64);
+        let iid = "b".repeat(32);
+        let guard_iid = "c".repeat(32);
+        let argv = command(&s, Path::new("/private/output")).unwrap();
+        let name = &s.units["full"];
+        let group = format!("/system.slice/{name}");
+        let owner = json!({"Id":name,"LoadState":"loaded","InvocationID":iid,"MainPID":"42","NRestarts":"0","ActiveState":"active","SubState":"running","ControlGroup":group});
+        let admission = json!({"binding":{"path":"/sealed/admission.json","sha256":"a".repeat(64)},"spec":{"path":"/sealed/spec.json","sha256":"a".repeat(64)},"argv":argv,"recorded_unix_seconds":900,"capacity":{"minimum_free_bytes":100}});
+        let plan = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":name,"invocation_id":iid,"filesystem":"/","worker_root":s.state_root,"minimum_free_bytes":100,"maximum_root_physical_bytes":METADATA,"maximum_worker_vmas":3500000});
+        let sample = json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","recorded_unix_seconds":910,"guard_invocation_id":guard_iid,"guard_sha256":s.programs["guard"].artifact.sha256,"producer_invocation_id":iid,
+            "producer":{"invocation_id":iid,"pid":42,"restarts":0,"restart_policy":"no","kill_mode":"control-group","delegated":false,"active":"active","sub":"running","cgroup":group},"producer_stop_enabled":true,
+            "minimum_free_bytes":100,"available_bytes":1000,"workers":[],"trip_reason":null,"worker_observation_error":null,"root_physical_observation_error":null,"bounded_measurement":false,
+            "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":METADATA,"canary_target_error":null,"target_handoff_error":null,"native_main":null,"bounded_canary":null,"remote_mutations":false,"r2_mutations":false,
+            "root_physical_observation":{"maximum_physical_bytes":METADATA,"conservative_physical_bytes":4096,"exceeds_budget":false}});
+        let mut process_args = vec!["bash".to_owned()];
+        process_args.extend(argv.clone());
+        let launch = json!({"schema":LAUNCH,"epoch":209,"phase":"full","issuer_sha256":helper,"unit":name,"invocation_id":iid,"owner":owner,"phase_spec":admission["spec"],"admission":admission["binding"],"argv":argv,
+            "process":{"pid":42,"executable":"/usr/bin/bash","executable_sha256":s.interpreter.as_ref().unwrap().sha256,"cmdline":process_args,"start_ticks":123,"source_read_only_mount":true,"native_limits":{"memory.high":(16u64<<30).to_string(),"memory.max":(32u64<<30).to_string(),"memory.swap.max":"0","pids.max":"512","cpu.max":"800000 100000"}},
+            "guard_unit":s.guard_units["full"],"guard_plan_contents":plan,"guard_sample_contents":sample,"captured_unix_seconds":920,
+            "guard_manager":{"manager_completion":{"_PID":"1","_UID":"0","UNIT":s.guard_units["full"],"INVOCATION_ID":guard_iid,"MESSAGE":format!("{}: Deactivated successfully.",s.guard_units["full"])}}});
+        (s, admission, launch, helper)
+    }
+    #[test]
+    fn completed_launch_binds_real_script_interpreter_and_rejects_historical_command_rewrites() {
+        let (s, a, good, helper) = fixture();
+        saved_shape(&good, &s, Phase::Full, &helper, &a).unwrap();
+        let mut changed = good.clone();
+        changed["process"]["cmdline"][1] = json!("/sealed/old-script");
+        assert!(saved_shape(&changed, &s, Phase::Full, &helper, &a).is_err());
+        let mut changed = good.clone();
+        changed["process"]["executable_sha256"] = json!("d".repeat(64));
+        assert!(saved_shape(&changed, &s, Phase::Full, &helper, &a).is_err());
+        let mut changed = good.clone();
+        changed["process"]["executable"] = json!("/usr/bin/foreign");
+        assert!(saved_shape(&changed, &s, Phase::Full, &helper, &a).is_err());
+        let mut changed = good;
+        changed["process"]["native_limits"]["memory.max"] = json!("max");
+        assert!(saved_shape(&changed, &s, Phase::Full, &helper, &a).is_err());
+    }
+    #[test]
+    fn completed_launch_requires_live_owner_and_fresh_same_admission_first_guard() {
+        let (s, a, good, helper) = fixture();
+        for (field, value) in [
+            ("ActiveState", "inactive"),
+            ("InvocationID", "foreign"),
+            ("MainPID", "0"),
+            ("NRestarts", "1"),
+        ] {
+            let mut bad = good.clone();
+            bad["owner"][field] = json!(value);
+            assert!(saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err());
+        }
+        let mut bad = good.clone();
+        bad["guard_sample_contents"]["producer_invocation_id"] = json!("d".repeat(32));
+        assert!(saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err());
+        let mut bad = good.clone();
+        bad["guard_sample_contents"]["recorded_unix_seconds"] = json!(899);
+        assert!(saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err());
+        let mut bad = good.clone();
+        bad["guard_sample_contents"]["producer_stop_enabled"] = json!(false);
+        assert!(saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err());
+        let mut bad = good;
+        bad["guard_manager"]["manager_completion"]["INVOCATION_ID"] = json!("d".repeat(32));
+        assert!(saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err());
+    }
+    #[test]
+    fn completed_launch_cannot_use_a_caller_iid_in_place_of_actual_launch_capture() {
+        let old = json!({"phase":"full","admission":{"path":"/sealed/admission.json","sha256":"a".repeat(64)},"invocation_id":"b".repeat(32)});
+        assert!(serde_json::from_value::<Prior>(old).is_err());
+        assert!(process_matches(Phase::Full, &[], Path::new("/usr/bin/bash"), &[]).is_err());
+    }
+}

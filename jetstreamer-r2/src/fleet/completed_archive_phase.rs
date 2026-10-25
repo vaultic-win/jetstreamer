@@ -2,10 +2,116 @@
 //! The downstream core has no epoch/tool pins. Origin variants retain their own
 //! native provenance gates. This command never launches a verifier or uploader.
 use super::*;
+mod decoder_capacity;
+mod launch;
 
 const SCHEMA: &str = "jetstreamer-completed-archive-phase-spec-v1";
 const RECEIPT: &str = "jetstreamer-completed-archive-phase-admission-v1";
 const METADATA: u64 = 1 << 30;
+const UNSAFE_ENVIRONMENT: [&str; 10] = [
+    "LD_PRELOAD",
+    "LD_AUDIT",
+    "LD_LIBRARY_PATH",
+    "BASH_ENV",
+    "ENV",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "RUBYOPT",
+    "PERL5OPT",
+    "GCONV_PATH",
+];
+
+fn credential_values(raw: &[u8]) -> Result<BTreeMap<String, String>> {
+    let text = std::str::from_utf8(raw).context("R2 environment file is not UTF-8")?;
+    let allowed = BTreeSet::from([
+        "HORIZON_S3_ENDPOINT",
+        "HORIZON_ACCESS_KEY_ID",
+        "HORIZON_SECRET_ACCESS_KEY",
+    ]);
+    let mut seen = BTreeSet::new();
+    let mut values = BTreeMap::new();
+    for line in text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+    {
+        let (key, value) = line
+            .split_once('=')
+            .context("R2 environment file has an invalid assignment")?;
+        ensure!(
+            allowed.contains(key) && seen.insert(key),
+            "R2 environment file has an unsupported or repeated key"
+        );
+        let value = value.trim();
+        let unquoted = if value.starts_with('"') || value.starts_with('\'') {
+            ensure!(
+                value.len() >= 2 && value.as_bytes().first() == value.as_bytes().last(),
+                "R2 environment value has unmatched quoting"
+            );
+            &value[1..value.len() - 1]
+        } else {
+            value
+        };
+        ensure!(
+            !unquoted.is_empty()
+                && unquoted
+                    .bytes()
+                    .all(|b| b.is_ascii_graphic() && !b"\\\"'".contains(&b)),
+            "R2 environment value has unsupported encoding"
+        );
+        values.insert(key.to_owned(), unquoted.to_owned());
+    }
+    ensure!(seen == allowed, "R2 environment file omits a required key");
+    Ok(values)
+}
+fn validate_credential_bytes(raw: &[u8]) -> Result<()> {
+    credential_values(raw).map(|_| ())
+}
+fn validate_environment_sources(
+    p: &BTreeMap<String, String>,
+    file: Option<&BoundFile>,
+) -> Result<()> {
+    let expected = file
+        .map(|b| format!("{} (ignore_errors=no)", b.path.display()))
+        .unwrap_or_default();
+    ensure!(
+        p.get("EnvironmentFiles") == Some(&expected)
+            && p.get("PassEnvironment").is_some_and(String::is_empty),
+        "completed phase has an unexpected effective environment source"
+    );
+    ensure!(
+        p.get("UnsetEnvironment")
+            .map(|v| v.split_whitespace().collect::<BTreeSet<_>>())
+            == Some(BTreeSet::from(UNSAFE_ENVIRONMENT)),
+        "completed phase does not exclude unsafe inherited variables"
+    );
+    Ok(())
+}
+
+pub(super) fn pipeline_scope(phase: &str, unit: &str) -> Option<u64> {
+    let role = match phase {
+        "full-verification" => "full",
+        "plugin-verification" => "plugin",
+        "upload-readback" => "upload",
+        _ => return None,
+    };
+    let rest = unit.strip_prefix("horizon-qualify-")?;
+    let (number, suffix) = rest.split_once('-')?;
+    let epoch = number.parse::<u64>().ok()?;
+    let tail = suffix
+        .strip_prefix(&format!("generic-{role}-"))?
+        .strip_suffix(".service")?;
+    (number == epoch.to_string()
+        && (201..=300).contains(&epoch)
+        && !tail.is_empty()
+        && tail
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)))
+    .then_some(epoch)
+}
+pub(super) fn capture() -> Result<()> {
+    launch::run()
+}
 
 #[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -53,10 +159,15 @@ struct Program {
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+struct DecoderCapacity {
+    full: BoundFile,
+    plugin: BoundFile,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct Prior {
     phase: Phase,
-    admission: BoundFile,
-    invocation_id: String,
+    launch: BoundFile,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -66,12 +177,15 @@ struct Spec {
     phase: Phase,
     origin: Origin,
     tools: BTreeMap<String, Tool>,
+    decoder_capacity: DecoderCapacity,
     programs: BTreeMap<String, Program>,
     units: BTreeMap<String, String>,
+    guard_units: BTreeMap<String, String>,
     state_root: PathBuf,
     r2_receipt_directory: PathBuf,
     upload_lock: PathBuf,
     environment_file: Option<BoundFile>,
+    interpreter: Option<BoundFile>,
     unit_file: BoundFile,
     resource_basis: Value,
     prior: Vec<Prior>,
@@ -126,13 +240,29 @@ fn shape(s: &Spec) -> Result<()> {
                 .collect::<BTreeSet<_>>()
                 == BTreeSet::from(["full", "plugin", "boundary", "progressive", "guard"])
             && s.units.keys().map(String::as_str).collect::<BTreeSet<_>>()
+                == BTreeSet::from(["full", "plugin", "upload"])
+            && s.guard_units
+                .keys()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>()
                 == BTreeSet::from(["full", "plugin", "upload"]),
         "completed phase tool/program/unit census differs"
     );
+    for tool in s.tools.values() {
+        token(&tool.artifact.path)?;
+        token(&tool.qualification.path)?;
+    }
+    for program in s.programs.values() {
+        token(&program.artifact.path)?;
+        token(&program.deployment_seal.path)?;
+    }
+    if let Some(environment) = &s.environment_file {
+        token(&environment.path)?;
+    }
     let mut names = BTreeSet::new();
     for (phase, name) in &s.units {
         ensure!(
-            name.starts_with(&format!("horizon-qualify-{}-", s.epoch))
+            name.starts_with(&format!("horizon-qualify-{}-generic-{phase}-", s.epoch))
                 && name.ends_with(".service")
                 && name
                     .bytes()
@@ -140,9 +270,30 @@ fn shape(s: &Spec) -> Result<()> {
                 && names.insert(name),
             "completed phase unit namespace differs"
         );
+        let wire = match phase.as_str() {
+            "full" => "full-verification",
+            "plugin" => "plugin-verification",
+            "upload" => "upload-readback",
+            _ => bail!("invalid completed phase role"),
+        };
+        ensure!(
+            pipeline_scope(wire, name) == Some(s.epoch),
+            "completed phase is outside its observational namespace"
+        );
         ensure!(
             matches!(phase.as_str(), "full" | "plugin" | "upload"),
             "completed phase unit role differs"
+        );
+    }
+    for (phase, name) in &s.guard_units {
+        ensure!(
+            name.starts_with(&format!("horizon-generic{}-{phase}-protective-", s.epoch))
+                && name.ends_with(".service")
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+                && names.insert(name),
+            "completed phase guard namespace differs"
         );
     }
     for path in [
@@ -167,6 +318,16 @@ fn shape(s: &Spec) -> Result<()> {
     ensure!(
         (s.phase == Phase::Upload) == s.environment_file.is_some(),
         "completed phase credentials differ"
+    );
+    ensure!(
+        if s.phase == Phase::Upload {
+            s.interpreter.is_none()
+        } else {
+            s.interpreter.as_ref().is_some_and(|b| {
+                b.path == Path::new("/usr/bin/bash") && is_lower_hex(&b.sha256, 64)
+            })
+        },
+        "completed phase interpreter binding differs"
     );
     let expected = match s.phase {
         Phase::Full => vec![],
@@ -221,7 +382,7 @@ fn origin(s: &Spec) -> Result<(LocalArchive, Value)> {
             singleton209_delivery::cohort(&read(cohort_publication)?, &a)?;
             Ok((
                 a,
-                json!({"origin":s.origin,"terminal":terminal,"process_reference_census":references,"cgroup":cgroup}),
+                json!({"origin":s.origin,"terminal":terminal,"process_reference_census":references,"cgroup":cgroup,"producer":{"node_sha256":l["node_sha256"],"worker_sha256":l["worker_sha256"],"manifest_sha256":singleton209::PREFLIGHT_SHA,"manifest_fingerprint":l["manifest_fingerprint"]}}),
             ))
         }
     }
@@ -322,7 +483,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
             == vec![format!("ExecStart={}", argv.join(" "))],
         "completed phase command differs"
     );
-    let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,CapabilityBoundingSet,AmbientCapabilities,Environment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
+    let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
     let p = singleton227_capture::properties(name, fields)?;
     let (high, max, runtime) = s.phase.profile();
     for (k, v) in [
@@ -381,6 +542,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
             == Some(environments),
         "completed phase environment differs"
     );
+    validate_environment_sources(&p, s.environment_file.as_ref())?;
     let environment_lines = text
         .lines()
         .filter(|l| l.starts_with("EnvironmentFile="))
@@ -462,12 +624,43 @@ fn receipt_words(raw: &[u8], wanted: &[&str]) -> Result<()> {
     );
     Ok(())
 }
-fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> Result<Value> {
+fn launch_terminal_order(launch: &Value, events: &[Value], admission: &Value) -> Result<()> {
     ensure!(
-        is_lower_hex(&p.invocation_id, 32),
-        "completed phase predecessor IID invalid"
+        events.len() == 2,
+        "completed phase terminal event count differs"
     );
-    let v = read(&p.admission)?;
+    let clock = |v: &Value| -> Result<u64> {
+        Ok(v["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("completed phase manager timestamp absent")?
+            .parse::<u64>()?
+            / 1_000_000)
+    };
+    let captured = launch["captured_unix_seconds"]
+        .as_u64()
+        .context("completed phase capture time absent")?;
+    let guarded = launch["guard_sample_contents"]["recorded_unix_seconds"]
+        .as_u64()
+        .context("completed phase first guard time absent")?;
+    let admitted = admission["recorded_unix_seconds"]
+        .as_u64()
+        .context("completed phase admission time absent")?;
+    ensure!(
+        admitted <= clock(&events[0])?
+            && clock(&events[0])? <= guarded
+            && guarded <= captured
+            && captured <= clock(&events[1])?,
+        "completed phase actual launch/first guard lies outside its terminal invocation"
+    );
+    Ok(())
+}
+fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> Result<Value> {
+    let captured = launch::validate_saved(&read(&p.launch)?, s, p.phase, self_sha)?;
+    let admission: BoundFile = serde_json::from_value(captured["admission"].clone())?;
+    let iid = captured["invocation_id"]
+        .as_str()
+        .context("completed phase captured IID missing")?;
+    let v = read(&admission)?;
     ensure!(
         v["schema"] == RECEIPT
             && v["admitted"] == true
@@ -477,14 +670,20 @@ fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> R
             && v["origin"] == serde_json::to_value(&s.origin)?
             && v["tools"] == serde_json::to_value(&s.tools)?
             && v["programs"] == serde_json::to_value(&s.programs)?
+            && v["decoder_capacity"] == serde_json::to_value(&s.decoder_capacity)?
             && v["state_root"] == serde_json::to_value(&s.state_root)?
             && v["units"] == serde_json::to_value(&s.units)?
+            && v["guard_units"] == serde_json::to_value(&s.guard_units)?
             && v["archive"] == singleton209_delivery::pair_identity(archive),
         "completed phase predecessor admission differs"
     );
     let old_spec: BoundFile = serde_json::from_value(v["spec"].clone())?;
     let prior: Spec = serde_json::from_value(read(&old_spec)?)?;
     shape(&prior)?;
+    ensure!(
+        v["interpreter"] == serde_json::to_value(&prior.interpreter)?,
+        "completed phase predecessor interpreter differs"
+    );
     ensure!(
         prior.phase == p.phase,
         "completed phase predecessor spec differs"
@@ -505,7 +704,7 @@ fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> R
             && current["SubState"] == "dead"
             && current["Result"] == "success"
             && current["ExecMainStatus"] == "0"
-            && (current["InvocationID"] == p.invocation_id || current["InvocationID"] == ""),
+            && (current["InvocationID"] == iid || current["InvocationID"] == ""),
         "completed phase predecessor is not natural success"
     );
     let out = ProcessCommand::new("/usr/bin/journalctl")
@@ -525,7 +724,8 @@ fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> R
     let rows = serde_json::Deserializer::from_slice(&out.stdout)
         .into_iter::<Value>()
         .collect::<std::result::Result<Vec<_>, _>>()?;
-    let events = singleton209_delivery::terminal_history_for(&rows, name, &p.invocation_id)?;
+    let events = singleton209_delivery::terminal_history_for(&rows, name, iid)?;
+    launch_terminal_order(&captured, &events, &v)?;
     let state = s.state_root.join(p.phase.name());
     let path = state
         .join("receipts")
@@ -573,7 +773,7 @@ fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> R
         )?;
     }
     Ok(
-        json!({"admission":private157::binding(&p.admission),"invocation_id":p.invocation_id,"unit":current,"manager_events":events,"manager_journal_sha256":hex_lower(&Sha256::digest(&out.stdout)),"receipt_path":path,"receipt_sha256":hex_lower(&Sha256::digest(&raw))}),
+        json!({"admission":private157::binding(&admission),"launch":private157::binding(&p.launch),"invocation_id":iid,"unit":current,"manager_events":events,"manager_journal_sha256":hex_lower(&Sha256::digest(&out.stdout)),"receipt_path":path,"receipt_sha256":hex_lower(&Sha256::digest(&raw))}),
     )
 }
 pub(super) fn run() -> Result<()> {
@@ -603,6 +803,9 @@ pub(super) fn run() -> Result<()> {
             );
         }
     }
+    if let Some(interpreter) = &s.interpreter {
+        bound_bytes(interpreter, 32 << 20, 0)?;
+    }
     for (role, t) in &s.tools {
         assembly204_recovery::qualified_delivery_tool(role, &t.artifact, &t.qualification)?;
     }
@@ -610,13 +813,14 @@ pub(super) fn run() -> Result<()> {
         program(p)?;
     }
     if let Some(e) = &s.environment_file {
-        bound_bytes(e, 64 << 10, 0)?;
+        validate_credential_bytes(&bound_bytes(e, 64 << 10, 0)?)?;
         ensure!(
             fs::symlink_metadata(&e.path)?.mode() & 0o077 == 0,
             "completed phase credentials are not private"
         );
     }
     let (archive, original) = origin(&s)?;
+    decoder_capacity::validate(&s, &original["producer"])?;
     let argv = command(&s, archive.archive_path.parent().context("archive parent")?)?;
     let effective = check_unit(&s, &argv)?;
     let mut names =
@@ -673,6 +877,9 @@ pub(super) fn run() -> Result<()> {
                 .collect::<Result<Vec<_>>>()?,
         "completed phase predecessor changed during admission"
     );
+    if let Some(interpreter) = &s.interpreter {
+        bound_bytes(interpreter, 32 << 20, 0)?;
+    }
     for (role, t) in &s.tools {
         assembly204_recovery::qualified_delivery_tool(role, &t.artifact, &t.qualification)?;
     }
@@ -680,11 +887,12 @@ pub(super) fn run() -> Result<()> {
         program(p)?;
     }
     if let Some(e) = &s.environment_file {
-        bound_bytes(e, 64 << 10, 0)?;
+        validate_credential_bytes(&bound_bytes(e, 64 << 10, 0)?)?;
     }
+    decoder_capacity::validate(&s, &original["producer"])?;
     private157::immutable_receipt(
         &s.output,
-        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"programs":s.programs,"units":s.units,"state_root":s.state_root,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
     )
 }
 
@@ -697,7 +905,7 @@ mod tests {
             sha256: "a".repeat(64),
         }
     }
-    fn fixture(phase: Phase) -> Spec {
+    pub(super) fn fixture(phase: Phase) -> Spec {
         Spec {
             schema: SCHEMA.into(),
             epoch: 209,
@@ -719,6 +927,10 @@ mod tests {
                     )
                 })
                 .collect(),
+            decoder_capacity: DecoderCapacity {
+                full: b("full-capacity"),
+                plugin: b("plugin-capacity"),
+            },
             programs: ["full", "plugin", "boundary", "progressive", "guard"]
                 .into_iter()
                 .map(|r| {
@@ -740,10 +952,23 @@ mod tests {
                     )
                 })
                 .collect(),
+            guard_units: ["full", "plugin", "upload"]
+                .into_iter()
+                .map(|r| {
+                    (
+                        r.into(),
+                        format!("horizon-generic209-{r}-protective-v1.service"),
+                    )
+                })
+                .collect(),
             state_root: "/home/ubuntu/.jetstreamer-private/generic-delivery209".into(),
             r2_receipt_directory: "/home/ubuntu/.jetstreamer-private/r2-receipts".into(),
             upload_lock: "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock".into(),
             environment_file: (phase == Phase::Upload).then(|| b("credentials")),
+            interpreter: (phase != Phase::Upload).then(|| BoundFile {
+                path: "/usr/bin/bash".into(),
+                sha256: "a".repeat(64),
+            }),
             unit_file: b("unit"),
             resource_basis: json!({}),
             prior: match phase {
@@ -883,5 +1108,116 @@ mod tests {
             assembly204_recovery::qualified_delivery_tool("assembly", &artifact, &b("proof"))
                 .is_err()
         );
+    }
+    #[test]
+    fn completed_phase_credentials_reject_execution_variables_and_never_report_values() {
+        let good = "HORIZON_S3_ENDPOINT=https://example.invalid/bucket\nHORIZON_ACCESS_KEY_ID=id\nHORIZON_SECRET_ACCESS_KEY='test-secret'\n";
+        validate_credential_bytes(good.as_bytes()).unwrap();
+        for addition in [
+            "LD_PRELOAD=/private-sensitive.so\n",
+            "PATH=/unsafe\n",
+            "BASH_ENV=/unsafe\n",
+            "PYTHONPATH=/unsafe\n",
+            "HORIZON_SECRET_ACCESS_KEY=duplicate\n",
+        ] {
+            let error = validate_credential_bytes(format!("{good}{addition}").as_bytes())
+                .unwrap_err()
+                .to_string();
+            assert!(!error.contains("private-sensitive") && !error.contains("test-secret"));
+        }
+        for bad in [
+            "HORIZON_S3_ENDPOINT=x\n",
+            "HORIZON_SECRET_ACCESS_KEY=bad\\\nPATH=/unsafe\n",
+            "export HORIZON_S3_ENDPOINT=x\n",
+        ] {
+            assert!(validate_credential_bytes(bad.as_bytes()).is_err());
+        }
+    }
+    #[test]
+    fn completed_phase_effective_environment_rejects_extra_files_passed_and_unset_variables() {
+        let file = b("r2.env");
+        let mut props = BTreeMap::from([
+            (
+                "EnvironmentFiles".into(),
+                format!("{} (ignore_errors=no)", file.path.display()),
+            ),
+            ("PassEnvironment".into(), String::new()),
+            ("UnsetEnvironment".into(), UNSAFE_ENVIRONMENT.join(" ")),
+        ]);
+        validate_environment_sources(&props, Some(&file)).unwrap();
+        for (key, value) in [
+            ("EnvironmentFiles", "/foreign.env (ignore_errors=no)"),
+            ("PassEnvironment", "LD_PRELOAD"),
+            ("UnsetEnvironment", "BASH_ENV"),
+        ] {
+            let mut bad = props.clone();
+            bad.insert(key.into(), value.into());
+            assert!(validate_environment_sources(&bad, Some(&file)).is_err());
+        }
+        props.insert("EnvironmentFiles".into(), String::new());
+        validate_environment_sources(&props, None).unwrap();
+        assert!(validate_environment_sources(&props, Some(&file)).is_err());
+    }
+    #[test]
+    fn completed_phase_pipeline_namespace_remains_observational_and_phase_exact() {
+        assert_eq!(
+            pipeline_scope(
+                "full-verification",
+                "horizon-qualify-209-generic-full-v1.service"
+            ),
+            Some(209)
+        );
+        assert_eq!(
+            pipeline_scope(
+                "plugin-verification",
+                "horizon-qualify-210-generic-plugin-attempt2.service"
+            ),
+            Some(210)
+        );
+        for (phase, name) in [
+            (
+                "upload-readback",
+                "horizon-qualify-209-generic-full-v1.service",
+            ),
+            (
+                "full-verification",
+                "horizon-qualify-0209-generic-full-v1.service",
+            ),
+            ("full-verification", "horizon-qualify-209-replay-v1.service"),
+            ("replay", "horizon-qualify-209-generic-full-v1.service"),
+        ] {
+            assert_eq!(pipeline_scope(phase, name), None);
+        }
+    }
+    #[test]
+    fn completed_phase_live_owner_blocks_unmodeled_concurrent_resource_admission() {
+        let empty = json!({"active":[],"unit_census":{}});
+        assert!(prefix223_live_peer::roster(&empty).unwrap().is_empty());
+        for phase in [Phase::Full, Phase::Plugin, Phase::Upload] {
+            let spec = fixture(phase);
+            let name = &spec.units[phase.name()];
+            let owner = json!({"Id":name,"InvocationID":"b".repeat(32),"NRestarts":"0"});
+            let fleet = json!({"active":[{"epoch":209,"phase":phase.name(),"ordinary_replay_claim":false,"unit":owner}],"unit_census":{name:owner}});
+            let error = prefix223_live_peer::roster(&fleet).unwrap_err().to_string();
+            assert!(error.contains("unmodeled full-prefix peer"), "{error}");
+        }
+    }
+    #[test]
+    fn completed_phase_terminal_cannot_precede_actual_launch_or_first_guard() {
+        let launch = json!({"captured_unix_seconds":920,"guard_sample_contents":{"recorded_unix_seconds":910}});
+        let admission = json!({"recorded_unix_seconds":900});
+        let events = [
+            json!({"__REALTIME_TIMESTAMP":"901000000"}),
+            json!({"__REALTIME_TIMESTAMP":"1000000000"}),
+        ];
+        launch_terminal_order(&launch, &events, &admission).unwrap();
+        for finish in ["909000000", "919000000"] {
+            let mut bad = events.clone();
+            bad[1]["__REALTIME_TIMESTAMP"] = json!(finish);
+            assert!(launch_terminal_order(&launch, &bad, &admission).is_err());
+        }
+        let mut bad = events;
+        bad[0]["__REALTIME_TIMESTAMP"] = json!("899000000");
+        assert!(launch_terminal_order(&launch, &bad, &admission).is_err());
     }
 }

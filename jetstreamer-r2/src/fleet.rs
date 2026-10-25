@@ -351,6 +351,9 @@ pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
 pub(super) fn deliver_singleton209_output() -> Result<()> {
     singleton209_delivery::run()
 }
+pub(super) fn capture_completed_archive_phase() -> Result<()> {
+    completed_archive_phase::capture()
+}
 pub(super) fn admit_completed_archive_phase() -> Result<()> {
     completed_archive_phase::run()
 }
@@ -1009,6 +1012,9 @@ pub(super) fn pipeline_unit_range(
     phase: &str,
     unit: &str,
 ) -> Result<std::ops::RangeInclusive<u64>> {
+    if let Some(epoch) = completed_archive_phase::pipeline_scope(phase, unit) {
+        return Ok(epoch..=epoch);
+    }
     if private144_scan::scope(phase, unit) {
         return Ok(144..=144);
     }
