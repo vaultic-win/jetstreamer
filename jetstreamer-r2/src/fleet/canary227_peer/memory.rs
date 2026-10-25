@@ -5,7 +5,7 @@ pub(super) const GUARD: u64 = 1 << 30;
 fn number(v: &Value, key: &str) -> Result<u64> {
     v[key]
         .as_u64()
-        .with_context(|| format!("canary saved memory integer missing:{key}"))
+        .with_context(|| format!("canary saved memory integer missing: {key}"))
 }
 pub(super) fn row(
     owner: &str,
