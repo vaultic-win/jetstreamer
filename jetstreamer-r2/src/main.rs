@@ -115,6 +115,8 @@ struct Config {
     status_publication_receipt: Option<PathBuf>,
     status_publication_sha256: Option<String>,
     latest_status_publication_receipt: bool,
+    expected_archive_sha256: Option<String>,
+    expected_archive_bytes: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -308,6 +310,8 @@ fn parse_args() -> Result<Config> {
     let mut status_publication_receipt = None;
     let mut status_publication_sha256 = None;
     let mut latest_status_publication_receipt = false;
+    let mut expected_archive_sha256 = None;
+    let mut expected_archive_bytes = None;
     while let Some(argument) = args.next() {
         let argument = argument
             .into_string()
@@ -320,6 +324,14 @@ fn parse_args() -> Result<Config> {
         };
         match argument.as_str() {
             "--epochs" => epochs = Some(parse_epoch_range(&value()?)?),
+            "--expected-archive-sha256" => expected_archive_sha256 = Some(value()?),
+            "--expected-archive-bytes" => {
+                expected_archive_bytes = Some(
+                    value()?
+                        .parse()
+                        .context("invalid --expected-archive-bytes")?,
+                )
+            }
             "--receipt-directory" => receipt_directory = Some(PathBuf::from(value()?)),
             "--public-receipt-directory" => {
                 public_receipt_directory = Some(PathBuf::from(value()?))
@@ -554,6 +566,22 @@ fn parse_args() -> Result<Config> {
         !matches!(command, Command::StatusPublish | Command::StatusDelete) || epochs.len() == 1,
         "status-publish and status-delete require exactly one epoch"
     );
+    ensure!(
+        expected_archive_sha256.is_some() == expected_archive_bytes.is_some(),
+        "archive expectation requires both SHA-256 and byte length"
+    );
+    if let Some(sha) = &expected_archive_sha256 {
+        ensure!(
+            command == Command::Sync
+                && epochs.len() == 1
+                && sha.len() == 64
+                && sha
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                && expected_archive_bytes.is_some_and(|n| n > 0),
+            "archive expectation requires one sync epoch and canonical SHA-256/length"
+        );
+    }
     Ok(Config {
         command,
         directory,
@@ -578,6 +606,8 @@ fn parse_args() -> Result<Config> {
         status_publication_receipt,
         status_publication_sha256,
         latest_status_publication_receipt,
+        expected_archive_sha256,
+        expected_archive_bytes,
     })
 }
 
@@ -3134,6 +3164,25 @@ fn validate_remote_pair_state(
     Ok(true)
 }
 
+fn validate_archive_expectation(
+    expected_sha: Option<&str>,
+    expected_bytes: Option<u64>,
+    actual_sha: &str,
+    actual_bytes: u64,
+) -> Result<()> {
+    ensure!(
+        expected_sha.is_some() == expected_bytes.is_some(),
+        "incomplete archive expectation"
+    );
+    if let (Some(sha), Some(bytes)) = (expected_sha, expected_bytes) {
+        ensure!(
+            sha == actual_sha && bytes == actual_bytes,
+            "local archive differs from the independently gated sync tuple"
+        );
+    }
+    Ok(())
+}
+
 async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64) -> Result<()> {
     // Discover a receipt-directory sandbox failure before any remote mutation
     // or expensive whole-object readback, not after committing the sidecar.
@@ -3144,6 +3193,12 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             .expect("delivery requires a receipt directory"),
     )?;
     let local = read_local_archive(&config.directory, epoch)?;
+    validate_archive_expectation(
+        config.expected_archive_sha256.as_deref(),
+        config.expected_archive_bytes,
+        &local.sha256_hex,
+        local.length,
+    )?;
     let archive_key = format!("epoch-{epoch}.jet");
     let checksum_key = format!("epoch-{epoch}.jet.sha256");
     let existing = head_archive(client, &r2.bucket, &archive_key).await?;
@@ -4955,6 +5010,17 @@ mod tests {
             .rfind("validate_authenticated_ready_pair(s3, &r2.bucket, &archive_receipt).await?")
             .unwrap();
         assert!(ready_pair_before < deletion && deletion < ready_pair_after);
+    }
+
+    #[test]
+    fn gated_sync_tuple_rejects_changed_archive_before_remote_work() {
+        let sha = "a".repeat(64);
+        let foreign = "b".repeat(64);
+        validate_archive_expectation(Some(&sha), Some(123), &sha, 123).unwrap();
+        assert!(validate_archive_expectation(Some(&sha), Some(123), &foreign, 123).is_err());
+        assert!(validate_archive_expectation(Some(&sha), Some(123), &sha, 124).is_err());
+        assert!(validate_archive_expectation(Some(&sha), None, &sha, 123).is_err());
+        validate_archive_expectation(None, None, &sha, 123).unwrap();
     }
 
     #[test]

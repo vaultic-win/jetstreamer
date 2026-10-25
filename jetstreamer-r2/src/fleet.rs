@@ -6,9 +6,9 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
-mod assembly204_recovery;
 mod assembly144_admission;
 mod assembly144_prepare;
+mod assembly204_recovery;
 mod assembly223;
 mod assembly223_capacity;
 mod assembly223_live_peer;
@@ -499,6 +499,24 @@ pub(super) fn prepare_capped204205_work() -> Result<()> {
 pub(super) async fn publish_capped204205_status() -> Result<()> {
     capped204205_work::publish().await
 }
+pub(super) fn assembly204_recovery_binding_scope(
+    epoch: u64,
+    unit: &str,
+    origin: &str,
+    phase: &str,
+) -> Result<()> {
+    ensure!(
+        epoch == 204
+            && origin == "horizon-qualify-204-assembly-only-recovery-v1.service"
+            && assembly204_recovery::scope(unit, 204, 204)
+            && !unit.starts_with("horizon-guard-")
+            && matches!(phase, "verification" | "upload" | "readback")
+            && (unit == "horizon-upload-204-assembly-recovery-v1.service"
+                || phase == "verification"),
+        "204 recovery status scope differs"
+    );
+    Ok(())
+}
 pub(super) fn capped204205_binding_scope(epoch: u64, unit: &str, phase: &str) -> Result<()> {
     capped204205_work::binding_scope(epoch, unit, phase)
 }
@@ -507,6 +525,13 @@ pub(super) fn capped204205_origin_scope(epoch: u64, unit: &str) -> Result<()> {
 }
 pub(super) fn capped204205_cleanup_allowed(f: &Value, epoch: u64) -> bool {
     capped204205_work::cleanup_allowed(f, epoch)
+        && (epoch != 204
+            || f.get("assembly204_recovery").is_none_or(|v| {
+                v.as_array().is_some_and(|rows| {
+                    rows.iter()
+                        .all(|r| r["live"] == false && r["positive_inactivity_confirmed"] == true)
+                })
+            }))
 }
 pub(super) fn original_capped204205_terminal_time(epoch: u64, e: &Value) -> Result<Option<u64>> {
     original_capped204205::terminal_time(epoch, e)
@@ -1245,6 +1270,12 @@ struct Plan {
     capped204205_work: Vec<capped204205_work::Claim>,
     #[serde(default)]
     capped204205_history: Vec<Value>,
+    #[serde(default)]
+    assembly204_recovery: Option<assembly204_recovery::Claim>,
+    #[serde(default)]
+    assembly204_recovery_history: Vec<Value>,
+    #[serde(default)]
+    assembly204_recovery_terminal: Option<BoundFile>,
 }
 
 fn validate_same_sample_admission(
@@ -2854,7 +2885,16 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == capped204205_work::EVENT_SCHEMA {
+            if event["schema"] == assembly204_recovery::EVENT_SCHEMA {
+                assembly204_recovery::event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == capped204205_work::EVENT_SCHEMA {
                 capped204205_work::event_predecessor(
                     &previous,
                     &plan,
@@ -3037,6 +3077,9 @@ pub(super) async fn run() -> Result<()> {
         }
     }
     let mut diagnostic_units = BTreeSet::new();
+    if let Some(claim) = &plan.assembly204_recovery {
+        names.extend(assembly204_recovery::names(claim)?);
+    }
     for claim in &plan.capped204205_work {
         names.extend(capped204205_work::names(claim)?);
     }
@@ -3767,6 +3810,31 @@ pub(super) async fn run() -> Result<()> {
             active.push(row.clone());
         }
     }
+    let mut recovery_work = plan
+        .assembly204_recovery
+        .as_ref()
+        .map(|c| assembly204_recovery::row(c, &observer, &before, started_seconds))
+        .transpose()?
+        .into_iter()
+        .collect::<Vec<_>>();
+    ensure!(
+        plan.assembly204_recovery.is_none() || plan.assembly204_recovery_terminal.is_none(),
+        "204 recovery cannot be live and terminal together"
+    );
+    if let Some(terminal) = &plan.assembly204_recovery_terminal {
+        recovery_work.push(assembly204_recovery::terminal_row(terminal, &before)?);
+    }
+    for row in &recovery_work {
+        ensure!(
+            !active
+                .iter()
+                .any(|r| r["epoch"] == 204 && r["live"] == true),
+            "204 recovery overlaps another accepted live owner"
+        );
+        if row["live"] == true {
+            active.push(row.clone());
+        }
+    }
     let mut remote_entries = Vec::new();
     let requested_epochs = (plan.first_epoch..=plan.last_epoch).collect::<Vec<_>>();
     let remote_inventory =
@@ -3838,6 +3906,10 @@ pub(super) async fn run() -> Result<()> {
         }) {
             state = "post-replay-pipeline";
         }
+        if epoch == 204 && recovery_work.iter().any(|r| r["live"] == true) {
+            state = "post-replay-pipeline";
+            next = "Continue the exact assembly recovery and its separately admitted verification, boundary, import and upload stages";
+        }
         let mut live = None;
         for replay in replays {
             let range = parse_observer_claim_range(observer_string(replay, &["range"])?)?;
@@ -3902,6 +3974,7 @@ pub(super) async fn run() -> Result<()> {
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                         || capped204205_work::status_matches(receipt, epoch, &capped_work)
+                        || assembly204_recovery::status_matches(receipt, epoch, &recovery_work)
                 });
             // Missing local publication history is explicitly unbound, never current.
             let matches = publication.as_ref().is_ok_and(|(receipt, _, _)| {
@@ -3927,9 +4000,10 @@ pub(super) async fn run() -> Result<()> {
             });
             let production_matches = production_status_binding_matches(matches, state)
                 || (matches && private_qualification_binding);
-            let capped_current = publication
-                .as_ref()
-                .is_ok_and(|(r, _, _)| capped204205_work::status_matches(r, epoch, &capped_work));
+            let capped_current = publication.as_ref().is_ok_and(|(r, _, _)| {
+                capped204205_work::status_matches(r, epoch, &capped_work)
+                    || assembly204_recovery::status_matches(r, epoch, &recovery_work)
+            });
             json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && (status.sampled_at_utc == sample || capped_current)})
         } else {
             Value::Null
@@ -3959,6 +4033,8 @@ pub(super) async fn run() -> Result<()> {
     let changes = transitions(&previous_fleet, &after, &entries);
     let receipt = json!({"schema":SCHEMA,"first_epoch":plan.first_epoch,"last_epoch":plan.last_epoch,"sampled_at_utc":sample,"observer_receipt":plan.observer.path,"observer_sha256":plan.observer.sha256,"previous_fleet":plan.previous_fleet.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"plan":plan_bound.path,"plan_sha256":plan_bound.sha256,"admission_transition_guard":plan.admission_transition_guard.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"inventory":inventory,"unit_census":after,"active":active,"diagnostics":diagnostics,"transitions":changes,"epochs":entries,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"remote_mutations":false,"producer_mutations":false,"publication_authorized":false});
     let mut receipt = receipt;
+    receipt["assembly204_recovery"] = json!(recovery_work);
+    receipt["assembly204_recovery_history"] = json!(plan.assembly204_recovery_history);
     receipt["capped204205_work"] = json!(capped_work);
     receipt["capped204205_history"] = json!(plan.capped204205_history);
     if let Some(event) = &plan.metadata_event {

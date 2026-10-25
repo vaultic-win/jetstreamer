@@ -199,10 +199,13 @@ pub(super) fn check_capped204_v4_delivery(
 /// Closed recovery candidates always include a real hard-memory envelope and
 /// use the same complete owner/guard census and hard-growth bracket as delivery.
 pub(super) fn check_assembly204_recovery(value: &Value, candidate: Candidate) -> Result<Value> {
-    ensure!(candidate.minimum_protected_disk_bytes>0 && candidate.additional_bytes>0
-        && matches!(candidate.memory_max_bytes,n if n==(64<<30)+(128<<20) || n==64<<30 || n==16<<30),
-        "204 recovery candidate resource envelope differs");
-    check_inner(value,candidate,MemoryMode::AssemblyRecovery204)
+    ensure!(
+        candidate.minimum_protected_disk_bytes == 0
+            && candidate.additional_bytes > 0
+            && matches!(candidate.memory_max_bytes,n if n==(64<<30)+(128<<20) || n==64<<30 || n==16<<30),
+        "204 recovery candidate resource envelope differs"
+    );
+    check_inner(value, candidate, MemoryMode::AssemblyRecovery204)
 }
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
     check_candidate(
@@ -230,18 +233,26 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
     // These authenticate the complete launch/frame/registration before a peer
     // can leave the legacy-only resource view. Raw evidence is never modified.
     capped204205_work::peer_observation(f, o)?;
-    let names = capped204205_work::peer_names(f)?;
+    assembly204_recovery::peer_observation(f, o)?;
+    let mut names = capped204205_work::peer_names(f)?;
+    names.extend(assembly204_recovery::peer_names(f)?);
     Ok((
-        capped204205_work::peer_legacy_view(f)?,
+        assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
         legacy_observer(o, &names)?,
     ))
 }
 pub(super) fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     native210_peer_history::current(f, current)?;
-    prefix223_live_peer::current(&capped204205_work::peer_legacy_view(f)?, current)?;
+    prefix223_live_peer::current(
+        &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
+        current,
+    )?;
     // Only proven auxiliary guards leave this comparison. Every producer stays
     // in the raw active roster, so an omitted or changed actor still fails.
-    singleton227_admission::owners(f, &capped204205_work::peer_current(f, current)?)
+    singleton227_admission::owners(
+        f,
+        &assembly204_recovery::peer_current(f, &capped204205_work::peer_current(f, current)?)?,
+    )
 }
 fn memory_required(reserve: u64, total: u64, candidate: u64) -> Result<u64> {
     ensure!(
@@ -310,14 +321,20 @@ fn memory_sample(
     let (required, policy) = match mode {
         MemoryMode::Existing => (memory_required(reserve, total, candidate)?, None),
         MemoryMode::AssemblyRecovery204 => {
-            let required=memory_required(reserve,total,candidate)?;
-            (required,Some(("assembly204_recovery_memory_policy",json!({
+            let required = memory_required(reserve, total, candidate)?;
+            (
+                required,
+                Some((
+                    "assembly204_recovery_memory_policy",
+                    json!({
                 "schema":"jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1",
                 "protected_existing_hard_memory_growth_bytes":reserve,
                 "host_available_floor_bytes":total.div_ceil(10),
                 "candidate_hard_memory_bytes":candidate,
                 "required_available_memory_bytes":required,
-                "available_floor_component_accounted_once_bytes":accounted_floor}))))
+                "available_floor_component_accounted_once_bytes":accounted_floor}),
+                )),
+            )
         }
         MemoryMode::Full210 => {
             let (n, p) = singleton210_memory::required(f, total, reserve, candidate)?;
