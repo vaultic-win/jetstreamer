@@ -231,6 +231,7 @@ fn validate_successor(
         "canary guard process identity changed"
     );
     let pid = number(process, "pid")?;
+    let expected_pid = pid.to_string();
     ensure!(
         pid > 1
             && number(process, "start_ticks")? > 0
@@ -243,7 +244,7 @@ fn validate_successor(
             && number(process, "executable_inode")? > 0
             && process["executable_sha256"] == c::GUARD_SHA
             && p["ControlGroup"] == format!("/system.slice/{PROTECTIVE}")
-            && p["ExecMainPID"] == pid.to_string()
+            && p["ExecMainPID"].as_str() == Some(expected_pid.as_str())
             && p["ExecMainStartTimestampMonotonic"]
                 .as_str()
                 .and_then(|s| s.parse::<u64>().ok())
@@ -254,7 +255,7 @@ fn validate_successor(
     // The dated root-captured activating/start frame confirms that this oneshot
     // uses MainPID=ExecMainPID and ControlPID=0; do not accept arbitrary PIDs.
     ensure!(
-        p["MainPID"] == pid.to_string() && p["ControlPID"] == "0",
+        p["MainPID"].as_str() == Some(expected_pid.as_str()) && p["ControlPID"] == "0",
         "canary successor PID ownership differs"
     );
     Ok(())
