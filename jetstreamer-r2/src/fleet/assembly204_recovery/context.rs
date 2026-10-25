@@ -83,6 +83,50 @@ fn event_fleet(path: &Path) -> bool {
         })
 }
 
+fn canary_terminal_suffix(path: &Path) -> Option<&str> {
+    if path.file_name()? != "fleet.json" { return None; }
+    let parent = path.parent()?;
+    if parent.parent()? != Path::new("/var/lib/jetstreamer") { return None; }
+    let suffix = parent.file_name()?.to_str()?
+        .strip_prefix("horizon-canary227-terminal-fleet-")?;
+    (!suffix.is_empty() && !suffix.starts_with("spec-")
+        && suffix.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))
+        .then_some(suffix)
+}
+fn canary_terminal_fleet(path: &Path) -> bool { canary_terminal_suffix(path).is_some() }
+fn accepted_namespace(path: &Path) -> bool {
+    event_fleet(path) || canary_terminal_fleet(path)
+        || path.starts_with("/var/lib/jetstreamer/horizon-campaign-fleet")
+}
+fn canary_terminal_members(binding: &BoundFile, f: &Value) -> Result<(BoundFile, BoundFile)> {
+    let suffix = canary_terminal_suffix(&binding.path).context("227 terminal fleet namespace")?;
+    let plan = BoundFile { path:s(f,"plan")?.into(), sha256:s(f,"plan_sha256")?.into() };
+    let proof: BoundFile = serde_json::from_value(f["metadata_event"].clone())?;
+    ensure!(
+        plan.path == Path::new("/var/lib/jetstreamer")
+            .join(format!("horizon-canary227-terminal-fleet-spec-{suffix}"))
+            .join("plan.json")
+            && proof.path == Path::new("/var/lib/jetstreamer/horizon-227-v1625-canary-terminal-selection-v2/proof.json"),
+        "204 context terminal 227 event has foreign paired plan or proof"
+    );
+    Ok((plan, proof))
+}
+fn canary_terminal_fleet_value(binding: &BoundFile) -> Result<Value> {
+    ensure!(canary_terminal_fleet(&binding.path), "227 terminal fleet namespace differs");
+    let parent = binding.path.parent().context("227 terminal fleet parent")?;
+    let d = fs::symlink_metadata(parent)?;
+    ensure!(parent.canonicalize()? == parent && d.is_dir() && d.uid()==0
+        && d.mode() & 0o777 == 0o700, "227 terminal fleet parent custody differs");
+    let before = fs::symlink_metadata(&binding.path)?;
+    ensure!(binding.path.canonicalize()? == binding.path && before.is_file()
+        && before.uid()==0 && before.nlink()==1 && before.mode() & 0o022 == 0,
+        "227 terminal fleet custody differs");
+    let value = bound_json(binding)?;
+    ensure!(identity(&before)==identity(&fs::symlink_metadata(&binding.path)?)
+        && identity(&d)==identity(&fs::symlink_metadata(parent)?),
+        "227 terminal fleet changed during read");
+    Ok(value)
+}
 fn event_fleet_value(binding: &BoundFile) -> Result<Value> {
     ensure!(
         event_fleet(&binding.path),
@@ -115,17 +159,21 @@ fn accepted_fleet(binding: &BoundFile) -> Result<Value> {
         &|b| {
             if event_fleet(&b.path) {
                 event_fleet_value(b)
+            } else if canary_terminal_fleet(&b.path) {
+                canary_terminal_fleet_value(b)
             } else {
                 bound_json(b)
             }
         },
         &|b, sealed| if sealed { read(b) } else { bound_json(b) },
+        &canary227_terminal::saved_predecessor,
     )
 }
 fn accepted_fleet_with(
     binding: &BoundFile,
     fleet: &impl Fn(&BoundFile) -> Result<Value>,
     metadata: &impl Fn(&BoundFile, bool) -> Result<Value>,
+    terminal: &impl Fn(&Value, &Value, &Value, &str, u64, &Value) -> Result<()>,
 ) -> Result<Value> {
     let mut next = binding.clone();
     let mut seen = BTreeSet::new();
@@ -139,7 +187,7 @@ fn accepted_fleet_with(
             .path
             .starts_with("/var/lib/jetstreamer/horizon-campaign-fleet");
         ensure!(
-            canonical || event_fleet(&next.path),
+            accepted_namespace(&next.path),
             "204 recovery needs an accepted fleet namespace"
         );
         let f = fleet(&next)?;
@@ -152,6 +200,43 @@ fn accepted_fleet_with(
         }
         if canonical {
             return result.context("204 accepted fleet missing");
+        }
+        if canary_terminal_fleet(&next.path) {
+            let (plan_binding, proof_binding) = canary_terminal_members(&next, &f)?;
+            let plan = metadata(&plan_binding, true)?;
+            let proof = metadata(&proof_binding, true)?;
+            let previous: BoundFile = serde_json::from_value(f["previous_fleet"].clone())?;
+            ensure!(accepted_namespace(&previous.path), "227 terminal predecessor namespace");
+            ensure!(!seen.contains(&previous.path), "204 event fleet lineage cycles");
+            let predecessor = fleet(&previous)?;
+            let observer_binding: BoundFile = serde_json::from_value(plan["observer"].clone())?;
+            let observer = metadata(&observer_binding, false)?;
+            let sample = s(&observer,"recorded_at_utc")?;
+            let at = s(&proof,"sampled_at_utc")?;
+            let recorded = n(&f,"recorded_unix_seconds")?;
+            ensure!(
+                plan["schema"] == "jetstreamer-horizon-campaign-fleet-plan-v1"
+                    && plan["output"] == next.path.to_string_lossy().as_ref()
+                    && plan["metadata_event"] == private157::binding(&proof_binding)
+                    && plan["previous_fleet"] == private157::binding(&previous)
+                    && proof["schema"] == canary227_terminal::SCHEMA
+                    && proof["recorded_unix_seconds"] == utc_seconds(at)?
+                    && plan["observer"]["path"] == f["observer_receipt"]
+                    && plan["observer"]["sha256"] == f["observer_sha256"]
+                    && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+                    && f["sampled_at_utc"] == sample
+                    && f["metadata_event_sampled_at_utc"] == at
+                    && plan["admission_transition_guard"].is_null()
+                    && f["admission_transition_guard"].is_null(),
+                "204 context terminal 227 fleet lost exact plan/proof/observer lineage"
+            );
+            let original = BoundFile {path:s(&predecessor,"plan")?.into(),sha256:s(&predecessor,"plan_sha256")?.into()};
+            let old_plan = metadata(&original,false)?;
+            // Replay genuine admission at its recorded historical event time;
+            // future WorkContext freshness and current peer checks stay separate.
+            terminal(&predecessor,&plan,&proof,sample,recorded,&old_plan)?;
+            next = previous;
+            continue;
         }
         let parent = next.path.parent().context("204 event fleet parent")?;
         let plan_binding = BoundFile {
@@ -168,10 +253,7 @@ fn accepted_fleet_with(
         let event = metadata(&event_binding, true)?;
         let previous: BoundFile = serde_json::from_value(f["previous_fleet"].clone())?;
         ensure!(
-            event_fleet(&previous.path)
-                || previous
-                    .path
-                    .starts_with("/var/lib/jetstreamer/horizon-campaign-fleet"),
+            accepted_namespace(&previous.path),
             "204 event predecessor namespace"
         );
         ensure!(
@@ -653,7 +735,9 @@ mod tests {
         let original = b("/fixture/original-plan.json");
         let mut old = json!({"schema":"jetstreamer-horizon-campaign-fleet-plan-v1",
             "first_epoch":201,"last_epoch":300,"tracked_units":["healthy207.service"],
-            "unrelated_gate":{"must_remain":true},"observer":b("/fixture/initial-observer.json")});
+            "unrelated_gate":{"must_remain":true},"observer":b("/fixture/initial-observer.json"),
+            "gates":{"227":{"state":"failed-needs-repair","evidence":[],"next_action":"retain failure","reserve_stop":null}},
+            "unrelated_guard_floor":123456789u64});
         let mut prior = json!({"schema":SCHEMA,"first_epoch":201,"last_epoch":300,
             "plan":original.path,"plan_sha256":original.sha256,"unit_census":{}});
         files.insert(original.path.clone(), old.clone());
@@ -705,7 +789,8 @@ mod tests {
     }
     fn saved_fleet(binding: &BoundFile, files: &BTreeMap<PathBuf, Value>) -> Result<Value> {
         let load = |b: &BoundFile| files.get(&b.path).cloned().context("fixture file missing");
-        accepted_fleet_with(binding, &load, &|b, _| load(b))
+        accepted_fleet_with(binding, &load, &|b, _| load(b),
+            &|_,_,_,_,_,_| anyhow::bail!("unexpected terminal 227 fixture"))
     }
     #[test]
     fn recovery_event_namespace_and_exact_plan_lineage_have_no_daily_chain_cutoff() {
@@ -787,4 +872,111 @@ mod tests {
             json!("f".repeat(64));
         assert!(saved_fleet(&binding, &files).is_err());
     }
+    fn canary_event_fixture() -> (BoundFile, BTreeMap<PathBuf, Value>) {
+        let (previous, mut files) = event_fixture(1);
+        let prior = files[&previous.path].clone();
+        let original = PathBuf::from(prior["plan"].as_str().unwrap());
+        let old = files[&original].clone();
+        let fleet = b("/var/lib/jetstreamer/horizon-canary227-terminal-fleet-fixture-v1/fleet.json");
+        let plan = b("/var/lib/jetstreamer/horizon-canary227-terminal-fleet-spec-fixture-v1/plan.json");
+        let proof = b("/var/lib/jetstreamer/horizon-227-v1625-canary-terminal-selection-v2/proof.json");
+        let clock = prior["recorded_unix_seconds"].as_u64().unwrap()+40;
+        let at = publication203::utc(clock).unwrap();
+        let terminal = json!({"schema":canary227_terminal::SCHEMA,"recorded_unix_seconds":clock,
+            "sampled_at_utc":at,"release_credit_bytes":0,"preserve_original_failed227_history":true,
+            "repair_gate_state":"failed-needs-repair","invocation_id":"c".repeat(32)});
+        let mut next = old.clone();
+        next["output"]=json!(fleet.path);next["previous_fleet"]=private157::binding(&previous);
+        next["metadata_event"]=private157::binding(&proof);
+        next["gates"]["227"]["evidence"]=json!([proof]);
+        next["gates"]["227"]["next_action"]=json!("terminal canary; retain failed repair");
+        let mut ledger=prior;
+        ledger["plan"]=json!(plan.path);ledger["plan_sha256"]=json!(plan.sha256);
+        ledger["metadata_event"]=private157::binding(&proof);
+        ledger["previous_fleet"]=private157::binding(&previous);
+        ledger["metadata_event_sampled_at_utc"]=json!(at);
+        ledger["recorded_unix_seconds"]=json!(clock+1);
+        files.insert(fleet.path.clone(),ledger);
+        files.insert(plan.path,next);files.insert(proof.path,terminal);
+        (fleet,files)
+    }
+    fn saved_canary_fixture(binding:&BoundFile, files:&BTreeMap<PathBuf,Value>) -> Result<Value> {
+        let load=|b:&BoundFile| {
+            ensure!(b.sha256=="a".repeat(64),"fixture binding digest substituted");
+            files.get(&b.path).cloned().context("fixture file absent")
+        };
+        accepted_fleet_with(binding,&load,&|b,_|load(b),&|prior,plan,proof,sample,recorded,old| {
+            // This is a pure lineage fixture, not an actual terminal proof.
+            // Runtime always calls the shared real saved_predecessor validator.
+            let clock=proof["recorded_unix_seconds"].as_u64().context("fixture clock")?;
+            ensure!(prior["sampled_at_utc"]==sample && plan["observer"]["path"]==prior["observer_receipt"]
+                && plan["observer"]["sha256"]==prior["observer_sha256"]
+                && clock<=recorded && recorded-clock<=300
+                && proof["release_credit_bytes"]==0 && proof["preserve_original_failed227_history"]==true
+                && proof["repair_gate_state"]=="failed-needs-repair"
+                && proof["invocation_id"]=="c".repeat(32),"fixture terminal transition rejected");
+            canary227_terminal::saved_plan_projection(old,plan)
+        })
+    }
+    #[test]
+    fn terminal227_private_event_replays_its_actual_historical_time_and_keeps_204_claim() {
+        let (binding,files)=canary_event_fixture();
+        let raw=files.clone();
+        let read=saved_canary_fixture(&binding,&files).unwrap();
+        assert_eq!(read,files[&binding.path]);
+        assert_eq!(files,raw);
+        let prior=&files[&PathBuf::from(read["previous_fleet"]["path"].as_str().unwrap())];
+        let old=&files[&PathBuf::from(prior["plan"].as_str().unwrap())];
+        let current=&files[&PathBuf::from(read["plan"].as_str().unwrap())];
+        assert_eq!(current["assembly204_recovery"],old["assembly204_recovery"]);
+        assert_eq!(current["assembly204_recovery_history"],old["assembly204_recovery_history"]);
+        assert!(read["recorded_unix_seconds"].as_u64().unwrap() < 20000);
+        // No wall-clock input is consulted to retroactively expire a valid event.
+        saved_canary_fixture(&binding,&files).unwrap();
+    }
+    #[test]
+    fn terminal227_namespace_and_exact_separate_plan_pairing_are_closed() {
+        let (binding,files)=canary_event_fixture();
+        for path in [
+            "/var/lib/jetstreamer/horizon-canary227-terminal-fleet-/fleet.json",
+            "/var/lib/jetstreamer/horizon-canary227-terminal-fleet-spec-fixture/fleet.json",
+            "/var/lib/jetstreamer/horizon-canary227-terminal-fleet-fixture/nested/fleet.json",
+            "/var/lib/jetstreamer/horizon-canary227-terminal-fleet-fixture_v1/fleet.json",
+            "/tmp/horizon-canary227-terminal-fleet-fixture/fleet.json",
+        ] { assert!(!canary_terminal_fleet(Path::new(path)),"{path}"); }
+        for (key,value) in [
+            ("plan",json!("/var/lib/jetstreamer/horizon-canary227-terminal-fleet-spec-other/plan.json")),
+            ("metadata_event",json!({"path":"/foreign/proof.json","sha256":"a".repeat(64)})),
+            ("previous_fleet",private157::binding(&binding)),
+        ] {
+            let mut bad=files.clone();bad.get_mut(&binding.path).unwrap()[key]=value;
+            assert!(saved_canary_fixture(&binding,&bad).is_err(),"{key}");
+        }
+    }
+    #[test]
+    fn terminal227_event_cannot_substitute_proof_observer_claim_history_or_other_fields() {
+        let (binding,files)=canary_event_fixture();
+        let ledger=&files[&binding.path];
+        let plan=PathBuf::from(ledger["plan"].as_str().unwrap());
+        let proof=PathBuf::from(ledger["metadata_event"]["path"].as_str().unwrap());
+        for (file,key,value) in [
+            (plan.clone(),"observer",json!({"path":"/foreign/observer.json","sha256":"a".repeat(64)})),
+            (plan.clone(),"assembly204_recovery",Value::Null),
+            (plan.clone(),"assembly204_recovery_history",json!([{"invented":true}])),
+            (plan.clone(),"unrelated_guard_floor",json!(0)),
+            (proof.clone(),"schema",json!("foreign-terminal-schema")),
+            (proof.clone(),"release_credit_bytes",json!(1)),
+            (proof.clone(),"preserve_original_failed227_history",json!(false)),
+            (proof.clone(),"invocation_id",json!("d".repeat(32))),
+            (binding.path.clone(),"observer_sha256",json!("b".repeat(64))),
+            (binding.path.clone(),"metadata_event_sampled_at_utc",json!("1970-01-01T00:00:00Z")),
+        ] {
+            let mut bad=files.clone();bad.get_mut(&file).unwrap()[key]=value;
+            assert!(saved_canary_fixture(&binding,&bad).is_err(),"{}:{key}",file.display());
+        }
+        let mut stale=files.clone();stale.get_mut(&binding.path).unwrap()["recorded_unix_seconds"]=
+            json!(files[&proof]["recorded_unix_seconds"].as_u64().unwrap()+301);
+        assert!(saved_canary_fixture(&binding,&stale).is_err());
+    }
+
 }
