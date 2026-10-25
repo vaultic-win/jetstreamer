@@ -132,7 +132,11 @@ fn guard_shape(
             && now - t <= 1800
             && g["producer_invocation_id"] == d.invocation_id
             && g["producer"]["invocation_id"] == d.invocation_id
-            && g["producer"]["unit"] == d.unit
+            // The standalone guard emits its unit in the bound plan and exact
+            // producer cgroup, not in a producer.unit field. Authenticate that
+            // existing shape without inventing a field in genuine receipts.
+            && p["unit"] == d.unit
+            && g["plan"] == l["guard_plan"]["path"]
             && g["producer"]["restarts"] == 0
             && g["producer"]["active"] == "active"
             && g["producer"]["sub"] == "running"
@@ -336,6 +340,8 @@ pub(super) fn current(f: &Value, census: &BTreeMap<String, Value>) -> Result<()>
     }
     Ok(())
 }
+#[cfg(test)]
+mod guard_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

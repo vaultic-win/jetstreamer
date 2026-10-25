@@ -1,0 +1,10 @@
+{
+  "epoch": 207,
+  "unit": "horizon-qualify-207-singleton-admitted-v1.service",
+  "invocation_id": "74eb420ca4574a50a35913d1417124f1",
+  "scratch_path": "/home/ubuntu/.jetstreamer-private/qualification-207-singleton-admitted-v1",
+  "launch_receipt": {
+    "path": "/var/lib/jetstreamer/horizon-singleton207-capture-retry-v1/launch.json",
+    "sha256": "7712ae90f84c1e4870579893e9e184b28d1b644ea0099ab5c23110bc03165ec0"
+  }
+}

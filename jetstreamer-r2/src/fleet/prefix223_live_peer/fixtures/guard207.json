@@ -1,0 +1,65 @@
+{
+  "available_bytes": 2450734972928,
+  "bounded_canary": null,
+  "bounded_measurement": false,
+  "canary_target_error": null,
+  "canary_target_stop_valid": false,
+  "guard_invocation_id": "576e528add8e41a2b5b794e8c7de82de",
+  "guard_sha256": "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f",
+  "maximum_root_physical_bytes": 437438953472,
+  "maximum_worker_vmas": 3500000,
+  "minimum_free_bytes": 2034359738368,
+  "native_main": null,
+  "plan": "/var/lib/jetstreamer/horizon-singleton207-guard-plan-retry-v1/guard-plan.json",
+  "plan_sha256": "6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c",
+  "producer": {
+    "active": "active",
+    "cgroup": "/system.slice/horizon-qualify-207-singleton-admitted-v1.service",
+    "delegated": false,
+    "invocation_id": "74eb420ca4574a50a35913d1417124f1",
+    "kill_mode": "control-group",
+    "load_state": "loaded",
+    "pid": 1423631,
+    "restart_policy": "no",
+    "restarts": 0,
+    "result": "success",
+    "sub": "running"
+  },
+  "producer_invocation_id": "74eb420ca4574a50a35913d1417124f1",
+  "producer_stop_enabled": true,
+  "r2_mutations": false,
+  "recorded_unix_seconds": 1792914608,
+  "remote_mutations": false,
+  "root_physical_observation": {
+    "conservative_physical_bytes": 82201862144,
+    "exceeds_budget": false,
+    "first": {
+      "directories": 33,
+      "entries": 370825,
+      "physical_bytes": 82197327872,
+      "symlinks": 0,
+      "vanished_entries": 0
+    },
+    "maximum_physical_bytes": 437438953472,
+    "second": {
+      "directories": 33,
+      "entries": 370825,
+      "physical_bytes": 82201862144,
+      "symlinks": 0,
+      "vanished_entries": 0
+    }
+  },
+  "root_physical_observation_error": null,
+  "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+  "scratch_deleted": false,
+  "target_handoff": null,
+  "target_handoff_error": null,
+  "trip_reason": null,
+  "worker_observation_error": null,
+  "workers": [
+    [
+      1425657,
+      371000
+    ]
+  ]
+}

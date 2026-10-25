@@ -1,0 +1,84 @@
+{
+  "epoch": 207,
+  "unit": "horizon-qualify-207-singleton-admitted-v1.service",
+  "private_run_root": "/home/ubuntu/.jetstreamer-private/qualification-207-singleton-admitted-v1",
+  "node_sha256": "08e14bb09a1cbf762ed1b8910a1d8a9e949f0a5890984060304bc6c7d45206f7",
+  "worker_sha256": "3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a",
+  "snapshot_sha256": "8af3cd20c8f9820dacd25932fc6b7938193e0d1a5dc83d8ddd59dfeea69b2ddc",
+  "runtime": "solana-v1.6.16",
+  "bootstrap_slot": 89423444,
+  "output_slot_start": 89424000,
+  "terminal_slot": 89855999,
+  "canonical_root_slots": [
+    89523820,
+    89855469
+  ],
+  "canonical_accounts_hashes": [
+    "7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik",
+    "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK"
+  ],
+  "output_slot_count": 432000,
+  "post_last_known_root_slots": 530,
+  "epoch208_tail_authorized": false,
+  "natural_parent_completion_required": true,
+  "maximum_scratch_bytes": 300000000000,
+  "scratch_is_trial_allowance_not_quota": true,
+  "upstream_shrink_budget_cap": false,
+  "own_tree_guard_threshold_bytes": 437438953472,
+  "candidate_incremental_disk_reservation_bytes": 471832246272,
+  "maximum_memory_bytes": 225000000000,
+  "maximum_runtime_seconds": 259200,
+  "remote_mutations": false,
+  "r2_mutations": false,
+  "capability": {
+    "path": "/var/lib/jetstreamer/horizon-207-singleton-preflight-admitted-md5-v1/preflight-capture.json",
+    "sha256": "835ca977c73d3db0717fd5257b6e7f8307fa012379826ba20bf750c5322a3d9a"
+  },
+  "native_input": {
+    "path": "/var/lib/jetstreamer/horizon-native207-terminal-proof-v1/proof.json",
+    "sha256": "ed39b654d78d4530f82877866d4474435beb353503ad1d3ebfcae04823489819"
+  },
+  "manifest": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-candidate-reviewed-20261025-sdk59001-v1/preflight207-singleton-candidate.json",
+    "sha256": "801707df48654c272b0fffc1005eea97b90dbd1ffe59190aede1c1616e134379"
+  },
+  "manifest_fingerprint": "sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7",
+  "authenticated_metadata": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-authenticated-reviewed-20261025-sdk59001-v1/metadata-evidence.json",
+    "sha256": "41262e1c49c26c72009ef5ec3d6fbdee081873cbb64c4983398f9d7555478176"
+  },
+  "schema": "jetstreamer-private-singleton207-launch-v1",
+  "launched": true,
+  "ordinary_replay_claim": false,
+  "entry_replay": true,
+  "public_sidecar_countdown_authorized": true,
+  "evidence": {
+    "units": [
+      {
+        "invocation_id": "74eb420ca4574a50a35913d1417124f1",
+        "main_pid": 1423631,
+        "restarts": 0,
+        "unit": "horizon-qualify-207-singleton-admitted-v1.service"
+      }
+    ]
+  },
+  "expected_exec_start": "{ path=/var/lib/jetstreamer/horizon-207-singleton-node-08e1-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-207-singleton-node-08e1-v1/jetstreamer-node 207 /home/ubuntu/.jetstreamer-private/qualification-207-singleton-admitted-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-207-root-metadata-candidate-reviewed-20261025-sdk59001-v1/preflight207-singleton-candidate.json --cohort-manifest-fingerprint=sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7 --snapshot-archive=/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+  "guard_minimum_free_bytes": 2034359738368,
+  "guard_plan": {
+    "path": "/var/lib/jetstreamer/horizon-singleton207-guard-plan-retry-v1/guard-plan.json",
+    "sha256": "6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c"
+  },
+  "ordinary_replay_authorized": false,
+  "full_cold_epoch_peak_qualified": false,
+  "canonical_prefix_independently_qualified": false,
+  "native_restart_qualified": false,
+  "suffix_qualified": false,
+  "assembly_qualified": false,
+  "full_epoch_qualified": false,
+  "full_plugin_qualified": false,
+  "runtime_promotion_authorized": false,
+  "canonical_sidecar_authorized": false,
+  "publication_authorized": false,
+  "repair_closed": false,
+  "archive_mutations_authorized": false
+}

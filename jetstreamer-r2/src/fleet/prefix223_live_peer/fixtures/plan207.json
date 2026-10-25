@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+  "unit": "horizon-qualify-207-singleton-admitted-v1.service",
+  "invocation_id": "74eb420ca4574a50a35913d1417124f1",
+  "filesystem": "/",
+  "minimum_free_bytes": 2034359738368,
+  "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-207-singleton-admitted-v1",
+  "maximum_worker_vmas": 3500000,
+  "maximum_root_physical_bytes": 437438953472,
+  "receipt_directory": "/var/lib/jetstreamer/horizon-207-singleton-guard-receipts-v1"
+}
