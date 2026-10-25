@@ -353,6 +353,26 @@ When agent slots are full, retain a prioritized repair queue with a named next a
 the fleet loop moving. Do not silently drop failed epochs or replace the campaign objective with
 the easiest repair. Close an incident only on the usual verified ready-pair evidence.
 
+### Avoid wasted native qualification windows
+
+Before granting a timed native lease, check that the latest creation deadline leaves time for
+handoff, pre-creation input readback and setup, using observed preparation timings with a margin.
+The worker's runtime allowance does not cover work done before it exists. Recheck the clock
+immediately before provisioning. If the creation window expires, preserve the unused admission
+and start from a fresh accepted frame; never extend a live deadline.
+
+For retained manual qualification scripts, run reusable blocks in isolated scopes with explicit
+inputs and outputs. Exercise the remaining pure lookups together against saved actual artifacts;
+separate document checks can miss a variable overwritten by another block. Keep saved observations
+distinct from the fresh process, descriptor, clock and guard evidence required at launch.
+
+Validate actual systemd values using their documented representation, including canonical mount
+options such as `:rbind`, while retaining exact roots and option checks. Obtain log-file identity
+from actual descriptors when the queried API has no file-path property. Apply the exact launcher's
+lock and worker-census contract: an ordinary paused launcher may have no historical worker, while
+a native gate may require same-PID lock ownership. Preserve separate positive-worker capability
+requirements; do not invent an extra census predicate at a boundary where it cannot hold.
+
 ## Scale beyond the proven point
 
 Increase beyond the proven operating point by exactly one replay lane at a time; capacity at or
