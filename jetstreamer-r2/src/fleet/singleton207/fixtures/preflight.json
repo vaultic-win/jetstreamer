@@ -1,0 +1,58 @@
+{
+  "schema": "operator-parent-witnessed-epoch207-admitted-metadata-preflight-v1",
+  "unit": "horizon-207-singleton-preflight-admitted-md5-v1.service",
+  "invocation_id": "7460fabcba4f4036bdbe86050fc885bf",
+  "node": {
+    "path": "/var/lib/jetstreamer/horizon-207-singleton-node-08e1-v1/jetstreamer-node",
+    "sha256": "08e14bb09a1cbf762ed1b8910a1d8a9e949f0a5890984060304bc6c7d45206f7"
+  },
+  "manifest": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-candidate-reviewed-20261025-sdk59001-v1/preflight207-singleton-candidate.json",
+    "sha256": "801707df48654c272b0fffc1005eea97b90dbd1ffe59190aede1c1616e134379"
+  },
+  "manifest_fingerprint": "sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7",
+  "natural_main_exit_status": 0,
+  "replay_entries": 0,
+  "worker_started": false,
+  "snapshot_restored": false,
+  "full_epoch_replay_qualified": false,
+  "producer_started": false,
+  "resource_samples_taken": 0,
+  "replay_launch_authorized": false,
+  "publication_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false,
+  "recorded_at_utc": "2026-10-25T03:45:49.814651+00:00",
+  "raw_evidence": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-singleton-preflight-admitted-md5-v1/terminal-properties.txt",
+      "sha256": "f375e49a284763a8b657bebd82398c6e49d68e51e4e8752160a8491d33d1c88f"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-singleton-preflight-admitted-md5-v1/complete-journal.jsonl",
+      "sha256": "6aa46b96712ef826ef4bfb1b8c57db7814ed78b8b410362bcaa1cd457d447db4"
+    }
+  ],
+  "actual_preflight_stdout": {
+    "bootstrap_slot": 89423444,
+    "candidate_only": true,
+    "canonical_root_slots": [
+      89523820,
+      89855469
+    ],
+    "epoch": 207,
+    "full_epoch_replay_qualified": false,
+    "manifest_fingerprint": "sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7",
+    "output_slot_end_exclusive": 89856000,
+    "output_slot_start": 89424000,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "replay_entries": 0,
+    "runtime": "solana-v1.6.16",
+    "schema": "jetstreamer-private-epoch207-singleton-preflight-v1",
+    "snapshot_restored": false,
+    "worker_started": false
+  },
+  "stdout_extracted_from_bound_same_invocation_journal": true
+}

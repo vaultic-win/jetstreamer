@@ -1,112 +1,178 @@
-//! Preserve all existing prefix/full210 owners and add only exact private verification.
-use super::assembly223_live_peer as base;
-use super::verification223 as c;
-use super::*;
+//! Lossless resource adapters for the closed 207 full epoch and 233 first root.
+//! No historical view may erase one of these owners or grant allocation credit.
+use super::{verification223_live_peer as base, *};
 #[cfg(test)]
 pub(super) use base::fixture_row;
-fn without(f: &Value) -> Result<Value> {
-    let mut seen = false;
-    let mut count = 0;
-    for row in f["active"]
-        .as_array()
-        .context("verification 223 complete owner roster")?
-    {
-        if row["epoch"] == 223 {
-            count += 1;
-        }
-        let owner = singleton227_admission::active_owner(row)?;
-        if owner["Id"] != c::UNIT {
-            continue;
-        }
-        ensure!(
-            !seen
-                && row["epoch"] == 223
-                && row["phase"] == "private-verification-only"
-                && row["ordinary_replay_claim"] == false
-                && owner["NRestarts"] == "0"
-                && owner["InvocationID"]
-                    .as_str()
-                    .is_some_and(|s| s.len() == 32)
-                && row["launch_receipt"] == format!("{}/launch.json", c::STATE)
-                && canonical_digest(&row["launch_receipt_sha256"]),
-            "verification 223 duplicate, changed or unrelated owner"
-        );
-        seen = true;
+fn profile(name: &str) -> Option<(u64, &'static str)> {
+    match name {
+        singleton207::UNIT => Some((207, "private-full-epoch-qualification")),
+        first_root233::UNIT => Some((233, "private-known-root-prefix")),
+        _ => None,
     }
-    ensure!(
-        !seen || count == 1,
-        "verification 223 overlaps another active epoch 223 owner"
-    );
-    let mut out = f.clone();
-    out["active"]
-        .as_array_mut()
-        .unwrap()
-        .retain(|r| singleton227_admission::active_owner(r).map_or(true, |u| u["Id"] != c::UNIT));
-    Ok(out)
 }
-fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
-    let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
-        path: f["plan"]
-            .as_str()
-            .context("verification 223 fleet plan")?
-            .into(),
-        sha256: f["plan_sha256"]
-            .as_str()
-            .context("verification 223 plan digest")?
-            .into(),
-    })?)?;
-    let found = plan
-        .diagnostics
-        .iter()
-        .filter(|d| c::namespace(d))
-        .collect::<Vec<_>>();
-    ensure!(
-        found.len() == 1,
-        "verification 223 needs exactly one authenticated claim"
-    );
-    let d = found[0];
-    let owner = singleton227_admission::active_owner(row)?;
-    ensure!(
-        owner["InvocationID"] == d.invocation_id
-            && owner["Id"] == d.unit
-            && row["launch_receipt"].as_str() == d.launch_receipt.path.to_str()
-            && row["launch_receipt_sha256"] == d.launch_receipt.sha256
-            && c::root_scope(&d.scratch_path),
-        "verification 223 claim/accepted owner differs"
-    );
-    let r = checked_diagnostic_launch(d)?;
-    Ok((
-        DiagnosticClaim {
-            epoch: d.epoch,
-            unit: d.unit.clone(),
-            invocation_id: d.invocation_id.clone(),
-            scratch_path: d.scratch_path.clone(),
-            launch_receipt: BoundFile {
-                path: d.launch_receipt.path.clone(),
-                sha256: d.launch_receipt.sha256.clone(),
-            },
-        },
-        r,
-    ))
+fn selected(row: &Value) -> bool {
+    singleton227_admission::active_owner(row)
+        .ok()
+        .and_then(|u| u["Id"].as_str())
+        .is_some_and(|n| profile(n).is_some())
 }
 fn rows(f: &Value) -> Result<Vec<&Value>> {
     Ok(f["active"]
         .as_array()
-        .context("verification 223 owner census")?
+        .context("closed peers complete active census")?
         .iter()
-        .filter(|r| singleton227_admission::active_owner(r).is_ok_and(|u| u["Id"] == c::UNIT))
+        .filter(|r| selected(r))
         .collect())
 }
-pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
-    let v = without(f)?;
-    let mut names = base::roster(&v)?;
-    if !rows(f)?.is_empty() {
+fn without(f: &Value) -> Result<Value> {
+    let mut seen = BTreeSet::new();
+    for row in rows(f)? {
+        let u = singleton227_admission::active_owner(row)?;
+        let name = u["Id"].as_str().context("closed peer name")?;
+        let (epoch, phase) = profile(name).context("closed peer profile")?;
         ensure!(
-            names.insert(c::UNIT.into()),
-            "verification 223 duplicate capacity owner"
+            seen.insert(epoch)
+                && row["epoch"] == epoch
+                && row["phase"] == phase
+                && row["ordinary_replay_claim"] == false
+                && u["NRestarts"] == "0"
+                && u["InvocationID"].as_str().is_some_and(private_prefix::iid)
+                && row["launch_receipt"]
+                    .as_str()
+                    .is_some_and(|s| Path::new(s).is_absolute())
+                && canonical_digest(&row["launch_receipt_sha256"])
+                && f["active"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|r| r["epoch"] == epoch)
+                    .count()
+                    == 1,
+            "closed peer duplicate, overlapping, changed or unbound owner"
         );
     }
+    let mut copy = f.clone();
+    copy["active"]
+        .as_array_mut()
+        .context("closed peer census")?
+        .retain(|r| !selected(r));
+    Ok(copy)
+}
+fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
+    let u = singleton227_admission::active_owner(row)?;
+    let name = u["Id"].as_str().context("closed peer unit")?;
+    let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: f["plan"].as_str().context("closed peer fleet plan")?.into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("closed peer fleet digest")?
+            .into(),
+    })?)?;
+    let claims = plan
+        .diagnostics
+        .into_iter()
+        .filter(|d| d.unit == name)
+        .collect::<Vec<_>>();
+    ensure!(
+        claims.len() == 1,
+        "closed peer lacks exactly one accepted claim"
+    );
+    let d = claims.into_iter().next().unwrap();
+    ensure!(
+        u["InvocationID"] == d.invocation_id
+            && row["launch_receipt"].as_str() == d.launch_receipt.path.to_str()
+            && row["launch_receipt_sha256"] == d.launch_receipt.sha256
+            && f["unit_census"][name] == *u,
+        "closed peer claim differs from full accepted raw census"
+    );
+    let launch = checked_diagnostic_launch(&d)?;
+    Ok((d, launch))
+}
+pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
+    let mut names = base::roster(&without(f)?)?;
+    for row in rows(f)? {
+        let name = singleton227_admission::active_owner(row)?["Id"]
+            .as_str()
+            .context("closed peer name")?;
+        ensure!(names.insert(name.into()), "closed peer duplicate roster");
+    }
     Ok(names)
+}
+fn live(d: &DiagnosticClaim, u: &Value) -> Result<()> {
+    match d.epoch {
+        207 => singleton207::validate_live(d, u),
+        233 => first_root233::validate_live(d, u),
+        _ => bail!("foreign closed peer"),
+    }
+}
+fn guard_shape(
+    d: &DiagnosticClaim,
+    l: &Value,
+    p: &Value,
+    g: &Value,
+    sha: &str,
+    sample: u64,
+    now: u64,
+) -> Result<()> {
+    let profile = match d.epoch {
+        207 => singleton207::guard_matches(d, l, p),
+        233 => first_root233::guard_matches(d, l, p),
+        _ => false,
+    };
+    let t = g["recorded_unix_seconds"]
+        .as_u64()
+        .context("closed peer guard clock")?;
+    ensure!(
+        profile
+            && g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && g["guard_sha256"] == singleton207::GUARD_SHA
+            && g["plan_sha256"] == sha
+            && t >= sample
+            && t <= now
+            && now - t <= 1800
+            && g["producer_invocation_id"] == d.invocation_id
+            && g["producer"]["invocation_id"] == d.invocation_id
+            && g["producer"]["unit"] == d.unit
+            && g["producer"]["restarts"] == 0
+            && g["producer"]["active"] == "active"
+            && g["producer"]["sub"] == "running"
+            && g["producer"]["cgroup"] == format!("/system.slice/{}", d.unit)
+            && g["producer"]["kill_mode"] == "control-group"
+            && g["producer"]["delegated"] == false
+            && g["producer_stop_enabled"] == true
+            && g["minimum_free_bytes"] == p["minimum_free_bytes"]
+            && g["available_bytes"]
+                .as_u64()
+                .zip(p["minimum_free_bytes"].as_u64())
+                .is_some_and(|(a, b)| a >= b)
+            && g["maximum_worker_vmas"] == p["maximum_worker_vmas"]
+            && g["maximum_root_physical_bytes"] == p["maximum_root_physical_bytes"]
+            && g["root_physical_observation"]["maximum_physical_bytes"]
+                == p["maximum_root_physical_bytes"]
+            && g["root_physical_observation"]["exceeds_budget"] == false
+            && g["root_physical_observation"]["conservative_physical_bytes"]
+                .as_u64()
+                .zip(p["maximum_root_physical_bytes"].as_u64())
+                .is_some_and(|(n, cap)| n <= cap)
+            && g["workers"].as_array().is_some_and(|w| w.len() == 1)
+            && g["workers"][0][0].as_u64().is_some_and(|n| n > 1)
+            && g["workers"][0][1]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n < 3500000)
+            && [
+                "trip_reason",
+                "worker_observation_error",
+                "root_physical_observation_error",
+                "canary_target_error",
+                "target_handoff_error"
+            ]
+            .iter()
+            .all(|k| g.get(*k).is_some_and(Value::is_null))
+            && g["r2_mutations"] == false
+            && g["remote_mutations"] == false,
+        "closed peer protective evidence changed, stale, tripped or omitted an obligation"
+    );
+    Ok(())
 }
 pub(super) fn disk(
     f: &Value,
@@ -116,107 +182,62 @@ pub(super) fn disk(
     now: u64,
 ) -> Result<(u64, Vec<Value>)> {
     roster(f)?;
-    let v = without(f)?;
-    let mut remaining = guards
+    let mut rest = guards
         .iter()
-        .map(|(k, v)| {
-            (
-                k.clone(),
-                BoundFile {
-                    path: v.path.clone(),
-                    sha256: v.sha256.clone(),
-                },
-            )
-        })
+        .map(|(k, b)| (k.clone(), binding(b.path.clone(), b.sha256.clone())))
         .collect::<BTreeMap<_, _>>();
     let mut extra = 0u64;
-    let mut evidence = Vec::new();
+    let mut proof = Vec::new();
     for row in rows(f)? {
-        let (d, r) = claim(f, row)?;
-        let gb = remaining
-            .remove(c::UNIT)
-            .context("verification 223 protective guard omitted")?;
+        let (d, l) = claim(f, row)?;
+        let gb = rest
+            .remove(&d.unit)
+            .context("closed peer protective guard omitted")?;
         let g = bound_json(&gb)?;
-        let pb: BoundFile = serde_json::from_value(r["guard_plan"].clone())?;
-        let p = bound_json(&pb)?;
-        let t = g["recorded_unix_seconds"]
-            .as_u64()
-            .context("verification 223 guard timestamp")?;
+        let pb: BoundFile = serde_json::from_value(l["guard_plan"].clone())?;
+        let p = native209::immutable_json(&pb)?;
+        guard_shape(&d, &l, &p, &g, &pb.sha256, sample, now)?;
         ensure!(
-            c::guard_matches(&d, &r, &p)
-                && g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
-                && g["bounded_measurement"] == false
-                && g.get("target_handoff").is_some_and(Value::is_null)
-                && g["producer"]["unit"] == c::UNIT
-                && g["producer"]["kill_mode"] == "control-group"
-                && g["producer"]["delegated"] == false
-                && t >= sample
-                && t <= now
-                && now - t <= 1800
-                && g["guard_sha256"] == c::GUARD_SHA
-                && g["plan_sha256"] == pb.sha256
-                && g["producer_invocation_id"] == d.invocation_id
-                && g["producer"]["invocation_id"] == d.invocation_id
-                && g["producer"]["active"] == "active"
-                && g["producer"]["sub"] == "running"
-                && g["producer"]["restarts"] == 0
-                && g["producer"]["cgroup"] == format!("/system.slice/{}", c::UNIT)
-                && g["producer"]["pid"]
-                    .as_u64()
-                    .map(|n| n.to_string())
-                    .as_deref()
-                    == singleton227_admission::active_owner(row)?["MainPID"].as_str()
-                && g["producer_stop_enabled"] == true
-                && g["workers"].as_array().is_some_and(Vec::is_empty)
-                && g["minimum_free_bytes"] == p["minimum_free_bytes"]
-                && g["available_bytes"]
-                    .as_u64()
-                    .zip(p["minimum_free_bytes"].as_u64())
-                    .is_some_and(|(a, b)| a >= b)
-                && [
-                    "trip_reason",
-                    "worker_observation_error",
-                    "target_handoff_error"
-                ]
-                .iter()
-                .all(|k| g.get(*k).is_some_and(Value::is_null))
-                && g["r2_mutations"] == false
-                && g["remote_mutations"] == false,
-            "verification 223 protective evidence changed/stale/tripped"
+            g["producer"]["pid"]
+                .as_u64()
+                .map(|n| n.to_string())
+                .as_deref()
+                == singleton227_admission::active_owner(row)?["MainPID"].as_str(),
+            "closed peer guard PID changed"
         );
-        let selected = warmup223::completed_guard_binding(
-            c::GUARD_UNIT,
-            Path::new(c::GUARD_RECEIPTS),
-            sample,
-            now,
-        )?;
+        let (service, dir) = prefix223_native20_admission::guard_selector(&d.unit)?;
+        let completed = warmup223::completed_guard_binding(service, Path::new(dir), sample, now)?;
         ensure!(
-            selected["binding"] == private157::binding(&gb),
-            "verification 223 guard is not latest completed fire"
+            completed["binding"] == private157::binding(&gb),
+            "closed peer latest completed guard differs"
         );
         let timer = singleton227_capture::properties(
-            &c::GUARD_UNIT.replace(".service", ".timer"),
-            "ActiveState",
+            &service.replace(".service", ".timer"),
+            "ActiveState,SubState",
         )?;
-        ensure!(
-            timer.get("ActiveState").is_some_and(|s| s == "active"),
-            "verification 223 protective timer inactive"
-        );
-        // No guessed allocation credit: the natural guard does not measure the
-        // root. Keep the entire capped archive/metadata claim reserved.
+        singleton227_capture::require(
+            &timer,
+            &[("ActiveState", "active"), ("SubState", "waiting")],
+        )?;
+        let budget = l["candidate_incremental_disk_reservation_bytes"]
+            .as_u64()
+            .context("closed peer disk cap missing")?;
         extra = extra
-            .checked_add(c::PEAK)
-            .context("verification 223 growth overflow")?;
-        evidence.push(json!({"epoch":223,"unit":d.unit,"invocation_id":d.invocation_id,"guard":private157::binding(&gb),
-            "remaining_growth_bytes":c::PEAK,"scratch_growth_credit_bytes":0,"source":"exact bounded private verifier; conservative full output reservation"}));
+            .checked_add(budget)
+            .context("closed peer disk overflow")?;
+        proof.push(json!({"epoch":d.epoch,"unit":d.unit,"invocation_id":d.invocation_id,
+            "remaining_growth_bytes":budget,"scratch_growth_credit_bytes":0,"guard":private157::binding(&gb),"source":"full conservative closed-owner reservation"}));
     }
-    let (n, more) = base::disk(&v, o, &remaining, sample, now)?;
-    evidence.extend(more);
+    let (n, more) = base::disk(&without(f)?, o, &rest, sample, now)?;
+    proof.extend(more);
     Ok((
         n.checked_add(extra)
-            .context("verification 223 combined growth overflow")?,
-        evidence,
+            .context("closed peers combined disk overflow")?,
+        proof,
     ))
+}
+fn binding(path: PathBuf, sha256: String) -> BoundFile {
+    BoundFile { path, sha256 }
 }
 pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     roster(f)?;
@@ -224,61 +245,82 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let mut proof = Vec::new();
     for row in rows(f)? {
         let (d, _) = claim(f, row)?;
-        c::live_limits(&d.scratch_path)?;
-        let path = Path::new("/sys/fs/cgroup/system.slice").join(c::UNIT);
+        live(&d, singleton227_admission::active_owner(row)?)?;
+        let path = Path::new("/sys/fs/cgroup/system.slice").join(&d.unit);
         ensure!(
             path.canonicalize()? == path,
-            "verification 223 cgroup redirected"
+            "closed peer cgroup redirected"
         );
         let read =
             |n: &str| -> Result<u64> { Ok(fs::read_to_string(path.join(n))?.trim().parse()?) };
         let cap = read("memory.max")?;
         let charge = read("memory.current")?;
+        let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
         ensure!(
-            cap == c::MEMORY
-                && read("memory.high")? == (48u64 << 30)
-                && read("memory.swap.max")? == 0
-                && charge <= cap,
-            "verification 223 cgroup envelope changed"
+            page.is_power_of_two()
+                && (4096..=65536).contains(&page)
+                && cap == singleton207::MEMORY / page * page
+                && charge <= cap
+                && read("memory.swap.max")? == 0,
+            "closed peer kernel hard memory differs"
         );
+        // The guard can be between oneshot invocations; reserve its full hard
+        // ceiling instead of silently zeroing it when its cgroup is absent.
+        let (service, _) = prefix223_native20_admission::guard_selector(&d.unit)?;
+        let properties = singleton227_capture::properties(service, "MemoryMax")?;
+        singleton227_capture::require(&properties, &[("MemoryMax", "1073741824")])?;
+        let growth = (cap - charge)
+            .checked_add(1 << 30)
+            .context("closed peer guard memory overflow")?;
         extra = extra
-            .checked_add(cap - charge)
-            .context("verification 223 memory overflow")?;
-        proof.push(json!({"unit":d.unit,"invocation_id":d.invocation_id,"hard_memory_cap_bytes":cap,"current_cgroup_charge_bytes":charge,"remaining_hard_memory_growth_bytes":cap-charge}));
+            .checked_add(growth)
+            .context("closed peer memory overflow")?;
+        proof.push(
+            json!({"unit":d.unit,"invocation_id":d.invocation_id,"hard_memory_cap_bytes":cap,
+            "current_cgroup_charge_bytes":charge,"guard_hard_memory_reserved_bytes":1u64<<30,
+            "remaining_hard_memory_growth_bytes":growth}),
+        );
     }
     let (n, more) = base::memory(&without(f)?)?;
     proof.extend(more);
     Ok((
         n.checked_add(extra)
-            .context("verification 223 combined memory overflow")?,
+            .context("closed peers combined memory overflow")?,
         proof,
     ))
 }
 pub(super) fn limits(f: &Value) -> Result<Value> {
     roster(f)?;
-    let mut out = base::limits(&without(f)?)?;
+    let mut result = base::limits(&without(f)?)?;
     for row in rows(f)? {
         let (d, _) = claim(f, row)?;
-        let p = c::live_limits(&d.scratch_path)?;
+        live(&d, singleton227_admission::active_owner(row)?)?;
+        let (service, _) = prefix223_native20_admission::guard_selector(&d.unit)?;
+        let guard = singleton227_capture::properties(service, "MemoryMax,TasksMax,ExecStart")?;
+        let producer = singleton227_capture::properties(
+            &d.unit,
+            "MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,AllowedCPUs,CPUAffinity,ExecStart",
+        )?;
         ensure!(
-            out.as_object_mut()
-                .context("protected caps")?
-                .insert(c::UNIT.into(), json!(p))
+            result
+                .as_object_mut()
+                .context("closed peer caps object")?
+                .insert(d.unit, json!({"producer":producer,"guard":guard}))
                 .is_none(),
-            "verification 223 cap collision"
+            "closed peer cap collision"
         );
     }
-    Ok(out)
+    Ok(result)
 }
-pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+pub(super) fn current(f: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
     roster(f)?;
-    base::current(&without(f)?, current)?;
+    base::current(&without(f)?, census)?;
     for row in rows(f)? {
         let (d, _) = claim(f, row)?;
-        let live = current
-            .get(c::UNIT)
-            .context("verification 223 current owner omitted")?;
-        c::validate_live(&d, live)?;
+        let u = census
+            .get(&d.unit)
+            .context("closed peer current owner omitted")?;
+        live(&d, u)?;
         let old = singleton227_admission::active_owner(row)?;
         for k in [
             "Id",
@@ -289,7 +331,7 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
             "ActiveState",
             "SubState",
         ] {
-            ensure!(old[k] == live[k], "verification 223 owner changed:{k}");
+            ensure!(old[k] == u[k], "closed peer current owner changed:{k}");
         }
     }
     Ok(())
@@ -297,54 +339,24 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn assembly() -> Value {
-        json!({"epoch":223,"phase":"private-verification-only","ordinary_replay_claim":false,
-            "launch_receipt":format!("{}/launch.json",c::STATE),"launch_receipt_sha256":"c".repeat(64),
-            "producer":{"Id":c::UNIT,"InvocationID":"1".repeat(32),"NRestarts":"0"}})
+    fn row(epoch: u64, name: &str, phase: &str) -> Value {
+        json!({"epoch":epoch,"phase":phase,"ordinary_replay_claim":false,"launch_receipt":"/sealed/launch.json",
+            "launch_receipt_sha256":"a".repeat(64),"producer":{"Id":name,"InvocationID":"b".repeat(32),"NRestarts":"0"}})
     }
     #[test]
-    fn exact_assembly_keeps_full_210_and_all_failed_history_in_the_authoritative_fleet() {
-        let full = json!({"epoch":210,"phase":"diagnostic-qualification","ordinary_replay_claim":false,
-            "unit":{"Id":singleton210::UNIT,"InvocationID":"a".repeat(32),"NRestarts":"0"}});
-        let f = json!({"active":[full,assembly()],"diagnostics":[{"history":"retained"}],"epochs":[{"epoch":223,"state":"failed-needs-repair"}],
-            "plan":"/unchanged/plan","plan_sha256":"b".repeat(64),"unit_census":{"kept":{}}});
-        let original = f.clone();
+    fn lossless_views_keep_all_raw_history_and_recognize_both_exact_profiles() {
+        let a = row(207, singleton207::UNIT, "private-full-epoch-qualification");
+        let b = row(233, first_root233::UNIT, "private-known-root-prefix");
+        let f = json!({"active":[a,b],"unit_census":{"history":1},"epochs":[{"failed":204}],"diagnostics":[{"prior":true}],"plan":"retained"});
         let v = without(&f).unwrap();
-        assert_eq!(v["active"], json!([full]));
-        assert_eq!(
-            roster(&f).unwrap(),
-            BTreeSet::from([c::UNIT.to_owned(), singleton210::UNIT.to_owned()])
-        );
-        for field in [
-            "diagnostics",
-            "epochs",
-            "plan",
-            "plan_sha256",
-            "unit_census",
-        ] {
-            assert_eq!(v[field], f[field], "{field}");
+        assert_eq!(v["active"], json!([]));
+        for k in ["unit_census", "epochs", "diagnostics", "plan"] {
+            assert_eq!(v[k], f[k]);
         }
-        assert_eq!(f, original);
-    }
-    #[test]
-    fn unknown_or_overlapping_223_is_never_erased_from_capacity() {
-        let row = assembly();
-        assert!(without(&json!({"active":[row,row]})).is_err());
-        assert!(without(&json!({"active":[row,base::fixture_row()]})).is_err());
-        for (pointer, value) in [
-            ("/epoch", json!(222)),
-            ("/phase", json!("replay")),
-            ("/ordinary_replay_claim", json!(true)),
-            ("/producer/NRestarts", json!("1")),
-            ("/launch_receipt_sha256", json!("unbound")),
-        ] {
-            let mut bad = row.clone();
-            *bad.pointer_mut(pointer).unwrap() = value;
-            assert!(roster(&json!({"active":[bad]})).is_err(), "{pointer}");
-        }
-        assert!(
-            roster(&json!({"active":[{"epoch":223,"producer":{"Id":"unmodeled.service"}}]}))
-                .is_err()
-        );
+        assert!(without(&json!({"active":[a,a]})).is_err());
+        assert!(without(&json!({"active":[a,{"epoch":207,"producer":{"Id":"foreign"}}]})).is_err());
+        let mut bad = a.clone();
+        bad["ordinary_replay_claim"] = json!(true);
+        assert!(without(&json!({"active":[bad]})).is_err());
     }
 }

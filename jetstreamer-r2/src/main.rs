@@ -3563,6 +3563,21 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-capped204-v4-delivery") {
         return fleet::admit_capped204_v4_delivery();
     }
+    if env::args().nth(1).as_deref() == Some("capture-singleton207-terminal") {
+        return fleet::capture_singleton207_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-singleton207-inputs") {
+        return fleet::prepare_singleton207_inputs();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-singleton207") {
+        return fleet::admit_singleton207();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-singleton207") {
+        return fleet::capture_singleton207();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-singleton207") {
+        return fleet::publish_singleton207_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("admit-singleton209") {
         return fleet::admit_singleton209();
     }

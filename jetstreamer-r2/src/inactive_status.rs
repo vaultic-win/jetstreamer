@@ -278,6 +278,9 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
     if let Some(owner) = fleet::prefix223_native20_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
+    if let Some(owner) = fleet::singleton207_status_inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     if let Some(owner) = fleet::first_root233_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }

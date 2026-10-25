@@ -143,6 +143,19 @@ pub(super) fn check_first_root233(value: &Value) -> Result<Value> {
         MemoryMode::FirstRoot233,
     )
 }
+/// Full 207 uses the same 225 GB producer + 2 GiB helper bracket policy.
+/// This shares only resource arithmetic, never 233 runtime/input qualification.
+pub(super) fn check_singleton207(value: &Value) -> Result<Value> {
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes: singleton207::DISK_RESERVATION,
+            memory_max_bytes: singleton207::MEMORY,
+            minimum_protected_disk_bytes: singleton207::FLOOR,
+        },
+        MemoryMode::FirstRoot233,
+    )
+}
 pub(super) fn first_root233_saved_memory_floor(policy: &Value, total: u64) -> Result<u64> {
     singleton210_memory::first_root233_saved_floor(policy, total)
 }

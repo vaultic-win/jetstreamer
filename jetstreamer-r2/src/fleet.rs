@@ -114,6 +114,7 @@ mod retained220;
 mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
+mod singleton207;
 mod singleton209;
 mod singleton209_admission;
 mod singleton209_capability;
@@ -135,6 +136,7 @@ mod tail223;
 mod tail223_scan;
 mod verification223;
 mod verification223_capacity;
+mod verification223_live_peer;
 mod verification223_prepare;
 mod warmup223;
 mod warmup223_input_capture;
@@ -194,6 +196,27 @@ pub(super) fn first_root233_status_inactive_owner(
 ) -> Result<Option<(String, String)>> {
     first_root233::inactive_owner(receipt)
 }
+pub(super) fn admit_singleton207() -> Result<()> {
+    singleton207::admit()
+}
+pub(super) fn capture_singleton207() -> Result<()> {
+    singleton207::capture_launch()
+}
+pub(super) async fn publish_singleton207_status() -> Result<()> {
+    singleton207::publish_status().await
+}
+pub(super) fn singleton207_status_inactive_owner(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    singleton207::inactive_owner(receipt)
+}
+pub(super) fn capture_singleton207_terminal() -> Result<()> {
+    singleton207::capture_terminal()
+}
+pub(super) fn prepare_singleton207_inputs() -> Result<()> {
+    singleton207::prepare_inputs()
+}
+
 pub(super) fn retire_warmup223_scratch() -> Result<()> {
     warmup223_retire::run()
 }
@@ -751,6 +774,9 @@ fn validate_private_225_terminal(value: &Value) -> Result<()> {
 fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     let launch = bound_json(&claim.launch_receipt)?;
     validate_diagnostic_launch(&launch, claim)?;
+    if singleton207::namespace(claim) {
+        singleton207::bindings(claim, &launch)?;
+    }
     if first_root233::namespace(claim) {
         first_root233::bindings(claim, &launch)?;
     }
@@ -1298,6 +1324,7 @@ fn validate_same_sample_admission(
         223 if tail223::namespace(claim) => tail223::GUARD_SHA,
         223 if prefix223::namespace(claim) => prefix223::GUARD_SHA,
         223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
+        207 if singleton207::namespace(claim) => singleton207::GUARD_SHA,
         233 if first_root233::namespace(claim) => first_root233::GUARD_SHA,
         224 if claim
             .unit
@@ -1496,6 +1523,10 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
 }
 
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
+    if singleton207::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| singleton207::guard_matches(claim, &r, plan));
+    }
     if first_root233::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| first_root233::guard_matches(claim, &r, plan));
@@ -1639,6 +1670,13 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if singleton207::namespace(claim) || receipt["schema"] == singleton207::SCHEMA {
+        ensure!(
+            singleton207::launch_matches(claim, receipt),
+            "singleton 207 namespace, schema, or private prefix scope differs"
+        );
+        return Ok(());
+    }
     if first_root233::namespace(claim) || receipt["schema"] == first_root233::SCHEMA {
         ensure!(
             first_root233::launch_matches(claim, receipt),
@@ -3447,6 +3485,9 @@ pub(super) async fn run() -> Result<()> {
             || (retained220::namespace(claim) && retained220::live(current));
         if is_active {
             register_live_diagnostic_scope(&mut live_diagnostic_epochs, claim)?;
+            if singleton207::namespace(claim) {
+                singleton207::validate_live(claim, current)?;
+            }
             if first_root233::namespace(claim) {
                 first_root233::validate_live(claim, current)?;
             }
@@ -3628,7 +3669,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if epoch136::namespace(claim) {
+            let phase = if singleton207::namespace(claim) {
+                "private-full-epoch-qualification"
+            } else if epoch136::namespace(claim) {
                 "private-corrected-worker-root-repair"
             } else if original141_capped::namespace(claim) {
                 "private-original-entry-capped-root-qualification"
@@ -3842,6 +3885,7 @@ pub(super) async fn run() -> Result<()> {
                         || full210_status::matches(receipt, epoch, &observer, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || first_root233::status_matches(receipt, epoch, &observer, &before)
+                        || singleton207::status_matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                         || capped204205_work::status_matches(receipt, epoch, &capped_work)

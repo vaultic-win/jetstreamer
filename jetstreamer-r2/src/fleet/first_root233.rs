@@ -27,8 +27,9 @@ const NATIVE_SHA: &str = "7c07e9b6a63ef56e202b0139fd0fa13802322d71c8b4c7a0a748a7
 pub(super) const GUARD: &str = "/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard";
 pub(super) const GUARD_SHA: &str =
     "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f";
-const PROTECTIVE: &str = "horizon-first-root233-protective-v1.service";
-const GUARD_RECEIPTS: &str = "/var/lib/jetstreamer/horizon-233-first-root-guard-receipts-v1";
+pub(super) const PROTECTIVE: &str = "horizon-first-root233-protective-v1.service";
+pub(super) const GUARD_RECEIPTS: &str =
+    "/var/lib/jetstreamer/horizon-233-first-root-guard-receipts-v1";
 const ARCHIVE: &str = "epoch-233-through-101087369.jet";
 const BOOTSTRAP: u64 = 100_655_540;
 const FIRST: u64 = 100_656_000;

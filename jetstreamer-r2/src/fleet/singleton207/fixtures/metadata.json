@@ -1,0 +1,73 @@
+{
+  "bootstrap_or_snapshot_rerun": false,
+  "candidate": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-candidate-reviewed-20261025-sdk59001-v1/preflight207-singleton-candidate.json",
+    "sha256": "801707df48654c272b0fffc1005eea97b90dbd1ffe59190aede1c1616e134379"
+  },
+  "candidate_helper": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-candidate-tools-14b71ae8-v1/jetstreamer-epoch207-root-metadata-candidate",
+    "sha256": "e1580a42e00c74728c540c8ce4c8db64fa052250b0787ac119a3844a306748b0"
+  },
+  "candidate_manifest_fingerprint": "sha256:9df04afe0f7ced39c179f2e5dafc34dac2aa6724fe1a8285b38cbfb528834db7",
+  "crc32c": "qIeOcA==",
+  "epoch": 207,
+  "gcloud_observed_entry_sha256": "03d163265c038e9a67b0760ed98de9b5970c4c9d172dbfec03384939d02d4800",
+  "generation": 1633927404656451,
+  "helper_sha256": "aaa0d9ffd6fd8cc858d05daa795fef6de2751247fbe31e4cb8122f229b23c86d",
+  "md5_base64": "j2A9+aBmNPGRhc6DKD2AXQ==",
+  "metadata_evidence_admission_passed": true,
+  "metadata_json_alone_proves_authentication": false,
+  "native_input_qualification_newly_performed": false,
+  "new_gcloud_call_performed": false,
+  "only_first_root_md5_changed": true,
+  "ordinary_download_native_full_replay_admission_separate": true,
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon-207-root-metadata-admit-plan-20261025-sdk59001-v1/admit-plan.json",
+    "sha256": "e8eb817a73c8dd86a2ab003e6cc177b6f3c1f518b8081b6609260546280048e3"
+  },
+  "prior_base": {
+    "path": "/var/lib/jetstreamer/horizon-207-singleton-metadata-v1/preflight207-singleton.json",
+    "sha256": "a921cb0be8c518950b0611d2f03cfa05576655f3160be5732b2bc3157213a580"
+  },
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "remote_mutations": false,
+  "replay_launch_authorized": false,
+  "resource_observation_taken": false,
+  "retained_native_input_proof": {
+    "path": "/var/lib/jetstreamer/horizon-native207-terminal-proof-v1/proof.json",
+    "sha256": "ed39b654d78d4530f82877866d4474435beb353503ad1d3ebfcae04823489819"
+  },
+  "root_seal_is_an_executor_receipt": false,
+  "root_slot": 89523820,
+  "root_witnessed_attempt_bound": true,
+  "runtime_admission_authorized": false,
+  "schema": "jetstreamer-private-epoch207-authenticated-root-metadata-evidence-v1",
+  "sdk_observed_version": "590.0.1",
+  "size": 8419571372,
+  "snapshot_restore_authorized": false,
+  "trust_basis": "Parent-root-witnessed actual one-shot GCloud attempt, independently reviewed and root-sealed; JSON alone is not remote authentication.",
+  "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst#1633927404656451",
+  "witnessed_transport": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-root89523820-metadata-20261025T022105Z-v1/stdout.json",
+      "sha256": "a74a736d22114f93d1461ef0606a3dd650c01f546a6c687ee7573f800bdf9d44"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-root89523820-metadata-20261025T022105Z-v1/command-and-context.json",
+      "sha256": "09f5581400792efdcc05144665fd1860c5f28bc509f93c506d3f89033db72943"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-root89523820-metadata-20261025T022105Z-v1/result.json",
+      "sha256": "137151abc5728d7b323183d703fc0fef0a42a569b13f517cbde53ad74c20cbb7"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-root89523820-metadata-20261025T022105Z-v1/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-207-root89523820-metadata-20261025T022105Z-v1/deployment-seal-receipt.json",
+      "sha256": "3beca6d32f0c72c644e6af53562ac44ba0404011bb2d9dd8b0c39ff0e80c725e"
+    }
+  ]
+}
