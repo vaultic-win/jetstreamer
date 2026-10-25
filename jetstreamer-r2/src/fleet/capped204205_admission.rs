@@ -1,6 +1,8 @@
 //! A future real, fresh complete-fleet admission; never starts a continuation.
 //! Static plans and missing capability evidence cannot produce a positive receipt.
 use super::*;
+mod envelope;
+pub(super) use envelope::{bracketed_fit, bracketed_requirements};
 mod inputs;
 mod sample;
 
@@ -674,18 +676,97 @@ pub(super) fn run() -> Result<()> {
         combined_resources(&f, &o, &s.protected_guards, &after, t, now)?;
     let (after_required_memory, after_memory_policy) =
         memory_requirement(&f, &o, &proposal, after_auxiliary, &after_memory_evidence)?;
-    let free = free_before.min(singleton227_admission::disk_free()?);
-    let memory = memory_before.min(actual_memory(&o)?);
-    ensure!(
-        before == after
-            && caps == combined_limits(&f, &s.protected_guards, &after, now)?
-            && after_growth <= growth
-            && after_auxiliary <= auxiliary
-            && after_required_memory <= required_memory
-            && free >= required
-            && memory >= required_memory,
-        "capped mutable owner/resource envelope changed during admission"
-    );
+    let disk_after = singleton227_admission::disk_free()?;
+    let memory_after = actual_memory(&o)?;
+    let free = free_before.min(disk_after);
+    let memory = memory_before.min(memory_after);
+    let after_caps = combined_limits(&f, &s.protected_guards, &after, now)?;
+    let late_values = envelope::LateValues {
+        growth_before: growth,
+        growth_after: after_growth,
+        auxiliary_before: auxiliary,
+        auxiliary_after: after_auxiliary,
+        required_memory_before: required_memory,
+        required_memory_after: after_required_memory,
+        required_disk: required,
+        sampled_disk_available: sampled_free,
+        sampled_memory_available: sampled_memory,
+        disk_before: free_before,
+        disk_after,
+        memory_before,
+        memory_after,
+    };
+    let late_predicates = envelope::predicates(&late_values, before == after, caps == after_caps);
+    if !late_predicates.passed() {
+        // Preview only: retain the original seven admission predicates until
+        // the conservative-bracket policy receives separate source review.
+        // Recompute existing floors/policies first; never max partial totals
+        // while silently dropping a native223/canary top-up.
+        let recomputed_disk = native228_admission::protected_floor(
+            century,
+            growth.max(after_growth),
+            &s.protected_guards,
+        )
+        .and_then(|(floor, _)| disk_requirement(&p, floor));
+        let recomputed_memory = memory_requirement(
+            &f,
+            &o,
+            &proposal,
+            auxiliary.max(after_auxiliary),
+            &after_memory_evidence,
+        );
+        let bracket_preview = match (&recomputed_disk, &recomputed_memory) {
+            (Ok(disk), Ok((memory, policy))) => {
+                let (required_disk, required_memory) = bracketed_requirements(
+                    required,
+                    *disk,
+                    required_memory,
+                    after_required_memory,
+                    *memory,
+                );
+                json!({"diagnostic_preview_only":true,"admission_policy_changed":false,
+                    "growth_max":growth.max(after_growth),"auxiliary_max":auxiliary.max(after_auxiliary),
+                    "disk_required":required_disk,"memory_required":required_memory,
+                    "memory_policy_after_max_auxiliary_recompute":policy,
+                    "would_fit":bracketed_fit(before==after,caps==after_caps,required_disk,required_memory,
+                        [sampled_free,free_before,disk_after],[sampled_memory,memory_before,memory_after])})
+            }
+            _ => json!({"diagnostic_preview_only":true,"admission_policy_changed":false,
+                "would_fit":false,
+                "disk_recomputation_error":recomputed_disk.as_ref().err().map(|e|format!("{e:#}")),
+                "memory_recomputation_error":recomputed_memory.as_ref().err().map(|e|format!("{e:#}"))}),
+        };
+        let at = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+        let at = u64::try_from(at).context("failed admission audit clock overflow")?;
+        let report = json!({
+            "schema":"jetstreamer-capped204205-failed-admission-audit-v1",
+            "epoch":p["epoch"],"spec":private157::binding(&spec_binding),"self_sha256":self_sha,
+            "producer_plan":private157::binding(&s.producer_plan),
+            "resource_proposal":private157::binding(&s.resource_proposal),
+            "fleet":private157::binding(&s.fleet),"observer":private157::binding(&s.observer),
+            "protected_guards":s.protected_guards,
+            "recorded_unix_millis":at,"predicates":late_predicates,"values":late_values,
+            "conservative_bracket_preview":bracket_preview,
+            "unit_census_before":before,"unit_census_after":after,
+            "protected_caps_before":caps,"protected_caps_after":after_caps,
+            "guard_evidence_before":guard_before,"guard_evidence_after":after_guard,
+            "growth_evidence_before":growth_evidence,"growth_evidence_after":after_growth_evidence,
+            "memory_evidence_before":memory_evidence,"memory_evidence_after":after_memory_evidence,
+            "memory_policy_before":memory_policy,"memory_policy_after":after_memory_policy,
+            "century_floor_bytes":century,"computed_protected_floor_bytes":protected,
+            "maximum_existing_guard_floor_bytes":existing_guard_floor,
+            "admitted":false,"resource_samples_taken":0,"producer_started":false,
+            "native_initialized":false,"replay_launch_authorized":false,
+            "publication_authorized":false,"canonical_sidecar_authorized":false,
+            "retirement_authorized":false,"remote_mutations":false,"r2_mutations":false,
+        });
+        let path = envelope::persist_failure(&s.output, at, std::process::id(), &report)
+            .with_context(|| format!("capped mutable owner/resource envelope changed during admission; failed to persist diagnostic; predicates={late_predicates:?}"))?;
+        bail!(
+            "capped mutable owner/resource envelope changed during admission; diagnostic={}",
+            path.display()
+        );
+    }
     let recorded = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
     let recorded = u64::try_from(recorded).context("capped admission clock overflow")?;
     ensure!(
