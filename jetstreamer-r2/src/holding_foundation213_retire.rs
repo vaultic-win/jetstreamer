@@ -34,7 +34,7 @@ fn operation(p: &Spec) -> Value {
     json!({"schema":"jetstreamer-foundation-holding-retirement-operation-v1",
         "mapping":p.mapping,"custody":p.custody,"restoration":p.restoration})
 }
-fn id(metadata: &fs::Metadata) -> Value {
+pub(in crate::holding) fn id(metadata: &fs::Metadata) -> Value {
     // rename changes ctime. All other identity attributes remain mandatory;
     // every quarantined body is fully rehashed before its deletion intent.
     json!({"device":metadata.dev(),"inode":metadata.ino(),"length":metadata.len(),
@@ -69,7 +69,7 @@ fn target_identity(path: &Path, original: bool) -> Result<Value> {
     }
     Ok(id(&m))
 }
-fn absence(path: &Path) -> Result<bool> {
+pub(in crate::holding) fn absence(path: &Path) -> Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(_) => Ok(false),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(true),
@@ -195,7 +195,7 @@ fn record_bytes_in(root: &Path, path: &Path, owner: u32, group: u32) -> Result<V
     record_namespace(root, path, &root_fd, &parent_fd, &file, owner, group)?;
     Ok(bytes)
 }
-fn read_record(path: &Path) -> Result<Value> {
+pub(in crate::holding) fn read_record(path: &Path) -> Result<Value> {
     // Production ownership remains exact root:root; fixture owner parameters
     // are private to the shared implementation and never command inputs.
     Ok(serde_json::from_slice(&record_bytes_in(
@@ -205,7 +205,7 @@ fn read_record(path: &Path) -> Result<Value> {
         0,
     )?)?)
 }
-fn binding(path: &Path) -> Result<Value> {
+pub(in crate::holding) fn binding(path: &Path) -> Result<Value> {
     let bytes = record_bytes_in(Path::new(STATE), path, 0, 0)?;
     let _: Value = serde_json::from_slice(&bytes)?;
     Ok(json!({"path":path,"sha256":hex_lower(&Sha256::digest(bytes))}))
@@ -359,13 +359,13 @@ fn record_matches(
     Ok(())
 }
 #[derive(Debug, PartialEq)]
-enum ResumeState {
+pub(in crate::holding) enum ResumeState {
     Move,
     Quarantined,
     Unlinked,
     Complete,
 }
-fn resume_state(
+pub(in crate::holding) fn resume_state(
     source: bool,
     quarantine: bool,
     deletion: bool,
@@ -393,7 +393,11 @@ fn resume_state(
         Ok(ResumeState::Unlinked)
     }
 }
-fn pinned_directory(path: &Path, owner: Option<u32>, private_mode: bool) -> Result<File> {
+pub(in crate::holding) fn pinned_directory(
+    path: &Path,
+    owner: Option<u32>,
+    private_mode: bool,
+) -> Result<File> {
     ensure!(path.canonicalize()? == path, "aliased retirement directory");
     let before = fs::symlink_metadata(path)?;
     let directory = OpenOptions::new()
@@ -419,7 +423,11 @@ fn child(path: &Path) -> Result<CString> {
     );
     Ok(CString::new(path.as_os_str().as_bytes())?)
 }
-fn rename_pinned(source: &Path, directory: &File, name: &Path) -> Result<()> {
+pub(in crate::holding) fn rename_pinned(
+    source: &Path,
+    directory: &File,
+    name: &Path,
+) -> Result<()> {
     let parent = pinned_directory(
         source.parent().context("retirement source parent")?,
         None,
@@ -448,7 +456,11 @@ fn rename_pinned(source: &Path, directory: &File, name: &Path) -> Result<()> {
     directory.sync_all()?;
     Ok(())
 }
-fn unlink_pinned(directory: &File, name: &Path, expected: &Value) -> Result<()> {
+pub(in crate::holding) fn unlink_pinned(
+    directory: &File,
+    name: &Path,
+    expected: &Value,
+) -> Result<()> {
     let name = child(name)?;
     let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
     ensure!(

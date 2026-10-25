@@ -7,7 +7,7 @@ mod maintenance;
 #[path = "holding_foundation213_restore_self.rs"]
 mod restore_self;
 #[path = "holding_foundation213_retire.rs"]
-mod retirement;
+pub(super) mod retirement;
 pub(crate) use restore_self::Context as RestoreContext;
 
 const STATE: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1";
@@ -823,9 +823,11 @@ mod tests {
     }
     #[test]
     fn only_two_exact_public_artifacts_and_the_user_namespace_are_addressable() {
-        assert!(key(review::SOURCE_SHA)
-            .unwrap()
-            .starts_with("foundation_node_01/objects/"));
+        assert!(
+            key(review::SOURCE_SHA)
+                .unwrap()
+                .starts_with("foundation_node_01/objects/")
+        );
         assert!(key(PROBE_SHA).unwrap().ends_with(".blob"));
         assert!(key("953e8c9efbdfc0dc49e4f066d30046e3b44e1a13e065b340a5bcc7b093632261").is_err());
         assert!(key("../epoch-213.jet").is_err());

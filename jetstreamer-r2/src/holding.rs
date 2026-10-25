@@ -5,6 +5,8 @@ use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
 #[path = "holding_epoch136.rs"]
 mod epoch136;
+#[path = "holding_foundation203.rs"]
+mod foundation203;
 #[path = "holding_foundation213.rs"]
 mod foundation213;
 #[path = "holding_resumable213.rs"]
@@ -1183,6 +1185,7 @@ pub(super) fn command(action: &str) -> bool {
             | "holding-restore-genesis-probe"
             | "holding-inspect136"
     ) || foundation213::command(action)
+        || foundation203::command(action)
 }
 
 pub(super) async fn run() -> Result<()> {
@@ -1209,6 +1212,9 @@ pub(super) async fn run() -> Result<()> {
         sha256: args[4].clone(),
     };
     let v = bound(&spec)?;
+    if foundation203::command(&args[1]) {
+        return foundation203::run(&args[1], v, &spec).await;
+    }
     if foundation213::command(&args[1]) {
         return foundation213::run(&args[1], v, &spec).await;
     }

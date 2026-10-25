@@ -38,7 +38,13 @@ mod continuation203_ops;
 mod continuation203_runtime;
 mod epoch136;
 mod first_root233;
+mod foundation_holding203;
 mod foundation_holding_capacity;
+pub(super) fn foundation_holding203_check(value: &Value, restoring: bool) -> Result<Value> {
+    foundation_holding203::check(value, restoring)
+}
+mod demotion223_capacity;
+mod demotion223_status;
 mod full209_status;
 mod full210_peer;
 mod full210_status;
@@ -46,27 +52,43 @@ mod full210_terminal;
 mod full227_failure;
 mod full227_status;
 mod maintenance_capacity;
-mod demotion223_capacity;
-mod demotion223_status;
 
-pub(super) fn capture_demotion223_task() -> Result<()> { demotion223_status::capture() }
-pub(super) fn capture_demotion223_terminal() -> Result<()> { demotion223_status::capture_terminal() }
-pub(super) async fn publish_demotion223_status() -> Result<()> { demotion223_status::publish().await }
-pub(super) fn demotion223_binding_scope(b: &pipeline_status::Binding, epoch: u64, phase: &str) -> Result<()> {
+pub(super) fn capture_demotion223_task() -> Result<()> {
+    demotion223_status::capture()
+}
+pub(super) fn capture_demotion223_terminal() -> Result<()> {
+    demotion223_status::capture_terminal()
+}
+pub(super) async fn publish_demotion223_status() -> Result<()> {
+    demotion223_status::publish().await
+}
+pub(super) fn demotion223_binding_scope(
+    b: &pipeline_status::Binding,
+    epoch: u64,
+    phase: &str,
+) -> Result<()> {
     demotion223_status::binding_scope(b, epoch, phase)
 }
-pub(super) fn demotion223_inactive_owner(r: &StatusPublicationReceipt) -> Result<Option<(String,String)>> {
+pub(super) fn demotion223_inactive_owner(
+    r: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
     demotion223_status::inactive_owner(r)
 }
 pub(super) fn demotion223_cleanup_time(epoch: u64, value: &Value) -> Result<Option<u64>> {
     demotion223_status::cleanup_time(epoch, value)
 }
-pub(super) fn demotion223_cleanup_current(epoch: u64, value: &Value, current: &BTreeMap<String,Value>, owners: &[(String,String)]) -> Result<bool> {
+pub(super) fn demotion223_cleanup_current(
+    epoch: u64,
+    value: &Value,
+    current: &BTreeMap<String, Value>,
+    owners: &[(String, String)],
+) -> Result<bool> {
     demotion223_status::cleanup_current(epoch, value, current, owners)
 }
 pub(super) fn compute_demotion223_capacity() -> Result<()> {
     demotion223_capacity::run()
 }
+mod demotion223_live_peer;
 mod native141;
 mod native144;
 mod native203;
@@ -118,7 +140,6 @@ mod prefix205_admission;
 mod prefix205_capture;
 mod prefix223;
 mod prefix223_live_peer;
-mod demotion223_live_peer;
 mod prefix223_live_sources;
 mod prefix223_native20;
 mod prefix223_native20_admission;
@@ -969,7 +990,9 @@ pub(super) fn pipeline_unit_range_for_epoch(
     unit: &str,
     epoch: u64,
 ) -> Result<std::ops::RangeInclusive<u64>> {
-    if epoch == 223 && demotion223_status::scope(phase, unit) { return Ok(223..=223); }
+    if epoch == 223 && demotion223_status::scope(phase, unit) {
+        return Ok(223..=223);
+    }
     if epoch == 223 && private223_status_scope(phase, unit) {
         return Ok(223..=223);
     }
@@ -1115,7 +1138,9 @@ fn validate_pipeline_claim(claim: &PipelineClaim, first: u64, last: u64) -> Resu
             && !claim.evidence.is_empty(),
         "invalid observational pipeline claim"
     );
-    if demotion223_status::scope(&claim.phase, &claim.unit) { demotion223_status::validate_claim(claim, None)?; }
+    if demotion223_status::scope(&claim.phase, &claim.unit) {
+        demotion223_status::validate_claim(claim, None)?;
+    }
     Ok(())
 }
 
@@ -1206,7 +1231,9 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
                     .is_some_and(|pid| pid > 0),
             "pipeline live identity or exact command changed"
         );
-        if demotion223_status::scope(&claim.phase, &claim.unit) { demotion223_status::validate_claim(claim, Some(current))?; }
+        if demotion223_status::scope(&claim.phase, &claim.unit) {
+            demotion223_status::validate_claim(claim, Some(current))?;
+        }
         if super::repair141::scope(&claim.phase, &claim.unit) {
             let evidence = claim
                 .evidence
@@ -2928,7 +2955,14 @@ pub(super) async fn run() -> Result<()> {
                     started_seconds,
                 )?;
             } else if demotion223_status::event_schema(&event) {
-                demotion223_status::event_predecessor(&previous, &plan, &plan_bound, &event, sample, started_seconds)?;
+                demotion223_status::event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == capped204205_work::EVENT_SCHEMA {
                 capped204205_work::event_predecessor(
                     &previous,
@@ -3221,7 +3255,9 @@ pub(super) async fn run() -> Result<()> {
             "duplicate pipeline unit or diagnostic relabeling"
         );
         register_pipeline_claim(&mut pipeline_units, claim)?;
-        if demotion223_status::scope(&claim.phase, &claim.unit) { names.extend(demotion223_status::claim_names(claim)?); }
+        if demotion223_status::scope(&claim.phase, &claim.unit) {
+            names.extend(demotion223_status::claim_names(claim)?);
+        }
         for evidence in &claim.evidence {
             bound_json(evidence)?;
         }
@@ -3531,7 +3567,8 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
-                        || ((demotion223_status::scope(&claim.phase, &claim.unit) || super::repair141::scope(&claim.phase, &claim.unit)
+                        || ((demotion223_status::scope(&claim.phase, &claim.unit)
+                            || super::repair141::scope(&claim.phase, &claim.unit)
                             || tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)
                             || native210::scope(&claim.phase, &claim.unit)
@@ -6330,6 +6367,10 @@ pub(super) fn qualification_recovery204_successor(
     actor_launch: &Value,
 ) -> Result<()> {
     assembly204_recovery::qualification_successor(
-        f, current, unit, iid, &serde_json::from_value(actor_launch.clone())?,
+        f,
+        current,
+        unit,
+        iid,
+        &serde_json::from_value(actor_launch.clone())?,
     )
 }

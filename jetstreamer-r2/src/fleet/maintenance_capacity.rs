@@ -6,6 +6,7 @@ mod singleton210_memory;
 #[derive(Clone, Copy)]
 enum MemoryMode {
     Existing,
+    Foundation203,
     Full210,
     Full209Delivery,
     FirstRoot233,
@@ -317,13 +318,16 @@ fn memory_sample(
         .as_u64()
         .and_then(|n| n.checked_mul(1024))
         .context("maintenance sampled available memory")?;
-    let (reserve, accounted_floor) = if matches!(mode, MemoryMode::Existing) {
-        (reserve, 0)
-    } else {
-        hard_growth(f, total, reserve, &owners)?
-    };
+    let (reserve, accounted_floor) =
+        if matches!(mode, MemoryMode::Existing | MemoryMode::Foundation203) {
+            (reserve, 0)
+        } else {
+            hard_growth(f, total, reserve, &owners)?
+        };
     let (required, policy) = match mode {
-        MemoryMode::Existing => (memory_required(reserve, total, candidate)?, None),
+        MemoryMode::Existing | MemoryMode::Foundation203 => {
+            (memory_required(reserve, total, candidate)?, None)
+        }
         MemoryMode::AssemblyRecovery204 => {
             let (required, mut policy) =
                 assembly204_recovery_memory_required(f, total, reserve, candidate)?;
@@ -454,6 +458,20 @@ pub(super) fn assembly204_native_terminal_fixture() -> Value {
 }
 fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<Value> {
     check_inner_with(value, candidate, mode, None)
+}
+fn foundation203_candidate(restoring: bool) -> Candidate {
+    Candidate {
+        additional_bytes: (64 << 20) + if restoring { 81_739_258_626 } else { 0 },
+        memory_max_bytes: 6 << 30,
+        minimum_protected_disk_bytes: 0,
+    }
+}
+pub(super) fn check_foundation203(value: &Value, restoring: bool) -> Result<Value> {
+    check_inner(
+        value,
+        foundation203_candidate(restoring),
+        MemoryMode::Foundation203,
+    )
 }
 pub(super) fn check_demotion223(
     value: &Value,
@@ -730,7 +748,7 @@ fn fleet_for_mode(
     accepted: &impl Fn(&BoundFile, &BoundFile) -> Result<Value>,
     canonical: &impl Fn(&BoundFile) -> Result<Value>,
 ) -> Result<Value> {
-    if matches!(mode, MemoryMode::Full210) {
+    if matches!(mode, MemoryMode::Full210 | MemoryMode::Foundation203) {
         return accepted(fleet, observer);
     }
     ensure!(
@@ -749,6 +767,59 @@ mod tests {
             path: path.into(),
             sha256: "a".repeat(64),
         }
+    }
+    #[test]
+    fn foundation203_requires_authenticated_full_context_without_fallback() {
+        let observer = context_binding("/saved/observer.json");
+        for path in [
+            "/var/lib/jetstreamer/horizon-campaign-fleet/fixture-v1/fleet.json",
+            "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-cycle417-refresh-v1/fleet.json",
+            "/var/lib/jetstreamer/horizon-canary227-terminal-fleet-fixture-v1/fleet.json",
+        ] {
+            let fleet = context_binding(path);
+            let raw =
+                json!({"active":[{"epoch":204}],"history":[{"raw":true}],"epochs":[{"epoch":203}]});
+            let actual = fleet_for_mode(
+                MemoryMode::Foundation203,
+                &fleet,
+                &observer,
+                &|f, o| {
+                    assert_eq!(f.path, fleet.path);
+                    assert_eq!(o.sha256, observer.sha256);
+                    Ok(raw.clone())
+                },
+                &|_| panic!("Foundation203 cannot use unvalidated fleet reader"),
+            )
+            .unwrap();
+            assert_eq!(actual, raw);
+            assert!(
+                fleet_for_mode(
+                    MemoryMode::Foundation203,
+                    &fleet,
+                    &observer,
+                    &|_, _| bail!("context rejected"),
+                    &|_| panic!("context rejection cannot fall back")
+                )
+                .is_err()
+            );
+        }
+    }
+    #[test]
+    fn foundation203_serial_restore_does_not_reserve_an_unstarted_full210() {
+        let candidate = foundation203_candidate(true);
+        assert_eq!(candidate.additional_bytes, 81_806_367_490);
+        assert_eq!(candidate.memory_max_bytes, 6 << 30);
+        assert_eq!(candidate.minimum_protected_disk_bytes, 0);
+        assert_eq!(foundation203_candidate(false).additional_bytes, 64 << 20);
+        // Current inherited guard floor already incorporates the complete
+        // existing peer obligations. The future Full210 candidate is absent.
+        let free = 2_520_694_075_392;
+        let existing = 2_034_359_738_368;
+        let required = envelope(existing, candidate.additional_bytes, free).unwrap();
+        assert_eq!(required, 2_116_166_105_858);
+        assert_eq!(free - required, 404_527_969_534);
+        assert!(envelope(existing, candidate.additional_bytes, required - 1).is_err());
+        assert_eq!(memory_required(100, 1000, 6).unwrap(), 206);
     }
     #[test]
     fn full210_uses_authenticated_context_for_canonical_and_private_fleets() {
