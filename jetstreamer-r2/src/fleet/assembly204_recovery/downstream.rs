@@ -293,6 +293,7 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
         &logs,
         &qa_files,
         read,
+        |b| sealed(b, 32 << 20),
     )?;
     Ok(tool)
 }

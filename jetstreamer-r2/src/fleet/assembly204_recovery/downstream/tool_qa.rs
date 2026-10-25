@@ -34,12 +34,53 @@ fn relevant(args: &[&str], component: &str) -> Option<bool> {
             .any(|a| a.strip_prefix("--package=") == Some(component));
     package.then_some(kind)
 }
+fn nonzero_passed_tests(bytes: &[u8]) -> Result<()> {
+    let text = std::str::from_utf8(bytes).context("204 component test log is not UTF-8")?;
+    let mut nonzero = false;
+    for line in text.lines() {
+        let Some(summary) = line.trim().strip_prefix("test result: ok. ") else {
+            continue;
+        };
+        let fields = summary.split("; ").collect::<Vec<_>>();
+        ensure!(
+            fields.len() >= 5,
+            "204 component test summary is incomplete"
+        );
+        let labels = [
+            " passed",
+            " failed",
+            " ignored",
+            " measured",
+            " filtered out",
+        ];
+        let mut counts = [0u64; 5];
+        for (index, label) in labels.iter().enumerate() {
+            counts[index] = fields[index]
+                .strip_suffix(*label)
+                .context("204 component test summary label differs")?
+                .parse()?;
+        }
+        ensure!(
+            counts[1] == 0,
+            "204 successful test summary claims failures"
+        );
+        // Do not add overlapping/nested groups or treat ignored fixtures as passes.
+        // Zero-test binaries/doc groups may accompany a nonzero unit group.
+        nonzero |= counts[0] > 0;
+    }
+    ensure!(
+        nonzero,
+        "204 component test log has no genuine nonzero passed group"
+    );
+    Ok(())
+}
 fn completed(
     args: &[&str],
     component: &str,
     exit: &Value,
     log: &str,
     logs: &[BoundFile],
+    read_log: &mut impl FnMut(&BoundFile) -> Result<Vec<u8>>,
 ) -> Result<Option<bool>> {
     let Some(clippy) = relevant(args, component) else {
         return Ok(None);
@@ -57,6 +98,20 @@ fn completed(
         is_lower_hex(log, 64) && logs.iter().any(|b| b.sha256 == log),
         "204 successful component QA lacks its actual sealed log"
     );
+    if !clippy {
+        ensure!(
+            !args.iter().any(|a| *a == "--no-run"
+                || *a == "--list"
+                || a.starts_with("--no-run=")
+                || a.starts_with("--list=")),
+            "204 component test command did not execute tests"
+        );
+        let actual_log = logs
+            .iter()
+            .find(|b| b.sha256 == log)
+            .context("204 actual component log missing")?;
+        nonzero_passed_tests(&read_log(actual_log)?)?;
+    }
     Ok(Some(clippy))
 }
 fn origin(row: &Value, key: &str) -> Result<BoundFile> {
@@ -83,6 +138,7 @@ pub(super) fn validate(
     logs: &[BoundFile],
     files: &[EvidenceFile],
     mut read_result: impl FnMut(&BoundFile) -> Result<Value>,
+    mut read_log: impl FnMut(&BoundFile) -> Result<Vec<u8>>,
 ) -> Result<()> {
     ensure!(is_lower_hex(source, 40), "204 tool QA source digest");
     let mut originals = BTreeSet::new();
@@ -186,13 +242,14 @@ pub(super) fn validate(
                 &result["exit_code"],
                 &log_origin.sha256,
                 logs,
+                &mut read_log,
             )? {
                 clippy |= is_clippy;
                 test |= !is_clippy;
             }
             continue;
         };
-        if let Some(is_clippy) = completed(&args, component, exit, log, logs)? {
+        if let Some(is_clippy) = completed(&args, component, exit, log, logs, &mut read_log)? {
             clippy |= is_clippy;
             test |= !is_clippy;
         }
@@ -287,6 +344,9 @@ mod tests {
                     .cloned()
                     .context("missing actual result")
             },
+            |_| {
+                Ok(b"test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n".to_vec())
+            },
         )
     }
     #[test]
@@ -379,5 +439,39 @@ mod tests {
             };
             assert!(check(&bad, &logs, &files, &results).is_err());
         }
+    }
+    #[test]
+    fn test_execution_requires_actual_nonzero_log_not_summary_or_compile_only_success() {
+        for text in [
+            "",
+            "Finished release profile",
+            "7 tests listed",
+            "test result: ok. 0 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 0s",
+            "test result: ok. 7 passed; 0 failed; 1 ignored",
+        ] {
+            assert!(nonzero_passed_tests(text.as_bytes()).is_err(), "{text}");
+        }
+        nonzero_passed_tests(b"test result: ok. 2 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0s").unwrap();
+        let (qa, logs, files, results) = fixture(false);
+        assert!(validate(&qa,&"e".repeat(40),"jetstreamer-horizon",&logs,&files,
+            |b|results.get(&b.path).cloned().context("missing result"),
+            |_|Ok(b"test result: ok. 0 passed; 0 failed; 99 ignored; 0 measured; 0 filtered out; finished in 0s".to_vec())).is_err());
+        for flag in ["--no-run", "--list"] {
+            let mut modified = results.clone();
+            modified.get_mut(&files[0].copy.path).unwrap()["argv"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!(flag));
+            assert!(check(&qa, &logs, &files, &modified).is_err());
+        }
+        let log = bound("/sealed/legacy.log", 'a');
+        let mut legacy = json!({"commands":[
+            {"command":["cargo","test","-p","jetstreamer-horizon","--no-run"],"exit_code":0,"log_sha256":log.sha256},
+            {"command":["cargo","clippy","-p","jetstreamer-horizon","--","-Dwarnings"],"exit_code":0,"log_sha256":log.sha256}]});
+        assert!(check(&legacy, std::slice::from_ref(&log), &[], &BTreeMap::new()).is_err());
+        legacy["commands"][0]["command"] =
+            json!(["cargo", "test", "-p", "jetstreamer-horizon", "--", "--list"]);
+        assert!(check(&legacy, &[log], &[], &BTreeMap::new()).is_err());
     }
 }

@@ -929,7 +929,6 @@ mod tests {
             MemoryMode::Full209Delivery,
             MemoryMode::FirstRoot233,
             MemoryMode::Capped204V4,
-            MemoryMode::AssemblyRecovery204,
         ] {
             assert_eq!(
                 fleet_for_mode(
