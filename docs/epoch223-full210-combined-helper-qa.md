@@ -6,15 +6,18 @@ R2 operation was performed. Exact command arrays and source pins are in
 
 ## Source closure
 
-The combined source checkpoint is `2bf7a3f2d5ed0f8c6307254d67216055f2558b4b`
-(tree `80e53e956b8d61f902e9e18d803ab29c430d2ddb`). It is frozen bracket checkpoint
+The combined implementation checkpoint is `7412f095d56a9683c257ea29532225f98d8f97ce`
+(tree `389c9f9d1febcb8e3caeb8e65fa675442a36d54a`). It is frozen bracket checkpoint
 `87f98a80` plus exact full 210 commits `1d0ab837`, `74b0699a`, `63a5e385`.
 Their sole added source change is `maintenance_capacity/singleton210_memory.rs`.
 Reviewed terminal 227 commits e3d84732, c6992980 and 511fbc75 are now also
 integrated, with only the separately requested two error-message spacing edits.
 All eight shared eaa files remain byte-identical to eaa8f5ac. Later full-root
-source is preserved separately. The epoch 204 refresh
-repair remains pending; this checkpoint is not claimed operationally complete.
+source is preserved separately. Reviewed epoch 204 commits 26e9eed8 and 9d0c9ac4 are now integrated.
+Both cherry-picked cleanly. The fleet assembly-owner map adds the recovery owner
+without removing capped owners or the separate demotion 223 adapter. Host-memory
+accounting retains the typed assembly path followed by demotion 223 memory views.
+No semantic conflict was found. This source is still unqualified.
 
 Static comparison against reviewed closure 688aa576 found every reviewed path
 package manifest unchanged. Workspace/R2 manifests, lock and Cargo config SHA-256
@@ -63,11 +66,13 @@ All commands use `--release --frozen --locked --offline -j2 -p jetstreamer-r2`.
 3. Focused all-feature test group `canary227`.
 4. Focused all-feature test group `canary227_terminal`.
 5. Focused all-feature test group `inactive_status` (including canary cleanup).
-6. Focused all-feature test group `prefix223_live_peer`.
-7. Focused all-feature test group `singleton210_memory`.
-8. Focused all-feature test group `maintenance_capacity`.
-9. Complete all-feature package suite.
-10. Complete default-feature package suite.
+6. Focused all-feature test group `assembly204_recovery`.
+7. Focused all-feature test group `fleet_memory`.
+8. Focused all-feature test group `prefix223_live_peer`.
+9. Focused all-feature test group `singleton210_memory`.
+10. Focused all-feature test group `maintenance_capacity`.
+11. Complete all-feature package suite.
+12. Complete default-feature package suite.
 
 Tests use `-- --test-threads=1`; no ignored tests are forced to run. Record exact
 matched test names/counts; a zero-match focused group is a failure of the plan.
@@ -110,4 +115,22 @@ actual systemd/R2 cleanup remains outside source QA.
 The source checkpoint in the machine plan predates only the requested wording
 changes and this proposal update. Root must pin the final document commit and
 full tracked source census before execution. No production/native artifact pin
-has been created, and the epoch 204 source fix is still awaited.
+has been created, and epoch 204 source qualification remains required.
+
+## Final combined execution preparation
+
+Root must review the final clean source commit/tree and external package hashes,
+then explicitly authorize staging at the existing passed source pathname
+`assembly204-aac-qa-corrections-worktree` and transfer its shared target lease.
+Preparation has not moved that pathname or read/written target/cache. The external
+package supplies a full tracked source census, exact commands, unchanged reviewed
+closure, original cumulative baseline and an adapted bounded wrapper proposal.
+The prior eaa result is historical evidence, not this successor's qualification.
+All prior evidence and retry allocations remain charged; the last historical
+combined charge was 2,850,996,224 bytes, not a current free-budget measurement.
+
+The focused recovery tests cover original-actor immutable lineage across routine
+frames, 30-minute cadence with the exact explicit user-requested exception, and
+real host RSS/guard accounting as non-replay overhead. Phase-origin inputs cannot
+be replaced by arbitrary later data. Full suites must still pass after source
+integration. The execution package is preparation only, not a launch instruction.
