@@ -6,6 +6,9 @@ const MAX_WAIT_MILLIS: u64 = 120_000;
 const MAX_ADMISSION_AGE_MILLIS: u64 = 120_000;
 const HASH_MEMORY_HIGH: u64 = 14 << 30;
 const HASH_MEMORY_MAX: u64 = 16 << 30;
+mod issuance {
+    include!("epoch223_demotion_issue.rs");
+}
 mod custody {
     include!("epoch223_demotion_custody.rs");
 }
@@ -152,7 +155,7 @@ struct GuardProof {
     publication_authorized: bool,
     r2_mutations: bool,
 }
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 struct ControlGrant {
     schema: String,
@@ -193,9 +196,13 @@ struct IssueSpec {
     admission_policy: BoundFile,
     accepted_observer: BoundFile,
     accepted_fleet: BoundFile,
-    context_qualification: BoundFile,
     repair_task: BoundFile,
     guard: BoundFile,
+    issuer_unit: String,
+    accounting_basis: BoundFile,
+    accounting_directory: PathBuf,
+    maximum_acknowledgment_wait_millis: u64,
+    maximum_lock_wait_millis: u64,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -750,6 +757,7 @@ impl Runtime {
                     observe(&actor)?;
                     observe(&admission.issuer)?;
                     observe(&guard.actor)?;
+                    issuance::validate_control_capacity(&admission, x)?;
                     check_control_kernel(p)?;
                     session
                         .gate
@@ -873,7 +881,6 @@ fn validate_issue_and_guard_plan(
             && i.admission_policy == a.admission_policy
             && i.accepted_observer == a.accepted_observer
             && i.accepted_fleet == a.accepted_fleet
-            && i.context_qualification == a.context_qualification
             && i.repair_task == a.repair_task
             && i.guard == a.guard
             && a.issuer.expected_exec_start
@@ -888,6 +895,8 @@ fn validate_issue_and_guard_plan(
     ensure!(
         q.schema == "jetstreamer-epoch223-demotion-guard-plan-v1"
             && q.runtime_plan == *plan
+            && q.guard_unit == g.actor.unit
+            && q.ready_output == a.guard.path
             && q.watched_runner == a.runner
             && q.admission_policy == a.admission_policy
             && q.run_root == p.run_root

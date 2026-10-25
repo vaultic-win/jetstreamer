@@ -229,7 +229,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     custody.file("cgroup.kill", true)?;
     let root = RunRoot::open(&plan.run_root, 1000)?;
     inspect(&plan, &custody, &root)?;
-    persist(
+    issuance::published(
         &plan.ready_output,
         &json!({"schema":"jetstreamer-epoch223-demotion-guard-ready-v1",
         "actor":actor,"watched_runner":plan.watched_runner,"guard_plan":binding,

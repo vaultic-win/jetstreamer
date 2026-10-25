@@ -80,7 +80,7 @@ The independent guard command remains:
 
 `EXE guard-epoch223-demotion PLAN --plan-sha256 SHA --self-sha256 ELF_SHA`
 
-Actual control/spawn issuers and native supervisor still require source completion.
+The spawn issuer and native supervisor still require source completion.
 Every new role, including the guard, remains unbuilt and unqualified. Their interface types are not
 execution evidence. The current patch implements two root-only metadata
 capture commands in the private utility binary:
@@ -120,9 +120,11 @@ group before attempting failure-receipt writes, backed by ChildGroup Drop. A
 disposable child/receipt-failure fixture covers that backstop; it remains unrun.
 
 Consumed root metadata must be readable through the runner's reviewed sandbox.
-Root capture outputs currently remain root-private; deployment must supply a
-separately sealed readable copy of approved non-sensitive evidence or an exact
-reviewed traversal capability. Do not loosen preserved private evidence. Every
+Root metadata captures and guard/control-ready outputs use no-clobber root-owned
+mode0444 files in an exact original private parent. Deployment must still ensure
+that every configured ancestor is readable through the intended sandbox; preserve
+root-private originals and publish separately bound copies of approved non-sensitive
+evidence where necessary. Do not loosen preserved private evidence. Every
 metadata handle is no-follow, bounded, immutable and checked before/after reads.
 The existing 15-second protective cadence stays separate from the single
 30-minute campaign observation.
@@ -192,3 +194,32 @@ serialize them: root must keep all nonparticipating admission paths quiescent
 during an exact223 transaction, and all new issuing paths must join this custody
 protocol before concurrent admission is permitted. No transaction is authorized
 by this document or the existence of the helper.
+
+## Concrete control issuer source
+
+`issue-epoch223-demotion-control` now implements the control half. The static
+`IssueSpec` adds `issuer_unit`, `accounting_basis`, `accounting_directory`,
+`maximum_lock_wait_millis` and `maximum_acknowledgment_wait_millis`. It no longer
+pre-binds a future capacity result: that would create a circular digest through
+the actual issuer's ExecStart/spec digest. The static accounting basis binds the
+accepted observer/fleet, full protected-guard map and separate qualified driver/
+guard receipts. It explicitly requires root's quiescence of nonparticipating
+legacy admission helpers; the lock does not establish that fact by itself.
+
+After immutable self/spec/native/original-clock validation, the actual root
+issuer takes host custody, rechecks all actors and the small control kernel
+envelope, constructs its actual complete context, and executes only the separately
+qualified corrected accounting ELF, bounded to90 seconds. Its original root0400
+result remains in a pre-existing root-private accounting directory. A byte-for-byte
+root0444 copy is created no-clobber in the runner's private receipts. The final
+grant binds that result and the actual issuer; the consumer independently checks
+the exact helper qualification, complete-accounting result/actor context, fresh
+clock and18GiB full candidate budget. No old399 capacity is authority.
+
+The issuer validates the same closed consumer interfaces before publishing the
+control grant, custody evidence and ready token. It retains host custody through
+final actor/kernel checks and durable publication, then releases it before its
+separate bounded local acknowledgment wait. This command authorizes read-only
+hashing only. It does not raise target caps, execute native inputs, renew an old
+grant, publish status, perform R2 operations or issue the later spawn grant.
+This source is formatted but has not been compiled, tested, sealed or executed.

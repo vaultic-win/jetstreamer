@@ -29,7 +29,10 @@ pub(super) fn dispatch() -> Option<Result<()>> {
     let role = args.get(1)?.as_str();
     if !matches!(
         role,
-        "capture-epoch223-origin" | "capture-epoch223-task" | "guard-epoch223-demotion"
+        "capture-epoch223-origin"
+            | "capture-epoch223-task"
+            | "guard-epoch223-demotion"
+            | "issue-epoch223-demotion-control"
     ) {
         return None;
     }
@@ -57,6 +60,7 @@ fn run(args: &[String]) -> Result<()> {
     };
     bound_file(&executable.path, &executable.sha256, 256 << 20)?;
     match args[1].as_str() {
+        "issue-epoch223-demotion-control" => super::issuance::control(&binding, &executable)?,
         "guard-epoch223-demotion" => super::protective::run(&binding, &executable)?,
         "capture-epoch223-origin" => {
             let spec: OriginSpec = read_bound(&binding)?;
@@ -84,7 +88,7 @@ fn run(args: &[String]) -> Result<()> {
                 "original_start_unix_millis":origin.original_start_unix_millis,
                 "manager_journal":origin.manager_journal,"failed_origin":origin.failed_origin,
                 "terminal_journal_sha256":origin.terminal_journal_sha256,"repair_closed":false});
-            persist(&spec.output, &value)?;
+            super::issuance::published(&spec.output, &value)?;
         }
         "capture-epoch223-task" => {
             let spec: TaskSpec = read_bound(&binding)?;
@@ -122,7 +126,7 @@ fn run(args: &[String]) -> Result<()> {
             );
             check_control_kernel(&plan.plan)?;
             observe(&issuer)?;
-            persist(
+            super::issuance::published(
                 &spec.launch_output,
                 &json!({"schema":"jetstreamer-epoch223-demotion-actor-launch-v1",
                 "runtime_plan":spec.runtime_plan,"actor":spec.runner,"captured_by":issuer,
@@ -135,7 +139,7 @@ fn run(args: &[String]) -> Result<()> {
                 sha256: hex(&Sha256::digest(&launch_bytes)),
             };
             observe(&spec.runner)?;
-            persist(
+            super::issuance::published(
                 &spec.task_output,
                 &json!({"schema":"jetstreamer-epoch223-demotion-repair-task-v1",
                 "epoch":223,"phase":"admission-rendezvous","actor":spec.runner,
