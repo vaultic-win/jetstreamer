@@ -325,6 +325,19 @@ fn accepted_fleet_with(
                 "normal fleet lost exact plan/observer lineage or borrowed authority"
             );
             validate_previous_fleet(&predecessor, 201, 300, sample)?;
+            let original = BoundFile {
+                path: s(&predecessor, "plan")?.into(),
+                sha256: s(&predecessor, "plan_sha256")?.into(),
+            };
+            let mut expected = metadata(&original, false)?;
+            expected["metadata_event"] = Value::Null;
+            expected["observer"] = private157::binding(&observer_binding);
+            expected["output"] = json!(next.path);
+            expected["previous_fleet"] = private157::binding(&previous);
+            ensure!(
+                plan == expected,
+                "normal fleet refresh changed unrelated claim/history/gate fields"
+            );
             next = previous;
             continue;
         }
@@ -1304,6 +1317,11 @@ mod tests {
         let plan = binding.path.parent().unwrap().join("plan.json");
         let observer = PathBuf::from(files[&binding.path]["observer_receipt"].as_str().unwrap());
         for (file, key, value) in [
+            (plan.clone(), "unrelated_guard_floor", json!(0)),
+            (plan.clone(), "assembly204_recovery", Value::Null),
+            (plan.clone(), "assembly204_recovery_history", json!([])),
+            (plan.clone(), "tracked_units", json!([])),
+            (plan.clone(), "gates", json!({})),
             (plan.clone(), "schema", json!("foreign")),
             (plan.clone(), "first_epoch", json!(200)),
             (plan.clone(), "last_epoch", json!(301)),
