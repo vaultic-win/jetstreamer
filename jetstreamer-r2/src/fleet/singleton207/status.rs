@@ -13,11 +13,40 @@ struct Model {
     observer: BoundFile,
     fleet: BoundFile,
     launch: BoundFile,
+    // An explicit model binding permits a newer qualified publisher to retain
+    // the authenticated original capture generation without recapturing launch.
+    #[serde(default)]
+    launch_capture_helper_sha256: Option<String>,
     estimate: private_prefix::Estimate,
     estimate_basis: String,
     estimate_evidence: Vec<BoundFile>,
     estimate_receipt: PathBuf,
     receipt_directory: PathBuf,
+}
+fn validate_publisher(p: &Model, launch: &Value, publisher: &str) -> Result<()> {
+    let capture = p
+        .launch_capture_helper_sha256
+        .as_deref()
+        .unwrap_or(publisher);
+    ensure!(
+        is_lower_hex(publisher, 64)
+            && is_lower_hex(capture, 64)
+            && launch["capture_helper_sha256"] == capture,
+        "singleton 207 publisher does not bind the authenticated original capture helper"
+    );
+    Ok(())
+}
+fn validate_frozen_publisher(p: &Model, launch: &Value, e: &Value) -> Result<()> {
+    let publisher = e["helper_sha256"]
+        .as_str()
+        .context("singleton 207 frozen publisher digest absent")?;
+    validate_publisher(p, launch, publisher)?;
+    ensure!(
+        (p.launch_capture_helper_sha256.is_none() && e.get("capture_helper_sha256").is_none())
+            || e["capture_helper_sha256"] == launch["capture_helper_sha256"],
+        "singleton 207 frozen capture helper binding differs"
+    );
+    Ok(())
 }
 fn claim(b: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
     let v = native209::immutable_json(b)?;
@@ -48,6 +77,9 @@ fn registered(d: &DiagnosticClaim, f: &Value) -> Result<()> {
             .as_str()
             .context("singleton 207 fleet plan digest absent")?,
     ))?)?;
+    registered_claim(d, &plan)
+}
+fn registered_claim(d: &DiagnosticClaim, plan: &Plan) -> Result<()> {
     let matches = plan
         .diagnostics
         .iter()
@@ -254,10 +286,7 @@ fn frozen(r: &StatusPublicationReceipt) -> Result<DiagnosticClaim> {
         "singleton 207 frozen model substituted its evidence"
     );
     let (d, launch) = claim(&p.launch)?;
-    ensure!(
-        launch["capture_helper_sha256"] == e["helper_sha256"],
-        "singleton 207 status must use the same qualified R2 generation as launch capture"
-    );
+    validate_frozen_publisher(&p, &launch, &e)?;
     let f = bound_json(&p.fleet)?;
     let o = bound_json(&p.observer)?;
     let observed = accepted(&p, &f, &o)?;
@@ -319,10 +348,7 @@ pub(super) async fn run() -> Result<()> {
         "horizon-singleton207-status-",
     )?;
     let (d, launch) = claim(&p.launch)?;
-    ensure!(
-        launch["capture_helper_sha256"] == self_sha,
-        "singleton 207 status must use the same qualified R2 generation as launch capture"
-    );
+    validate_publisher(&p, &launch, &self_sha)?;
     let f = bound_json(&p.fleet)?;
     let o = bound_json(&p.observer)?;
     let observed = accepted(&p, &f, &o)?;
@@ -379,6 +405,7 @@ pub(super) async fn run() -> Result<()> {
             phase,
         };
         let e = json!({"schema":OBSERVATION,"model":private157::binding(&bound),"helper_sha256":self_sha,
+            "capture_helper_sha256":launch["capture_helper_sha256"],
             "observer":private157::binding(&p.observer),"fleet":private157::binding(&p.fleet),
             "launch":private157::binding(&p.launch),"progress":progress,"jet_measurement":measurement,"status":status,"clock_anchor":launch["clock_anchor"],
             "estimate_basis":p.estimate_basis,"estimate_evidence":p.estimate_evidence,"resource_samples_taken":0,
@@ -386,6 +413,11 @@ pub(super) async fn run() -> Result<()> {
         private157::immutable_receipt(&p.estimate_receipt, &e)?;
         e
     };
+    ensure!(
+        evidence["helper_sha256"] == self_sha,
+        "singleton 207 retry substituted the executing publisher"
+    );
+    validate_frozen_publisher(&p, &launch, &evidence)?;
     let status = reproduce(&evidence, &p, &launch, seconds)?;
     ensure!(
         before == live(&d, &f)?,
@@ -450,6 +482,7 @@ mod tests {
             observer: b(),
             fleet: b(),
             launch: b(),
+            launch_capture_helper_sha256: None,
             estimate: private_prefix::Estimate {
                 initialization_allowance_millis: 600_000,
                 fallback_slots_per_second: 2.0,
@@ -520,5 +553,78 @@ mod tests {
         changed["diagnostic_replays"][0]["observation"]["producer_after"]["invocation_id"] =
             json!("b".repeat(32));
         assert!(progress(&changed, &invocation).is_err());
+    }
+    #[test]
+    fn legacy_capture_requires_original_publisher_and_reproduces_old_receipts() {
+        let original = "a".repeat(64);
+        let launch = json!({"capture_helper_sha256":original});
+        validate_publisher(&model(), &launch, &original).unwrap();
+        validate_frozen_publisher(&model(), &launch, &json!({"helper_sha256":original})).unwrap();
+        assert!(validate_publisher(&model(), &launch, &"b".repeat(64)).is_err());
+        assert!(validate_frozen_publisher(
+            &model(),
+            &launch,
+            &json!({"helper_sha256":"b".repeat(64)})
+        )
+        .is_err());
+    }
+    #[test]
+    fn migrated_publisher_preserves_explicit_capture_and_rejects_substitution() {
+        let original = "a".repeat(64);
+        let publisher = "b".repeat(64);
+        let launch = json!({"capture_helper_sha256":original});
+        let mut p = model();
+        p.launch_capture_helper_sha256 = Some(original.clone());
+        validate_publisher(&p, &launch, &publisher).unwrap();
+        let evidence = json!({"helper_sha256":publisher,"capture_helper_sha256":original});
+        validate_frozen_publisher(&p, &launch, &evidence).unwrap();
+        for bad in [
+            json!({"helper_sha256":publisher}),
+            json!({"helper_sha256":publisher,"capture_helper_sha256":"c".repeat(64)}),
+            json!({"helper_sha256":"bad","capture_helper_sha256":original}),
+            json!({"capture_helper_sha256":original}),
+        ] {
+            assert!(validate_frozen_publisher(&p, &launch, &bad).is_err());
+        }
+        p.launch_capture_helper_sha256 = Some("c".repeat(64));
+        assert!(validate_publisher(&p, &launch, &publisher).is_err());
+        p.launch_capture_helper_sha256 = Some("bad".into());
+        assert!(validate_publisher(&p, &launch, &publisher).is_err());
+    }
+    #[test]
+    fn full_recovery204_plan_keeps_exact_registered207_claim() {
+        let b = json!({"path":"/sealed/evidence.json","sha256":"a".repeat(64)});
+        let d = DiagnosticClaim {
+            epoch: 207,
+            unit: UNIT.into(),
+            invocation_id: "c".repeat(32),
+            scratch_path: ROOT.into(),
+            launch_receipt: binding("/sealed/evidence.json", &"a".repeat(64)),
+        };
+        let recovery = json!({"epoch":204,"recovery_plan":b,"admission":b,
+            "launch":b,"actor_launch":b,"frame":b,"eta_policy":b});
+        let value = json!({"schema":super::super::SCHEMA,"first_epoch":201,"last_epoch":300,
+            "observer":b,"previous_fleet":null,"output":"/private/fleet.json",
+            "status_receipt_directory":"/private/status","gates":{},"tracked_units":[],
+            "diagnostics":[{"epoch":207,"unit":UNIT,"invocation_id":d.invocation_id,
+                "scratch_path":ROOT,"launch_receipt":b}],
+            "assembly204_recovery":recovery,"assembly204_recovery_history":[{"preserved":true}],
+            "assembly204_recovery_terminal":null});
+        let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+        assert!(plan.assembly204_recovery.is_some());
+        assert_eq!(plan.assembly204_recovery_history.len(), 1);
+        registered_claim(&d, &plan).unwrap();
+        let mut wrong = value.clone();
+        wrong["diagnostics"][0]["invocation_id"] = json!("d".repeat(32));
+        assert!(registered_claim(&d, &serde_json::from_value(wrong).unwrap()).is_err());
+        let mut duplicate = value.clone();
+        duplicate["diagnostics"]
+            .as_array_mut()
+            .unwrap()
+            .push(value["diagnostics"][0].clone());
+        assert!(registered_claim(&d, &serde_json::from_value(duplicate).unwrap()).is_err());
+        let mut unknown = value;
+        unknown["unreviewed_future_field"] = json!(true);
+        assert!(serde_json::from_value::<Plan>(unknown).is_err());
     }
 }
