@@ -31,10 +31,10 @@ pub(super) fn command_matches(actual: &str, expected: &str) -> bool {
         .trim_end_matches(" }");
     actual == expected.trim_end_matches(" }")
 }
-pub(super) fn no_overlap(actor: Option<downstream::Stage>) -> Result<()> {
-    let mut names = BTreeSet::from([OLD_UNIT.into(), OLD_GUARD.into(), UNIT.into(), GUARD.into()]);
-    names.extend(downstream::Stage::all().iter().map(|s| s.unit().into()));
-    let current = census(&names, 201, 300)?;
+pub(super) fn validate_closed_ownership(
+    current: &BTreeMap<String, Value>,
+    actor: Option<downstream::Stage>,
+) -> Result<()> {
     let old = current.get(OLD_UNIT).context("204 original omitted")?;
     ensure!(
         is_idle(old) && (old["InvocationID"] == OLD_IID || old["InvocationID"] == ""),
@@ -44,22 +44,40 @@ pub(super) fn no_overlap(actor: Option<downstream::Stage>) -> Result<()> {
         is_idle(current.get(OLD_GUARD).context("204 old guard omitted")?),
         "204 old guard live"
     );
-    inactive_status::no_pending_owner_trigger(OLD_UNIT, false)?;
-    for (name, row) in &current {
-        let permitted = actor.is_some_and(|s| {
-            name == s.unit() || (s == downstream::Stage::Assembly && name == GUARD)
+    ensure!(
+        context::closed_names()
+            .iter()
+            .all(|name| current.contains_key(name)),
+        "204 closed actor omitted from complete census"
+    );
+    for (name, row) in current {
+        let permitted = actor.is_some_and(|stage| {
+            name == stage.unit() || (stage == downstream::Stage::Assembly && name == GUARD)
         });
         if !permitted
             && name
                 .split(|c: char| !c.is_ascii_digit())
-                .any(|n| n == "204")
+                .any(|s| s == "204")
         {
             ensure!(
-                !is_live(row)
-                    && row["ActiveState"] != "activating"
-                    && row["ActiveState"] != "reloading",
-                "204 overlapping original/downstream/replacement owner: {name}"
+                is_idle(row),
+                "204 overlapping, pending or unknown replacement owner: {name}"
             );
+        }
+    }
+    Ok(())
+}
+pub(super) fn no_overlap(context: &Context, actor: Option<downstream::Stage>) -> Result<()> {
+    let current = context.census(&context::closed_names())?;
+    validate_closed_ownership(&current, actor)?;
+    for name in current.keys().filter(|name| {
+        name.split(|c: char| !c.is_ascii_digit())
+            .any(|n| n == "204")
+    }) {
+        let permitted = actor.is_some_and(|stage| {
+            *name == stage.unit() || (stage == downstream::Stage::Assembly && *name == GUARD)
+        });
+        if !permitted {
             inactive_status::no_pending_owner_trigger(name, false)?;
         }
     }
@@ -151,6 +169,7 @@ pub(super) fn current_actor(
 #[serde(deny_unknown_fields)]
 struct LaunchSpec {
     schema: String,
+    context: Context,
     stage: downstream::Stage,
     recovery_plan: BoundFile,
     admission: BoundFile,
@@ -175,7 +194,7 @@ pub(super) fn capture_launch(v: &Value, spec: &BoundFile, self_sha: &str) -> Res
             "204 assembly admission expired before launch"
         );
     }
-    no_overlap(Some(x.stage))?;
+    no_overlap(&x.context, Some(x.stage))?;
     let owner = unit(x.stage.unit())?;
     ensure!(
         is_live(&owner) && id(s(&owner, "InvocationID")?),
@@ -254,7 +273,7 @@ pub(super) fn capture_launch(v: &Value, spec: &BoundFile, self_sha: &str) -> Res
     let started = manager_shape(&raw, x.stage.unit(), s(&owner, "InvocationID")?, false)?;
     custody::write_bytes(&x.output_directory.join("launch-manager.jsonl"), &raw)?;
     let journal = binding(&x.output_directory.join("launch-manager.jsonl"))?;
-    no_overlap(Some(x.stage))?;
+    no_overlap(&x.context, Some(x.stage))?;
     same_owner(&owner, &unit(x.stage.unit())?)?;
     write(
         &x.output_directory.join("launch.json"),
@@ -262,7 +281,7 @@ pub(super) fn capture_launch(v: &Value, spec: &BoundFile, self_sha: &str) -> Res
         "stage":x.stage,"unit":x.stage.unit(),"invocation_id":owner["InvocationID"],"main_pid":owner["MainPID"],
         "expected_exec_start":owner["ExecStart"],"owner":owner,"guard_unit":if x.stage==downstream::Stage::Assembly {GUARD}else{""},
         "guard_invocation_id":guard["InvocationID"],"guard":guard,"producer_limits":producer_limits,"guard_limits":guard_limits,
-        "recovery_plan":x.recovery_plan,"admission":x.admission,"stage_admission":stage_admission,"stage_spec":x.stage_spec,"manager_journal":journal,
+        "accepted_context":x.context,"recovery_plan":x.recovery_plan,"admission":x.admission,"stage_admission":stage_admission,"stage_spec":x.stage_spec,"manager_journal":journal,
         "started_unix_millis":started,"epoch_started_unix_millis":ORIGIN,"issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     Ok(())
@@ -386,6 +405,7 @@ pub(super) fn validate_success_terminal(t: &Value, name: &str, iid: &str) -> Res
     deny(&t["authority"])
 }
 pub(super) fn capture_success_terminal(
+    context: &Context,
     name: &str,
     iid: &str,
     outcome: &Path,
@@ -394,7 +414,7 @@ pub(super) fn capture_success_terminal(
     self_sha: &str,
 ) -> Result<()> {
     private(directory)?;
-    no_overlap(None)?;
+    no_overlap(context, None)?;
     let before = unit(name)?;
     ensure!(
         is_idle(&before)
@@ -491,11 +511,15 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
     custody::plan_scope(&p)?;
     let origin = read(&w.claim.launch)?;
     validate_launch(&origin, &w.claim.recovery_plan, &p, &w.claim.admission)?;
+    let context = Context {
+        fleet: w.previous_fleet.clone(),
+        observer: w.observer.clone(),
+    };
     let launch = read(&w.claim.actor_launch)?;
     let stage: downstream::Stage = serde_json::from_value(launch["stage"].clone())?;
-    no_overlap(Some(stage))?;
+    no_overlap(&context, Some(stage))?;
     let names = names(&w.claim)?;
-    let before = census(&names, 201, 300)?;
+    let before = context.census(&names)?;
     let owner = before.get(stage.unit()).context("204 actor omitted")?;
     same_owner(&launch["owner"], owner)?;
     ensure!(is_live(owner), "204 current work actor inactive");
@@ -557,7 +581,7 @@ pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Resul
         output_bytes <= OUTPUT_MAX,
         "204 observed output exceeded cap"
     );
-    let after = census(&names, 201, 300)?;
+    let after = context.census(&names)?;
     ensure!(before == after, "204 work census changed");
     let frame = json!({"schema":"jetstreamer-epoch204-assembly-recovery-work-v1","epoch":204,"stage":stage,"phase":phase,
         "recovery_plan":w.claim.recovery_plan,"launch":w.claim.launch,"actor_launch":w.claim.actor_launch,
@@ -649,6 +673,7 @@ pub(in crate::fleet) fn row(
     let frame = read(&c.frame)?;
     let policy = read(&c.eta_policy)?;
     let stage: downstream::Stage = serde_json::from_value(actor["stage"].clone())?;
+    validate_closed_ownership(current, Some(stage))?;
     ensure!(
         frame["schema"] == "jetstreamer-epoch204-assembly-recovery-work-v1"
             && frame["epoch"] == 204
@@ -768,8 +793,12 @@ pub(super) async fn publish(v: &Value, _spec: &BoundFile, self_sha: &str) -> Res
     );
     let frame = read(&x.claim.frame)?;
     let observer = bound_json(&serde_json::from_value(frame["observer"].clone())?)?;
+    let context = Context {
+        fleet: serde_json::from_value(frame["previous_fleet"].clone())?,
+        observer: serde_json::from_value(frame["observer"].clone())?,
+    };
     let names = names(&x.claim)?;
-    let before = census(&names, 201, 300)?;
+    let before = context.census(&names)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let row = row(&x.claim, &observer, &before, now)?;
     let policy = read(&x.claim.eta_policy)?;
@@ -794,7 +823,7 @@ pub(super) async fn publish(v: &Value, _spec: &BoundFile, self_sha: &str) -> Res
     };
     binding.validate(204, &status.phase)?;
     ensure!(
-        census(&names, 201, 300)? == before,
+        context.census(&names)? == before,
         "204 owner changed before publication"
     );
     let r2 = r2_config_from_env()?;
@@ -906,6 +935,7 @@ fn failure_shape(raw: &[u8], name: &str, iid: &str) -> Result<()> {
     Ok(())
 }
 pub(super) fn capture_failure_terminal(
+    context: &Context,
     name: &str,
     iid: &str,
     directory: &Path,
@@ -913,7 +943,7 @@ pub(super) fn capture_failure_terminal(
     self_sha: &str,
 ) -> Result<()> {
     private(directory)?;
-    no_overlap(None)?;
+    no_overlap(context, None)?;
     let before = unit(name)?;
     ensure!(
         is_idle(&before) && before["InvocationID"] == iid,

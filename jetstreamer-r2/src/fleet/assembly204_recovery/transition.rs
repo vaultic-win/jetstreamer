@@ -249,7 +249,11 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
         "204 terminal prepare spec"
     );
     private(&x.output_directory)?;
-    ownership::no_overlap(None)?;
+    let context = Context {
+        fleet: x.previous_fleet.clone(),
+        observer: x.observer.clone(),
+    };
+    ownership::no_overlap(&context, None)?;
     let old = bound_json(&x.original_plan)?;
     let prior = bound_json(&x.previous_fleet)?;
     let mut next = terminal_derivative(&x, &old, &prior)?;

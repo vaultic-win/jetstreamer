@@ -153,9 +153,9 @@ pub(super) fn terminal_shape(current: &Value, raw: &[u8]) -> Result<u64> {
     );
     finished.context("204 has no actual failed/stopped terminal")
 }
-pub(super) fn old_idle() -> Result<Value> {
-    let names = BTreeSet::from([OLD_UNIT.into(), OLD_GUARD.into(), UNIT.into(), GUARD.into()]);
-    let before = census(&names, 201, 300)?;
+pub(super) fn old_idle(context: &Context) -> Result<Value> {
+    let names = context::closed_names();
+    let before = context.census(&names)?;
     let original = before.get(OLD_UNIT).context("204 old owner omitted")?;
     ensure!(
         is_idle(original)
@@ -166,27 +166,7 @@ pub(super) fn old_idle() -> Result<Value> {
         is_idle(before.get(OLD_GUARD).context("204 old guard omitted")?),
         "204 old guard still owns work"
     );
-    for (name, row) in &before {
-        if name == UNIT
-            || name == GUARD
-            || downstream::Stage::all()
-                .iter()
-                .any(|stage| stage.unit() == name)
-        {
-            continue;
-        }
-        if name != OLD_UNIT
-            && name != OLD_GUARD
-            && name
-                .split(|c: char| !c.is_ascii_digit())
-                .any(|s| s == "204")
-        {
-            ensure!(
-                !is_live(row) && row["ActiveState"] != "activating",
-                "another 204 owner exists"
-            );
-        }
-    }
+    ownership::validate_closed_ownership(&before, None)?;
     inactive_status::no_pending_owner_trigger(OLD_UNIT, false)?;
     inactive_status::no_pending_owner_trigger(OLD_GUARD, false)?;
     let group = capped204205_work::empty_terminal_cgroup(OLD_UNIT)?;
@@ -205,13 +185,13 @@ pub(super) fn old_idle() -> Result<Value> {
         first.references.is_empty() && second.references.is_empty(),
         "204 original sources retain process references"
     );
-    let after = census(&names, 201, 300)?;
+    let after = context.census(&names)?;
     ensure!(
         before == after,
         "204 source ownership changed during custody census"
     );
     Ok(
-        json!({"unit_census_before":before,"unit_census_after":after,"old_cgroup":group,"old_guard_cgroup":old_guard_group,
+        json!({"accepted_context":context,"unit_census_before":before,"unit_census_after":after,"old_cgroup":group,"old_guard_cgroup":old_guard_group,
         "prefix_references":first,"suffix_references":second,"old_owner_idle":true}),
     )
 }
@@ -219,6 +199,7 @@ pub(super) fn old_idle() -> Result<Value> {
 #[serde(deny_unknown_fields)]
 struct TerminalSpec {
     schema: String,
+    context: Context,
     original_plan: BoundFile,
     suffix_proof: BoundFile,
     output_directory: PathBuf,
@@ -232,7 +213,7 @@ pub(super) fn capture_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     private(&t.output_directory)?;
     // Presence is a conflict, not a reason to relabel an actual natural result.
     no_file(&Path::new(OLD_ROOT).join("receipts/continuation.json"))?;
-    let idle = old_idle()?;
+    let idle = old_idle(&t.context)?;
     let current = unit(OLD_UNIT)?;
     let raw = journal(OLD_UNIT)?;
     let finished = terminal_shape(&current, &raw)?;
@@ -244,7 +225,9 @@ pub(super) fn capture_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     let journal_path = t.output_directory.join("manager.jsonl");
     write_bytes(&journal_path, &raw)?;
     let manager = binding(&journal_path)?;
-    let idle_after = old_idle()?;
+    let idle_after = old_idle(&t.context)?;
+    let custody_before = write(&t.output_directory.join("custody-before.json"), &idle)?;
+    let custody_after = write(&t.output_directory.join("custody-after.json"), &idle_after)?;
     ensure!(current == unit(OLD_UNIT)?, "204 original terminal changed");
     no_file(&Path::new(OLD_ROOT).join("receipts/continuation.json"))?;
     write(
@@ -255,7 +238,7 @@ pub(super) fn capture_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
         "suffix_proof":proof,"outcome":"failed_or_stopped","epoch_started_unix_millis":ORIGIN,
         "manager_journal":private157::binding(&manager),"manager_journal_complete":true,
         "finished_unix_millis":finished,"current_unit":current,"old_cgroup_empty":true,
-        "source_reference_census_empty":true,"custody_before":idle,"custody_after":idle_after,
+        "source_reference_census_empty":true,"accepted_context":t.context,"custody_before":custody_before,"custody_after":custody_after,
         "original_complete_outcome_absent":true,"issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     Ok(())
@@ -319,6 +302,7 @@ fn raw_proof(b: &BoundFile) -> Result<Vec<u8>> {
 #[serde(deny_unknown_fields)]
 struct CaptureSpec {
     schema: String,
+    context: Context,
     original_plan: BoundFile,
     original_terminal: BoundFile,
     suffix_proof: BoundFile,
@@ -338,7 +322,7 @@ pub(super) fn capture_sources(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
         "204 source plan differs"
     );
     let proof_bytes = raw_proof(&c.suffix_proof)?;
-    let idle_before = old_idle()?;
+    let idle_before = old_idle(&c.context)?;
     let proof_path = c.output_directory.join("suffix.json");
     write_bytes(&proof_path, &proof_bytes)?;
     let proof = binding(&proof_path)?;
@@ -372,15 +356,20 @@ pub(super) fn capture_sources(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
         sources.push(json!({"path":path,"sha256":sha,"identity":frozen,"identity_before_custody":before,
             "source_digest_basis":"preserved genuine source proof; merger rehashes exact handle","body_reads":0}));
     }
-    let idle_after = old_idle()?;
+    let idle_after = old_idle(&c.context)?;
+    let custody_before = write(
+        &c.output_directory.join("custody-before.json"),
+        &idle_before,
+    )?;
+    let custody_after = write(&c.output_directory.join("custody-after.json"), &idle_after)?;
     write(
         &c.output_directory.join("source-capture.json"),
         &json!({
         "schema":"jetstreamer-epoch204-assembly-recovery-source-capture-v1","epoch":204,
         "original_invocation_id":OLD_IID,"original_plan":c.original_plan,"original_terminal":c.original_terminal,
         "suffix_proof":private157::binding(&proof),"captured_unix_millis":SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
-        "original_owner_idle":true,"no_source_references":true,"sources":sources,"idle_before":idle_before,
-        "idle_after":idle_after,"archive_body_reads":0,"issuer":issuer(spec,self_sha),"authority":denied()}),
+        "original_owner_idle":true,"no_source_references":true,"sources":sources,"accepted_context":c.context,"idle_before":custody_before,
+        "idle_after":custody_after,"archive_body_reads":0,"issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     Ok(())
 }
@@ -454,6 +443,7 @@ pub(super) fn plan_scope(p: &Value) -> Result<()> {
 #[serde(deny_unknown_fields)]
 struct PlanSpec {
     schema: String,
+    context: Context,
     original_plan: BoundFile,
     original_terminal: BoundFile,
     source_capture: BoundFile,
@@ -482,7 +472,7 @@ pub(super) fn issue_plan(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<
         n(&terminal, "finished_unix_millis")?,
     )?;
     lineage::sources(&x.original_plan, &proof)?;
-    old_idle()?;
+    old_idle(&x.context)?;
     check_source_names(&capture)?;
     sealed(&x.assembler, 128 << 20)?;
     let production = artifact::validate(&x.assembler_capture, &x.assembler)?;

@@ -373,6 +373,7 @@ pub(super) fn validate_outcome(
 #[serde(deny_unknown_fields)]
 struct CompletionSpec {
     schema: String,
+    context: Context,
     launch: BoundFile,
     recovery_terminal: BoundFile,
     output: PathBuf,
@@ -402,7 +403,7 @@ pub(super) fn capture_completion(v: &Value, spec: &BoundFile, self_sha: &str) ->
     let loaded = load_recipe(recipe.clone())?;
     let before = unit(UNIT)?;
     ensure!(is_idle(&before), "204 recovery still live");
-    custody::old_idle()?;
+    custody::old_idle(&c.context)?;
     let path = Path::new(OUTPUT);
     let file = custody::open_source(path)?;
     let before_output = custody::FileStamp::of(&file.metadata()?);

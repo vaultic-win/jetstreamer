@@ -154,6 +154,7 @@ pub(super) fn admit(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
         a.schema == "jetstreamer-epoch204-assembly-recovery-admission-spec-v1",
         "204 admission spec"
     );
+    let context = Context::from_basis(&a.resource_basis)?;
     let p = read(&a.recovery_plan)?;
     custody::plan_scope(&p)?;
     let issuance = read(&a.plan_issuance)?;
@@ -166,7 +167,12 @@ pub(super) fn admit(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let old: BoundFile = serde_json::from_value(p["original_terminal"].clone())?;
     custody::validate_terminal_saved(&read(&old)?)?;
     let capture = read(&serde_json::from_value(p["source_capture"].clone())?)?;
-    custody::old_idle()?;
+    custody::old_idle(&context)?;
+    ownership::no_overlap(&context, None)?;
+    ensure!(
+        fs::metadata(ROOT)?.dev() == fs::metadata(CANONICAL)?.dev(),
+        "204 recovery output is outside the admitted filesystem"
+    );
     custody::check_source_names(&capture)?;
     sealed(&a.assembler, 128 << 20)?;
     let current = unit(UNIT)?;
@@ -187,7 +193,8 @@ pub(super) fn admit(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let c = candidate(downstream::Stage::Assembly, 0)?;
     let capacity = maintenance_capacity::check_assembly204_recovery(&a.resource_basis, c)?;
     validate_capacity(&capacity, c.memory_max_bytes, c.additional_bytes)?;
-    custody::old_idle()?;
+    custody::old_idle(&context)?;
+    ownership::no_overlap(&context, None)?;
     custody::check_source_names(&capture)?;
     ensure!(
         unit(UNIT)? == current && is_idle(&unit(GUARD)?),

@@ -73,6 +73,7 @@ struct Neighbor {
 #[serde(deny_unknown_fields)]
 pub(super) struct StageSpec {
     schema: String,
+    context: Context,
     pub stage: Stage,
     pub source: lineage::DownstreamSource,
     gates: Vec<Gate>,
@@ -95,6 +96,12 @@ fn stage_spec(v: &Value) -> Result<StageSpec> {
     );
     private(&x.output_directory)?;
     private(&x.scan_directory)?;
+    let device = fs::metadata(CANONICAL)?.dev();
+    ensure!(
+        fs::metadata(&x.output_directory)?.dev() == device
+            && fs::metadata(&x.scan_directory)?.dev() == device,
+        "204 staging is outside the admitted filesystem"
+    );
     ensure!(
         x.admission.parent() == Some(x.output_directory.as_path())
             && x.admission.file_name() == Some(std::ffi::OsStr::new("admission.json")),
@@ -420,6 +427,7 @@ pub(super) fn admit_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result
         "204 stage admission spec"
     );
     let x = stage_spec(&read(&a.stage_spec)?)?;
+    x.context.matches_basis(&a.resource_basis)?;
     let (source, _) = lineage::load_source(&x.source)?;
     gates(&x)?;
     if x.stage != Stage::Import {
@@ -433,14 +441,14 @@ pub(super) fn admit_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result
         tool(&anchor)?;
     }
     installed_stage(&x, &a.stage_spec, &a.runner, &a.unit_file, self_sha)?;
-    ownership::no_overlap(None)?;
+    ownership::no_overlap(&x.context, None)?;
     let before = unit(x.stage.unit())?;
     ensure!(is_idle(&before), "204 stage is already running");
     inactive_status::no_pending_owner_trigger(x.stage.unit(), false)?;
     let capacity =
         capacity::stage_capacity(&a.resource_basis, x.stage, n(&source, "archive_bytes")?)?;
     let cap = write(&a.capacity_output, &capacity)?;
-    ownership::no_overlap(None)?;
+    ownership::no_overlap(&x.context, None)?;
     ensure!(
         unit(x.stage.unit())? == before,
         "204 stage changed during admission"
@@ -681,7 +689,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
     }
     let admission = issued_admission(&x, spec, n(&c, "archive_bytes")?)?;
     let current = ownership::current_actor(x.stage, spec, self_sha)?;
-    ownership::no_overlap(Some(x.stage))?;
+    ownership::no_overlap(&x.context, Some(x.stage))?;
     let scan = x.scan_directory.join("epoch-204.jet");
     let sha = s(&c, "archive_sha256")?;
     let bytes = n(&c, "archive_bytes")?;
@@ -940,6 +948,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
 #[serde(deny_unknown_fields)]
 struct Capture {
     schema: String,
+    context: Context,
     stage: Stage,
     launch: BoundFile,
     outcome: Option<PathBuf>,
@@ -960,6 +969,7 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
     let current = unit(c.stage.unit())?;
     if current["Result"] == "success" && current["ExecMainStatus"] == "0" {
         ownership::capture_success_terminal(
+            &c.context,
             c.stage.unit(),
             iid,
             c.outcome
@@ -971,6 +981,7 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
         )
     } else {
         ownership::capture_failure_terminal(
+            &c.context,
             c.stage.unit(),
             iid,
             &c.output_directory,
