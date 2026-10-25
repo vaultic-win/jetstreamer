@@ -404,6 +404,14 @@ pub(super) fn validate_provenance(v: &Value) -> Result<()> {
                 row["invocation_id"] == v["unit_census_before"][name]["InvocationID"],
                 "204 saved memory evidence belongs to another invocation"
             );
+            if name == canary227::UNIT {
+                ensure!(
+                    row["guard"] == basis["protected_guards"][name]
+                        && bound_json(&serde_json::from_value(row["guard"].clone())?)?
+                            == row["guard_observation"],
+                    "204 saved canary memory guard differs from accepted bound receipt"
+                );
+            }
         }
     }
     for bound in basis["protected_guards"]

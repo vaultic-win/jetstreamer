@@ -2,6 +2,8 @@
 //! Raw fleet, failures and claims are preserved; only derived accounting removes it.
 use super::canary227 as c;
 use super::*;
+mod memory;
+pub(super) use memory::validate_saved_memory_row;
 pub(super) const PROTECTIVE: &str = "horizon-canary227-v1625-protective-selection-v2.service";
 const LAUNCH: &str =
     "/var/lib/jetstreamer/horizon-227-v1625-canary-capture-selection-v2/launch.json";
@@ -655,7 +657,7 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         return Ok((0, vec![]));
     };
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let (_, _, protection) = protection(&peer, sample_time(f)?, now, None)?;
+    let (guard_binding, guard_sample, protection) = protection(&peer, sample_time(f)?, now, None)?;
     let caps = kernel(&peer)?;
     let floor = memory_floor(f, host_total_memory()?)?;
     let remaining = caps["remaining_hard_memory_growth_bytes"]
@@ -664,12 +666,15 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     let top_up = floor["memory_floor_top_up_bytes"]
         .as_u64()
         .context("canary memory floor top-up absent")?;
-    Ok((
-        add_memory(remaining, top_up, 0)?,
-        vec![
-            json!({"epoch":227,"unit":c::UNIT,"invocation_id":peer.d.invocation_id,"hard_memory_envelope":caps,"actual_guard_timer_proof":protection,"memory_floor_policy":floor,"remaining_hard_memory_growth_bytes":remaining,"memory_floor_top_up_bytes":top_up}),
-        ],
-    ))
+    let row = memory::row(
+        &peer.d.invocation_id,
+        caps,
+        floor,
+        guard_binding,
+        guard_sample,
+        protection,
+    )?;
+    Ok((add_memory(remaining, top_up, memory::GUARD)?, vec![row]))
 }
 fn static_caps(k: &Value) -> Result<Value> {
     let mut result = serde_json::Map::new();
