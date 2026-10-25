@@ -3,8 +3,9 @@
 This source is unbuilt and unqualified. No command below has run. It grants no
 native/replay launch, runtime promotion, full-root qualification, archive upload,
 sidecar creation, or current deployment permission. The utility and accounting
-branches must be coherently merged with corrected generation8289bc65, including
-the independent227 guard and actual sealed helper/v2 pins, before qualification.
+source is now coherently merged with corrected generation 8289bc65, including
+the independent 227 guard and generation-v2 204 corrections. Actual sealed
+helper bindings and exact qualification are still required before runtime use.
 
 The new Rust commands are:
 
@@ -88,8 +89,25 @@ systemd's unchanged configured14/16GiB from actual FD-updated kernel150/225GB or
 native112/128GiB. They bind immutable allocation/capacity receipts and charge
 full producer plus independent guard/issuer envelopes. Partial cap failure keeps
 the full reservation without claiming committed spawn. Coherent accepted-owner
-accounting must consume `resource_contract`, never the manager's old16GiB value;
-an af-only helper is not current authority.
+accounting consumes `resource_contract`, never the manager's old 16 GiB value.
+The narrow repair peer adapter leaves the accepted source ledger and raw census
+unchanged, authenticates the actual task and guard, and reserves their full
+producer/guard/issuer memory envelope and full admitted disk growth. The new
+candidate envelope is added above every accepted control allocation, including
+when candidate role names overlap. No current charge, reclaimed scratch, name
+overlap, or expected handoff releases an accepted reservation. Releasing a
+duplicate budget requires genuine lifecycle and ownership evidence first.
+
+The coordinated memory report verifies both actual repair and guard PID/start
+ticks in each complete host RSS census. Their RSS stays in whole-host memory,
+and neither actor increases the executing entry-replay lane count or marginal
+replay RSS. A reused PID, changed invocation, missing process, restart, ordinary
+replay relabeling, or another lane claiming their RSS fails closed. Normalized
+accounting views retain the raw evidence and are not new source ledgers. The
+independent guard-ready receipt carries the exact positive local free-space
+floor, so existing guard-key union and protected-floor accounting remain intact.
+The older production 8289bc65 helper lacks these new commands and cannot stand
+in for a newly qualified helper containing this integration.
 
 Only the existing R2 status publisher mutates the canonical223 status key. It
 conditions changes on the exact owned ETag, authenticates byte-for-byte readback
@@ -110,9 +128,11 @@ authenticated absence/readback and durable deletion receipt remain unchanged.
 No archive completion is inferred and all partial archives/evidence stay intact.
 Canonical completion cleanup still happens only after the verified `.sha256`.
 
-Thirteen source tests cover actual-owner shape/replacement, native wire-phase
+Targeted source tests cover actual-owner shape/replacement, native wire-phase
 limits, original clock/cadence exceptions, real logger/foreign journal rejection,
 terminal history/replacement, unchanged peer policies, full-root/sidecar ETA
-allowances, resets/stalls and manager/kernel/partial-allocation budgets. They have
+allowances, resets/stalls, manager/kernel/partial-allocation budgets, additive
+accepted control/guard retention, malformed/scope/identity rejection, and
+whole-host RSS preservation without counting repair as entry replay. They have
 not run: Cargo, target and runtime remain leased elsewhere. Rustfmt parsing and
 `git diff --check` are the only completed checks.

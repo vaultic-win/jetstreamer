@@ -147,7 +147,12 @@ pub(super) fn sample(t: &Task, manager: &Value) -> Result<Value> {
             && actor["swap"] == 0
             && guard["max"] == 1u64 << 30
             && guard["high"] == (768u64 << 20)
-            && guard["swap"] == 0,
+            && guard["swap"] == 0
+            && actor["current"]
+                .as_u64()
+                .zip(actor["max"].as_u64())
+                .is_some_and(|(c, m)| c <= m)
+            && guard["current"].as_u64().is_some_and(|c| c <= 1u64 << 30),
         "223 original kernel/independent guard envelope differs"
     );
     let path = if t.job_kind == "native-input" {
@@ -241,7 +246,15 @@ pub(super) fn validate_saved(t: &Task, value: &Value) -> Result<()> {
             && value["manager_policy_was_not_updated_by_fd_cap_write"] == true
             && kernel["swap"] == 0
             && value["guard_kernel"]["max"] == 1u64 << 30
-            && value["guard_kernel"]["swap"] == 0,
+            && value["guard_kernel"]["high"] == 768u64 << 20
+            && value["guard_kernel"]["swap"] == 0
+            && kernel["current"]
+                .as_u64()
+                .zip(kernel["max"].as_u64())
+                .is_some_and(|(c, m)| c <= m)
+            && value["guard_kernel"]["current"]
+                .as_u64()
+                .is_some_and(|c| c <= 1u64 << 30),
         "223 saved resource accounting undercounts or changes kernel/manager policy"
     );
     Ok(())
@@ -288,6 +301,35 @@ mod tests {
                 16 << 30,
                 true,
                 true
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn malformed_or_understated_manager_and_kernel_limits_fail_closed() {
+        for kind in ["bracket", "native-input"] {
+            for (manager_high, manager_max, high, max) in [
+                (14u64 << 30, 16u64 << 30, 14u64 << 30, 15u64 << 30),
+                (13u64 << 30, 16u64 << 30, 14u64 << 30, 16u64 << 30),
+                (14u64 << 30, 15u64 << 30, 14u64 << 30, 16u64 << 30),
+                (14u64 << 30, 16u64 << 30, 0, 16u64 << 30),
+                (14u64 << 30, 16u64 << 30, 14u64 << 30, u64::MAX),
+            ] {
+                assert!(
+                    classification(kind, manager_high, manager_max, high, max, false, false)
+                        .is_err()
+                );
+            }
+        }
+        assert!(
+            classification(
+                "foreign",
+                14 << 30,
+                16 << 30,
+                14 << 30,
+                16 << 30,
+                false,
+                false
             )
             .is_err()
         );

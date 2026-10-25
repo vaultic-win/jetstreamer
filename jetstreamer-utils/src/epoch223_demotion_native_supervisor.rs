@@ -196,7 +196,7 @@ fn permission(w: Wait<'_>) -> Result<(BoundFile, Grant, GuardProof)> {
                 && result["schema"] == "jetstreamer-epoch223-demotion-capacity-result-v1"
                 && result["self_sha256"] == w.plan.accounting_executable.sha256
                 && result["upstream_accounting_source_commit"]
-                    == "af09802051463086cf8f47de3bf200717d84e094"
+                    == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
                 && result["context"]["phase"] == w.phase
                 && result["context"]["job_kind"] == "native-input"
                 && result["context"]["runtime_plan"] == binding_value(w.binding)
@@ -648,7 +648,7 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         qualification["complete_memory_accounting_qualified"] == true
             && qualification["executable_sha256"] == plan.accounting_executable.sha256
             && qualification["upstream_accounting_source_commit"]
-                == "af09802051463086cf8f47de3bf200717d84e094",
+                == "8289bc65aab9d495071ac81f932d3ae71c6bad38",
         "223 native corrected accounting unqualified"
     );
     bound_file(

@@ -260,7 +260,7 @@ pub(super) fn validate_allocation(g: &Grant, x: &Prerequisites, requested: u64) 
         result["schema"] == "jetstreamer-epoch223-demotion-capacity-result-v1"
             && result["self_sha256"] == x.accounting_executable.sha256
             && result["upstream_accounting_source_commit"]
-                == "af09802051463086cf8f47de3bf200717d84e094"
+                == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
             && result["context"]["phase"] == "spawn"
             && result["context"]["job_kind"] == "bracket"
             && result["context"]["runtime_plan"] == binding_value(&g.runtime_plan)
@@ -288,7 +288,7 @@ pub(super) fn validate_allocation(g: &Grant, x: &Prerequisites, requested: u64) 
                 .as_u64()
                 .is_some_and(|n| n >= requested && n <= g.recorded_unix_millis)
             && qualification["upstream_accounting_source_commit"]
-                == "af09802051463086cf8f47de3bf200717d84e094"
+                == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
             && qualification["executable_sha256"] == x.accounting_executable.sha256
             && qualification["complete_memory_accounting_qualified"] == true
             && proof["capacity"]["schema"] == "jetstreamer-horizon-maintenance-capacity-v1"

@@ -380,11 +380,11 @@ canonical validation; it does not fill the observed tuple from a success literal
 Actual manager result/restart count and captured launch/result fields likewise
 supply the proof values. No native proof has been produced by this source work.
 
-Accounting integration remains blocked for source qualification: the adapter
-branch was originally based on af098020, while the new coherent204 generation-v2
-accounting and canary227 independent1GiB guard correction are rooted in e5eee552 /
-80f746a0 /47184fd7. Preserve the existing af-based branch as unqualified source;
-do not compile/use it as current full-fleet authority. Root must provide the
-actual corrected sealed helper/qualification and coordinate the coherent merge
-before repinning these exact223 interfaces. No shared source or target was
-modified, no lock was created, and no campaign observation was taken here.
+The source adapter now includes the coherent 8289bc65 complete accounting base,
+including the independent 227 1 GiB guard and generation-v2 204 corrections.
+Its exact 223 task adapter preserves accepted control ownership and adds every
+new candidate envelope in full above the existing reservation. This source is
+still unqualified: root must coordinate QA and provide the actual sealed helper
+and exact source qualification before any runtime use. The production 8289bc65
+binary lacks these new commands and cannot substitute for that new helper.
+No shared target, service, remote object, or campaign observation was touched.

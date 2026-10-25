@@ -118,6 +118,7 @@ mod prefix205_admission;
 mod prefix205_capture;
 mod prefix223;
 mod prefix223_live_peer;
+mod demotion223_live_peer;
 mod prefix223_live_sources;
 mod prefix223_native20;
 mod prefix223_native20_admission;
@@ -224,6 +225,13 @@ pub(super) fn capped_assembly_memory_owners(
 ) -> Result<BTreeMap<String, Value>> {
     capped204205_work::peer_assembly_memory_owners(f, o)
 }
+pub(super) fn demotion223_memory_views(
+    f: &Value,
+    o: &Value,
+) -> Result<(Value, Value, BTreeMap<String, Value>)> {
+    demotion223_live_peer::memory_views(f, o)
+}
+
 pub(super) fn admit_singleton207() -> Result<()> {
     singleton207::admit()
 }

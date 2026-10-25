@@ -19,7 +19,7 @@ pub(super) fn validate_control_capacity(grant: &ControlGrant, x: &Prerequisites)
         result["schema"] == "jetstreamer-epoch223-demotion-capacity-result-v1"
             && result["self_sha256"] == x.accounting_executable.sha256
             && result["upstream_accounting_source_commit"]
-                == "af09802051463086cf8f47de3bf200717d84e094"
+                == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
             && qualification["complete_memory_accounting_qualified"] == true
             && qualification["executable_sha256"] == x.accounting_executable.sha256
             && result["context"]["phase"] == "control"
@@ -170,7 +170,7 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
     let qualification: Value = read_bound(&x.accounting_qualification)?;
     ensure!(
         qualification["upstream_accounting_source_commit"]
-            == "af09802051463086cf8f47de3bf200717d84e094"
+            == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
             && qualification["executable_sha256"] == x.accounting_executable.sha256
             && qualification["complete_memory_accounting_qualified"] == true,
         "223 corrected accounting executable is not qualified"
@@ -516,7 +516,7 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let qualification: Value = read_bound(&x.accounting_qualification)?;
     ensure!(
         qualification["upstream_accounting_source_commit"]
-            == "af09802051463086cf8f47de3bf200717d84e094"
+            == "8289bc65aab9d495071ac81f932d3ae71c6bad38"
             && qualification["executable_sha256"] == x.accounting_executable.sha256
             && qualification["complete_memory_accounting_qualified"] == true,
         "223 spawn accounting unqualified"

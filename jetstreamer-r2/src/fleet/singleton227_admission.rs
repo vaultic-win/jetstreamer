@@ -611,7 +611,8 @@ fn owners_inner(
     let old = f["unit_census"]
         .as_object()
         .context("227 predecessor census")?;
-    let mut active = BTreeSet::new();
+    demotion223_live_peer::current_guards(f, current)?;
+    let mut active = demotion223_live_peer::accepted_guard_names(f)?;
     for row in f["active"].as_array().context("227 active owners")? {
         let p = active_owner(row)?;
         let unit = p["Id"].as_str().context("227 owner name")?;

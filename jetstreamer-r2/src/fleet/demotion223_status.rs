@@ -673,6 +673,12 @@ fn guard_for(t: &Task) -> Result<Actor> {
     let a: Actor = serde_json::from_value(value["actor"].clone())?;
     let plan: BoundFile = serde_json::from_value(value["guard_plan"].clone())?;
     let body = bound_json(&plan)?;
+    let runtime = bound_json(&t.runtime_plan)?;
+    let floor = if t.job_kind == "native-input" {
+        &runtime["local_floor_bytes"]
+    } else {
+        &runtime["plan"]["minimum_free_bytes"]
+    };
     let qualification = bound_json(&t.guard_qualification)?;
     ensure!(
         guard_name(&a.unit)
@@ -684,6 +690,10 @@ fn guard_for(t: &Task) -> Result<Actor> {
             && value["protective_guard_proven"] == true
             && value["publication_authorized"] == false
             && body["runtime_plan"] == private157::binding(&t.runtime_plan)
+            && body["schema"] == "jetstreamer-epoch223-demotion-guard-plan-v1"
+            && value["minimum_free_bytes"] == body["protected_floor_bytes"]
+            && value["minimum_free_bytes"] == *floor
+            && value["minimum_free_bytes"].as_u64().is_some_and(|n| n > 0)
             && body["guard_unit"] == a.unit
             && body["ready_output"].as_str() == t.guard.path.to_str()
             && qualification["schema"] == "jetstreamer-epoch223-demotion-role-qualification-v1"
@@ -1736,7 +1746,60 @@ pub(super) fn resource_contract(c: &PipelineClaim) -> Result<Value> {
     let row = observe(&t.actor, &t.job_kind)?;
     let guard = guard_for(&t)?;
     observe(&guard, "guard")?;
-    resource::sample(&t, &row)
+    let mut contract = resource::sample(&t, &row)?;
+    let plan = bound_json(&t.runtime_plan)?;
+    let floor = if t.job_kind == "native-input" {
+        plan["local_floor_bytes"].as_u64()
+    } else {
+        plan["plan"]["minimum_free_bytes"].as_u64()
+    }
+    .filter(|n| *n > 0)
+    .context("223 accepted task local floor")?;
+    contract["minimum_free_bytes"] = json!(floor);
+    // Keep the whole admitted envelope even during hashing/control and after
+    // scratch reclamation. A sample is never allocation credit.
+    contract["remaining_disk_growth_bytes"] = json!(if t.job_kind == "native-input" {
+        301u64 << 30
+    } else {
+        471_798_691_840u64
+    });
+    contract["guard_plan"] = private157::binding(&t.guard);
+    Ok(contract)
+}
+
+pub(super) fn accepted_claim(f: &Value, row: &Value) -> Result<PipelineClaim> {
+    let owner = singleton227_admission::active_owner(row)?;
+    let unit = owner["Id"].as_str().context("223 accepted task unit")?;
+    ensure!(
+        row["epoch"] == 223
+            && scope(row["phase"].as_str().unwrap_or(""), unit)
+            && row["ordinary_replay_claim"] == false,
+        "223 accepted task scope changed"
+    );
+    let plan: Plan = serde_json::from_value(bound_json(&BoundFile {
+        path: f["plan"].as_str().context("223 accepted plan")?.into(),
+        sha256: f["plan_sha256"]
+            .as_str()
+            .context("223 accepted plan SHA")?
+            .into(),
+    })?)?;
+    let claims: Vec<_> = plan
+        .pipeline_claims
+        .iter()
+        .filter(|c| c.unit == unit)
+        .collect();
+    ensure!(
+        claims.len() == 1,
+        "223 accepted task claim missing/duplicate"
+    );
+    let c: PipelineClaim = serde_json::from_value(serde_json::to_value(claims[0])?)?;
+    ensure!(
+        c.invocation_id == owner["InvocationID"]
+            && c.evidence == serde_json::from_value::<Vec<BoundFile>>(row["evidence"].clone())?,
+        "223 accepted task evidence differs"
+    );
+    validate_claim(&c, Some(owner))?;
+    Ok(c)
 }
 
 pub(super) fn discovered(name: &str) -> bool {

@@ -1,4 +1,4 @@
-//! Exact epoch 223 control/spawn candidates over the complete af098020 ledger.
+//! Exact epoch 223 candidates over the coherent 8289bc65 complete ledger.
 //! Pending candidate actors are charged in full, never hidden as free capacity.
 use super::*;
 
@@ -215,17 +215,8 @@ impl Context {
         current: &BTreeMap<String, Value>,
     ) -> Result<(BTreeMap<String, Value>, Value)> {
         self.shape()?;
-        let names = self.names()?;
-        for active in f["active"]
-            .as_array()
-            .context("223candidate accepted producer roster")?
-        {
-            let owner = singleton227_admission::active_owner(active)?;
-            ensure!(
-                !names.contains(owner["Id"].as_str().context("223candidate roster name")?),
-                "223candidate cannot replace or discount an accepted producer"
-            );
-        }
+        let guard_names = demotion223_live_peer::accepted_guard_names(f)?;
+        let view = self.retained_peer_view(f, current, &guard_names)?;
         self.validate_plan()?;
         let main_user = if self.job_kind == "bracket" {
             "ubuntu"
@@ -259,16 +250,61 @@ impl Context {
             768 << 20,
             "root",
         )?;
-        let mut view = current.clone();
-        for name in names {
-            view.remove(&name);
-        }
         let evidence = json!({"schema":"jetstreamer-epoch223-demotion-candidate-accounting-v1","context":self,
             "actors":{"producer":producer,"guard":guard,"issuer":issuer},
             "candidate_memory_max_bytes":self.candidate()?.memory_max_bytes,
             "producer_and_guard_and_issuer_full_caps_charged":true,"allocation_credit_bytes":0,
             "raw_accepted_fleet_unchanged":true,"accepted_producer_removed":false});
         Ok((view, evidence))
+    }
+    fn retained_peer_view(
+        &self,
+        f: &Value,
+        current: &BTreeMap<String, Value>,
+        guards: &BTreeSet<String>,
+    ) -> Result<BTreeMap<String, Value>> {
+        let mut accepted = guards.clone();
+        for row in f["active"]
+            .as_array()
+            .context("223 accepted producer roster")?
+        {
+            let owner = singleton227_admission::active_owner(row)?;
+            ensure!(
+                accepted.insert(
+                    owner["Id"]
+                        .as_str()
+                        .context("223 accepted producer name")?
+                        .into()
+                ),
+                "223 duplicate accepted actor"
+            );
+        }
+        let mut view = current.clone();
+        for a in [&self.producer, &self.guard, &self.issuer] {
+            if !accepted.contains(&a.unit) {
+                view.remove(&a.unit);
+                continue;
+            }
+            let old = &f["unit_census"][&a.unit];
+            let live = current.get(&a.unit).context("223 accepted actor missing")?;
+            for row in [old, live] {
+                ensure!(
+                    row["Id"] == a.unit
+                        && row["InvocationID"] == a.invocation_id
+                        && row["MainPID"].as_str().and_then(|s| s.parse::<u32>().ok())
+                            == Some(a.pid)
+                        && row["ControlGroup"] == a.cgroup
+                        && row["NRestarts"] == "0"
+                        && row["ActiveState"] == "active"
+                        && row["SubState"] == "running"
+                        && row["ExecStart"]
+                            .as_str()
+                            .is_some_and(|s| same_command(s, &a.expected_exec_start)),
+                    "223 accepted actor invocation/restart/identity changed"
+                );
+            }
+        }
+        Ok(view)
     }
 }
 #[derive(Deserialize)]
@@ -296,7 +332,7 @@ pub(super) fn run() -> Result<()> {
         &s.output,
         &json!({"schema":"jetstreamer-epoch223-demotion-capacity-result-v1",
         "spec":private157::binding(&binding),"self_sha256":self_sha,"context":s.context,
-        "upstream_accounting_source_commit":"af09802051463086cf8f47de3bf200717d84e094","capacity":capacity,
+        "upstream_accounting_source_commit":"8289bc65aab9d495071ac81f932d3ae71c6bad38","capacity":capacity,
         "native_execution_authorized":false,"publication_authorized":false,"r2_mutations":false}),
     )?;
     println!("{}", private157::file_binding(&s.output)?);
@@ -371,11 +407,38 @@ mod tests {
         assert!(c.candidate().is_err());
     }
     #[test]
-    fn accepted_candidate_is_rejected_before_any_host_probe() {
+    fn accepted_control_and_guard_are_retained_above_full_new_candidate() {
         let c = context();
-        let f = json!({"active":[{"producer":{"Id":c.producer.unit}}]});
-        let error = c.peer_view(&f, &BTreeMap::new()).unwrap_err().to_string();
-        assert!(error.contains("cannot replace or discount an accepted producer"));
+        let row = |a: &Actor| json!({"Id":a.unit,"InvocationID":a.invocation_id,"MainPID":a.pid.to_string(),"ControlGroup":a.cgroup,"NRestarts":"0","ActiveState":"active","SubState":"running","ExecStart":a.expected_exec_start});
+        let census = BTreeMap::from([
+            (c.producer.unit.clone(), row(&c.producer)),
+            (c.guard.unit.clone(), row(&c.guard)),
+            (c.issuer.unit.clone(), row(&c.issuer)),
+        ]);
+        let f = json!({"active":[{"unit":row(&c.producer)}],"unit_census":census});
+        let guards = BTreeSet::from([c.guard.unit.clone()]);
+        let kept = c.retained_peer_view(&f, &census, &guards).unwrap();
+        assert_eq!(kept.len(), 2);
+        assert_eq!(kept.get(&c.producer.unit), census.get(&c.producer.unit));
+        assert!(kept.contains_key(&c.guard.unit));
+        assert_eq!(c.candidate().unwrap().memory_max_bytes, 18 * GIB);
+        let empty = json!({"active":[],"unit_census":{}});
+        assert!(
+            c.retained_peer_view(&empty, &census, &BTreeSet::new())
+                .unwrap()
+                .is_empty()
+        );
+        for (key, value) in [
+            ("InvocationID", json!("e".repeat(32))),
+            ("NRestarts", json!("1")),
+            ("MainPID", json!("999")),
+            ("ExecStart", json!("other")),
+            ("ActiveState", json!("inactive")),
+        ] {
+            let mut changed = census.clone();
+            changed.get_mut(&c.producer.unit).unwrap()[key] = value;
+            assert!(c.retained_peer_view(&f, &changed, &guards).is_err());
+        }
     }
     #[test]
     fn foreign_legacy_or_borrowed_actor_cannot_be_a_candidate_exemption() {

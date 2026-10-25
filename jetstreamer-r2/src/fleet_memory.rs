@@ -278,7 +278,15 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
     (|| -> Result<Value> {
         let assembly=crate::fleet::capped_assembly_memory_owners(ledger,o)?;
         let accounting=crate::fleet::native227_terminal_observer_view(ledger,o)?;
-        let mut result=checked_with_assembly(&accounting,ledger,&assembly)?;
+        let (memory_ledger,memory_observer,repair)=crate::fleet::demotion223_memory_views(ledger,&accounting)?;
+        let mut result=checked_with_assembly(&memory_observer,&memory_ledger,&assembly)?;
+        if !repair.is_empty() {
+            let owners=result["owner_census"].as_array_mut().context("memory owner census")?;
+            owners.extend(repair.keys().map(|name|json!(name)));
+            result["repair_non_replay_overhead"]=json!(repair.values().collect::<Vec<_>>());
+            result["repair_non_replay_owner_count"]=json!(repair.len());
+            result["repair_rss_already_in_whole_host_census"]=json!(true);
+        }
         if let Some(evidence)=accounting.get("terminal_observation_accounting") {
             result["terminal_observation_accounting"]=evidence.clone();
         }

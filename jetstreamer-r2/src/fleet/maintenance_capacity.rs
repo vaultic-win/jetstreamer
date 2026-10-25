@@ -234,11 +234,15 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
     // can leave the legacy-only resource view. Raw evidence is never modified.
     capped204205_work::peer_observation(f, o)?;
     assembly204_recovery::peer_observation(f, o)?;
+    let (_, repair_observer, repair) = demotion223_live_peer::memory_views(f, o)?;
     let mut names = capped204205_work::peer_names(f)?;
     names.extend(assembly204_recovery::peer_names(f)?);
+    names.extend(repair.keys().cloned());
     Ok((
-        assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
-        legacy_observer(o, &names)?,
+        demotion223_live_peer::without(&assembly204_recovery::peer_view(
+            &capped204205_work::peer_legacy_view(f)?,
+        )?)?,
+        legacy_observer(&repair_observer, &names)?,
     ))
 }
 pub(super) fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {

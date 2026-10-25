@@ -1,6 +1,6 @@
 //! Lossless resource adapters for the closed 207 full epoch and 233 first root.
 //! No historical view may erase one of these owners or grant allocation credit.
-use super::{verification223_live_peer as base, *};
+use super::{demotion223_live_peer as base, *};
 mod legacy_memory;
 #[cfg(test)]
 pub(super) use base::fixture_row;

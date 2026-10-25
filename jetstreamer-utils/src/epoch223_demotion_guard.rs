@@ -262,6 +262,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         "actor":actor,"watched_runner":plan.watched_runner,"guard_plan":binding,
         "admission_policy":plan.admission_policy,"run_root":plan.run_root,"worker_sha256":WORKER,
         "target_slot":plan.target_slot,"protective_guard_proven":true,"producer_stop_enabled":true,
+        "minimum_free_bytes":plan.protected_floor_bytes,
         "recorded_unix_millis":millis()?,"publication_authorized":false,"r2_mutations":false}),
     )?;
     loop {
