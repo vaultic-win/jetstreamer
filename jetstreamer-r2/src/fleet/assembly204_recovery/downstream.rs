@@ -271,10 +271,17 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
             "204 actual tool capture/QA source revision differs"
         );
     }
-    let component = match x.stage {
-        Stage::Full | Stage::Boundary => "jetstreamer-horizon",
-        Stage::Plugin => "jetstreamer-pipeline",
-        Stage::Upload => "jetstreamer-r2",
+    let (component, qa_target) = match x.stage {
+        Stage::Full => (
+            "jetstreamer-horizon",
+            tool_qa::Target::Example("verify_archive"),
+        ),
+        Stage::Boundary => (
+            "jetstreamer-horizon",
+            tool_qa::Target::Example("archive_boundaries"),
+        ),
+        Stage::Plugin => ("jetstreamer", tool_qa::Target::Binary("horizon_pipeline")),
+        Stage::Upload => ("jetstreamer-r2", tool_qa::Target::Package),
         _ => bail!("204 stage has no child tool"),
     };
     let logs: Vec<BoundFile> = serde_json::from_value(proof["qa_logs"].clone())?;
@@ -290,6 +297,7 @@ fn tool(x: &StageSpec) -> Result<BoundFile> {
         &qa,
         s(&proof, "source_revision")?,
         component,
+        qa_target,
         &logs,
         &qa_files,
         read,
