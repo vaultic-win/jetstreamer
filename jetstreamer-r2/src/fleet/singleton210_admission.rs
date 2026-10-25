@@ -12,9 +12,7 @@ struct Spec {
     output: PathBuf,
 }
 pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
-    native210_peer_history::current(f, current)?;
-    prefix223_live_peer::current(f, current)?;
-    singleton227_admission::owners(f, current)
+    maintenance_capacity::current_owners(f, current)
 }
 fn memory(o: &Value) -> Result<()> {
     let m = &o["lane_rss_history"]["200"];

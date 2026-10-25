@@ -480,14 +480,14 @@ fn check_inner_with(
         "Maintenance capacity requires root"
     );
     let s: Spec = serde_json::from_value(value.clone())?;
-    ensure!(
-        s.fleet
-            .path
-            .starts_with("/var/lib/jetstreamer/horizon-campaign-fleet"),
-        "foreign Maintenance fleet"
-    );
     let o = bound_json(&s.observer)?;
-    let f = bound_json(&s.fleet)?;
+    let f = fleet_for_mode(
+        mode,
+        &s.fleet,
+        &s.observer,
+        &assembly204_recovery::accepted_context,
+        &bound_json,
+    )?;
     ensure!(
         f["observer_receipt"].as_str() == s.observer.path.to_str()
             && f["observer_sha256"] == s.observer.sha256,
@@ -723,9 +723,118 @@ fn check_inner_with(
     }
     Ok(capacity)
 }
+fn fleet_for_mode(
+    mode: MemoryMode,
+    fleet: &BoundFile,
+    observer: &BoundFile,
+    accepted: &impl Fn(&BoundFile, &BoundFile) -> Result<Value>,
+    canonical: &impl Fn(&BoundFile) -> Result<Value>,
+) -> Result<Value> {
+    if matches!(mode, MemoryMode::Full210) {
+        return accepted(fleet, observer);
+    }
+    ensure!(
+        fleet
+            .path
+            .starts_with("/var/lib/jetstreamer/horizon-campaign-fleet"),
+        "foreign Maintenance fleet"
+    );
+    canonical(fleet)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn context_binding(path: &str) -> BoundFile {
+        BoundFile {
+            path: path.into(),
+            sha256: "a".repeat(64),
+        }
+    }
+    #[test]
+    fn full210_uses_authenticated_context_for_canonical_and_private_fleets() {
+        let observer = context_binding("/saved/observer.json");
+        for path in [
+            "/var/lib/jetstreamer/horizon-campaign-fleet-v1/fleet.json",
+            "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-cycle414-refresh-v1/fleet.json",
+        ] {
+            let fleet = context_binding(path);
+            let raw = json!({"active":[{"epoch":204}],"history":[{"raw":true}]});
+            let actual = fleet_for_mode(
+                MemoryMode::Full210,
+                &fleet,
+                &observer,
+                &|f, o| {
+                    assert_eq!(f.path, fleet.path);
+                    assert_eq!(f.sha256, fleet.sha256);
+                    assert_eq!(o.path, observer.path);
+                    assert_eq!(o.sha256, observer.sha256);
+                    Ok(raw.clone())
+                },
+                &|_| panic!("Full210 must authenticate its accepted context"),
+            )
+            .unwrap();
+            assert_eq!(actual, raw);
+        }
+    }
+    #[test]
+    fn full210_context_failure_never_falls_back_to_plain_reader() {
+        let fleet = context_binding("/foreign/fleet.json");
+        let observer = context_binding("/saved/observer.json");
+        let error = fleet_for_mode(
+            MemoryMode::Full210,
+            &fleet,
+            &observer,
+            &|_, _| bail!("context lineage or observer rejected"),
+            &|_| panic!("failed authentication must not fall back"),
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("context lineage or observer rejected")
+        );
+    }
+    #[test]
+    fn other_maintenance_modes_keep_the_canonical_namespace_gate() {
+        let canonical =
+            context_binding("/var/lib/jetstreamer/horizon-campaign-fleet-v1/fleet.json");
+        let private = context_binding(
+            "/var/lib/jetstreamer/horizon-204-assembly-fleet-event-cycle414-refresh-v1/fleet.json",
+        );
+        let observer = context_binding("/saved/observer.json");
+        for mode in [
+            MemoryMode::Existing,
+            MemoryMode::Full209Delivery,
+            MemoryMode::FirstRoot233,
+            MemoryMode::Capped204V4,
+            MemoryMode::AssemblyRecovery204,
+        ] {
+            assert_eq!(
+                fleet_for_mode(
+                    mode,
+                    &canonical,
+                    &observer,
+                    &|_, _| panic!("other modes must retain the canonical reader"),
+                    &|f| {
+                        assert_eq!(f.path, canonical.path);
+                        Ok(json!({"raw":true}))
+                    },
+                )
+                .unwrap(),
+                json!({"raw":true})
+            );
+            assert!(
+                fleet_for_mode(
+                    mode,
+                    &private,
+                    &observer,
+                    &|_, _| panic!("other modes cannot borrow accepted context"),
+                    &|_| panic!("private fleet must reject before reading"),
+                )
+                .is_err()
+            );
+        }
+    }
     #[test]
     fn capped_legacy_observation_is_derived_without_dropping_other_rows_or_history() {
         let original = json!({"recorded_at_utc":"2026-10-24T10:00:00Z",

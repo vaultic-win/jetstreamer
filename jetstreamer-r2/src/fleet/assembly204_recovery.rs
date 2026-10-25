@@ -8,6 +8,15 @@ mod capacity;
 mod context;
 mod custody;
 use context::AcceptedContext;
+// Full210 shares the authenticated complete context reader. Its maintenance
+// admission retains the coordinated sample's own freshness and resource gates.
+pub(super) fn accepted_context(fleet: &BoundFile, observer: &BoundFile) -> Result<Value> {
+    AcceptedContext {
+        fleet: fleet.clone(),
+        observer: observer.clone(),
+    }
+    .historical()
+}
 mod downstream;
 mod lineage;
 mod ownership;
@@ -18,8 +27,7 @@ mod tests;
 pub(super) use ownership::{Claim, names, row, status_matches};
 pub(super) use ownership::{
     peer_current, peer_guards, peer_limits, peer_memory_owners, peer_names, peer_observation,
-    qualification_successor,
-    peer_resources, peer_view,
+    peer_resources, peer_view, qualification_successor,
 };
 
 const OLD_UNIT: &str = "horizon-qualify-204-capped-continuation-bounded8-v4-df57.service";
