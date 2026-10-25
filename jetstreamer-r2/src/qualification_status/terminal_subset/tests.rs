@@ -348,3 +348,18 @@ fn recovery204_successor_never_hides_raw_guard_or_foreign_unit_changes() {
     let mut changed=current;changed.get_mut(guard).unwrap()["InvocationID"]=json!("d".repeat(32));
     assert!(same_census(&f,&changed).is_err());
 }
+
+#[test]
+fn every_non141_schema_rejects_an_epoch141_delivery_policy() {
+    for omitted in [vec![], vec![204], vec![205], vec![204, 205]] {
+        let mut p = plan(&omitted);
+        plan_epochs(&p).unwrap();
+        p.epoch141_delivery_policy = Some(serde_json::from_value(b("/sealed/foreign-141-policy.json")).unwrap());
+        assert!(plan_epochs(&p).is_err());
+    }
+    let mut legacy = plan(&[]);
+    legacy.schema = "jetstreamer-qualification-status-plan-v1".into();
+    plan_epochs(&legacy).unwrap();
+    legacy.epoch141_delivery_policy = Some(serde_json::from_value(b("/sealed/foreign-141-policy.json")).unwrap());
+    assert!(plan_epochs(&legacy).is_err());
+}

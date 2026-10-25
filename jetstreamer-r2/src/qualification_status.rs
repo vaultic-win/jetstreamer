@@ -232,6 +232,10 @@ fn plan_epochs(p: &Plan) -> Result<Vec<u64>> {
         );
     }
     ensure!(
+        epochs == [141] || p.epoch141_delivery_policy.is_none(),
+        "non-141 qualification status cannot borrow an epoch 141 delivery policy"
+    );
+    ensure!(
         p.downstream_allowance_millis
             .values()
             .all(|value| *value > 0),
