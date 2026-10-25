@@ -188,6 +188,25 @@ const SOLANA_V1_6_20_TAG: &str = "v1.6.20";
 const SOLANA_V1_6_20_COMMIT: &str = "77bdb45d4af61fc687161ec06cc0178ff79726d5";
 const SOLANA_V1_6_20_RUST_TOOLCHAIN: &str = "rustc 1.51.0 (2fd73fabe 2021-03-23)";
 const SOLANA_V1_6_20_TARGET: &str = "x86_64-unknown-linux-gnu";
+// Keep private worker identity in this shared client module: standalone resource
+// binaries include historical.rs without the main replay binary's modules.
+#[cfg(feature = "epoch223-demotion-bracket")]
+pub(crate) const EPOCH223_DEMOTION_BACKEND: &str =
+    "solana-v1.6.20-epoch223-called-program-demotion-candidate";
+#[cfg(feature = "epoch223-demotion-bracket")]
+pub(crate) const EPOCH223_DEMOTION_WORKER_SHA: &str =
+    "0f8cc22ad76365f4feb1ef328ce77babbb5242a9b5edb38e9bd076528bc530c0";
+
+#[cfg(feature = "epoch223-demotion-bracket")]
+pub(crate) fn validate_epoch223_demotion_worker_digest(
+    actual: [u8; HASH_BYTES],
+) -> Result<(), String> {
+    if digest_hex(&actual) != EPOCH223_DEMOTION_WORKER_SHA {
+        return Err("private demotion worker digest differs before executable spawn".into());
+    }
+    Ok(())
+}
+
 const SOLANA_V1_6_25_BACKEND_ID: &str = "solana-v1.6.25";
 const SOLANA_V1_6_25_TAG: &str = "v1.6.25";
 const SOLANA_V1_6_25_COMMIT: &str = "7de8a55b54d3e11058b82f9483bb405d143b455c";
@@ -209,7 +228,7 @@ const SOLANA_V1_8_11_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 fn backend_supports_entry_batches(backend_id: &str) -> bool {
     #[cfg(feature = "epoch223-demotion-bracket")]
-    if backend_id == crate::epoch223_demotion::BACKEND {
+    if backend_id == EPOCH223_DEMOTION_BACKEND {
         return true;
     }
     matches!(
@@ -1379,8 +1398,8 @@ impl HistoricalRuntimeClient {
         // replacement window between parent admission and worker loading.
         let bound_executable = bind_worker_executable(&executable, private_work_dir.path())?;
         #[cfg(feature = "epoch223-demotion-bracket")]
-        if profile.backend_id == crate::epoch223_demotion::BACKEND {
-            crate::epoch223_demotion::validate_worker_digest(bound_executable.sha256)
+        if profile.backend_id == EPOCH223_DEMOTION_BACKEND {
+            validate_epoch223_demotion_worker_digest(bound_executable.sha256)
                 .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
         }
         let (ledger_path, initial_state, expected_source) = match initialization {
@@ -4126,6 +4145,23 @@ mod tests {
     use super::*;
     use solana_transaction::{Address, Signature, Transaction};
 
+    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[test]
+    fn epoch223_demotion_worker_identity_is_exact_without_main_module() {
+        let expected = [
+            0x0f, 0x8c, 0xc2, 0x2a, 0xd7, 0x63, 0x65, 0xf4, 0xfe, 0xb1, 0xef, 0x32, 0x8c, 0xe7,
+            0x7b, 0xab, 0xbb, 0x52, 0x42, 0xa9, 0xb5, 0xed, 0xb3, 0x8e, 0x9b, 0xd0, 0x76, 0x52,
+            0x8b, 0xc5, 0x30, 0xc0,
+        ];
+        assert!(backend_supports_entry_batches(EPOCH223_DEMOTION_BACKEND));
+        assert!(validate_epoch223_demotion_worker_digest(expected).is_ok());
+        for index in 0..HASH_BYTES {
+            let mut different = expected;
+            different[index] ^= 1;
+            assert!(validate_epoch223_demotion_worker_digest(different).is_err());
+        }
+        assert!(validate_epoch223_demotion_worker_digest([0; HASH_BYTES]).is_err());
+    }
     type HandshakeMutation = (&'static str, fn(&mut protocol::Handshake));
 
     #[test]

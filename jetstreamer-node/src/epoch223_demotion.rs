@@ -12,9 +12,9 @@ use std::{
 pub(crate) const BOOTSTRAP: u64 = 96_335_538;
 const FIRST: u64 = 96_336_000;
 pub(crate) const END: u64 = 96_544_588;
-pub(crate) const BACKEND: &str = "solana-v1.6.20-epoch223-called-program-demotion-candidate";
+pub(crate) const BACKEND: &str = h::EPOCH223_DEMOTION_BACKEND;
 // Independently captured production build from frozen source 551728fd.
-const WORKER_SHA: &str = "0f8cc22ad76365f4feb1ef328ce77babbb5242a9b5edb38e9bd076528bc530c0";
+const WORKER_SHA: &str = h::EPOCH223_DEMOTION_WORKER_SHA;
 const SNAPSHOT_SHA: &str = "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665";
 const SNAPSHOT_SIZE: u64 = 9_815_262_303;
 const BOOT_ACCOUNTS: &str = "Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE";
@@ -71,12 +71,6 @@ pub(crate) fn digest(s: &str) -> Result<[u8; 32], String> {
             .map_err(|e| e.to_string())?;
     }
     Ok(out)
-}
-pub(crate) fn validate_worker_digest(actual: [u8; 32]) -> Result<(), String> {
-    if actual != digest(WORKER_SHA)? {
-        return Err("private demotion worker digest differs before executable spawn".into());
-    }
-    Ok(())
 }
 pub(crate) fn selected(range: &Range<u64>) -> bool {
     range.end == END + 1 && [BOOTSTRAP + 1, FIRST].contains(&range.start)
