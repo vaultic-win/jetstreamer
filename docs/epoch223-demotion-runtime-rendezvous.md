@@ -157,9 +157,15 @@ readback and sidecar. No ETA or status is issued here. Genuine lifecycle events
 are immediate; routine refresh remains once per 1,800-second replay observation,
 with the user-requested out-of-band exception.
 
-The existing conservative memory/floor minima remain unchanged. They are not a
-fresh resource fit or permission to retain an obsolete floor; reconcile them with
-the current century's evidence and complete fleet before runtime qualification.
+Memory envelopes remain closed. New223 no longer hardcodes another owner's2TB
+floor: plan.minimum_free_bytes and the guard's protected floor represent only the
+evidenced century/own-drain floor, independently bound in the candidate context.
+The fresh corrected helper recomputes the century floor and rejects a lower local
+floor; it separately protects all currently enforced live-owner minima and full
+remaining growth. No current207/209/227 floor is lowered. A future same-IID guard/
+controller supersession needs separate source/capability qualification; the
+present original-guard actor binding cannot hot-swap a guard or its immutable
+plan. Do not claim that gap is already solved.
 
 The worker still rejects entries from 96544589 onward. Bracket success at
 96544588 is not canonical root 96767522 or a complete epoch. Both real Bank gates,
@@ -294,3 +300,19 @@ repair-closure/publication/R2 authority false. Old harness proof is never accept
 The capture role is source-only and has not run. The native supervisor that must
 produce genuine launch/result/stdout and its admission/guard qualification is
 still not implemented; these strict input types do not pretend otherwise.
+
+New223 floor separation is source-only. Cycle402's observed century floor was
+245,383,154,903 bytes; it is evidence, not a permanent constant. The live inherited
+2,034,359,738,368-byte constraint belongs to207/227 (209 still enforces2TB).
+The new223 candidate context must bind its actual local floor from its actual
+plan, and the corrected full accounting independently protects those other
+owners while they remain active. This does not modify the current227 immutable
+canary or grant any lowering of its 15-second internal gate.
+
+After a committed marker, an acknowledgment failure now attempts a durable
+`*-acknowledgment-failure.json` interrupted-ownership receipt containing the exact
+original marker/grant/owner/guard. It explicitly avoids claiming a current owner
+was reobserved, denies rollback/repeat spawn, and requires root reconciliation
+before next admission. If that receipt also fails, return both errors while
+retaining the original reservation, files and guard. An uncertain marker
+publication remains potentially committed under the same recovery rule.

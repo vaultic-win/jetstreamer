@@ -13,7 +13,9 @@ mod profile {
     pub const TARGET: u64 = 96_544_588;
     pub const TERMINAL: u64 = TARGET;
     pub const INITIAL_REPLAY: u64 = 96_335_539;
-    pub const MINIMUM_FREE: u64 = 2_471_798_691_840;
+    // Admission binds the evidenced local century/own-drain floor. Other
+    // owners' temporary floors stay in complete fleet accounting.
+    pub const MINIMUM_FREE: u64 = 1;
     pub const MAX_SCRATCH: u64 = 300_000_000_000;
     pub const MAX_RUNTIME: u64 = 129600;
     pub const SNAPSHOT_SIZE: u64 = 9_815_262_303;

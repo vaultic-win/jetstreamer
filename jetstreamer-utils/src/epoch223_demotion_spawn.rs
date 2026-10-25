@@ -262,6 +262,7 @@ pub(super) fn validate_allocation(g: &Grant, x: &Prerequisites, requested: u64) 
             && result["context"]["phase"] == "spawn"
             && result["context"]["job_kind"] == "bracket"
             && result["context"]["runtime_plan"] == binding_value(&g.runtime_plan)
+            && result["context"]["local_floor_bytes"] == g.protected_floor_bytes
             && result["context"]["producer"] == serde_json::to_value(&g.runner)?
             && result["context"]["issuer"] == serde_json::to_value(&g.issuer)?
             && result["context"]["guard"] == serde_json::to_value(&guard.actor)?

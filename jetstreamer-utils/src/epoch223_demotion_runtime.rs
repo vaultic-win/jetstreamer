@@ -967,8 +967,8 @@ fn validate_admission(
     ensure!(
         a.read_only_hashing_authorized
             && !a.native_execution_authorized
-            && a.protected_floor_bytes >= 2_000_000_000_000
-            && a.protected_floor_bytes <= p.minimum_free_bytes,
+            && a.protected_floor_bytes > 0
+            && a.protected_floor_bytes == p.minimum_free_bytes,
         "223 control grant cannot authorize allocation or execution"
     );
     ensure!(

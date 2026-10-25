@@ -32,6 +32,16 @@ pub(super) fn validate_control_capacity(grant: &ControlGrant, x: &Prerequisites)
             && result["capacity"]["all_live_growth_and_century_floor_protected"] == true,
         "223 control grant lacks exact newly computed complete accounting"
     );
+    let local = result["context"]["local_floor_bytes"]
+        .as_u64()
+        .context("223 local floor")?;
+    let century = result["capacity"]["century_floor_bytes"]
+        .as_u64()
+        .context("223 actual century floor")?;
+    ensure!(
+        local == grant.protected_floor_bytes && local >= century,
+        "223 local century/own-drain floor differs; inherited minima must remain separate"
+    );
     let guard: GuardProof = read_bound(&grant.guard)?;
     ensure!(
         result["context"]["guard"] == serde_json::to_value(&guard.actor)?,
@@ -249,7 +259,7 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
         &p.run_root.join("receipts/control-custody.json"),
         &lock.evidence()?,
     )?;
-    commit_marker(
+    let marker = commit_marker(
         || {
             observe(&task.actor)?;
             observe(&issuer)?;
@@ -271,32 +281,43 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
         },
     )?;
     drop(lock); // never reserve custody across read-only input hashing
-    let started = Instant::now();
-    loop {
-        let path = p.run_root.join("receipts/admission-accepted.json");
-        match fs::symlink_metadata(&path) {
-            Ok(_) => {
-                let bytes = read_owned(&path, 1000)?;
-                let accepted: Value = serde_json::from_slice(&bytes)?;
-                ensure!(
-                    accepted["runner"] == serde_json::to_value(&task.actor)?
-                        && accepted["admission"] == binding_value(&grant_binding)
-                        && accepted["read_only_hashing_authorized"] == true
-                        && accepted["native_execution_authorized"] == false,
-                    "223 control acknowledgment differs"
-                );
-                observe(&task.actor)?;
-                return Ok(());
+    let outcome = (|| -> Result<()> {
+        let started = Instant::now();
+        loop {
+            let path = p.run_root.join("receipts/admission-accepted.json");
+            match fs::symlink_metadata(&path) {
+                Ok(_) => {
+                    let bytes = read_owned(&path, 1000)?;
+                    let accepted: Value = serde_json::from_slice(&bytes)?;
+                    ensure!(
+                        accepted["runner"] == serde_json::to_value(&task.actor)?
+                            && accepted["admission"] == binding_value(&grant_binding)
+                            && accepted["read_only_hashing_authorized"] == true
+                            && accepted["native_execution_authorized"] == false,
+                        "223 control acknowledgment differs"
+                    );
+                    observe(&task.actor)?;
+                    return Ok(());
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
+            ensure!(
+                started.elapsed() < Duration::from_millis(spec.maximum_acknowledgment_wait_millis),
+                "223 control acknowledgment deadline"
+            );
+            thread::sleep(Duration::from_millis(100));
         }
-        ensure!(
-            started.elapsed() < Duration::from_millis(spec.maximum_acknowledgment_wait_millis),
-            "223 control acknowledgment deadline"
-        );
-        thread::sleep(Duration::from_millis(100));
-    }
+    })();
+    preserve_after_marker(
+        &p.run_root,
+        "control",
+        &marker,
+        &grant_binding,
+        &task.actor,
+        &guard.actor,
+        outcome,
+    )
 }
 
 struct Calculation<'a> {
@@ -328,7 +349,7 @@ fn calculate(calculation: Calculation<'_>) -> Result<BoundFile> {
         &directory.join(format!("{phase}-capacity-spec.json")),
         &json!({
         "schema":"jetstreamer-epoch223-demotion-capacity-spec-v1",
-        "context":{"job_kind":"bracket","phase":phase,"runtime_plan":plan,
+        "context":{"job_kind":"bracket","phase":phase,"local_floor_bytes":p.minimum_free_bytes,"runtime_plan":plan,
             "producer":producer,"guard":guard,"issuer":issuer,
             "driver_qualification":basis.driver_qualification,"guard_qualification":basis.guard_qualification},
         "resource_basis":{"observer":basis.observer,"fleet":basis.fleet,"protected_guards":basis.protected_guards},
@@ -553,7 +574,7 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let grant: super::spawn::Grant = serde_json::from_value(grant_value.clone())?;
     super::spawn::validate_allocation(&grant, x, requested)?;
     let grant_binding = published(&p.run_root.join("receipts/spawn-grant.json"), &grant_value)?;
-    commit_marker(
+    let marker = commit_marker(
         || {
             observe(&spec.runner)?;
             observe(&issuer)?;
@@ -576,29 +597,40 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         },
     )?;
     drop(lock);
-    let started = Instant::now();
-    loop {
-        let path = p.run_root.join("receipts/spawn-accepted.json");
-        match fs::symlink_metadata(&path) {
-            Ok(_) => {
-                let bytes = read_owned(&path, 1000)?;
-                let accepted: Value = serde_json::from_slice(&bytes)?;
-                ensure!(
-                    accepted["runner"] == serde_json::to_value(&spec.runner)?
-                        && accepted["grant"] == binding_value(&grant_binding),
-                    "223 spawn acknowledgment differs"
-                );
-                return Ok(());
+    let outcome = (|| -> Result<()> {
+        let started = Instant::now();
+        loop {
+            let path = p.run_root.join("receipts/spawn-accepted.json");
+            match fs::symlink_metadata(&path) {
+                Ok(_) => {
+                    let bytes = read_owned(&path, 1000)?;
+                    let accepted: Value = serde_json::from_slice(&bytes)?;
+                    ensure!(
+                        accepted["runner"] == serde_json::to_value(&spec.runner)?
+                            && accepted["grant"] == binding_value(&grant_binding),
+                        "223 spawn acknowledgment differs"
+                    );
+                    return Ok(());
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
+            ensure!(
+                started.elapsed() < Duration::from_millis(spec.maximum_acknowledgment_wait_millis),
+                "223 spawn acknowledgment deadline"
+            );
+            thread::sleep(Duration::from_millis(100));
         }
-        ensure!(
-            started.elapsed() < Duration::from_millis(spec.maximum_acknowledgment_wait_millis),
-            "223 spawn acknowledgment deadline"
-        );
-        thread::sleep(Duration::from_millis(100));
-    }
+    })();
+    preserve_after_marker(
+        &p.run_root,
+        "spawn",
+        &marker,
+        &grant_binding,
+        &spec.runner,
+        &guard.actor,
+        outcome,
+    )
 }
 
 // There are deliberately no fallible post-publication checks here. A marker's
@@ -610,6 +642,42 @@ fn commit_marker<T>(
 ) -> Result<T> {
     validate()?;
     publish()
+}
+
+fn preserve_after_marker(
+    root: &Path,
+    stage: &str,
+    marker: &BoundFile,
+    grant: &BoundFile,
+    owner: &Actor,
+    guard: &Actor,
+    outcome: Result<()>,
+) -> Result<()> {
+    match outcome {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            // A consumed token cannot be revoked by issuer timeout/exit. Keep
+            // original reservation/owner/guard; root must reconcile before any
+            // next admission. This receipt makes no new live-owner claim.
+            let record = published(
+                &root.join(format!("receipts/{stage}-acknowledgment-failure.json")),
+                &json!({
+                "schema":"jetstreamer-epoch223-demotion-interrupted-ownership-v1","stage":stage,
+                "marker":marker,"grant":grant,"original_admitted_owner":owner,"original_guard":guard,
+                "current_owner_reobserved":false,"marker_may_have_been_consumed":true,
+                "reason":format!("{error:#}"),"recorded_unix_millis":millis()?,
+                "preserve_original_reservation_and_guard":true,"root_reconciliation_required":true,
+                "repeat_spawn_authorized":false,"rollback_authorized":false,
+                "publication_authorized":false,"r2_mutations":false}),
+            );
+            match record {
+                Ok(_) => Err(error),
+                Err(record_error) => Err(error.context(format!(
+                    "interrupted-ownership receipt also failed: {record_error:#}"
+                ))),
+            }
+        }
+    }
 }
 
 #[cfg(test)]

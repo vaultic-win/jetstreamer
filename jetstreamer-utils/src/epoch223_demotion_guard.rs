@@ -184,7 +184,8 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             && plan.worker_sha256 == WORKER
             && plan.target_slot == TERMINAL
             && plan.maximum_scratch_bytes == MAX_SCRATCH
-            && plan.protected_floor_bytes >= 2_000_000_000_000,
+            && plan.protected_floor_bytes > 0
+            && plan.protected_floor_bytes == runtime.plan.minimum_free_bytes,
         "223 guard exact scope differs"
     );
     let prerequisites = runtime
