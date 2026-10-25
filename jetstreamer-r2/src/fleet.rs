@@ -196,6 +196,12 @@ pub(super) fn first_root233_status_inactive_owner(
 ) -> Result<Option<(String, String)>> {
     first_root233::inactive_owner(receipt)
 }
+pub(super) fn capped_assembly_memory_owners(
+    f: &Value,
+    o: &Value,
+) -> Result<BTreeMap<String, Value>> {
+    capped204205_work::peer_assembly_memory_owners(f, o)
+}
 pub(super) fn admit_singleton207() -> Result<()> {
     singleton207::admit()
 }

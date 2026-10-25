@@ -190,8 +190,17 @@ pub(in crate::fleet) fn peer_clean_assembly_window(
     f: &Value,
     o: &Value,
 ) -> Result<BTreeSet<String>> {
+    Ok(assembly_owners(f, o, true)?.into_keys().collect())
+}
+pub(in crate::fleet) fn peer_assembly_memory_owners(
+    f: &Value,
+    o: &Value,
+) -> Result<BTreeMap<String, Value>> {
+    assembly_owners(f, o, false)
+}
+fn assembly_owners(f: &Value, o: &Value, expanded: bool) -> Result<BTreeMap<String, Value>> {
     let peers = accepted(f)?;
-    let mut names = BTreeSet::new();
+    let mut names = BTreeMap::new();
     for peer in peers
         .iter()
         .filter(|p| p.row["current_stage"] == "assembly")
@@ -200,14 +209,17 @@ pub(in crate::fleet) fn peer_clean_assembly_window(
         let end = utc_seconds(string(o, "recorded_at_utc")?)?
             .checked_mul(1000)
             .context("assembly window end overflow")?;
-        let elapsed = number(&o["host_global_pressure"]["cross_sample"], "elapsed_millis")?;
-        ensure!(
-            elapsed >= 1_800_000,
-            "assembly needs the same clean coordinated host window"
-        );
-        let begin = end
-            .checked_sub(elapsed)
-            .context("assembly window starts before epoch")?;
+        let begin = if expanded {
+            let elapsed = number(&o["host_global_pressure"]["cross_sample"], "elapsed_millis")?;
+            ensure!(
+                elapsed >= 1_800_000,
+                "assembly needs the same clean coordinated host window"
+            );
+            end.checked_sub(elapsed)
+                .context("assembly window starts before epoch")?
+        } else {
+            end
+        };
         let previous_bound: BoundFile =
             serde_json::from_value(peer.input.frame["previous_fleet"].clone())?;
         let previous = bound_json(&previous_bound)?;
@@ -245,13 +257,27 @@ pub(in crate::fleet) fn peer_clean_assembly_window(
             &serde_json::from_value(peer.input.frame["guard_snapshot"].clone())?,
             true,
         )?;
-        assembly_window(&old_guard, &guard, begin, end)?;
+        if expanded {
+            assembly_window(&old_guard, &guard, begin, end)?;
+        } else {
+            assembly_phase_pair(&old_guard, &guard, begin, end)?;
+        }
         ensure!(
             number(&peer.input.frame, "sampled_unix_millis")? >= end,
             "assembly frame predates coordinated window end"
         );
+        let name = string(&peer.input.plan, "producer_unit")?;
+        let proof = json!({"schema":"jetstreamer-typed-capped-assembly-memory-owner-v1","epoch":peer.claim.epoch,
+            "unit":name,"invocation_id":peer.input.launch["invocation_id"],"main_pid":guard["processes"]["main_pid"],
+            "role":"assembly-non-replay","sampled_at_utc":o["recorded_at_utc"],"phase":guard["phase"],
+            "window_begin_millis":begin,"window_end_millis":end,"expanded_clean_window":expanded,
+            "frame":private157::binding(&peer.claim.frame),"launch":private157::binding(&peer.claim.launch),
+            "admission":private157::binding(&peer.claim.admission),"producer_plan":private157::binding(&peer.claim.producer_plan),
+            "guard_snapshot":peer.input.frame["guard_snapshot"],"previous_fleet":private157::binding(&previous_bound),
+            "included_in_whole_host_resident_memory":true,"fabricated_worker_rss":false,
+            "disk_or_hard_memory_growth_exempted":false,"admission_authorized":false});
         ensure!(
-            names.insert(string(&peer.input.plan, "producer_unit")?.into()),
+            names.insert(name.into(), proof).is_none(),
             "duplicate assembly window owner"
         );
     }
@@ -259,7 +285,14 @@ pub(in crate::fleet) fn peer_clean_assembly_window(
 }
 fn assembly_window(old: &Value, current: &Value, begin: u64, end: u64) -> Result<()> {
     ensure!(
-        end.checked_sub(begin).is_some_and(|n| n >= 1_800_000)
+        end.checked_sub(begin).is_some_and(|n| n >= 1_800_000),
+        "assembly clean window is too short"
+    );
+    assembly_phase_pair(old, current, begin, end)
+}
+fn assembly_phase_pair(old: &Value, current: &Value, begin: u64, end: u64) -> Result<()> {
+    ensure!(
+        begin <= end
             && old["schema"] == "jetstreamer-capped204205-guard-heartbeat-v1"
             && current["schema"] == old["schema"]
             && current["epoch"] == old["epoch"]

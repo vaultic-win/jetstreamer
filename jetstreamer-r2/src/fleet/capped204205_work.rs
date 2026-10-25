@@ -6,8 +6,8 @@ mod evidence;
 mod lifecycle;
 mod peer;
 pub(super) use peer::{
-    peer_clean_assembly_window, peer_current, peer_disk, peer_legacy_guards, peer_legacy_view,
-    peer_limits, peer_memory, peer_names, peer_observation,
+    peer_assembly_memory_owners, peer_clean_assembly_window, peer_current, peer_disk,
+    peer_legacy_guards, peer_legacy_view, peer_limits, peer_memory, peer_names, peer_observation,
 };
 #[cfg(test)]
 mod tests;

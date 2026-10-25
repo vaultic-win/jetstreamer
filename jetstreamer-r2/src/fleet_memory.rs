@@ -5,7 +5,15 @@ use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
+#[cfg(test)]
 fn checked(o: &Value, ledger: &Value) -> Result<Value> {
+    checked_with_assembly(o, ledger, &BTreeMap::new())
+}
+fn checked_with_assembly(
+    o: &Value,
+    ledger: &Value,
+    assembly: &BTreeMap<String, Value>,
+) -> Result<Value> {
     ensure!(
         ledger["first_epoch"] == 201
             && ledger["last_epoch"] == 300
@@ -34,6 +42,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                     | "qualification"
                     | "private-known-root-prefix"
                     | "diagnostic-qualification"
+                    | "private-full-epoch-qualification"
             )
         );
         if let Some(old) = owners.insert(name.to_string(), (iid.to_string(), comparable)) {
@@ -41,6 +50,106 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 old == (iid.to_string(), comparable),
                 "duplicate memory owner conflicts"
             );
+        }
+    }
+    for (name, proof) in assembly {
+        let (iid, comparable) = owners
+            .get(name)
+            .context("proved Assembly owner absent from full fleet")?;
+        ensure!(
+            !comparable,
+            "Assembly cannot replace a comparable replay lane"
+        );
+        let rows = ledger["active"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["unit"]["Id"] == *name || r["producer"]["Id"] == *name)
+            .collect::<Vec<_>>();
+        ensure!(rows.len() == 1, "Assembly memory owner duplicated");
+        let row = rows[0];
+        ensure!(
+            proof["schema"] == "jetstreamer-typed-capped-assembly-memory-owner-v1"
+                && proof["role"] == "assembly-non-replay"
+                && proof["unit"] == *name
+                && proof["invocation_id"] == *iid
+                && matches!(proof["epoch"].as_u64(), Some(204 | 205))
+                && row["epoch"] == proof["epoch"]
+                && row["phase"] == "capped204205-continuation"
+                && row["current_stage"] == "assembly"
+                && row["live"] == true
+                && row["ownership_unresolved"] != true
+                && row["ordinary_replay_claim"] == false
+                && proof["frame"] == row["frame"]
+                && proof["launch"] == row["launch"]
+                && proof["producer_plan"] == row["producer_plan"]
+                && proof["sampled_at_utc"] == o["recorded_at_utc"]
+                && proof["phase"]["stage"] == "assembly"
+                && proof["phase"]["epoch"] == proof["epoch"]
+                && proof["phase"]["invocation_id"] == *iid
+                && proof["included_in_whole_host_resident_memory"] == true
+                && proof["fabricated_worker_rss"] == false
+                && proof["disk_or_hard_memory_growth_exempted"] == false
+                && proof["admission_authorized"] == false,
+            "Assembly memory proof is foreign, unresolved, changed or grants a growth exemption"
+        );
+        let end = proof["window_end_millis"]
+            .as_u64()
+            .filter(|n| *n > 0)
+            .context("Assembly host sample clock absent")?;
+        let begin = proof["window_begin_millis"]
+            .as_u64()
+            .context("Assembly host sample start absent")?;
+        ensure!(
+            begin <= end
+                && proof["phase"]["started_unix_millis"]
+                    .as_u64()
+                    .is_some_and(|n| n > 0 && n <= begin),
+            "Assembly phase does not cover the coordinated host sample"
+        );
+        let pid = proof["main_pid"]
+            .as_u64()
+            .filter(|n| *n > 1)
+            .context("Assembly real main PID absent")?;
+        let unit = if row["producer"].is_object() {
+            &row["producer"]
+        } else {
+            &row["unit"]
+        };
+        ensure!(
+            unit["MainPID"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(pid),
+            "Assembly PID differs from raw fleet owner"
+        );
+        let mut start = None;
+        for phase in ["before", "after"] {
+            let host = &o["host_resident_memory"][phase];
+            ensure!(
+                host["status"] == "observed"
+                    && host["rss"]["census_stable"] == true
+                    && host["rss"]["error"].is_null(),
+                "Assembly host RSS census is unavailable or unstable"
+            );
+            let matches = host["rss"]["processes"]
+                .as_array()
+                .context("Assembly whole-host process census absent")?
+                .iter()
+                .filter(|p| p["pid"] == pid)
+                .collect::<Vec<_>>();
+            ensure!(
+                matches.len() == 1,
+                "Assembly main PID absent/duplicated in whole-host sample"
+            );
+            let process = matches[0];
+            let ticks = process["start_ticks"]
+                .as_u64()
+                .filter(|n| *n > 0)
+                .context("Assembly host PID lifetime absent")?;
+            ensure!(
+                process["rss_bytes"].as_u64().is_some_and(|n| n > 0)
+                    && start.is_none_or(|s| s == ticks),
+                "Assembly host process changed lifetime or lacks actual RSS"
+            );
+            start = Some(ticks);
         }
     }
     let mut ordinary = Vec::new();
@@ -75,6 +184,42 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             seen.insert(name.to_string(), ()).is_none(),
             "duplicate memory observation"
         );
+        if let Some(proof) = assembly.get(name) {
+            for role in [
+                "controller_before",
+                "controller_after",
+                "producer_before",
+                "producer_after",
+            ] {
+                ensure!(
+                    row[role]["unit"] == *name
+                        && row[role]["invocation_id"] == *iid
+                        && row[role]["restarts"] == 0
+                        && row[role]["active_state"] == "active"
+                        && row[role]["sub_state"] == "running"
+                        && row[role]["main_pid"] == proof["main_pid"],
+                    "observed Assembly owner changed identity or role"
+                );
+            }
+            continue;
+        }
+        for proof in assembly.values() {
+            for role in [
+                "controller_before",
+                "controller_after",
+                "producer_before",
+                "producer_after",
+            ] {
+                ensure!(
+                    row[role]["rss"]["processes"]
+                        .as_array()
+                        .is_none_or(|processes| processes
+                            .iter()
+                            .all(|p| p["pid"] != proof["main_pid"])),
+                    "Assembly PID is incorrectly claimed as another replay lane RSS"
+                );
+            }
+        }
         if *comparable {
             ensure!(
                 row["useful_work"]["sufficient_for_rates"] == true,
@@ -104,6 +249,9 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             private.push(row.clone());
         }
     }
+    for name in assembly.keys() {
+        seen.entry(name.clone()).or_insert(());
+    }
     ensure!(
         seen.len() == owners.len(),
         "active fleet owner missing from coordinated RSS telemetry"
@@ -120,13 +268,17 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
     report["sampled_at_utc"] = o["recorded_at_utc"].clone();
     report["owner_census"] = json!(owners.keys().collect::<Vec<_>>());
     report["qualification_replays_in_marginal_average"] = json!(true);
+    report["assembly_non_replay_overhead"] = json!(assembly.values().collect::<Vec<_>>());
+    report["assembly_non_replay_owner_count"] = json!(assembly.len());
+    report["assembly_rss_already_in_whole_host_census"] = json!(true);
     Ok(report)
 }
 
 pub(super) fn report(o: &Value, ledger: &Value) -> Value {
     (|| -> Result<Value> {
+        let assembly=crate::fleet::capped_assembly_memory_owners(ledger,o)?;
         let accounting=crate::fleet::native227_terminal_observer_view(ledger,o)?;
-        let mut result=checked(&accounting,ledger)?;
+        let mut result=checked_with_assembly(&accounting,ledger,&assembly)?;
         if let Some(evidence)=accounting.get("terminal_observation_accounting") {
             result["terminal_observation_accounting"]=evidence.clone();
         }
@@ -139,7 +291,7 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn fixture() -> (Value, Value) {
+    pub(super) fn fixture() -> (Value, Value) {
         let mut observations = Vec::new();
         let mut active = Vec::new();
         let mut host_processes = Vec::new();
@@ -225,5 +377,101 @@ mod tests {
                 .unwrap()
                 .contains("missing from coordinated RSS")
         );
+    }
+}
+
+#[cfg(test)]
+mod assembly_tests {
+    use super::*;
+    fn fixture() -> (Value, Value, BTreeMap<String, Value>, u64) {
+        let (mut o, mut f) = super::tests::fixture();
+        let name = "horizon-qualify-204-capped-continuation-bound.service";
+        let iid = "a".repeat(32);
+        let pid = 55u64;
+        let rss = 75_000_000_000u64;
+        let bound = json!({"path":"/sealed/actual.json","sha256":"b".repeat(64)});
+        f["active"].as_array_mut().unwrap().push(json!({"epoch":204,"phase":"capped204205-continuation",
+            "current_stage":"assembly","live":true,"ordinary_replay_claim":false,
+            "frame":bound,"launch":bound,"producer_plan":bound,
+            "unit":{"Id":name,"InvocationID":iid,"MainPID":pid.to_string(),"ActiveState":"active","SubState":"running","NRestarts":"0"}}));
+        let host = &mut o["host_resident_memory"]["after"]["rss"];
+        host["aggregate_rss_bytes"] = json!(host["aggregate_rss_bytes"].as_u64().unwrap() + rss);
+        host["processes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"pid":pid,"start_ticks":123,"rss_bytes":rss}));
+        o["host_resident_memory"]["before"] = o["host_resident_memory"]["after"].clone();
+        let proof = json!({"schema":"jetstreamer-typed-capped-assembly-memory-owner-v1","epoch":204,
+            "role":"assembly-non-replay","unit":name,"invocation_id":iid,"main_pid":pid,
+            "sampled_at_utc":o["recorded_at_utc"],"window_begin_millis":10000,"window_end_millis":10000,
+            "frame":bound,"launch":bound,"producer_plan":bound,
+            "phase":{"stage":"assembly","epoch":204,"invocation_id":iid,"started_unix_millis":1000},
+            "included_in_whole_host_resident_memory":true,"fabricated_worker_rss":false,
+            "disk_or_hard_memory_growth_exempted":false,"admission_authorized":false});
+        (o, f, BTreeMap::from([(name.into(), proof)]), rss)
+    }
+    #[test]
+    fn authenticated_assembly_is_host_overhead_once_and_never_a_synthetic_replay_lane() {
+        let (base_o, base_f) = super::tests::fixture();
+        let base = checked(&base_o, &base_f).unwrap();
+        let (o, f, proof, rss) = fixture();
+        let r = checked_with_assembly(&o, &f, &proof).unwrap();
+        assert_eq!(r["valid"], true, "{r}");
+        assert_eq!(r["executing_lanes"], base["executing_lanes"]);
+        assert_eq!(
+            r["aggregate_production_lane_rss_bytes"],
+            base["aggregate_production_lane_rss_bytes"]
+        );
+        assert_eq!(
+            r["marginal_lane_rss_bytes"],
+            base["marginal_lane_rss_bytes"]
+        );
+        assert_eq!(
+            r["reservation_ceiling_bytes"],
+            base["reservation_ceiling_bytes"]
+        );
+        assert_eq!(
+            r["non_lane_resident_planning_bytes"],
+            base["non_lane_resident_planning_bytes"].as_u64().unwrap() + rss
+        );
+        assert_eq!(r["assembly_non_replay_owner_count"], 1);
+        assert_eq!(r["owner_census"].as_array().unwrap().len(), 4);
+        assert!(checked(&o, &f).is_err());
+    }
+    #[test]
+    fn unproved_foreign_unresolved_or_phase_changing_overhead_never_hides_an_owner() {
+        let (o, f, proof, _) = fixture();
+        let name = proof.keys().next().unwrap();
+        for (path, value) in [
+            ("/epoch", json!(205)),
+            ("/unit", json!("foreign.service")),
+            ("/phase/stage", json!("native_restore")),
+            ("/phase/invocation_id", json!("c".repeat(32))),
+            ("/phase/started_unix_millis", json!(10001)),
+            ("/main_pid", json!(56)),
+            ("/frame/sha256", json!("c".repeat(64))),
+            ("/disk_or_hard_memory_growth_exempted", json!(true)),
+            ("/fabricated_worker_rss", json!(true)),
+        ] {
+            let mut bad = proof.clone();
+            *bad.get_mut(name).unwrap().pointer_mut(path).unwrap() = value;
+            assert!(checked_with_assembly(&o, &f, &bad).is_err(), "{path}");
+        }
+        let mut bad = f.clone();
+        bad["active"][3]["ownership_unresolved"] = json!(true);
+        assert!(checked_with_assembly(&o, &bad, &proof).is_err());
+        let mut bad = o.clone();
+        bad["host_resident_memory"]["before"]["rss"]["processes"][4]["start_ticks"] = json!(124);
+        assert!(checked_with_assembly(&bad, &f, &proof).is_err());
+        let mut bad = o.clone();
+        bad["host_resident_memory"]["after"]["rss"]["processes"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(checked_with_assembly(&bad, &f, &proof).is_err());
+        let mut bad = o.clone();
+        bad["diagnostic_replays"][0]["observation"]["producer_after"]["rss"]["processes"][0]["pid"] =
+            json!(55);
+        assert!(checked_with_assembly(&bad, &f, &proof).is_err());
     }
 }
