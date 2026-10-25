@@ -1,4 +1,4 @@
-//! Host-wide serialization for new issuing paths, not a fleet lease or grant.
+// Host-wide serialization for new issuing paths, not a fleet lease or grant.
 use super::*;
 use std::os::fd::AsRawFd;
 const LOCK: &str = "/run/lock/jetstreamer-horizon-admission.lock";
