@@ -721,6 +721,40 @@ mod tests {
         assert!(observer_chain(&new, &current, &new, &prior, &history).is_err());
     }
     #[test]
+    fn assembly_terminal_refresh_requires_exact_predecessor_and_every_observer_link() {
+        let old = b("/fixture/accepted417.json");
+        let middle = b("/fixture/observer418.json");
+        let new = b("/fixture/observer419.json");
+        let prior = observation(10_000, None);
+        let current = observation(11_860, Some((&old, &prior)));
+        observer_chain(&middle, &current, &old, &prior, &[]).unwrap();
+        let later = observation(13_720, Some((&middle, &current)));
+        observer_chain(
+            &new,
+            &later,
+            &old,
+            &prior,
+            &[(middle.clone(), current.clone())],
+        )
+        .unwrap();
+        assert!(observer_chain(&new, &later, &old, &prior, &[]).is_err());
+        let mut foreign = old.clone();
+        foreign.sha256 = "b".repeat(64);
+        assert!(observer_chain(&middle, &current, &foreign, &prior, &[]).is_err());
+        assert!(observer_chain(&old, &current, &old, &prior, &[]).is_err());
+        assert!(observer_chain(&middle, &prior, &old, &prior, &[]).is_err());
+        assert!(
+            observer_chain(
+                &new,
+                &later,
+                &old,
+                &prior,
+                &[(middle, current.clone()), (new.clone(), later.clone())]
+            )
+            .is_err()
+        );
+    }
+    #[test]
     fn explicit_user_requested_status_can_advance_before_the_routine_interval() {
         let old = b("/fixture/old.json");
         let requested = b("/fixture/requested.json");

@@ -1,6 +1,7 @@
 //! Positive recovery owner frames preserve the original epoch clock. A caller
 //! cannot select a different invocation, borrow a guard or assert readback.
 use super::*;
+pub(super) mod assembly_success;
 mod live_guard;
 mod peer;
 mod work_input;
@@ -88,6 +89,10 @@ pub(super) fn no_overlap(
 ) -> Result<()> {
     let current = context.census(&context::closed_names())?;
     no_overlap_current(&current, actor)
+}
+pub(super) fn no_overlap_work(context: &context::WorkContext) -> Result<()> {
+    let current = context.census(&context::closed_names())?;
+    no_overlap_current(&current, None)
 }
 fn no_overlap_current(
     current: &BTreeMap<String, Value>,
@@ -418,7 +423,10 @@ pub(super) fn validate_success_terminal(t: &Value, name: &str, iid: &str) -> Res
             && t["current_unit"]["Result"] == "success"
             && t["current_unit"]["ExecMainStatus"] == "0"
             && is_idle(&t["current_unit"])
-            && t["current_unit"]["InvocationID"] == iid,
+            && (t["current_unit"]["InvocationID"] == iid
+                || (name == UNIT
+                    && t["current_unit"]["InvocationID"] == ""
+                    && t.get("assembly_success_origin").is_some())),
         "204 distinct recovery success terminal required"
     );
     let raw = sealed(
@@ -426,6 +434,13 @@ pub(super) fn validate_success_terminal(t: &Value, name: &str, iid: &str) -> Res
         8 << 20,
     )?;
     manager_shape(&raw, name, iid, true)?;
+    if t.get("assembly_success_origin").is_some() {
+        ensure!(
+            name == UNIT,
+            "204 collected proof cannot authorize another stage"
+        );
+        assembly_success::validate(t, &raw)?;
+    }
     deny(&t["authority"])
 }
 pub(super) fn capture_success_terminal(

@@ -158,6 +158,9 @@ pub(in crate::fleet) fn event_predecessor(
             original_plan: serde_json::from_value(event["original_plan"].clone())?,
             previous_fleet: serde_json::from_value(event["previous_fleet"].clone())?,
             observer: serde_json::from_value(event["observer"].clone())?,
+            observer_history: serde_json::from_value(
+                event.get("observer_history").cloned().unwrap_or(json!([])),
+            )?,
             terminal: serde_json::from_value(event["terminal"].clone())?,
             output_directory: binding
                 .path
@@ -202,6 +205,8 @@ struct TerminalPrepare {
     original_plan: BoundFile,
     previous_fleet: BoundFile,
     observer: BoundFile,
+    #[serde(default)]
+    observer_history: Vec<BoundFile>,
     terminal: BoundFile,
     output_directory: PathBuf,
 }
@@ -218,6 +223,7 @@ fn terminal_derivative(x: &TerminalPrepare, old: &Value, previous: &Value) -> Re
     let claim: Claim = serde_json::from_value(old["assembly204_recovery"].clone())?;
     let launch = read(&claim.actor_launch)?;
     let t = read(&x.terminal)?;
+    terminal_context_join(x, &t)?;
     ensure!(
         t["unit"] == launch["unit"] && t["invocation_id"] == launch["invocation_id"],
         "204 terminal transition replaced its actor"
@@ -277,6 +283,9 @@ pub(super) fn saved_event_plan(
             original_plan,
             previous_fleet,
             observer,
+            observer_history: serde_json::from_value(
+                event.get("observer_history").cloned().unwrap_or(json!([])),
+            )?,
             terminal: serde_json::from_value(event["terminal"].clone())?,
             output_directory: directory.into(),
         };
@@ -319,15 +328,24 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
         "204 terminal prepare spec"
     );
     private(&x.output_directory)?;
-    let context = AcceptedContext {
-        fleet: x.previous_fleet.clone(),
-        observer: x.observer.clone(),
-    };
-    ownership::no_overlap(&context, None)?;
+    let t = read(&x.terminal)?;
+    if terminal_context_join(&x, &t)? {
+        let context = context::WorkContext::new(
+            x.previous_fleet.clone(),
+            x.observer.clone(),
+            x.observer_history.clone(),
+        )?;
+        ownership::no_overlap_work(&context)?;
+    } else {
+        let context = AcceptedContext {
+            fleet: x.previous_fleet.clone(),
+            observer: x.observer.clone(),
+        };
+        ownership::no_overlap(&context, None)?;
+    }
     let old = bound_json(&x.original_plan)?;
     let prior = bound_json(&x.previous_fleet)?;
     let mut next = terminal_derivative(&x, &old, &prior)?;
-    let t = read(&x.terminal)?;
     ensure!(
         unit(s(&t, "unit")?)? == t["current_unit"],
         "204 terminal owner changed before handoff"
@@ -340,12 +358,96 @@ pub(super) fn prepare_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     let event = write(
         &x.output_directory.join("event.json"),
         &json!({"schema":EVENT_SCHEMA,"action":"terminal",
-        "original_plan":x.original_plan,"previous_fleet":x.previous_fleet,"observer":x.observer,"terminal":x.terminal,
+        "original_plan":x.original_plan,"previous_fleet":x.previous_fleet,"observer":x.observer,"observer_history":x.observer_history,"terminal":x.terminal,
         "sampled_at_utc":sampled,"metadata_only":true,"resource_samples_taken":0,"issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     next["metadata_event"] = private157::binding(&event);
     write(&x.output_directory.join("plan.json"), &next)?;
     Ok(())
+}
+fn terminal_context_join(x: &TerminalPrepare, terminal: &Value) -> Result<bool> {
+    if let Some(origin) = terminal.get("assembly_success_origin") {
+        ensure!(
+            terminal["unit"] == UNIT
+                && terminal["result"] == "natural_success"
+                && origin["context"]["fleet"] == private157::binding(&x.previous_fleet)
+                && origin["context"]["observer"] == private157::binding(&x.observer)
+                && origin["observer_history"] == serde_json::to_value(&x.observer_history)?,
+            "204 terminal event changed its authenticated assembly observation context"
+        );
+        return Ok(true);
+    }
+    ensure!(
+        x.observer_history.is_empty(),
+        "204 observer refresh requires exact assembly success origin"
+    );
+    Ok(false)
+}
+
+#[cfg(test)]
+mod terminal_context_tests {
+    use super::*;
+    fn binding(name: &str) -> BoundFile {
+        BoundFile {
+            path: Path::new("/fixture").join(name),
+            sha256: "a".repeat(64),
+        }
+    }
+    fn spec() -> Value {
+        json!({"schema":"jetstreamer-epoch204-assembly-recovery-terminal-prepare-spec-v1",
+            "original_plan":binding("plan.json"),"previous_fleet":binding("fleet417.json"),
+            "observer":binding("observer418.json"),"terminal":binding("terminal.json"),
+            "output_directory":"/var/lib/jetstreamer/horizon-204-assembly-fleet-event-terminal-test"})
+    }
+    #[test]
+    fn terminal_prepare_defaults_history_and_binds_exact_success_capture_context() {
+        let x: TerminalPrepare = serde_json::from_value(spec()).unwrap();
+        assert!(x.observer_history.is_empty());
+        let t = json!({"unit":UNIT,"result":"natural_success","assembly_success_origin":{
+            "context":{"fleet":x.previous_fleet,"observer":x.observer},"observer_history":[]}});
+        assert!(terminal_context_join(&x, &t).unwrap());
+        for path in [
+            "/assembly_success_origin/context/fleet/sha256",
+            "/assembly_success_origin/context/observer/sha256",
+        ] {
+            let mut changed = t.clone();
+            *changed.pointer_mut(path).unwrap() = json!("b".repeat(64));
+            assert!(terminal_context_join(&x, &changed).is_err());
+        }
+        for (key, value) in [("unit", json!(OLD_UNIT)), ("result", json!("failed"))] {
+            let mut changed = t.clone();
+            changed[key] = value;
+            assert!(terminal_context_join(&x, &changed).is_err());
+        }
+        let mut changed = t.clone();
+        changed["assembly_success_origin"]["observer_history"] =
+            json!([binding("intermediate.json")]);
+        assert!(terminal_context_join(&x, &changed).is_err());
+        assert!(!terminal_context_join(&x, &json!({"result":"failed"})).unwrap());
+        let mut nonempty = spec();
+        nonempty["observer_history"] = json!([binding("intermediate.json")]);
+        let with_history: TerminalPrepare = serde_json::from_value(nonempty).unwrap();
+        assert!(terminal_context_join(&with_history, &json!({"result":"failed"})).is_err());
+    }
+    #[test]
+    fn saved_terminal_projection_retains_explicit_history_without_fabricated_frames() {
+        let previous = json!({"plan":"/fixture/plan.json","plan_sha256":"a".repeat(64)});
+        let claim = json!({"epoch":204,"recovery_plan":binding("recovery.json"),"admission":binding("admission.json"),
+            "launch":binding("launch.json"),"actor_launch":binding("launch.json"),"frame":binding("frame.json"),"eta_policy":binding("eta.json")});
+        let old = json!({"schema":"jetstreamer-horizon-campaign-fleet-plan-v1","first_epoch":201,"last_epoch":300,
+            "assembly204_recovery":claim,"unrelated_guard":123,"assembly204_recovery_history":[]});
+        let mut event = json!({"action":"terminal","original_plan":binding("plan.json"),"previous_fleet":binding("fleet417.json"),
+            "observer":binding("observer419.json"),"observer_history":[binding("observer418.json")],"terminal":binding("terminal.json")});
+        let projected =
+            saved_event_plan(&event, &old, &previous, None, Path::new("/fixture/event")).unwrap();
+        assert!(projected["assembly204_recovery"].is_null());
+        assert_eq!(projected["unrelated_guard"], 123);
+        assert_eq!(projected["assembly204_recovery_history"], json!([claim]));
+        event["observer_history"] = json!([{"path":"/fixture/missing-digest.json"}]);
+        assert!(
+            saved_event_plan(&event, &old, &previous, None, Path::new("/fixture/event")).is_err()
+        );
+    }
 }
 pub(in crate::fleet) fn terminal_row(
     bound: &BoundFile,

@@ -946,13 +946,15 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Capture {
+pub(super) struct Capture {
     schema: String,
-    context: AcceptedContext,
+    pub(super) context: AcceptedContext,
+    #[serde(default)]
+    pub(super) observer_history: Vec<BoundFile>,
     stage: Stage,
-    launch: BoundFile,
-    outcome: Option<PathBuf>,
-    output_directory: PathBuf,
+    pub(super) launch: BoundFile,
+    pub(super) outcome: Option<PathBuf>,
+    pub(super) output_directory: PathBuf,
 }
 pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let c: Capture = serde_json::from_value(v.clone())?;
@@ -967,7 +969,11 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
         "204 stage terminal launch scope"
     );
     let current = unit(c.stage.unit())?;
-    if current["Result"] == "success" && current["ExecMainStatus"] == "0" {
+    let success = current["Result"] == "success" && current["ExecMainStatus"] == "0";
+    if assembly_success_context(c.stage, success, &c.observer_history)? {
+        return ownership::assembly_success::capture(&c, spec, self_sha);
+    }
+    if success {
         ownership::capture_success_terminal(
             &c.context,
             c.stage.unit(),
@@ -988,5 +994,35 @@ pub(super) fn capture_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Resu
             spec,
             self_sha,
         )
+    }
+}
+fn assembly_success_context(stage: Stage, success: bool, history: &[BoundFile]) -> Result<bool> {
+    let refreshed = stage == Stage::Assembly && success;
+    ensure!(
+        refreshed || history.is_empty(),
+        "204 observer refresh belongs only to assembly success capture"
+    );
+    Ok(refreshed)
+}
+
+#[cfg(test)]
+mod terminal_capture_context_tests {
+    use super::*;
+    #[test]
+    fn refreshed_terminal_context_is_exclusive_to_assembly_natural_success() {
+        let history = [BoundFile {
+            path: "/fixture/middle-observer.json".into(),
+            sha256: "a".repeat(64),
+        }];
+        for stage in Stage::all() {
+            for success in [false, true] {
+                let actual = assembly_success_context(stage, success, &[]).unwrap();
+                assert_eq!(actual, stage == Stage::Assembly && success);
+                assert_eq!(
+                    assembly_success_context(stage, success, &history).is_ok(),
+                    actual
+                );
+            }
+        }
     }
 }
