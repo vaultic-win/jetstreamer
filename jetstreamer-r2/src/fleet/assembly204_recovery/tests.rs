@@ -313,7 +313,7 @@ fn source_freeze_must_follow_true_terminal_and_bind_both_exact_sources() {
         "no_source_references":true,"archive_body_reads":0,"issuer":{"executable_sha256":"b".repeat(64)},"authority":denied(),
         "sources":[{"path":PREFIX_PATH,"sha256":PREFIX_SHA,"body_reads":0,"identity":stamp(103_318_151_802)},
         {"path":SUFFIX_PATH,"sha256":SUFFIX_SHA,"body_reads":0,"identity":stamp(155_545_863)}]});
-    custody::validate_source_capture(&c, &original, &terminal, &proof, 2000).unwrap();
+    custody::validate_source_capture_shape(&c, &original, &terminal, &proof, 2000).unwrap();
     for (pointer, value) in [
         ("/captured_unix_millis", json!(1999)),
         ("/original_owner_idle", json!(false)),
@@ -325,7 +325,8 @@ fn source_freeze_must_follow_true_terminal_and_bind_both_exact_sources() {
         let mut changed = c.clone();
         *changed.pointer_mut(pointer).unwrap() = value;
         assert!(
-            custody::validate_source_capture(&changed, &original, &terminal, &proof, 2000).is_err(),
+            custody::validate_source_capture_shape(&changed, &original, &terminal, &proof, 2000)
+                .is_err(),
             "accepted {pointer}"
         );
     }

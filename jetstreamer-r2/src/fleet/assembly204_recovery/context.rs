@@ -23,7 +23,7 @@ impl Context {
         );
         Ok(())
     }
-    fn accepted(&self) -> Result<Value> {
+    pub(super) fn historical(&self) -> Result<Value> {
         ensure!(
             self.fleet
                 .path
@@ -32,8 +32,7 @@ impl Context {
         );
         let f = bound_json(&self.fleet)?;
         let o = bound_json(&self.observer)?;
-        let sample = utc_seconds(s(&o, "recorded_at_utc")?)?;
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        utc_seconds(s(&o, "recorded_at_utc")?)?;
         ensure!(
             f["schema"] == SCHEMA
                 && f["first_epoch"] == 201
@@ -41,12 +40,30 @@ impl Context {
                 && f["observer_receipt"] == self.observer.path.to_string_lossy().as_ref()
                 && f["observer_sha256"] == self.observer.sha256
                 && f["sampled_at_utc"] == o["recorded_at_utc"]
-                && o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
-                && sample <= now
-                && now - sample <= 1800,
-            "204 recovery context is stale, foreign or not the accepted coordinated observation"
+                && o["schema"] == "jetstreamer-horizon-live-resource-sample-v2",
+            "204 recovery context is foreign or not the accepted coordinated observation"
         );
         Ok(f)
+    }
+    fn accepted(&self) -> Result<Value> {
+        let f = self.historical()?;
+        let sample = utc_seconds(s(&f, "sampled_at_utc")?)?;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        ensure!(
+            sample <= now && now - sample <= 1800,
+            "204 recovery context is stale"
+        );
+        Ok(f)
+    }
+    pub(super) fn validate_saved(&self, current: &BTreeMap<String, Value>) -> Result<()> {
+        let f = self.historical()?;
+        ensure!(
+            requested_names(&f, &BTreeSet::new())?
+                .iter()
+                .all(|name| current.contains_key(name)),
+            "204 saved custody omits accepted or closed census names"
+        );
+        validate_peer_bindings(&f, current)
     }
     pub(super) fn census(&self, hints: &BTreeSet<String>) -> Result<BTreeMap<String, Value>> {
         let f = self.accepted()?;

@@ -243,6 +243,46 @@ pub(super) fn capture_terminal(v: &Value, spec: &BoundFile, self_sha: &str) -> R
     )?;
     Ok(())
 }
+fn validate_saved_custody(receipt: &Value, before: &str, after: &str) -> Result<()> {
+    let context: Context = serde_json::from_value(receipt["accepted_context"].clone())?;
+    for field in [before, after] {
+        let evidence = read(&serde_json::from_value(receipt[field].clone())?)?;
+        ensure!(
+            evidence["accepted_context"] == receipt["accepted_context"]
+                && evidence["old_owner_idle"] == true,
+            "204 saved custody context or idle evidence differs"
+        );
+        let current: BTreeMap<String, Value> =
+            serde_json::from_value(evidence["unit_census_before"].clone())?;
+        ensure!(
+            evidence["unit_census_before"] == evidence["unit_census_after"],
+            "204 saved custody census changed"
+        );
+        context.validate_saved(&current)?;
+        ownership::validate_closed_ownership(&current, None)?;
+        for (key, unit) in [("old_cgroup", OLD_UNIT), ("old_guard_cgroup", OLD_GUARD)] {
+            let group = &evidence[key];
+            ensure!(
+                group["path"] == format!("/sys/fs/cgroup/system.slice/{unit}")
+                    && (group["state"] == "absent"
+                        || (group["state"] == "unpopulated"
+                            && is_lower_hex(s(group, "events_sha256")?, 64))),
+                "204 saved custody cgroup is not exact empty evidence"
+            );
+        }
+        for key in ["prefix_references", "suffix_references"] {
+            let references = &evidence[key];
+            n(references, "inspected_processes")?;
+            ensure!(
+                references["references"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty),
+                "204 saved custody has missing or nonempty process references"
+            );
+        }
+    }
+    Ok(())
+}
 pub(super) fn validate_terminal_saved(v: &Value) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-epoch204-assembly-recovery-original-terminal-v1"
@@ -259,6 +299,7 @@ pub(super) fn validate_terminal_saved(v: &Value) -> Result<()> {
             && is_lower_hex(s(&v["issuer"], "executable_sha256")?, 64),
         "204 original terminal is not issued exact failure/custody evidence"
     );
+    validate_saved_custody(v, "custody_before", "custody_after")?;
     let raw = sealed(
         &serde_json::from_value(v["manager_journal"].clone())?,
         8 << 20,
@@ -374,6 +415,16 @@ pub(super) fn capture_sources(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
     Ok(())
 }
 pub(super) fn validate_source_capture(
+    c: &Value,
+    old: &BoundFile,
+    terminal: &BoundFile,
+    proof: &BoundFile,
+    finished: u64,
+) -> Result<()> {
+    validate_source_capture_shape(c, old, terminal, proof, finished)?;
+    validate_saved_custody(c, "idle_before", "idle_after")
+}
+pub(super) fn validate_source_capture_shape(
     c: &Value,
     old: &BoundFile,
     terminal: &BoundFile,
@@ -497,4 +548,106 @@ pub(super) fn issue_plan(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<
         "issuer":issuer(spec,self_sha),"authority":denied()}),
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod saved_custody_tests {
+    use super::*;
+    #[test]
+    #[ignore = "root-only sealed metadata fixture; no service, archive or remote operations"]
+    fn saved_custody_reopens_both_hash_bound_records_without_current_freshness() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let root = tempfile::Builder::new()
+            .prefix("test-204-custody-")
+            .tempdir_in("/var/lib/jetstreamer/horizon-campaign-fleet")
+            .unwrap();
+        let put = |name: &str, value: &Value| {
+            let path = root.path().join(name);
+            fs::write(&path, serde_json::to_vec(value).unwrap()).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+            binding(&path).unwrap()
+        };
+        let observer = put(
+            "observer.json",
+            &json!({"schema":"jetstreamer-horizon-live-resource-sample-v2","recorded_at_utc":"2020-01-01T00:00:00Z"}),
+        );
+        let current: BTreeMap<String, Value> = context::closed_names().into_iter().map(|name| {
+            let row = json!({"Id":name,"InvocationID":"","MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead"});
+            (name,row)
+        }).collect();
+        let fleet = put(
+            "fleet.json",
+            &json!({"schema":SCHEMA,"first_epoch":201,"last_epoch":300,
+            "observer_receipt":observer.path,"observer_sha256":observer.sha256,
+            "sampled_at_utc":"2020-01-01T00:00:00Z","active":[],"unit_census":current}),
+        );
+        let context = json!({"fleet":fleet,"observer":observer});
+        let evidence = json!({"accepted_context":context,"old_owner_idle":true,
+            "unit_census_before":current,"unit_census_after":current,
+            "old_cgroup":{"state":"absent","path":format!("/sys/fs/cgroup/system.slice/{OLD_UNIT}")},
+            "old_guard_cgroup":{"state":"absent","path":format!("/sys/fs/cgroup/system.slice/{OLD_GUARD}")},
+            "prefix_references":{"inspected_processes":2,"references":[]},
+            "suffix_references":{"inspected_processes":2,"references":[]}});
+        let before = put("before.json", &evidence);
+        let after = put("after.json", &evidence);
+        let receipt = json!({"accepted_context":context,"before":before,"after":after});
+        validate_saved_custody(&receipt, "before", "after").unwrap();
+        for field in ["before", "after"] {
+            let mut changed = receipt.clone();
+            changed[field] = Value::Null;
+            assert!(validate_saved_custody(&changed, "before", "after").is_err());
+            changed = receipt.clone();
+            changed[field]["path"] = json!(root.path().join("missing.json"));
+            assert!(validate_saved_custody(&changed, "before", "after").is_err());
+            changed = receipt.clone();
+            changed[field]["sha256"] = json!("0".repeat(64));
+            assert!(validate_saved_custody(&changed, "before", "after").is_err());
+        }
+        let mut changed = evidence;
+        changed["suffix_references"]["references"] = json!(["unexpected process"]);
+        let bad = put("nonempty.json", &changed);
+        let mut changed_receipt = receipt.clone();
+        changed_receipt["after"] = json!(bad);
+        assert!(validate_saved_custody(&changed_receipt, "before", "after").is_err());
+        fs::set_permissions(&after.path, fs::Permissions::from_mode(0o600)).unwrap();
+        fs::write(&after.path, b"{}").unwrap();
+        fs::set_permissions(&after.path, fs::Permissions::from_mode(0o400)).unwrap();
+        assert!(validate_saved_custody(&receipt, "before", "after").is_err());
+    }
+    #[test]
+    #[ignore = "root-only actual accepted-context metadata regression; no writes or resource poll"]
+    fn actual_accepted_context_reaches_original_custody_call_site() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let supplied = |path_var: &str, hash_var: &str| BoundFile {
+            path: env::var_os(path_var)
+                .expect("independently supplied accepted metadata path")
+                .into(),
+            sha256: env::var(hash_var).expect("independently supplied accepted metadata hash"),
+        };
+        let context = Context {
+            fleet: supplied(
+                "JETSTREAMER_204_ACCEPTED_FLEET",
+                "JETSTREAMER_204_ACCEPTED_FLEET_SHA256",
+            ),
+            observer: supplied(
+                "JETSTREAMER_204_ACCEPTED_OBSERVER",
+                "JETSTREAMER_204_ACCEPTED_OBSERVER_SHA256",
+            ),
+        };
+        let captured = old_idle(&context).unwrap();
+        assert_eq!(captured["old_owner_idle"], true);
+        assert_eq!(
+            captured["unit_census_before"],
+            captured["unit_census_after"]
+        );
+        let accepted = context.historical().unwrap();
+        let current = captured["unit_census_before"].as_object().unwrap();
+        assert!(
+            accepted["unit_census"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .all(|name| current.contains_key(name))
+        );
+    }
 }
