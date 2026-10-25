@@ -107,16 +107,28 @@ fn live(d: &DiagnosticClaim, u: &Value) -> Result<()> {
         _ => bail!("foreign closed peer"),
     }
 }
-fn guard_shape(
+fn guard_shape_binding(
     d: &DiagnosticClaim,
     l: &Value,
     p: &Value,
     g: &Value,
-    sha: &str,
+    binding: &BoundFile,
     sample: u64,
     now: u64,
 ) -> Result<()> {
+    let rebased = binding.path.to_str() != l["guard_plan"]["path"].as_str();
+    let sha = &binding.sha256;
+    let plan_path = &binding.path;
     let profile = match d.epoch {
+        207 if rebased => {
+            singleton207::launch_matches(d, l)
+                && p["unit"] == d.unit
+                && p["invocation_id"] == d.invocation_id
+                && p["worker_root"].as_str() == Some(singleton207::ROOT)
+                && p["maximum_root_physical_bytes"] == 437_438_953_472u64
+                && p["maximum_worker_vmas"] == 3500000
+                && p["receipt_directory"].as_str() == Some(singleton207::GUARD_RECEIPTS)
+        }
         207 => singleton207::guard_matches(d, l, p),
         233 => first_root233::guard_matches(d, l, p),
         _ => false,
@@ -138,7 +150,7 @@ fn guard_shape(
             // producer cgroup, not in a producer.unit field. Authenticate that
             // existing shape without inventing a field in genuine receipts.
             && p["unit"] == d.unit
-            && g["plan"] == l["guard_plan"]["path"]
+            && g["plan"].as_str() == plan_path.to_str()
             && g["producer"]["restarts"] == 0
             && g["producer"]["active"] == "active"
             && g["producer"]["sub"] == "running"
@@ -200,9 +212,19 @@ pub(super) fn disk(
             .remove(&d.unit)
             .context("closed peer protective guard omitted")?;
         let g = bound_json(&gb)?;
-        let pb: BoundFile = serde_json::from_value(l["guard_plan"].clone())?;
-        let p = native209::immutable_json(&pb)?;
-        guard_shape(&d, &l, &p, &g, &pb.sha256, sample, now)?;
+        let effective = if d.epoch == 207 {
+            singleton207_rebase::effective(f, &l)?
+        } else {
+            None
+        };
+        let (pb, p) = if let Some(effective) = effective {
+            effective
+        } else {
+            let pb: BoundFile = serde_json::from_value(l["guard_plan"].clone())?;
+            let p = native209::immutable_json(&pb)?;
+            (pb, p)
+        };
+        guard_shape_binding(&d, &l, &p, &g, &pb, sample, now)?;
         ensure!(
             g["producer"]["pid"]
                 .as_u64()
@@ -368,4 +390,31 @@ mod tests {
         bad["ordinary_replay_claim"] = json!(true);
         assert!(without(&json!({"active":[bad]})).is_err());
     }
+}
+
+#[cfg(test)]
+fn guard_shape(
+    d: &DiagnosticClaim,
+    l: &Value,
+    p: &Value,
+    g: &Value,
+    sha: &str,
+    sample: u64,
+    now: u64,
+) -> Result<()> {
+    guard_shape_binding(
+        d,
+        l,
+        p,
+        g,
+        &BoundFile {
+            path: l["guard_plan"]["path"]
+                .as_str()
+                .context("guard plan path")?
+                .into(),
+            sha256: sha.into(),
+        },
+        sample,
+        now,
+    )
 }

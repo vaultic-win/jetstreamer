@@ -87,6 +87,51 @@ pub(super) fn completed_phase_recompute(
     Ok((required, result))
 }
 
+pub(super) fn rebase207_required(
+    fleet: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    let owners = fleet["active"]
+        .as_array()
+        .context("207 rebase active roster absent")?
+        .iter()
+        .map(singleton227_admission::active_owner)
+        .collect::<Result<Vec<_>>>()?;
+    let live = owners.iter().any(|u| u["Id"] == prefix223_native20::UNIT);
+    let terminal = if live {
+        original_native223(fleet)?;
+        None
+    } else {
+        Some(capped204_native223::prove_terminal(fleet)?)
+    };
+    let p = json!({"schema":"jetstreamer-first-root233-native223-memory-policy-v1","native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,"native223_floor_state":if live {"live"} else {"positively-terminal"},"native223_release_proof":terminal});
+    rebase207_recompute(&p, total, growth, candidate)
+}
+pub(super) fn rebase207_recompute(
+    policy: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    ensure!(
+        candidate == 2u64 << 30,
+        "207 rebase memory candidate differs"
+    );
+    let floor = first_root233_saved_floor(policy, total)?;
+    let required = floor
+        .checked_add(growth)
+        .and_then(|n| n.checked_add(candidate))
+        .context("207 rebase memory overflow")?;
+    let mut p = policy.clone();
+    p["required_available_memory_bytes"] = json!(required);
+    p["effective_available_memory_floor_bytes"] = json!(floor);
+    p["bridge_and_metadata_hard_memory_bytes"] = json!(candidate);
+    p["protected_existing_hard_memory_growth_bytes"] = json!(growth);
+    p["floor_counted_once"] = json!(true);
+    Ok((required, p))
+}
 pub(super) fn first_root233_recompute(
     policy: &Value,
     total: u64,
@@ -1026,5 +1071,22 @@ mod tests {
         let mut bad = p;
         bad["native223_floor_policy"]["native223_invocation_id"] = json!("f".repeat(32));
         assert!(completed_phase_recompute(&bad, total, 123, 32u64 << 30).is_err());
+    }
+}
+#[cfg(test)]
+mod rebase207_tests {
+    use super::*;
+    #[test]
+    fn rebase207_memory_keeps_native_floor_peer_growth_and_bridge_issuer_once() {
+        let p = json!({"schema":"jetstreamer-first-root233-native223-memory-policy-v1","native223_unit":prefix223_native20::UNIT,"native223_invocation_id":NATIVE223_IID,"native223_floor_state":"live","native223_release_proof":null});
+        let (required, proof) =
+            rebase207_recompute(&p, 1_024_000_000_000, 123, 2u64 << 30).unwrap();
+        assert_eq!(required, (480u64 << 30) + 123 + (2u64 << 30));
+        assert_eq!(proof["floor_counted_once"], true);
+        assert!(rebase207_recompute(&p, 1_024_000_000_000, u64::MAX, 2u64 << 30).is_err());
+        assert!(rebase207_recompute(&p, 1_024_000_000_000, 0, 1u64 << 30).is_err());
+        let mut unproved = p;
+        unproved["native223_floor_state"] = json!("positively-terminal");
+        assert!(rebase207_recompute(&unproved, 1_024_000_000_000, 0, 2u64 << 30).is_err());
     }
 }

@@ -6,6 +6,7 @@ mod singleton210_memory;
 #[derive(Clone, Copy)]
 enum MemoryMode {
     Existing,
+    GuardRebase207,
     Foundation203,
     Full210,
     Full209Delivery,
@@ -120,6 +121,17 @@ pub(super) fn check_candidate(value: &Value, candidate: Candidate) -> Result<Val
     );
     check_inner(value, candidate, MemoryMode::Existing)
 }
+pub(super) fn check_guard_rebase207(value: &Value) -> Result<Value> {
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes: 1u64 << 30,
+            memory_max_bytes: 2u64 << 30,
+            minimum_protected_disk_bytes: 2_034_359_738_368,
+        },
+        MemoryMode::GuardRebase207,
+    )
+}
 pub(super) fn check_singleton210(value: &Value, minimum_disk: u64) -> Result<Value> {
     ensure!(minimum_disk > 0, "210 protected disk floor missing");
     check_inner(
@@ -228,7 +240,7 @@ pub(super) fn assembly223(value: &Value) -> Result<Value> {
         },
     )
 }
-fn legacy_observer(o: &Value, names: &BTreeSet<String>) -> Result<Value> {
+pub(super) fn legacy_observer(o: &Value, names: &BTreeSet<String>) -> Result<Value> {
     let mut view = o.clone();
     view["diagnostic_replays"]
         .as_array_mut()
@@ -344,6 +356,10 @@ fn memory_sample(
     let (required, policy) = match mode {
         MemoryMode::Existing | MemoryMode::Foundation203 => {
             (memory_required(reserve, total, candidate)?, None)
+        }
+        MemoryMode::GuardRebase207 => {
+            let (n, p) = singleton210_memory::rebase207_required(f, total, reserve, candidate)?;
+            (n, Some(("guard_rebase207_memory_policy", p)))
         }
         MemoryMode::AssemblyRecovery204 => {
             let (required, mut policy) =
@@ -625,7 +641,7 @@ fn check_inner_with(
         )?;
     let bracketed = matches!(
         mode,
-        MemoryMode::FirstRoot233 | MemoryMode::CompletedArchivePhase
+        MemoryMode::FirstRoot233 | MemoryMode::CompletedArchivePhase | MemoryMode::GuardRebase207
     );
     ensure!(
         bracketed || (after_growth <= growth && after_memory_growth <= memory_growth),
@@ -673,6 +689,13 @@ fn check_inner_with(
         let (recomputed_memory, policy) = if matches!(mode, MemoryMode::CompletedArchivePhase) {
             singleton210_memory::completed_phase_recompute(
                 &memory_after["completed_archive_phase_memory_policy"],
+                n(&memory_after, "host_total_memory_bytes")?,
+                hard,
+                candidate.memory_max_bytes,
+            )?
+        } else if matches!(mode, MemoryMode::GuardRebase207) {
+            singleton210_memory::rebase207_recompute(
+                &memory_after["guard_rebase207_memory_policy"],
                 n(&memory_after, "host_total_memory_bytes")?,
                 hard,
                 candidate.memory_max_bytes,
@@ -789,6 +812,7 @@ fn fleet_for_mode(
             | MemoryMode::AssemblyRecovery204
             | MemoryMode::Full209Delivery
             | MemoryMode::CompletedArchivePhase
+            | MemoryMode::GuardRebase207
     ) {
         return accepted(fleet, observer);
     }

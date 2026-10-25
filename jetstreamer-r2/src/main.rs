@@ -3758,6 +3758,17 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-canary227-v1625-terminal") {
         return fleet::capture_canary227_v1625_terminal();
     }
+    if let Some(command) = env::args().nth(1)
+        && matches!(
+            command.as_str(),
+            "prepare-singleton207-guard-rebase"
+                | "capture-singleton207-rebase-bridge"
+                | "capture-singleton207-rebase-switch"
+                | "capture-singleton207-guard-rebase"
+        )
+    {
+        return fleet::singleton207_rebase_command(&command);
+    }
     if env::args().nth(1).as_deref() == Some("admit-capped204205-continuation") {
         return fleet::admit_capped204205_continuation();
     }

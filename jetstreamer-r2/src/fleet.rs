@@ -160,6 +160,7 @@ mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
 mod singleton207;
+mod singleton207_rebase;
 mod singleton209;
 mod singleton209_admission;
 mod singleton209_capability;
@@ -1319,6 +1320,8 @@ fn diagnostic_stage_running(current: &Value) -> bool {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Plan {
+    #[serde(default)]
+    singleton207_guard_handoff: Option<BoundFile>,
     schema: String,
     first_epoch: u64,
     last_epoch: u64,
@@ -6410,4 +6413,8 @@ pub(super) fn cleared_success_cleanup_current(
     owners: &[(String, String)],
 ) -> Result<bool> {
     assembly204_recovery::cleared_success_cleanup_current(epoch, evidence, current, owners)
+}
+
+pub(super) fn singleton207_rebase_command(command: &str) -> Result<()> {
+    singleton207_rebase::run(command)
 }
