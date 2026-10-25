@@ -119,6 +119,7 @@ impl Context {
             ensure!(
                 plan["schema"] == "jetstreamer-epoch223-demotion-native-supervisor-plan-v1"
                     && plan["unit"] == self.producer.unit
+                    && plan["local_floor_bytes"] == self.local_floor_bytes
                     && plan["harness"]["sha256"]
                         == "a280b1f48f0bb430c482e01a03b4b800ee8f95f326590059e4cdf4873b14a22b"
                     && plan["bootstrap_slot"] == 96_335_538u64,
@@ -353,6 +354,21 @@ mod tests {
         c.job_kind = "native-input".into();
         c.producer = actor("horizon-native-input-223-demotion-fixture.service", 11, "a");
         assert_eq!(c.candidate().unwrap().memory_max_bytes, 130 * GIB);
+    }
+    #[test]
+    fn local_floor_is_not_raised_to_another_owners_legacy_two_terabytes() {
+        let mut c = context();
+        assert_eq!(
+            c.candidate().unwrap().minimum_protected_disk_bytes,
+            245_383_154_903
+        );
+        c.local_floor_bytes = 300_000_000_000;
+        assert_eq!(
+            c.candidate().unwrap().minimum_protected_disk_bytes,
+            300_000_000_000
+        );
+        c.local_floor_bytes = 0;
+        assert!(c.candidate().is_err());
     }
     #[test]
     fn accepted_candidate_is_rejected_before_any_host_probe() {
