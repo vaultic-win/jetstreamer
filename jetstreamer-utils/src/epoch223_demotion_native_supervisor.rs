@@ -406,9 +406,24 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             "223 native harness inherited effective or ambient capabilities"
         );
     }
-    let argv: Vec<String> = std::iter::once(plan.harness.path.display().to_string())
+    let expected_argv: Vec<String> = std::iter::once(plan.harness.path.display().to_string())
         .chain(args.into_iter().map(String::from))
         .collect();
+    let command = fs::read(format!("/proc/{pid}/cmdline"))?;
+    ensure!(
+        command.len() <= 65536 && command.last() == Some(&0),
+        "223 native actual argv bounds"
+    );
+    let argv = command[..command.len() - 1]
+        .split(|byte| *byte == 0)
+        .map(|word| Ok(std::str::from_utf8(word)?.to_owned()))
+        .collect::<Result<Vec<_>>>()?;
+    ensure!(
+        argv == expected_argv
+            && start_ticks(pid)? == ticks
+            && fs::read_link(format!("/proc/{pid}/exe"))? == plan.harness.path,
+        "223 native actual argv/start/ELF changed before launch capture"
+    );
     let launch = issuance::published(
         &plan.run_root.join("native-launch.json"),
         &json!({
