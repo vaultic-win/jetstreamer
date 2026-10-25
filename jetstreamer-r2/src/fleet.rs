@@ -6319,3 +6319,17 @@ mod singleton_discovery_tests {
 #[allow(dead_code)]
 #[path = "../../jetstreamer-node/src/capped_thread_profile.rs"]
 mod capped204205_thread_profile;
+
+// Status-only authentication of a typed recovery successor; no fleet projection,
+// owner release, resource credit or original terminal-proof substitution.
+pub(super) fn qualification_recovery204_successor(
+    f: &Value,
+    current: &BTreeMap<String, Value>,
+    unit: &str,
+    iid: &str,
+    actor_launch: &Value,
+) -> Result<()> {
+    assembly204_recovery::qualification_successor(
+        f, current, unit, iid, &serde_json::from_value(actor_launch.clone())?,
+    )
+}

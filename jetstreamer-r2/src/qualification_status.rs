@@ -2,6 +2,8 @@
 use super::*;
 use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
+mod terminal_subset;
+mod verification205;
 
 #[derive(Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
@@ -21,6 +23,10 @@ struct Plan {
     estimate_basis: String,
     #[serde(default)]
     epoch141_delivery_policy: Option<Bound>,
+    #[serde(default)]
+    omitted_originals: BTreeMap<u64, terminal_subset::Terminal>,
+    #[serde(default)]
+    delegated_verification: BTreeMap<u64, Bound>,
 }
 struct Profile {
     first: u64,
@@ -179,6 +185,8 @@ fn plan_epochs(p: &Plan) -> Result<Vec<u64>> {
     if p.schema == "jetstreamer-qualification141-status-plan-v2" {
         ensure!(
             epochs == [141]
+                && p.omitted_originals.is_empty()
+                && p.delegated_verification.is_empty()
                 && p.receipt_directory
                     == Path::new("/home/sol/.jetstreamer-private/r2-status-receipts"),
             "foreign141 status scope"
@@ -192,15 +200,56 @@ fn plan_epochs(p: &Plan) -> Result<Vec<u64>> {
             delivery141(&policy)? == p.downstream_allowance_millis[&141],
             "141 downstream allowance differs from staged policy"
         );
+    } else if p.schema == "jetstreamer-qualification-status-plan-v1" {
+        ensure!(
+            epochs == [204, 205, 225, 226]
+                && p.omitted_originals.is_empty()
+                && p.delegated_verification.is_empty(),
+            "legacy qualification status plan requires all four original epochs"
+        );
     } else {
         ensure!(
-            p.schema == "jetstreamer-qualification-status-plan-v1"
-                && epochs == [204, 205, 225, 226]
-                && p.epoch141_delivery_policy.is_none(),
-            "qualification status plan differs"
+            p.schema == terminal_subset::SCHEMA,
+            "unsupported qualification status plan"
+        );
+        let expected = [204, 205, 225, 226]
+            .into_iter()
+            .filter(|epoch| {
+                !p.omitted_originals.contains_key(epoch)
+                    && !p.delegated_verification.contains_key(epoch)
+            })
+            .collect::<Vec<_>>();
+        ensure!(
+            p.omitted_originals
+                .keys()
+                .all(|epoch| matches!(epoch, 204 | 205))
+                && p.delegated_verification
+                    .keys()
+                    .all(|epoch| *epoch == 205 && !p.omitted_originals.contains_key(epoch))
+                && epochs == expected
+                && epochs.ends_with(&[225, 226]),
+            "qualification v2 requires terminal 204/205 proof or explicit live 205 delegation"
         );
     }
+    ensure!(
+        p.downstream_allowance_millis
+            .values()
+            .all(|value| *value > 0),
+        "qualification downstream allowances must be positive"
+    );
     Ok(epochs)
+}
+fn saved_statuses_match(p: &Plan, states: &[EpochStatus], sampled: &str) -> Result<bool> {
+    let epochs = plan_epochs(p)?;
+    Ok(states.iter().map(|s| s.epoch).eq(epochs.iter().copied())
+        && states.iter().all(|s| {
+            s.sampled_at_utc == sampled
+                && if p.schema == terminal_subset::SCHEMA {
+                    s.phase == "replay"
+                } else {
+                    matches!(s.phase.as_str(), "replay" | "qualification")
+                }
+        }))
 }
 fn bound(b: &Bound) -> Result<Value> {
     ensure!(
@@ -455,6 +504,9 @@ pub(super) fn matches(
     o: &Value,
     census: &BTreeMap<String, Value>,
 ) -> bool {
+    if verification205::matches(receipt, epoch, o, census) {
+        return true;
+    }
     let Ok(p) = profile(epoch) else { return false };
     let Some(u) = census.get(p.unit) else {
         return false;
@@ -475,6 +527,9 @@ pub(super) fn matches(
 pub(super) fn inactive_owner(
     publication: &StatusPublicationReceipt,
 ) -> Result<Option<(String, String)>> {
+    if let Some(owner) = verification205::inactive_owner(publication)? {
+        return Ok(Some(owner));
+    }
     if !matches!(
         publication.status.phase.as_str(),
         "replay" | "qualification"
@@ -520,7 +575,11 @@ pub(super) async fn run() -> Result<()> {
         path: args[2].clone().into(),
         sha256: args[4].clone(),
     };
-    let p: Plan = serde_json::from_value(bound(&plan_bound)?)?;
+    let raw = bound(&plan_bound)?;
+    if raw["schema"] == verification205::SCHEMA {
+        return verification205::run(&plan_bound, raw, &args[6], args.len() == 8).await;
+    }
+    let p: Plan = serde_json::from_value(raw)?;
     let epochs = plan_epochs(&p)?;
     let o = bound(&p.observer)?;
     let f = bound(&p.fleet)?;
@@ -541,6 +600,7 @@ pub(super) async fn run() -> Result<()> {
             && f["inventory"]["anomalies"] == 0,
         "qualification status needs fresh accepted fleet"
     );
+    terminal_subset::current(&p, &f)?;
     let mut states = Vec::new();
     let mut owners = BTreeMap::new();
     let mut execution141_window = None;
@@ -584,17 +644,15 @@ pub(super) async fn run() -> Result<()> {
         );
         states = serde_json::from_value(saved["statuses"].clone())?;
         ensure!(
-            states.iter().map(|s| s.epoch).eq(epochs.iter().copied())
-                && states.iter().all(|s| s.sampled_at_utc == sampled
-                    && matches!(s.phase.as_str(), "replay" | "qualification")),
+            saved_statuses_match(&p, &states, sampled)?,
             "qualification estimate receipt differs"
         );
     } else if args.len() == 7 {
         fleet::persist(
             &p.estimate_receipt,
-            &json!({"schema":if epochs == [141] {"jetstreamer-qualification141-status-estimate-v2"} else {"jetstreamer-qualification-status-estimate-v1"},"plan_sha256":plan_bound.sha256,
+            &json!({"schema":if epochs == [141] {"jetstreamer-qualification141-status-estimate-v2"} else if p.schema == terminal_subset::SCHEMA {"jetstreamer-qualification-status-estimate-v2"} else {"jetstreamer-qualification-status-estimate-v1"},"plan_sha256":plan_bound.sha256,
             "observer_sha256":p.observer.sha256,"fleet_sha256":p.fleet.sha256,"estimate_basis":p.estimate_basis,
-            "downstream_allowance_millis":p.downstream_allowance_millis,"epoch141_delivery_policy":p.epoch141_delivery_policy,
+            "downstream_allowance_millis":p.downstream_allowance_millis,"omitted_originals":p.omitted_originals,"delegated_verification":p.delegated_verification,"epoch141_delivery_policy":p.epoch141_delivery_policy,
             "separate_suffix_slots":if epochs == [141] {15234} else {0},"execution141_window":execution141_window,
             "statuses":states,"archive_or_sidecar_mutation_authorized":false}),
         )?;
@@ -612,6 +670,7 @@ pub(super) async fn run() -> Result<()> {
     let r2 = r2_config_from_env()?;
     let s3 = s3_client(&r2);
     for status in states {
+        terminal_subset::current(&p, &f)?;
         let profile = profile(status.epoch)?;
         ensure!(
             live(profile, &f)? == owners[profile.unit],

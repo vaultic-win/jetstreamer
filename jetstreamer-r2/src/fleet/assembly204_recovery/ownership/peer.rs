@@ -281,3 +281,30 @@ pub(in crate::fleet) fn peer_resources(
     }
     Ok((disk, de, memory, me))
 }
+
+pub(in crate::fleet) fn qualification_successor(
+    f: &Value,
+    census: &BTreeMap<String, Value>,
+    unit: &str,
+    iid: &str,
+    actor_launch: &BoundFile,
+) -> Result<()> {
+    let peers = accepted(f)?;
+    ensure!(peers.len() == 1, "qualification requires one authenticated recovery 204 owner");
+    let p = &peers[0];
+    ensure!(
+        p.claim.epoch == 204
+            && p.stage.unit() == unit
+            && p.row["unit"]["InvocationID"] == iid
+            && p.claim.actor_launch == *actor_launch,
+        "qualification recovery 204 successor identity differs"
+    );
+    current(p, census)?;
+    let observer = bound_json(&serde_json::from_value(p.frame["observer"].clone())?)?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        row(&p.claim, &observer, census, now)? == p.row,
+        "qualification recovery 204 row changed or became stale"
+    );
+    Ok(())
+}

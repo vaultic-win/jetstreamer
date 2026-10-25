@@ -5,6 +5,7 @@ mod peer;
 mod work_input;
 pub(in crate::fleet) use peer::{
     peer_current, peer_guards, peer_limits, peer_memory_owners, peer_names, peer_observation,
+    qualification_successor,
     peer_resources, peer_view,
 };
 use work_input::WorkInput;

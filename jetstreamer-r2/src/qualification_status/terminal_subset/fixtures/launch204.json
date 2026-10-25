@@ -1,0 +1,148 @@
+{
+  "actual_guard_timer_proof": {
+    "journal_sha256": "fc75dc0dfbd8cf9b635c01840c24912f28d2dbe393854d3c659a188b50ace681",
+    "manager_completion": {
+      "CODE_FILE": "src/core/unit.c",
+      "CODE_FUNC": "unit_log_success",
+      "CODE_LINE": "6168",
+      "INVOCATION_ID": "843bfb473ba34fc2896e69446b65e616",
+      "MESSAGE": "horizon-prefix204-protective-v1.service: Deactivated successfully.",
+      "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+      "PRIORITY": "6",
+      "SYSLOG_FACILITY": "3",
+      "SYSLOG_IDENTIFIER": "systemd",
+      "TID": "1",
+      "UNIT": "horizon-prefix204-protective-v1.service",
+      "_BOOT_ID": "2e60f44d8e484d7e91fcc2dc724d2ae6",
+      "_CAP_EFFECTIVE": "1ffffffffff",
+      "_CMDLINE": "/usr/lib/systemd/systemd --switched-root --system --deserialize=51",
+      "_COMM": "systemd",
+      "_EXE": "/usr/lib/systemd/systemd",
+      "_GID": "0",
+      "_HOSTNAME": "horizon-vaultic",
+      "_MACHINE_ID": "662c3da6039944779789c3fe1c3d7401",
+      "_PID": "1",
+      "_RUNTIME_SCOPE": "system",
+      "_SOURCE_REALTIME_TIMESTAMP": "1792749957718274",
+      "_SYSTEMD_CGROUP": "/init.scope",
+      "_SYSTEMD_SLICE": "-.slice",
+      "_SYSTEMD_UNIT": "init.scope",
+      "_TRANSPORT": "journal",
+      "_UID": "0",
+      "__CURSOR": "s=d048fb8ccd4e4326a91b8c5edb351816;i=3c6dc4;b=2e60f44d8e484d7e91fcc2dc724d2ae6;m=18cae459224;t=65e7f2066a108;x=b89fac827284c68d",
+      "__MONOTONIC_TIMESTAMP": "1703730844196",
+      "__REALTIME_TIMESTAMP": "1792749957718280",
+      "__SEQNUM": "3960260",
+      "__SEQNUM_ID": "d048fb8ccd4e4326a91b8c5edb351816"
+    },
+    "properties": {
+      "ActiveState": "inactive",
+      "CPUQuotaPerSecUSec": "1s",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-ownroot203-capability-8623b37c-v1/jetstreamer-horizon-standalone-guard ; argv[]=/var/lib/jetstreamer/horizon-ownroot203-capability-8623b37c-v1/jetstreamer-horizon-standalone-guard /var/lib/jetstreamer/horizon-prefix204-guard-plan-fcbf3992-v1/guard-plan.json --plan-sha256 dfa45f5f8de36fab51fff7a669ceff8e0089bde058bf60be53fcfa7f02a4cd7d --self-sha256 134904cf2e28ce3ede1dd85a6878e40a407443580d4e83a50cb30efc29fd28be ; ignore_errors=no ; start_time=[Fri 2026-10-23 10:06:56 UTC] ; stop_time=[Fri 2026-10-23 10:06:58 UTC] ; pid=3823320 ; code=exited ; status=0 }",
+      "MemoryMax": "1073741824",
+      "NoNewPrivileges": "yes",
+      "PrivateNetwork": "yes",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "ReadWritePaths": "/var/lib/jetstreamer/horizon-prefix204-guard-receipts-v1",
+      "Result": "success",
+      "SubState": "dead",
+      "TasksMax": "256",
+      "Type": "oneshot",
+      "User": "root"
+    },
+    "timer": {
+      "ActiveState": "active",
+      "SubState": "waiting"
+    }
+  },
+  "actual_sandbox": {
+    "CPUQuotaPerSecUSec": "8s",
+    "Delegate": "no",
+    "Group": "ubuntu",
+    "KillMode": "control-group",
+    "MemoryHigh": "206158430208",
+    "MemoryMax": "240518168576",
+    "MemorySwapMax": "0",
+    "NoNewPrivileges": "yes",
+    "ProtectHome": "read-only",
+    "ProtectSystem": "strict",
+    "ReadWritePaths": "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-204-fcbf3992-v1",
+    "Restart": "no",
+    "TasksMax": "4096",
+    "User": "ubuntu"
+  },
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon-prefix204-admission-fcbf3992-v1/admission.json",
+    "sha256": "dab8f184772600ba4591071a4d144f1b5dced76955e0febdc6758189b367a22b"
+  },
+  "assembly_qualified": false,
+  "bootstrap_slot": 88127580,
+  "canonical_prefix_independently_qualified": false,
+  "canonical_sidecar_authorized": false,
+  "capability": {
+    "path": "/var/lib/jetstreamer/horizon-prefix204-input-capability-result-v1/capability.json",
+    "sha256": "9b2c12e561660f1c7e3c0af3708fddb3240e51a83bd7ed272bc96750f9caeb85"
+  },
+  "capture_helper_sha256": "5e110c359222dbaee295497bd16ecb0bbfdb9e0db1e64b832b4ed9442e6a998e",
+  "capture_spec": {
+    "path": "/var/lib/jetstreamer/horizon-prefix204-capture-spec-fcbf3992-v1/spec.json",
+    "sha256": "d5f393202866fe458ee8b1adf92b823ecf0655f09e2e20d81d1261b8585cf351"
+  },
+  "epoch": 204,
+  "evidence": {
+    "units": [
+      {
+        "active_state": "active",
+        "invocation_id": "448da7f2a3a34217afe7e115120b3cea",
+        "load_state": "loaded",
+        "main_pid": 3822861,
+        "restarts": 0,
+        "result": "success",
+        "sub_state": "running",
+        "unit": "horizon-qualify-204-shrink-root-prefix-resource-fcbf3992-v1.service"
+      }
+    ]
+  },
+  "expected_exec_start": "{ path=/var/lib/jetstreamer/horizon-prefix204-input-capability-fcbf3992-v1/jetstreamer-epoch204-shrink-root-prefix-resource ; argv[]=/var/lib/jetstreamer/horizon-prefix204-input-capability-fcbf3992-v1/jetstreamer-epoch204-shrink-root-prefix-resource /var/lib/jetstreamer/horizon-prefix204-resource-fcbf3992-v1/resource-plan.json --plan-sha256 cc5109ed54c4b5cdc7db99a7e839708753b677cee11b7ca867c30e7a198911ba --self-sha256 1cd9bfe3418616add2319802adc4caf66b86e3f6fdf6c903c4be2648b10c0baa ; ignore_errors=no ; start_time=[Fri 2026-10-23 10:05:26 UTC] ; stop_time=[n/a] ; pid=3822861 ; code=(null) ; status=0/0 }",
+  "experimental_envelope_bytes": 471798691840,
+  "full_cold_epoch_peak_qualified": false,
+  "guard": {
+    "path": "/var/lib/jetstreamer/horizon-prefix204-guard-receipts-v1/sample-843bfb473ba34fc2896e69446b65e616.json",
+    "sha256": "c1bc5d6f4964e5d9c23b9e57746ccea4f68fc4aa288cc2e226f61fe984dcdf5f"
+  },
+  "guard_minimum_free_bytes": 1372922903443,
+  "guard_plan": {
+    "path": "/var/lib/jetstreamer/horizon-prefix204-guard-plan-fcbf3992-v1/guard-plan.json",
+    "sha256": "dfa45f5f8de36fab51fff7a669ceff8e0089bde058bf60be53fcfa7f02a4cd7d"
+  },
+  "launched": true,
+  "maximum_runtime_seconds": 259200,
+  "maximum_scratch_bytes": 300000000000,
+  "native_restart_qualified": false,
+  "natural_parent_completion_required": true,
+  "node_sha256": "025757b9b337abf05435c427f143f590d9bfa542b5e4493aae783c158b4f2d3d",
+  "ordinary_replay_authorized": false,
+  "output_slot_count": 431362,
+  "output_slot_start": 88128000,
+  "plan_path": "/var/lib/jetstreamer/horizon-prefix204-resource-fcbf3992-v1/resource-plan.json",
+  "plan_sha256": "cc5109ed54c4b5cdc7db99a7e839708753b677cee11b7ca867c30e7a198911ba",
+  "private_run_root": "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-204-fcbf3992-v1",
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "recorded_unix_seconds": 1792750038,
+  "remote_mutations": false,
+  "required_initial_free_bytes": 1844721595283,
+  "root_prefix_resource_attempt_authorized": true,
+  "runner_sha256": "1cd9bfe3418616add2319802adc4caf66b86e3f6fdf6c903c4be2648b10c0baa",
+  "runtime": "solana-v1.6.16",
+  "runtime_promotion_authorized": false,
+  "schema": "jetstreamer-private-epoch204-capped-root-prefix-launch-v1",
+  "snapshot_sha256": "d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6",
+  "solana_rayon_threads": 16,
+  "terminal_root_slot": 88559361,
+  "uncovered_suffix_slots": 638,
+  "upstream_shrink_budget_cap": true,
+  "worker_sha256": "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc"
+}

@@ -18,6 +18,7 @@ mod tests;
 pub(super) use ownership::{Claim, names, row, status_matches};
 pub(super) use ownership::{
     peer_current, peer_guards, peer_limits, peer_memory_owners, peer_names, peer_observation,
+    qualification_successor,
     peer_resources, peer_view,
 };
 
