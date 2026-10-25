@@ -21,11 +21,13 @@ fn actual_aac_capture_preserves_33_tests_root_proof_and_transitive_limits() {
     let limits = v["candidate"]["scope"]["limits"].as_str().unwrap();
     assert!(limits.contains("not independently audited"));
     assert!(limits.contains("not an actual linker map"));
-    assert!(v["annex"]["actual_exec_sessions"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|s| s["final_exit_code"] == 86));
+    assert!(
+        v["annex"]["actual_exec_sessions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["final_exit_code"] == 86)
+    );
     // The genuine earlier failed QA attempts remain historical failures.
     assert_eq!(v["qa"]["test_counts"]["total_distinct_passed"], 33);
     assert_eq!(v["candidate"]["scope"]["deployment_sealed"], false);
@@ -88,6 +90,27 @@ fn changed_helper_source_qa_root_sandbox_or_capture_authority_is_rejected() {
         let mut bad = valid.clone();
         bad.as_object_mut().unwrap().remove(key);
         assert!(check(&bad).is_err(), "accepted missing {key}");
+    }
+}
+#[test]
+fn all_actual_duplicate_configuration_records_must_agree() {
+    let valid = actual();
+    let configs = valid["configuration"].as_array().unwrap();
+    assert_eq!(configs.len(), 3);
+    assert_eq!(
+        configs[0]["input"]["literal_path"],
+        configs[1]["input"]["literal_path"]
+    );
+    check(&valid).unwrap();
+    for index in 0..configs.len() {
+        for (field, value) in [("sha256", json!("a".repeat(64))), ("bytes", json!(0))] {
+            let mut bad = valid.clone();
+            bad["configuration"][index]["input"][field] = value;
+            assert!(
+                check(&bad).is_err(),
+                "accepted changed captured record {index}/{field}"
+            );
+        }
     }
 }
 fn seal() -> Seal {

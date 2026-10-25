@@ -71,10 +71,14 @@ fn root_shape(qa: &Value, result: &Value, executable: &Value, sandbox: &Value) -
     Ok(())
 }
 fn configuration_shape(preflight: &Value, captured: &Value) -> Result<()> {
-    ensure!(preflight["source_commit"] == REVISION && preflight["source_tree"] == TREE
-        && preflight["inherited_overrides"] == json!({})
-        && preflight["scope"] == "Actual pre-build current source/config checkpoint; no production Cargo has run. Wrapper rechecks these inputs before and after build/capture.",
-        "204 pre-build configuration checkpoint scope differs");
+    ensure!(
+        preflight["source_commit"] == REVISION
+            && preflight["source_tree"] == TREE
+            && preflight["inherited_overrides"] == json!({})
+            && preflight["scope"]
+                == "Actual pre-build current source/config checkpoint; no production Cargo has run. Wrapper rechecks these inputs before and after build/capture.",
+        "204 pre-build configuration checkpoint scope differs"
+    );
     let configs = preflight["configuration"]
         .as_array()
         .context("204 configuration checkpoint missing")?;
@@ -86,10 +90,16 @@ fn configuration_shape(preflight: &Value, captured: &Value) -> Result<()> {
             && configs
                 .iter()
                 .all(|c| c["sha256"] == CONFIG && c["bytes"] == 489)
-            && configs.iter().all(|c| inputs
-                .iter()
-                .any(|i| i["input"]["literal_path"] == c["path"]
-                    && i["input"]["sha256"] == c["sha256"])),
+            && configs.iter().all(|c| {
+                let matches = inputs
+                    .iter()
+                    .filter(|i| i["input"]["literal_path"] == c["path"])
+                    .collect::<Vec<_>>();
+                !matches.is_empty()
+                    && matches.iter().all(|i| {
+                        i["input"]["sha256"] == c["sha256"] && i["input"]["bytes"] == c["bytes"]
+                    })
+            }),
         "204 actual captured configuration differs from pre-build checkpoint"
     );
     Ok(())

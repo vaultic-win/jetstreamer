@@ -201,6 +201,18 @@ pub(super) fn scope(name: &str, first: u64, last: u64) -> bool {
             || name == GUARD
             || downstream::Stage::all().iter().any(|x| x.unit() == name))
 }
+pub(super) fn binding_scope(epoch: u64, unit: &str, origin: &str, phase: &str) -> Result<()> {
+    ensure!(
+        epoch == 204
+            && origin == UNIT
+            && scope(unit, 204, 204)
+            && unit != GUARD
+            && matches!(phase, "verification" | "upload" | "readback")
+            && (unit == downstream::Stage::Upload.unit() || phase == "verification"),
+        "204 recovery status scope differs"
+    );
+    Ok(())
+}
 pub(super) fn command_name(name: &str) -> bool {
     matches!(
         name,

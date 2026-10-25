@@ -226,6 +226,30 @@ fn authority_is_explicit_and_recovery_status_has_no_replay_route() {
     );
 }
 #[test]
+fn status_bindings_use_the_current_generation_for_origin_and_upload_actor() {
+    let upload = downstream::Stage::Upload.unit();
+    assert_eq!(upload, "horizon-upload-204-assembly-recovery-v2.service");
+    for phase in ["verification", "upload", "readback"] {
+        assert!(super::super::assembly204_recovery_binding_scope(204, upload, UNIT, phase).is_ok());
+        for (actor, origin) in [
+            (upload, FAILED_V1_UNIT),
+            (FAILED_V1_UNIT, UNIT),
+            ("horizon-upload-204-assembly-recovery-v1.service", UNIT),
+            (GUARD, UNIT),
+        ] {
+            assert!(
+                super::super::assembly204_recovery_binding_scope(204, actor, origin, phase)
+                    .is_err(),
+                "accepted obsolete or guard binding {actor}/{origin}/{phase}"
+            );
+        }
+    }
+    for phase in ["upload", "readback", "replay"] {
+        assert!(super::super::assembly204_recovery_binding_scope(204, UNIT, UNIT, phase).is_err());
+    }
+    assert!(super::super::assembly204_recovery_binding_scope(205, upload, UNIT, "upload").is_err());
+}
+#[test]
 fn actual_controlled_stop_keeps_exit15_as_stopped_and_never_archive_success() {
     let mut rows = terminal_rows(
         OLD_UNIT,
