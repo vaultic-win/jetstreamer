@@ -44,6 +44,17 @@ pub(super) fn validate_closed_ownership(
         is_idle(current.get(OLD_GUARD).context("204 old guard omitted")?),
         "204 old guard live"
     );
+    for (name, iid) in [
+        (FAILED_V1_UNIT, FAILED_V1_IID),
+        (FAILED_V1_GUARD, FAILED_V1_GUARD_IID),
+    ] {
+        let previous = current.get(name).context("204 failed v1 owner omitted")?;
+        ensure!(
+            is_idle(previous)
+                && (previous["InvocationID"] == iid || previous["InvocationID"] == ""),
+            "204 failed v1 owner is live, replaced or restarted"
+        );
+    }
     ensure!(
         context::closed_names()
             .iter()

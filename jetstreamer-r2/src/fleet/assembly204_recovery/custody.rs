@@ -527,6 +527,13 @@ pub(super) fn issue_plan(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<
     check_source_names(&capture)?;
     sealed(&x.assembler, 128 << 20)?;
     let production = artifact::validate(&x.assembler_capture, &x.assembler)?;
+    // The old947seal remains authenticated historical evidence. It cannot
+    // qualify a generation2 helper. Exact new artifact/QA/seal pins must be
+    // filled only after the real frozen helper is built and qualified.
+    ensure!(
+        production["source_revision"] == RETRY_HELPER_SOURCE,
+        "204 generation2 helper production and QA pins are not yet qualified"
+    );
     let guard = read(&x.guard_spec)?;
     ensure!(
         guard["executable_sha256"] == x.assembler.sha256
