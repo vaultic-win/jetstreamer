@@ -6,6 +6,9 @@ const MAX_WAIT_MILLIS: u64 = 120_000;
 const MAX_ADMISSION_AGE_MILLIS: u64 = 120_000;
 const HASH_MEMORY_HIGH: u64 = 14 << 30;
 const HASH_MEMORY_MAX: u64 = 16 << 30;
+mod protective {
+    include!("epoch223_demotion_guard.rs");
+}
 mod roles {
     include!("epoch223_demotion_roles.rs");
 }
@@ -203,6 +206,9 @@ struct GuardPlan {
     target_slot: u64,
     maximum_scratch_bytes: u64,
     protected_floor_bytes: u64,
+    guard_unit: String,
+    ready_output: PathBuf,
+    stop_output: PathBuf,
 }
 
 // The only mutable state is local to one invocation. Timeout, malformed evidence,

@@ -27,15 +27,24 @@ struct TaskSpec {
 pub(super) fn dispatch() -> Option<Result<()>> {
     let args: Vec<String> = env::args().collect();
     let role = args.get(1)?.as_str();
-    if !matches!(role, "capture-epoch223-origin" | "capture-epoch223-task") {
+    if !matches!(
+        role,
+        "capture-epoch223-origin" | "capture-epoch223-task" | "guard-epoch223-demotion"
+    ) {
         return None;
     }
     Some(run(&args))
 }
 fn run(args: &[String]) -> Result<()> {
+    ensure!(args.len() == 7, "223 role requires seven arguments");
+    let flag = if args[1] == "guard-epoch223-demotion" {
+        "--plan-sha256"
+    } else {
+        "--spec-sha256"
+    };
     ensure!(
-        args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "223 capture requires exact hash-bound arguments"
+        args[3] == flag && args[5] == "--self-sha256",
+        "223 exact hash-bound arguments required"
     );
     ensure!(unsafe { libc::geteuid() } == 0, "223 capture requires root");
     let binding = BoundFile {
@@ -48,6 +57,7 @@ fn run(args: &[String]) -> Result<()> {
     };
     bound_file(&executable.path, &executable.sha256, 256 << 20)?;
     match args[1].as_str() {
+        "guard-epoch223-demotion" => super::protective::run(&binding, &executable)?,
         "capture-epoch223-origin" => {
             let spec: OriginSpec = read_bound(&binding)?;
             ensure!(
@@ -134,13 +144,20 @@ fn run(args: &[String]) -> Result<()> {
                 "publication_authorized":false,"r2_mutations":false}),
             )?;
         }
-        _ => bail!("223 unknown metadata capture role"),
+        _ => anyhow::bail!("223 unknown metadata capture role"),
     }
     Ok(())
 }
-fn own_role(unit: &str, command: &str, spec: &BoundFile, executable: &BoundFile) -> Result<Actor> {
+pub(super) fn own_role(
+    unit: &str,
+    command: &str,
+    spec: &BoundFile,
+    executable: &BoundFile,
+) -> Result<Actor> {
     ensure!(
-        unit.starts_with("horizon-admit-223-demotion-")
+        (unit.starts_with("horizon-admit-223-demotion-")
+            || (command == "guard-epoch223-demotion"
+                && unit.starts_with("horizon-guard-223-demotion-")))
             && unit.ends_with(".service")
             && unit
                 .bytes()
@@ -161,7 +178,16 @@ fn own_role(unit: &str, command: &str, spec: &BoundFile, executable: &BoundFile)
         expected_exec_start: String::new(),
     };
     let actor = Actor {
-        expected_exec_start: exact_helper_command(&actor, command, spec, "--spec-sha256"),
+        expected_exec_start: exact_helper_command(
+            &actor,
+            command,
+            spec,
+            if command == "guard-epoch223-demotion" {
+                "--plan-sha256"
+            } else {
+                "--spec-sha256"
+            },
+        ),
         ..actor
     };
     observe(&actor)?;

@@ -80,9 +80,9 @@ The independent guard command remains:
 
 `EXE guard-epoch223-demotion PLAN --plan-sha256 SHA --self-sha256 ELF_SHA`
 
-Actual control/spawn issuers, native supervisor, and guard implementations still
-require source completion and qualification. Their interface types are not
-execution evidence. The current patch implements two real root-only metadata
+Actual control/spawn issuers and native supervisor still require source completion.
+Every new role, including the guard, remains unbuilt and unqualified. Their interface types are not
+execution evidence. The current patch implements two root-only metadata
 capture commands in the private utility binary:
 
 `EXE capture-epoch223-origin SPEC --spec-sha256 SHA --self-sha256 ELF_SHA`
@@ -95,6 +95,17 @@ plan and small control kernel envelope before issuing no-clobber launch and task
 receipts. Both authenticate their own actual root systemd actor and immutable
 executable/spec bytes. They read metadata only and perform no native/R2 operation.
 The task receipt alone grants no execution or dashboard publication authority.
+
+The private guard role now has concrete source. Its exact plan also binds
+`guard_unit`, `ready_output` and `stop_output`. It captures an independent root
+actor, verifies its 768 MiB high / 1 GiB max / swap-zero envelope and exact target,
+and holds the original cgroup directory FD. Startup opens both original freeze
+and kill controls without writing them before claiming stop capability. Its
+15-second local protection checks cover filesystem floor, bounded physical root
+and scratch usage, and per-process VMA headroom. A fault first fsyncs a no-clobber
+stop intent, then freezes/kills through FD-relative original cgroup controls,
+preserving every file. It exits when that original cgroup empties and never
+follows a new target invocation. No service has been launched or stop exercised.
 
 Consumed root metadata must be readable through the runner's reviewed sandbox.
 Root capture outputs currently remain root-private; deployment must supply a
