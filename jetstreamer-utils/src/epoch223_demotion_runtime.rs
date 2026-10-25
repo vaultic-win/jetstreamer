@@ -1334,7 +1334,7 @@ mod tests {
             repair_task: file("task"),
             guard: file("guard"),
             recorded_unix_millis: 10,
-            protected_floor_bytes: 2000000000000,
+            protected_floor_bytes: p.minimum_free_bytes,
             read_only_hashing_authorized: true,
             native_execution_authorized: false,
             full_fleet_census_complete: true,
