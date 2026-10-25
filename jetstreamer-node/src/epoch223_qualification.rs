@@ -1,5 +1,5 @@
 //! Private epoch 223 era comparisons. Never an ordinary runtime promotion.
-#[cfg(not(feature = "epoch223-demotion-bracket"))]
+#[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
 use crate::snapshot_path_expectation;
 use crate::{BankHashExpectation, QualificationPlan, compatibility};
 use std::collections::BTreeMap;
@@ -7,18 +7,19 @@ use std::path::Path;
 
 pub(crate) const COLD_BOOTSTRAP: u64 = 96_335_538;
 pub(crate) const TAIL_BOOTSTRAP: u64 = 96_767_522;
-#[cfg(not(feature = "epoch223-demotion-bracket"))]
+#[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
 pub(crate) const OUTPUT_END: u64 = 96_767_999;
 
 pub(crate) fn private_build_enabled() -> bool {
     cfg!(any(
         feature = "epoch223-v1-6-25-qualification",
         feature = "epoch223-demotion-bracket",
+        feature = "epoch223-demotion-full-root",
         feature = "epoch223-v1-6-20-prefix-qualification"
     ))
 }
 
-#[cfg(not(feature = "epoch223-demotion-bracket"))]
+#[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
 fn private_namespace() -> &'static str {
     if cfg!(feature = "epoch223-v1-6-20-prefix-qualification") {
         "qualification-223-v1620-"
@@ -27,7 +28,7 @@ fn private_namespace() -> &'static str {
     }
 }
 
-#[cfg(not(feature = "epoch223-demotion-bracket"))]
+#[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
 fn prefix_namespace() -> &'static str {
     if cfg!(feature = "epoch223-v1-6-20-prefix-qualification") {
         "qualification-223-v1620-prefix-"
@@ -260,9 +261,9 @@ pub(crate) fn planning_report(
     plan: QualificationPlan,
     selection: &compatibility::RuntimeSelection,
 ) -> serde_json::Value {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     return crate::epoch223_demotion::planning_report(plan, selection);
-    #[cfg(not(feature = "epoch223-demotion-bracket"))]
+    #[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
     {
         let worker = selection
             .descriptor
@@ -309,9 +310,9 @@ pub(crate) fn validate_tail_mode(
     focused: Option<(u64, u64)>,
     ledger: &Path,
 ) -> Result<(), String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     return crate::epoch223_demotion::tail_mode(enabled, preflight, focused, ledger);
-    #[cfg(not(feature = "epoch223-demotion-bracket"))]
+    #[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
     {
         if preflight && !enabled {
             return Err("epoch 223 tail preflight requires explicit tail comparison".into());
@@ -343,9 +344,9 @@ pub(crate) fn validate_tail_mode(
 pub(crate) fn validate_tail_runtime(
     selection: &compatibility::RuntimeSelection,
 ) -> Result<(), String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     return crate::epoch223_demotion::worker_profile(selection.descriptor).map(|_| ());
-    #[cfg(not(feature = "epoch223-demotion-bracket"))]
+    #[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
     {
         let d = selection.descriptor;
         let (name, revision, identity, environment) =
@@ -389,9 +390,9 @@ pub(crate) fn tail_expectations(
     snapshot: &Path,
     bootstrap: compatibility::BootstrapState,
 ) -> Result<BTreeMap<u64, BankHashExpectation>, String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     return crate::epoch223_demotion::expectations(expected, plan, snapshot, bootstrap);
-    #[cfg(not(feature = "epoch223-demotion-bracket"))]
+    #[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
     {
         let mut expected = expected;
         if plan.epoch != 223
@@ -445,7 +446,7 @@ pub(crate) fn validate_filesystem(ledger: &Path) -> Result<(), String> {
 /// Run before dispatching any early maintenance/recovery subcommand. The
 /// focused validator below still owns all parsed epoch/path/span checks.
 pub(crate) fn validate_entrypoint(args: &[String]) -> Result<(), String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     crate::epoch223_demotion::entrypoint(args)?;
     if !matches!(args.first().map(String::as_str), Some("223" | "223-223")) {
         return Err("epoch 223 private build accepts only focused epoch 223; maintenance/recovery entrypoints are disabled".into());
@@ -461,7 +462,7 @@ pub(crate) fn validate_launch(
     recovery_or_inherited_lease: bool,
     paths: Option<(&Path, &Path, &Path)>,
 ) -> Result<(), String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     return crate::epoch223_demotion::launch(
         first,
         last,
@@ -470,7 +471,7 @@ pub(crate) fn validate_launch(
         recovery_or_inherited_lease,
         paths,
     );
-    #[cfg(not(feature = "epoch223-demotion-bracket"))]
+    #[cfg(not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root")))]
     {
         if cfg!(feature = "epoch223-v1-6-20-prefix-qualification")
             && focused != Some((COLD_BOOTSTRAP, TAIL_BOOTSTRAP))
@@ -538,7 +539,7 @@ pub(crate) fn validate_launch(
 #[cfg(all(
     test,
     not(feature = "epoch223-v1-6-20-prefix-qualification"),
-    not(feature = "epoch223-demotion-bracket")
+    not(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))
 ))]
 mod tests {
     use super::*;

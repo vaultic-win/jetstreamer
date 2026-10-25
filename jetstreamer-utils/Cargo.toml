@@ -46,6 +46,8 @@ epoch223-root-prefix-resource = []
 epoch223-v1620-root-prefix-resource = []
 # Exact semantic-candidate bracket, independent of the canonical-root runner.
 epoch223-demotion-bracket = []
+# Separate dormant canonical-root adapter, with execution bridge still closed.
+epoch223-demotion-full-root = []
 
 # Private first 16-slot worker envelope; never epoch or root qualification.
 epoch223-warmup-resource = []
@@ -60,6 +62,11 @@ epoch205-shrink-root-prefix-resource = []
 # Private capped-shrink204 prefix; publication and638-slot suffix remain closed.
 epoch204-shrink-root-prefix-resource = []
 epoch186-shrink-root-prefix-resource = []
+
+[[bin]]
+name = "jetstreamer-epoch223-demotion-full-root-resource"
+path = "src/epoch223_demotion_full_root_resource_bin.rs"
+required-features = ["epoch223-demotion-full-root"]
 
 [[bin]]
 name = "jetstreamer-epoch223-demotion-bracket-resource"

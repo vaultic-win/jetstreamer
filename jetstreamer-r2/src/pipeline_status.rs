@@ -93,7 +93,7 @@ fn same_unit_census(expected: &Value, current: &Value) -> bool {
 
 impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
-        if self.claim_phase == "epoch223-demotion-repair" {
+        if matches!(self.claim_phase.as_str(),"epoch223-demotion-repair"|"epoch223-full-root-demotion-repair") {
             fleet::demotion223_binding_scope(self, epoch, phase)?;
             ensure!(unit_name(&self.unit) && hex_id(&self.invocation_id, 32)
                 && !self.expected_exec_start.trim().is_empty() && self.model_path.is_absolute()

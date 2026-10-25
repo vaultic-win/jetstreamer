@@ -307,6 +307,10 @@ impl Context {
         Ok(view)
     }
 }
+impl maintenance_capacity::CandidateContext for Context {
+    fn names(&self)->Result<BTreeSet<String>>{Context::names(self)}
+    fn peer_view(&self,f:&Value,current:&BTreeMap<String,Value>)->Result<(BTreeMap<String,Value>,Value)>{Context::peer_view(self,f,current)}
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {

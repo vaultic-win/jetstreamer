@@ -12,6 +12,8 @@ keywords.workspace = true
 default = []
 # Exact private Bank/Vote comparison; never edits the ordinary era registry.
 epoch223-demotion-bracket = []
+# Dormant exact canonical-root semantic candidate; no bracket/ordinary authority.
+epoch223-demotion-full-root = []
 # Exact private 207cohort through its own final slot; never ordinary support.
 epoch207-singleton-qualification = []
 # Exact private singleton209–212 profiles with their own canonical final root.

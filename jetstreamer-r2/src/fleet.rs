@@ -48,25 +48,36 @@ mod full227_status;
 mod maintenance_capacity;
 mod demotion223_capacity;
 mod demotion223_status;
+mod full_root_demotion223_status;
+mod full_root_demotion223_capacity;
+mod full_root_demotion223_live_peer;
 
 pub(super) fn capture_demotion223_task() -> Result<()> { demotion223_status::capture() }
 pub(super) fn capture_demotion223_terminal() -> Result<()> { demotion223_status::capture_terminal() }
 pub(super) async fn publish_demotion223_status() -> Result<()> { demotion223_status::publish().await }
 pub(super) fn demotion223_binding_scope(b: &pipeline_status::Binding, epoch: u64, phase: &str) -> Result<()> {
+    if b.claim_phase == "epoch223-full-root-demotion-repair" { return full_root_demotion223_status::binding_scope(b,epoch,phase); }
     demotion223_status::binding_scope(b, epoch, phase)
 }
 pub(super) fn demotion223_inactive_owner(r: &StatusPublicationReceipt) -> Result<Option<(String,String)>> {
+    if let Some(owner)=full_root_demotion223_status::inactive_owner(r)? { return Ok(Some(owner)); }
     demotion223_status::inactive_owner(r)
 }
 pub(super) fn demotion223_cleanup_time(epoch: u64, value: &Value) -> Result<Option<u64>> {
+    if let Some(time)=full_root_demotion223_status::cleanup_time(epoch,value)? {return Ok(Some(time));}
     demotion223_status::cleanup_time(epoch, value)
 }
 pub(super) fn demotion223_cleanup_current(epoch: u64, value: &Value, current: &BTreeMap<String,Value>, owners: &[(String,String)]) -> Result<bool> {
+    if full_root_demotion223_status::cleanup_current(epoch,value,current,owners)? {return Ok(true);}
     demotion223_status::cleanup_current(epoch, value, current, owners)
 }
 pub(super) fn compute_demotion223_capacity() -> Result<()> {
     demotion223_capacity::run()
 }
+pub(super) fn capture_full_root_demotion223_task()->Result<()> {full_root_demotion223_status::capture()}
+pub(super) fn capture_full_root_demotion223_terminal()->Result<()> {full_root_demotion223_status::capture_terminal()}
+pub(super) async fn publish_full_root_demotion223_status()->Result<()> {full_root_demotion223_status::publish().await}
+pub(super) fn compute_full_root_demotion223_capacity()->Result<()> {full_root_demotion223_capacity::run()}
 mod native141;
 mod native144;
 mod native203;
@@ -229,7 +240,10 @@ pub(super) fn demotion223_memory_views(
     f: &Value,
     o: &Value,
 ) -> Result<(Value, Value, BTreeMap<String, Value>)> {
-    demotion223_live_peer::memory_views(f, o)
+    let (root_view,root_observer,mut proofs)=full_root_demotion223_live_peer::memory_views(f,o)?;
+    let (view,observer,old)=demotion223_live_peer::memory_views(&root_view,&root_observer)?;
+    for (name,proof) in old {ensure!(proofs.insert(name,proof).is_none(),"duplicate repair memory owner");}
+    Ok((view,observer,proofs))
 }
 
 pub(super) fn admit_singleton207() -> Result<()> {
@@ -959,7 +973,7 @@ pub(super) fn pipeline_unit_range_for_epoch(
     unit: &str,
     epoch: u64,
 ) -> Result<std::ops::RangeInclusive<u64>> {
-    if epoch == 223 && demotion223_status::scope(phase, unit) { return Ok(223..=223); }
+    if epoch == 223 && (demotion223_status::scope(phase, unit) || full_root_demotion223_status::scope(phase, unit)) { return Ok(223..=223); }
     if epoch == 223 && private223_status_scope(phase, unit) {
         return Ok(223..=223);
     }
@@ -1105,6 +1119,7 @@ fn validate_pipeline_claim(claim: &PipelineClaim, first: u64, last: u64) -> Resu
             && !claim.evidence.is_empty(),
         "invalid observational pipeline claim"
     );
+    if full_root_demotion223_status::scope(&claim.phase,&claim.unit) {full_root_demotion223_status::validate_claim(claim,None)?;}
     if demotion223_status::scope(&claim.phase, &claim.unit) { demotion223_status::validate_claim(claim, None)?; }
     Ok(())
 }
@@ -1196,6 +1211,7 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
                     .is_some_and(|pid| pid > 0),
             "pipeline live identity or exact command changed"
         );
+        if full_root_demotion223_status::scope(&claim.phase,&claim.unit) {full_root_demotion223_status::validate_claim(claim,Some(current))?;}
         if demotion223_status::scope(&claim.phase, &claim.unit) { demotion223_status::validate_claim(claim, Some(current))?; }
         if super::repair141::scope(&claim.phase, &claim.unit) {
             let evidence = claim
@@ -2540,7 +2556,7 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&141) && (native141::unit_name(name) || original141::unit_name(name) || original141_trace::unit_name(name) || original141_freeze::unit_name(name) || original141_vote_prefix::unit_name(name) || original141_capped::unit_name(name)))
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
-            || ((first_epoch..=last_epoch).contains(&223) && demotion223_status::discovered(name))
+            || ((first_epoch..=last_epoch).contains(&223) && (demotion223_status::discovered(name) || full_root_demotion223_status::discovered(name)))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
             || ((first_epoch..=last_epoch).contains(&210) && native210::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&227) && native227_v1625::unit_name(name))
@@ -2917,6 +2933,8 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if full_root_demotion223_status::event_schema(&event) {
+                full_root_demotion223_status::event_predecessor(&previous,&plan,&plan_bound,&event,sample,started_seconds)?;
             } else if demotion223_status::event_schema(&event) {
                 demotion223_status::event_predecessor(&previous, &plan, &plan_bound, &event, sample, started_seconds)?;
             } else if event["schema"] == capped204205_work::EVENT_SCHEMA {
@@ -3211,6 +3229,7 @@ pub(super) async fn run() -> Result<()> {
             "duplicate pipeline unit or diagnostic relabeling"
         );
         register_pipeline_claim(&mut pipeline_units, claim)?;
+        if full_root_demotion223_status::scope(&claim.phase,&claim.unit) {names.extend(full_root_demotion223_status::claim_names(claim)?);}
         if demotion223_status::scope(&claim.phase, &claim.unit) { names.extend(demotion223_status::claim_names(claim)?); }
         for evidence in &claim.evidence {
             bound_json(evidence)?;
@@ -3229,6 +3248,7 @@ pub(super) async fn run() -> Result<()> {
     }
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
     demotion223_status::event_census(&plan, &before)?;
+    full_root_demotion223_status::event_census(&plan,&before)?;
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
     warmup223::terminal_census(&plan, &before)?;
@@ -3492,7 +3512,7 @@ pub(super) async fn run() -> Result<()> {
             };
             (live, proof)
         };
-        let private_scan = demotion223_status::scope(&claim.phase, &claim.unit)
+        let private_scan = full_root_demotion223_status::scope(&claim.phase,&claim.unit) || demotion223_status::scope(&claim.phase, &claim.unit)
             || super::repair141::scope(&claim.phase, &claim.unit)
             || private144_scan::scope(&claim.phase, &claim.unit)
             || native209::scope(&claim.phase, &claim.unit)
@@ -3510,6 +3530,7 @@ pub(super) async fn run() -> Result<()> {
             "evidence":claim.evidence.iter().map(|e|json!({"path":e.path,"sha256":e.sha256})).collect::<Vec<_>>(),
             "sampled_at_utc":sample,"ordinary_replay_claim":false,
             "current_sidecar_eta_valid":false,"grants_launch_or_publication_authority":false});
+        if is_active && full_root_demotion223_status::scope(&claim.phase,&claim.unit) {entry["resource_contract"]=full_root_demotion223_status::resource_contract(claim)?;}
         if is_active && demotion223_status::scope(&claim.phase, &claim.unit) {
             entry["resource_contract"] = demotion223_status::resource_contract(claim)?;
         }
@@ -3521,7 +3542,7 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
-                        || ((demotion223_status::scope(&claim.phase, &claim.unit) || super::repair141::scope(&claim.phase, &claim.unit)
+                        || ((full_root_demotion223_status::scope(&claim.phase,&claim.unit) || demotion223_status::scope(&claim.phase, &claim.unit) || super::repair141::scope(&claim.phase, &claim.unit)
                             || tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)
                             || native210::scope(&claim.phase, &claim.unit)
@@ -4000,6 +4021,7 @@ pub(super) async fn run() -> Result<()> {
                         || full209_status::matches(receipt, epoch, &observer, &before)
                         || full210_status::matches(receipt, epoch, &observer, &before)
                         || demotion223_status::matches(receipt, epoch, &before)
+                        || full_root_demotion223_status::matches(receipt,epoch,&before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || first_root233::status_matches(receipt, epoch, &observer, &before)
                         || singleton207::status_matches(receipt, epoch, &observer, &before)

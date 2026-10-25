@@ -611,8 +611,10 @@ fn owners_inner(
     let old = f["unit_census"]
         .as_object()
         .context("227 predecessor census")?;
+    full_root_demotion223_live_peer::current_guards(f,current)?;
     demotion223_live_peer::current_guards(f, current)?;
     let mut active = demotion223_live_peer::accepted_guard_names(f)?;
+    for name in full_root_demotion223_live_peer::accepted_guard_names(f)? {ensure!(active.insert(name),"duplicate protected repair guard");}
     for row in f["active"].as_array().context("227 active owners")? {
         let p = active_owner(row)?;
         let unit = p["Id"].as_str().context("227 owner name")?;

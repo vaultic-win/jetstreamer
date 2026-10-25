@@ -234,13 +234,13 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
     // can leave the legacy-only resource view. Raw evidence is never modified.
     capped204205_work::peer_observation(f, o)?;
     assembly204_recovery::peer_observation(f, o)?;
-    let (_, repair_observer, repair) = demotion223_live_peer::memory_views(f, o)?;
+    let (_, repair_observer, repair) = super::demotion223_memory_views(f, o)?;
     let mut names = capped204205_work::peer_names(f)?;
     names.extend(assembly204_recovery::peer_names(f)?);
     names.extend(repair.keys().cloned());
     Ok((
-        demotion223_live_peer::without(&assembly204_recovery::peer_view(
-            &capped204205_work::peer_legacy_view(f)?,
+        full_root_demotion223_live_peer::without(&demotion223_live_peer::without(
+            &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
         )?)?,
         legacy_observer(&repair_observer, &names)?,
     ))
@@ -455,6 +455,28 @@ pub(super) fn assembly204_native_terminal_fixture() -> Value {
 fn check_inner(value: &Value, candidate: Candidate, mode: MemoryMode) -> Result<Value> {
     check_inner_with(value, candidate, mode, None)
 }
+pub(super) trait CandidateContext {
+    fn names(&self) -> Result<BTreeSet<String>>;
+    fn peer_view(
+        &self,
+        f: &Value,
+        current: &BTreeMap<String, Value>,
+    ) -> Result<(BTreeMap<String, Value>, Value)>;
+}
+pub(super) fn check_full_root_demotion223(
+    value: &Value,
+    candidate: Candidate,
+    context: &full_root_demotion223_capacity::Context,
+) -> Result<Value> {
+    let exact = context.candidate()?;
+    ensure!(
+        candidate.additional_bytes == exact.additional_bytes
+            && candidate.memory_max_bytes == exact.memory_max_bytes
+            && candidate.minimum_protected_disk_bytes == exact.minimum_protected_disk_bytes,
+        "full-root candidate envelope differs"
+    );
+    check_inner_with(value, candidate, MemoryMode::Existing, Some(context))
+}
 pub(super) fn check_demotion223(
     value: &Value,
     candidate: Candidate,
@@ -473,7 +495,7 @@ fn check_inner_with(
     value: &Value,
     candidate: Candidate,
     mode: MemoryMode,
-    candidate_context: Option<&demotion223_capacity::Context>,
+    candidate_context: Option<&dyn CandidateContext>,
 ) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,

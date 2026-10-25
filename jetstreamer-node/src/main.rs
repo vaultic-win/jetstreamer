@@ -5,6 +5,9 @@ mod epoch141_original_entry;
 mod epoch207_singleton;
 #[cfg(feature = "epoch223-demotion-bracket")]
 mod epoch223_demotion;
+#[cfg(feature = "epoch223-demotion-full-root")]
+#[path = "epoch223_demotion_full_root.rs"]
+mod epoch223_demotion;
 mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
@@ -5588,7 +5591,7 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     if focused_qualification && epoch223_demotion::selected(&range) {
         return epoch223_demotion::select(range, focused_qualification, allow_candidate_runtime);
     }
@@ -5608,7 +5611,7 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     if focused_qualification && epoch223_demotion::selected(&output_range) {
         if replay_start != epoch223_demotion::BOOTSTRAP + 1 {
             return Err("private 223 demotion requires exact cold replay start".into());
@@ -7717,7 +7720,7 @@ fn build_multi_runtime_provenance(
 fn historical_worker_profile(
     descriptor: &compatibility::RuntimeDescriptor,
 ) -> Result<historical::WorkerProfile, String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     if descriptor.identity.name == epoch223_demotion::BACKEND {
         return epoch223_demotion::worker_profile(descriptor);
     }
@@ -12458,7 +12461,7 @@ async fn run_geyser_replay(
                                 )
                             }
                         };
-                    #[cfg(feature = "epoch223-demotion-bracket")]
+                    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
                     let initialization = if worker_profile.backend_id == epoch223_demotion::BACKEND
                     {
                         epoch223_demotion::bind_initialization(initialization)?
@@ -14762,7 +14765,7 @@ fn qualification_expectations(
     snapshot_archive: &Path,
     bootstrap: compatibility::BootstrapState,
 ) -> Result<BTreeMap<Slot, BankHashExpectation>, String> {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     if epoch223_demotion::exact(plan) {
         return epoch223_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
     }

@@ -3677,6 +3677,10 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-full227-failure") {
         return fleet::capture_full227_failure();
     }
+    if env::args().nth(1).as_deref() == Some("compute-full-root-demotion223-capacity") {return fleet::compute_full_root_demotion223_capacity();}
+    if env::args().nth(1).as_deref() == Some("capture-full-root-demotion223-repair-task") {return fleet::capture_full_root_demotion223_task();}
+    if env::args().nth(1).as_deref() == Some("capture-full-root-demotion223-task-terminal") {return fleet::capture_full_root_demotion223_terminal();}
+    if env::args().nth(1).as_deref() == Some("status-publish-full-root-demotion223-repair") {return fleet::publish_full_root_demotion223_status().await;}
     if env::args().nth(1).as_deref() == Some("compute-demotion223-capacity") {
         return fleet::compute_demotion223_capacity();
     }

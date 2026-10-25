@@ -190,18 +190,28 @@ const SOLANA_V1_6_20_RUST_TOOLCHAIN: &str = "rustc 1.51.0 (2fd73fabe 2021-03-23)
 const SOLANA_V1_6_20_TARGET: &str = "x86_64-unknown-linux-gnu";
 // Keep private worker identity in this shared client module: standalone resource
 // binaries include historical.rs without the main replay binary's modules.
-#[cfg(feature = "epoch223-demotion-bracket")]
+#[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
 pub(crate) const EPOCH223_DEMOTION_BACKEND: &str =
     "solana-v1.6.20-epoch223-called-program-demotion-candidate";
 #[cfg(feature = "epoch223-demotion-bracket")]
 pub(crate) const EPOCH223_DEMOTION_WORKER_SHA: &str =
     "0f8cc22ad76365f4feb1ef328ce77babbb5242a9b5edb38e9bd076528bc530c0";
 
-#[cfg(feature = "epoch223-demotion-bracket")]
+#[cfg(all(feature = "epoch223-demotion-full-root", not(feature = "epoch223-demotion-bracket")))]
+pub(crate) const EPOCH223_DEMOTION_WORKER_SHA: &str = match option_env!("JETSTREAMER_EPOCH223_DEMOTION_FULL_ROOT_WORKER_SHA256") {
+    Some(s) => s,
+    None => "",
+};
+
+#[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
 pub(crate) fn validate_epoch223_demotion_worker_digest(
     actual: [u8; HASH_BYTES],
 ) -> Result<(), String> {
-    if digest_hex(&actual) != EPOCH223_DEMOTION_WORKER_SHA {
+    if digest_hex(&actual) != EPOCH223_DEMOTION_WORKER_SHA
+        || (cfg!(all(feature = "epoch223-demotion-full-root", not(feature = "epoch223-demotion-bracket"))) && (
+            actual == [0; HASH_BYTES]
+            || EPOCH223_DEMOTION_WORKER_SHA == "0f8cc22ad76365f4feb1ef328ce77babbb5242a9b5edb38e9bd076528bc530c0"
+            || EPOCH223_DEMOTION_WORKER_SHA == "a651b7a6ee3c0d4f8359e1ea6cfcb96becf259d440ee744beb173b264de6af20")) {
         return Err("private demotion worker digest differs before executable spawn".into());
     }
     Ok(())
@@ -227,7 +237,7 @@ const SOLANA_V1_8_11_RUST_TOOLCHAIN: &str = "rustc 1.52.1 (9bc8c42bb 2021-05-09)
 const SOLANA_V1_8_11_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 fn backend_supports_entry_batches(backend_id: &str) -> bool {
-    #[cfg(feature = "epoch223-demotion-bracket")]
+    #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
     if backend_id == EPOCH223_DEMOTION_BACKEND {
         return true;
     }
@@ -1397,7 +1407,7 @@ impl HistoricalRuntimeClient {
         // worker only the private, digest-bound copy. This closes the path
         // replacement window between parent admission and worker loading.
         let bound_executable = bind_worker_executable(&executable, private_work_dir.path())?;
-        #[cfg(feature = "epoch223-demotion-bracket")]
+        #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
         if profile.backend_id == EPOCH223_DEMOTION_BACKEND {
             validate_epoch223_demotion_worker_digest(bound_executable.sha256)
                 .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;

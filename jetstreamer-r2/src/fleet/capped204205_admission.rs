@@ -442,6 +442,7 @@ pub(super) fn guards(
     for (name, b) in
         &assembly204_recovery::peer_guards(f, &capped204205_work::peer_legacy_guards(f, bounds)?)?
     {
+        if let Some(actual)=full_root_demotion223_live_peer::guard_evidence(f,name,b)? {evidence.insert(name.clone(),actual);continue;}
         if let Some(actual) = demotion223_live_peer::guard_evidence(f, name, b)? {
             evidence.insert(name.clone(), actual);
             continue;

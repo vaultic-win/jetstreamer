@@ -319,9 +319,9 @@ impl HistoricalReplay {
         progress: Arc<ReplayProgress>,
         live_start_slot: Slot,
     ) -> Result<Self, String> {
-        #[cfg(feature = "epoch223-demotion-bracket")]
+        #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
         let mut client = client;
-        #[cfg(feature = "epoch223-demotion-bracket")]
+        #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
         if crate::epoch223_demotion::is_candidate(&client) {
             crate::epoch223_demotion::initialize(&mut client)?;
         }
@@ -331,7 +331,7 @@ impl HistoricalReplay {
             .as_ref()
             .map(|verifier| verifier.legacy_checkpoint_slots().into_iter().collect())
             .unwrap_or_default();
-        #[cfg(feature = "epoch223-demotion-bracket")]
+        #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
         let checkpoint_slots = {
             let mut slots = checkpoint_slots;
             if crate::epoch223_demotion::active() {
@@ -1099,7 +1099,7 @@ impl HistoricalReplay {
                 apply_runtime_reconstructed_metadata(scheduled, actual);
             }
         }
-        #[cfg(feature = "epoch223-demotion-bracket")]
+        #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
         if crate::epoch223_demotion::active() {
             crate::epoch223_demotion::outcomes(entry, outcomes)?;
         }
@@ -1139,7 +1139,7 @@ impl HistoricalReplay {
             &checkpoint.writes,
         )?;
         let summary = HistoricalCheckpointSummary::try_from(&checkpoint)?;
-        #[cfg(feature = "epoch223-demotion-bracket")]
+        #[cfg(any(feature = "epoch223-demotion-bracket", feature = "epoch223-demotion-full-root"))]
         if crate::epoch223_demotion::active() {
             crate::epoch223_demotion::checkpoint(&checkpoint)?;
         }
