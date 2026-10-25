@@ -64,6 +64,7 @@ pub(super) fn clean_expanded_window(f: &Value, o: &Value) -> Result<()> {
             "singleton 207 expanded fleet has excessive pressure: {counter}"
         );
     }
+    let assembly = capped204205_work::peer_clean_assembly_window(f, o)?;
     let mut rows = o["replays"]
         .as_array()
         .context("singleton 207 ordinary observer census absent")?
@@ -85,6 +86,11 @@ pub(super) fn clean_expanded_window(f: &Value, o: &Value) -> Result<()> {
         let name = owner["Id"]
             .as_str()
             .context("singleton 207 expanded owner absent")?;
+        if assembly.contains(name) {
+            // Its fresh protective heartbeat, complete disk claim and both
+            // producer/guard hard limits remain checked by capacity admission.
+            continue;
+        }
         let selected = rows
             .iter()
             .filter(|r| r["producer_after"]["unit"] == name)

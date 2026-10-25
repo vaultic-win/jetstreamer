@@ -183,6 +183,107 @@ pub(in crate::fleet) fn peer_observation(f: &Value, observer: &Value) -> Result<
     }
     Ok(())
 }
+/// A workerless exemption is only for the exact typed Assembly owner. Its
+/// authority comes from two accepted bound phase frames and the existing full
+/// conservative admission, never from an unavailable diagnostic by itself.
+pub(in crate::fleet) fn peer_clean_assembly_window(
+    f: &Value,
+    o: &Value,
+) -> Result<BTreeSet<String>> {
+    let peers = accepted(f)?;
+    let mut names = BTreeSet::new();
+    for peer in peers
+        .iter()
+        .filter(|p| p.row["current_stage"] == "assembly")
+    {
+        registration(&peer.claim, &peer.input, o)?;
+        let end = utc_seconds(string(o, "recorded_at_utc")?)?
+            .checked_mul(1000)
+            .context("assembly window end overflow")?;
+        let elapsed = number(&o["host_global_pressure"]["cross_sample"], "elapsed_millis")?;
+        ensure!(
+            elapsed >= 1_800_000,
+            "assembly needs the same clean coordinated host window"
+        );
+        let begin = end
+            .checked_sub(elapsed)
+            .context("assembly window starts before epoch")?;
+        let previous_bound: BoundFile =
+            serde_json::from_value(peer.input.frame["previous_fleet"].clone())?;
+        let previous = bound_json(&previous_bound)?;
+        ensure!(
+            previous["schema"] == SCHEMA
+                && previous["first_epoch"] == 201
+                && previous["last_epoch"] == 300
+                && previous["inventory"]["anomalies"] == 0,
+            "assembly predecessor fleet is foreign or unresolved"
+        );
+        let prior = accepted(&previous)?;
+        let matches = prior
+            .iter()
+            .filter(|p| p.claim.epoch == peer.claim.epoch)
+            .collect::<Vec<_>>();
+        ensure!(
+            matches.len() == 1,
+            "assembly has no unique earlier accepted owner frame"
+        );
+        let old = matches[0];
+        ensure!(
+            old.claim.launch == peer.claim.launch
+                && old.claim.producer_plan == peer.claim.producer_plan
+                && old.claim.admission == peer.claim.admission
+                && old.row["current_stage"] == "assembly"
+                && number(&old.input.frame, "sampled_unix_millis")?
+                    <= number(&peer.input.frame, "sampled_unix_millis")?,
+            "assembly predecessor changed owner/admission, phase, or time direction"
+        );
+        let old_guard = evidence::bound(
+            &serde_json::from_value(old.input.frame["guard_snapshot"].clone())?,
+            true,
+        )?;
+        let guard = evidence::bound(
+            &serde_json::from_value(peer.input.frame["guard_snapshot"].clone())?,
+            true,
+        )?;
+        assembly_window(&old_guard, &guard, begin, end)?;
+        ensure!(
+            number(&peer.input.frame, "sampled_unix_millis")? >= end,
+            "assembly frame predates coordinated window end"
+        );
+        ensure!(
+            names.insert(string(&peer.input.plan, "producer_unit")?.into()),
+            "duplicate assembly window owner"
+        );
+    }
+    Ok(names)
+}
+fn assembly_window(old: &Value, current: &Value, begin: u64, end: u64) -> Result<()> {
+    ensure!(
+        end.checked_sub(begin).is_some_and(|n| n >= 1_800_000)
+            && old["schema"] == "jetstreamer-capped204205-guard-heartbeat-v1"
+            && current["schema"] == old["schema"]
+            && current["epoch"] == old["epoch"]
+            && current["plan_sha256"] == old["plan_sha256"]
+            && current["producer_unit"] == old["producer_unit"]
+            && current["producer_invocation_id"] == old["producer_invocation_id"]
+            && current["guard_unit"] == old["guard_unit"]
+            && current["guard_invocation_id"] == old["guard_invocation_id"]
+            && current["processes"]["main_pid"] == old["processes"]["main_pid"]
+            && current["phase"] == old["phase"]
+            && current["phase"]["stage"] == "assembly"
+            && number(&current["phase"], "started_unix_millis")? <= begin
+            && number(old, "recorded_unix_millis")? <= number(current, "recorded_unix_millis")?
+            && number(current, "recorded_unix_millis")? >= end
+            && [old, current].iter().all(|g| g["processes"]["workers"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+                && g["trip"] == false
+                && g["producer_stop_enabled"] == true),
+        "assembly clean window is missing, backward, foreign, short, stale, or contains a historical worker"
+    );
+    Ok(())
+}
+
 pub(in crate::fleet) fn peer_legacy_view(f: &Value) -> Result<Value> {
     let peers = accepted(f)?;
     let mut view = f.clone();
@@ -281,12 +382,41 @@ fn heartbeat(
         now.checked_mul(1000)
             .context("capped peer clock overflow")?,
     )?;
+    if peer.row["current_stage"] == "assembly" {
+        let accepted_guard = evidence::bound(
+            &serde_json::from_value(peer.input.frame["guard_snapshot"].clone())?,
+            true,
+        )?;
+        assembly_progress(&accepted_guard, &g)?;
+    }
     ensure!(
         g["kernel_limits"] == peer.input.admission["kernel_limits"]
             && g["resource_proposal"] == peer.input.admission["resource_proposal"],
         "capped peer guard lost actual admitted limits"
     );
     Ok(g)
+}
+fn assembly_progress(previous: &Value, current: &Value) -> Result<()> {
+    let old = &previous["phase"];
+    let new = &current["phase"];
+    ensure!(
+        old["stage"] == "assembly"
+            && matches!(new["stage"].as_str(), Some("assembly" | "complete"))
+            && old["epoch"] == new["epoch"]
+            && old["invocation_id"] == new["invocation_id"]
+            && old["plan_sha256"] == new["plan_sha256"]
+            && old["schema"] == new["schema"]
+            && number(previous, "recorded_unix_millis")?
+                <= number(current, "recorded_unix_millis")?
+            && (new["stage"] == "complete"
+                && number(new, "started_unix_millis")? >= number(old, "started_unix_millis")?
+                || new == old)
+            && current["processes"]["workers"]
+                .as_array()
+                .is_some_and(Vec::is_empty),
+        "capped assembly regressed, changed identity/clock, or regained a historical worker"
+    );
+    Ok(())
 }
 fn props(name: &str) -> Result<BTreeMap<String, String>> {
     singleton227_capture::properties(
@@ -656,5 +786,74 @@ mod tests {
         assert!(peer_names(&unmodeled).is_err());
         assert!(peer_legacy_view(&unmodeled).is_err());
         assert!(peer_current(&unmodeled, &current).is_err());
+    }
+}
+
+#[cfg(test)]
+mod assembly_window_tests {
+    use super::*;
+    fn guard(at: u64) -> Value {
+        json!({"schema":"jetstreamer-capped204205-guard-heartbeat-v1","epoch":204,
+            "plan_sha256":"a".repeat(64),"producer_unit":"producer204.service","producer_invocation_id":"b".repeat(32),
+            "guard_unit":"guard204.service","guard_invocation_id":"c".repeat(32),
+            "recorded_unix_millis":at,"trip":false,"producer_stop_enabled":true,
+            "phase":{"schema":"jetstreamer-capped204205-continuation-phase-v1","epoch":204,
+                "plan_sha256":"a".repeat(64),"invocation_id":"b".repeat(32),"stage":"assembly","started_unix_millis":1000},
+            "processes":{"main_pid":42,"workers":[]}})
+    }
+    #[test]
+    fn only_same_authenticated_workerless_assembly_can_cover_a_complete_host_window() {
+        let old = guard(1800);
+        let current = guard(1_802_000);
+        assembly_window(&old, &current, 2000, 1_802_000).unwrap();
+        for (path, value) in [
+            ("/phase", Value::Null),
+            ("/phase/stage", json!("native_restore")),
+            ("/phase/stage", json!("unresolved")),
+            ("/phase/started_unix_millis", json!(2001)),
+            ("/phase/invocation_id", json!("d".repeat(32))),
+            ("/guard_unit", Value::Null),
+            ("/guard_invocation_id", json!("d".repeat(32))),
+            ("/producer_invocation_id", json!("d".repeat(32))),
+            ("/processes/main_pid", json!(43)),
+            ("/processes/workers", json!([{"pid":90}])),
+            ("/recorded_unix_millis", json!(1_801_999)),
+            ("/trip", json!(true)),
+            ("/producer_stop_enabled", json!(false)),
+        ] {
+            let mut bad = current.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(
+                assembly_window(&old, &bad, 2000, 1_802_000).is_err(),
+                "{path}"
+            );
+        }
+        assert!(assembly_window(&old, &current, 2001, 1_802_000).is_err());
+        assert!(assembly_window(&current, &old, 2000, 1_802_000).is_err());
+        let mut missing = current.clone();
+        missing.as_object_mut().unwrap().remove("phase");
+        assert!(assembly_window(&old, &missing, 2000, 1_802_000).is_err());
+    }
+    #[test]
+    fn current_admission_bracket_never_regresses_an_accepted_assembly_or_releases_its_caps() {
+        let old = guard(1800);
+        let current = guard(1_802_000);
+        assembly_progress(&old, &current).unwrap();
+        let mut complete = current.clone();
+        complete["phase"]["stage"] = json!("complete");
+        complete["phase"]["started_unix_millis"] = json!(1_802_000);
+        assembly_progress(&old, &complete).unwrap();
+        for (path, value) in [
+            ("/phase/stage", json!("suffix_validation")),
+            ("/phase/stage", json!("native_restore")),
+            ("/phase/started_unix_millis", json!(999)),
+            ("/phase/invocation_id", json!("d".repeat(32))),
+            ("/recorded_unix_millis", json!(1799)),
+            ("/processes/workers", json!([{"pid":90}])),
+        ] {
+            let mut bad = current.clone();
+            *bad.pointer_mut(path).unwrap() = value;
+            assert!(assembly_progress(&old, &bad).is_err(), "{path}");
+        }
     }
 }

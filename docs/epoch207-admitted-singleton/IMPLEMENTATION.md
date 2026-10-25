@@ -55,3 +55,10 @@ The existing verifier-223 peer implementation is retained verbatim as `verificat
 ## Gates that remain separate
 
 Source, passing tests and a captured binary do not prove the root's source review, disposable sandbox, CPU assignment, actual new resource admission, producer start or first guard. Those must be performed and captured by the parent in order. Natural parent completion does not replace full archive checks, current-plugin checks, canonical root-cohort gate verification, boundary policy, authenticated whole-object upload/readback, sidecar commit or local-retirement rules. The terminal receipt intentionally grants none of those authorities.
+
+
+## Successor correction: typed workerless Assembly
+
+The initial 74e0739b generation passed 991 default and 991 all-feature tests and strict Clippy, but static review against the actual epoch 204 Assembly frame exposed a policy defect: the clean-window check demanded a historical worker from every active role. The successor narrows this for exact, authenticated typed capped Assembly only, in both full-207 and first-root-233 admission. An unavailable observer alone grants no exemption.
+
+Two hash-bound accepted frames must identify the same producer/guard, admission, plan, PID and unchanged Assembly phase. The original phase start must cover the entire clean coordinated host-pressure window, the current frame/guard must reach its end, and both guards must have zero workers. A fresh capacity bracket cannot move that accepted owner backward into restore or replay. All existing conservative producer/guard hard-memory growth, full disk reservation, original 204 admission origin (1e1e generation), and positive native-223 terminal floor-release proof remain unchanged. Ordinary replay peers still require their complete stable one-worker observation windows. This correction neither restarts an owner nor rewrites historical admission or launch receipts.

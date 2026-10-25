@@ -239,6 +239,11 @@ fn a_new_lane_waits_for_a_complete_clean_expanded_observation_window() {
             json!(3500000),
         ),
         (
+            "/diagnostic_replays/0/observation/worker_after/matching_workers",
+            json!(0),
+        ),
+        ("/diagnostic_replays/0/status", json!("unavailable")),
+        (
             "/host_global_pressure/cross_sample/counter_delta_usec/memory.full_total_usec",
             json!(180000001),
         ),
