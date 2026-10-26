@@ -373,7 +373,7 @@ fn guard_manager(
     let name = &s.guard_units[s.phase.name()];
     let p = singleton227_capture::properties(
         name,
-        "Id,InvocationID,MainPID,NRestarts,Type,User,Restart,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,Result,ExecMainStatus,ActiveState,SubState,DropInPaths,NeedDaemonReload,Transient",
+        "Id,InvocationID,MainPID,NRestarts,Type,User,Restart,KillMode,Delegate,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,Result,ExecMainStatus,ActiveState,SubState,DropInPaths,NeedDaemonReload,Transient,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
     )?;
     singleton227_capture::require(
         &p,
@@ -382,6 +382,8 @@ fn guard_manager(
             ("Type", "oneshot"),
             ("User", "root"),
             ("Restart", "no"),
+            ("KillMode", "control-group"),
+            ("Delegate", "no"),
             ("NRestarts", "0"),
             ("MainPID", "0"),
             ("ProtectSystem", "strict"),
@@ -389,6 +391,7 @@ fn guard_manager(
             ("PrivateNetwork", "yes"),
             ("NoNewPrivileges", "yes"),
             ("MemoryMax", "1073741824"),
+            ("MemorySwapMax", "0"),
             ("TasksMax", "256"),
             ("CPUQuotaPerSecUSec", "1s"),
             ("Result", "success"),
@@ -400,6 +403,7 @@ fn guard_manager(
             ("Transient", "no"),
         ],
     )?;
+    validate_guard_controls(&p)?;
     ensure!(
         p["InvocationID"] == sample["guard_invocation_id"] || p["InvocationID"].is_empty(),
         "completed launch first guard has been replaced"

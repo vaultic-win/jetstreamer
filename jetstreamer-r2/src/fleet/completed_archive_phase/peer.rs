@@ -318,8 +318,9 @@ fn guard(
     );
     let props = singleton227_capture::properties(
         &p.spec.guard_units[p.spec.phase.name()],
-        "MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ReadWritePaths,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,Restart,Type,User,DropInPaths,NeedDaemonReload,Transient",
+        "MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ReadWritePaths,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,Restart,KillMode,Delegate,Type,User,DropInPaths,NeedDaemonReload,Transient,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
     )?;
+    validate_guard_controls(&props)?;
     singleton227_capture::require(
         &props,
         &[
@@ -332,6 +333,8 @@ fn guard(
             ("PrivateNetwork", "yes"),
             ("NoNewPrivileges", "yes"),
             ("Restart", "no"),
+            ("KillMode", "control-group"),
+            ("Delegate", "no"),
             ("Type", "oneshot"),
             ("User", "root"),
             ("DropInPaths", ""),

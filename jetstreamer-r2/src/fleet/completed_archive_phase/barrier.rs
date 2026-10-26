@@ -537,8 +537,9 @@ fn current_manager(p: &Startup, s: &Spec, v: &Value, actual: &Value) -> Result<(
     );
     let guard = properties(
         &p.guard_unit,
-        "Id,LoadState,InvocationID,MainPID,NRestarts,ActiveState,SubState,Result,ExecMainStatus,ExecStart,DropInPaths,NeedDaemonReload,Transient",
+        "Id,LoadState,InvocationID,MainPID,NRestarts,ActiveState,SubState,Result,ExecMainStatus,ExecStart,DropInPaths,NeedDaemonReload,Transient,Type,User,Restart,KillMode,Delegate,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
     )?;
+    validate_guard_controls(&guard)?;
     singleton227_capture::require(
         &guard,
         &[
@@ -553,6 +554,19 @@ fn current_manager(p: &Startup, s: &Spec, v: &Value, actual: &Value) -> Result<(
             ("DropInPaths", ""),
             ("NeedDaemonReload", "no"),
             ("Transient", "no"),
+            ("Type", "oneshot"),
+            ("User", "root"),
+            ("Restart", "no"),
+            ("KillMode", "control-group"),
+            ("Delegate", "no"),
+            ("MemoryMax", "1073741824"),
+            ("MemorySwapMax", "0"),
+            ("TasksMax", "256"),
+            ("CPUQuotaPerSecUSec", "1s"),
+            ("ProtectSystem", "strict"),
+            ("ProtectHome", "read-only"),
+            ("PrivateNetwork", "yes"),
+            ("NoNewPrivileges", "yes"),
         ],
     )?;
     ensure!(
@@ -566,6 +580,10 @@ fn current_manager(p: &Startup, s: &Spec, v: &Value, actual: &Value) -> Result<(
                 )?
             ),
         "completed startup first guard was replaced or changed"
+    );
+    ensure!(
+        guard["ReadWritePaths"] == string(&v["guard_plan_contents"], "receipt_directory")?,
+        "completed startup guard writable namespace changed"
     );
     let timer = properties(
         &p.guard_unit.replace(".service", ".timer"),

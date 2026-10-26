@@ -93,6 +93,26 @@ fn validate_environment_sources(
     );
     Ok(())
 }
+fn validate_guard_controls(p: &BTreeMap<String, String>) -> Result<()> {
+    validate_environment_sources(p, None)?;
+    for key in [
+        "ExecCondition",
+        "ExecStartPre",
+        "ExecStartPost",
+        "ExecReload",
+        "ExecStop",
+        "ExecStopPost",
+        "OnSuccess",
+        "OnFailure",
+        "Environment",
+    ] {
+        ensure!(
+            p.get(key).is_some_and(String::is_empty),
+            "completed guard has an unqualified hook or environment source: {key}"
+        );
+    }
+    Ok(())
+}
 
 pub(super) fn pipeline_scope(phase: &str, unit: &str) -> Option<u64> {
     let role = match phase {
@@ -530,7 +550,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
             == vec![format!("ExecStart={}", unit_argv.join(" "))],
         "completed phase command differs"
     );
-    let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,InaccessiblePaths,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
+    let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,InaccessiblePaths,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
     let p = singleton227_capture::properties(name, fields)?;
     let (high, max, runtime) = s.phase.profile();
     for (k, v) in [
@@ -613,6 +633,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
     for k in [
         "OnSuccess",
         "OnFailure",
+        "ExecCondition",
         "ExecStartPre",
         "ExecStartPost",
         "ExecReload",
@@ -1229,6 +1250,41 @@ mod tests {
         props.insert("EnvironmentFiles".into(), String::new());
         validate_environment_sources(&props, None).unwrap();
         assert!(validate_environment_sources(&props, Some(&file)).is_err());
+    }
+    #[test]
+    fn completed_phase_guard_controls_reject_extra_hooks_and_execution_environment() {
+        let mut props = BTreeMap::new();
+        for key in [
+            "ExecCondition",
+            "ExecStartPre",
+            "ExecStartPost",
+            "ExecReload",
+            "ExecStop",
+            "ExecStopPost",
+            "OnSuccess",
+            "OnFailure",
+            "Environment",
+            "EnvironmentFiles",
+            "PassEnvironment",
+        ] {
+            props.insert(key.into(), String::new());
+        }
+        props.insert("UnsetEnvironment".into(), UNSAFE_ENVIRONMENT.join(" "));
+        validate_guard_controls(&props).unwrap();
+        for (key, value) in [
+            ("ExecCondition", "/sealed/pre-guard-read"),
+            ("ExecStartPost", "/sealed/unqualified"),
+            ("OnSuccess", "unbound.service"),
+            ("Environment", "LD_PRELOAD=/sensitive.so"),
+            ("EnvironmentFiles", "/foreign.env (ignore_errors=no)"),
+            ("PassEnvironment", "LD_PRELOAD"),
+            ("UnsetEnvironment", ""),
+        ] {
+            let mut changed = props.clone();
+            changed.insert(key.into(), value.into());
+            let error = validate_guard_controls(&changed).unwrap_err().to_string();
+            assert!(!error.contains("sensitive.so"));
+        }
     }
     #[test]
     fn completed_phase_pipeline_namespace_remains_observational_and_phase_exact() {

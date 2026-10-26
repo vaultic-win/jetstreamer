@@ -1,4 +1,4 @@
-//! Closed, metadata-only migration of the existing207 guard selector. Original
+//! Closed, metadata-only migration of the existing 207 guard selector. Original
 //! launch evidence is immutable. A separate old-floor bridge covers reconfiguration.
 use super::*;
 use std::os::unix::fs::MetadataExt;
@@ -85,7 +85,7 @@ fn timer_shape(p: &BTreeMap<String, String>, service: &str, armed: bool) -> Resu
                         && !s.contains("OnBootUSec")
                         && !s.contains("OnStartupUSec")
                         && !s.contains("OnUnitActiveUSec")),
-            "207 rebase timer is not armed at the exact60-second cadence"
+            "207 rebase timer is not armed at the exact 60-second cadence"
         );
     } else {
         ensure!(
@@ -238,7 +238,7 @@ fn release205(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
             .context("207 rebase active roster missing")?
             .iter()
             .any(|r| r["epoch"] == 205),
-        "workerless205 assembly/downstream work is still live"
+        "workerless 205 assembly/downstream work is still live"
     );
     let rows = f["capped204205_work"]
         .as_array()
@@ -834,7 +834,7 @@ fn capture(command: &str, binding: &BoundFile, self_sha: &str) -> Result<()> {
         "capture-singleton207-rebase-bridge" => "bridge",
         "capture-singleton207-rebase-switch" => "switch",
         "capture-singleton207-guard-rebase" => "complete",
-        _ => bail!("unknown207 rebase capture command"),
+        _ => bail!("unknown 207 rebase capture command"),
     };
     let mut proof = json!({"schema":CAPTURE,"phase":phase,"issuer_sha256":self_sha,"capture_spec":binding,"preparation":private157::binding(&c.preparation),"producer":producer,"recorded_unix_seconds":now()?,"capacity_credit_authorized":false,"producer_mutations":false,"replay_launch_authorized":false,"r2_mutations":false});
     if phase == "bridge" {
