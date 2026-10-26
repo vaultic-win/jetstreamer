@@ -222,13 +222,18 @@ pub(super) fn check_capped204_v4_delivery(
 /// Closed recovery candidates always include a real hard-memory envelope and
 /// use the same complete owner/guard census and hard-growth bracket as delivery.
 pub(super) fn check_assembly204_recovery(value: &Value, candidate: Candidate) -> Result<Value> {
+    assembly204_candidate_shape(candidate)?;
+    check_inner(value, candidate, MemoryMode::AssemblyRecovery204)
+}
+fn assembly204_candidate_shape(candidate: Candidate) -> Result<()> {
     ensure!(
         candidate.minimum_protected_disk_bytes == 0
             && candidate.additional_bytes > 0
-            && matches!(candidate.memory_max_bytes,n if n==(64<<30)+(128<<20) || n==64<<30 || n==16<<30),
+            && matches!(candidate.memory_max_bytes,n if n==(64<<30)+(128<<20)
+                || n==64<<30 || n==16<<30 || n==65<<30 || n==17<<30),
         "204 recovery candidate resource envelope differs"
     );
-    check_inner(value, candidate, MemoryMode::AssemblyRecovery204)
+    Ok(())
 }
 pub(super) fn assembly223(value: &Value) -> Result<Value> {
     check_candidate(
@@ -830,6 +835,28 @@ fn fleet_for_mode(
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn root204_delivery_candidate_entry_accepts_exact_independent_guard_envelopes() {
+        use super::*;
+        for bytes in [17u64 << 30, 65u64 << 30] {
+            assembly204_candidate_shape(Candidate {
+                additional_bytes: 1,
+                memory_max_bytes: bytes,
+                minimum_protected_disk_bytes: 0,
+            })
+            .unwrap();
+        }
+        for bytes in [0, 18u64 << 30, 66u64 << 30, (64u64 << 30) + (512u64 << 20)] {
+            assert!(
+                assembly204_candidate_shape(Candidate {
+                    additional_bytes: 1,
+                    memory_max_bytes: bytes,
+                    minimum_protected_disk_bytes: 0
+                })
+                .is_err()
+            );
+        }
+    }
     use super::*;
     fn context_binding(path: &str) -> BoundFile {
         BoundFile {
