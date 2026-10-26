@@ -20,6 +20,7 @@ struct Plan {
     guard_seal: BoundFile,
     guard_unit: String,
     guard_receipt_directory: PathBuf,
+    guard_plan_path: PathBuf,
     waiting: PathBuf,
     release: PathBuf,
     maximum_wait_seconds: u64,
@@ -76,6 +77,21 @@ fn plan(x: &downstream::StageSpec) -> Result<(BoundFile, Plan)> {
         "204 root startup plan scope differs"
     );
     private(&p.guard_receipt_directory)?;
+    ensure!(
+        p.guard_plan_path
+            .file_name()
+            .is_some_and(|n| n == "guard-plan.json")
+            && p.guard_plan_path.parent() != Some(x.output_directory.as_path())
+            && p.guard_plan_path.parent() != Some(x.scan_directory.as_path())
+            && p.guard_plan_path.parent() != Some(p.guard_receipt_directory.as_path())
+            && p.guard_plan_path.parent() != Some(Path::new(ROOT)),
+        "204 startup guard plan must be outside writable payload roots"
+    );
+    private(
+        p.guard_plan_path
+            .parent()
+            .context("204 guard plan parent missing")?,
+    )?;
     ensure!(
         p.guard_receipt_directory != Path::new(ROOT)
             && p.release.parent() != Some(Path::new(ROOT))
@@ -406,6 +422,10 @@ pub(super) fn release(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()>
     )?;
     let capacity = write(&r.capacity_output, &cap)?;
     let g = read(&r.guard_plan)?;
+    ensure!(
+        r.guard_plan.path == p.guard_plan_path,
+        "204 first guard changed its planned metadata path"
+    );
     // Selection comes only from actual completed PID1/guard output, never a
     // caller's chosen sample or an asserted guard-success boolean.
     let latest = warmup223::completed_guard_binding(
@@ -649,6 +669,22 @@ pub(super) fn current_protection(
         let w = read(&binding(&p.waiting)?)?;
         let actual = snapshot(x, spec, &p, owner, true)?;
         let begin = n(&actual["clock"], "started_unix_seconds")?;
+        let gp = binding(&p.guard_plan_path)?;
+        let g = read(&gp)?;
+        ensure!(
+            g["unit"] == x.stage.unit()
+                && g["invocation_id"] == owner["InvocationID"]
+                && g["worker_root"] == serde_json::to_value(&x.scan_directory)?
+                && g["receipt_directory"] == serde_json::to_value(&p.guard_receipt_directory)?,
+            "204 waiting guard plan does not protect this exact holder"
+        );
+        let guard = unit(&p.guard_unit)?;
+        let manager = guard_manager(
+            &p,
+            &gp,
+            &g,
+            &json!({"guard_invocation_id":guard["InvocationID"]}),
+        )?;
         ensure!(
             w["schema"] == "jetstreamer-root204-delivery-waiting-v1"
                 && w["startup_plan"] == private157::binding(&pb)
@@ -660,7 +696,8 @@ pub(super) fn current_protection(
             "204 pre-release holder is not a bounded childless waiting owner"
         );
         return Ok(
-            json!({"waiting":binding(&p.waiting)?,"waiting_contents":w,"payload_started":false,"guard_memory":guard_memory}),
+            json!({"waiting":binding(&p.waiting)?,"waiting_contents":w,"payload_started":false,
+            "guard_manager":manager,"guard_memory":guard_memory}),
         );
     }
     let (consumed, r) = saved_consumption(x)?;
@@ -821,6 +858,7 @@ mod tests {
             guard_seal: b.clone(),
             guard_unit: guard_name(x.stage).unwrap().into(),
             guard_receipt_directory: "/sealed/guard".into(),
+            guard_plan_path: "/sealed/guard-plan.json".into(),
             waiting: "/sealed/waiting.json".into(),
             release: "/sealed/release.json".into(),
             maximum_wait_seconds: WAIT,
