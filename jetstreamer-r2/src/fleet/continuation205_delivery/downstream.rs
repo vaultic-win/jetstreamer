@@ -603,14 +603,12 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
     let stamp = scan_stamp.context("205 no measured copy after Full")?;
     custody::hash_exact(&scan, &stamp, &sha)?;
     custody::hash_exact(Path::new(OUTPUT), &original, &sha)?;
-    ensure!(
-        unit(x.stage.unit())? == owner,
-        "205 actor changed during actual operation"
-    );
+    let owner_after = unit(x.stage.unit())?;
+    peer::same_owner(&owner, &owner_after)?;
     write(
         &x.output_directory.join("outcome.json"),
         &json!({"schema":"jetstreamer-continuation205-delivery-stage-outcome-v1","epoch":205,"stage":x.stage,"spec":spec,
-        "source":x.source,"admission":admission,"startup_release":consumed,"invocation_id":owner["InvocationID"],"archive_sha256":sha,"archive_bytes":BYTES,
+        "source":x.source,"admission":admission,"startup_release":consumed,"owner_before":owner,"owner_after":owner_after,"invocation_id":owner["InvocationID"],"archive_sha256":sha,"archive_bytes":BYTES,
         "measurement":measurement,"source_digest_initial_state":if x.stage==Stage::Full{"unmeasured"}else{"measured_by_genuine_full"},
         "predecessor_outcomes":predecessors,"commands":commands,"anchor_proof":anchor_proof,"imported":imported,
         "retirement_boundary_only":x.stage==Stage::Boundary,"local_retirement_authorized":false,"passed":true,"issuer":peer::issuer(spec,self_sha),"authority":denied()}),

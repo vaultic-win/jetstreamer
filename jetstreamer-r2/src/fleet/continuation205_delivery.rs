@@ -3,6 +3,7 @@
 use super::*;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 mod capacity;
+pub(super) use capacity::WaitingContext;
 mod custody;
 mod delivery;
 mod downstream;

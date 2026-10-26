@@ -577,13 +577,53 @@ pub(super) fn check_demotion223(
             && candidate.minimum_protected_disk_bytes == exact.minimum_protected_disk_bytes,
         "223candidate envelope differs"
     );
-    check_inner_with(value, candidate, MemoryMode::Existing, Some(context))
+    check_inner_with(
+        value,
+        candidate,
+        MemoryMode::Existing,
+        Some(CandidateContext::Demotion223(context)),
+    )
+}
+#[derive(Clone, Copy)]
+enum CandidateContext<'a> {
+    Demotion223(&'a demotion223_capacity::Context),
+    Waiting205(&'a continuation205_delivery::WaitingContext),
+}
+impl CandidateContext<'_> {
+    fn names(self) -> Result<BTreeSet<String>> {
+        match self {
+            Self::Demotion223(c) => c.names(),
+            Self::Waiting205(c) => c.names(),
+        }
+    }
+    fn peer_view(
+        self,
+        f: &Value,
+        raw: &BTreeMap<String, Value>,
+    ) -> Result<(BTreeMap<String, Value>, Value)> {
+        match self {
+            Self::Demotion223(c) => c.peer_view(f, raw),
+            Self::Waiting205(c) => c.peer_view(f, raw),
+        }
+    }
+}
+pub(super) fn check_continuation205_waiting(
+    value: &Value,
+    context: &continuation205_delivery::WaitingContext,
+) -> Result<Value> {
+    let candidate = context.candidate()?;
+    check_inner_with(
+        value,
+        candidate,
+        MemoryMode::Continuation205Delivery,
+        Some(CandidateContext::Waiting205(context)),
+    )
 }
 fn check_inner_with(
     value: &Value,
     candidate: Candidate,
     mode: MemoryMode,
-    candidate_context: Option<&demotion223_capacity::Context>,
+    candidate_context: Option<CandidateContext<'_>>,
 ) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -610,7 +650,7 @@ fn check_inner_with(
     prefix223_live_peer::roster(&legacy)?;
     native210_peer_history::validate(&f)?;
     let floor = singleton227_admission::century_floor_for_maintenance(&f)?;
-    if candidate_context.is_some() {
+    if matches!(candidate_context, Some(CandidateContext::Demotion223(_))) {
         ensure!(
             candidate.minimum_protected_disk_bytes >= floor,
             "223 local floor is below evidenced century floor"
@@ -812,7 +852,7 @@ fn check_inner_with(
     if candidate_context.is_some() {
         ensure!(
             raw_before == raw_after && raw_before == raw_current,
-            "223candidate identity changed across complete accounting"
+            "typed candidate identity changed across complete accounting"
         );
         capacity["candidate_accounting_before"] = candidate_before;
         capacity["candidate_accounting_after"] = candidate_after;
