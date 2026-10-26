@@ -183,6 +183,57 @@ fn row_shape(p: &Peer, claim: &PipelineClaim, f: &Value) -> Result<()> {
     );
     Ok(())
 }
+/// Metadata-only intrinsic selection inputs from the same authenticated peer
+/// reader used by ordinary capacity. No caller-chosen guard path is accepted.
+#[derive(Clone, PartialEq, Eq, Serialize)]
+pub(in crate::fleet) struct GuardSelectionProfile {
+    pub owner: String,
+    pub owner_invocation_id: String,
+    pub epoch: u64,
+    pub guard_unit: String,
+    pub receipt_directory: PathBuf,
+    pub guard_plan: BoundFile,
+    pub guard_sha256: String,
+    pub authenticated_launch: BoundFile,
+}
+pub(in crate::fleet) fn peer_guard_selection_profiles(
+    f: &Value,
+) -> Result<BTreeMap<String, GuardSelectionProfile>> {
+    let mut result = BTreeMap::new();
+    for p in accepted(f)? {
+        let owner = p.spec.units[p.spec.phase.name()].clone();
+        let guard_plan: BoundFile = serde_json::from_value(p.launch["guard_plan"].clone())?;
+        let plan = read(&guard_plan)?;
+        let directory = PathBuf::from(string(&plan, "receipt_directory")?);
+        let m = fs::symlink_metadata(&directory)?;
+        let iid = string(&p.launch, "invocation_id")?.to_owned();
+        ensure!(
+            plan["unit"] == owner
+                && plan["invocation_id"] == iid
+                && directory.is_absolute()
+                && directory.canonicalize()? == directory
+                && m.is_dir()
+                && m.uid() == 0
+                && m.mode() & 0o077 == 0,
+            "completed peer intrinsic guard profile differs from authenticated launch custody"
+        );
+        let profile = GuardSelectionProfile {
+            owner: owner.clone(),
+            owner_invocation_id: iid,
+            epoch: p.spec.epoch,
+            guard_unit: p.spec.guard_units[p.spec.phase.name()].clone(),
+            receipt_directory: directory,
+            guard_plan,
+            guard_sha256: p.spec.programs["guard"].artifact.sha256.clone(),
+            authenticated_launch: p.binding,
+        };
+        ensure!(
+            result.insert(owner, profile).is_none(),
+            "completed intrinsic guard profile duplicated"
+        );
+    }
+    Ok(result)
+}
 pub(in crate::fleet) fn peer_names(f: &Value) -> Result<BTreeSet<String>> {
     Ok(accepted(f)?
         .iter()

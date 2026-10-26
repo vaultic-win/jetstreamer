@@ -30,16 +30,24 @@ small native terminal proof, exact bounded caller unit and fragment, executable
 and deployment seal, and one new root-private output directory under
 `/var/lib/jetstreamer/horizon-210-singleton-admission-*`.
 
-For the first implementation, authorize exactly the current accepted 207 and 225
-owner roster. The schema names their expected producer IIDs and guarded services;
-the receipt directories and service pairings are derived from the existing
-closed profile constants. Caller-supplied arbitrary directories, receipts,
-guard executables, ignored peers, or override budgets are rejected. Derive the
-complete protected guard owner union using the same adapters as ordinary
-maintenance capacity, and require exact equality to the immutable expected
-roster. If a generic 209 delivery owner starts first, this narrow issuer refuses
-until a separately reviewed schema supports that additional profile; no owner is
-silently dropped from accounting.
+Derive the complete supported active roster from the immutable accepted fleet.
+The current legacy profiles are 207 and 225, using their existing closed
+producer IIDs, guard services and receipt directories. Registered generic 209
+Full/plugin/upload peers obtain their selection profile from the same
+`completed_archive_phase::peer` reader used by ordinary capacity. That reader
+revalidates the captured launch, spec, admitted guard plan, immutable receipt
+namespace and source qualification. Its profile binds the exact owner IID,
+guard unit, plan and executable SHA, and authenticated launch. No JIT wire field
+accepts guard choices or peer exemptions.
+
+Require every accepted active owner to resolve to exactly one supported profile,
+all provider records to be consumed, and every supported live raw census owner
+to remain represented. Preserve and revalidate the complete derived profile map
+with the selected histories. The ordinary core still independently validates
+all current owners, native processes, guards and full resource envelopes. Other
+ordinary profile families remain an explicit unsupported limitation for this
+JIT issuer; they fail closed until an equally authenticated selector adapter is
+reviewed. There is no universal owner-name or zero-resource exemption.
 
 Authenticate the calling metadata service before input validation, immediately
 before selection, and before output commit. Bind its live PID, process start
@@ -61,7 +69,7 @@ empty-array proofs for properties omitted by systemctl, through a narrow exact
    shared private function so JIT execution does not rehash the snapshot again
    after selection. Ordinary admission retains the same checks and order.
 3. Recheck issuer identity, unchanged immutable context and complete roster.
-   Select both latest completed guard receipts intrinsically using the existing
+   Select every supported owner’s latest completed guard receipt intrinsically using the existing
    Rust selector with the exact coordinated sample minimum and existing age
    bound. Preserve the complete selected history and bound receipt for each.
 4. Write a no-clobber, fsynced root-owned immutable effective ordinary admission
@@ -102,7 +110,8 @@ Meaningful tests should establish:
 - Selection and admission occur in the same issuer, with an effective immutable
   spec binding the exact guarded resource context and source spec.
 - Changed PID/ticks/IID/boot/argv/cgroup/executable, arbitrary guard paths,
-  duplicate/missing/added owners, or a live generic 209 competitor reject.
+  duplicate/missing owners or an unregistered generic 209 competitor reject;
+  a genuinely captured generic 209 peer remains fully included.
 - The existing no-fallback latest-job selector remains authoritative, and a guard
   advancing before either capacity bracket produces no admission receipt.
 - The ordinary admission route and downstream capture schema retain their gates;

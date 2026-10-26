@@ -24,8 +24,9 @@ pub(super) fn jit210_native_text(path: impl AsRef<Path>, maximum: u64) -> Result
 mod launch;
 mod peer;
 pub(super) use peer::{
-    claim_names, peer_current, peer_guards, peer_limits, peer_memory_views, peer_names,
-    peer_observation, peer_resources, peer_view, peer_window_names,
+    GuardSelectionProfile, claim_names, peer_current, peer_guard_selection_profiles, peer_guards,
+    peer_limits, peer_memory_views, peer_names, peer_observation, peer_resources, peer_view,
+    peer_window_names,
 };
 
 const SCHEMA: &str = "jetstreamer-completed-archive-phase-spec-v1";

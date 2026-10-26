@@ -2,11 +2,12 @@
 //! validator authenticates sealed report/result/log copies; no asserted passed
 //! flag substitutes for the real full-test and strict-Clippy result records.
 use super::*;
-pub(super) const REQUIRED: [&str; 10] = [
+pub(super) const REQUIRED: [&str; 11] = [
     "fleet::singleton210_admission::custody::tests::full210_prehashed_tuple_covers_content_identity_custody_and_exact_mode",
     "fleet::singleton210_admission::custody::tests::full210_prehashed_descriptor_cannot_hide_path_replacement_or_mode_change",
     "fleet::singleton210_admission::custody::tests::full210_prehashed_input_changed_through_preexisting_writer_is_rejected",
     "fleet::singleton210_admission::jit::tests::full210_jit_roster_cannot_omit_duplicate_replace_or_add_a_live_owner",
+    "fleet::singleton210_admission::jit::tests::full210_jit_roster_uses_authenticated_completed209_profile_without_omitting_legacy_peers",
     "fleet::singleton210_admission::jit::tests::full210_jit_selection_rejects_foreign_stale_tripped_and_replaced_guard",
     "fleet::singleton210_admission::jit::tests::full210_jit_wire_cannot_import_guard_choices_skip_checks_or_gain_authority",
     "fleet::singleton210_admission::jit::issuer::tests::full210_jit_same_process_proof_rejects_replaced_caller_and_effective_contract",
