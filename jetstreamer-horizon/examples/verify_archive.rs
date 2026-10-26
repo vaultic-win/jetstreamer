@@ -1447,11 +1447,12 @@ fn main() {
     }
     if args.first().map(String::as_str) == Some("--capacity-probe") {
         let result = run_capacity_probe();
-        if result == 0 && args.len() > 1 {
-            if let Err(error) = write_capacity_probe_receipt(&args[1..]) {
-                eprintln!("CAPACITY PROBE RECEIPT FAIL: {error}");
-                std::process::exit(1);
-            }
+        if result == 0
+            && args.len() > 1
+            && let Err(error) = write_capacity_probe_receipt(&args[1..])
+        {
+            eprintln!("CAPACITY PROBE RECEIPT FAIL: {error}");
+            std::process::exit(1);
         }
         std::process::exit(result);
     }
