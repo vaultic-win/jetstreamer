@@ -17,6 +17,21 @@ pub(super) fn completed_guard_binding(
     let selected = guard_receipt::select(name, directory, minimum, now, 1800)?;
     Ok(json!({"binding":private157::binding(&selected.binding),"history":selected.history}))
 }
+pub(super) fn completed_guard_successor(
+    name: &str,
+    directory: &Path,
+    supplied: &BoundFile,
+    minimum: u64,
+    now: u64,
+) -> Result<Value> {
+    let selected = guard_receipt::select_successor(name, directory, supplied, minimum, now, 1800)?;
+    Ok(json!({
+        "supplied":{"binding":private157::binding(&selected.supplied.binding),
+            "receipt":selected.supplied.receipt,"history":selected.supplied.history},
+        "latest":{"binding":private157::binding(&selected.latest.binding),
+            "receipt":selected.latest.receipt,"history":selected.latest.history}
+    }))
+}
 pub(super) fn validate_completed_guard_history(history: &Value, guard: &Value) -> Result<()> {
     guard_receipt::validate_history(history, guard)
 }

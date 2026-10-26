@@ -3443,6 +3443,21 @@ pub(super) async fn run() -> Result<()> {
         }
         names.insert(claim.unit.clone());
     }
+    if let Some(binding) = &plan.metadata_event {
+        let event = bound_json(binding)?;
+        if completed_archive_phase::is_delivery209_event(&event) {
+            // A same-sample successor may carry a validated terminal Full209
+            // predecessor that was never registered in the older fleet. Its
+            // guard is still required by event_census and must be observed by
+            // exact name; do not infer it from a suffix or the prior census.
+            names.extend(
+                completed_archive_phase::delivery209_predecessor_guard_names(
+                    &previous_fleet,
+                    &event,
+                )?,
+            );
+        }
+    }
     if plan.admission_transition_guard.is_some() {
         ensure!(
             previous_fleet["unit_census"]
@@ -3454,6 +3469,12 @@ pub(super) async fn run() -> Result<()> {
         );
     }
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
+    let guard_rollover_before = completed_archive_phase::guard_rollover_endpoints(
+        &plan.pipeline_claims,
+        &before,
+        sample_seconds,
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+    )?;
     demotion223_status::event_census(&plan, &before)?;
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
@@ -4389,18 +4410,30 @@ pub(super) async fn run() -> Result<()> {
         auxiliary_diagnostics.push(entry);
     }
     let after = census(&names, plan.first_epoch, plan.last_epoch)?;
+    let guard_rollover_after = completed_archive_phase::guard_rollover_endpoints(
+        &plan.pipeline_claims,
+        &after,
+        sample_seconds,
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+    )?;
     ensure!(
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() - sample_seconds <= 1800,
         "observer became stale during fleet reconciliation"
     );
-    ensure!(
-        before == after,
-        "fleet unit identities or commands changed during reconciliation"
-    );
+    let guard_rollovers = completed_archive_phase::authenticated_guard_rollovers(
+        &before,
+        &after,
+        &guard_rollover_before,
+        &guard_rollover_after,
+    )?;
     let inventory = inventory_report(remote_entries);
     let changes = transitions(&previous_fleet, &after, &entries);
     let receipt = json!({"schema":SCHEMA,"first_epoch":plan.first_epoch,"last_epoch":plan.last_epoch,"sampled_at_utc":sample,"observer_receipt":plan.observer.path,"observer_sha256":plan.observer.sha256,"previous_fleet":plan.previous_fleet.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"plan":plan_bound.path,"plan_sha256":plan_bound.sha256,"admission_transition_guard":plan.admission_transition_guard.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"inventory":inventory,"unit_census":after,"active":active,"diagnostics":diagnostics,"transitions":changes,"epochs":entries,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"remote_mutations":false,"producer_mutations":false,"publication_authorized":false});
     let mut receipt = receipt;
+    if !guard_rollovers.is_empty() {
+        receipt["unit_census_before"] = serde_json::to_value(&before)?;
+        receipt["authenticated_nonlaunching_guard_rollovers"] = json!(guard_rollovers);
+    }
     receipt["assembly204_recovery"] = json!(recovery_work);
     receipt["continuation205_delivery"] = json!(continuation205_work);
     receipt["epoch225_extraction"] = json!(extraction225_rows);

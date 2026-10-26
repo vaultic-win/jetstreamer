@@ -18,6 +18,20 @@ pub(super) use full209_event::{
     prepare as prepare_full209_event, publish as publish_full209_status,
     status_matches as full209_event_status_matches,
 };
+pub(super) fn delivery209_predecessor_guard_names(
+    previous: &Value,
+    event: &Value,
+) -> Result<BTreeSet<String>> {
+    if full209_event::is_event(event) {
+        full209_event::event_census_names(previous, event)
+    } else {
+        ensure!(
+            event["schema"] == terminal_event::SCHEMA,
+            "completed209 event name request has foreign schema"
+        );
+        Ok(BTreeSet::new())
+    }
+}
 pub(super) fn is_delivery209_event(v: &Value) -> bool {
     full209_event::is_event(v) || v["schema"] == terminal_event::SCHEMA
 }
@@ -207,9 +221,10 @@ pub(super) fn root204_credential_digest(
     }
 }
 pub(super) use peer::{
-    GuardSelectionProfile, claim_names, peer_current, peer_guard_selection_profiles, peer_guards,
-    peer_limits, peer_memory_views, peer_names, peer_observation, peer_resources, peer_view,
-    peer_window_names,
+    GuardSelectionProfile, authenticated_guard_rollover_brackets, authenticated_guard_rollovers,
+    claim_names, guard_rollover_endpoints, peer_current, peer_guard_rollover_endpoints,
+    peer_guard_selection_profiles, peer_guards, peer_limits, peer_memory_views, peer_names,
+    peer_observation, peer_resources, peer_view, peer_window_names,
 };
 
 const SCHEMA: &str = "jetstreamer-completed-archive-phase-spec-v1";

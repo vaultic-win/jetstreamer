@@ -7,6 +7,7 @@ struct Peer {
     launch: Value,
     admission: Value,
     row: Value,
+    claim: Value,
 }
 fn string<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
     v[k].as_str()
@@ -95,6 +96,360 @@ pub(in crate::fleet) fn claim_names(claim: &PipelineClaim) -> Result<BTreeSet<St
     let (_, _, s, _) = claim_launch(claim)?;
     Ok(BTreeSet::from([s.guard_units[s.phase.name()].clone()]))
 }
+
+fn terminal_guard_row(row: &Value, guard: &str, protection: &Value) -> Result<()> {
+    let history = &protection["completed"]["history"];
+    let selected = string(history, "guard_invocation_id")?;
+    ensure!(
+        row["Id"] == guard
+            && row["LoadState"] == "loaded"
+            && row["Type"] == "oneshot"
+            && row["ActiveState"] == "inactive"
+            && row["SubState"] == "dead"
+            && row["MainPID"] == "0"
+            && row["ControlGroup"] == ""
+            && row["NRestarts"] == "0"
+            && row["Result"] == "success"
+            && row["ExecMainStatus"] == "0"
+            && row["InvocationID"] == selected
+            && protection["latest_sample"]["guard_invocation_id"] == selected
+            && pipeline_status::same_exec_start(
+                string(history, "expected_exec_start")?,
+                string(row, "ExecStart")?
+            ),
+        "completed rollover endpoint is not the selected terminal-success guard firing"
+    );
+    Ok(())
+}
+
+fn no_relevant_jobs(names: &BTreeSet<String>) -> Result<Value> {
+    let output = ProcessCommand::new("/usr/bin/systemctl")
+        .args([
+            "list-jobs",
+            "--no-legend",
+            "--plain",
+            "--no-pager",
+            "--full",
+        ])
+        .output()?;
+    ensure!(
+        output.status.success() && output.stdout.len() <= 1 << 20,
+        "completed rollover pending-job lookup failed"
+    );
+    let stdout = std::str::from_utf8(&output.stdout)?;
+    ensure!(
+        !stdout.split_whitespace().any(|word| names.contains(word)),
+        "completed producer or guard has a pending systemd job"
+    );
+    Ok(json!({"units":names,"raw_stdout":stdout,"exit_code":output.status.code()}))
+}
+
+fn rollover_endpoint(
+    peer: &Peer,
+    census: &BTreeMap<String, Value>,
+    minimum: u64,
+    now: u64,
+) -> Result<(String, Value, BTreeSet<String>)> {
+    let owner_name = peer.spec.units[peer.spec.phase.name()].clone();
+    let owner = census
+        .get(&owner_name)
+        .context("completed rollover owner omitted from raw census")?;
+    owner_matches(peer, owner)?;
+    let guard_name = peer.spec.guard_units[peer.spec.phase.name()].clone();
+    let guard_row = census
+        .get(&guard_name)
+        .context("completed rollover guard omitted from raw census")?;
+    let plan: BoundFile = serde_json::from_value(peer.launch["guard_plan"].clone())?;
+    let plan_contents = read(&plan)?;
+    let completed = warmup223::completed_guard_binding(
+        &guard_name,
+        Path::new(string(&plan_contents, "receipt_directory")?),
+        minimum,
+        now,
+    )?;
+    let sample: BoundFile = serde_json::from_value(completed["binding"].clone())?;
+    let protection = guard(
+        peer,
+        &BTreeMap::from([(owner_name.clone(), sample)]),
+        census,
+        minimum,
+        now,
+    )?;
+    terminal_guard_row(guard_row, &guard_name, &protection)?;
+    Ok((
+        guard_name.clone(),
+        json!({
+            "schema":"jetstreamer-completed-archive-nonlaunching-guard-endpoint-v1",
+            "epoch":peer.spec.epoch,
+            "phase":peer.spec.phase,
+            "protected_unit":owner_name.clone(),
+            "guard_unit":guard_name.clone(),
+            "claim":peer.claim.clone(),
+            "authenticated_launch":private157::binding(&peer.binding),
+            "phase_spec":peer.launch["phase_spec"].clone(),
+            "guard_plan":private157::binding(&plan),
+            "guard_executable":peer.spec.programs["guard"].artifact.clone(),
+            "raw_owner":owner,
+            "raw_guard":guard_row,
+            "protection":protection,
+            "no_stop_files_confirmed":true
+        }),
+        BTreeSet::from([owner_name, guard_name]),
+    ))
+}
+
+fn attach_pending_jobs(
+    mut result: BTreeMap<String, Value>,
+    pending_names: BTreeSet<String>,
+) -> Result<BTreeMap<String, Value>> {
+    if result.is_empty() {
+        return Ok(result);
+    }
+    let jobs = no_relevant_jobs(&pending_names)?;
+    for endpoint in result.values_mut() {
+        endpoint["pending_jobs"] = jobs.clone();
+    }
+    Ok(result)
+}
+
+fn fleet_rollover_scope(claim: &PipelineClaim) -> bool {
+    matches!(claim.epoch, 207 | 209)
+        && pipeline_scope(&claim.phase, &claim.unit) == Some(claim.epoch)
+}
+
+/// Capture one independently authenticated endpoint for the only volatile
+/// actor in an authenticated completed pipeline: its periodic, non-launching guard.
+/// Terminal predecessors are intentionally skipped; their owners are not live.
+pub(in crate::fleet) fn guard_rollover_endpoints(
+    claims: &[PipelineClaim],
+    census: &BTreeMap<String, Value>,
+    minimum: u64,
+    now: u64,
+) -> Result<BTreeMap<String, Value>> {
+    let mut pending_names = BTreeSet::new();
+    let mut result = BTreeMap::new();
+    for claim in claims.iter().filter(|claim| fleet_rollover_scope(claim)) {
+        // Scope is only routing. The immutable launch/spec/origin remains the
+        // mandatory authority for both epoch 207 and epoch 209.
+        let (binding, launch, spec, admission) = claim_launch(claim)?;
+        let owner = census
+            .get(&claim.unit)
+            .context("completed rollover owner omitted from raw census")?;
+        if owner["ActiveState"] != "active" || owner["SubState"] != "running" {
+            continue;
+        }
+        let peer = Peer {
+            spec,
+            binding,
+            launch,
+            admission,
+            row: Value::Null,
+            claim: serde_json::to_value(claim)?,
+        };
+        let (guard_name, endpoint, names) = rollover_endpoint(&peer, census, minimum, now)?;
+        pending_names.extend(names);
+        ensure!(
+            result.insert(guard_name, endpoint).is_none(),
+            "completed rollover guard is claimed more than once"
+        );
+    }
+    attach_pending_jobs(result, pending_names)
+}
+
+/// Derive every turnover-capable auxiliary guard from the authenticated
+/// completed peers in the fleet, never from a unit-name suffix.
+pub(in crate::fleet) fn peer_guard_rollover_endpoints(
+    fleet: &Value,
+    census: &BTreeMap<String, Value>,
+    minimum: u64,
+    now: u64,
+) -> Result<BTreeMap<String, Value>> {
+    let mut pending_names = BTreeSet::new();
+    let mut result = BTreeMap::new();
+    for peer in accepted(fleet)? {
+        let (guard_name, endpoint, names) = rollover_endpoint(&peer, census, minimum, now)?;
+        pending_names.extend(names);
+        ensure!(
+            result.insert(guard_name, endpoint).is_none(),
+            "completed peer rollover guard is claimed more than once"
+        );
+    }
+    attach_pending_jobs(result, pending_names)
+}
+
+fn endpoint_shape(
+    endpoint: &Value,
+    census: &BTreeMap<String, Value>,
+    guard_name: &str,
+) -> Result<()> {
+    let owner = string(endpoint, "protected_unit")?;
+    let epoch = number(endpoint, "epoch")?;
+    let claim_phase = string(&endpoint["claim"], "phase")?;
+    let expected_phase = match claim_phase {
+        "full-verification" => "full",
+        "plugin-verification" => "plugin",
+        "upload-readback" => "upload",
+        _ => bail!("completed rollover claim phase differs"),
+    };
+    let claim_evidence = endpoint["claim"]["evidence"]
+        .as_array()
+        .context("completed rollover claim evidence differs")?;
+    ensure!(
+        endpoint["schema"] == "jetstreamer-completed-archive-nonlaunching-guard-endpoint-v1"
+            && pipeline_scope(claim_phase, owner) == Some(epoch)
+            && endpoint["claim"]["epoch"].as_u64() == Some(epoch)
+            && endpoint["claim"]["unit"].as_str() == Some(owner)
+            && endpoint["phase"].as_str() == Some(expected_phase)
+            && endpoint["claim"]["invocation_id"] == endpoint["raw_owner"]["InvocationID"]
+            && endpoint["raw_owner"]["Id"].as_str() == Some(owner)
+            && string(&endpoint["claim"], "expected_exec_start")
+                .ok()
+                .zip(endpoint["raw_owner"]["ExecStart"].as_str())
+                .is_some_and(|(expected, actual)| {
+                    pipeline_status::same_exec_start(expected, actual)
+                })
+            && claim_evidence.contains(&endpoint["authenticated_launch"])
+            && endpoint["phase_spec"]["path"].as_str().is_some()
+            && endpoint["phase_spec"]["sha256"]
+                .as_str()
+                .is_some_and(|digest| is_lower_hex(digest, 64))
+            && endpoint["guard_unit"] == guard_name
+            && endpoint["raw_owner"]
+                == *census
+                    .get(owner)
+                    .context("completed rollover endpoint owner disappeared")?
+            && endpoint["raw_guard"]
+                == *census
+                    .get(guard_name)
+                    .context("completed rollover endpoint guard disappeared")?
+            && endpoint["no_stop_files_confirmed"] == true
+            && endpoint["pending_jobs"]["units"]
+                .as_array()
+                .is_some_and(|units| {
+                    [owner, guard_name]
+                        .iter()
+                        .all(|name| units.iter().any(|value| value.as_str() == Some(name)))
+                })
+            && endpoint["pending_jobs"]["raw_stdout"]
+                .as_str()
+                .is_some_and(|raw| {
+                    !raw.split_whitespace()
+                        .any(|word| word == owner || word == guard_name)
+                })
+            && endpoint["pending_jobs"]["exit_code"] == 0,
+        "completed rollover endpoint lost raw identity, no-stop, or pending-job proof"
+    );
+    terminal_guard_row(&endpoint["raw_guard"], guard_name, &endpoint["protection"])
+}
+
+/// Compare complete raw censuses without normalizing either one. Only the two
+/// volatile fields of an independently authenticated, terminal-success
+/// completed-phase periodic guard may differ. The returned evidence retains both raw
+/// endpoint rows and both independently selected latest completions.
+pub(in crate::fleet) fn authenticated_guard_rollovers(
+    before: &BTreeMap<String, Value>,
+    after: &BTreeMap<String, Value>,
+    before_endpoints: &BTreeMap<String, Value>,
+    after_endpoints: &BTreeMap<String, Value>,
+) -> Result<Vec<Value>> {
+    if before == after {
+        return Ok(Vec::new());
+    }
+    ensure!(
+        before.keys().eq(after.keys()),
+        "fleet unit roster changed during completed guard rollover"
+    );
+    let mut normalized = after.clone();
+    let mut evidence = Vec::new();
+    for (name, before_row) in before
+        .iter()
+        .filter(|(name, row)| after.get(*name) != Some(*row))
+    {
+        let before_endpoint = before_endpoints
+            .get(name)
+            .context("changed fleet actor is not an authenticated completed guard")?;
+        let after_endpoint = after_endpoints
+            .get(name)
+            .context("changed fleet actor lacks its second authenticated guard endpoint")?;
+        endpoint_shape(before_endpoint, before, name)?;
+        endpoint_shape(after_endpoint, after, name)?;
+        let owner = string(before_endpoint, "protected_unit")?;
+        ensure!(
+            before_endpoint["protected_unit"] == after_endpoint["protected_unit"]
+                && before_endpoint["claim"] == after_endpoint["claim"]
+                && before_endpoint["authenticated_launch"]
+                    == after_endpoint["authenticated_launch"]
+                && before_endpoint["guard_plan"] == after_endpoint["guard_plan"]
+                && before_endpoint["guard_executable"] == after_endpoint["guard_executable"]
+                && before_endpoint["phase_spec"] == after_endpoint["phase_spec"]
+                && before_endpoint["protection"]["properties"]
+                    == after_endpoint["protection"]["properties"]
+                && before.get(owner) == after.get(owner)
+                && before_endpoint["raw_owner"] == after_endpoint["raw_owner"],
+            "completed guard rollover changed its claim, executable, plan, controls, or producer"
+        );
+        let before_iid = string(before_row, "InvocationID")?;
+        let after_row = after
+            .get(name)
+            .context("completed rollover after row absent")?;
+        let after_iid = string(after_row, "InvocationID")?;
+        ensure!(
+            before_iid != after_iid
+                && pipeline_status::same_exec_start(
+                    string(before_row, "ExecStart")?,
+                    string(after_row, "ExecStart")?
+                ),
+            "completed guard change is not one genuine invocation rollover"
+        );
+        let mut stable = after_row.clone();
+        stable["InvocationID"] = before_row["InvocationID"].clone();
+        stable["ExecStart"] = before_row["ExecStart"].clone();
+        ensure!(
+            stable == *before_row,
+            "completed guard changed nonvolatile service state"
+        );
+        let before_sample = number(
+            &before_endpoint["protection"]["latest_sample"],
+            "recorded_unix_seconds",
+        )?;
+        let after_sample = number(
+            &after_endpoint["protection"]["latest_sample"],
+            "recorded_unix_seconds",
+        )?;
+        ensure!(
+            after_sample >= before_sample,
+            "completed guard completion clock moved backwards"
+        );
+        normalized.insert(name.clone(), before_row.clone());
+        evidence.push(json!({"guard_unit":name,"protected_unit":owner,
+            "raw_before":before_row,"raw_after":after_row,
+            "endpoint_before":before_endpoint,"endpoint_after":after_endpoint,
+            "only_invocation_and_rendered_exec_start_changed":true,
+            "producer_unchanged":true,"nonlaunching_guard_only":true}));
+    }
+    ensure!(
+        normalized == *before && !evidence.is_empty(),
+        "fleet unit identities or commands changed outside authenticated completed guard rollover"
+    );
+    Ok(evidence)
+}
+pub(in crate::fleet) fn authenticated_guard_rollover_brackets(
+    before: &BTreeMap<String, Value>,
+    after: &BTreeMap<String, Value>,
+    current: &BTreeMap<String, Value>,
+    before_endpoints: &BTreeMap<String, Value>,
+    after_endpoints: &BTreeMap<String, Value>,
+    current_endpoints: &BTreeMap<String, Value>,
+) -> Result<Value> {
+    Ok(json!({
+        "before_after":authenticated_guard_rollovers(
+            before, after, before_endpoints, after_endpoints)?,
+        "before_final":authenticated_guard_rollovers(
+            before, current, before_endpoints, current_endpoints)?,
+        "all_non_guard_rows_exact":true,
+        "raw_endpoint_censuses_preserved":true
+    }))
+}
 fn owner_matches(p: &Peer, owner: &Value) -> Result<()> {
     let expected = &p.launch["owner"];
     for k in [
@@ -155,6 +510,7 @@ fn accepted(f: &Value) -> Result<Vec<Peer>> {
             launch,
             admission,
             row: row.clone(),
+            claim: serde_json::to_value(claim)?,
         };
         row_shape(&peer, claim, f)?;
         ensure!(
@@ -382,16 +738,46 @@ fn guard(
         minimum,
         now,
     )?;
-    let completed = warmup223::completed_guard_binding(
+    let completions = warmup223::completed_guard_successor(
         &p.spec.guard_units[p.spec.phase.name()],
         Path::new(string(&plan, "receipt_directory")?),
+        bound,
         minimum,
         now,
     )?;
     ensure!(
-        completed["binding"] == private157::binding(bound),
-        "completed peer guard is not the latest genuine completed firing"
+        completions["supplied"]["binding"] == private157::binding(bound),
+        "completed peer supplied guard is not a genuine completed firing"
     );
+    let latest_binding: BoundFile =
+        serde_json::from_value(completions["latest"]["binding"].clone())?;
+    let latest_sample = launch::read_sample(&latest_binding, &plan)?;
+    ensure!(
+        latest_sample["plan_sha256"] == p.launch["guard_plan"]["sha256"]
+            && latest_sample["plan"] == p.launch["guard_plan"]["path"],
+        "completed peer successor guard plan changed"
+    );
+    launch::current_guard_shape(
+        &p.spec,
+        &p.admission,
+        &plan,
+        &latest_sample,
+        census
+            .get(name)
+            .context("completed peer protected owner absent after guard successor")?,
+        minimum,
+        now,
+    )?;
+    ensure!(
+        completions["supplied"]["receipt"] == sample
+            && completions["latest"]["receipt"] == latest_sample
+            && completions["supplied"]["history"]["executable"]
+                == serde_json::to_value(&p.spec.programs["guard"].artifact.path)?
+            && completions["latest"]["history"]["executable"]
+                == serde_json::to_value(&p.spec.programs["guard"].artifact.path)?,
+        "completed peer guard history, receipt, or immutable executable changed"
+    );
+    let completed = &completions["latest"];
     let props = empty_properties::properties(
         &p.spec,
         true,
@@ -432,7 +818,9 @@ fn guard(
     let timer = barrier::guard_timer_properties(&p.spec.guard_units[p.spec.phase.name()])?;
     validate_guard_timer(&timer, &p.spec.guard_units[p.spec.phase.name()])?;
     Ok(
-        json!({"binding":bound,"sample":sample,"completed":completed,"properties":props,"timer":timer}),
+        json!({"binding":bound,"sample":sample,"supplied_completed":completions["supplied"],
+            "latest_binding":latest_binding,"latest_sample":latest_sample,"completed":completed,
+            "properties":props,"timer":timer}),
     )
 }
 fn sample_seconds(f: &Value) -> Result<u64> {
@@ -448,6 +836,7 @@ pub(super) fn captured_live(claim: &PipelineClaim) -> Result<Value> {
         launch,
         admission,
         row: Value::Null,
+        claim: serde_json::to_value(claim)?,
     };
     let names = BTreeSet::from([
         claim.unit.clone(),
@@ -625,6 +1014,7 @@ pub(super) fn capture_observer(claim: &PipelineClaim, o: &Value) -> Result<Value
         spec,
         admission,
         row: Value::Null,
+        claim: serde_json::to_value(claim)?,
     };
     host_shape(&p, o)
 }
@@ -713,6 +1103,113 @@ fn observation(p: &Peer, f: &Value, o: &Value) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fleet_rollover_scope_accepts_exact_207_and_209_claims_and_rejects_unvalidated_names() {
+        let claim = |epoch: u64, phase: &str, unit: &str| PipelineClaim {
+            epoch,
+            phase: phase.into(),
+            unit: unit.into(),
+            invocation_id: "a".repeat(32),
+            expected_exec_start: "sealed command".into(),
+            evidence: Vec::new(),
+        };
+        assert!(fleet_rollover_scope(&claim(
+            207,
+            "full-verification",
+            "horizon-qualify-207-generic-full-v1.service"
+        )));
+        assert!(fleet_rollover_scope(&claim(
+            209,
+            "plugin-verification",
+            "horizon-qualify-209-generic-plugin-v1.service"
+        )));
+        for foreign in [
+            claim(
+                208,
+                "full-verification",
+                "horizon-qualify-208-generic-full-v1.service",
+            ),
+            claim(
+                207,
+                "full-verification",
+                "horizon-qualify-209-generic-full-v1.service",
+            ),
+            claim(207, "replay", "horizon-qualify-207-generic-full-v1.service"),
+            claim(
+                207,
+                "full-verification",
+                "horizon-qualify-207-generic-full.service",
+            ),
+            claim(
+                207,
+                "full-verification",
+                "foreign-qualify-207-generic-full-v1.service",
+            ),
+        ] {
+            assert!(!fleet_rollover_scope(&foreign), "{}", foreign.unit);
+        }
+        // Production immediately calls claim_launch after this routing gate;
+        // this predicate alone never authenticates an endpoint.
+    }
+    fn rollover_fixture() -> (
+        BTreeMap<String, Value>,
+        BTreeMap<String, Value>,
+        BTreeMap<String, Value>,
+        BTreeMap<String, Value>,
+    ) {
+        let owner = "horizon-qualify-209-generic-plugin-v12.service";
+        let guard = "horizon-generic209-plugin-protective-v12.service";
+        let before_iid = "a".repeat(32);
+        let after_iid = "b".repeat(32);
+        let command = |start: &str, pid: u64| {
+            format!(
+                "{{ path=/sealed/guard ; argv[]=/sealed/guard /sealed/plan --plan-sha256 {} --self-sha256 {} ; ignore_errors=no ; start_time=[{start}] ; stop_time=[{start}] ; pid={pid} ; code=exited ; status=0/0 }}",
+                "c".repeat(64),
+                "d".repeat(64)
+            )
+        };
+        let owner_row = json!({"Id":owner,"LoadState":"loaded","Type":"exec","ActiveState":"active",
+            "SubState":"running","InvocationID":"e".repeat(32),"MainPID":"42","ControlGroup":format!("/system.slice/{owner}"),
+            "NRestarts":"0","Result":"success","ExecMainStatus":"0","ExecStart":"owner command"});
+        let guard_row = |iid: &str, start: &str, pid: u64| {
+            json!({"Id":guard,"LoadState":"loaded","Type":"oneshot",
+            "ActiveState":"inactive","SubState":"dead","InvocationID":iid,"MainPID":"0","ControlGroup":"",
+            "NRestarts":"0","Result":"success","ExecMainStatus":"0","ExecStart":command(start,pid)})
+        };
+        let endpoint = |iid: &str, raw: Value, recorded: u64| {
+            json!({
+                "schema":"jetstreamer-completed-archive-nonlaunching-guard-endpoint-v1",
+                "epoch":209,"phase":"plugin",
+                "protected_unit":owner,"guard_unit":guard,
+                "claim":{"epoch":209,"phase":"plugin-verification","unit":owner,
+                    "invocation_id":"e".repeat(32),"expected_exec_start":"owner command",
+                    "evidence":[{"path":"/sealed/launch.json","sha256":"f".repeat(64)}]},
+                "authenticated_launch":{"path":"/sealed/launch.json","sha256":"f".repeat(64)},
+                "phase_spec":{"path":"/sealed/spec.json","sha256":"1".repeat(64)},
+                "guard_plan":{"path":"/sealed/plan.json","sha256":"c".repeat(64)},
+                "guard_executable":{"path":"/sealed/guard","sha256":"d".repeat(64)},
+                "raw_owner":owner_row,"raw_guard":raw,
+                "protection":{"sample":{"guard_invocation_id":iid,"recorded_unix_seconds":recorded},
+                    "latest_sample":{"guard_invocation_id":iid,"recorded_unix_seconds":recorded},
+                    "completed":{"history":{"guard_invocation_id":iid,"expected_exec_start":command("n/a",0)}},
+                    "properties":{"ExecStart":"immutable exact guard command","ExecStop":""}},
+                "no_stop_files_confirmed":true,
+                "pending_jobs":{"units":[owner,guard],"raw_stdout":"","exit_code":0}
+            })
+        };
+        let raw_before = guard_row(&before_iid, "before", 101);
+        let raw_after = guard_row(&after_iid, "after", 202);
+        let before = BTreeMap::from([
+            (owner.into(), owner_row.clone()),
+            (guard.into(), raw_before.clone()),
+        ]);
+        let after = BTreeMap::from([(owner.into(), owner_row), (guard.into(), raw_after.clone())]);
+        let before_endpoints =
+            BTreeMap::from([(guard.into(), endpoint(&before_iid, raw_before, 100))]);
+        let after_endpoints =
+            BTreeMap::from([(guard.into(), endpoint(&after_iid, raw_after, 130))]);
+        (before, after, before_endpoints, after_endpoints)
+    }
     fn fixture(phase: Phase) -> (Peer, PipelineClaim, Value, Value) {
         let spec = super::super::tests::fixture(phase);
         let name = &spec.units[phase.name()];
@@ -750,6 +1247,7 @@ mod tests {
             launch,
             admission: json!({}),
             row,
+            claim: serde_json::to_value(&claim).unwrap(),
         };
         let process = json!({"pid":42,"start_ticks":123,"rss_bytes":4096});
         let host = json!({"status":"observed","rss":{"census_stable":true,"error":null,"processes":[process]}});
@@ -765,6 +1263,124 @@ mod tests {
         assert_eq!(view, fleet);
         assert_eq!(sample, observer);
         assert!(owners.is_empty());
+    }
+    #[test]
+    fn completed209_periodic_guard_rollover_accepts_only_authenticated_terminal_success_iids() {
+        let (before, after, before_endpoints, after_endpoints) = rollover_fixture();
+        let proof =
+            authenticated_guard_rollovers(&before, &after, &before_endpoints, &after_endpoints)
+                .unwrap();
+        assert_eq!(proof.len(), 1);
+        let guard = proof[0]["guard_unit"].as_str().unwrap();
+        assert_eq!(proof[0]["raw_before"], before[guard]);
+        assert_eq!(proof[0]["raw_after"], after[guard]);
+        assert_eq!(proof[0]["producer_unchanged"], true);
+        assert_eq!(proof[0]["nonlaunching_guard_only"], true);
+    }
+    #[test]
+    fn maintenance_three_brackets_accept_authenticated_auxiliary_turnover_only() {
+        let (before, after, before_endpoints, after_endpoints) = rollover_fixture();
+        let owner = "horizon-qualify-209-generic-plugin-v12.service";
+        assert_eq!(before[owner], after[owner]);
+        let brackets = authenticated_guard_rollover_brackets(
+            &before,
+            &after,
+            &after,
+            &before_endpoints,
+            &after_endpoints,
+            &after_endpoints,
+        )
+        .unwrap();
+        assert_eq!(brackets["before_after"].as_array().unwrap().len(), 1);
+        assert_eq!(brackets["before_final"].as_array().unwrap().len(), 1);
+        assert_eq!(brackets["raw_endpoint_censuses_preserved"], true);
+        let mut changed = after.clone();
+        changed.get_mut(owner).unwrap()["MainPID"] = json!("99");
+        assert!(
+            authenticated_guard_rollover_brackets(
+                &before,
+                &after,
+                &changed,
+                &before_endpoints,
+                &after_endpoints,
+                &after_endpoints,
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn completed209_guard_rollover_rejects_producer_failure_stop_restart_and_pending_jobs() {
+        let (before, after, before_endpoints, after_endpoints) = rollover_fixture();
+        let guard = "horizon-generic209-plugin-protective-v12.service";
+        let owner = "horizon-qualify-209-generic-plugin-v12.service";
+        let mut bad = after.clone();
+        bad.get_mut(owner).unwrap()["InvocationID"] = json!("0".repeat(32));
+        assert!(
+            authenticated_guard_rollovers(&before, &bad, &before_endpoints, &after_endpoints)
+                .is_err()
+        );
+        for (field, value) in [
+            ("Result", json!("exit-code")),
+            ("ActiveState", json!("deactivating")),
+            ("SubState", json!("stop")),
+            ("NRestarts", json!("1")),
+            ("ExecMainStatus", json!("1")),
+        ] {
+            let mut rows = after.clone();
+            let mut endpoints = after_endpoints.clone();
+            rows.get_mut(guard).unwrap()[field] = value.clone();
+            endpoints.get_mut(guard).unwrap()["raw_guard"][field] = value;
+            assert!(
+                authenticated_guard_rollovers(&before, &rows, &before_endpoints, &endpoints)
+                    .is_err(),
+                "{field}"
+            );
+        }
+        let mut endpoints = after_endpoints;
+        endpoints.get_mut(guard).unwrap()["pending_jobs"]["raw_stdout"] =
+            json!(format!("88 {owner} stop running\n"));
+        assert!(
+            authenticated_guard_rollovers(&before, &after, &before_endpoints, &endpoints).is_err()
+        );
+        for pointer in [
+            "/claim/invocation_id",
+            "/authenticated_launch/sha256",
+            "/phase_spec/sha256",
+            "/guard_plan/sha256",
+            "/guard_executable/sha256",
+            "/protection/properties/ExecStart",
+        ] {
+            let mut endpoints = before_endpoints.clone();
+            *endpoints
+                .get_mut(guard)
+                .unwrap()
+                .pointer_mut(pointer)
+                .unwrap() = json!("changed");
+            assert!(
+                authenticated_guard_rollovers(&before, &after, &endpoints, &after_endpoints)
+                    .is_err(),
+                "{pointer}"
+            );
+        }
+    }
+    #[test]
+    fn completed209_guard_rollover_preserves_raw_censuses_and_rejects_suffix_exemptions() {
+        let (before, mut after, before_endpoints, after_endpoints) = rollover_fixture();
+        let before_saved = before.clone();
+        let after_saved = after.clone();
+        authenticated_guard_rollovers(&before, &after, &before_endpoints, &after_endpoints)
+            .unwrap();
+        assert_eq!(before, before_saved);
+        assert_eq!(after, after_saved);
+        let foreign = "horizon-generic209-plugin-protective-foreign.service";
+        after.insert(
+            foreign.into(),
+            after["horizon-generic209-plugin-protective-v12.service"].clone(),
+        );
+        assert!(
+            authenticated_guard_rollovers(&before, &after, &before_endpoints, &after_endpoints)
+                .is_err()
+        );
     }
     #[test]
     fn completed_peer_registered_row_binds_launch_claim_and_complete_census() {

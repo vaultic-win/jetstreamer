@@ -9,6 +9,10 @@ pub(super) struct Selection {
     pub receipt: Value,
     pub history: Value,
 }
+pub(super) struct Successor {
+    pub supplied: Selection,
+    pub latest: Selection,
+}
 fn clock(r: &Value) -> Result<u64> {
     Ok(r["__REALTIME_TIMESTAMP"]
         .as_str()
@@ -260,13 +264,7 @@ pub(super) fn validate_history(history: &Value, receipt: &Value) -> Result<()> {
     );
     Ok(())
 }
-pub(super) fn select(
-    name: &str,
-    root: &Path,
-    minimum: u64,
-    now: u64,
-    age: u64,
-) -> Result<Selection> {
+fn scope(name: &str, root: &Path, age: u64) -> Result<()> {
     ensure!(
         name.ends_with(".service")
             && name
@@ -285,7 +283,9 @@ pub(super) fn select(
             && m.mode() & 0o077 == 0,
         "guard receipt directory is not root-private"
     );
-    no_stop(root)?;
+    no_stop(root)
+}
+fn journal(name: &str, now: u64, age: u64) -> Result<Vec<Value>> {
     let since = now.saturating_sub(age).saturating_sub(60);
     let output = ProcessCommand::new("/usr/bin/journalctl")
         .args([
@@ -311,7 +311,37 @@ pub(super) fn select(
         !rows.is_empty() && rows.len() <= 4096,
         "guard history row bounds"
     );
-    let finish = latest_completed(&rows, name)?;
+    Ok(rows)
+}
+fn bound_selection(
+    rows: &[Value],
+    name: &str,
+    root: &Path,
+    binding: BoundFile,
+    minimum: u64,
+    now: u64,
+    age: u64,
+) -> Result<Selection> {
+    let receipt = bound_json(&binding)?;
+    let selected = receipt["guard_invocation_id"]
+        .as_str()
+        .filter(|s| iid(s))
+        .context("guard completed IID invalid")?;
+    ensure!(
+        binding.path == root.join(format!("sample-{selected}.json"))
+            && private157::file_binding(&binding.path)? == private157::binding(&binding),
+        "guard receipt path or immutable binding differs"
+    );
+    let history = terminal_history(rows, name, selected, &receipt, minimum, now, age)?;
+    validate_history(&history, &receipt)?;
+    Ok(Selection {
+        binding,
+        receipt,
+        history,
+    })
+}
+fn latest_binding(rows: &[Value], name: &str, root: &Path) -> Result<BoundFile> {
+    let finish = latest_completed(rows, name)?;
     let selected = finish["INVOCATION_ID"]
         .as_str()
         .filter(|s| iid(s))
@@ -322,10 +352,9 @@ pub(super) fn select(
         rm.is_file() && rm.uid() == 0 && rm.nlink() == 1 && rm.mode() & 0o077 == 0,
         "guard receipt privacy/ownership differs"
     );
-    let binding: BoundFile = serde_json::from_value(private157::file_binding(&path)?)?;
-    let receipt = bound_json(&binding)?;
-    let history = terminal_history(&rows, name, selected, &receipt, minimum, now, age)?;
-    validate_history(&history, &receipt)?;
+    serde_json::from_value(private157::file_binding(&path)?)
+}
+fn current(name: &str, selected: &Selection) -> Result<()> {
     let current = unit(name)?;
     ensure!(
         current["Id"] == name
@@ -334,7 +363,7 @@ pub(super) fn select(
             && current["Result"] == "success"
             && current["NRestarts"] == "0"
             && pipeline_status::same_exec_start(
-                history["expected_exec_start"]
+                selected.history["expected_exec_start"]
                     .as_str()
                     .context("guard selected command")?,
                 current["ExecStart"]
@@ -343,16 +372,102 @@ pub(super) fn select(
             ),
         "guard currently failed or command changed after history selection"
     );
+    Ok(())
+}
+fn successor_shape(supplied: &Selection, latest: &Selection) -> Result<()> {
+    ensure!(
+        supplied.history["unit"] == latest.history["unit"]
+            && supplied.history["executable"] == latest.history["executable"]
+            && supplied.receipt["plan"] == latest.receipt["plan"]
+            && supplied.receipt["plan_sha256"] == latest.receipt["plan_sha256"]
+            && supplied.receipt["guard_sha256"] == latest.receipt["guard_sha256"],
+        "guard successor changed unit, executable, plan, or executable digest"
+    );
+    let supplied_at = supplied.receipt["recorded_unix_seconds"]
+        .as_u64()
+        .context("supplied guard receipt clock")?;
+    let latest_at = latest.receipt["recorded_unix_seconds"]
+        .as_u64()
+        .context("latest guard receipt clock")?;
+    let supplied_finish = clock(
+        supplied.history["events"]
+            .as_array()
+            .and_then(|events| events.last())
+            .context("supplied guard finish event")?,
+    )?;
+    let latest_finish = clock(
+        latest.history["events"]
+            .as_array()
+            .and_then(|events| events.last())
+            .context("latest guard finish event")?,
+    )?;
+    ensure!(
+        (supplied.binding == latest.binding
+            && supplied_at == latest_at
+            && supplied_finish == latest_finish)
+            || (supplied.binding != latest.binding
+                && latest_at >= supplied_at
+                && latest_finish > supplied_finish),
+        "guard successor is neither the supplied completion nor a later completion"
+    );
+    Ok(())
+}
+pub(super) fn select_successor(
+    name: &str,
+    root: &Path,
+    supplied: &BoundFile,
+    minimum: u64,
+    now: u64,
+    age: u64,
+) -> Result<Successor> {
+    scope(name, root, age)?;
+    let rows = journal(name, now, age)?;
+    let supplied = bound_selection(&rows, name, root, supplied.clone(), minimum, now, age)?;
+    let latest = bound_selection(
+        &rows,
+        name,
+        root,
+        latest_binding(&rows, name, root)?,
+        minimum,
+        now,
+        age,
+    )?;
+    successor_shape(&supplied, &latest)?;
+    current(name, &latest)?;
     no_stop(root)?;
     ensure!(
-        private157::file_binding(&path)? == private157::binding(&binding),
+        private157::file_binding(&supplied.binding.path)? == private157::binding(&supplied.binding)
+            && private157::file_binding(&latest.binding.path)?
+                == private157::binding(&latest.binding),
+        "guard receipt changed after successor selection"
+    );
+    Ok(Successor { supplied, latest })
+}
+pub(super) fn select(
+    name: &str,
+    root: &Path,
+    minimum: u64,
+    now: u64,
+    age: u64,
+) -> Result<Selection> {
+    scope(name, root, age)?;
+    let rows = journal(name, now, age)?;
+    let selected = bound_selection(
+        &rows,
+        name,
+        root,
+        latest_binding(&rows, name, root)?,
+        minimum,
+        now,
+        age,
+    )?;
+    current(name, &selected)?;
+    no_stop(root)?;
+    ensure!(
+        private157::file_binding(&selected.binding.path)? == private157::binding(&selected.binding),
         "guard receipt changed after history selection"
     );
-    Ok(Selection {
-        binding,
-        receipt,
-        history,
-    })
+    Ok(selected)
 }
 
 #[cfg(test)]
@@ -533,5 +648,48 @@ mod tests {
         let mut wrong = r;
         wrong["guard_invocation_id"] = json!("e".repeat(32));
         assert!(call(&rows, &wrong, 99, 105).is_err());
+    }
+    #[test]
+    fn successor_preserves_the_supplied_completion_and_rejects_identity_or_clock_changes() {
+        let selection = |iid: char, recorded: u64, finished: u64| Selection {
+            binding: BoundFile {
+                path: format!("/receipts/sample-{}.json", iid.to_string().repeat(32)).into(),
+                sha256: iid.to_string().repeat(64),
+            },
+            receipt: json!({
+                "guard_invocation_id":iid.to_string().repeat(32),
+                "recorded_unix_seconds":recorded,
+                "plan":"/sealed/plan.json","plan_sha256":"c".repeat(64),
+                "guard_sha256":"d".repeat(64)
+            }),
+            history: json!({
+                "unit":"horizon-guard-test.service","executable":"/sealed/guard",
+                "events":[{"__REALTIME_TIMESTAMP":finished.to_string()}]
+            }),
+        };
+        let supplied = selection('a', 100, 100_000_000);
+        let latest = selection('b', 130, 130_000_000);
+        successor_shape(&supplied, &latest).unwrap();
+        successor_shape(&supplied, &supplied).unwrap();
+
+        for (field, value) in [
+            ("unit", json!("foreign.service")),
+            ("executable", json!("/foreign/guard")),
+        ] {
+            let mut changed = selection('b', 130, 130_000_000);
+            changed.history[field] = value;
+            assert!(successor_shape(&supplied, &changed).is_err(), "{field}");
+        }
+        for (field, value) in [
+            ("plan", json!("/foreign/plan.json")),
+            ("plan_sha256", json!("e".repeat(64))),
+            ("guard_sha256", json!("f".repeat(64))),
+        ] {
+            let mut changed = selection('b', 130, 130_000_000);
+            changed.receipt[field] = value;
+            assert!(successor_shape(&supplied, &changed).is_err(), "{field}");
+        }
+        assert!(successor_shape(&supplied, &selection('b', 99, 130_000_000)).is_err());
+        assert!(successor_shape(&supplied, &selection('b', 130, 99_000_000)).is_err());
     }
 }

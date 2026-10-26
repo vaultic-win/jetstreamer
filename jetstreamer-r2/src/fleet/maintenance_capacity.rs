@@ -783,6 +783,8 @@ fn check_inner_with(
         names.extend(context.names()?);
     }
     let raw_before = census(&names, 201, 300)?;
+    let completed_guard_endpoints_before =
+        completed_archive_phase::peer_guard_rollover_endpoints(&f, &raw_before, t, now)?;
     if let Some(profile) = &epoch225 {
         profile.current(&f, &raw_before)?;
     }
@@ -843,6 +845,9 @@ fn check_inner_with(
     let actual_free = singleton227_admission::disk_free()?;
     envelope(minimum, candidate.additional_bytes, actual_free)?;
     let raw_after = census(&names, 201, 300)?;
+    let after_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let completed_guard_endpoints_after =
+        completed_archive_phase::peer_guard_rollover_endpoints(&f, &raw_after, t, after_now)?;
     if let Some(profile) = &epoch225 {
         profile.current(&f, &raw_after)?;
     }
@@ -856,16 +861,21 @@ fn check_inner_with(
         .transpose()?
         .unwrap_or_else(|| after.clone());
     current_owners(&peer_f, &peer_after)?;
-    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let now = after_now;
+    completed_archive_phase::authenticated_guard_rollovers(
+        &raw_before,
+        &raw_after,
+        &completed_guard_endpoints_before,
+        &completed_guard_endpoints_after,
+    )?;
+    completed_archive_phase::authenticated_guard_rollovers(
+        &before,
+        &after,
+        &completed_guard_endpoints_before,
+        &completed_guard_endpoints_after,
+    )?;
     ensure!(
-        before == after
-            && caps
-                == capped204205_admission::combined_limits(
-                    &peer_f,
-                    &peer_guards,
-                    &peer_after,
-                    now
-                )?,
+        caps == capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_after, now)?,
         "Maintenance owners/caps changed during capacity admission"
     );
     let after_accounting_o = native227_terminal_observer_view(&f, &o)?;
@@ -932,6 +942,9 @@ fn check_inner_with(
         mode,
     )?;
     let raw_current = census(&names, 201, 300)?;
+    let current_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let completed_guard_endpoints_current =
+        completed_archive_phase::peer_guard_rollover_endpoints(&f, &raw_current, t, current_now)?;
     if let Some(profile) = &epoch225 {
         profile.current(&f, &raw_current)?;
     }
@@ -946,9 +959,36 @@ fn check_inner_with(
         .unwrap_or_else(|| current.clone());
     current_owners(&peer_f, &peer_current)?;
     let final_caps =
-        capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_current, now)?;
+        capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_current, current_now)?;
+    let raw_guard_rollover_brackets =
+        completed_archive_phase::authenticated_guard_rollover_brackets(
+            &raw_before,
+            &raw_after,
+            &raw_current,
+            &completed_guard_endpoints_before,
+            &completed_guard_endpoints_after,
+            &completed_guard_endpoints_current,
+        )?;
+    let peer_guard_rollover_brackets =
+        completed_archive_phase::authenticated_guard_rollover_brackets(
+            &before,
+            &after,
+            &current,
+            &completed_guard_endpoints_before,
+            &completed_guard_endpoints_after,
+            &completed_guard_endpoints_current,
+        )?;
+    let owners_equivalent = before == current
+        || peer_guard_rollover_brackets["before_final"]
+            .as_array()
+            .is_some_and(|proof| !proof.is_empty());
     ensure!(
-        before == current && caps == final_caps,
+        owners_equivalent,
+        "maintenance completed guard bracket did not prove owner equivalence"
+    );
+    let final_caps_unchanged = caps == final_caps;
+    ensure!(
+        final_caps_unchanged,
         "maintenance owners/caps changed across final memory/guard checks"
     );
     let final_free = singleton227_admission::disk_free()?;
@@ -1011,8 +1051,8 @@ fn check_inner_with(
         );
         ensure!(
             capped204205_admission::bracketed_fit(
-                before == current,
-                caps == final_caps,
+                owners_equivalent,
+                final_caps_unchanged,
                 required,
                 required_memory,
                 [sampled_free, actual_free, final_free],
@@ -1042,18 +1082,21 @@ fn check_inner_with(
         "maximum_existing_guard_floor_bytes":largest_guard_floor,"minimum_free_bytes":minimum,"additional_bytes":candidate.additional_bytes,
         "required_initial_free_bytes":required,"sampled_available_bytes":sampled_free,"actual_available_bytes":actual_free.min(final_free),
         "protected_growth_before":measurements,"protected_growth_after":after_measurements,"protected_caps":caps,
-        "unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":now,"maximum_age_seconds":900,
+        "unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":current_now,"maximum_age_seconds":900,
         "maintenance_only":true,"all_live_growth_and_century_floor_protected":true,"new_resource_samples":0,
         "replay_launch_authorized":false,"local_retirement_authorized":false,"publication_authorized":false,"r2_mutations":false,
         "protected_guard_history_before":guard_history,"protected_guard_history_after":guard_history_after,
         "unit_census_after_memory_and_guard_checks":current,"memory_before":memory_before,"memory_after":memory_after,
+        "raw_unit_census_before":raw_before,"raw_unit_census_after":raw_after,
+        "raw_unit_census_after_memory_and_guard_checks":raw_current,
+        "completed_guard_endpoints_before":completed_guard_endpoints_before,
+        "completed_guard_endpoints_after":completed_guard_endpoints_after,
+        "completed_guard_endpoints_after_memory_and_guard_checks":completed_guard_endpoints_current,
+        "authenticated_completed_guard_rollover_brackets":raw_guard_rollover_brackets,
+        "authenticated_peer_guard_rollover_brackets":peer_guard_rollover_brackets,
         "capped_peer_accounting":{"raw_fleet_and_observer_preserved":true,"producer_and_independent_guard_hard_memory_charged":true,
             "full_admitted_disk_envelopes_charged":true,"allocation_credit_bytes":0}});
     if candidate_context.is_some() {
-        ensure!(
-            raw_before == raw_after && raw_before == raw_current,
-            "typed candidate identity changed across complete accounting"
-        );
         capacity["candidate_accounting_before"] = candidate_before;
         capacity["candidate_accounting_after"] = candidate_after;
         capacity["candidate_accounting_final"] = candidate_current;

@@ -1047,6 +1047,7 @@ pub(super) mod tests {
             ("recorded_unix_seconds", json!(8999)),
             ("producer_invocation_id", json!("f".repeat(32))),
             ("producer_stop_enabled", json!(false)),
+            ("available_bytes", json!(99)),
             ("workers", json!([[42, 100]])),
             ("trip_reason", json!("floor")),
             ("maximum_root_physical_bytes", json!(METADATA + 1)),
@@ -1057,6 +1058,22 @@ pub(super) mod tests {
             assert!(
                 current_guard_shape(&s, &a, plan, &changed, owner, 9000, 10000).is_err(),
                 "accepted {key}"
+            );
+        }
+        for (pointer, value) in [
+            ("/producer/pid", json!(41)),
+            ("/producer/restarts", json!(1)),
+            (
+                "/root_physical_observation/conservative_physical_bytes",
+                json!(METADATA + 1),
+            ),
+            ("/root_physical_observation/exceeds_budget", json!(true)),
+        ] {
+            let mut changed = sample.clone();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                current_guard_shape(&s, &a, plan, &changed, owner, 9000, 10000).is_err(),
+                "accepted {pointer}"
             );
         }
     }

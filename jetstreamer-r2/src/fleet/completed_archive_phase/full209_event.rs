@@ -218,6 +218,35 @@ fn event_launch(event: &Value) -> Result<(PipelineClaim, Value, Spec, Value)> {
     );
     Ok(result)
 }
+fn predecessor_guard_names(previous: &Value, spec: &Spec) -> Result<BTreeSet<String>> {
+    if spec.phase == Phase::Full {
+        return Ok(BTreeSet::new());
+    }
+    Ok(terminal::previous_view(previous, spec)?.1)
+}
+pub(in crate::fleet) fn event_census_names(
+    previous: &Value,
+    event: &Value,
+) -> Result<BTreeSet<String>> {
+    let (_, _, spec, _) = event_launch(event)?;
+    predecessor_guard_names(previous, &spec)
+}
+fn prepare_census_names(
+    previous: &Value,
+    claim: &PipelineClaim,
+    current_guard: &str,
+    predecessor_guards: BTreeSet<String>,
+) -> Result<BTreeSet<String>> {
+    let mut names = previous["unit_census"]
+        .as_object()
+        .context("completed209 complete census missing")?
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    names.extend(predecessor_guards);
+    names.extend([claim.unit.clone(), current_guard.into()]);
+    Ok(names)
+}
 fn output_scope(path: &Path) -> Result<()> {
     resource_audit::private_directory(path)?;
     ensure!(
@@ -313,14 +342,13 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
         string(&o, "recorded_at_utc")?,
         now()?,
     )?;
-    let mut names = previous["unit_census"]
-        .as_object()
-        .context("completed209 complete census missing")?
-        .keys()
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    names.insert(c.unit.clone());
-    names.insert(s.guard_units[s.phase.name()].clone());
+    let predecessor_guards = predecessor_guard_names(&previous, &s)?;
+    let names = prepare_census_names(
+        &previous,
+        &c,
+        &s.guard_units[s.phase.name()],
+        predecessor_guards,
+    )?;
     event_census(&previous, &census(&names, 201, 300)?, &event)?;
     live(&c, &l)?;
     Ok(())
@@ -576,6 +604,52 @@ mod tests {
             bad[key] = value;
             assert!(capture_shape(&bad).is_err(), "{key}");
         }
+    }
+    #[test]
+    fn delivery_event_census_adds_validated_terminal_guard_absent_from_prior_fleet() {
+        let spec = super::super::tests::fixture(Phase::Plugin);
+        let current = PipelineClaim {
+            epoch: 209,
+            phase: "plugin-verification".into(),
+            unit: spec.units["plugin"].clone(),
+            invocation_id: "a".repeat(32),
+            expected_exec_start: "captured command".into(),
+            evidence: Vec::new(),
+        };
+        let previous = json!({"unit_census":{"unrelated.service":{"Id":"unrelated.service"}}});
+        let predecessor = spec.guard_units["full"].clone();
+        assert!(previous["unit_census"].get(&predecessor).is_none());
+        let names = prepare_census_names(
+            &previous,
+            &current,
+            &spec.guard_units["plugin"],
+            BTreeSet::from([predecessor.clone()]),
+        )
+        .unwrap();
+        assert!(names.contains(&predecessor));
+        assert!(names.contains(&current.unit));
+        assert!(names.contains(&spec.guard_units["plugin"]));
+        assert!(names.contains("unrelated.service"));
+    }
+    #[test]
+    #[ignore = "root-only read-only regression over the exact sealed plugin event and terminal chain"]
+    fn host_delivery_event_derives_missing_terminal_guard_from_authenticated_chain() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let event_path = Path::new(
+            "/var/lib/jetstreamer/horizon-generic209-delivery-event-plugin-terminal-bridge-v1/event.json",
+        );
+        let event_binding: BoundFile = serde_json::from_value(
+            private157::file_binding(event_path).expect("sealed event binding"),
+        )
+        .unwrap();
+        let event = read(&event_binding).unwrap();
+        let previous_binding: BoundFile =
+            serde_json::from_value(event["previous_fleet"].clone()).unwrap();
+        let previous = read(&previous_binding).unwrap();
+        let guard = "horizon-generic209-full-protective-v12.service";
+        assert!(previous["unit_census"].get(guard).is_none());
+        let names = event_census_names(&previous, &event).unwrap();
+        assert_eq!(names, BTreeSet::from([guard.into()]));
     }
     #[test]
     fn g209_event_rejects_changed_release_source_floor_and_cap_proofs() {
