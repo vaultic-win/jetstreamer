@@ -173,7 +173,7 @@ pub fn shape(p: &Plan) -> Result<()> {
                 .path
                 .file_name()
                 .is_some_and(|n| n == "jetstreamer-epoch225-prefix-extract")
-            && p.source_manifest.path == PathBuf::from(format!("{ORIGINAL}.segment.json"))
+            && p.source_manifest.path == Path::new(&format!("{ORIGINAL}.segment.json"))
             && p.source_manifest.sha256 == MANIFEST_SHA,
         "epoch 225 plan scope differs"
     );
