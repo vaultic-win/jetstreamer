@@ -92,6 +92,11 @@ fn receipt_scope(v: &Value, helper: &str) -> Result<()> {
             && v["snapshot_restored"] == false
             && v["archive_created"] == false
             && v["producer_started"] == false
+            && v["replay_launch_authorized"] == false
+            && v["native_input_qualified"] == false
+            && v["entry_replay"] == false
+            && v["snapshot_schema_or_contents_tested"] == false
+            && v["fresh_resource_admission_passed"] == false
             && v["resource_samples_taken"] == 0
             && v["remote_mutations"] == false
             && v["r2_mutations"] == false,
@@ -300,7 +305,10 @@ pub(super) fn run() -> Result<()> {
         "intended_exec_start":command(),"intended_environment":environment(),"probe_root":PROBE_ROOT,
         "helper_sha256":helper,"invocation_id":env::var("INVOCATION_ID")?,"spec":private157::binding(&bound),"probes":rows,
         "exact_parent_cli_route_observed":true,"snapshot_intentionally_absent":true,"all_immutable_inputs_rehashed":true,
-        "worker_spawned":false,"snapshot_restored":false,"archive_created":false,"producer_started":false,"resource_samples_taken":0,"remote_mutations":false,"r2_mutations":false});
+        "worker_spawned":false,"snapshot_restored":false,"archive_created":false,"producer_started":false,
+        "replay_launch_authorized":false,"native_input_qualified":false,"entry_replay":false,
+        "snapshot_schema_or_contents_tested":false,"fresh_resource_admission_passed":false,
+        "resource_samples_taken":0,"remote_mutations":false,"r2_mutations":false});
     deny_fields(&mut receipt);
     validate(&receipt, &helper)?;
     private157::immutable_receipt(&spec.output, &receipt)
@@ -309,6 +317,34 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capability_cannot_borrow_another_parent_worker_or_qualification_scope() {
+        let helper = "a".repeat(64);
+        let mut v = json!({"schema":SCHEMA,"scope":scope(),"parent":private157::binding(&binding(NODE,NODE_SHA)),
+            "worker":private157::binding(&binding(WORKER,WORKER_SHA)),"intended_exec_start":command(),"intended_environment":environment(),
+            "probe_root":PROBE_ROOT,"helper_sha256":helper,"invocation_id":"b".repeat(32),
+            "exact_parent_cli_route_observed":true,"snapshot_intentionally_absent":true,"all_immutable_inputs_rehashed":true,
+            "worker_spawned":false,"snapshot_restored":false,"archive_created":false,"producer_started":false,
+            "replay_launch_authorized":false,"native_input_qualified":false,"entry_replay":false,
+            "snapshot_schema_or_contents_tested":false,"fresh_resource_admission_passed":false,
+            "resource_samples_taken":0,"remote_mutations":false,"r2_mutations":false});
+        deny_fields(&mut v);
+        receipt_scope(&v, &helper).unwrap();
+        for (pointer, bad) in [
+            ("/parent/sha256", json!("0".repeat(64))),
+            ("/worker/path", json!("/sealed/epoch227-worker")),
+            ("/scope/terminal_root_slot", json!(98927999)),
+            ("/worker_spawned", json!(true)),
+            ("/native_input_qualified", json!(true)),
+            ("/fresh_resource_admission_passed", json!(true)),
+            ("/replay_launch_authorized", json!(true)),
+            ("/helper_sha256", json!("c".repeat(64))),
+        ] {
+            let mut changed = v.clone();
+            *changed.pointer_mut(pointer).unwrap() = bad;
+            assert!(receipt_scope(&changed, &helper).is_err(), "{pointer}");
+        }
+    }
     #[test]
     fn exact_parent_requires_actual_candidate_route_and_snapshot_gate() {
         let text = format!(
