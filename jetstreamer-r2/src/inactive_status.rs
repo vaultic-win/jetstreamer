@@ -17,6 +17,7 @@ mod native227;
 mod native227_v1625;
 mod native228;
 mod natural144;
+mod natural225;
 mod preserved144;
 mod publication144;
 mod terminal185;
@@ -437,6 +438,8 @@ fn fresh_census(
     if natural144 {
         natural144::validate_current(&current, terminal_fleet, owners)?;
     }
+    let natural225_terminal =
+        natural225::validate_current(plan.epoch, terminal_fleet, &current, owners)?;
     let capped141 = capped141::recognized(terminal_fleet);
     if capped141 {
         ensure!(plan.epoch == 141, "foreign capped141 cleanup epoch");
@@ -518,6 +521,7 @@ fn fresh_census(
         } else if !preserved
             && !missing157
             && !natural144
+            && !natural225_terminal
             && !capped141
             && !terminal185
             && !native223
@@ -743,6 +747,8 @@ pub(super) async fn run() -> Result<()> {
             "foreign157terminal evidence"
         );
         missing157::time(&history)?
+    } else if let Some(time) = natural225::time(plan.epoch, &history)? {
+        time
     } else if history["schema"] == "jetstreamer-horizon-terminal-failed-replay-evidence-v1" {
         ensure!(
             history["epoch"] == plan.epoch,
