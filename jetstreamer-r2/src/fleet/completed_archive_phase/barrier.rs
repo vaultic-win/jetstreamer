@@ -130,7 +130,7 @@ pub(super) fn validate_plan(s: &Spec, argv: &[String]) -> Result<Startup> {
     Ok(p)
 }
 fn plan_matches(s: &Spec, p: &Startup, argv: &[String]) -> Result<()> {
-    plan_shape(&p)?;
+    plan_shape(p)?;
     let role = if s.phase == Phase::Upload {
         "progressive"
     } else {

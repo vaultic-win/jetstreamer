@@ -366,33 +366,6 @@ pub(super) fn current(f: &Value, census: &BTreeMap<String, Value>) -> Result<()>
     Ok(())
 }
 #[cfg(test)]
-mod guard_tests;
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn row(epoch: u64, name: &str, phase: &str) -> Value {
-        json!({"epoch":epoch,"phase":phase,"ordinary_replay_claim":false,"launch_receipt":"/sealed/launch.json",
-            "launch_receipt_sha256":"a".repeat(64),"producer":{"Id":name,"InvocationID":"b".repeat(32),"NRestarts":"0"}})
-    }
-    #[test]
-    fn lossless_views_keep_all_raw_history_and_recognize_both_exact_profiles() {
-        let a = row(207, singleton207::UNIT, "private-full-epoch-qualification");
-        let b = row(233, first_root233::UNIT, "private-known-root-prefix");
-        let f = json!({"active":[a,b],"unit_census":{"history":1},"epochs":[{"failed":204}],"diagnostics":[{"prior":true}],"plan":"retained"});
-        let v = without(&f).unwrap();
-        assert_eq!(v["active"], json!([]));
-        for k in ["unit_census", "epochs", "diagnostics", "plan"] {
-            assert_eq!(v[k], f[k]);
-        }
-        assert!(without(&json!({"active":[a,a]})).is_err());
-        assert!(without(&json!({"active":[a,{"epoch":207,"producer":{"Id":"foreign"}}]})).is_err());
-        let mut bad = a.clone();
-        bad["ordinary_replay_claim"] = json!(true);
-        assert!(without(&json!({"active":[bad]})).is_err());
-    }
-}
-
-#[cfg(test)]
 fn guard_shape(
     d: &DiagnosticClaim,
     l: &Value,
@@ -417,4 +390,31 @@ fn guard_shape(
         sample,
         now,
     )
+}
+
+#[cfg(test)]
+mod guard_tests;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn row(epoch: u64, name: &str, phase: &str) -> Value {
+        json!({"epoch":epoch,"phase":phase,"ordinary_replay_claim":false,"launch_receipt":"/sealed/launch.json",
+            "launch_receipt_sha256":"a".repeat(64),"producer":{"Id":name,"InvocationID":"b".repeat(32),"NRestarts":"0"}})
+    }
+    #[test]
+    fn lossless_views_keep_all_raw_history_and_recognize_both_exact_profiles() {
+        let a = row(207, singleton207::UNIT, "private-full-epoch-qualification");
+        let b = row(233, first_root233::UNIT, "private-known-root-prefix");
+        let f = json!({"active":[a,b],"unit_census":{"history":1},"epochs":[{"failed":204}],"diagnostics":[{"prior":true}],"plan":"retained"});
+        let v = without(&f).unwrap();
+        assert_eq!(v["active"], json!([]));
+        for k in ["unit_census", "epochs", "diagnostics", "plan"] {
+            assert_eq!(v[k], f[k]);
+        }
+        assert!(without(&json!({"active":[a,a]})).is_err());
+        assert!(without(&json!({"active":[a,{"epoch":207,"producer":{"Id":"foreign"}}]})).is_err());
+        let mut bad = a.clone();
+        bad["ordinary_replay_claim"] = json!(true);
+        assert!(without(&json!({"active":[bad]})).is_err());
+    }
 }
