@@ -598,6 +598,19 @@ fn wait_release(
         pause();
     }
 }
+fn pre_exec_freshness(v: &Value, at: u64, elapsed: Duration, deadline: Duration) -> Result<()> {
+    let issued = n(v, "captured_unix_seconds")?;
+    let guarded = n(&v["guard_sample_contents"], "recorded_unix_seconds")?;
+    ensure!(
+        elapsed < deadline
+            && issued <= at
+            && at - issued <= RELEASE_AGE
+            && guarded <= at
+            && at - guarded <= GUARD_AGE,
+        "completed startup release/first guard expired or wait deadline passed before exec"
+    );
+    Ok(())
+}
 pub(super) fn run() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
     ensure!(
@@ -658,6 +671,12 @@ pub(super) fn run() -> Result<()> {
     );
     consume_shape(&p, &value, &final_actual, now()?)?;
     current_manager(&p, &s, &value, &final_actual)?;
+    pre_exec_freshness(
+        &value,
+        now()?,
+        started.elapsed(),
+        Duration::from_secs(p.maximum_wait_seconds),
+    )?;
     Err(ProcessCommand::new(&p.child_argv[0])
         .args(&p.child_argv[1..])
         .exec()
@@ -866,6 +885,53 @@ mod tests {
         assert!(transition_shape(&release, &s, &a, &child["process"], &owner, 920).is_err());
         assert!(
             transition_shape(&release, &s, &a, &child["process"], &child["owner"], 911).is_err()
+        );
+    }
+    #[test]
+    fn completed_barrier_final_freshness_and_deadline_follow_slow_manager_checks() {
+        let (_, _, release, _, _) = fixture();
+        pre_exec_freshness(
+            &release,
+            926,
+            Duration::from_secs(294),
+            Duration::from_secs(300),
+        )
+        .unwrap();
+        assert!(
+            pre_exec_freshness(
+                &release,
+                932,
+                Duration::from_secs(294),
+                Duration::from_secs(300)
+            )
+            .is_err()
+        );
+        assert!(
+            pre_exec_freshness(
+                &release,
+                926,
+                Duration::from_secs(300),
+                Duration::from_secs(300)
+            )
+            .is_err()
+        );
+        let mut old_guard = release;
+        old_guard["captured_unix_seconds"] = json!(938);
+        pre_exec_freshness(
+            &old_guard,
+            938,
+            Duration::from_secs(100),
+            Duration::from_secs(300),
+        )
+        .unwrap();
+        assert!(
+            pre_exec_freshness(
+                &old_guard,
+                944,
+                Duration::from_secs(106),
+                Duration::from_secs(300)
+            )
+            .is_err()
         );
     }
     #[test]
