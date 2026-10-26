@@ -3597,6 +3597,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-singleton210") {
         return fleet::admit_singleton210();
     }
+    if env::args().nth(1).as_deref() == Some("admit-singleton210-jit") {
+        return fleet::admit_singleton210_jit();
+    }
     if env::args().nth(1).as_deref() == Some("capture-singleton210") {
         return fleet::capture_singleton210();
     }

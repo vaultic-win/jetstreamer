@@ -1,7 +1,13 @@
 //! Full210 candidate admission from the complete current fleet, never native-only.
 use super::{singleton210 as c, *};
+mod custody;
+mod jit;
+pub(super) use jit::run as run_jit;
+pub(super) fn jit_issuer_scope(name: &str) -> bool {
+    jit::issuer_scope(name)
+}
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
     schema: String,
@@ -55,6 +61,10 @@ fn memory(o: &Value) -> Result<()> {
 pub(super) fn run() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("admit-singleton210")?;
     let s: Spec = serde_json::from_value(native210::immutable_json(&binding)?)?;
+    let inputs = validate_inputs(&s)?;
+    admit_validated(&s, &binding, &self_sha, &inputs, None)
+}
+fn validate_inputs(s: &Spec) -> Result<custody::ValidatedInputs> {
     ensure!(
         s.schema == "jetstreamer-private-epoch210-singleton-admission-spec-v1"
             && s.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
@@ -67,6 +77,7 @@ pub(super) fn run() -> Result<()> {
             && s.capability.path == Path::new(c::CAPABILITY),
         "210 full admission namespace differs"
     );
+    let inputs = custody::ValidatedInputs::capture(s)?;
     c::capability(&native210::immutable_json(&s.capability)?)?;
     c::native(&s.native_input)?;
     singleton210_capability::inputs()?;
@@ -88,6 +99,17 @@ pub(super) fn run() -> Result<()> {
         "210 resource plan is not the sealed full-epoch envelope"
     );
     c::no_publication(&resource)?;
+    inputs.revalidate(s)?;
+    Ok(inputs)
+}
+fn admit_validated(
+    s: &Spec,
+    binding: &BoundFile,
+    self_sha: &str,
+    inputs: &custody::ValidatedInputs,
+    jit: Option<&jit::Attempt>,
+) -> Result<()> {
+    inputs.revalidate(s)?;
     let observer: BoundFile = serde_json::from_value(s.resource_basis["observer"].clone())?;
     let fleet: BoundFile = serde_json::from_value(s.resource_basis["fleet"].clone())?;
     let o = bound_json(&observer)?;
@@ -155,7 +177,7 @@ pub(super) fn run() -> Result<()> {
         "required_initial_free_bytes":capacity["required_initial_free_bytes"],
         "fresh_complete_census_passed":true,"older_producers_and_guards_preserved":true,"unit_census_before":before,
         "recorded_unix_seconds":now,"sampled_at_utc":o["recorded_at_utc"],"resource_samples_taken":0,
-        "spec":private157::binding(&binding),"helper_sha256":self_sha,"guard_first_fire_required":true});
+        "spec":private157::binding(binding),"helper_sha256":self_sha,"guard_first_fire_required":true});
     for flag in [
         "runtime_promotion_authorized",
         "full_epoch_qualified",
@@ -167,6 +189,12 @@ pub(super) fn run() -> Result<()> {
         receipt[flag] = json!(false);
     }
     c::no_publication(&receipt)?;
+    inputs.revalidate(s)?;
+    receipt["independent_input_validation"] = inputs.evidence();
+    if let Some(attempt) = jit {
+        receipt["jit_issuer"] = attempt.before_commit(s, binding, self_sha)?;
+    }
+    inputs.revalidate(s)?;
     if s.output.try_exists()? {
         let old = native210::immutable_json(&serde_json::from_value(private157::file_binding(
             &s.output,

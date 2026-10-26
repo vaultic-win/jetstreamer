@@ -6,6 +6,21 @@ mod barrier;
 mod capacity;
 mod decoder_capacity;
 mod empty_properties;
+// Scope-limited metadata reuse for the separate Full 210 JIT issuer. These
+// helpers confer no generic completed-archive origin or execution authority.
+pub(super) fn jit210_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+    empty_properties::jit210_properties(name, fields)
+}
+pub(super) fn jit210_start_ticks(raw: &str) -> Result<u64> {
+    launch::start_ticks(raw)
+}
+pub(super) fn jit210_start_clock(ticks: u64) -> Result<Value> {
+    launch::native_start_clock(ticks)
+}
+pub(super) fn jit210_native_text(path: impl AsRef<Path>, maximum: u64) -> Result<String> {
+    barrier::native_text(path, maximum)
+}
+
 mod launch;
 mod peer;
 pub(super) use peer::{

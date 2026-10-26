@@ -19,6 +19,7 @@ const FIELDS: [(&str, &str, &str); 11] = [
 fn object_path(service: &str) -> Result<String> {
     ensure!(
         guard_scope(service, 201, 300)
+            || singleton210_admission::jit_issuer_scope(service)
             || [
                 "full-verification",
                 "plugin-verification",
@@ -181,6 +182,23 @@ fn normalize(
     effective.insert("TypedEmptyReplies".into(), serde_json::to_string(proof)?);
     Ok(effective)
 }
+
+pub(super) fn jit210_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+    ensure!(
+        singleton210_admission::jit_issuer_scope(name),
+        "foreign JIT 210 typed property caller"
+    );
+    let show = singleton227_capture::properties(name, fields)?;
+    let path = object_path(name)?;
+    let mut proof = serde_json::Map::new();
+    for (property, interface, _) in roster(false, false) {
+        if !show.contains_key(property) {
+            proof.insert(property.into(), query(name, &path, interface, property)?);
+        }
+    }
+    normalize(name, &show, &Value::Object(proof), false, false)
+}
+
 pub(super) fn properties(s: &Spec, guard: bool, fields: &str) -> Result<BTreeMap<String, String>> {
     properties_with(s, guard, fields, singleton227_capture::properties)
 }

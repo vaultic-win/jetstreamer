@@ -329,6 +329,9 @@ pub(super) fn prepare_singleton210_inputs() -> Result<()> {
 pub(super) fn admit_singleton210() -> Result<()> {
     singleton210_admission::run()
 }
+pub(super) fn admit_singleton210_jit() -> Result<()> {
+    singleton210_admission::run_jit()
+}
 pub(super) fn capture_singleton210() -> Result<()> {
     singleton210_capture::run()
 }
