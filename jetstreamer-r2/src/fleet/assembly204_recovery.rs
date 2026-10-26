@@ -254,6 +254,7 @@ pub(super) fn command_name(name: &str) -> bool {
         name,
         "capture-assembly204-recovery-terminal"
             | "prepare-assembly204-delivery"
+            | "capture-assembly204-plugin-capacity"
             | "release-assembly204-delivery-stage"
             | "capture-assembly204-recovery-sources"
             | "issue-assembly204-recovery-plan"
@@ -279,6 +280,9 @@ pub(super) async fn run(command: &str) -> Result<()> {
     let value = read(&spec)?;
     match command {
         "prepare-assembly204-delivery" => delivery::prepare(&value, &spec, &self_sha),
+        "capture-assembly204-plugin-capacity" => {
+            delivery::capture_plugin_capacity(&value, &spec, &self_sha)
+        }
         "release-assembly204-delivery-stage" => startup::release(&value, &spec, &self_sha),
         "capture-assembly204-recovery-terminal" => {
             custody::capture_terminal(&value, &spec, &self_sha)

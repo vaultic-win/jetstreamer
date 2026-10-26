@@ -89,7 +89,7 @@ fn plugin_probe(binding: &BoundFile, tool: &Tool, required: u64) -> Result<Value
         path: s(&child, "log")?.into(),
         sha256: s(&child, "log_sha256")?.into(),
     };
-    let raw = sealed(&log, 32 << 20)?;
+    let raw = bound_bytes(&log, 64 << 20, 0)?;
     let text = std::str::from_utf8(&raw)?;
     let rows = text
         .lines()
@@ -271,6 +271,95 @@ fn stage_tools(saved: &Value, x: &downstream::StageSpec) -> Result<()> {
 pub(super) fn validate_stage(binding: &BoundFile, x: &downstream::StageSpec) -> Result<()> {
     validate_saved(binding, &x.source)?;
     stage_tools(&read(binding)?, x)
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PluginProbeSpec {
+    schema: String,
+    recipe: lineage::Recipe,
+    full: Tool,
+    plugin: Tool,
+    full_capacity: BoundFile,
+    launcher: BoundFile,
+    launcher_seal: BoundFile,
+    output_directory: PathBuf,
+}
+pub(super) fn capture_plugin_capacity(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
+    let p: PluginProbeSpec = serde_json::from_value(v.clone())?;
+    ensure!(
+        p.schema == "jetstreamer-epoch204-plugin-capacity-spec-v1"
+            && p.launcher.sha256 == self_sha
+            && fs::read_link("/proc/self/exe")? == p.launcher.path,
+        "204 plugin capacity scope or sealed issuer differs"
+    );
+    artifact::validate_member_binding(&p.launcher_seal, &p.launcher, 256 << 20)?;
+    private(&p.output_directory)?;
+    ensure!(
+        p.output_directory
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n
+                .strip_prefix("horizon-204-assembly-plugin-capacity-")
+                .is_some_and(|suffix| !suffix.is_empty()))
+            && fs::read_dir(&p.output_directory)?.next().is_none(),
+        "204 capacity output attempt is not fresh and dedicated"
+    );
+    let loaded = lineage::load_recipe(p.recipe.clone())?;
+    let identity = producer(
+        &p.recipe,
+        &read(&p.recipe.recovery_plan)?,
+        &loaded.expected.digest,
+    )?;
+    for (role, tool) in [("full", &p.full), ("plugin", &p.plugin)] {
+        downstream::qualified_tool(role, &tool.artifact, &tool.qualification)?;
+    }
+    let required = full_capacity(
+        &read(&p.full_capacity)?,
+        &p.full,
+        &identity,
+        &read(&p.full.qualification)?,
+    )?;
+    let log = p.output_directory.join("plugin-capacity.log");
+    let child = resource_verify::run_bound_child(
+        &p.plugin.artifact.path,
+        &p.plugin.artifact.sha256,
+        &["--archive-capacity-probe".into()],
+        &log,
+    )?;
+    resource_verify::validate_bound_child(
+        &child,
+        &p.plugin.artifact.path,
+        &p.plugin.artifact.sha256,
+        &["--archive-capacity-probe".into()],
+    )?;
+    let raw = bound_bytes(
+        &BoundFile {
+            path: log,
+            sha256: s(&child, "log_sha256")?.into(),
+        },
+        64 << 20,
+        0,
+    )?;
+    let rows = std::str::from_utf8(&raw)?
+        .lines()
+        .filter(|line| line.starts_with('{'))
+        .map(serde_json::from_str::<Value>)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(rows.len() == 1, "204 plugin capacity result arity differs");
+    plugin_capacity(&rows[0], required)?;
+    let mut report = child;
+    report.as_object_mut().context("204 capacity child report object missing")?.extend(json!({
+        "schema":"jetstreamer-epoch204-plugin-capacity-report-v1","epoch":204,"kind":"AssemblyRecovery204",
+        "recipe":p.recipe,"producer":identity,"full":p.full,"plugin":p.plugin,"full_capacity":p.full_capacity,
+        "full_required_records":required,"capability_only":true,"archive_body_reads":0,"probe_executed":true,
+        "issuer":issuer(spec,self_sha),"runtime_admission":false,"publication_authorized":false,
+        "remote_mutations":false,"r2_mutations":false
+    }).as_object().context("204 capacity report extension missing")?.clone());
+    write(
+        &p.output_directory.join("plugin-capacity-child.json"),
+        &report,
+    )?;
+    Ok(())
 }
 #[cfg(test)]
 mod tests {
