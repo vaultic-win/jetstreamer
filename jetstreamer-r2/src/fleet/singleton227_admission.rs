@@ -306,6 +306,12 @@ fn century_inventory_floor(f: &Value, candidate_epoch: Option<u64>) -> Result<u6
         .context("227 century floor overflow")?
         .div_ceil(count))
 }
+pub(super) const SHARED_GUARD_BUFFER: u64 = 64u64 << 30;
+pub(super) fn with_shared_guard_buffer(growth: u64) -> Result<u64> {
+    growth
+        .checked_add(SHARED_GUARD_BUFFER)
+        .context("227 shared guard buffer overflow")
+}
 pub(super) fn protected_growth(
     f: &Value,
     observer: &Value,
@@ -573,12 +579,7 @@ fn protected_growth_base(
         "227 guard census omits or adds owners"
     );
     // One separately authorized shared buffer; do not count it per lane.
-    Ok((
-        growth
-            .checked_add(64u64 << 30)
-            .context("227 shared guard buffer overflow")?,
-        measurements,
-    ))
+    Ok((with_shared_guard_buffer(growth)?, measurements))
 }
 pub(super) fn disk_free() -> Result<u64> {
     let path = CString::new("/")?;

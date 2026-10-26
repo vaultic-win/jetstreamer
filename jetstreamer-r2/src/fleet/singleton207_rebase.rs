@@ -5,7 +5,7 @@ use std::os::unix::fs::MetadataExt;
 const OLD_FLOOR: u64 = 2_034_359_738_368;
 const OLD_PLAN_SHA: &str = "6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c";
 const LAUNCH_SHA: &str = "7712ae90f84c1e4870579893e9e184b28d1b644ea0099ab5c23110bc03165ec0";
-const BUFFER: u64 = 64 << 30;
+const BUFFER: u64 = singleton227_admission::SHARED_GUARD_BUFFER;
 const METADATA: u64 = 1 << 30;
 const BRIDGE: &str = "horizon-singleton207-bridge-v1.service";
 const BRIDGE_DIR: &str = "/var/lib/jetstreamer/horizon-singleton207-bridge-receipts-v1";
@@ -282,9 +282,14 @@ fn budget(floor: u64, total_growth: u64, other_guard_floor: u64) -> Result<u64> 
     let other = total_growth
         .checked_sub(singleton207::DISK_RESERVATION)
         .context("207 full protected growth omitted")?;
+    ensure!(
+        other >= BUFFER,
+        "207 protected growth lacks its inherited shared buffer"
+    );
+    // Common protected growth already contains its shared buffer once. Keep
+    // that component when removing only 207's complete owner reservation.
     let stop = floor
         .checked_add(other)
-        .and_then(|n| n.checked_add(BUFFER))
         .and_then(|n| n.checked_add(METADATA))
         .context("207 rebase floor overflow")?
         .max(other_guard_floor);
@@ -694,7 +699,12 @@ fn growth_census(f: &Value, capacity: &Value) -> Result<()> {
         totals.push(total);
     }
     ensure!(
-        totals.into_iter().max() == Some(n(capacity, "protected_remaining_growth_bytes")?),
+        singleton227_admission::with_shared_guard_buffer(
+            totals
+                .into_iter()
+                .max()
+                .context("207 growth brackets missing")?
+        )? == n(capacity, "protected_remaining_growth_bytes")?,
         "207 protected growth sum understated"
     );
     Ok(())
@@ -1067,7 +1077,10 @@ mod tests {
         assert_eq!(
             budget(
                 century,
-                singleton207::DISK_RESERVATION + other,
+                singleton227_admission::with_shared_guard_buffer(
+                    singleton207::DISK_RESERVATION + other
+                )
+                .unwrap(),
                 317_008_659_347
             )
             .unwrap(),
@@ -1081,7 +1094,7 @@ mod tests {
     fn rebase207_growth_census_rejects_missing_duplicated_foreign_or_credited_peers() {
         let f = json!({"active":[{"epoch":207,"producer":{"Id":singleton207::UNIT}},{"epoch":225,"producer":{"Id":"peer225"}}]});
         let rows = json!([{"unit":singleton207::UNIT,"remaining_growth_bytes":singleton207::DISK_RESERVATION,"scratch_growth_credit_bytes":0},{"unit":"peer225","remaining_growth_bytes":640u64<<30}]);
-        let good = json!({"protected_growth_before":rows,"protected_growth_after":rows,"protected_remaining_growth_bytes":singleton207::DISK_RESERVATION+(640u64<<30)});
+        let good = json!({"protected_growth_before":rows,"protected_growth_after":rows,"protected_remaining_growth_bytes":singleton227_admission::with_shared_guard_buffer(singleton207::DISK_RESERVATION+(640u64<<30)).unwrap()});
         growth_census(&f, &good).unwrap();
         for key in ["protected_growth_before", "protected_growth_after"] {
             let mut bad = good.clone();
@@ -1266,5 +1279,30 @@ mod tests {
             bad[key] = json!(1);
             assert!(serde_json::from_value::<Prepare>(bad).is_err(), "{key}");
         }
+    }
+    #[test]
+    fn rebase207_common_accounting_retains_unowned_shared_buffer_exactly_once() {
+        let own = singleton207::DISK_RESERVATION;
+        let peer = 640u64 << 30;
+        let before = json!([{"unit":singleton207::UNIT,"remaining_growth_bytes":own,"scratch_growth_credit_bytes":0},{"unit":"peer225","remaining_growth_bytes":peer}]);
+        let mut after = before.clone();
+        after[1]["remaining_growth_bytes"] = json!(peer + 123);
+        let f = json!({"active":[{"epoch":207,"producer":{"Id":singleton207::UNIT}},{"epoch":225,"producer":{"Id":"peer225"}}]});
+        // Invoke the exact helper used by singleton227 protected_growth. Its
+        // shared 64 GiB is deliberately absent from the per-owner rows.
+        let common = singleton227_admission::with_shared_guard_buffer(own + peer + 123).unwrap();
+        let capacity = json!({"protected_growth_before":before,"protected_growth_after":after,"protected_remaining_growth_bytes":common});
+        growth_census(&f, &capacity).unwrap();
+        let century = 245_383_154_903;
+        assert_eq!(
+            budget(century, common, 317_008_659_347).unwrap(),
+            century + peer + 123 + BUFFER + METADATA
+        );
+        for total in [own + peer + 123, common + BUFFER] {
+            let mut bad = capacity.clone();
+            bad["protected_remaining_growth_bytes"] = json!(total);
+            assert!(growth_census(&f, &bad).is_err());
+        }
+        assert!(singleton227_admission::with_shared_guard_buffer(u64::MAX).is_err());
     }
 }
