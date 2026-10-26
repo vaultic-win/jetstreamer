@@ -365,18 +365,29 @@ fn guard(service: &str, b: &BoundFile, p: &Value, current: &Value, minimum: u64)
             "207 replacement guard swap must be disabled"
         );
     }
-    ensure!(
-        properties["ReadWritePaths"] == text(p, "receipt_directory")?
-            && private_prefix::same_command(
-                &json!(properties["ExecStart"]),
-                text(&selected["history"], "expected_exec_start")?,
-            )
-            && selected["history"]["executable"].as_str() == Some(singleton207::GUARD),
-        "207 guard effective executable/plan differs"
-    );
+    effective_guard_command(&properties, &selected["history"], p)?;
     Ok(
         json!({"selected":selected,"sample":sample,"properties":properties,"typed_empty_properties":typed_empty_properties,"timer":timer(service,true)?}),
     )
+}
+fn effective_guard_command(
+    properties: &BTreeMap<String, String>,
+    history: &Value,
+    plan: &Value,
+) -> Result<()> {
+    ensure!(
+        properties["ReadWritePaths"] == text(plan, "receipt_directory")?
+            // Both values are complete PID1 ExecStart properties. The private
+            // prefix comparator instead expects an argument prefix, so it
+            // rejects even the unchanged original guard's genuine history.
+            && pipeline_status::same_exec_start(
+                text(history, "expected_exec_start")?,
+                &properties["ExecStart"],
+            )
+            && history["executable"].as_str() == Some(singleton207::GUARD),
+        "207 guard effective executable/plan differs"
+    );
+    Ok(())
 }
 fn guard_shape(g: &Value, p: &Value, b: &BoundFile, u: &Value, time: u64) -> Result<()> {
     let t = n(g, "recorded_unix_seconds")?;
@@ -1037,6 +1048,8 @@ pub(super) fn run(command: &str) -> Result<()> {
         capture(command, &binding, &self_sha)
     }
 }
+#[cfg(test)]
+mod command_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

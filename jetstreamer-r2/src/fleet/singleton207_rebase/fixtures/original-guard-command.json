@@ -1,0 +1,32 @@
+{
+  "properties": {
+    "ReadWritePaths": "/var/lib/jetstreamer/horizon-207-singleton-guard-receipts-v1",
+    "ExecStart": "{ path=/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard ; argv[]=/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard /var/lib/jetstreamer/horizon-singleton207-guard-plan-retry-v1/guard-plan.json --plan-sha256 6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c --self-sha256 044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f ; ignore_errors=no ; start_time=[Mon 2026-10-26 05:29:22 UTC] ; stop_time=[Mon 2026-10-26 05:29:24 UTC] ; pid=2255477 ; code=exited ; status=0 }"
+  },
+  "history": {
+    "executable": "/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard",
+    "expected_exec_start": "{ path=/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard ; argv[]=/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard /var/lib/jetstreamer/horizon-singleton207-guard-plan-retry-v1/guard-plan.json --plan-sha256 6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c --self-sha256 044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+  },
+  "plan": {
+    "receipt_directory": "/var/lib/jetstreamer/horizon-207-singleton-guard-receipts-v1"
+  },
+  "provenance": {
+    "diagnostic_path": "/var/lib/jetstreamer/horizon-singleton207-rebase440-execution-v1/guard-command-comparator-diagnostic.json",
+    "diagnostic_sha256": "0ccb1615bb6a0b7bdd59cdfc8bfdb5ea8d6e9c74f32ce8d3d487805d65cf206e",
+    "actual_property_source": {
+      "path": "/var/lib/jetstreamer/horizon-singleton207-rebase440-execution-v1/pre-abort-properties.json",
+      "sha256": "46cfcb26b0c693e162874091b1ab86993b1ee1cb5e6f639d35ad118c58ec979f"
+    },
+    "selected_guard": {
+      "path": "/var/lib/jetstreamer/horizon-207-singleton-guard-receipts-v1/sample-87ec35dd82834baaad916259bbd31e9a.json",
+      "sha256": "3e911e98e5084a54633683cf0c1ce714ba2ab65bbf9265bff2dcdf26d97ba862"
+    },
+    "expected_property_derivation": "Copied byte-for-byte from the original launch receipt's genuine completed-guard history; also equals current qualified terminal_history full-property construction.",
+    "fixture_scope": "Pure comparator regression only; no guard sample, admission, resource release or publication authority.",
+    "actual_history_source": {
+      "path": "/var/lib/jetstreamer/horizon-singleton207-capture-retry-v1/launch.json",
+      "sha256": "7712ae90f84c1e4870579893e9e184b28d1b644ea0099ab5c23110bc03165ec0",
+      "json_pointer": "/guard_manager/completed_selection/history"
+    }
+  }
+}
