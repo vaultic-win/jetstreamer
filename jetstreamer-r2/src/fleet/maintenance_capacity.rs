@@ -15,6 +15,7 @@ enum MemoryMode {
     Capped204V4,
     AssemblyRecovery204,
     Continuation205Delivery,
+    Epoch225Extraction,
 }
 
 #[derive(Deserialize)]
@@ -23,6 +24,8 @@ struct Spec {
     observer: BoundFile,
     fleet: BoundFile,
     protected_guards: BTreeMap<String, BoundFile>,
+    #[serde(default)]
+    epoch225_handoff: Option<BoundFile>,
 }
 fn envelope(minimum: u64, additional: u64, available: u64) -> Result<u64> {
     let required = minimum
@@ -409,6 +412,7 @@ fn memory_sample(
             let (n, p) = singleton210_memory::required(f, total, reserve, candidate)?;
             (n, Some(("full210_memory_policy", p)))
         }
+        MemoryMode::Epoch225Extraction => (memory_required(reserve, total, candidate)?, None),
         MemoryMode::Full209Delivery => {
             let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
             (n, Some(("full209_delivery_memory_policy", p)))
@@ -634,6 +638,31 @@ pub(super) fn check_assembly204_waiting(
         Some(CandidateContext::Waiting204(context)),
     )
 }
+pub(in crate::fleet) fn check_epoch225_extraction(
+    value: &Value,
+    handoff: &BoundFile,
+) -> Result<Value> {
+    let mut basis = value.clone();
+    ensure!(
+        basis.is_object()
+            && basis
+                .get("epoch225_handoff")
+                .is_none_or(|v| *v == private157::binding(handoff)),
+        "epoch 225 extraction handoff differs from its resource basis"
+    );
+    basis["epoch225_handoff"] = private157::binding(handoff);
+    check_inner_with(
+        &basis,
+        Candidate {
+            additional_bytes: terminal225_peer::OUTPUT_BYTES
+                + terminal225_peer::OUTPUT_METADATA_BYTES,
+            memory_max_bytes: terminal225_peer::EXTRACTION_ADMISSION_MEMORY_BYTES,
+            minimum_protected_disk_bytes: 0,
+        },
+        MemoryMode::Epoch225Extraction,
+        None,
+    )
+}
 fn check_inner_with(
     value: &Value,
     candidate: Candidate,
@@ -653,6 +682,17 @@ fn check_inner_with(
         &assembly204_recovery::accepted_context,
         &bound_json,
     )?;
+    let epoch225 = s
+        .epoch225_handoff
+        .as_ref()
+        .map(|binding| terminal225_peer::Profile::load(binding, &f))
+        .transpose()?;
+    ensure!(
+        (!matches!(mode, MemoryMode::Epoch225Extraction) || epoch225.is_some())
+            && (epoch225.is_none()
+                || matches!(mode, MemoryMode::Full210 | MemoryMode::Epoch225Extraction)),
+        "epoch 225 terminal handoff is required for extraction and scoped to Full 210"
+    );
     ensure!(
         f["observer_receipt"].as_str() == s.observer.path.to_str()
             && f["observer_sha256"] == s.observer.sha256,
@@ -677,10 +717,16 @@ fn check_inner_with(
         .keys()
         .cloned()
         .collect::<BTreeSet<_>>();
+    if let Some(profile) = &epoch225 {
+        names.extend(profile.census_names());
+    }
     if let Some(context) = candidate_context {
         names.extend(context.names()?);
     }
     let raw_before = census(&names, 201, 300)?;
+    if let Some(profile) = &epoch225 {
+        profile.current(&f, &raw_before)?;
+    }
     let (before, candidate_before) = candidate_context
         .map(|c| c.peer_view(&f, &raw_before))
         .transpose()?
@@ -689,8 +735,12 @@ fn check_inner_with(
     // Share the already qualified sibling accounting policy, including the
     // complete guard-key union, genuine latest fires and independent guard caps.
     let guard_history = capped204205_admission::guards(&f, &s.protected_guards, &before, t, now)?;
+    let epoch225_guard_before = epoch225
+        .as_ref()
+        .map(|profile| profile.guard(&s.protected_guards, &raw_before, t, now))
+        .transpose()?;
     let caps = capped204205_admission::combined_limits(&f, &s.protected_guards, &before, now)?;
-    let (growth, measurements, memory_growth, memory_evidence) =
+    let (mut growth, mut measurements, mut memory_growth, mut memory_evidence) =
         capped204205_admission::combined_resources(
             &f,
             &accounting_o,
@@ -699,6 +749,17 @@ fn check_inner_with(
             t,
             now,
         )?;
+    if let Some(profile) = &epoch225 {
+        let (disk, disk_evidence, memory, hard_memory_evidence) = profile.resources();
+        growth = growth
+            .checked_add(disk)
+            .context("epoch 225 retained reservation overflow")?;
+        measurements.push(disk_evidence);
+        memory_growth = memory_growth
+            .checked_add(memory)
+            .context("epoch 225 extractor memory reservation overflow")?;
+        memory_evidence.push(hard_memory_evidence);
+    }
     let (minimum, largest_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let minimum = minimum.max(candidate.minimum_protected_disk_bytes);
@@ -717,6 +778,9 @@ fn check_inner_with(
     let actual_free = singleton227_admission::disk_free()?;
     envelope(minimum, candidate.additional_bytes, actual_free)?;
     let raw_after = census(&names, 201, 300)?;
+    if let Some(profile) = &epoch225 {
+        profile.current(&f, &raw_after)?;
+    }
     let (after, candidate_after) = candidate_context
         .map(|c| c.peer_view(&f, &raw_after))
         .transpose()?
@@ -739,15 +803,34 @@ fn check_inner_with(
     );
     let guard_history_after =
         capped204205_admission::guards(&f, &s.protected_guards, &after, t, now)?;
-    let (after_growth, after_measurements, after_memory_growth, after_memory_evidence) =
-        capped204205_admission::combined_resources(
-            &f,
-            &after_accounting_o,
-            &s.protected_guards,
-            &after,
-            t,
-            now,
-        )?;
+    let epoch225_guard_after = epoch225
+        .as_ref()
+        .map(|profile| profile.guard(&s.protected_guards, &raw_after, t, now))
+        .transpose()?;
+    let (
+        mut after_growth,
+        mut after_measurements,
+        mut after_memory_growth,
+        mut after_memory_evidence,
+    ) = capped204205_admission::combined_resources(
+        &f,
+        &after_accounting_o,
+        &s.protected_guards,
+        &after,
+        t,
+        now,
+    )?;
+    if let Some(profile) = &epoch225 {
+        let (disk, disk_evidence, memory, hard_memory_evidence) = profile.resources();
+        after_growth = after_growth
+            .checked_add(disk)
+            .context("epoch 225 retained after-reservation overflow")?;
+        after_measurements.push(disk_evidence);
+        after_memory_growth = after_memory_growth
+            .checked_add(memory)
+            .context("epoch 225 extractor after-memory reservation overflow")?;
+        after_memory_evidence.push(hard_memory_evidence);
+    }
     let bracketed = matches!(
         mode,
         MemoryMode::FirstRoot233 | MemoryMode::CompletedArchivePhase | MemoryMode::GuardRebase207
@@ -765,6 +848,9 @@ fn check_inner_with(
         mode,
     )?;
     let raw_current = census(&names, 201, 300)?;
+    if let Some(profile) = &epoch225 {
+        profile.current(&f, &raw_current)?;
+    }
     let (current, candidate_current) = candidate_context
         .map(|c| c.peer_view(&f, &raw_current))
         .transpose()?
@@ -881,6 +967,18 @@ fn check_inner_with(
     if let Some(evidence) = accounting_o.get("terminal_observation_accounting") {
         capacity["terminal_observation_accounting"] = evidence.clone();
     }
+    if let Some(profile) = &epoch225 {
+        capacity["epoch225_handoff"] = json!({"profile":s.epoch225_handoff.as_ref().map(|b|private157::binding(b)),
+            "phase":profile.phase(),"guard_before":epoch225_guard_before,
+            "guard_after":epoch225_guard_after,
+            "retained_disk_reservation_bytes":terminal225_peer::RETAINED_DISK_BYTES,
+            "extractor_output_bytes":terminal225_peer::OUTPUT_BYTES,
+            "output_metadata_bytes":terminal225_peer::OUTPUT_METADATA_BYTES,
+            "extractor_hard_memory_bytes":terminal225_peer::EXTRACTOR_MEMORY_BYTES,
+            "independent_guard_hard_memory_bytes":terminal225_peer::GUARD_MEMORY_BYTES,
+            "metadata_issuer_hard_memory_bytes":terminal225_peer::METADATA_ISSUER_MEMORY_BYTES,
+            "reclamation_credit_bytes":0,"old_worker_rss_credit_bytes":0});
+    }
     if bracketed {
         let accounted = memory_after["available_floor_component_accounted_once_bytes"]
             .as_u64()
@@ -917,6 +1015,7 @@ fn fleet_for_mode(
     if matches!(
         mode,
         MemoryMode::Full210
+            | MemoryMode::Epoch225Extraction
             | MemoryMode::Foundation203
             | MemoryMode::AssemblyRecovery204
             | MemoryMode::Continuation205Delivery

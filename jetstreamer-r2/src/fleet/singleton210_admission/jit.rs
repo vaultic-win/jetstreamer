@@ -3,9 +3,7 @@
 use super::*;
 mod issuer;
 mod qualification;
-const OWNER225: &str = "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service";
 const IID207: &str = "74eb420ca4574a50a35913d1417124f1";
-const IID225: &str = "4cd76ae1353a4411885b997f04306402";
 pub(super) fn issuer_scope(name: &str) -> bool {
     issuer::scope(name)
 }
@@ -18,6 +16,7 @@ struct Request {
     schema: String,
     observer: BoundFile,
     fleet: BoundFile,
+    epoch225_handoff: BoundFile,
     resource_plan: BoundFile,
     capability: BoundFile,
     native_input: BoundFile,
@@ -61,6 +60,7 @@ struct GuardProfile {
     guard_unit: String,
     receipt_directory: PathBuf,
     registered_completed: Option<completed_archive_phase::GuardSelectionProfile>,
+    registered_extractor: Option<terminal225_peer::Extractor>,
 }
 fn legacy_profile(owner: &str, epoch: u64, iid: &str) -> Result<GuardProfile> {
     let (unit, directory) = prefix223_native20_admission::guard_selector(owner)?;
@@ -71,13 +71,16 @@ fn legacy_profile(owner: &str, epoch: u64, iid: &str) -> Result<GuardProfile> {
         guard_unit: unit.into(),
         receipt_directory: directory.into(),
         registered_completed: None,
+        registered_extractor: None,
     })
 }
 fn roster_with(
     f: &Value,
+    handoff: &terminal225_peer::Profile,
     mut completed: BTreeMap<String, completed_archive_phase::GuardSelectionProfile>,
 ) -> Result<BTreeMap<String, GuardProfile>> {
     let mut found = BTreeMap::new();
+    let selected225 = handoff.selected_owner(f)?;
     for row in f["active"]
         .as_array()
         .context("210 JIT complete accepted roster absent")?
@@ -86,9 +89,40 @@ fn roster_with(
         let name = owner["Id"]
             .as_str()
             .context("210 JIT accepted owner name absent")?;
+        if matches!(row["epoch"].as_u64(), Some(225 | 226)) {
+            let extractor = handoff
+                .extractor()
+                .context("210 JIT active epoch 225/226 row lacks an admitted extractor")?;
+            ensure!(
+                selected225 == Some(owner)
+                    && name == extractor.unit
+                    && owner["InvocationID"] == extractor.invocation_id,
+                "210 JIT epoch 225/226 extractor row changed generation"
+            );
+            if row["epoch"] == 226 {
+                continue;
+            }
+            ensure!(
+                found
+                    .insert(
+                        name.to_owned(),
+                        GuardProfile {
+                            owner: name.into(),
+                            owner_invocation_id: extractor.invocation_id.clone(),
+                            epoch: 225,
+                            guard_unit: extractor.guard_unit.clone(),
+                            receipt_directory: extractor.guard_receipt_directory.clone(),
+                            registered_completed: None,
+                            registered_extractor: Some(extractor.clone()),
+                        },
+                    )
+                    .is_none(),
+                "210 JIT duplicate epoch 225 extractor profile"
+            );
+            continue;
+        }
         let profile = match name {
             singleton207::UNIT => legacy_profile(name, 207, IID207)?,
-            OWNER225 => legacy_profile(name, 225, IID225)?,
             _ => {
                 let p = completed.remove(name).with_context(|| {
                     format!("210 JIT has an unsupported or unregistered accepted owner: {name}")
@@ -104,6 +138,7 @@ fn roster_with(
                     guard_unit: p.guard_unit.clone(),
                     receipt_directory: p.receipt_directory.clone(),
                     registered_completed: Some(p),
+                    registered_extractor: None,
                 }
             }
         };
@@ -132,7 +167,8 @@ fn roster_with(
         .as_object()
         .context("210 JIT raw accepted census missing")?
     {
-        if (matches!(name.as_str(), singleton207::UNIT | OWNER225)
+        if (name == singleton207::UNIT
+            || name.starts_with("horizon-qualify-225-prefix-extract-")
             || name.starts_with("horizon-qualify-209-generic-"))
             && diagnostic_stage_running(owner)
         {
@@ -144,16 +180,21 @@ fn roster_with(
     }
     Ok(found)
 }
-fn roster(f: &Value) -> Result<BTreeMap<String, GuardProfile>> {
+fn roster(
+    f: &Value,
+    handoff: &terminal225_peer::Profile,
+) -> Result<BTreeMap<String, GuardProfile>> {
     roster_with(
         f,
+        handoff,
         completed_archive_phase::peer_guard_selection_profiles(f)?,
     )
 }
 fn ordinary_spec(r: &Request, guards: BTreeMap<String, BoundFile>) -> Spec {
     Spec {
         schema: "jetstreamer-private-epoch210-singleton-admission-spec-v1".into(),
-        resource_basis: json!({"observer":r.observer,"fleet":r.fleet,"protected_guards":guards}),
+        resource_basis: json!({"observer":r.observer,"fleet":r.fleet,"protected_guards":guards,
+            "epoch225_handoff":r.epoch225_handoff}),
         resource_plan: r.resource_plan.clone(),
         capability: r.capability.clone(),
         native_input: r.native_input.clone(),
@@ -207,8 +248,16 @@ fn selected_shape(
             "210 JIT completed guard changed its authenticated plan or executable"
         );
     }
+    if let Some(x) = &profile.registered_extractor {
+        ensure!(
+            receipt["plan"] == serde_json::to_value(&x.guard_plan.path)?
+                && receipt["plan_sha256"] == x.guard_plan.sha256
+                && receipt["guard_sha256"] == x.guard_sha256,
+            "210 JIT extractor guard changed its admitted plan or executable"
+        );
+    }
     // Preserve the exact existing per-generation validators in ordinary capacity;
-    // the historical 225 guard must not be forced into a newer payload schema.
+    // the historical epoch 225 guard must not be forced into a newer payload schema.
     Ok(())
 }
 fn selected_scope(
@@ -233,6 +282,7 @@ pub(super) struct Attempt {
     role: issuer::Role,
     observer: BoundFile,
     fleet: BoundFile,
+    epoch225_handoff: BoundFile,
     output_directory: PathBuf,
 }
 impl Attempt {
@@ -266,10 +316,9 @@ impl Attempt {
                 .as_str()
                 .context("210 JIT observer time missing at commit")?,
         )?;
-        let profiles = roster(&assembly204_recovery::accepted_context(
-            &self.fleet,
-            &self.observer,
-        )?)?;
+        let accepted = assembly204_recovery::accepted_context(&self.fleet, &self.observer)?;
+        let handoff = terminal225_peer::Profile::load(&self.epoch225_handoff, &accepted)?;
+        let profiles = roster(&accepted, &handoff)?;
         ensure!(
             selections["profiles"] == serde_json::to_value(&profiles)?,
             "210 JIT selected profile roster changed"
@@ -305,7 +354,8 @@ impl Attempt {
             )?;
         }
         let f = assembly204_recovery::accepted_context(&self.fleet, &self.observer)?;
-        roster(&f)?;
+        let handoff = terminal225_peer::Profile::load(&self.epoch225_handoff, &f)?;
+        roster(&f, &handoff)?;
         let current =
             issuer::snapshot(&self.role, &self.request, self_sha, &self.output_directory)?;
         issuer::same(&self.initial, &current)?;
@@ -337,7 +387,8 @@ pub(super) fn run() -> Result<()> {
             &json!({"request":binding,"issuer":initial,"authority":denied()}),
         )?;
         let f = assembly204_recovery::accepted_context(&r.fleet, &r.observer)?;
-        let initial_profiles = roster(&f)?;
+        let handoff = terminal225_peer::Profile::load(&r.epoch225_handoff, &f)?;
+        let initial_profiles = roster(&f, &handoff)?;
         let o = bound_json(&r.observer)?;
         memory(&o)?;
         let minimum = utc_seconds(
@@ -361,7 +412,7 @@ pub(super) fn run() -> Result<()> {
             assembly204_recovery::accepted_context(&r.fleet, &r.observer)? == f,
             "210 JIT accepted context changed before selection"
         );
-        let profiles = roster(&f)?;
+        let profiles = roster(&f, &handoff)?;
         ensure!(
             profiles == initial_profiles,
             "210 JIT supported peer profiles changed before intrinsic selection"
@@ -412,6 +463,7 @@ pub(super) fn run() -> Result<()> {
             role: r.issuer.clone(),
             observer: r.observer.clone(),
             fleet: r.fleet.clone(),
+            epoch225_handoff: r.epoch225_handoff.clone(),
             output_directory: r.output_directory.clone(),
         };
         phase = "complete-ordinary-admission";
@@ -440,37 +492,40 @@ mod tests {
     #[test]
     fn full210_jit_roster_cannot_omit_duplicate_replace_or_add_a_live_owner() {
         let a = row(207, singleton207::UNIT, IID207);
-        let b = row(225, OWNER225, IID225);
-        let f = json!({"active":[a,b],"unit_census":{singleton207::UNIT:a["producer"],OWNER225:b["producer"]}});
-        roster_with(&f, BTreeMap::new()).unwrap();
+        let handoff = terminal225_peer::fixture_terminal_profile();
+        let mut f = terminal225_peer::fixture_terminal_fleet(vec![a.clone()]);
+        f["unit_census"][singleton207::UNIT] = a["producer"].clone();
+        roster_with(&f, &handoff, BTreeMap::new()).unwrap();
         let mut missing = f.clone();
         missing["active"].as_array_mut().unwrap().pop();
-        assert!(roster_with(&missing, BTreeMap::new()).is_err());
+        assert!(roster_with(&missing, &handoff, BTreeMap::new()).is_err());
         let mut duplicate = f.clone();
         duplicate["active"]
             .as_array_mut()
             .unwrap()
             .push(f["active"][0].clone());
-        assert!(roster_with(&duplicate, BTreeMap::new()).is_err());
+        assert!(roster_with(&duplicate, &handoff, BTreeMap::new()).is_err());
         let mut changed = f.clone();
         changed["active"][0]["producer"]["InvocationID"] = json!("a".repeat(32));
-        assert!(roster_with(&changed, BTreeMap::new()).is_err());
+        assert!(roster_with(&changed, &handoff, BTreeMap::new()).is_err());
         let mut competitor = f;
         competitor["active"].as_array_mut().unwrap().push(row(
             209,
             "horizon-qualify-209-generic-full-v7.service",
             &"b".repeat(32),
         ));
-        assert!(roster_with(&competitor, BTreeMap::new()).is_err());
+        assert!(roster_with(&competitor, &handoff, BTreeMap::new()).is_err());
     }
     #[test]
     fn full210_jit_roster_uses_authenticated_completed209_profile_without_omitting_legacy_peers() {
         let name = "horizon-qualify-209-generic-full-v7.service";
         let iid = "b".repeat(32);
         let a = row(207, singleton207::UNIT, IID207);
-        let b = row(225, OWNER225, IID225);
         let c = row(209, name, &iid);
-        let f = json!({"active":[a,b,c],"unit_census":{singleton207::UNIT:a["producer"],OWNER225:b["producer"],name:c["producer"]}});
+        let handoff = terminal225_peer::fixture_terminal_profile();
+        let mut f = terminal225_peer::fixture_terminal_fleet(vec![a.clone(), c.clone()]);
+        f["unit_census"][singleton207::UNIT] = a["producer"].clone();
+        f["unit_census"][name] = c["producer"].clone();
         let profile = completed_archive_phase::GuardSelectionProfile {
             owner: name.into(),
             owner_invocation_id: iid,
@@ -489,9 +544,9 @@ mod tests {
             },
         };
         let provider = BTreeMap::from([(name.into(), profile.clone())]);
-        let profiles = roster_with(&f, provider.clone()).unwrap();
-        assert_eq!(profiles.len(), 3);
-        assert!(profiles.contains_key(singleton207::UNIT) && profiles.contains_key(OWNER225));
+        let profiles = roster_with(&f, &handoff, provider.clone()).unwrap();
+        assert_eq!(profiles.len(), 2);
+        assert!(profiles.contains_key(singleton207::UNIT));
         assert_eq!(
             profiles[name]
                 .registered_completed
@@ -500,16 +555,16 @@ mod tests {
                 .guard_plan,
             profile.guard_plan
         );
-        assert!(roster_with(&f, BTreeMap::new()).is_err());
+        assert!(roster_with(&f, &handoff, BTreeMap::new()).is_err());
         let mut missing = f.clone();
         missing["active"].as_array_mut().unwrap().remove(0);
-        assert!(roster_with(&missing, provider.clone()).is_err());
+        assert!(roster_with(&missing, &handoff, provider.clone()).is_err());
         let mut replaced = f.clone();
-        replaced["active"][2]["producer"]["InvocationID"] = json!("f".repeat(32));
-        assert!(roster_with(&replaced, provider.clone()).is_err());
+        replaced["active"][1]["producer"]["InvocationID"] = json!("f".repeat(32));
+        assert!(roster_with(&replaced, &handoff, provider.clone()).is_err());
         let mut foreign = provider;
         foreign.get_mut(name).unwrap().owner = "other.service".into();
-        assert!(roster_with(&f, foreign).is_err());
+        assert!(roster_with(&f, &handoff, foreign).is_err());
     }
     #[test]
     fn full210_jit_selection_rejects_foreign_stale_tripped_and_replaced_guard() {
@@ -553,7 +608,7 @@ mod tests {
     fn full210_jit_wire_cannot_import_guard_choices_skip_checks_or_gain_authority() {
         let binding = json!({"path":"/sealed/input","sha256":"a".repeat(64)});
         let mut request = json!({"schema":"jetstreamer-full210-jit-admission-spec-v1","observer":binding,"fleet":binding,
-            "resource_plan":binding,"capability":binding,"native_input":binding,"issuer":{"unit":"horizon-capacity210-jit-test.service",
+            "epoch225_handoff":binding,"resource_plan":binding,"capability":binding,"native_input":binding,"issuer":{"unit":"horizon-capacity210-jit-test.service",
             "fragment":"/etc/systemd/system/horizon-capacity210-jit-test.service","runner":binding,"deployment_seal":binding,"qualification":binding},"output_directory":"/var/lib/jetstreamer/horizon-210-singleton-admission-test"});
         assert!(serde_json::from_value::<Request>(request.clone()).is_ok());
         for key in [

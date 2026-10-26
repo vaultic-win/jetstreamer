@@ -181,6 +181,7 @@ mod singleton227_terminal;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
+mod terminal225_peer;
 mod verification223;
 mod verification223_capacity;
 mod verification223_live_peer;
