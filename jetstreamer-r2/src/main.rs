@@ -3624,6 +3624,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("admit-completed-archive-phase") {
         return fleet::admit_completed_archive_phase();
     }
+    if env::args().nth(1).as_deref() == Some("capture-completed-archive-plugin-capacity") {
+        return fleet::capture_completed_archive_plugin_capacity();
+    }
     if env::args().nth(1).as_deref() == Some("admit-singleton209-delivery") {
         return fleet::admit_singleton209_delivery();
     }

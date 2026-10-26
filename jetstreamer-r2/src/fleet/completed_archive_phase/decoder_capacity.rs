@@ -43,13 +43,27 @@ fn plugin_shape(v: &Value, required: u64) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate(s: &Spec, producer: &Value) -> Result<()> {
-    let full = read(&s.decoder_capacity.full)?;
-    let source = read(&s.tools["full"].qualification)?;
-    let required = full_shape(&full, &s.tools["full"].artifact, &source, producer)?;
-    let child = read(&s.decoder_capacity.plugin)?;
-    let tool = &s.tools["plugin"].artifact;
+    validate_decoder_capacity(
+        &s.decoder_capacity.full,
+        &s.decoder_capacity.plugin,
+        &s.tools["full"].artifact,
+        &s.tools["full"].qualification,
+        &s.tools["plugin"].artifact,
+        &s.tools["plugin"].qualification,
+        producer,
+    )
+}
+pub(super) fn full_requirement(
+    capacity: &BoundFile,
+    tool: &BoundFile,
+    qualification: &BoundFile,
+    producer: &Value,
+) -> Result<u64> {
+    full_shape(&read(capacity)?, tool, &read(qualification)?, producer)
+}
+pub(super) fn validate_plugin_child(child: &Value, tool: &BoundFile, required: u64) -> Result<()> {
     resource_verify::validate_bound_child(
-        &child,
+        child,
         &tool.path,
         &tool.sha256,
         &["--archive-capacity-probe".into()],

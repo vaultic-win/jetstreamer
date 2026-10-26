@@ -3,6 +3,7 @@
 //! native provenance gates. This command never launches a verifier or uploader.
 use super::*;
 mod barrier;
+mod capacity;
 mod decoder_capacity;
 mod launch;
 mod peer;
@@ -217,6 +218,27 @@ pub(super) fn release() -> Result<()> {
 }
 pub(super) fn run_guarded() -> Result<()> {
     barrier::run()
+}
+pub(super) fn capture_plugin_capacity() -> Result<()> {
+    capacity::run()
+}
+
+/// Decoder evidence only. The caller supplies its independently authenticated
+/// producer identity; this never establishes archive or launch authority.
+pub(in crate::fleet) fn validate_decoder_capacity(
+    full_capacity: &BoundFile,
+    plugin_capacity: &BoundFile,
+    full_tool: &BoundFile,
+    full_qualification: &BoundFile,
+    plugin_tool: &BoundFile,
+    plugin_qualification: &BoundFile,
+    producer: &Value,
+) -> Result<()> {
+    assembly204_recovery::qualified_delivery_tool("full", full_tool, full_qualification)?;
+    assembly204_recovery::qualified_delivery_tool("plugin", plugin_tool, plugin_qualification)?;
+    let required =
+        decoder_capacity::full_requirement(full_capacity, full_tool, full_qualification, producer)?;
+    decoder_capacity::validate_plugin_child(&read(plugin_capacity)?, plugin_tool, required)
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

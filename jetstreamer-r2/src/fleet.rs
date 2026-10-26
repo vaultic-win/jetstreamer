@@ -370,6 +370,9 @@ pub(super) fn run_completed_archive_phase() -> Result<()> {
 pub(super) fn admit_completed_archive_phase() -> Result<()> {
     completed_archive_phase::run()
 }
+pub(super) fn capture_completed_archive_plugin_capacity() -> Result<()> {
+    completed_archive_phase::capture_plugin_capacity()
+}
 pub(super) fn admit_singleton209_delivery() -> Result<()> {
     singleton209_delivery::admission::run()
 }
