@@ -86,7 +86,7 @@ fn plan(x: &downstream::StageSpec) -> Result<(BoundFile, Plan)> {
     sealed(&p.runner, 256 << 20)?;
     artifact::validate_member_binding(&p.runner_seal, &p.runner, 256 << 20)?;
     artifact::validate_member_binding(&p.guard_seal, &p.guard, 256 << 20)?;
-    delivery::validate_saved(&p.preparation, &x.source)?;
+    delivery::validate_stage(&p.preparation, x)?;
     Ok((binding.clone(), p))
 }
 pub(super) fn before_admission(x: &downstream::StageSpec) -> Result<()> {

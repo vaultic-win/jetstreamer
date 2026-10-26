@@ -230,9 +230,78 @@ pub(super) fn validate_saved(
     Ok(())
 }
 
+fn stage_tools(saved: &Value, x: &downstream::StageSpec) -> Result<()> {
+    use downstream::Stage;
+    let role = match x.stage {
+        Stage::Full => Some("full"),
+        Stage::Plugin => Some("plugin"),
+        Stage::Boundary => Some("anchor"),
+        Stage::Upload => Some("upload"),
+        Stage::Import => None,
+        Stage::Assembly => bail!("204 assembly is not a downstream stage"),
+    };
+    if let Some(role) = role {
+        let tool: Tool = serde_json::from_value(saved["tools"][role].clone())?;
+        ensure!(
+            x.tool.as_ref() == Some(&tool.artifact)
+                && x.tool_qualification.as_ref() == Some(&tool.qualification),
+            "204 actual stage tool differs from prepared capacity/qualification"
+        );
+    } else {
+        ensure!(
+            x.tool.is_none() && x.tool_qualification.is_none(),
+            "204 import has an unqualified child tool"
+        );
+    }
+    if x.stage == Stage::Full {
+        let tool: Tool = serde_json::from_value(saved["tools"]["anchor"].clone())?;
+        ensure!(
+            x.anchor_tool.as_ref() == Some(&tool.artifact)
+                && x.anchor_tool_qualification.as_ref() == Some(&tool.qualification),
+            "204 actual Full anchor decoder differs from prepared tool"
+        );
+    } else {
+        ensure!(
+            x.anchor_tool.is_none() && x.anchor_tool_qualification.is_none(),
+            "204 non-Full stage has an extra anchor tool"
+        );
+    }
+    Ok(())
+}
+pub(super) fn validate_stage(binding: &BoundFile, x: &downstream::StageSpec) -> Result<()> {
+    validate_saved(binding, &x.source)?;
+    stage_tools(&read(binding)?, x)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typed204_actual_stage_cannot_borrow_another_binarys_capacity_or_anchor() {
+        let b = BoundFile {
+            path: "/sealed/b.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let mut x:downstream::StageSpec=serde_json::from_value(json!({
+            "schema":"jetstreamer-epoch204-assembly-recovery-stage-spec-v1","context":{"fleet":b,"observer":b},
+            "stage":"full","source":{"kind":"AssemblyRecovery204","completion":b},"startup":b,
+            "gates":[],"tool":b,"tool_qualification":b,"anchor_tool":b,"anchor_tool_qualification":b,
+            "admission":"/sealed/admission.json","output_directory":"/sealed/output","scan_directory":"/sealed/scan",
+            "upload_receipt":null,"neighbors":[]})).unwrap();
+        let saved = json!({"tools":{"full":{"artifact":b,"qualification":b},"anchor":{"artifact":b,"qualification":b}}});
+        stage_tools(&saved, &x).unwrap();
+        let foreign = BoundFile {
+            path: "/sealed/foreign".into(),
+            sha256: "b".repeat(64),
+        };
+        x.tool = Some(foreign.clone());
+        assert!(stage_tools(&saved, &x).is_err());
+        x.tool = Some(b.clone());
+        x.tool_qualification = Some(foreign.clone());
+        assert!(stage_tools(&saved, &x).is_err());
+        x.tool_qualification = Some(b.clone());
+        x.anchor_tool = Some(foreign);
+        assert!(stage_tools(&saved, &x).is_err());
+    }
     #[test]
     fn typed204_capacity_rejects_singleton209_and_changed_dual_lineage_identity() {
         let tool = Tool {
