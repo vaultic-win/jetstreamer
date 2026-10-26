@@ -352,7 +352,7 @@ fn latest_binding(rows: &[Value], name: &str, root: &Path) -> Result<BoundFile> 
         rm.is_file() && rm.uid() == 0 && rm.nlink() == 1 && rm.mode() & 0o077 == 0,
         "guard receipt privacy/ownership differs"
     );
-    serde_json::from_value(private157::file_binding(&path)?)
+    Ok(serde_json::from_value(private157::file_binding(&path)?)?)
 }
 fn current(name: &str, selected: &Selection) -> Result<()> {
     let current = unit(name)?;

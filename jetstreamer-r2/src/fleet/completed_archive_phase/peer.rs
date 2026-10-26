@@ -1203,7 +1203,10 @@ mod tests {
             (owner.into(), owner_row.clone()),
             (guard.into(), raw_before.clone()),
         ]);
-        let after = BTreeMap::from([(owner.into(), owner_row), (guard.into(), raw_after.clone())]);
+        let after = BTreeMap::from([
+            (owner.into(), owner_row.clone()),
+            (guard.into(), raw_after.clone()),
+        ]);
         let before_endpoints =
             BTreeMap::from([(guard.into(), endpoint(&before_iid, raw_before, 100))]);
         let after_endpoints =
@@ -1336,7 +1339,7 @@ mod tests {
                 "{field}"
             );
         }
-        let mut endpoints = after_endpoints;
+        let mut endpoints = after_endpoints.clone();
         endpoints.get_mut(guard).unwrap()["pending_jobs"]["raw_stdout"] =
             json!(format!("88 {owner} stop running\n"));
         assert!(
