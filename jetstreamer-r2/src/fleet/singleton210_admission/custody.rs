@@ -73,12 +73,18 @@ impl FrozenInput {
                 && is_lower_hex(&binding.sha256, 64),
             "210 prehash input path/digest differs"
         );
+        let before = Stamp::of(&fs::symlink_metadata(&binding.path)?);
+        before.safe(executable, maximum)?;
         let file = OpenOptions::new()
             .read(true)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
             .open(&binding.path)?;
         let stamp = Stamp::of(&file.metadata()?);
         stamp.safe(executable, maximum)?;
+        ensure!(
+            stamp == before,
+            "210 prehash input changed between regular-file stat and open"
+        );
         ensure!(
             stamp == Stamp::of(&fs::symlink_metadata(&binding.path)?),
             "210 prehash input namespace changed"
