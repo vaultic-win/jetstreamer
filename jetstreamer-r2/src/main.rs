@@ -3770,6 +3770,18 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-prefix223-native20") {
         return fleet::publish_prefix223_native20_status().await;
     }
+    if env::args().nth(1).as_deref() == Some("probe-bounded228-parent") {
+        return fleet::probe_bounded228_parent();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-bounded228") {
+        return fleet::admit_bounded228();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-bounded228") {
+        return fleet::capture_bounded228();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-bounded228") {
+        return fleet::publish_bounded228_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("admit-first-root233") {
         return fleet::admit_first_root233();
     }

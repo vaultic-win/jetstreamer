@@ -12,6 +12,7 @@ enum MemoryMode {
     Full209Delivery,
     CompletedArchivePhase,
     FirstRoot233,
+    Bounded228,
     Capped204V4,
     AssemblyRecovery204,
     Continuation205Delivery,
@@ -152,6 +153,20 @@ pub(super) fn check_singleton210(value: &Value, minimum_disk: u64) -> Result<Val
 }
 pub(super) fn singleton210_memory_proven(capacity: &Value) -> Result<()> {
     singleton210_memory::validate_capacity(capacity)
+}
+pub(super) fn check_bounded228(value: &Value) -> Result<Value> {
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes: bounded228::DISK_RESERVATION,
+            memory_max_bytes: bounded228::MEMORY,
+            minimum_protected_disk_bytes: 0,
+        },
+        MemoryMode::Bounded228,
+    )
+}
+pub(super) fn bounded228_saved_memory_floor(policy: &Value, total: u64) -> Result<u64> {
+    singleton210_memory::bounded228_saved_floor(policy, total)
 }
 pub(super) fn check_first_root233(value: &Value) -> Result<Value> {
     check_inner(
@@ -426,6 +441,10 @@ fn memory_sample(
             let (n, p) = capped204_native223::required(f, total, reserve, candidate)?;
             (n, Some(("capped204_v4_memory_policy", p)))
         }
+        MemoryMode::Bounded228 => {
+            let (n, p) = singleton210_memory::bounded228_required(f, total, reserve, candidate)?;
+            (n, Some(("bounded228_memory_policy", p)))
+        }
         MemoryMode::FirstRoot233 => {
             let (n, p) = singleton210_memory::first_root233_required(f, total, reserve, candidate)?;
             (n, Some(("first_root233_memory_policy", p)))
@@ -690,7 +709,10 @@ fn check_inner_with(
     ensure!(
         (!matches!(mode, MemoryMode::Epoch225Extraction) || epoch225.is_some())
             && (epoch225.is_none()
-                || matches!(mode, MemoryMode::Full210 | MemoryMode::Epoch225Extraction)),
+                || matches!(
+                    mode,
+                    MemoryMode::Full210 | MemoryMode::Epoch225Extraction | MemoryMode::Bounded228
+                )),
         "epoch 225 terminal handoff is required for extraction and scoped to Full 210"
     );
     ensure!(
@@ -871,7 +893,10 @@ fn check_inner_with(
     }
     let bracketed = matches!(
         mode,
-        MemoryMode::FirstRoot233 | MemoryMode::CompletedArchivePhase | MemoryMode::GuardRebase207
+        MemoryMode::FirstRoot233
+            | MemoryMode::Bounded228
+            | MemoryMode::CompletedArchivePhase
+            | MemoryMode::GuardRebase207
     );
     ensure!(
         bracketed || (after_growth <= growth && after_memory_growth <= memory_growth),
@@ -934,6 +959,13 @@ fn check_inner_with(
         } else if matches!(mode, MemoryMode::GuardRebase207) {
             singleton210_memory::rebase207_recompute(
                 &memory_after["guard_rebase207_memory_policy"],
+                n(&memory_after, "host_total_memory_bytes")?,
+                hard,
+                candidate.memory_max_bytes,
+            )?
+        } else if matches!(mode, MemoryMode::Bounded228) {
+            singleton210_memory::bounded228_recompute(
+                &memory_after["bounded228_memory_policy"],
                 n(&memory_after, "host_total_memory_bytes")?,
                 hard,
                 candidate.memory_max_bytes,
@@ -1058,6 +1090,7 @@ fn fleet_for_mode(
     if matches!(
         mode,
         MemoryMode::Full210
+            | MemoryMode::Bounded228
             | MemoryMode::Epoch225Extraction
             | MemoryMode::Foundation203
             | MemoryMode::AssemblyRecovery204

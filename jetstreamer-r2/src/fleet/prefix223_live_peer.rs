@@ -15,6 +15,7 @@ fn profile(name: &str) -> Option<(u64, &'static str)> {
     match name {
         singleton207::UNIT => Some((207, "private-full-epoch-qualification")),
         first_root233::UNIT => Some((233, "private-known-root-prefix")),
+        bounded228::UNIT => Some((228, "private-known-root-prefix")),
         _ => None,
     }
 }
@@ -110,6 +111,7 @@ fn live(d: &DiagnosticClaim, u: &Value) -> Result<()> {
     match d.epoch {
         207 => singleton207::validate_live(d, u),
         233 => first_root233::validate_live(d, u),
+        228 => bounded228::validate_live(d, u),
         _ => bail!("foreign closed peer"),
     }
 }
@@ -137,6 +139,7 @@ fn guard_shape_binding(
         }
         207 => singleton207::guard_matches(d, l, p),
         233 => first_root233::guard_matches(d, l, p),
+        228 => bounded228::guard_matches(d, l, p),
         _ => false,
     };
     let t = g["recorded_unix_seconds"]
@@ -275,6 +278,7 @@ fn disk_reservation(d: &DiagnosticClaim, launch: &Value) -> Result<u64> {
     let expected = match d.epoch {
         207 if singleton207::launch_matches(d, launch) => singleton207::DISK_RESERVATION,
         233 if first_root233::launch_matches(d, launch) => first_root233::DISK_RESERVATION,
+        228 if bounded228::launch_matches(d, launch) => bounded228::DISK_RESERVATION,
         _ => bail!("closed peer disk reservation lacks its exact launch"),
     };
     ensure!(
@@ -294,6 +298,7 @@ fn memory_obligation(
     let expected = match d.epoch {
         207 if singleton207::launch_matches(d, launch) => singleton207::MEMORY,
         233 if first_root233::launch_matches(d, launch) => first_root233::MEMORY,
+        228 if bounded228::launch_matches(d, launch) => bounded228::MEMORY,
         _ => bail!("closed peer memory lacks its exact launch"),
     };
     ensure!(

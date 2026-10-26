@@ -14,6 +14,7 @@ mod assembly223_capacity;
 mod assembly223_live_peer;
 mod assembly223_prepare;
 mod bounded205;
+mod bounded228;
 mod canary227;
 mod canary227_admission;
 mod canary227_allocation;
@@ -260,6 +261,23 @@ pub(super) fn prefix223_native20_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
 ) -> Result<Option<(String, String)>> {
     prefix223_native20_status::inactive_owner(receipt)
+}
+pub(super) fn admit_bounded228() -> Result<()> {
+    bounded228::admit()
+}
+pub(super) fn probe_bounded228_parent() -> Result<()> {
+    bounded228::probe_parent()
+}
+pub(super) fn capture_bounded228() -> Result<()> {
+    bounded228::capture_launch()
+}
+pub(super) async fn publish_bounded228_status() -> Result<()> {
+    bounded228::publish_status().await
+}
+pub(super) fn bounded228_status_inactive_owner(
+    r: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    bounded228::inactive_owner(r)
 }
 pub(super) fn admit_first_root233() -> Result<()> {
     first_root233::admit()
@@ -958,6 +976,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     if first_root233::namespace(claim) {
         first_root233::bindings(claim, &launch)?;
     }
+    if bounded228::namespace(claim) {
+        bounded228::bindings(claim, &launch)?;
+    }
     if private_225_verification(claim) {
         let evidence: BoundFile = serde_json::from_value(launch["terminal_evidence"].clone())?;
         validate_private_225_terminal(&bound_json(&evidence)?)?;
@@ -1528,6 +1549,7 @@ fn validate_same_sample_admission(
         223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
         207 if singleton207::namespace(claim) => singleton207::GUARD_SHA,
         233 if first_root233::namespace(claim) => first_root233::GUARD_SHA,
+        228 if bounded228::namespace(claim) => bounded228::GUARD_SHA,
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -1729,6 +1751,10 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| singleton207::guard_matches(claim, &r, plan));
     }
+    if bounded228::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| bounded228::guard_matches(claim, &r, plan));
+    }
     if first_root233::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| first_root233::guard_matches(claim, &r, plan));
@@ -1876,6 +1902,13 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         ensure!(
             singleton207::launch_matches(claim, receipt),
             "singleton 207 namespace, schema, or private prefix scope differs"
+        );
+        return Ok(());
+    }
+    if bounded228::namespace(claim) || receipt["schema"] == bounded228::SCHEMA {
+        ensure!(
+            bounded228::launch_matches(claim, receipt),
+            "bounded228 namespace, schema or root-tail scope differs"
         );
         return Ok(());
     }
@@ -3777,6 +3810,9 @@ pub(super) async fn run() -> Result<()> {
             if first_root233::namespace(claim) {
                 first_root233::validate_live(claim, current)?;
             }
+            if bounded228::namespace(claim) {
+                bounded228::validate_live(claim, current)?;
+            }
             if private157::namespace(claim) {
                 private157::live_limits()?;
             }
@@ -3972,6 +4008,7 @@ pub(super) async fn run() -> Result<()> {
             } else if prefix223::namespace(claim)
                 || prefix223_native20::namespace(claim)
                 || first_root233::namespace(claim)
+                || bounded228::namespace(claim)
                 || prefix205::namespace(claim)
                 || prefix204::namespace(claim)
             {
@@ -4250,6 +4287,7 @@ pub(super) async fn run() -> Result<()> {
                         || demotion223_status::matches(receipt, epoch, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || first_root233::status_matches(receipt, epoch, &observer, &before)
+                        || bounded228::status_matches(receipt, epoch, &observer, &before)
                         || singleton207::status_matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)

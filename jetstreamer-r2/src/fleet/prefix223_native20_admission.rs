@@ -123,6 +123,7 @@ pub(super) fn guard_selector(name: &str) -> Result<(&'static str, &'static str)>
         ),
         singleton207::UNIT => (singleton207::PROTECTIVE, singleton207::GUARD_RECEIPTS),
         first_root233::UNIT => (first_root233::PROTECTIVE, first_root233::GUARD_RECEIPTS),
+        bounded228::UNIT => (bounded228::PROTECTIVE, bounded228::GUARD_RECEIPTS),
         singleton210::UNIT => (
             "horizon-singleton210-protective-v1.service",
             "/var/lib/jetstreamer/horizon-singleton210-guard-receipts-v1",
