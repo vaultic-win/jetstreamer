@@ -530,22 +530,10 @@ fn self_snapshot(p: &Startup) -> Result<Value> {
         );
         limits.insert(file, actual);
     }
-    let mount = p
-        .archive_directory
-        .to_str()
-        .context("completed startup archive path encoding differs")?;
-    ensure!(
-        native_text("/proc/self/mountinfo", 4 << 20)?
-            .lines()
-            .any(|line| {
-                let fields = line.split_whitespace().collect::<Vec<_>>();
-                fields.get(4).copied() == Some(mount)
-                    && fields
-                        .get(5)
-                        .is_some_and(|v| v.split(',').any(|f| f == "ro"))
-            }),
-        "completed startup archive mount is not read-only"
-    );
+    let source_mount_proof = archive_readonly_mount(
+        &p.archive_directory,
+        &native_text("/proc/self/mountinfo", 4 << 20)?,
+    )?;
     ensure!(
         UNSAFE_ENVIRONMENT
             .iter()
@@ -554,7 +542,111 @@ fn self_snapshot(p: &Startup) -> Result<Value> {
     );
     Ok(
         json!({"pid":pid,"invocation_id":iid,"start_ticks":ticks,"native_start_clock":launch::native_start_clock(ticks)?,
-        "cgroup":group,"native_limits":limits}),
+        "cgroup":group,"native_limits":limits,"source_mount_proof":source_mount_proof}),
+    )
+}
+/// systemd may omit a redundant child bind when its parent is already read-only.
+/// Require the most specific covering mount and every mount inside the archive
+/// to be read-only; an unrelated writable state directory grants no exception.
+pub(super) fn archive_readonly_mount(archive: &Path, raw: &str) -> Result<Value> {
+    fn mount_path(raw: &str) -> Result<PathBuf> {
+        let input = raw.as_bytes();
+        let mut decoded = Vec::new();
+        let mut i = 0;
+        while i < input.len() {
+            if input[i] == b'\\' {
+                let escaped = input
+                    .get(i..i + 4)
+                    .context("incomplete mount path escape")?;
+                decoded.push(match escaped {
+                    b"\\040" => b' ',
+                    b"\\011" => b'\t',
+                    b"\\012" => b'\n',
+                    b"\\134" => b'\\',
+                    _ => bail!("unrecognized mount path escape"),
+                });
+                i += 4;
+            } else {
+                decoded.push(input[i]);
+                i += 1;
+            }
+        }
+        let text = String::from_utf8(decoded)?;
+        ensure!(
+            text.starts_with('/')
+                && !text.contains('\0')
+                && text.split('/').all(|p| p != "." && p != ".."),
+            "mount path is not an absolute canonical path"
+        );
+        Ok(text.into())
+    }
+    let target = archive
+        .to_str()
+        .context("archive mount path encoding differs")?;
+    ensure!(
+        archive.is_absolute()
+            && !target.contains('\0')
+            && target.split('/').all(|part| part != "." && part != ".."),
+        "archive mount path is not absolute and canonical"
+    );
+    ensure!(
+        !raw.is_empty() && raw.len() <= 4 << 20,
+        "mount history is empty or oversized"
+    );
+    let mut mounts = BTreeMap::new();
+    let mut ids = BTreeSet::new();
+    for line in raw.lines() {
+        let fields = line.split_whitespace().collect::<Vec<_>>();
+        let separator = fields
+            .iter()
+            .position(|v| *v == "-")
+            .context("mount separator missing")?;
+        ensure!(
+            separator >= 6 && fields.len() == separator + 4,
+            "mount row is malformed"
+        );
+        let id = fields[0].parse::<u64>()?;
+        fields[1].parse::<u64>()?;
+        let (major, minor) = fields[2]
+            .split_once(':')
+            .context("mount device is malformed")?;
+        major.parse::<u32>()?;
+        minor.parse::<u32>()?;
+        ensure!(
+            id > 0 && ids.insert(id),
+            "mount identity is missing or duplicated"
+        );
+        mount_path(fields[3])?;
+        let point = mount_path(fields[4])?;
+        let options = fields[5].split(',').collect::<BTreeSet<_>>();
+        let readonly = options.contains("ro");
+        ensure!(
+            !options.contains("") && readonly != options.contains("rw"),
+            "mount access flags are missing or contradictory"
+        );
+        ensure!(
+            mounts.insert(point, (id, readonly)).is_none(),
+            "mountpoint is ambiguous"
+        );
+    }
+    let (cover, (id, readonly)) = mounts
+        .iter()
+        .filter(|(point, _)| archive.starts_with(point.as_path()))
+        .max_by_key(|(point, _)| point.components().count())
+        .context("archive has no covering mount")?;
+    ensure!(*readonly, "archive covering mount is writable");
+    let mut descendants = 0;
+    for (point, (_, readonly)) in &mounts {
+        if point.starts_with(archive) {
+            ensure!(*readonly, "archive contains a writable descendant mount");
+            descendants += 1;
+        }
+    }
+    Ok(
+        json!({"archive_directory":archive,"covering_mountpoint":cover,
+        "covering_mount_id":id,"covering_mount_read_only":true,
+        "read_only_mounts_within_archive":descendants,
+        "mountinfo_sha256":hex_lower(&Sha256::digest(raw.as_bytes()))}),
     )
 }
 fn consume_shape(p: &Startup, v: &Value, actual: &Value, at: u64) -> Result<Spec> {
@@ -1077,5 +1169,98 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(attempts.get(), 1);
         assert_eq!(child_executions.get(), 0);
+    }
+}
+
+#[cfg(test)]
+mod archive_mount_tests {
+    use super::*;
+    fn row(id: u64, point: &str, access: &str) -> String {
+        format!(
+            "{id} 37 259:1 / {point} {access},nosuid,relatime shared:47 master:1 - ext4 /dev/nvme0n1p1 rw,discard\n"
+        )
+    }
+    #[test]
+    fn completed_readonly_mount_accepts_inherited_root_with_writable_state_sibling() {
+        let target = Path::new("/home/ubuntu/archive/output");
+        let raw = row(180, "/", "ro")
+            + &row(181, "/run", "rw")
+            + &row(182, "/home/ubuntu/full-state/full", "rw");
+        let proof = archive_readonly_mount(target, &raw).unwrap();
+        assert_eq!(proof["covering_mountpoint"], "/");
+        assert_eq!(proof["covering_mount_read_only"], true);
+        assert_eq!(proof["read_only_mounts_within_archive"], 0);
+        assert_eq!(
+            proof["mountinfo_sha256"],
+            hex_lower(&Sha256::digest(raw.as_bytes()))
+        );
+    }
+    #[test]
+    fn completed_readonly_mount_uses_most_specific_ancestor_and_accepts_exact_bind() {
+        let target = Path::new("/home/archive");
+        let raw = row(1, "/", "ro") + &row(2, "/home", "rw");
+        assert!(archive_readonly_mount(target, &raw).is_err());
+        let raw = raw + &row(3, "/home/archive", "ro");
+        assert_eq!(
+            archive_readonly_mount(target, &raw).unwrap()["covering_mountpoint"],
+            "/home/archive"
+        );
+        let raw = row(1, "/", "rw") + &row(2, "/home", "ro");
+        assert_eq!(
+            archive_readonly_mount(target, &raw).unwrap()["covering_mountpoint"],
+            "/home"
+        );
+    }
+    #[test]
+    fn completed_readonly_mount_rejects_writable_descendant_directory_or_file() {
+        let target = Path::new("/archive");
+        for point in ["/archive/tmp", "/archive/epoch-209.jet"] {
+            let raw = row(1, "/", "ro") + &row(2, point, "rw");
+            assert!(archive_readonly_mount(target, &raw).is_err(), "{point}");
+        }
+        let raw = row(1, "/", "ro") + &row(2, "/archive/cache", "ro");
+        assert_eq!(
+            archive_readonly_mount(target, &raw).unwrap()["read_only_mounts_within_archive"],
+            1
+        );
+    }
+    #[test]
+    fn completed_readonly_mount_rejects_ambiguous_mountpoints_ids_and_missing_cover() {
+        let target = Path::new("/archive");
+        for raw in [
+            row(1, "/", "ro") + &row(2, "/", "rw"),
+            row(1, "/", "ro") + &row(1, "/run", "rw"),
+            row(1, "/other", "ro"),
+        ] {
+            assert!(archive_readonly_mount(target, &raw).is_err());
+        }
+    }
+    #[test]
+    fn completed_readonly_mount_decodes_kernel_escapes_and_respects_path_components() {
+        let raw = row(1, "/", "rw") + &row(2, r"/data/a\040b", "ro");
+        assert!(archive_readonly_mount(Path::new("/data/a b"), &raw).is_ok());
+        assert!(archive_readonly_mount(Path::new("/data/a b-other"), &raw).is_err());
+        let raw = row(1, "/", "rw") + &row(2, r"/data/a\134b", "ro");
+        assert!(archive_readonly_mount(Path::new(r"/data/a\b"), &raw).is_ok());
+    }
+    #[test]
+    fn completed_readonly_mount_rejects_malformed_flags_rows_escapes_and_targets() {
+        let target = Path::new("/archive");
+        for raw in [
+            String::new(),
+            "malformed".to_owned(),
+            row(1, "/", "ro,rw"),
+            row(1, "/", "relatime"),
+            row(0, "/", "ro"),
+            row(1, r"/bad\041path", "ro"),
+            row(1, r"/bad\04", "ro"),
+            row(1, "/../archive", "ro"),
+            " ".repeat((4 << 20) + 1),
+        ] {
+            assert!(archive_readonly_mount(target, &raw).is_err());
+        }
+        for target in ["archive", "/a/../archive", "/a/./archive", ""] {
+            assert!(archive_readonly_mount(Path::new(target), &row(1, "/", "ro")).is_err());
+        }
     }
 }

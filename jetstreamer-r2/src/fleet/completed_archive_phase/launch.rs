@@ -205,16 +205,7 @@ fn process_as(s: &Spec, owner: &Value, argv: &[String], waiting: bool) -> Result
         Origin::Singleton209 { .. } => Path::new(singleton209::ROOT).join("output"),
     };
     let mounts = fs::read_to_string(proc.join("mountinfo"))?;
-    ensure!(
-        mounts.lines().any(|line| {
-            let fields = line.split_whitespace().collect::<Vec<_>>();
-            fields.get(4).copied() == archive.to_str()
-                && fields
-                    .get(5)
-                    .is_some_and(|v| v.split(',').any(|f| f == "ro"))
-        }),
-        "completed launch actual archive mount is not read-only"
-    );
+    let source_mount_proof = barrier::archive_readonly_mount(&archive, &mounts)?;
     let references = jetstreamer_horizon_observe::process_references::scan(
         Path::new("/proc"),
         Path::new(singleton209::ROOT),
@@ -237,7 +228,7 @@ fn process_as(s: &Spec, owner: &Value, argv: &[String], waiting: bool) -> Result
         "completed launch main process changed during capture"
     );
     Ok(
-        json!({"pid":pid,"executable":exe,"executable_sha256":executable_sha256,"cmdline":args,"start_ticks":tick,"native_start_clock":native_start_clock,"cgroup":cgroup,"native_limits":limits,"credential_values_not_recorded":true,"credential_environment_sha256":credential_digest,"source_read_only_mount":true,"source_reference_census":references,"native_memory_current":fs::read_to_string(group.join("memory.current"))?.trim(),"native_memory_peak":fs::read_to_string(group.join("memory.peak"))?.trim()}),
+        json!({"pid":pid,"executable":exe,"executable_sha256":executable_sha256,"cmdline":args,"start_ticks":tick,"native_start_clock":native_start_clock,"cgroup":cgroup,"native_limits":limits,"credential_values_not_recorded":true,"credential_environment_sha256":credential_digest,"source_read_only_mount":true,"source_mount_proof":source_mount_proof,"source_reference_census":references,"native_memory_current":fs::read_to_string(group.join("memory.current"))?.trim(),"native_memory_peak":fs::read_to_string(group.join("memory.peak"))?.trim()}),
     )
 }
 pub(super) fn read_sample(binding: &BoundFile, plan: &Value) -> Result<Value> {
