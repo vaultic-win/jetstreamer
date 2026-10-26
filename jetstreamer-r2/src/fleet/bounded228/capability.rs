@@ -1,13 +1,15 @@
 //! Exact immutable parent CLI probes. The absent snapshot gate precedes Bank restore
 //! and worker creation; passing this command never admits or starts the replay.
 use super::*;
-use std::os::unix::process::CommandExt;
+use std::os::unix::process::{CommandExt, ExitStatusExt};
 
 const SCHEMA: &str = "jetstreamer-private-bounded228-parent-cli-capability-v1";
 const PROBE_ROOT: &str = "/home/ubuntu/.jetstreamer-private/bounded228-parent-capability-v1";
 const RECEIPT: &str =
     "/var/lib/jetstreamer/horizon-bounded228-parent-capability-v1/capability.json";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-228-capped-candidate-1bfa8d51-v1/jetstreamer-historical-worker-v1-6-20";
+const MAX_LOG_BYTES: usize = 1 << 20;
+const FOREIGN_RANGE_REJECTION: &str = "--horizon-output cannot be used with an epoch range (228-229); each epoch is written to <dest-dir>/epoch-<N>.jet";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,10 +33,15 @@ fn arguments(foreign: bool) -> Vec<String> {
 
 fn validate_log(foreign: bool, exit: i64, log: &[u8]) -> Result<()> {
     let text = std::str::from_utf8(log)?;
-    ensure!(log.len() <= 1 << 20, "bounded228 CLI log exceeds its bound");
+    ensure!(
+        log.len() <= MAX_LOG_BYTES,
+        "bounded228 CLI log exceeds its bound"
+    );
     let required = if foreign {
         ensure!(exit == 2, "bounded228 foreign range did not fail at CLI");
-        vec!["--qualification-end-slot requires one epoch, not 228-229".into()]
+        // The pinned parent rejects an explicit output file for a range before
+        // it checks the focused-qualification argument. Require that real gate.
+        vec![FOREIGN_RANGE_REJECTION.into()]
     } else {
         ensure!(
             exit == 1,
@@ -188,6 +195,80 @@ fn write_log(path: &Path, bytes: &[u8]) -> Result<BoundFile> {
     ))
 }
 
+struct ProbeOutput<'a> {
+    foreign: bool,
+    argv: &'a [String],
+    child_pid: u32,
+    started_unix_seconds: u64,
+    exited_unix_seconds: u64,
+    output: &'a std::process::Output,
+}
+
+fn preserve_and_validate_output(directory: &Path, probe: ProbeOutput<'_>) -> Result<Value> {
+    let stem = if probe.foreign {
+        "foreign-range"
+    } else {
+        "exact-route"
+    };
+    let out = probe.output;
+    // Keep bounded diagnostics even when a child is signaled, emits invalid UTF-8,
+    // exceeds its output limit, or fails the expected CLI gate. These files make
+    // no qualification claim and must precede every validation of child output.
+    let stdout = write_log(
+        &directory.join(format!("{stem}.stdout")),
+        &out.stdout[..out.stdout.len().min(MAX_LOG_BYTES)],
+    )?;
+    let stderr = write_log(
+        &directory.join(format!("{stem}.stderr")),
+        &out.stderr[..out.stderr.len().min(MAX_LOG_BYTES)],
+    )?;
+    let mut bytes = out.stdout[..out.stdout.len().min(MAX_LOG_BYTES)].to_vec();
+    bytes.extend_from_slice(&out.stderr[..out.stderr.len().min(MAX_LOG_BYTES - bytes.len())]);
+    let log = write_log(&directory.join(format!("{stem}.log")), &bytes)?;
+    let result = json!({
+        "schema":"jetstreamer-bounded228-parent-cli-probe-output-v1",
+        "argv":probe.argv,"child_pid":probe.child_pid,
+        "started_unix_seconds":probe.started_unix_seconds,
+        "exited_unix_seconds":probe.exited_unix_seconds,
+        "exit_status":out.status.code(),"exit_signal":out.status.signal(),
+        "core_dumped":out.status.core_dumped(),"raw_wait_status":out.status.into_raw(),
+        "stdout":private157::binding(&stdout),"stderr":private157::binding(&stderr),
+        "log":private157::binding(&log),"stdout_bytes":out.stdout.len(),
+        "stderr_bytes":out.stderr.len(),"per_stream_capture_limit_bytes":MAX_LOG_BYTES,
+        "stdout_truncated":out.stdout.len()>MAX_LOG_BYTES,
+        "stderr_truncated":out.stderr.len()>MAX_LOG_BYTES,
+        "combined_log_truncated":out.stdout.len().saturating_add(out.stderr.len())>MAX_LOG_BYTES,
+        "gate_validation_attempted":false,"replay_launch_authorized":false,
+        "publication_authorized":false,"remote_mutations":false,"r2_mutations":false
+    });
+    let mut result_bytes = serde_json::to_vec_pretty(&result)?;
+    result_bytes.push(b'\n');
+    let evidence = write_log(
+        &directory.join(format!("{stem}.result.json")),
+        &result_bytes,
+    )?;
+    let length = out
+        .stdout
+        .len()
+        .checked_add(out.stderr.len())
+        .context("bounded228 CLI log size overflow")?;
+    ensure!(length <= MAX_LOG_BYTES, "bounded228 CLI log exceeded bound");
+    let exit = out
+        .status
+        .code()
+        .context("bounded228 CLI probe was signaled")?;
+    validate_log(probe.foreign, i64::from(exit), &bytes)?;
+    ensure!(
+        probe.exited_unix_seconds >= probe.started_unix_seconds
+            && probe.exited_unix_seconds - probe.started_unix_seconds <= 600,
+        "bounded228 CLI probe lifetime exceeded"
+    );
+    Ok(json!({"argv":probe.argv,"child_pid":probe.child_pid,
+        "started_unix_seconds":probe.started_unix_seconds,
+        "exited_unix_seconds":probe.exited_unix_seconds,"exit_status":exit,
+        "log":private157::binding(&log),"raw_output_evidence":private157::binding(&evidence)}))
+}
+
 pub(super) fn run() -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -266,23 +347,17 @@ pub(super) fn run() -> Result<()> {
         let pid = child.id();
         let out = child.wait_with_output()?;
         let exited = now()?;
-        let exit = out
-            .status
-            .code()
-            .context("bounded228 CLI probe was signaled")?;
-        let length = out
-            .stdout
-            .len()
-            .checked_add(out.stderr.len())
-            .context("bounded228 CLI log size overflow")?;
-        ensure!(length <= 1 << 20, "bounded228 CLI log exceeded bound");
-        let mut bytes = out.stdout;
-        bytes.extend_from_slice(&out.stderr);
-        validate_log(foreign, i64::from(exit), &bytes)?;
-        ensure!(
-            exited >= started && exited - started <= 600,
-            "bounded228 CLI probe lifetime exceeded"
-        );
+        let row = preserve_and_validate_output(
+            spec.output.parent().unwrap(),
+            ProbeOutput {
+                foreign,
+                argv: &args,
+                child_pid: pid,
+                started_unix_seconds: started,
+                exited_unix_seconds: exited,
+                output: &out,
+            },
+        )?;
         for d in ["scratch", "output"] {
             ensure!(
                 fs::read_dir(Path::new(PROBE_ROOT).join(d))?
@@ -291,15 +366,7 @@ pub(super) fn run() -> Result<()> {
                 "bounded228 capability unexpectedly created replay artifacts"
             );
         }
-        let log = write_log(
-            &spec.output.parent().unwrap().join(if foreign {
-                "foreign-range.log"
-            } else {
-                "exact-route.log"
-            }),
-            &bytes,
-        )?;
-        rows.push(json!({"argv":args,"child_pid":pid,"started_unix_seconds":started,"exited_unix_seconds":exited,"exit_status":exit,"log":private157::binding(&log)}));
+        rows.push(row);
     }
     let mut receipt = json!({"schema":SCHEMA,"scope":scope(),"parent":private157::binding(&binding(NODE,NODE_SHA)),"worker":private157::binding(&binding(WORKER,WORKER_SHA)),
         "intended_exec_start":command(),"intended_environment":environment(),"probe_root":PROBE_ROOT,
@@ -361,19 +428,157 @@ mod tests {
             assert!(validate_log(false, 1, bad.as_bytes()).is_err());
         }
         assert!(validate_log(false, 0, text.as_bytes()).is_err());
-        validate_log(
-            true,
-            2,
-            b"--qualification-end-slot requires one epoch, not 228-229",
+    }
+
+    #[test]
+    fn foreign_range_requires_the_pinned_parents_actual_output_file_gate() {
+        validate_log(true, 2, FOREIGN_RANGE_REJECTION.as_bytes()).unwrap();
+        for bad in [
+            "--qualification-end-slot requires one epoch, not 228-229".to_owned(),
+            FOREIGN_RANGE_REJECTION.replace("228-229", "227-228"),
+            FOREIGN_RANGE_REJECTION.replace("--horizon-output", "--snapshot-archive"),
+            format!("{FOREIGN_RANGE_REJECTION}\nprogress slot 98496001/98928278"),
+        ] {
+            assert!(validate_log(true, 2, bad.as_bytes()).is_err(), "{bad}");
+        }
+        for exit in [0, 1, 3] {
+            assert!(validate_log(true, exit, FOREIGN_RANGE_REJECTION.as_bytes()).is_err());
+        }
+    }
+
+    fn capture_fixture(
+        directory: &Path,
+        raw_status: i32,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    ) -> Result<Value> {
+        let argv = arguments(true);
+        let output = std::process::Output {
+            status: std::process::ExitStatus::from_raw(raw_status),
+            stdout,
+            stderr,
+        };
+        preserve_and_validate_output(
+            directory,
+            ProbeOutput {
+                foreign: true,
+                argv: &argv,
+                child_pid: 42,
+                started_unix_seconds: 10,
+                exited_unix_seconds: 11,
+                output: &output,
+            },
         )
-        .unwrap();
+    }
+
+    fn captured_result(directory: &Path) -> Value {
+        serde_json::from_slice(&fs::read(directory.join("foreign-range.result.json")).unwrap())
+            .unwrap()
+    }
+
+    #[test]
+    fn failed_gate_preserves_separate_raw_streams_and_actual_status_before_validation() {
+        let directory = tempfile::tempdir().unwrap();
+        let stdout = b"jetstreamer logger installed\n".to_vec();
+        let stderr = b"unexpected CLI rejection\n".to_vec();
+        assert!(capture_fixture(directory.path(), 2 << 8, stdout.clone(), stderr.clone()).is_err());
+        assert_eq!(
+            fs::read(directory.path().join("foreign-range.stdout")).unwrap(),
+            stdout
+        );
+        assert_eq!(
+            fs::read(directory.path().join("foreign-range.stderr")).unwrap(),
+            stderr
+        );
+        let result = captured_result(directory.path());
+        assert_eq!(result["argv"], json!(arguments(true)));
+        assert_eq!(result["child_pid"], 42);
+        assert_eq!(result["exit_status"], 2);
+        assert_eq!(result["raw_wait_status"], 2 << 8);
+        assert!(result["exit_signal"].is_null());
+        assert_eq!(result["gate_validation_attempted"], false);
+        assert_eq!(result["publication_authorized"], false);
+        assert_eq!(result["combined_log_truncated"], false);
+        // Preserved diagnostics are no-clobber, including after failed validation.
+        assert!(capture_fixture(directory.path(), 2 << 8, vec![], vec![]).is_err());
+        assert_eq!(captured_result(directory.path()), result);
+    }
+
+    #[test]
+    fn signaled_probe_preserves_raw_output_and_signal_without_claiming_an_exit_code() {
+        let directory = tempfile::tempdir().unwrap();
         assert!(
-            validate_log(
-                true,
-                1,
-                b"--qualification-end-slot requires one epoch, not 228-229"
+            capture_fixture(
+                directory.path(),
+                libc::SIGKILL,
+                vec![0xff],
+                b"signal\n".to_vec()
             )
             .is_err()
+        );
+        let result = captured_result(directory.path());
+        assert!(result["exit_status"].is_null());
+        assert_eq!(result["exit_signal"], libc::SIGKILL);
+        assert_eq!(result["raw_wait_status"], libc::SIGKILL);
+        assert_eq!(
+            fs::read(directory.path().join("foreign-range.stdout")).unwrap(),
+            [0xff]
+        );
+    }
+
+    #[test]
+    fn oversized_probe_keeps_bounded_diagnostics_and_actual_lengths_before_failing() {
+        let directory = tempfile::tempdir().unwrap();
+        assert!(
+            capture_fixture(
+                directory.path(),
+                2 << 8,
+                vec![b'x'; MAX_LOG_BYTES + 1],
+                vec![b'y']
+            )
+            .is_err()
+        );
+        let result = captured_result(directory.path());
+        assert_eq!(result["stdout_bytes"], MAX_LOG_BYTES + 1);
+        assert_eq!(result["stderr_bytes"], 1);
+        assert_eq!(result["stdout_truncated"], true);
+        assert_eq!(result["stderr_truncated"], false);
+        assert_eq!(result["combined_log_truncated"], true);
+        assert_eq!(
+            fs::metadata(directory.path().join("foreign-range.stdout"))
+                .unwrap()
+                .len(),
+            MAX_LOG_BYTES as u64
+        );
+        assert_eq!(
+            fs::metadata(directory.path().join("foreign-range.log"))
+                .unwrap()
+                .len(),
+            MAX_LOG_BYTES as u64
+        );
+    }
+
+    #[test]
+    fn accepted_probe_binds_its_prevalidation_raw_evidence_without_changing_the_gate() {
+        let directory = tempfile::tempdir().unwrap();
+        let row = capture_fixture(
+            directory.path(),
+            2 << 8,
+            vec![],
+            FOREIGN_RANGE_REJECTION.as_bytes().to_vec(),
+        )
+        .unwrap();
+        assert_eq!(row["exit_status"], 2);
+        assert_eq!(row["argv"], json!(arguments(true)));
+        let path = directory.path().join("foreign-range.result.json");
+        assert_eq!(row["raw_output_evidence"]["path"], json!(path));
+        assert_eq!(
+            row["raw_output_evidence"]["sha256"],
+            hex_lower(&Sha256::digest(fs::read(path).unwrap()))
+        );
+        assert_eq!(
+            captured_result(directory.path())["gate_validation_attempted"],
+            false
         );
     }
 }
