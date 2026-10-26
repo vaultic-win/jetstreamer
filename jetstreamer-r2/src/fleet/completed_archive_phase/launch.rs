@@ -371,8 +371,9 @@ fn guard_manager(
     admitted: u64,
 ) -> Result<Value> {
     let name = &s.guard_units[s.phase.name()];
-    let p = singleton227_capture::properties(
-        name,
+    let p = empty_properties::properties(
+        s,
+        true,
         "Id,InvocationID,MainPID,NRestarts,Type,User,Restart,KillMode,Delegate,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,Result,ExecMainStatus,ActiveState,SubState,DropInPaths,NeedDaemonReload,Transient,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
     )?;
     singleton227_capture::require(

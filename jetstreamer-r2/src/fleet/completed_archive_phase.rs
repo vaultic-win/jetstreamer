@@ -5,6 +5,7 @@ use super::*;
 mod barrier;
 mod capacity;
 mod decoder_capacity;
+mod empty_properties;
 mod launch;
 mod peer;
 pub(super) use peer::{
@@ -624,7 +625,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
         "completed phase command differs"
     );
     let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,InaccessiblePaths,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
-    let p = singleton227_capture::properties(name, fields)?;
+    let p = empty_properties::properties(s, false, fields)?;
     let (high, max, runtime) = s.phase.profile();
     for (k, v) in [
         ("Id", name.clone()),

@@ -316,8 +316,9 @@ fn guard(
         completed["binding"] == private157::binding(bound),
         "completed peer guard is not the latest genuine completed firing"
     );
-    let props = singleton227_capture::properties(
-        &p.spec.guard_units[p.spec.phase.name()],
+    let props = empty_properties::properties(
+        &p.spec,
+        true,
         "MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ReadWritePaths,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,Restart,KillMode,Delegate,Type,User,DropInPaths,NeedDaemonReload,Transient,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
     )?;
     validate_guard_controls(&props)?;

@@ -441,6 +441,7 @@ pub(super) fn guard_timer_properties(service: &str) -> Result<BTreeMap<String, S
     let timer = service.replace(".service", ".timer");
     let path = timer_object_path(&timer)?;
     let mut properties = properties(&timer, GUARD_TIMER_FIELDS)?;
+    let raw_show = properties.clone();
     // systemctl omits an empty TimersCalendar even with --all. Require a
     // successful typed D-Bus read; absence is never treated as an empty schedule.
     let mut command = ProcessCommand::new("/usr/bin/busctl");
@@ -460,6 +461,22 @@ pub(super) fn guard_timer_properties(service: &str) -> Result<BTreeMap<String, S
                 .get("TimersCalendar")
                 .is_none_or(String::is_empty),
         "completed guard timer calendar replies disagree"
+    );
+    ensure!(
+        self::properties(&timer, GUARD_TIMER_FIELDS)? == raw_show,
+        "completed timer properties changed across typed query"
+    );
+    properties.insert(
+        "TimersCalendarRawShow".into(),
+        serde_json::to_string(&raw_show)?,
+    );
+    properties.insert(
+        "TimersCalendarRawStdout".into(),
+        std::str::from_utf8(&reply.stdout)?.to_owned(),
+    );
+    properties.insert(
+        "TimersCalendarRawStderr".into(),
+        std::str::from_utf8(&reply.stderr)?.to_owned(),
     );
     properties.insert("TimersCalendar".into(), String::new());
     properties.insert("TimersCalendarTypedReply".into(), "a(sst) 0".into());
@@ -596,9 +613,11 @@ fn current_manager(p: &Startup, s: &Spec, v: &Value, actual: &Value) -> Result<(
             ),
         "completed startup manager owner/command changed"
     );
-    let guard = properties(
-        &p.guard_unit,
+    let guard = empty_properties::properties_with(
+        s,
+        true,
         "Id,LoadState,InvocationID,MainPID,NRestarts,ActiveState,SubState,Result,ExecMainStatus,ExecStart,DropInPaths,NeedDaemonReload,Transient,Type,User,Restart,KillMode,Delegate,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
+        properties,
     )?;
     validate_guard_controls(&guard)?;
     singleton227_capture::require(
