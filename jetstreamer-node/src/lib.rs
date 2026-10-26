@@ -6,6 +6,7 @@ pub mod epoch225_extract;
 pub mod epoch228_extract;
 pub mod handoff_snapshot;
 pub mod segment_manifest;
+mod segment_progress;
 pub mod snapshots;
 
 pub use snapshots::{

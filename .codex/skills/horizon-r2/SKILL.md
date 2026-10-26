@@ -253,6 +253,12 @@ not stall otherwise admissible ordinary campaign work.
   observational, grants no gate authority, must redact credentials and presigned URLs, and must
   not restart healthy work or modify sealed deployments just to add output. When resuming a quiet
   operation, inspect its real handle and phase log before deciding that it has stalled.
+  For parallel segment-source validation, log decoded buckets and slots from the existing decode
+  loop, then range-merge, identity-recheck, and success/failure transitions. Decoded counters are
+  not verified counts: only successful completion of every validation gate proves the source.
+  Rate-limit decode progress to once per minute across the whole pool. If a single decode blocks,
+  silence alone cannot distinguish slow work from a stall; do not add archive reads or restart a
+  healthy verifier merely to produce a heartbeat. New logging applies to future qualified builds.
 - Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
   campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
   coordination and user reporting. Keep the loop work-conserving while repair agents investigate;
