@@ -59,6 +59,77 @@ pub(super) fn root204_environment(
     }
     Ok(())
 }
+fn normalized_credential_digest(
+    expected: &BTreeMap<String, String>,
+    actual: &str,
+) -> Result<String> {
+    let mut values = BTreeMap::new();
+    for entry in actual.split('\0').filter(|e| !e.is_empty()) {
+        let (key, value) = entry
+            .split_once('=')
+            .context("204 process environment assignment differs")?;
+        ensure!(
+            values.insert(key, value).is_none(),
+            "204 process environment repeats a key"
+        );
+    }
+    ensure!(
+        expected
+            .iter()
+            .all(|(k, v)| values.get(k.as_str()).copied() == Some(v.as_str())),
+        "204 process credential environment differs from bound file"
+    );
+    Ok(hex_lower(&Sha256::digest(serde_json::to_vec(expected)?)))
+}
+pub(super) fn root204_credential_digest(
+    actual: &str,
+    file: Option<&BoundFile>,
+) -> Result<Option<String>> {
+    if let Some(file) = file {
+        let expected = credential_values(&bound_bytes(file, 64 << 10, 0)?)?;
+        Ok(Some(normalized_credential_digest(&expected, actual)?))
+    } else {
+        ensure!(
+            actual
+                .split('\0')
+                .all(|e| !e.starts_with("HORIZON_S3_ENDPOINT=")
+                    && !e.starts_with("HORIZON_ACCESS_KEY_ID=")
+                    && !e.starts_with("HORIZON_SECRET_ACCESS_KEY=")),
+            "204 non-upload process inherited unbound R2 credentials"
+        );
+        Ok(None)
+    }
+}
+#[cfg(test)]
+mod root204_credential_tests {
+    use super::*;
+    #[test]
+    fn root204_upload_credentials_bind_actual_values_without_disclosing_them() {
+        let expected = BTreeMap::from([
+            ("HORIZON_S3_ENDPOINT".into(), "fake-endpoint".into()),
+            ("HORIZON_ACCESS_KEY_ID".into(), "fake-access".into()),
+            ("HORIZON_SECRET_ACCESS_KEY".into(), "fake-secret".into()),
+        ]);
+        let actual = "HORIZON_S3_ENDPOINT=fake-endpoint\0HORIZON_ACCESS_KEY_ID=fake-access\0HORIZON_SECRET_ACCESS_KEY=fake-secret\0TOKIO_WORKER_THREADS=4\0";
+        let digest = normalized_credential_digest(&expected, actual).unwrap();
+        assert!(is_lower_hex(&digest, 64));
+        for changed in [
+            actual.replace("fake-secret", "wrong-secret"),
+            actual.replace("HORIZON_ACCESS_KEY_ID=fake-access\0", ""),
+        ] {
+            let error = normalized_credential_digest(&expected, &changed)
+                .unwrap_err()
+                .to_string();
+            assert!(!error.contains("fake-secret") && !error.contains("wrong-secret"));
+        }
+        assert!(root204_credential_digest(actual, None).is_err());
+        assert!(
+            root204_credential_digest("TOKIO_WORKER_THREADS=4\0", None)
+                .unwrap()
+                .is_none()
+        );
+    }
+}
 pub(super) use peer::{
     GuardSelectionProfile, claim_names, peer_current, peer_guard_selection_profiles, peer_guards,
     peer_limits, peer_memory_views, peer_names, peer_observation, peer_resources, peer_view,

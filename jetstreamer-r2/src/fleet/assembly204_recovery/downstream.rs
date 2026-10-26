@@ -831,6 +831,7 @@ pub(super) fn full_arguments(
     ])
 }
 pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
+    let startup_deadline = Instant::now();
     let x = stage_spec(v)?;
     let (c, l) = lineage::load_source(&x.source)?;
     let predecessors = gates(&x)?;
@@ -842,7 +843,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
     ownership::no_overlap(&x.context, Some(x.stage))?;
     // Same root process waits here before taking any archive handle, hashing,
     // copying, acquiring a mutation lease, or starting any child.
-    let startup_release = startup::wait(&x, spec, self_sha)?;
+    let startup_release = startup::wait(&x, spec, self_sha, startup_deadline)?;
     let _mutation_lease = if matches!(x.stage, Stage::Import | Stage::Upload) {
         Some(mutation_lock()?)
     } else {

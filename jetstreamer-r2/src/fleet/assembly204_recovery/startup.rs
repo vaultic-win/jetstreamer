@@ -38,6 +38,23 @@ struct ReleaseSpec {
 fn now() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
+fn distinct_roots(control: &Path, writable: &[&Path]) -> Result<()> {
+    ensure!(
+        writable
+            .iter()
+            .all(|root| !control.starts_with(root) && !root.starts_with(control)),
+        "204 startup control custody overlaps a writable root"
+    );
+    Ok(())
+}
+fn native_deadline(process: &Value, at: u64) -> Result<()> {
+    let begin = n(&process["clock"], "started_unix_seconds")?;
+    ensure!(
+        begin <= at && at - begin < WAIT,
+        "204 native waiting process exceeded startup deadline"
+    );
+    Ok(())
+}
 fn unit(name: &str) -> Result<Value> {
     Ok(serde_json::to_value(
         completed_archive_phase::root204_properties(
@@ -77,6 +94,31 @@ fn plan(x: &downstream::StageSpec) -> Result<(BoundFile, Plan)> {
         "204 root startup plan scope differs"
     );
     private(&p.guard_receipt_directory)?;
+    let mut writable = vec![x.output_directory.as_path(), x.scan_directory.as_path()];
+    if x.stage == downstream::Stage::Import {
+        writable.push(Path::new(CANONICAL));
+    }
+    if matches!(
+        x.stage,
+        downstream::Stage::Import | downstream::Stage::Upload
+    ) {
+        writable.push(Path::new(
+            "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock",
+        ));
+    }
+    for control in [
+        p.guard_receipt_directory.as_path(),
+        p.release.parent().context("204 release parent")?,
+        p.guard_plan_path
+            .parent()
+            .context("204 guard plan parent")?,
+    ] {
+        distinct_roots(control, &writable)?;
+    }
+    distinct_roots(
+        p.release.parent().context("204 release parent")?,
+        &[p.guard_receipt_directory.as_path()],
+    )?;
     ensure!(
         p.guard_plan_path
             .file_name()
@@ -139,6 +181,10 @@ fn snapshot(
     let exe = fs::read_link(proc.join("exe"))?;
     let cmd = native(proc.join("cmdline"), 64 << 10)?.into_bytes();
     let environment = native(proc.join("environ"), 1 << 20)?;
+    let credential_digest = completed_archive_phase::root204_credential_digest(
+        &environment,
+        x.environment_file.as_ref(),
+    )?;
     for entry in environment.split('\0') {
         let key = entry.split('=').next().unwrap_or("");
         ensure!(
@@ -224,7 +270,8 @@ fn snapshot(
     );
     Ok(
         json!({"pid":pid,"start_ticks":ticks,"clock":completed_archive_phase::root204_start_clock(ticks)?,
-        "invocation_id":owner["InvocationID"],"cgroup":group,"limits":limits,"runner":p.runner,"argv":expected}),
+        "invocation_id":owner["InvocationID"],"cgroup":group,"limits":limits,"runner":p.runner,"argv":expected,
+        "credential_environment_sha256":credential_digest}),
     )
 }
 fn fresh(release: u64, guard: u64, at: u64, elapsed: Duration) -> Result<()> {
@@ -303,6 +350,7 @@ fn guard_shape(
             && sample["maximum_root_physical_bytes"] == ROOT_CAP
             && sample["maximum_worker_vmas"] == 3500000
             && sample["remote_mutations"] == false
+            && sample["r2_mutations"] == false
             && sample["root_physical_observation"]["exceeds_budget"] == false
             && n(
                 &sample["root_physical_observation"],
@@ -413,6 +461,7 @@ pub(super) fn release(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()>
     )?;
     let owner = unit(x.stage.unit())?;
     let process = snapshot(&x, &r.stage_spec, &p, &owner, true)?;
+    native_deadline(&process, now()?)?;
     ensure!(waiting["process"] == process, "204 waiter was replaced");
     let cap = capacity::stage_capacity(
         &r.resource_basis,
@@ -457,6 +506,7 @@ pub(super) fn release(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()>
         "204 waiter changed during release"
     );
     let at = now()?;
+    native_deadline(&process, at)?;
     ensure!(
         n(&cap, "recorded_unix_seconds")? <= at
             && at - n(&cap, "recorded_unix_seconds")? <= RELEASE_AGE,
@@ -477,18 +527,23 @@ pub(super) fn wait(
     x: &downstream::StageSpec,
     spec: &BoundFile,
     self_sha: &str,
+    started: Instant,
 ) -> Result<BoundFile> {
     let (pb, p) = plan(x)?;
     ensure!(p.runner.sha256 == self_sha, "204 waiter runner differs");
     no_file(&p.release)?;
     let owner = ownership::current_actor(x.stage, spec, self_sha)?;
     let actual = snapshot(x, spec, &p, &owner, true)?;
+    native_deadline(&actual, now()?)?;
+    ensure!(
+        started.elapsed() < Duration::from_secs(WAIT),
+        "204 pre-wait metadata exhausted startup deadline"
+    );
     write(
         &p.waiting,
         &json!({"schema":"jetstreamer-root204-delivery-waiting-v1","stage_spec":spec,
         "startup_plan":pb,"process":actual,"owner":owner,"authority":denied()}),
     )?;
-    let started = Instant::now();
     loop {
         ensure!(
             started.elapsed() < Duration::from_secs(WAIT),
@@ -567,12 +622,14 @@ pub(super) fn wait(
         "204 startup no longer has its complete memory and disk envelope"
     );
     // This is deliberately after the final potentially slow manager query.
+    native_deadline(&actual, now()?)?;
     fresh(
         n(&r, "released_unix_seconds")?,
         n(&sample, "recorded_unix_seconds")?,
         now()?,
         started.elapsed(),
     )?;
+    native_deadline(&actual, now()?)?;
     let consumed = write(
         &x.output_directory.join("startup-consumed.json"),
         &json!({
@@ -585,6 +642,7 @@ pub(super) fn wait(
         now()?,
         started.elapsed(),
     )?;
+    native_deadline(&actual, now()?)?;
     Ok(consumed)
 }
 
@@ -630,6 +688,7 @@ fn saved_consumption(x: &downstream::StageSpec) -> Result<(BoundFile, Value)> {
         n(&c, "consumed_unix_seconds")?,
         Duration::ZERO,
     )?;
+    native_deadline(&r["process"], n(&c, "consumed_unix_seconds")?)?;
     let gs: BoundFile = serde_json::from_value(r["guard_sample"].clone())?;
     let gp: BoundFile = serde_json::from_value(r["guard_plan"].clone())?;
     ensure!(
@@ -691,7 +750,7 @@ pub(super) fn current_protection(
                 && w["stage_spec"] == private157::binding(spec)
                 && w["process"] == actual
                 && begin <= at
-                && at - begin <= WAIT
+                && at - begin < WAIT
                 && unit(&p.guard_unit)?["MainPID"] == "0",
             "204 pre-release holder is not a bounded childless waiting owner"
         );
@@ -875,7 +934,7 @@ mod tests {
             "producer":{"invocation_id":owner["InvocationID"],"pid":42,"restarts":0,"restart_policy":"no","kill_mode":"control-group",
                 "delegated":false,"active":"active","sub":"running","cgroup":owner["ControlGroup"]},
             "producer_stop_enabled":true,"minimum_free_bytes":100,"available_bytes":100,"workers":[],"bounded_measurement":false,
-            "maximum_root_physical_bytes":ROOT_CAP,"maximum_worker_vmas":3500000,"remote_mutations":false,
+            "maximum_root_physical_bytes":ROOT_CAP,"maximum_worker_vmas":3500000,"remote_mutations":false,"r2_mutations":false,
             "root_physical_observation":{"exceeds_budget":false,"conservative_physical_bytes":0},
             "trip_reason":null,"worker_observation_error":null,"root_physical_observation_error":null,"canary_target_error":null,
             "target_handoff_error":null,"native_main":null,"bounded_canary":null});
@@ -902,5 +961,39 @@ mod tests {
         let mut bad = sample;
         bad.as_object_mut().unwrap().remove("canary_target_error");
         assert!(guard_shape(&p, &x, &a, &b, &g, &bad, &owner).is_err());
+    }
+    #[test]
+    fn root204_custody_rejects_nested_writable_guard_and_canonical_import_roots() {
+        let writes = [
+            Path::new("/var/lib/jetstreamer/horizon-204-assembly-output"),
+            Path::new(CANONICAL),
+        ];
+        distinct_roots(
+            Path::new("/var/lib/jetstreamer/horizon-204-assembly-release"),
+            &writes,
+        )
+        .unwrap();
+        for control in [
+            "/var/lib/jetstreamer/horizon-204-assembly-output/release",
+            "/var/lib/jetstreamer",
+            "/home/ubuntu/horizon/release",
+        ] {
+            assert!(distinct_roots(Path::new(control), &writes).is_err());
+        }
+        assert!(
+            distinct_roots(
+                Path::new("/private/guard/release"),
+                &[Path::new("/private/guard")]
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn root204_native_deadline_cannot_restart_after_slow_pre_wait_metadata() {
+        let process = json!({"clock":{"started_unix_seconds":100}});
+        native_deadline(&process, 399).unwrap();
+        assert!(native_deadline(&process, 400).is_err());
+        assert!(native_deadline(&process, 99).is_err());
+        assert!(native_deadline(&process, 1000).is_err());
     }
 }
