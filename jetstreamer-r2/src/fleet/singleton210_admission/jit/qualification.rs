@@ -152,6 +152,31 @@ fn command_scope(result: &Value, commit: &str, log: &BoundFile, clippy: bool) ->
                 .any(|s| s.starts_with("--package=") || *s == "--workspace" || *s == "--exclude"),
         "210 JIT QA selected a foreign/ambiguous package"
     );
+    let mut index = 2;
+    while index < cargo.len() {
+        match cargo[index] {
+            "-p" | "--package" => {
+                ensure!(
+                    cargo.get(index + 1) == Some(&"jetstreamer-r2"),
+                    "210 JIT QA package operand differs"
+                );
+                index += 2;
+            }
+            "-j" | "--jobs" => {
+                ensure!(
+                    matches!(cargo.get(index + 1).copied(), Some("1" | "2")),
+                    "210 JIT QA jobs operand differs"
+                );
+                index += 2;
+            }
+            "--release" | "--frozen" | "--locked" | "--offline" | "--verbose" | "-v"
+            | "--quiet" | "-q" | "-j1" | "-j2" | "--jobs=1" | "--jobs=2" => index += 1,
+            "--all-targets" | "--all-features" if clippy => index += 1,
+            _ => {
+                bail!("210 JIT actual QA has an unreviewed option, name filter or source override")
+            }
+        }
+    }
     for needed in ["--release", "--frozen", "--locked", "--offline"] {
         ensure!(
             cargo.contains(&needed),
@@ -163,9 +188,7 @@ fn command_scope(result: &Value, commit: &str, log: &BoundFile, clippy: bool) ->
             cargo.contains(&"--all-targets")
                 && cargo.contains(&"--all-features")
                 && split < args.len()
-                && args[split + 1..]
-                    .windows(2)
-                    .any(|p| p == ["-D", "warnings"]),
+                && matches!(&args[split + 1..], ["-D", "warnings"] | ["-Dwarnings"]),
             "210 JIT actual Clippy is not strict all-target/all-feature QA"
         );
     } else {
@@ -316,6 +339,34 @@ mod tests {
             .unwrap()
             .push(json!("some_test"));
         assert!(command_scope(&filtered, &commit, &log, false).is_err());
+        let mut cargo_filter = r.clone();
+        cargo_filter["argv"]
+            .as_array_mut()
+            .unwrap()
+            .insert(4, json!("some_test"));
+        assert!(command_scope(&cargo_filter, &commit, &log, false).is_err());
+        let mut clippy = r.clone();
+        clippy["argv"] = json!([
+            "cargo",
+            "clippy",
+            "-p",
+            "jetstreamer-r2",
+            "--release",
+            "--frozen",
+            "--locked",
+            "--offline",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings"
+        ]);
+        command_scope(&clippy, &commit, &log, true).unwrap();
+        clippy["argv"]
+            .as_array_mut()
+            .unwrap()
+            .extend([json!("--cap-lints"), json!("allow")]);
+        assert!(command_scope(&clippy, &commit, &log, true).is_err());
         let q = json!({"source_commit":commit,"source_tree":"e".repeat(40),"source_tree_pointer":"/tree","qa_tree_pointer":"/tree"});
         let c = json!({"source_revision":commit,"source_revision_pointer":"/commit","qa_revision_pointer":"/commit"});
         let source = json!({"commit":commit,"tree":"e".repeat(40)});

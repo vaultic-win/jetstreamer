@@ -1,7 +1,8 @@
 # Full 210 admission with in-process guard selection
 
-Status: source-only proposal against `f7257b01`. No implementation, compiler,
-service, archive, snapshot, or R2 activity is authorized by this document.
+Status: source implementation against `7c557e91`, awaiting final independent
+review and parent compiler/runtime qualification. This document grants no
+service, archive, snapshot, replay, or R2 authority.
 
 ## Problem and available implementation
 
