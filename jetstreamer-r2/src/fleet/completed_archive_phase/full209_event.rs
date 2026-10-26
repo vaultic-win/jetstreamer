@@ -1,10 +1,25 @@
-//! A captured Full209 child may join one accepted resource sample. This is
+//! A captured epoch209 delivery child may join one accepted resource sample. This is
 //! metadata ownership, never replay, archive readiness, or capacity credit.
 use super::*;
-mod late_capture;
+pub(super) mod late_capture;
 mod status;
 pub(in crate::fleet) use status::{publish, status_matches};
 pub(in crate::fleet) const EVENT_SCHEMA: &str = "jetstreamer-completed209-full-captured-event-v1";
+const DELIVERY_EVENT: &str = "jetstreamer-completed209-delivery-captured-event-v1";
+const DELIVERY_REQUEST: &str = "jetstreamer-completed209-delivery-event-request-v1";
+pub(super) fn is_event(v: &Value) -> bool {
+    v["schema"] == EVENT_SCHEMA || v["schema"] == DELIVERY_EVENT
+}
+fn phase(l: &Value) -> Result<Phase> {
+    Ok(serde_json::from_value(l["phase"].clone())?)
+}
+fn claim_phase(p: Phase) -> &'static str {
+    match p {
+        Phase::Full => "full-verification",
+        Phase::Plugin => "plugin-verification",
+        Phase::Upload => "upload-readback",
+    }
+}
 const REQUEST: &str = "jetstreamer-completed209-full-event-request-v1";
 const MAX_EVENT_AGE: u64 = 300;
 
@@ -30,12 +45,13 @@ fn capture_shape(l: &Value) -> Result<()> {
     ensure!(
         l["schema"] == "jetstreamer-completed-archive-phase-launch-v1"
             && l["epoch"] == 209
-            && l["phase"] == "full"
+            && (l["phase"] == "full"
+                || l["phase_spec_contents"]["launcher_transition"].is_object())
             && l["child_execution_authorized"] == false
             && l["publication_authorized"] == false
             && l["remote_mutations"] == false
             && l["r2_mutations"] == false
-            && pipeline_scope("full-verification", string(l, "unit")?) == Some(209)
+            && pipeline_scope(claim_phase(phase(l)?), string(l, "unit")?) == Some(209)
             && l["owner"]["Id"] == l["unit"]
             && l["owner"]["InvocationID"] == l["invocation_id"]
             && l["owner"]["NRestarts"] == "0"
@@ -44,7 +60,7 @@ fn capture_shape(l: &Value) -> Result<()> {
             && l["process"]["source_read_only_mount"] == true
             && l["startup_release"].is_object()
             && l["startup_release_contents"]["schema"] == barrier::RELEASE,
-        "completed209 event requires the genuine captured Full child, not a legacy launch or waiter"
+        "completed209 event requires the genuine captured delivery child, not a terminal proof or waiter"
     );
     Ok(())
 }
@@ -60,21 +76,29 @@ fn claim(binding: &BoundFile, l: &Value) -> Result<PipelineClaim> {
     capture_shape(l)?;
     Ok(PipelineClaim {
         epoch: 209,
-        phase: "full-verification".into(),
+        phase: claim_phase(phase(l)?).into(),
         unit: string(l, "unit")?.into(),
         invocation_id: string(l, "invocation_id")?.into(),
         expected_exec_start: string(&l["effective_unit"], "ExecStart")?.into(),
         evidence: vec![binding.clone()],
     })
 }
+fn admitted_resource(a: &Value, s: &Spec) -> Result<()> {
+    ensure!(
+        a["capacity"]["resource_basis"] == s.resource_basis,
+        "completed209 event changed the actual admitted capacity context"
+    );
+    Ok(())
+}
 fn checked_launch(binding: &BoundFile) -> Result<(PipelineClaim, Value, Spec, Value)> {
     let l = read(binding)?;
     let c = claim(binding, &l)?;
     let (actual, saved, s, a) = peer::claim_launch(&c)?;
     ensure!(
-        actual == *binding && saved == l && s.epoch == 209 && s.phase == Phase::Full,
+        actual == *binding && saved == l && s.epoch == 209 && s.phase == phase(&l)?,
         "completed209 capture differs from its qualified saved launch/control proofs"
     );
+    admitted_resource(&a, &s)?;
     Ok((c, saved, s, a))
 }
 fn owner_shape(l: &Value, u: &Value) -> Result<()> {
@@ -149,7 +173,7 @@ fn event_clock(previous: &Value, o: &Value, l: &Value, at: u64) -> Result<u64> {
     );
     Ok(captured)
 }
-fn accepted(previous: &Value, observer: &BoundFile, o: &Value) -> Result<()> {
+pub(super) fn accepted(previous: &Value, observer: &BoundFile, o: &Value) -> Result<()> {
     ensure!(
         previous["schema"] == super::super::SCHEMA
             && previous["first_epoch"] == 201
@@ -168,18 +192,25 @@ fn accepted(previous: &Value, observer: &BoundFile, o: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn accepted_child(previous: &Value, observer: &BoundFile, o: &Value, l: &Value) -> Result<()> {
+    if phase(l)? == Phase::Full {
+        return accepted(previous, observer, o);
+    }
+    let s: Spec = serde_json::from_value(read(&serde_json::from_value(l["phase_spec"].clone())?)?)?;
+    let (view, _) = terminal::previous_view(previous, &s)?;
+    accepted(&view, observer, o)
+}
 fn event_launch(event: &Value) -> Result<(PipelineClaim, Value, Spec, Value)> {
     ensure!(
-        event["schema"] == EVENT_SCHEMA
-            && event["epoch"] == 209
-            && event["phase"] == "full-verification"
-            && event["authority"] == denied(),
+        is_event(event) && event["epoch"] == 209 && event["authority"] == denied(),
         "completed209 event scope/authority differs"
     );
     let b: BoundFile = serde_json::from_value(event["launch"].clone())?;
     let result = checked_launch(&b)?;
     ensure!(
-        event["claim"] == serde_json::to_value(&result.0)?
+        event["phase"] == result.0.phase
+            && (event["schema"] == DELIVERY_EVENT || result.2.phase == Phase::Full)
+            && event["claim"] == serde_json::to_value(&result.0)?
             && event["recorded_unix_seconds"] == result.1["captured_unix_seconds"]
             && utc_seconds(string(event, "sampled_at_utc")?)?
                 == number(&result.1, "captured_unix_seconds")?,
@@ -194,7 +225,8 @@ fn output_scope(path: &Path) -> Result<()> {
             && path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("horizon-generic209-full-event-")),
+                .is_some_and(|n| n.starts_with("horizon-generic209-full-event-")
+                    || n.starts_with("horizon-generic209-delivery-event-")),
         "completed209 event needs its dedicated private namespace"
     );
     Ok(())
@@ -215,7 +247,7 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("prepare-completed209-full-event")?;
     let r: Request = serde_json::from_value(read(&binding)?)?;
     ensure!(
-        r.schema == REQUEST,
+        matches!(r.schema.as_str(), REQUEST | DELIVERY_REQUEST),
         "completed209 event request schema differs"
     );
     private_output(&r.output_directory)?;
@@ -224,13 +256,13 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
     let (c, l, s, a) = checked_launch(&r.launch)?;
     let late = late_capture::context(&previous, &r.observer, &o, &l, &a, &c)?;
     ensure!(
-        (late || a["resource_basis"]["observer"] == private157::binding(&r.observer))
-            && a["resource_basis"]["fleet"] == private157::binding(&r.previous_fleet),
+        (late || a["capacity"]["resource_basis"]["observer"] == private157::binding(&r.observer))
+            && a["capacity"]["resource_basis"]["fleet"] == private157::binding(&r.previous_fleet),
         "completed209 event substituted the child's admitted resource context"
     );
     let captured = event_clock(&previous, &o, &l, now()?)?;
     live(&c, &l)?;
-    let event = json!({"schema":EVENT_SCHEMA,"epoch":209,"phase":"full-verification",
+    let event = json!({"schema":if s.phase == Phase::Full {EVENT_SCHEMA} else {DELIVERY_EVENT},"epoch":209,"phase":c.phase,
         "request":binding,"issuer_sha256":self_sha,"observer":r.observer,"previous_fleet":r.previous_fleet,
         "output_directory":r.output_directory,
         "launch":r.launch,"claim":c,"recorded_unix_seconds":captured,
@@ -257,7 +289,7 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
     let tracked = plan["tracked_units"]
         .as_array_mut()
         .context("completed209 tracked roster missing")?;
-    for name in [&c.unit, &s.guard_units["full"]] {
+    for name in [&c.unit, &s.guard_units[s.phase.name()]] {
         if !tracked.iter().any(|n| n.as_str() == Some(name.as_str())) {
             tracked.push(json!(name));
         }
@@ -288,7 +320,7 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
         .cloned()
         .collect::<BTreeSet<_>>();
     names.insert(c.unit.clone());
-    names.insert(s.guard_units["full"].clone());
+    names.insert(s.guard_units[s.phase.name()].clone());
     event_census(&previous, &census(&names, 201, 300)?, &event)?;
     live(&c, &l)?;
     Ok(())
@@ -314,15 +346,15 @@ pub(in crate::fleet) fn event_predecessor(
                 .is_some_and(|b| event["previous_fleet"] == private157::binding(b))
             && event["observer"] == private157::binding(&p.observer)
             && sample == string(&o, "recorded_at_utc")?
-            && (late || a["resource_basis"]["observer"] == event["observer"])
-            && a["resource_basis"]["fleet"] == event["previous_fleet"]
+            && (late || a["capacity"]["resource_basis"]["observer"] == event["observer"])
+            && a["capacity"]["resource_basis"]["fleet"] == event["previous_fleet"]
             && number(event, "recorded_unix_seconds")? == t,
         "completed209 event lost its exact admitted predecessor/observation"
     );
     let request: Request =
         serde_json::from_value(read(&serde_json::from_value(event["request"].clone())?)?)?;
     ensure!(
-        request.schema == REQUEST
+        matches!(request.schema.as_str(), REQUEST | DELIVERY_REQUEST)
             && event["observer"] == private157::binding(&request.observer)
             && event["previous_fleet"] == private157::binding(&request.previous_fleet)
             && event["launch"] == private157::binding(&request.launch)
@@ -343,7 +375,7 @@ pub(in crate::fleet) fn event_predecessor(
         &old,
         &new,
         &c,
-        &s.guard_units["full"],
+        &s.guard_units[s.phase.name()],
         if late { Some(&p.observer) } else { None },
     )?;
     let old_claims: Vec<PipelineClaim> = serde_json::from_value(
@@ -360,7 +392,7 @@ pub(in crate::fleet) fn event_predecessor(
     );
     let mut tracked: BTreeSet<String> = serde_json::from_value(old["tracked_units"].clone())?;
     tracked.insert(c.unit.clone());
-    tracked.insert(s.guard_units["full"].clone());
+    tracked.insert(s.guard_units[s.phase.name()].clone());
     ensure!(
         tracked == p.tracked_units.iter().cloned().collect(),
         "completed209 event changed unrelated tracked owners"
@@ -466,8 +498,20 @@ pub(in crate::fleet) fn event_census(
     event: &Value,
 ) -> Result<()> {
     let (c, l, s, _) = event_launch(event)?;
+    let (previous_view, terminal_guards) = if s.phase == Phase::Full {
+        (previous.clone(), BTreeSet::new())
+    } else {
+        terminal::previous_view(previous, &s)?
+    };
     let mut peers = current.clone();
-    for name in [&c.unit, &s.guard_units["full"]] {
+    for guard in terminal_guards {
+        let row = peers
+            .get(&guard)
+            .context("completed209 terminal predecessor guard omitted")?;
+        idle(row)?;
+        peers.remove(&guard);
+    }
+    for name in [&c.unit, &s.guard_units[s.phase.name()]] {
         peers
             .remove(name)
             .context("completed209 new owner/guard omitted from census")?;
@@ -476,7 +520,7 @@ pub(in crate::fleet) fn event_census(
             peers.insert(name.clone(), old.clone());
         }
     }
-    maintenance_capacity::current_owners(previous, &peers)?;
+    maintenance_capacity::current_owners(&previous_view, &peers)?;
     owner_shape(
         &l,
         current.get(&c.unit).context("completed209 child missing")?,
@@ -703,5 +747,48 @@ mod tests {
         ] {
             assert_eq!(denied()[key], false);
         }
+    }
+    #[test]
+    fn completed209_delivery_claims_use_real_plugin_and_upload_phases_and_reject_terminal_as_live()
+    {
+        let (_, _, base, _) = fixture();
+        for (p, wire) in [
+            (Phase::Plugin, "plugin-verification"),
+            (Phase::Upload, "upload-readback"),
+        ] {
+            let mut l = base.clone();
+            l["phase"] = json!(p);
+            l["phase_spec_contents"] =
+                json!({"launcher_transition":{"authenticated_by_checked_launch":true}});
+            let unit = format!("horizon-qualify-209-generic-{}-v12.service", p.name());
+            l["unit"] = json!(unit);
+            l["owner"]["Id"] = json!(unit);
+            capture_shape(&l).unwrap();
+            let c = claim(
+                &BoundFile {
+                    path: "/sealed/live.json".into(),
+                    sha256: "a".repeat(64),
+                },
+                &l,
+            )
+            .unwrap();
+            assert_eq!(c.phase, wire);
+            l["schema"] = json!(terminal::SCHEMA);
+            assert!(capture_shape(&l).is_err());
+        }
+        assert!(is_event(&json!({"schema":DELIVERY_EVENT})));
+    }
+    #[test]
+    fn completed209_event_uses_actual_admission_capacity_resource_basis_without_fabricating_top_level_field()
+     {
+        let (mut s, _, _, _) = fixture();
+        s.resource_basis = json!({"fleet":{"path":"/sealed/fleet.json","sha256":"a".repeat(64)},
+            "observer":{"path":"/sealed/observer.json","sha256":"b".repeat(64)}});
+        let mut admission = json!({"capacity":{"resource_basis":s.resource_basis}});
+        assert!(admission.get("resource_basis").is_none());
+        admitted_resource(&admission, &s).unwrap();
+        admission["resource_basis"] = s.resource_basis.clone();
+        admission["capacity"]["resource_basis"]["fleet"]["sha256"] = json!("0".repeat(64));
+        assert!(admitted_resource(&admission, &s).is_err());
     }
 }

@@ -8,11 +8,40 @@ mod decoder_capacity;
 mod empty_properties;
 mod full209_event;
 pub(super) use full209_event::{
-    event_census as full209_event_census, event_predecessor as full209_event_predecessor,
     prepare as prepare_full209_event, publish as publish_full209_status,
     status_matches as full209_event_status_matches,
 };
-pub(super) const FULL209_EVENT_SCHEMA: &str = full209_event::EVENT_SCHEMA;
+pub(super) fn is_delivery209_event(v: &Value) -> bool {
+    full209_event::is_event(v) || v["schema"] == terminal_event::SCHEMA
+}
+pub(super) fn full209_event_predecessor(
+    previous: &Value,
+    p: &Plan,
+    pb: &BoundFile,
+    event: &Value,
+    sample: &str,
+    at: u64,
+) -> Result<()> {
+    if event["schema"] == terminal_event::SCHEMA {
+        terminal_event::predecessor(previous, p, pb, event, sample, at)
+    } else {
+        full209_event::event_predecessor(previous, p, pb, event, sample, at)
+    }
+}
+pub(super) fn full209_event_census(
+    previous: &Value,
+    current: &BTreeMap<String, Value>,
+    event: &Value,
+) -> Result<()> {
+    if event["schema"] == terminal_event::SCHEMA {
+        terminal_event::census_check(previous, current, event)
+    } else {
+        full209_event::event_census(previous, current, event)
+    }
+}
+pub(super) fn prepare_terminal_event() -> Result<()> {
+    terminal_event::prepare()
+}
 // Scope-limited metadata reuse for the separate Full 210 JIT issuer. These
 // helpers confer no generic completed-archive origin or execution authority.
 pub(super) fn jit210_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
@@ -28,8 +57,11 @@ pub(super) fn jit210_native_text(path: impl AsRef<Path>, maximum: u64) -> Result
     barrier::native_text(path, maximum)
 }
 
+mod handoff;
 mod launch;
 mod peer;
+mod terminal;
+mod terminal_event;
 pub(super) fn root205_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     ensure!(
         continuation205_delivery::scope(name) || continuation205_delivery::guard_scope(name),
@@ -359,6 +391,9 @@ pub(super) fn guard_scope(unit: &str, first: u64, last: u64) -> bool {
                 })
         })
 }
+pub(super) fn capture_terminal() -> Result<()> {
+    terminal::capture()
+}
 pub(super) fn capture() -> Result<()> {
     launch::run()
 }
@@ -466,6 +501,8 @@ struct Spec {
     interpreter: Option<BoundFile>,
     unit_file: BoundFile,
     resource_basis: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    launcher_transition: Option<handoff::Transition>,
     prior: Vec<Prior>,
     output: PathBuf,
 }
@@ -958,7 +995,11 @@ fn launch_terminal_order(launch: &Value, events: &[Value], admission: &Value) ->
     Ok(())
 }
 fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> Result<Value> {
-    let captured = launch::validate_saved(&read(&p.launch)?, s, p.phase, self_sha)?;
+    let value = read(&p.launch)?;
+    if value["schema"] == terminal::SCHEMA {
+        return terminal::predecessor(&value, s, p, archive, self_sha);
+    }
+    let captured = launch::validate_saved(&value, s, p.phase, self_sha)?;
     let admission: BoundFile = serde_json::from_value(captured["admission"].clone())?;
     let iid = captured["invocation_id"]
         .as_str()
@@ -969,10 +1010,8 @@ fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> R
             && v["admitted"] == true
             && v["epoch"] == s.epoch
             && v["phase"] == p.phase.name()
-            && v["issuer_sha256"] == self_sha
             && v["origin"] == serde_json::to_value(&s.origin)?
             && v["tools"] == serde_json::to_value(&s.tools)?
-            && v["programs"] == serde_json::to_value(&s.programs)?
             && v["decoder_capacity"] == serde_json::to_value(&s.decoder_capacity)?
             && v["state_root"] == serde_json::to_value(&s.state_root)?
             && v["units"] == serde_json::to_value(&s.units)?
@@ -983,8 +1022,11 @@ fn predecessor(s: &Spec, p: &Prior, archive: &LocalArchive, self_sha: &str) -> R
     let old_spec: BoundFile = serde_json::from_value(v["spec"].clone())?;
     let prior: Spec = serde_json::from_value(read(&old_spec)?)?;
     shape(&prior)?;
+    handoff::programs_match(&prior, s)?;
     ensure!(
-        v["interpreter"] == serde_json::to_value(&prior.interpreter)?,
+        v["issuer_sha256"] == prior.programs["launcher"].artifact.sha256
+            && v["programs"] == serde_json::to_value(&prior.programs)?
+            && v["interpreter"] == serde_json::to_value(&prior.interpreter)?,
         "completed phase predecessor interpreter differs"
     );
     ensure!(
@@ -1084,6 +1126,7 @@ pub(super) fn run() -> Result<()> {
     let s: Spec = serde_json::from_value(read(&binding)?)?;
     shape(&s)?;
     validate_output_destination(&s.output)?;
+    handoff::validate(&s)?;
     let state = fs::symlink_metadata(&s.state_root)?;
     ensure!(
         s.state_root.canonicalize()? == s.state_root
@@ -1200,7 +1243,7 @@ pub(super) fn run() -> Result<()> {
     decoder_capacity::validate(&s, &original["producer"])?;
     private157::immutable_receipt(
         &s.output,
-        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"origin_evidence_after":origin_after,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"startup_plan":s.startup_plan,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"origin_evidence_after":origin_after,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"launcher_transition":s.launcher_transition,"startup_plan":s.startup_plan,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
     )
 }
 
@@ -1287,6 +1330,7 @@ mod tests {
             }),
             unit_file: b("unit"),
             resource_basis: json!({}),
+            launcher_transition: None,
             prior: match phase {
                 Phase::Full => vec![],
                 Phase::Plugin => vec![Phase::Full],

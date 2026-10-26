@@ -62,6 +62,11 @@ pub(super) fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, S
             && admission["schema"] == RECEIPT
             && admission["admitted"] == true
             && admission["issuer_sha256"] == spec.programs["launcher"].artifact.sha256
+            && admission
+                .get("launcher_transition")
+                .cloned()
+                .unwrap_or(Value::Null)
+                == serde_json::to_value(&spec.launcher_transition)?
             && admission["epoch"] == spec.epoch
             && admission["phase"] == spec.phase.name()
             && admission["origin"] == serde_json::to_value(&spec.origin)?
@@ -73,6 +78,7 @@ pub(super) fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, S
             && admission["guard_units"] == serde_json::to_value(&spec.guard_units)?
             && admission["startup_plan"] == private157::binding(&spec.startup_plan)
             && admission["argv"] == serde_json::to_value(command(&spec, &archive)?)?
+            && admission["capacity"]["resource_basis"] == spec.resource_basis
             && admission["capacity"]["additional_bytes"] == METADATA
             && admission["capacity"]["memory_before"]["candidate_memory_max_bytes"]
                 == spec.phase.profile().1
@@ -805,12 +811,14 @@ mod tests {
                 assert_eq!(total, cap + (2u64 << 30));
                 assert_eq!(memory["remaining_hard_memory_growth_bytes"], total);
             }
-            assert!(resource_evidence(
-                &p,
-                &json!({"native_memory_current":(cap+1).to_string()}),
-                Value::Null
-            )
-            .is_err());
+            assert!(
+                resource_evidence(
+                    &p,
+                    &json!({"native_memory_current":(cap+1).to_string()}),
+                    Value::Null
+                )
+                .is_err()
+            );
         }
     }
     #[test]

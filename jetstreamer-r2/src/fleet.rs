@@ -374,6 +374,12 @@ pub(super) fn prepare_singleton209_admission_spec() -> Result<()> {
 pub(super) fn deliver_singleton209_output() -> Result<()> {
     singleton209_delivery::run()
 }
+pub(super) fn prepare_completed209_terminal_event() -> Result<()> {
+    completed_archive_phase::prepare_terminal_event()
+}
+pub(super) fn capture_completed209_phase_terminal() -> Result<()> {
+    completed_archive_phase::capture_terminal()
+}
 pub(super) fn capture_completed_archive_phase() -> Result<()> {
     completed_archive_phase::capture()
 }
@@ -3012,7 +3018,7 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == completed_archive_phase::FULL209_EVENT_SCHEMA {
+            if completed_archive_phase::is_delivery209_event(&event) {
                 completed_archive_phase::full209_event_predecessor(
                     &previous,
                     &plan,
@@ -3507,7 +3513,7 @@ pub(super) async fn run() -> Result<()> {
         singleton227_event::event_census(&previous, &before, claims[0])?;
     }
     if let Some(binding) = &plan.metadata_event
-        && bound_json(binding)?["schema"] == completed_archive_phase::FULL209_EVENT_SCHEMA
+        && completed_archive_phase::is_delivery209_event(&bound_json(binding)?)
     {
         completed_archive_phase::full209_event_census(
             &bound_json(

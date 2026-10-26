@@ -26,7 +26,12 @@ fn predecessor(o: &Value, at: u64) -> Result<BoundFile> {
     );
     Ok(b)
 }
-fn chain(observer: &BoundFile, o: &Value, original: &BoundFile, historical: &Value) -> Result<()> {
+pub(in crate::fleet::completed_archive_phase) fn chain(
+    observer: &BoundFile,
+    o: &Value,
+    original: &BoundFile,
+    historical: &Value,
+) -> Result<()> {
     let original_at = utc_seconds(string(historical, "recorded_at_utc")?)?;
     let mut binding = observer.clone();
     let mut current = o.clone();
@@ -64,12 +69,13 @@ pub(super) fn context(
     c: &PipelineClaim,
 ) -> Result<bool> {
     if l.get("capture_recovery").is_none() {
-        accepted(previous, observer, o)?;
+        accepted_child(previous, observer, o, l)?;
         return Ok(false);
     }
     // checked_launch has authenticated the exact v12 recovery pins, distinct
     // capturer seal, unchanged release, original admission and current protection.
-    let original: BoundFile = serde_json::from_value(a["resource_basis"]["observer"].clone())?;
+    let original: BoundFile =
+        serde_json::from_value(a["capacity"]["resource_basis"]["observer"].clone())?;
     let historical = read(&original)?;
     accepted(previous, &original, &historical)?;
     ensure!(

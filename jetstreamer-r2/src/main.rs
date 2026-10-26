@@ -3544,10 +3544,20 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
     }
-    if env::args().nth(1).as_deref() == Some("prepare-completed209-full-event") {
+    if env::args().nth(1).as_deref().is_some_and(|c| {
+        matches!(
+            c,
+            "prepare-completed209-full-event" | "prepare-completed209-delivery-event"
+        )
+    }) {
         return fleet::prepare_completed209_full_event();
     }
-    if env::args().nth(1).as_deref() == Some("status-publish-completed209-full") {
+    if env::args().nth(1).as_deref().is_some_and(|c| {
+        matches!(
+            c,
+            "status-publish-completed209-full" | "status-publish-completed209-delivery"
+        )
+    }) {
         return fleet::publish_completed209_full_status().await;
     }
     if env::args().nth(1).as_deref() == Some("repair-task-capture-141") {
@@ -3621,6 +3631,12 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("deliver-singleton209-output") {
         return fleet::deliver_singleton209_output();
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-completed209-terminal-event") {
+        return fleet::prepare_completed209_terminal_event();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-completed209-phase-terminal") {
+        return fleet::capture_completed209_phase_terminal();
     }
     if env::args().nth(1).as_deref() == Some("capture-completed-archive-phase") {
         return fleet::capture_completed_archive_phase();

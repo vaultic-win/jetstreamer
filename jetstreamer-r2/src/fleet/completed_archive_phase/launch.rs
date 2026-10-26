@@ -651,7 +651,6 @@ pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) 
         "origin",
         "tools",
         "decoder_capacity",
-        "programs",
         "units",
         "guard_units",
         "state_root",
@@ -667,7 +666,18 @@ pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) 
         prior.phase == phase,
         "completed phase captured phase differs"
     );
-    saved_shape(v, &prior, phase, self_sha, &a)?;
+    handoff::programs_match(&prior, s)?;
+    let issuer = if s.launcher_transition.is_some() {
+        handoff::validate(s)?;
+        ensure!(
+            self_sha == s.programs["launcher"].artifact.sha256,
+            "completed phase successor admitting helper differs"
+        );
+        string(v, "issuer_sha256")?
+    } else {
+        self_sha
+    };
+    saved_shape(v, &prior, phase, issuer, &a)?;
     recovery::validate_files(v)?;
     let plan: BoundFile = serde_json::from_value(v["guard_plan"].clone())?;
     let sample: BoundFile = serde_json::from_value(v["guard_sample"].clone())?;

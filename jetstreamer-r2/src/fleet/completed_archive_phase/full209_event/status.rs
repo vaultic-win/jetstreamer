@@ -1,7 +1,17 @@
-//! Numeric Full209 verification forecasts through canonical sidecar commit.
+//! Numeric epoch209 delivery forecasts through canonical sidecar commit.
 //! Uses the common conditional authenticated status writer, never archive I/O.
 use super::*;
+const DELIVERY_REQUEST: &str = "jetstreamer-completed209-delivery-status-request-v1";
+fn wire_phase(p: Phase) -> &'static str {
+    if p == Phase::Upload {
+        "upload"
+    } else {
+        "verification"
+    }
+}
 const REQUEST: &str = "jetstreamer-completed209-full-status-request-v1";
+const DELIVERY_POLICY: &str = "jetstreamer-completed209-delivery-sidecar-policy-v1";
+const DELIVERY_ESTIMATE: &str = "jetstreamer-completed209-delivery-status-estimate-v1";
 const POLICY: &str = "jetstreamer-completed209-full-sidecar-policy-v1";
 const ESTIMATE: &str = "jetstreamer-completed209-full-status-estimate-v1";
 const STAGES: [&str; 7] = [
@@ -40,9 +50,9 @@ struct Policy {
     estimate_basis: String,
     evidence: Vec<BoundFile>,
 }
-fn forecast(p: &Policy, r: &Request, sample: &str) -> Result<u64> {
+fn forecast(p: &Policy, r: &Request, sample: &str, phase: Phase) -> Result<u64> {
     ensure!(
-        p.schema == POLICY
+        matches!(p.schema.as_str(), POLICY | DELIVERY_POLICY)
             && p.epoch == 209
             && p.launch == r.launch
             && p.observer == r.observer
@@ -58,15 +68,18 @@ fn forecast(p: &Policy, r: &Request, sample: &str) -> Result<u64> {
                 == BTreeSet::from(STAGES),
         "completed209 forecast is not the exact current positive sidecar-inclusive model"
     );
-    p.remaining_stage_millis.values().try_fold(0u64, |sum, n| {
-        ensure!(*n > 0, "completed209 forecast contains a zero allowance");
+    p.remaining_stage_millis.iter().try_fold(0u64, |sum, (stage,n)| {
+        let completed = (stage == "remaining_full_verification" && phase != Phase::Full)
+            || (stage == "plugin_verification" && phase == Phase::Upload);
+        ensure!(if completed {*n == 0} else {*n > 0},
+            "completed209 forecast changed a proved completed stage or lacks a remaining allowance");
         sum.checked_add(*n)
             .context("completed209 sidecar estimate overflow")
     })
 }
 fn registered(r: &Request, f: &Value, o: &Value, c: &PipelineClaim) -> Result<()> {
     ensure!(
-        r.schema == REQUEST
+        matches!(r.schema.as_str(), REQUEST | DELIVERY_REQUEST)
             && o["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && f["schema"] == super::super::super::SCHEMA
             && f["first_epoch"] == 201
@@ -91,13 +104,13 @@ fn registered(r: &Request, f: &Value, o: &Value, c: &PipelineClaim) -> Result<()
                 .context("completed209 live roster missing")?
                 .iter()
                 .filter(|v| v["epoch"] == 209
-                    && v["phase"] == "full-verification"
+                    && v["phase"] == c.phase
                     && v["live"] == true
                     && v["unit"]["Id"] == c.unit
                     && v["unit"]["InvocationID"] == c.invocation_id)
                 .count()
                 == 1,
-        "completed209 status is not registered as its genuine generic Full child"
+        "completed209 status is not registered as its genuine generic delivery child"
     );
     peer_observation(f, o)?;
     Ok(())
@@ -227,7 +240,7 @@ pub(in crate::fleet) async fn publish() -> Result<()> {
     registered(&r, &f, &o, &c)?;
     let sampled = sample(&r, &f, &o, &l, now()?)?;
     let policy: Policy = serde_json::from_value(read(&r.policy)?)?;
-    let remaining = forecast(&policy, &r, &sampled)?;
+    let remaining = forecast(&policy, &r, &sampled, s.phase)?;
     for b in &policy.evidence {
         ensure!(
             b.path.starts_with("/var/lib/jetstreamer")
@@ -249,14 +262,14 @@ pub(in crate::fleet) async fn publish() -> Result<()> {
         elapsed_execution_millis: elapsed,
         estimated_remaining_millis: remaining,
         sampled_at_utc: sampled,
-        phase: "verification".into(),
+        phase: wire_phase(s.phase).into(),
     };
     validate_epoch_status(&status, 209)?;
     let pipeline = pipeline_status::Binding {
         unit: c.unit.clone(),
         invocation_id: c.invocation_id.clone(),
         expected_exec_start: c.expected_exec_start.clone(),
-        claim_phase: "full-verification".into(),
+        claim_phase: c.phase.clone(),
         origin_unit: origin.unit,
         origin_invocation_id: origin.invocation_id,
         model_path: binding.path.clone(),
@@ -264,7 +277,7 @@ pub(in crate::fleet) async fn publish() -> Result<()> {
         fleet_path: r.fleet.path.clone(),
         fleet_sha256: r.fleet.sha256.clone(),
     };
-    pipeline.validate(209, "verification")?;
+    pipeline.validate(209, wire_phase(s.phase))?;
     ensure!(
         r.receipt_directory == Path::new("/home/ubuntu/.jetstreamer-private/r2-status-receipts"),
         "completed209 status receipt directory differs"
@@ -279,13 +292,14 @@ pub(in crate::fleet) async fn publish() -> Result<()> {
             && parent
                 .file_name()
                 .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("horizon-generic209-full-status-"))
+                .is_some_and(|n| n.starts_with("horizon-generic209-full-status-")
+                    || n.starts_with("horizon-generic209-delivery-status-"))
             && r.estimate_receipt
                 .file_name()
                 .is_some_and(|n| n == "estimate.json"),
         "completed209 estimate escaped private namespace"
     );
-    let estimate = json!({"schema":ESTIMATE,"request":binding,"issuer_sha256":self_sha,
+    let estimate = json!({"schema":if s.phase == Phase::Full {ESTIMATE} else {DELIVERY_ESTIMATE},"request":binding,"issuer_sha256":self_sha,
         "observer":r.observer,"fleet":r.fleet,"launch":r.launch,"event":r.event,"mode":r.mode,
         "policy":r.policy,"status":status,"jet_identity":id,"original_started_millis":start,
         "original_terminal_evidence":terminal,"authority":denied()});
@@ -368,7 +382,7 @@ pub(in crate::fleet) fn status_matches(
             epoch == 209
                 && receipt.epoch == 209
                 && receipt.schema == PIPELINE_STATUS_RECEIPT_SCHEMA
-                && receipt.status.phase == "verification"
+                && matches!(receipt.status.phase.as_str(), "verification" | "upload")
                 && receipt.authenticated_readback,
             "not completed209 verification metadata"
         );
@@ -378,15 +392,17 @@ pub(in crate::fleet) fn status_matches(
         };
         let estimate = read(&b)?;
         ensure!(
-            estimate["schema"] == ESTIMATE
-                && estimate["status"] == json!(receipt.status)
+            matches!(
+                estimate["schema"].as_str(),
+                Some(ESTIMATE | DELIVERY_ESTIMATE)
+            ) && estimate["status"] == json!(receipt.status)
                 && estimate["authority"] == denied(),
             "completed209 status is not from this immutable observation"
         );
         let model: BoundFile = serde_json::from_value(estimate["request"].clone())?;
         let r: Request = serde_json::from_value(read(&model)?)?;
         ensure!(
-            r.schema == REQUEST
+            matches!(r.schema.as_str(), REQUEST | DELIVERY_REQUEST)
                 && estimate["launch"] == private157::binding(&r.launch)
                 && estimate["policy"] == private157::binding(&r.policy)
                 && estimate["observer"] == private157::binding(&r.observer)
@@ -400,7 +416,7 @@ pub(in crate::fleet) fn status_matches(
         capture_shape(&l)?;
         let p: Policy = serde_json::from_value(read(&r.policy)?)?;
         ensure!(
-            forecast(&p, &r, &receipt.status.sampled_at_utc)?
+            forecast(&p, &r, &receipt.status.sampled_at_utc, phase(&l)?)?
                 == receipt.status.estimated_remaining_millis,
             "completed209 status forecast changed"
         );
@@ -408,11 +424,16 @@ pub(in crate::fleet) fn status_matches(
             .pipeline_binding
             .as_ref()
             .context("completed209 status binding absent")?;
-        binding.validate(209, "verification")?;
+        let child_phase = phase(&l)?;
+        ensure!(
+            receipt.status.phase == wire_phase(child_phase),
+            "completed209 status wire phase differs from child"
+        );
+        binding.validate(209, wire_phase(child_phase))?;
         ensure!(
             binding.unit == l["unit"]
                 && binding.invocation_id == l["invocation_id"]
-                && binding.claim_phase == "full-verification"
+                && binding.claim_phase == claim_phase(child_phase)
                 && binding.model_path == model.path
                 && binding.model_sha256 == model.sha256
                 && binding.fleet_path == r.fleet.path
@@ -469,39 +490,45 @@ mod tests {
     fn g209_status_forecast_is_numeric_positive_and_sidecar_inclusive() {
         let r = request();
         let p = policy(&r);
-        assert_eq!(forecast(&p, &r, &p.sampled_at_utc).unwrap(), 7000);
+        assert_eq!(
+            forecast(&p, &r, &p.sampled_at_utc, Phase::Full).unwrap(),
+            7000
+        );
         for stage in STAGES {
             let mut p = policy(&r);
             p.remaining_stage_millis.insert(stage.into(), 0);
-            assert!(forecast(&p, &r, &p.sampled_at_utc).is_err(), "{stage}");
+            assert!(
+                forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err(),
+                "{stage}"
+            );
         }
         let mut p = policy(&r);
         p.remaining_stage_millis.remove("readback");
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
         let mut p = policy(&r);
         p.sidecar_inclusive = false;
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
         let mut p = policy(&r);
         p.remaining_stage_millis.insert("upload".into(), u64::MAX);
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
     }
     #[test]
     fn g209_status_policy_cannot_reuse_stale_sample_or_foreign_capture() {
         let r = request();
         let p = policy(&r);
-        assert!(forecast(&p, &r, "2026-10-26T06:20:00Z").is_err());
+        assert!(forecast(&p, &r, "2026-10-26T06:20:00Z", Phase::Full).is_err());
         let mut p = policy(&r);
         p.launch = bound("legacy-replay");
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
         let mut p = policy(&r);
         p.observer.sha256 = "b".repeat(64);
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
         let mut p = policy(&r);
         p.epoch = 210;
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
         let mut p = policy(&r);
         p.evidence.clear();
-        assert!(forecast(&p, &r, &p.sampled_at_utc).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
     }
     #[test]
     fn g209_status_wire_rejects_replay_phase_and_caller_clock_overrides() {
@@ -549,5 +576,48 @@ mod tests {
             "1970-01-01T03:03:20Z"
         );
         assert!(report_clock("initial", 9900, 10000, Some("1970-01-01T00:15:00Z")).is_err());
+    }
+    #[test]
+    fn completed209_successor_status_zeros_completed_gates_and_binds_upload_wire_phase() {
+        let r = request();
+        let mut p = policy(&r);
+        p.remaining_stage_millis
+            .insert("remaining_full_verification".into(), 0);
+        assert_eq!(
+            forecast(&p, &r, &p.sampled_at_utc, Phase::Plugin).unwrap(),
+            6000
+        );
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Full).is_err());
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Upload).is_err());
+        p.remaining_stage_millis
+            .insert("plugin_verification".into(), 0);
+        assert_eq!(
+            forecast(&p, &r, &p.sampled_at_utc, Phase::Upload).unwrap(),
+            5000
+        );
+        assert_eq!(wire_phase(Phase::Plugin), "verification");
+        assert_eq!(wire_phase(Phase::Upload), "upload");
+        p.remaining_stage_millis.insert("readback".into(), 0);
+        assert!(forecast(&p, &r, &p.sampled_at_utc, Phase::Upload).is_err());
+    }
+    #[test]
+    fn completed209_successor_status_bindings_use_the_actual_claim_phase() {
+        for phase in [Phase::Plugin, Phase::Upload] {
+            let mut b = pipeline_status::Binding {
+                unit: format!("horizon-qualify-209-generic-{}-v12.service", phase.name()),
+                invocation_id: "b".repeat(32),
+                expected_exec_start: "exact admitted command".into(),
+                claim_phase: claim_phase(phase).into(),
+                origin_unit: singleton209::UNIT.into(),
+                origin_invocation_id: "c".repeat(32),
+                model_path: "/sealed/model.json".into(),
+                model_sha256: "d".repeat(64),
+                fleet_path: "/sealed/fleet.json".into(),
+                fleet_sha256: "e".repeat(64),
+            };
+            b.validate(209, wire_phase(phase)).unwrap();
+            b.claim_phase = "full-verification".into();
+            assert!(b.validate(209, wire_phase(phase)).is_err());
+        }
     }
 }
