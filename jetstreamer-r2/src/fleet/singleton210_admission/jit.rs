@@ -324,6 +324,11 @@ pub(super) fn run() -> Result<()> {
     let (binding, self_sha) = publication203::parsed_args("admit-singleton210-jit")?;
     let r: Request = serde_json::from_value(native210::immutable_json(&binding)?)?;
     scope(&r)?;
+    let mut progress = crate::operation_progress::ProgressLog::new(
+        "full210-jit-admission",
+        210,
+        "issuer-validation",
+    );
     let mut phase = "issuer-validation";
     let outcome = (|| -> Result<()> {
         let initial = issuer::snapshot(&r.issuer, &binding, &self_sha, &r.output_directory)?;
@@ -341,12 +346,14 @@ pub(super) fn run() -> Result<()> {
                 .context("210 JIT coordinated sample time absent")?,
         )?;
         phase = "independent-input-validation";
+        progress.phase(phase);
         let mut s = ordinary_spec(&r, BTreeMap::new());
         // This is the same original capability, native, snapshot, node, worker,
         // preflight, genesis and resource-plan validation used by ordinary run.
         // The returned token has no deserializer or caller-controlled success.
         let inputs = validate_inputs(&s)?;
         phase = "preselection-native-custody";
+        progress.phase(phase);
         inputs.revalidate(&s)?;
         let current = issuer::snapshot(&r.issuer, &binding, &self_sha, &r.output_directory)?;
         issuer::same(&initial, &current)?;
@@ -360,6 +367,7 @@ pub(super) fn run() -> Result<()> {
             "210 JIT supported peer profiles changed before intrinsic selection"
         );
         phase = "intrinsic-guard-selection";
+        progress.phase(phase);
         let mut guards = BTreeMap::new();
         let mut chosen = Vec::new();
         for (owner, profile) in &profiles {
@@ -407,6 +415,7 @@ pub(super) fn run() -> Result<()> {
             output_directory: r.output_directory.clone(),
         };
         phase = "complete-ordinary-admission";
+        progress.phase(phase);
         // Direct invocation in this exact root process. No exec, external seal,
         // message, source-body rehash or timer operation intervenes here.
         admit_validated(&s, &effective, &self_sha, &inputs, Some(&attempt))
@@ -415,6 +424,7 @@ pub(super) fn run() -> Result<()> {
         "admission_passed":outcome.is_ok(),"last_phase":phase,"error":outcome.as_ref().err().map(|e|format!("{e:#}")),
         "same_process_pid":std::process::id(),"recorded_unix_seconds":now()?,"no_automatic_retry":true,"authority":denied()});
     let persisted = bind_written(&r.output_directory.join("attempt-result.json"), &result);
+    progress.finish(outcome.is_ok() && persisted.is_ok());
     match (outcome,persisted) {
         (Ok(()),Ok(_))=>Ok(()),(Err(error),Ok(_))=>Err(error),
         (Ok(()),Err(error))=>Err(error.context("210 JIT admission passed but result persistence failed; preserve exact admission and attempt")),

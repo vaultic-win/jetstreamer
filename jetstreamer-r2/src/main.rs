@@ -76,6 +76,7 @@ mod holding213_transport_probe;
 mod inactive_status;
 mod inventory_batch;
 mod native223_status;
+mod operation_progress;
 mod pipeline_status;
 mod qualification_status;
 mod readback_progress;

@@ -53,6 +53,12 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   replace an existing package directory. The seal receipt explicitly denies replay launch,
   publication, and remote mutation; exact-node capability probes and fresh admission remain
   independent requirements.
+- For the deployed sealer with SHA-256
+  `96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24`, use
+  process `umask 0022`, or `UMask=0022` in a metadata service that invokes it. This generation
+  applies the inherited umask to generated `0444` members and rejects their resulting mode under
+  `0077`. Keep private state directories explicitly `0700` and private writable receipts `0600`;
+  scope the setting to this sealer or its invoking metadata service.
 
 For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Optional local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
 
@@ -236,6 +242,17 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- Make long operations and control transitions observable in private stdout/stderr logs. Emit
+  timestamped phase start, substantive progress, completion and failure records with the epoch,
+  operation, elapsed time and last substantive progress time. For bounded waits, include the exact
+  awaited condition, deadline or remaining time, and next action on expiry. Emit a rate-limited
+  heartbeat at least once per minute from existing in-process work/wait loops; distinguish it from
+  advancing work and never reset the last-progress clock merely because a heartbeat was emitted.
+  Use existing counters or already captured evidence, without extra replay/resource observations
+  or R2 reads. Keep routine fleet/status refreshes on the single 30-minute cadence. Logging is
+  observational, grants no gate authority, must redact credentials and presigned URLs, and must
+  not restart healthy work or modify sealed deployments just to add output. When resuming a quiet
+  operation, inspect its real handle and phase log before deciding that it has stalled.
 - Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
   campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
   coordination and user reporting. Keep the loop work-conserving while repair agents investigate;

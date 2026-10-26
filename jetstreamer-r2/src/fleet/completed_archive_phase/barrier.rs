@@ -814,12 +814,22 @@ pub(super) fn run() -> Result<()> {
     };
     let p = read_plan(&binding)?;
     plan_shape(&p)?;
+    let mut progress = crate::operation_progress::ProgressLog::new(
+        "completed-archive-startup",
+        p.epoch,
+        "startup-validation",
+    );
     ensure!(
         fs::read_link("/proc/self/exe")? == p.launcher.path && args[6] == p.launcher.sha256,
         "completed startup running launcher differs"
     );
     release_parent(&p)?;
     let actual = self_snapshot(&p)?;
+    progress.phase("waiting-for-protective-release");
+    progress.wait_started(
+        "authenticated-protective-release",
+        Duration::from_secs(p.maximum_wait_seconds).saturating_sub(started.elapsed()),
+    );
     let value = wait_release(
         Duration::from_secs(p.maximum_wait_seconds),
         || started.elapsed(),
@@ -828,8 +838,15 @@ pub(super) fn run() -> Result<()> {
             Err(e) => Err(e.into()),
             Ok(_) => Ok(Some(release_value(&p, None)?.1)),
         },
-        || std::thread::sleep(Duration::from_millis(100)),
+        || {
+            progress.waiting(
+                "authenticated-protective-release",
+                Duration::from_secs(p.maximum_wait_seconds).saturating_sub(started.elapsed()),
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        },
     )?;
+    progress.phase("release-validation");
     let s = consume_shape(&p, &value, &actual, now()?)?;
     ensure!(
         s.startup_plan == binding,
@@ -857,6 +874,7 @@ pub(super) fn run() -> Result<()> {
         started.elapsed(),
         Duration::from_secs(p.maximum_wait_seconds),
     )?;
+    progress.phase("executing-child");
     Err(ProcessCommand::new(&p.child_argv[0])
         .args(&p.child_argv[1..])
         .exec()

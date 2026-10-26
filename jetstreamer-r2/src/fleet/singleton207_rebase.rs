@@ -1040,13 +1040,26 @@ pub(super) fn effective(f: &Value, original: &Value) -> Result<Option<(BoundFile
     Ok(Some((approved, p)))
 }
 pub(super) fn run(command: &str) -> Result<()> {
+    let mut progress = crate::operation_progress::ProgressLog::new(
+        "singleton207-guard-rebase",
+        207,
+        "issuer-validation",
+    );
     let (binding, self_sha) = publication203::parsed_args(command)?;
     issuer()?;
-    if command == "prepare-singleton207-guard-rebase" {
+    progress.phase(match command {
+        "prepare-singleton207-guard-rebase" => "prepare",
+        "capture-singleton207-rebase-bridge" => "capture-bridge",
+        "capture-singleton207-rebase-switch" => "capture-switch",
+        _ => "capture-completion",
+    });
+    let result = if command == "prepare-singleton207-guard-rebase" {
         prepare(&binding, &self_sha)
     } else {
         capture(command, &binding, &self_sha)
-    }
+    };
+    progress.finish(result.is_ok());
+    result
 }
 #[cfg(test)]
 mod command_tests;
