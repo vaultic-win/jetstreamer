@@ -114,6 +114,55 @@ fn validate_guard_controls(p: &BTreeMap<String, String>) -> Result<()> {
     Ok(())
 }
 
+const GUARD_TIMER_FIELDS: &str = "Id,LoadState,InvocationID,ActiveState,SubState,Triggers,TimersMonotonic,TimersCalendar,AccuracyUSec,RandomizedDelayUSec,Persistent,WakeSystem,OnClockChange,OnTimezoneChange,DropInPaths,NeedDaemonReload,Transient";
+fn validate_guard_timer(p: &BTreeMap<String, String>, service: &str) -> Result<()> {
+    singleton227_capture::require(
+        p,
+        &[
+            ("Id", &service.replace(".service", ".timer")),
+            ("LoadState", "loaded"),
+            ("ActiveState", "active"),
+            ("SubState", "waiting"),
+            ("Triggers", service),
+            ("TimersCalendar", ""),
+            ("AccuracyUSec", "1s"),
+            ("RandomizedDelayUSec", "0"),
+            ("Persistent", "no"),
+            ("WakeSystem", "no"),
+            ("OnClockChange", "no"),
+            ("OnTimezoneChange", "no"),
+            ("DropInPaths", ""),
+            ("NeedDaemonReload", "no"),
+            ("Transient", "no"),
+        ],
+    )?;
+    let next = p
+        .get("TimersMonotonic")
+        .and_then(|v| v.strip_prefix("{ OnUnitActiveUSec=30s ; next_elapse="))
+        .and_then(|v| v.strip_suffix(" }"))
+        .context("completed guard timer lacks its sole approved 30-second recurrence")?;
+    ensure!(
+        p.get("InvocationID").is_some_and(|v| is_lower_hex(v, 32))
+            && !next.is_empty()
+            && next.split(' ').all(|part| {
+                ["us", "ms", "min", "s", "h", "d", "w", "month", "y"]
+                    .iter()
+                    .find_map(|suffix| part.strip_suffix(suffix))
+                    .is_some_and(|number| {
+                        let digits =
+                            |v: &str| !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit());
+                        match number.split_once('.') {
+                            Some((whole, fraction)) => digits(whole) && digits(fraction),
+                            None => digits(number),
+                        }
+                    })
+            })
+            && next.bytes().any(|b| matches!(b, b'1'..=b'9')),
+        "completed guard timer invocation or next elapse is missing/unsupported"
+    );
+    Ok(())
+}
+
 pub(super) fn pipeline_scope(phase: &str, unit: &str) -> Option<u64> {
     let role = match phase {
         "full-verification" => "full",
@@ -1284,6 +1333,88 @@ mod tests {
             changed.insert(key.into(), value.into());
             let error = validate_guard_controls(&changed).unwrap_err().to_string();
             assert!(!error.contains("sensitive.so"));
+        }
+    }
+    #[test]
+    fn completed_phase_guard_timer_requires_exact_recurring_schedule_and_service_target() {
+        let service = "horizon-generic209-full-protective-v3.service";
+        let props = BTreeMap::from([
+            ("Id".into(), service.replace(".service", ".timer")),
+            ("LoadState".into(), "loaded".into()),
+            ("InvocationID".into(), "1".repeat(32)),
+            ("ActiveState".into(), "active".into()),
+            ("SubState".into(), "waiting".into()),
+            ("Triggers".into(), service.into()),
+            (
+                "TimersMonotonic".into(),
+                "{ OnUnitActiveUSec=30s ; next_elapse=3d 2h 17min 30s }".into(),
+            ),
+            ("TimersCalendar".into(), String::new()),
+            ("AccuracyUSec".into(), "1s".into()),
+            ("RandomizedDelayUSec".into(), "0".into()),
+            ("Persistent".into(), "no".into()),
+            ("WakeSystem".into(), "no".into()),
+            ("OnClockChange".into(), "no".into()),
+            ("OnTimezoneChange".into(), "no".into()),
+            ("DropInPaths".into(), String::new()),
+            ("NeedDaemonReload".into(), "no".into()),
+            ("Transient".into(), "no".into()),
+        ]);
+        validate_guard_timer(&props, service).unwrap();
+        for (key, value) in [
+            (
+                "TimersMonotonic",
+                "{ OnUnitActiveUSec=1d ; next_elapse=4d }",
+            ),
+            (
+                "TimersMonotonic",
+                "{ OnUnitInactiveUSec=30s ; next_elapse=4d }",
+            ),
+            (
+                "TimersMonotonic",
+                "{ OnUnitActiveUSec=30s ; next_elapse=4d } { OnBootUSec=1s ; next_elapse=4d }",
+            ),
+            (
+                "TimersMonotonic",
+                "{ OnUnitActiveUSec=30s ; next_elapse=0 }",
+            ),
+            (
+                "TimersMonotonic",
+                "{ OnUnitActiveUSec=30s ; next_elapse=infinity }",
+            ),
+            ("TimersMonotonic", "unsupported"),
+            (
+                "TimersMonotonic",
+                "{ OnUnitActiveUSec=30s ; next_elapse=1unsupported }",
+            ),
+            (
+                "Triggers",
+                "horizon-generic209-plugin-protective-v3.service",
+            ),
+            (
+                "TimersCalendar",
+                "{ OnCalendar=daily ; next_elapse=tomorrow }",
+            ),
+            ("AccuracyUSec", "1d"),
+            ("RandomizedDelayUSec", "1d"),
+            ("OnClockChange", "yes"),
+            ("DropInPaths", "/etc/systemd/system/foreign.conf"),
+            ("SubState", "elapsed"),
+        ] {
+            let mut changed = props.clone();
+            changed.insert(key.into(), value.into());
+            assert!(
+                validate_guard_timer(&changed, service).is_err(),
+                "accepted {key}: {value}"
+            );
+        }
+        for key in props.keys() {
+            let mut missing = props.clone();
+            missing.remove(key);
+            assert!(
+                validate_guard_timer(&missing, service).is_err(),
+                "accepted missing {key}"
+            );
         }
     }
     #[test]

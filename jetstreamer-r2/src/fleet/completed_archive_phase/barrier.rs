@@ -587,16 +587,9 @@ fn current_manager(p: &Startup, s: &Spec, v: &Value, actual: &Value) -> Result<(
     );
     let timer = properties(
         &p.guard_unit.replace(".service", ".timer"),
-        "ActiveState,SubState,Triggers",
+        GUARD_TIMER_FIELDS,
     )?;
-    singleton227_capture::require(
-        &timer,
-        &[
-            ("ActiveState", "active"),
-            ("SubState", "waiting"),
-            ("Triggers", &p.guard_unit),
-        ],
-    )?;
+    validate_guard_timer(&timer, &p.guard_unit)?;
     Ok(())
 }
 fn wait_release(

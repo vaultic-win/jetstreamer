@@ -354,12 +354,9 @@ fn guard(
     );
     let timer = singleton227_capture::properties(
         &p.spec.guard_units[p.spec.phase.name()].replace(".service", ".timer"),
-        "ActiveState,SubState",
+        GUARD_TIMER_FIELDS,
     )?;
-    singleton227_capture::require(
-        &timer,
-        &[("ActiveState", "active"), ("SubState", "waiting")],
-    )?;
+    validate_guard_timer(&timer, &p.spec.guard_units[p.spec.phase.name()])?;
     Ok(
         json!({"binding":bound,"sample":sample,"completed":completed,"properties":props,"timer":timer}),
     )
