@@ -547,7 +547,8 @@ fn self_snapshot(p: &Startup) -> Result<Value> {
 }
 /// systemd may omit a redundant child bind when its parent is already read-only.
 /// Require the most specific covering mount and every mount inside the archive
-/// to be read-only; an unrelated writable state directory grants no exception.
+/// to be read-only and unambiguous. Validate every row, but allow unrelated
+/// overmounts; an unrelated writable state directory grants no source exception.
 pub(super) fn archive_readonly_mount(archive: &Path, raw: &str) -> Result<Value> {
     fn mount_path(raw: &str) -> Result<PathBuf> {
         let input = raw.as_bytes();
@@ -624,10 +625,16 @@ pub(super) fn archive_readonly_mount(archive: &Path, raw: &str) -> Result<Value>
             !options.contains("") && readonly != options.contains("rw"),
             "mount access flags are missing or contradictory"
         );
-        ensure!(
-            mounts.insert(point, (id, readonly)).is_none(),
-            "mountpoint is ambiguous"
-        );
+        // Kernel mountinfo can list stacked mounts at unrelated paths. They
+        // cannot change archive access through this path, but a duplicate at
+        // any covering ancestor or inside the archive remains ambiguous.
+        // Keep all row/path/ID/access checks above global, even for ignored rows.
+        if archive.starts_with(&point) || point.starts_with(archive) {
+            ensure!(
+                mounts.insert(point, (id, readonly)).is_none(),
+                "mountpoint is ambiguous"
+            );
+        }
     }
     let (cover, (id, readonly)) = mounts
         .iter()
@@ -1197,6 +1204,123 @@ mod archive_mount_tests {
         format!(
             "{id} 37 259:1 / {point} {access},nosuid,relatime shared:47 master:1 - ext4 /dev/nvme0n1p1 rw,discard\n"
         )
+    }
+    fn unrelated_overmounts() -> String {
+        row(10, "/run/user/1000", "rw")
+            + &row(11, "/run/user/1000", "ro")
+            + &row(12, "/proc/sys/fs/binfmt_misc", "rw")
+            + &row(13, "/proc/sys/fs/binfmt_misc", "ro")
+            // A lexical prefix is not a descendant path component.
+            + &row(14, "/home/archive-other", "rw")
+            + &row(15, "/home/archive-other", "ro")
+    }
+    #[test]
+    fn completed_readonly_mount_accepts_unrelated_overmounts_with_inherited_home_cover() {
+        let target = Path::new("/home/archive");
+        let raw = row(1, "/", "rw")
+            + &row(2, "/home", "ro")
+            + &row(3, "/home/full-state", "rw")
+            + &unrelated_overmounts();
+        let proof = archive_readonly_mount(target, &raw).unwrap();
+        assert_eq!(proof["covering_mountpoint"], "/home");
+        assert_eq!(proof["covering_mount_id"], 2);
+        assert_eq!(proof["covering_mount_read_only"], true);
+        assert_eq!(proof["read_only_mounts_within_archive"], 0);
+        // Overmount listing order must not make unrelated access relevant.
+        let reversed = raw.lines().rev().collect::<Vec<_>>().join("\n");
+        assert_eq!(
+            archive_readonly_mount(target, &reversed).unwrap()["covering_mountpoint"],
+            "/home"
+        );
+    }
+    #[test]
+    fn completed_readonly_mount_accepts_actual_v11_namespace_with_unrelated_duplicates() {
+        let raw = include_str!("fixtures/v11-startup-mountinfo.txt");
+        assert_eq!(
+            hex_lower(&Sha256::digest(raw.as_bytes())),
+            "615dd33540be8b0638ae0e51f44fb81dbd157e699cf137475be08fe794be3a84"
+        );
+        for point in ["/run/user/1000", "/proc/sys/fs/binfmt_misc"] {
+            assert_eq!(
+                raw.lines()
+                    .filter(|line| line.split_whitespace().nth(4) == Some(point))
+                    .count(),
+                2
+            );
+        }
+        let target = Path::new(singleton209::ROOT).join("output");
+        assert!(
+            raw.lines()
+                .all(|line| line.split_whitespace().nth(4) != target.to_str())
+        );
+        let proof = archive_readonly_mount(&target, raw).unwrap();
+        assert_eq!(proof["covering_mountpoint"], "/");
+        assert_eq!(proof["covering_mount_id"], 155);
+        assert_eq!(proof["covering_mount_read_only"], true);
+        assert_eq!(proof["read_only_mounts_within_archive"], 0);
+    }
+    #[test]
+    fn completed_readonly_mount_rejects_ambiguity_at_every_source_related_mountpoint() {
+        let target = Path::new("/home/archive");
+        let base = row(1, "/", "ro")
+            + &row(2, "/home", "ro")
+            + &row(3, "/home/archive", "ro")
+            + &unrelated_overmounts();
+        for point in [
+            "/",
+            "/home",
+            "/home/archive",
+            "/home/archive/cache",
+            "/home/archive/epoch-209.jet",
+        ] {
+            for access in ["ro", "rw"] {
+                let raw = base.clone() + &row(20, point, "ro") + &row(21, point, access);
+                assert!(
+                    archive_readonly_mount(target, &raw).is_err(),
+                    "accepted ambiguous {point} with {access} overmount"
+                );
+            }
+        }
+    }
+    #[test]
+    fn completed_readonly_mount_rejects_writable_source_alias_amid_unrelated_duplicates() {
+        let target = Path::new("/home/archive");
+        let base = row(1, "/", "rw") + &row(2, "/home", "ro") + &unrelated_overmounts();
+        archive_readonly_mount(target, &base).unwrap();
+        for (root, point) in [
+            ("/home/archive", "/home/archive"),
+            ("/home/archive", "/home/archive/cache"),
+            ("/home/archive/epoch-209.jet", "/home/archive/linked.jet"),
+        ] {
+            let alias = format!("20 2 259:1 {root} {point} rw,nosuid - ext4 /dev/nvme0n1p1 rw\n");
+            assert!(
+                archive_readonly_mount(target, &(base.clone() + &alias)).is_err(),
+                "accepted writable source alias at {point}"
+            );
+        }
+    }
+    #[test]
+    fn completed_readonly_mount_validates_unrelated_rows_before_scoping_ambiguity() {
+        let target = Path::new("/home/archive");
+        let base = row(1, "/", "ro") + &unrelated_overmounts();
+        archive_readonly_mount(target, &base).unwrap();
+        for bad in [
+            "malformed unrelated row\n".to_owned(),
+            row(20, "/run/unrelated", "ro,rw"),
+            row(20, "/run/unrelated", "relatime"),
+            row(0, "/run/unrelated", "ro"),
+            row(1, "/run/unrelated", "ro"),
+            row(20, r"/run/bad\041path", "ro"),
+            row(20, "/run/unrelated", "ro").replacen("37", "bad-parent", 1),
+            row(20, "/run/unrelated", "ro").replacen("259:1", "bad:device", 1),
+            row(20, "/run/unrelated", "ro").replacen(" / /run/", r" /bad\041root /run/", 1),
+            row(20, "/run/unrelated", "ro") + &row(20, "/run/another", "ro"),
+        ] {
+            assert!(
+                archive_readonly_mount(target, &(base.clone() + &bad)).is_err(),
+                "accepted malformed or duplicate-ID unrelated row: {bad}"
+            );
+        }
     }
     #[test]
     fn completed_readonly_mount_accepts_inherited_root_with_writable_state_sibling() {

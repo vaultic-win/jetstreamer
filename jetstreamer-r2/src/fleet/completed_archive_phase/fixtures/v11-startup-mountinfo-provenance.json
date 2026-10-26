@@ -1,0 +1,23 @@
+{
+  "schema": "generic209-v11-captured-mountinfo-fixture-provenance-v1",
+  "source": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-v11-mount-diagnostic-v1/mountinfo.txt",
+    "sha256": "615dd33540be8b0638ae0e51f44fb81dbd157e699cf137475be08fe794be3a84",
+    "bytes": 6048
+  },
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-admission-v11/admission.json",
+    "sha256": "3c1711b1c6e7717202dded7715012575029d9b0e6d58b393e4ca0f8cb9420317"
+  },
+  "startup_plan": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-startup-v11/startup-plan.json",
+    "sha256": "99703800ed1cb13d7b4306e2a938dc1ccfe2329afc669965846ae7a7e785a9a4"
+  },
+  "archive_directory": "/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1/output",
+  "unrelated_duplicate_mountpoints": [
+    "/run/user/1000",
+    "/proc/sys/fs/binfmt_misc"
+  ],
+  "literal_covering_mountpoint": "/",
+  "scope": "Byte-identical captured read-only diagnostic namespace metadata. Test input only; no archive, admission, guard, release, or publication authority."
+}
