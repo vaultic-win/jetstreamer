@@ -1151,12 +1151,13 @@ mod tests {
         // Production immediately calls claim_launch after this routing gate;
         // this predicate alone never authenticates an endpoint.
     }
-    fn rollover_fixture() -> (
+    type RolloverFixture = (
         BTreeMap<String, Value>,
         BTreeMap<String, Value>,
         BTreeMap<String, Value>,
         BTreeMap<String, Value>,
-    ) {
+    );
+    fn rollover_fixture() -> RolloverFixture {
         let owner = "horizon-qualify-209-generic-plugin-v12.service";
         let guard = "horizon-generic209-plugin-protective-v12.service";
         let before_iid = "a".repeat(32);
