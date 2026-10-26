@@ -472,7 +472,9 @@ pub(super) fn guards(
         } else {
             prefix223_native20_admission::guard_selector(name)?
         };
-        let directory = if name == singleton209::UNIT || name == canary227::UNIT {
+        let directory = if name == singleton210::UNIT {
+            prefix223_native20_admission::singleton210_guard_directory(b)?
+        } else if name == singleton209::UNIT || name == canary227::UNIT {
             let parent = b.path.parent().context("capped guard directory missing")?;
             ensure!(
                 parent.starts_with("/var/lib/jetstreamer"),

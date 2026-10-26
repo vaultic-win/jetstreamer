@@ -136,6 +136,60 @@ pub(super) fn guard_selector(name: &str) -> Result<(&'static str, &'static str)>
         _ => anyhow::bail!("unmodeled protective selector:{name}"),
     })
 }
+const SINGLETON210_ACTUAL_RECEIPTS: &str =
+    "/var/lib/jetstreamer/horizon-210-singleton-guard-receipts-v1";
+const SINGLETON210_LEGACY_RECEIPTS: &str =
+    "/var/lib/jetstreamer/horizon-singleton210-guard-receipts-v1";
+fn singleton210_directory_shape<'a>(
+    bound: &'a BoundFile,
+    receipt: &Value,
+    plan: &Value,
+) -> Result<&'a Path> {
+    let directory = bound
+        .path
+        .parent()
+        .context("singleton210 bound guard directory missing")?;
+    let iid = receipt["guard_invocation_id"]
+        .as_str()
+        .context("singleton210 guard invocation missing")?;
+    let producer = receipt["producer_invocation_id"]
+        .as_str()
+        .context("singleton210 guard producer invocation missing")?;
+    ensure!(
+        (directory == Path::new(SINGLETON210_ACTUAL_RECEIPTS)
+            || directory == Path::new(SINGLETON210_LEGACY_RECEIPTS))
+            && is_lower_hex(iid, 32)
+            && is_lower_hex(producer, 32)
+            && bound.path.file_name().and_then(|n| n.to_str())
+                == Some(format!("sample-{iid}.json").as_str())
+            && receipt["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && receipt["guard_sha256"] == singleton210::GUARD_SHA
+            && plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
+            && plan["unit"] == singleton210::UNIT
+            && plan["invocation_id"] == producer
+            && plan["receipt_directory"] == serde_json::to_value(directory)?,
+        "singleton210 guard receipt directory is not its exact authenticated actual/legacy plan namespace"
+    );
+    Ok(directory)
+}
+/// Select the exact already-bound path, never a filesystem fallback or alias.
+/// PID1 completion, live owner, floors and current timer checks remain callers'
+/// independent gates. Both supported directories require the plan's exact bind.
+pub(super) fn singleton210_guard_directory(bound: &BoundFile) -> Result<&Path> {
+    let receipt = bound_json(bound)?;
+    let plan = BoundFile {
+        path: receipt["plan"]
+            .as_str()
+            .context("singleton210 guard plan path missing")?
+            .into(),
+        sha256: receipt["plan_sha256"]
+            .as_str()
+            .context("singleton210 guard plan digest missing")?
+            .into(),
+    };
+    let plan = native209::immutable_json(&plan)?;
+    singleton210_directory_shape(bound, &receipt, &plan)
+}
 pub(super) fn completed_guards(
     f: &Value,
     guards: &BTreeMap<String, BoundFile>,
@@ -157,7 +211,9 @@ pub(super) fn completed_guards_for(
     let mut history = BTreeMap::new();
     for (name, bound) in guards {
         let (unit, dir) = guard_selector(name)?;
-        let dir = if name == singleton209::UNIT || name == canary227::UNIT {
+        let dir = if name == singleton210::UNIT {
+            singleton210_guard_directory(bound)?
+        } else if name == singleton209::UNIT || name == canary227::UNIT {
             let parent = bound.path.parent().context("full209 bound guard parent")?;
             ensure!(
                 parent.starts_with("/var/lib/jetstreamer"),
@@ -594,6 +650,86 @@ mod tests {
             let mut extended = good.clone();
             extended["active"].as_array_mut().unwrap().push(json!({"epoch":epoch,"phase":phase,"ordinary_replay_claim":false,"unit":{"Id":name,"InvocationID":"a".repeat(32),"NRestarts":"0"}}));
             assert_eq!(roster(&extended).unwrap().len(), 2);
+        }
+    }
+    fn singleton210_path_fixture(directory: &str) -> (BoundFile, Value, Value) {
+        let iid = "a".repeat(32);
+        let producer = "b".repeat(32);
+        let binding = BoundFile {
+            path: Path::new(directory).join(format!("sample-{iid}.json")),
+            sha256: "c".repeat(64),
+        };
+        let receipt = json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_invocation_id":iid,
+            "producer_invocation_id":producer,"guard_sha256":singleton210::GUARD_SHA});
+        let plan = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":singleton210::UNIT,
+            "invocation_id":producer,"receipt_directory":directory});
+        (binding, receipt, plan)
+    }
+    #[test]
+    fn singleton210_guard_selection_preserves_exact_actual_and_legacy_plan_receipt_paths() {
+        for directory in [SINGLETON210_ACTUAL_RECEIPTS, SINGLETON210_LEGACY_RECEIPTS] {
+            let (binding, receipt, plan) = singleton210_path_fixture(directory);
+            let before = binding.clone();
+            assert_eq!(
+                singleton210_directory_shape(&binding, &receipt, &plan).unwrap(),
+                Path::new(directory)
+            );
+            assert_eq!(
+                binding, before,
+                "path selection must not rewrite the supplied binding"
+            );
+        }
+        assert_eq!(
+            guard_selector(singleton210::UNIT).unwrap(),
+            (
+                "horizon-singleton210-protective-v1.service",
+                SINGLETON210_LEGACY_RECEIPTS
+            )
+        );
+    }
+    #[test]
+    fn singleton210_guard_selection_rejects_copy_aliases_foreign_plans_and_replaced_invocations() {
+        let (binding, receipt, plan) = singleton210_path_fixture(SINGLETON210_ACTUAL_RECEIPTS);
+        for (pointer, value) in [
+            ("/receipt_directory", json!(SINGLETON210_LEGACY_RECEIPTS)),
+            ("/unit", json!(singleton207::UNIT)),
+            ("/invocation_id", json!("d".repeat(32))),
+            ("/schema", json!("foreign-plan")),
+        ] {
+            let mut changed = plan.clone();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                singleton210_directory_shape(&binding, &receipt, &changed).is_err(),
+                "{pointer}"
+            );
+        }
+        for (key, value) in [
+            ("guard_invocation_id", json!("d".repeat(32))),
+            ("producer_invocation_id", json!("d".repeat(32))),
+            ("guard_sha256", json!("d".repeat(64))),
+            ("guard_invocation_id", json!("A".repeat(32))),
+        ] {
+            let mut changed = receipt.clone();
+            changed[key] = value;
+            assert!(
+                singleton210_directory_shape(&binding, &changed, &plan).is_err(),
+                "{key}"
+            );
+        }
+    }
+    #[test]
+    fn singleton210_guard_selection_cannot_generalize_to_arbitrary_private_or_nested_directories() {
+        for directory in [
+            "/var/lib/jetstreamer/other-guard-receipts",
+            "/var/lib/jetstreamer/horizon-210-singleton-guard-receipts-v1/nested",
+            "/tmp/horizon-210-singleton-guard-receipts-v1",
+            "/var/lib/jetstreamer/horizon-210-singleton-guard-receipts-v2",
+        ] {
+            let (binding, receipt, plan) = singleton210_path_fixture(directory);
+            assert!(
+                singleton210_directory_shape(&binding, &receipt, &plan).is_err(),
+                "{directory}"
+            );
         }
     }
 }
