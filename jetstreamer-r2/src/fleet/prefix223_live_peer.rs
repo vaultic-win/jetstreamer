@@ -117,7 +117,7 @@ fn guard_shape_binding(
     now: u64,
 ) -> Result<()> {
     let rebased = binding.path.to_str() != l["guard_plan"]["path"].as_str();
-    let sha = &binding.sha256;
+    let sha = binding.sha256.as_str();
     let plan_path = &binding.path;
     let profile = match d.epoch {
         207 if rebased => {
