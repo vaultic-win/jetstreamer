@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 mod canary227;
 mod capped141;
+mod extraction225;
 mod full210;
 mod metadata_cycle;
 mod missing157;
@@ -260,6 +261,9 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
         binding.validate(publication.epoch, &publication.status.phase)?;
         return Ok(vec![(binding.unit.clone(), binding.invocation_id.clone())]);
     }
+    if let Some(owner) = fleet::epoch225_extraction_inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     if let Some(owner) = native223_status::inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
@@ -450,6 +454,11 @@ fn fresh_census(
     }
     let native209 = plan.epoch == 209 && native209::recognized(terminal_fleet, owners);
     let native210 = plan.epoch == 210 && native210::recognized(terminal_fleet, owners);
+    let extraction225 = matches!(plan.epoch, 225 | 226)
+        && extraction225::recognized(terminal_fleet, owners, plan.epoch);
+    if extraction225 {
+        extraction225::validate(&current, terminal_fleet, owners, plan.epoch)?;
+    }
     let full210 = plan.epoch == 210 && full210::recognized(terminal_fleet, owners);
     if full210 {
         full210::validate(&current, terminal_fleet, owners)?;
@@ -514,6 +523,7 @@ fn fresh_census(
             && !native209
             && !native210
             && !full210
+            && !extraction225
             && !canary227
             && !native227_v1625
             && !native228
@@ -1000,6 +1010,30 @@ mod tests {
             "sampled_at_utc":"2026-10-20T04:04:42Z","recorded_unix_seconds":1792469100u64,
             "active":[],"epochs":[{"epoch":224,"state":"failed-needs-repair"}]});
         (plan, fleet)
+    }
+
+    #[test]
+    fn e225_cleanup_does_not_bypass_an_active_replacement_or_downstream_owner() {
+        for epoch in [225, 226] {
+            let (mut plan, mut f) = plan_fixture();
+            plan.epoch = epoch;
+            f["epochs"][0]["epoch"] = json!(epoch);
+            f["epoch225_extraction"] =
+                json!([{"epoch":epoch,"live":false,"terminal_outcome":"failed-needs-repair"}]);
+            validate_fleet(&f, &plan, 1792469200).unwrap();
+            for phase in ["replay", "verification", "upload", "readback"] {
+                let mut live = f.clone();
+                live["active"] = json!([{"epoch":epoch,"phase":phase}]);
+                assert!(
+                    validate_fleet(&live, &plan, 1792469200).is_err(),
+                    "{epoch}:{phase}"
+                );
+            }
+            let mut diagnostic = f.clone();
+            diagnostic["diagnostics"] =
+                json!([{"epoch":225,"scope_first_epoch":225,"scope_last_epoch":226,"live":true}]);
+            assert!(validate_fleet(&diagnostic, &plan, 1792469200).is_err());
+        }
     }
 
     #[test]

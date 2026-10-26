@@ -2,6 +2,7 @@
 //! Operational metadata confers no runtime, archive or canonical sidecar authority.
 use super::*;
 use jetstreamer_horizon_observe::epoch225_extraction as c;
+mod terminal;
 pub(super) const EVENT: &str = "jetstreamer-epoch225-extraction-handoff-event-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -519,6 +520,11 @@ fn current(l: &Value, p: &c::Plan, b: &BoundFile, a: &Value) -> Result<Value> {
     );
     Ok(raw)
 }
+pub(super) fn validate_live_peer(b: &BoundFile) -> Result<()> {
+    let (l, p, pb, a) = launch(b)?;
+    current(&l, &p, &pb, &a)?;
+    Ok(())
+}
 pub(super) fn names(b: &BoundFile) -> Result<BTreeSet<String>> {
     let (_, p, _, _) = launch(b)?;
     Ok(BTreeSet::from([p.unit, p.guard_unit]))
@@ -526,72 +532,8 @@ pub(super) fn names(b: &BoundFile) -> Result<BTreeSet<String>> {
 pub(super) fn rows(b: &BoundFile, o: &Value) -> Result<Vec<Value>> {
     let (l, p, pb, a) = launch(b)?;
     let manager = c::manager(&p.unit)?;
-    if manager["MainPID"] == "0"
-        && manager["ActiveState"] == "inactive"
-        && manager["SubState"] == "dead"
-    {
-        ensure!(
-            manager["NRestarts"] == "0"
-                && manager["Result"] == "success"
-                && manager["ExecMainStatus"] == "0"
-                && manager["InvocationID"]
-                    .as_str()
-                    .is_some_and(|s| s.is_empty() || Some(s) == l["invocation_id"].as_str())
-                && pipeline_status::same_exec_start(
-                    text(&manager, "ExecStart")?,
-                    text(&l["actor"]["manager"], "ExecStart")?
-                ),
-            "epoch 225 extraction ended unsuccessfully or changed owner; preserve failure evidence"
-        );
-        let result = fb(&c::binding(&p.root.join("extraction.json"))?);
-        let value = bound_json(&result)?;
-        ensure!(
-            value["schema"] == "jetstreamer-epoch225-prefix-extraction-result-v1"
-                && value["launch"] == json!(b)
-                && value["plan"] == json!(pb)
-                && value["admission"] == l["admission"]
-                && value["authority"] == c::denied()
-                && value["result"]["epoch"] == 225
-                && value["result"]["output_slot_count"] == 432000
-                && value["result"]["source_archive_sha256"]
-                    == "77c0f95a020ceb6c45e323f4ce1bb48066fd0b379615bd5c9dbcb67f9082d6f9"
-                && value["result"]["source_manifest_sha256"] == c::MANIFEST_SHA
-                && value["result"]["source_runtime_admission"] == "candidate"
-                && value["result"]["epoch226_tail_is_private"] == true
-                && value["result"]["independent_output_reread_passed"] == true
-                && value["result"]["full_verification_passed"] == false
-                && value["result"]["current_plugin_verification_passed"] == false
-                && value["result"]["publication_authorized"] == false
-                && value["candidate_identity"]
-                    == c::identity(&fs::symlink_metadata(p.root.join("epoch-225.jet"))?),
-            "epoch 225 successful terminal task has no unchanged private candidate evidence"
-        );
-        let out = ProcessCommand::new("/usr/bin/journalctl")
-            .args([
-                "--unit",
-                &p.unit,
-                "_PID=1",
-                "--output=json",
-                "--no-pager",
-                "--lines=256",
-            ])
-            .output()?;
-        ensure!(
-            out.status.success() && out.stdout.len() <= 2 << 20,
-            "epoch 225 terminal PID1 history unavailable"
-        );
-        let records = serde_json::Deserializer::from_slice(&out.stdout)
-            .into_iter::<Value>()
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        let events = singleton209_delivery::terminal_history_for(
-            &records,
-            &p.unit,
-            text(&l, "invocation_id")?,
-        )?;
-        return Ok([225,226].into_iter().map(|epoch|json!({"epoch":epoch,"phase":"private-prefix-extraction-complete","live":false,
-            "producer":manager,"launch":b,"result":result,"manager_events":events,"source_must_be_retained":true,
-            "retained226_private_slots":431465,"missing226_suffix_slots":535,"ordinary_replay_claim":false,
-            "archive_or_sidecar_completion_claimed":false,"authority":c::denied()})).collect());
+    if terminal::candidate(&manager) {
+        return terminal::rows(b, &l, &p, &pb, &manager);
     }
     let owner = current(&l, &p, &pb, &a)?;
     Ok([225,226].into_iter().map(|epoch|json!({"epoch":epoch,"phase":"private-prefix-extraction","wire_phase":"verification",
@@ -1058,6 +1000,91 @@ pub(super) async fn publish() -> Result<()> {
     }
     Ok(())
 }
+fn origin_owner(r: &StatusPublicationReceipt, l: &Value, p: &c::Plan) -> Result<(String, String)> {
+    c::shape(p)?;
+    ensure!(
+        matches!(r.epoch, 225 | 226)
+            && r.status.epoch == r.epoch
+            && r.status.phase == "verification"
+            && r.schema == STATUS_RECEIPT_SCHEMA
+            && r.authenticated_readback
+            && r.pipeline_binding.is_none()
+            && l["unit"] == p.unit
+            && l["epoch"] == 225
+            && l["epochs"] == json!([225, 226])
+            && c::hex(&r.producer_invocation_id, 32)
+            && r.producer_invocation_id.bytes().any(|b| b != b'0')
+            && r.producer_invocation_id == text(l, "invocation_id")?
+            && r.controller_invocation_id == r.producer_invocation_id,
+        "epoch 225 status owner differs from its exact captured extraction launch"
+    );
+    Ok((p.unit.clone(), r.producer_invocation_id.clone()))
+}
+fn status_origin(r: &StatusPublicationReceipt) -> Result<(StatusRequest, Value, c::Plan)> {
+    ensure!(
+        matches!(r.epoch, 225 | 226)
+            && r.status.epoch == r.epoch
+            && r.schema == STATUS_RECEIPT_SCHEMA
+            && r.status.phase == "verification"
+            && r.authenticated_readback
+            && r.pipeline_binding.is_none(),
+        "foreign extraction status"
+    );
+    let e = bound_json(&BoundFile {
+        path: r.observer_receipt.clone(),
+        sha256: r.observer_receipt_sha256.clone(),
+    })?;
+    ensure!(
+        e["schema"] == "jetstreamer-epoch225-extraction-status-estimate-v1"
+            && e["authority"] == c::denied()
+            && e["statuses"]
+                .as_array()
+                .is_some_and(|s| s.contains(&json!(r.status))),
+        "epoch 225 status estimate differs"
+    );
+    let request: StatusRequest =
+        serde_json::from_value(bound_json(&serde_json::from_value(e["request"].clone())?)?)?;
+    ensure!(
+        request.schema == "jetstreamer-epoch225-extraction-status-request-v1"
+            && e["observer"] == json!(request.observer)
+            && e["fleet"] == json!(request.fleet)
+            && e["launch"] == json!(request.launch)
+            && e["policy"] == json!(request.policy),
+        "epoch 225 status belongs to another observation"
+    );
+    let policy = bound_json(&request.policy)?;
+    ensure!(
+        policy["launch"] == json!(request.launch)
+            && policy["observer"] == json!(request.observer)
+            && policy["sampled_at_utc"] == r.status.sampled_at_utc
+            && c::stage_policy(&policy)?[&r.epoch] == r.status.estimated_remaining_millis,
+        "epoch 225 status no longer reproduces its immutable sidecar policy"
+    );
+    let (l, p, _, _) = launch(&request.launch)?;
+    origin_owner(r, &l, &p)?;
+    Ok((request, l, p))
+}
+pub(super) fn inactive_owner(r: &StatusPublicationReceipt) -> Result<Option<(String, String)>> {
+    if !matches!(r.epoch, 225 | 226) || r.pipeline_binding.is_some() {
+        return Ok(None);
+    }
+    let e = bound_json(&BoundFile {
+        path: r.observer_receipt.clone(),
+        sha256: r.observer_receipt_sha256.clone(),
+    })?;
+    if e["schema"] != "jetstreamer-epoch225-extraction-status-estimate-v1" {
+        return Ok(None);
+    }
+    let (_, l, p) = status_origin(r)?;
+    Ok(Some(origin_owner(r, &l, &p)?))
+}
+pub(super) fn cleanup_current(
+    row: &Value,
+    current: &Value,
+    owner: &(String, String),
+) -> Result<()> {
+    terminal::validate_cleanup(row, current, owner)
+}
 pub(super) fn matches(
     r: &StatusPublicationReceipt,
     epoch: u64,
@@ -1065,47 +1092,12 @@ pub(super) fn matches(
     units: &BTreeMap<String, Value>,
 ) -> bool {
     (|| -> Result<()> {
+        ensure!(r.epoch == epoch, "foreign extraction status epoch");
+        let (request, l, p) = status_origin(r)?;
         ensure!(
-            matches!(epoch, 225 | 226)
-                && r.epoch == epoch
-                && r.schema == STATUS_RECEIPT_SCHEMA
-                && r.status.phase == "verification"
-                && r.authenticated_readback
-                && r.pipeline_binding.is_none(),
-            "foreign extraction status"
-        );
-        let e = bound_json(&BoundFile {
-            path: r.observer_receipt.clone(),
-            sha256: r.observer_receipt_sha256.clone(),
-        })?;
-        ensure!(
-            e["schema"] == "jetstreamer-epoch225-extraction-status-estimate-v1"
-                && e["authority"] == c::denied()
-                && e["statuses"]
-                    .as_array()
-                    .is_some_and(|s| s.contains(&json!(r.status))),
-            "epoch 225 status estimate differs"
-        );
-        let request: StatusRequest =
-            serde_json::from_value(bound_json(&serde_json::from_value(e["request"].clone())?)?)?;
-        ensure!(
-            request.schema == "jetstreamer-epoch225-extraction-status-request-v1"
-                && e["observer"] == json!(request.observer)
-                && e["fleet"] == json!(request.fleet)
-                && bound_json(&request.observer)? == *o
-                && e["launch"] == json!(request.launch)
-                && e["policy"] == json!(request.policy),
+            bound_json(&request.observer)? == *o,
             "epoch 225 status belongs to another observation"
         );
-        let policy = bound_json(&request.policy)?;
-        ensure!(
-            policy["launch"] == json!(request.launch)
-                && policy["observer"] == json!(request.observer)
-                && policy["sampled_at_utc"] == r.status.sampled_at_utc
-                && c::stage_policy(&policy)?[&epoch] == r.status.estimated_remaining_millis,
-            "epoch 225 status no longer reproduces its immutable sidecar policy"
-        );
-        let (l, p, _, _) = launch(&request.launch)?;
         let owner = units
             .get(&p.unit)
             .context("epoch 225 current owner absent")?;
@@ -1114,9 +1106,7 @@ pub(super) fn matches(
                 && owner["MainPID"] == l["actor"]["manager"]["MainPID"]
                 && owner["ActiveState"] == "active"
                 && owner["SubState"] == "running"
-                && owner["NRestarts"] == "0"
-                && r.producer_invocation_id == text(&l, "invocation_id")?
-                && r.controller_invocation_id == r.producer_invocation_id,
+                && owner["NRestarts"] == "0",
             "epoch 225 status owner is no longer live"
         );
         Ok(())
@@ -1145,6 +1135,61 @@ mod tests {
                 .into(),
             receipt_directory: "/home/ubuntu/.jetstreamer-private/r2-status-receipts".into(),
         }
+    }
+    #[test]
+    fn e225_status_owner_recovery_is_exact_for_both_epochs_without_a_live_actor() {
+        let p: c::Plan = serde_json::from_str(include_str!(
+            "../../../docs/examples/epoch225-extraction/plan.example.json"
+        ))
+        .unwrap();
+        let iid = "a".repeat(32);
+        let l = json!({"unit":p.unit,"epoch":225,"epochs":[225,226],"invocation_id":iid});
+        for epoch in [225, 226] {
+            let r = StatusPublicationReceipt {
+                schema: STATUS_RECEIPT_SCHEMA.into(),
+                bucket: "test".into(),
+                epoch,
+                key: format!("epoch-{epoch}.epoch-status.json"),
+                status: EpochStatus {
+                    epoch,
+                    jet_size_bytes: 0,
+                    elapsed_execution_millis: 100,
+                    estimated_remaining_millis: 1000,
+                    sampled_at_utc: "2026-10-26T00:00:00Z".into(),
+                    phase: "verification".into(),
+                },
+                object_etag: "etag".into(),
+                previous_object_etag: None,
+                observer_receipt: "/sealed/estimate.json".into(),
+                observer_receipt_sha256: "b".repeat(64),
+                controller_invocation_id: iid.clone(),
+                producer_invocation_id: iid.clone(),
+                authenticated_readback: true,
+                verified_unix_seconds: 1,
+                pipeline_binding: None,
+            };
+            assert_eq!(
+                origin_owner(&r, &l, &p).unwrap(),
+                (p.unit.clone(), iid.clone())
+            );
+            let mut bad = r.clone();
+            bad.producer_invocation_id = "c".repeat(32);
+            assert!(origin_owner(&bad, &l, &p).is_err());
+            let mut bad = r.clone();
+            bad.controller_invocation_id = "c".repeat(32);
+            assert!(origin_owner(&bad, &l, &p).is_err());
+            let mut bad = r.clone();
+            bad.epoch = 224;
+            assert!(origin_owner(&bad, &l, &p).is_err());
+            let mut bad = r.clone();
+            bad.status.phase = "replay".into();
+            assert!(origin_owner(&bad, &l, &p).is_err());
+            let mut bad = r;
+            bad.authenticated_readback = false;
+            assert!(origin_owner(&bad, &l, &p).is_err());
+        }
+        // The inactive-status caller independently rejects any active downstream
+        // owner before the exact recovered extraction owner can authorize deletion.
     }
     #[test]
     fn e225_status_event_clock_rejects_backdating_staleness_and_fake_sample() {

@@ -54,6 +54,18 @@ mod full210_terminal;
 mod full227_failure;
 mod full227_status;
 mod maintenance_capacity;
+pub(super) fn epoch225_extraction_inactive_owner(
+    r: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    epoch225_extraction::inactive_owner(r)
+}
+pub(super) fn epoch225_extraction_cleanup_current(
+    row: &Value,
+    current: &Value,
+    owner: &(String, String),
+) -> Result<()> {
+    epoch225_extraction::cleanup_current(row, current, owner)
+}
 pub(super) fn validate_epoch225_extraction_role() -> Result<()> {
     epoch225_extraction::validate_role()
 }
@@ -4079,11 +4091,11 @@ pub(super) async fn run() -> Result<()> {
         .transpose()?
         .unwrap_or_default();
     for row in &extraction225_rows {
-        ensure!(
-            !active.iter().any(|other| other["epoch"] == row["epoch"]),
-            "epoch 225/226 extraction overlaps another active owner"
-        );
         if row["live"] == true {
+            ensure!(
+                !active.iter().any(|other| other["epoch"] == row["epoch"]),
+                "epoch 225/226 extraction overlaps another active owner"
+            );
             active.push(row.clone());
         }
     }
@@ -4164,6 +4176,14 @@ pub(super) async fn run() -> Result<()> {
         if epoch == 205 && continuation205_work.iter().any(|r| r["live"] == true) {
             state = "post-replay-pipeline";
             next = "Continue exact205 guarded Full, current-plugin, import and authenticated upload/readback";
+        }
+        if extraction225_rows
+            .iter()
+            .any(|row| row["epoch"] == epoch && row["terminal_outcome"] == "failed-needs-repair")
+            && !active.iter().any(|row| row["epoch"] == epoch)
+        {
+            state = "failed-needs-repair";
+            next = "Preserve the exact extraction failure, original source and private epoch 226 tail; diagnose and admit a separate repair owner before retry or publication";
         }
         let mut live = None;
         for replay in replays {

@@ -346,6 +346,37 @@ fn extractor_scope(x: &Extractor, f: &Value, admission: &Value, launch: &Value) 
     Ok(())
 }
 
+fn accounting_fleet(f: &Value, extractor: Option<&str>) -> Result<Value> {
+    let mut copy = f.clone();
+    let rows = copy["active"]
+        .as_array_mut()
+        .context("epoch 225 handoff active roster absent")?;
+    for row in rows
+        .iter()
+        .filter(|r| matches!(r["epoch"].as_u64(), Some(225 | 226)))
+    {
+        ensure!(
+            extractor.is_some_and(
+                |name| singleton227_admission::active_owner(row).is_ok_and(|u| u["Id"] == name)
+            ),
+            "epoch 225 accounting projection would hide an unsupported 225/226 owner"
+        );
+    }
+    rows.retain(|row| !matches!(row["epoch"].as_u64(), Some(225 | 226)));
+    Ok(copy)
+}
+fn accounting_census(
+    census: &BTreeMap<String, Value>,
+    extractor: Option<&Extractor>,
+) -> BTreeMap<String, Value> {
+    let mut copy = census.clone();
+    copy.remove(ORIGINAL_UNIT);
+    if let Some(x) = extractor {
+        copy.remove(&x.unit);
+        copy.remove(&x.guard_unit);
+    }
+    copy
+}
 fn source_anchor(
     source: &Profile,
     profile: &Profile,
@@ -579,6 +610,9 @@ impl Profile {
             .context("epoch 225 terminal original omitted from current census")?;
         terminal_owner(original, &original_history(f)?["unit"])?;
         if let Some(x) = &self.extractor {
+            // Authenticate the actual executor and its independent guard before
+            // their rows can leave the generic peer accounting census.
+            epoch225_extraction::validate_live_peer(&x.launch)?;
             let accepted =
                 accepted.context("epoch 225 admitted extractor has no accepted owner")?;
             let current = census
@@ -615,12 +649,7 @@ impl Profile {
 
     pub(super) fn without(&self, f: &Value) -> Result<Value> {
         self.validate_fleet(f)?;
-        let mut view = f.clone();
-        view["active"]
-            .as_array_mut()
-            .context("epoch 225 handoff active roster absent")?
-            .retain(|row| !matches!(row["epoch"].as_u64(), Some(225) | Some(226)));
-        Ok(view)
+        accounting_fleet(f, self.extractor.as_ref().map(|x| x.unit.as_str()))
     }
 
     pub(super) fn without_current(
@@ -629,12 +658,7 @@ impl Profile {
         census: &BTreeMap<String, Value>,
     ) -> Result<BTreeMap<String, Value>> {
         self.current(f, census)?;
-        let mut view = census.clone();
-        view.remove(ORIGINAL_UNIT);
-        if let Some(x) = &self.extractor {
-            view.remove(&x.unit);
-        }
-        Ok(view)
+        Ok(accounting_census(census, self.extractor.as_ref()))
     }
 
     pub(super) fn without_observer(&self, o: &Value, f: &Value) -> Result<Value> {
@@ -875,8 +899,45 @@ mod tests {
         };
         let mut f = fleet(terminal());
         f["active"] = json!([row(225), row(226)]);
-        f["unit_census"][unit] = owner;
+        f["unit_census"][unit] = owner.clone();
         extractor_scope(&x, &f, &admission, &launch).unwrap();
+        let closed = prefix223_live_peer::first_root233_fixture().0;
+        f["active"].as_array_mut().unwrap().push(closed.clone());
+        let raw_before = f.clone();
+        let view = accounting_fleet(&f, Some(&x.unit)).unwrap();
+        assert_eq!(view["active"], json!([closed]));
+        assert!(
+            prefix223_live_peer::roster(&f).is_err(),
+            "legacy consumer rejects the actual extractor until projection"
+        );
+        assert!(
+            prefix223_live_peer::roster(&view).is_ok(),
+            "the known233 peer still reaches its exact typed consumer"
+        );
+        assert_eq!(view["unit_census"], f["unit_census"]);
+        assert_eq!(
+            f, raw_before,
+            "no accepted fleet or raw history is rewritten"
+        );
+        assert!(
+            accounting_fleet(&f, None).is_err(),
+            "terminal-only custody cannot hide a live extractor"
+        );
+        let mut hidden = f.clone();
+        hidden["active"][1]["producer"]["Id"] = json!("foreign226.service");
+        assert!(accounting_fleet(&hidden, Some(&x.unit)).is_err());
+        let raw = BTreeMap::from([
+            (ORIGINAL_UNIT.into(), json!({"source":true})),
+            (x.unit.clone(), owner.clone()),
+            (x.guard_unit.clone(), json!({"guard":true})),
+            ("unrelated.service".into(), json!({"unrelated":true})),
+        ]);
+        let peers = accounting_census(&raw, Some(&x));
+        assert_eq!(
+            peers,
+            BTreeMap::from([("unrelated.service".into(), json!({"unrelated":true}))])
+        );
+        assert_eq!(raw.len(), 4);
         let p = profile("extractor-live", Some(x.clone()));
         assert_eq!(
             p.resources().0,

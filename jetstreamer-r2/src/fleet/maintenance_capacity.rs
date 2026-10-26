@@ -699,7 +699,24 @@ fn check_inner_with(
         "Maintenance fleet is not bound to the exact observer"
     );
     let accounting_o = native227_terminal_observer_view(&f, &o)?;
-    let (legacy, legacy_o) = accounting_views(&f, &accounting_o)?;
+    // Authenticate the handoff against the complete raw fleet before deriving
+    // a legacy-only view. Its full reservations are added separately below.
+    let peer_f = epoch225
+        .as_ref()
+        .map(|p| p.without(&f))
+        .transpose()?
+        .unwrap_or_else(|| f.clone());
+    let peer_o = epoch225
+        .as_ref()
+        .map(|p| p.without_observer(&accounting_o, &f))
+        .transpose()?
+        .unwrap_or_else(|| accounting_o.clone());
+    let peer_guards = epoch225
+        .as_ref()
+        .map(|p| p.without_guards(&s.protected_guards))
+        .transpose()?
+        .unwrap_or_else(|| s.protected_guards.clone());
+    let (legacy, legacy_o) = accounting_views(&peer_f, &peer_o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = sampled(&legacy_o, &legacy, now)?;
     prefix223_live_peer::roster(&legacy)?;
@@ -731,21 +748,27 @@ fn check_inner_with(
         .map(|c| c.peer_view(&f, &raw_before))
         .transpose()?
         .unwrap_or_else(|| (raw_before.clone(), Value::Null));
-    current_owners(&f, &before)?;
+    let peer_before = epoch225
+        .as_ref()
+        .map(|p| p.without_current(&f, &before))
+        .transpose()?
+        .unwrap_or_else(|| before.clone());
+    current_owners(&peer_f, &peer_before)?;
     // Share the already qualified sibling accounting policy, including the
     // complete guard-key union, genuine latest fires and independent guard caps.
-    let guard_history = capped204205_admission::guards(&f, &s.protected_guards, &before, t, now)?;
+    let guard_history =
+        capped204205_admission::guards(&peer_f, &peer_guards, &peer_before, t, now)?;
     let epoch225_guard_before = epoch225
         .as_ref()
         .map(|profile| profile.guard(&s.protected_guards, &raw_before, t, now))
         .transpose()?;
-    let caps = capped204205_admission::combined_limits(&f, &s.protected_guards, &before, now)?;
+    let caps = capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_before, now)?;
     let (mut growth, mut measurements, mut memory_growth, mut memory_evidence) =
         capped204205_admission::combined_resources(
-            &f,
-            &accounting_o,
-            &s.protected_guards,
-            &before,
+            &peer_f,
+            &peer_o,
+            &peer_guards,
+            &peer_before,
             t,
             now,
         )?;
@@ -785,16 +808,31 @@ fn check_inner_with(
         .map(|c| c.peer_view(&f, &raw_after))
         .transpose()?
         .unwrap_or_else(|| (raw_after.clone(), Value::Null));
-    current_owners(&f, &after)?;
+    let peer_after = epoch225
+        .as_ref()
+        .map(|p| p.without_current(&f, &after))
+        .transpose()?
+        .unwrap_or_else(|| after.clone());
+    current_owners(&peer_f, &peer_after)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         before == after
             && caps
-                == capped204205_admission::combined_limits(&f, &s.protected_guards, &after, now)?,
+                == capped204205_admission::combined_limits(
+                    &peer_f,
+                    &peer_guards,
+                    &peer_after,
+                    now
+                )?,
         "Maintenance owners/caps changed during capacity admission"
     );
     let after_accounting_o = native227_terminal_observer_view(&f, &o)?;
-    let (after_legacy, after_legacy_o) = accounting_views(&f, &after_accounting_o)?;
+    let after_peer_o = epoch225
+        .as_ref()
+        .map(|p| p.without_observer(&after_accounting_o, &f))
+        .transpose()?
+        .unwrap_or_else(|| after_accounting_o.clone());
+    let (after_legacy, after_legacy_o) = accounting_views(&peer_f, &after_peer_o)?;
     sampled(&after_legacy_o, &after_legacy, now)?;
     ensure!(
         accounting_o["terminal_observation_accounting"]
@@ -802,7 +840,7 @@ fn check_inner_with(
         "Maintenance terminal observation accounting changed during admission"
     );
     let guard_history_after =
-        capped204205_admission::guards(&f, &s.protected_guards, &after, t, now)?;
+        capped204205_admission::guards(&peer_f, &peer_guards, &peer_after, t, now)?;
     let epoch225_guard_after = epoch225
         .as_ref()
         .map(|profile| profile.guard(&s.protected_guards, &raw_after, t, now))
@@ -813,10 +851,10 @@ fn check_inner_with(
         mut after_memory_growth,
         mut after_memory_evidence,
     ) = capped204205_admission::combined_resources(
-        &f,
-        &after_accounting_o,
-        &s.protected_guards,
-        &after,
+        &peer_f,
+        &after_peer_o,
+        &peer_guards,
+        &peer_after,
         t,
         now,
     )?;
@@ -855,9 +893,14 @@ fn check_inner_with(
         .map(|c| c.peer_view(&f, &raw_current))
         .transpose()?
         .unwrap_or_else(|| (raw_current.clone(), Value::Null));
-    current_owners(&f, &current)?;
+    let peer_current = epoch225
+        .as_ref()
+        .map(|p| p.without_current(&f, &current))
+        .transpose()?
+        .unwrap_or_else(|| current.clone());
+    current_owners(&peer_f, &peer_current)?;
     let final_caps =
-        capped204205_admission::combined_limits(&f, &s.protected_guards, &current, now)?;
+        capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_current, now)?;
     ensure!(
         before == current && caps == final_caps,
         "maintenance owners/caps changed across final memory/guard checks"

@@ -19,7 +19,15 @@ struct Spec {
     native_input: BoundFile,
     output: PathBuf,
 }
-pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
+pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>, basis: &Value) -> Result<()> {
+    if !basis["epoch225_handoff"].is_null() {
+        let binding: BoundFile = serde_json::from_value(basis["epoch225_handoff"].clone())?;
+        let profile = terminal225_peer::Profile::load(&binding, f)?;
+        return maintenance_capacity::current_owners(
+            &profile.without(f)?,
+            &profile.without_current(f, current)?,
+        );
+    }
     maintenance_capacity::current_owners(f, current)
 }
 fn memory(o: &Value) -> Result<()> {
@@ -136,7 +144,7 @@ fn admit_validated(
         .cloned()
         .collect::<BTreeSet<_>>();
     let before = census(&names, 201, 300)?;
-    owners(&f, &before)?;
+    owners(&f, &before, &s.resource_basis)?;
     let candidate = unit(c::UNIT)?;
     ensure!(
         candidate["MainPID"] == "0"
