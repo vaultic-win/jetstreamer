@@ -248,38 +248,7 @@ pub(super) fn snapshot(
         "210 JIT effective fragment is not immutable root custody"
     );
     assembly204_recovery::deployed_delivery_member(&role.deployment_seal, &role.runner, 256 << 20)?;
-    let qualification = native210::immutable_json(&role.qualification)?;
-    ensure!(
-        qualification["schema"] == "jetstreamer-full210-jit-issuer-role-qualification-v1"
-            && qualification["role"] == "singleton210-jit-admission"
-            && qualification["helper"] == private157::binding(&role.runner)
-            && qualification["strict_clippy_passed"] == true
-            && qualification["full_default_tests_passed"] == true
-            && qualification["focused_jit_regressions_passed"] == true
-            && qualification["native210_small_enabled"] == true,
-        "210 JIT issuer role is not independently qualified for this ELF"
-    );
-    for key in ["source_commit", "source_tree"] {
-        ensure!(
-            qualification[key]
-                .as_str()
-                .is_some_and(|s| is_lower_hex(s, 40)),
-            "210 JIT qualification source identity missing"
-        );
-    }
-    for key in [
-        "publication_authorized",
-        "replay_launch_authorized",
-        "remote_mutations",
-        "r2_mutations",
-    ] {
-        ensure!(
-            qualification[key] == false,
-            "210 JIT role borrows execution/publication authority"
-        );
-    }
-    let qa: BoundFile = serde_json::from_value(qualification["source_qa"].clone())?;
-    native210::immutable_json(&qa)?;
+    let role_qa = qualification::validate(role)?;
     let fragment = fragment(role, spec, output)?;
     let props = completed_archive_phase::jit210_properties(&role.unit, FIELDS)?;
     shape(role, spec, self_sha, output, &props)?;
@@ -375,7 +344,7 @@ pub(super) fn snapshot(
     Ok(
         json!({"pid":std::process::id(),"invocation_id":iid,"start_ticks":ticks,"native_start_clock":clock,
         "cgroup":group,"runner":role.runner,"argv":argv,"credentials":credentials,"properties":props,
-        "fragment":fragment,"qualification":role.qualification,"deployment_seal":role.deployment_seal}),
+        "fragment":fragment,"qualification":role.qualification,"qualified_role_evidence":role_qa,"deployment_seal":role.deployment_seal}),
     )
 }
 pub(super) fn same(before: &Value, after: &Value) -> Result<()> {
@@ -390,6 +359,7 @@ pub(super) fn same(before: &Value, after: &Value) -> Result<()> {
         "credentials",
         "fragment",
         "qualification",
+        "qualified_role_evidence",
         "deployment_seal",
     ] {
         ensure!(
@@ -428,7 +398,7 @@ mod tests {
             "cgroup":"/system.slice/horizon-capacity210-jit-test.service","runner":{"path":"/sealed/helper","sha256":"c".repeat(64)},
             "argv":["/sealed/helper","admit-singleton210-jit"],"credentials":{"uid":0},
             "fragment":{"path":"/etc/systemd/system/horizon-capacity210-jit-test.service","sha256":"d".repeat(64)},
-            "qualification":{"path":"/sealed/qualification","sha256":"e".repeat(64)},
+            "qualification":{"path":"/sealed/qualification","sha256":"e".repeat(64)},"qualified_role_evidence":{"verified":true},
             "deployment_seal":{"path":"/sealed/seal","sha256":"f".repeat(64)},
             "properties":{"ExecStart":"{ path=/sealed/helper ; argv[]=/sealed/helper admit-singleton210-jit ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }","MemoryMax":"21474836480","TypedEmptyRawShow":"{}","TypedEmptyReplies":"{}"}})
     }

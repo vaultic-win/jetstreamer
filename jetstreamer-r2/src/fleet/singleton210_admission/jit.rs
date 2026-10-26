@@ -2,6 +2,7 @@
 //! precede intrinsic guard selection; ordinary complete admission is unchanged.
 use super::*;
 mod issuer;
+mod qualification;
 const OWNER225: &str = "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service";
 const IID207: &str = "74eb420ca4574a50a35913d1417124f1";
 const IID225: &str = "4cd76ae1353a4411885b997f04306402";
