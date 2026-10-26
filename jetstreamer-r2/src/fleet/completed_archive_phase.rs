@@ -13,6 +13,18 @@ pub(super) use full209_event::{
     status_matches as full209_event_status_matches,
 };
 pub(super) const FULL209_EVENT_SCHEMA: &str = full209_event::EVENT_SCHEMA;
+pub(super) fn epoch225_extraction_guard_timer(service: &str) -> Result<()> {
+    ensure!(
+        service.starts_with("horizon-qualify-225-prefix-extract-")
+            && service.ends_with("-guard.service"),
+        "epoch 225 extraction timer namespace differs"
+    );
+    validate_guard_timer(&barrier::guard_timer_properties(service)?, service)
+}
+pub(super) fn epoch225_extraction_empty_controls(service: &str, guard: bool) -> Result<()> {
+    empty_properties::extraction225_properties(service, guard)?;
+    Ok(())
+}
 // Scope-limited metadata reuse for the separate Full 210 JIT issuer. These
 // helpers confer no generic completed-archive origin or execution authority.
 pub(super) fn jit210_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {

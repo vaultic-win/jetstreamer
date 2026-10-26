@@ -38,6 +38,7 @@ mod continuation203_ops;
 mod continuation203_runtime;
 mod continuation205_delivery;
 mod epoch136;
+mod epoch225_extraction;
 mod first_root233;
 mod foundation_holding203;
 mod foundation_holding_capacity;
@@ -53,6 +54,24 @@ mod full210_terminal;
 mod full227_failure;
 mod full227_status;
 mod maintenance_capacity;
+pub(super) fn validate_epoch225_extraction_role() -> Result<()> {
+    epoch225_extraction::validate_role()
+}
+pub(super) fn capture_epoch225_extraction_source() -> Result<()> {
+    epoch225_extraction::capture_source()
+}
+pub(super) fn admit_epoch225_extraction() -> Result<()> {
+    epoch225_extraction::admit()
+}
+pub(super) fn release_epoch225_extraction() -> Result<()> {
+    epoch225_extraction::release()
+}
+pub(super) fn prepare_epoch225_extraction_event() -> Result<()> {
+    epoch225_extraction::prepare_event()
+}
+pub(super) async fn publish_epoch225_extraction_status() -> Result<()> {
+    epoch225_extraction::publish().await
+}
 
 pub(super) fn capture_demotion223_task() -> Result<()> {
     demotion223_status::capture()
@@ -1377,6 +1396,8 @@ struct Plan {
     diagnostics: Vec<DiagnosticClaim>,
     #[serde(default)]
     epoch203_ram_auxiliary: Option<ram_auxiliary::Claim>,
+    #[serde(default)]
+    epoch225_extraction: Option<BoundFile>,
     #[serde(default)]
     pipeline_claims: Vec<PipelineClaim>,
     #[serde(default)]
@@ -3013,7 +3034,16 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == completed_archive_phase::FULL209_EVENT_SCHEMA {
+            if event["schema"] == epoch225_extraction::EVENT {
+                epoch225_extraction::event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == completed_archive_phase::FULL209_EVENT_SCHEMA {
                 completed_archive_phase::full209_event_predecessor(
                     &previous,
                     &plan,
@@ -3212,6 +3242,9 @@ pub(super) async fn run() -> Result<()> {
         .as_array()
         .context("observer replays missing")?;
     let mut names: BTreeSet<_> = plan.tracked_units.iter().cloned().collect();
+    if let Some(b) = &plan.epoch225_extraction {
+        names.extend(epoch225_extraction::names(b)?);
+    }
     for gate in plan.gates.values() {
         if let Some(stop) = &gate.reserve_stop {
             names.extend(stop.owners().into_iter().map(|(name, _)| name));
@@ -3521,6 +3554,19 @@ pub(super) async fn run() -> Result<()> {
         )?;
     }
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == epoch225_extraction::EVENT
+    {
+        epoch225_extraction::event_census(
+            &bound_json(
+                plan.previous_fleet
+                    .as_ref()
+                    .context("epoch 225 predecessor missing")?,
+            )?,
+            &before,
+            &bound_json(binding)?,
+        )?;
+    }
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
         if let Some(stop) = &gate.reserve_stop {
@@ -4026,6 +4072,21 @@ pub(super) async fn run() -> Result<()> {
         }
     }
     let mut remote_entries = Vec::new();
+    let extraction225_rows = plan
+        .epoch225_extraction
+        .as_ref()
+        .map(|b| epoch225_extraction::rows(b, &observer))
+        .transpose()?
+        .unwrap_or_default();
+    for row in &extraction225_rows {
+        ensure!(
+            !active.iter().any(|other| other["epoch"] == row["epoch"]),
+            "epoch 225/226 extraction overlaps another active owner"
+        );
+        if row["live"] == true {
+            active.push(row.clone());
+        }
+    }
     let requested_epochs = (plan.first_epoch..=plan.last_epoch).collect::<Vec<_>>();
     let remote_inventory =
         inventory_batch::collect(&requested_epochs, |epoch| inventory_epoch(&s3, &r2, epoch))
@@ -4161,6 +4222,7 @@ pub(super) async fn run() -> Result<()> {
                         || canary227_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
+                        || epoch225_extraction::matches(receipt, epoch, &observer, &before)
                         || completed_archive_phase::full209_event_status_matches(
                             receipt, epoch, &observer, &before,
                         )
@@ -4204,7 +4266,8 @@ pub(super) async fn run() -> Result<()> {
             let production_matches = production_status_binding_matches(matches, state)
                 || (matches && private_qualification_binding);
             let capped_current = publication.as_ref().is_ok_and(|(r, _, _)| {
-                capped204205_work::status_matches(r, epoch, &capped_work)
+                epoch225_extraction::matches(r, epoch, &observer, &before)
+                    || capped204205_work::status_matches(r, epoch, &capped_work)
                     || assembly204_recovery::status_matches(r, epoch, &recovery_work)
                     || continuation205_delivery::status_matches(r, epoch, &continuation205_work)
                     || completed_archive_phase::full209_event_status_matches(
@@ -4242,6 +4305,7 @@ pub(super) async fn run() -> Result<()> {
     let mut receipt = receipt;
     receipt["assembly204_recovery"] = json!(recovery_work);
     receipt["continuation205_delivery"] = json!(continuation205_work);
+    receipt["epoch225_extraction"] = json!(extraction225_rows);
     receipt["assembly204_recovery_history"] = json!(plan.assembly204_recovery_history);
     receipt["capped204205_work"] = json!(capped_work);
     receipt["capped204205_history"] = json!(plan.capped204205_history);

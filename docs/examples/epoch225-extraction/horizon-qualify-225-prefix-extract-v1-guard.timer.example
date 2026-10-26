@@ -1,0 +1,15 @@
+[Unit]
+Description=Periodic protective check for the actual epoch 225 extraction
+
+[Timer]
+Unit=horizon-qualify-225-prefix-extract-v1-guard.service
+OnUnitActiveSec=30s
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=no
+WakeSystem=no
+OnClockChange=no
+OnTimezoneChange=no
+
+[Install]
+WantedBy=timers.target

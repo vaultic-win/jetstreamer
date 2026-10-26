@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+  "unit": "horizon-qualify-225-prefix-extract-v1.service",
+  "invocation_id": "ACTUAL_IID_FROM_WAITING_RECEIPT",
+  "filesystem": "/",
+  "minimum_free_bytes": "ACTUAL_ADMISSION.capacity.minimum_free_bytes",
+  "worker_root": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1",
+  "maximum_worker_vmas": 3500000,
+  "maximum_root_physical_bytes": 343865819136,
+  "receipt_directory": "/var/lib/jetstreamer/horizon-epoch225-extract-guard-v1"
+}

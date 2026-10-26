@@ -1,0 +1,21 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-role-qualification-v1",
+  "role": "prefix-extraction",
+  "executable": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extractor-ACTUAL/jetstreamer-epoch225-prefix-extract",
+    "sha256": "ACTUAL_QUALIFIED_EXTRACTOR_SHA256"
+  },
+  "source_commit": "ACTUAL_FROZEN_SOURCE_COMMIT",
+  "source_tree": "ACTUAL_FROZEN_SOURCE_TREE",
+  "source_qa_passed": false,
+  "cli_qa_passed": false,
+  "qa_evidence": [
+    {
+      "path": "ACTUAL_ROOT_QA_JSON_RECEIPT",
+      "sha256": "ACTUAL_QA_JSON_SHA256"
+    }
+  ],
+  "resource_admission_claimed": false,
+  "runtime_promotion_authorized": false,
+  "publication_authorized": false
+}

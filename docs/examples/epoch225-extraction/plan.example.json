@@ -1,0 +1,42 @@
+{
+  "schema": "jetstreamer-epoch225-prefix-extraction-plan-v1",
+  "attempt": "v1",
+  "unit": "horizon-qualify-225-prefix-extract-v1.service",
+  "guard_unit": "horizon-qualify-225-prefix-extract-v1-guard.service",
+  "root": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1",
+  "executable": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extractor-ACTUAL/jetstreamer-epoch225-prefix-extract",
+    "sha256": "ACTUAL_QUALIFIED_EXTRACTOR_SHA256"
+  },
+  "admitter": {
+    "path": "ACTUAL_QUALIFIED_R2_PATH",
+    "sha256": "ACTUAL_R2_SHA256"
+  },
+  "deployment_seal": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extractor-ACTUAL/deployment-seal-receipt.json",
+    "sha256": "ACTUAL_EXTRACTOR_SEAL_SHA256"
+  },
+  "qualification": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extract-inputs-v1/role-qualification.json",
+    "sha256": "ACTUAL_ROLE_QUALIFICATION_SHA256"
+  },
+  "unit_file": "/etc/systemd/system/horizon-qualify-225-prefix-extract-v1.service",
+  "terminal_handoff": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-terminal-handoff-v1/profile.json",
+    "sha256": "ACTUAL_TERMINAL_PROFILE_SHA256"
+  },
+  "source_manifest": {
+    "path": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet.segment.json",
+    "sha256": "53a69d801e70866b0bc048e1b3a75d9c16c1fb93995503157fc206742f3cdcf6"
+  },
+  "guard_executable": {
+    "path": "ACTUAL_EXISTING_QUALIFIED_STANDALONE_GUARD_PATH",
+    "sha256": "ACTUAL_GUARD_SHA256"
+  },
+  "guard_qualification": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extract-inputs-v1/guard-qualification.json",
+    "sha256": "ACTUAL_GUARD_QUALIFICATION_SHA256"
+  },
+  "admission": "/var/lib/jetstreamer/horizon-epoch225-extract-admission-v1/admission.json",
+  "release": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1/release.json"
+}

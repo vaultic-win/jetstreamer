@@ -346,6 +346,24 @@ fn extractor_scope(x: &Extractor, f: &Value, admission: &Value, launch: &Value) 
     Ok(())
 }
 
+fn source_anchor(
+    source: &Profile,
+    profile: &Profile,
+    launch: &Value,
+    anchor: &BoundFile,
+) -> Result<()> {
+    ensure!(
+        source.phase == "terminal-retained"
+            && source.extractor.is_none()
+            && source.original_launch == profile.original_launch
+            && source.source_manifest == profile.source_manifest
+            && source.terminal_properties == profile.terminal_properties
+            && source.manager_journal == profile.manager_journal
+            && launch["terminal_handoff"] == private157::binding(anchor),
+        "epoch 225 extractor borrowed a different terminal handoff"
+    );
+    Ok(())
+}
 impl Profile {
     fn source_manifest_placeholder() -> BoundFile {
         BoundFile {
@@ -358,7 +376,18 @@ impl Profile {
         let value = native210::immutable_json(binding)?;
         let profile: Self = serde_json::from_value(value)?;
         exact_original(&profile)?;
-        let manifest = native210::immutable_json(&profile.source_manifest)?;
+        // The retained manifest remains owned by its original producer. Freeze
+        // its bytes without changing that uid merely to read terminal evidence.
+        let m = fs::symlink_metadata(&profile.source_manifest.path)?;
+        ensure!(
+            m.is_file()
+                && m.uid() == 1000
+                && m.nlink() == 1
+                && m.mode() & 0o222 == 0
+                && profile.source_manifest.path.canonicalize()? == profile.source_manifest.path,
+            "epoch 225 retained manifest custody differs"
+        );
+        let manifest = bound_json(&profile.source_manifest)?;
         let launch = native210::immutable_json(&profile.original_launch)?;
         manifest_shape(&manifest)?;
         original_launch_shape(&launch)?;
@@ -378,11 +407,12 @@ impl Profile {
         if let Some(x) = &profile.extractor {
             let admission = native210::immutable_json(&x.admission)?;
             let launch = native210::immutable_json(&x.launch)?;
-            ensure!(
-                admission["terminal_handoff"] == private157::binding(binding)
-                    && launch["terminal_handoff"] == private157::binding(binding),
-                "epoch 225 extractor borrowed a different terminal handoff"
-            );
+            // The live profile is prepared after launch. Its source anchor was
+            // frozen before admission; requiring the live profile's own digest
+            // here would create an impossible admission/launch hash cycle.
+            let anchor: BoundFile = serde_json::from_value(admission["terminal_handoff"].clone())?;
+            let source = Self::load_evidence(&anchor)?;
+            source_anchor(&source, &profile, &launch, &anchor)?;
         }
         profile.validate_fleet(f)?;
         Ok(profile)
@@ -512,10 +542,16 @@ impl Profile {
             .extractor
             .as_ref()
             .map_or(0, |_| EXTRACTION_ADMISSION_MEMORY_BYTES);
+        let output = self
+            .extractor
+            .as_ref()
+            .map_or(0, |_| OUTPUT_BYTES + OUTPUT_METADATA_BYTES);
         (
-            RETAINED_DISK_BYTES,
+            RETAINED_DISK_BYTES + output,
             json!({"epoch":225,"phase":self.phase,"retained_source_archive_bytes":SOURCE_ARCHIVE_BYTES,
                 "retained_disk_reservation_bytes":RETAINED_DISK_BYTES,"reclamation_credit_bytes":0,
+                "additional_extractor_output_and_metadata_bytes":output,
+                "total_protected_disk_bytes":RETAINED_DISK_BYTES+output,
                 "extractor_output_cap_bytes":self.extractor.as_ref().map(|_|OUTPUT_BYTES),
                 "source_and_private_epoch_226_tail_retained":true}),
             memory,
@@ -730,6 +766,25 @@ mod tests {
     }
 
     #[test]
+    fn e225_terminal_live_profile_uses_immutable_prior_anchor_without_hash_cycle() {
+        let original = profile("terminal-retained", None);
+        let mut live = original.clone();
+        live.phase = "extractor-live".into();
+        let anchor = BoundFile {
+            path: "/sealed/terminal-anchor.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let launch = json!({"terminal_handoff":private157::binding(&anchor)});
+        source_anchor(&original, &live, &launch, &anchor).unwrap();
+        live.terminal_properties.sha256 = "b".repeat(64);
+        assert!(source_anchor(&original, &live, &launch, &anchor).is_err());
+        let mut live = original.clone();
+        live.phase = "extractor-live".into();
+        let foreign = json!({"terminal_handoff":{"path":"/sealed/foreign-profile.json","sha256":"b".repeat(64)}});
+        assert!(source_anchor(&original, &live, &foreign, &anchor).is_err());
+        assert!(source_anchor(&live, &live, &launch, &anchor).is_err());
+    }
+    #[test]
     fn terminal225_retains_reservation_without_fabricating_a_live_iid_or_guard() {
         let p = profile("terminal-retained", None);
         exact_original(&p).unwrap();
@@ -823,11 +878,14 @@ mod tests {
         f["unit_census"][unit] = owner;
         extractor_scope(&x, &f, &admission, &launch).unwrap();
         let p = profile("extractor-live", Some(x.clone()));
-        assert_eq!(p.resources().0, RETAINED_DISK_BYTES);
-        assert_eq!(p.resources().2, EXTRACTION_ADMISSION_MEMORY_BYTES);
         assert_eq!(
             p.resources().0,
-            profile("terminal-retained", None).resources().0
+            RETAINED_DISK_BYTES + OUTPUT_BYTES + OUTPUT_METADATA_BYTES
+        );
+        assert_eq!(p.resources().2, EXTRACTION_ADMISSION_MEMORY_BYTES);
+        assert_eq!(
+            p.resources().0 - profile("terminal-retained", None).resources().0,
+            OUTPUT_BYTES + OUTPUT_METADATA_BYTES
         );
         let mut fabricated = f;
         fabricated["active"][0]["producer"]["InvocationID"] = json!("2".repeat(32));

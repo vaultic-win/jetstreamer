@@ -3544,6 +3544,23 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
     }
+    match env::args().nth(1).as_deref() {
+        Some("validate-epoch225-extraction-role") => {
+            return fleet::validate_epoch225_extraction_role();
+        }
+        Some("admit-epoch225-prefix-extraction") => return fleet::admit_epoch225_extraction(),
+        Some("capture-epoch225-terminal-handoff") => {
+            return fleet::capture_epoch225_extraction_source();
+        }
+        Some("release-epoch225-prefix-extraction") => return fleet::release_epoch225_extraction(),
+        Some("prepare-epoch225-extraction-event") => {
+            return fleet::prepare_epoch225_extraction_event();
+        }
+        Some("status-publish-epoch225-extraction") => {
+            return fleet::publish_epoch225_extraction_status().await;
+        }
+        _ => (),
+    }
     if env::args().nth(1).as_deref() == Some("prepare-completed209-full-event") {
         return fleet::prepare_completed209_full_event();
     }

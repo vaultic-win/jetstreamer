@@ -1,4 +1,4 @@
-//! Correctness core for private epoch225 prefix extraction.
+//! Correctness core for private epoch 225 prefix extraction.
 //!
 //! This does not authorize an executor, resources, sidecars, publication or
 //! source retirement. A separately admitted controller must bind the completed
@@ -31,7 +31,7 @@ pub const FIRST_SLOT: u64 = 97_200_000;
 pub const CANONICAL_SLOTS: u64 = 432_000;
 pub const FOCUSED_SLOTS: u64 = 863_465;
 pub const TERMINAL_ROOT: u64 = 98_063_464;
-/// Exact shrink-budget worker from the retained225 producer launch.
+/// Exact shrink-budget worker from the retained epoch 225 producer launch.
 pub const PINNED_WORKER_SHA256: [u8; 32] = [
     0x2d, 0xcc, 0x9b, 0x84, 0xa6, 0xce, 0x27, 0xed, 0xba, 0x3d, 0x3b, 0x05, 0x3c, 0x6e, 0x61, 0x70,
     0xf6, 0x6a, 0x23, 0x37, 0xf1, 0x2a, 0x5a, 0xae, 0x54, 0x90, 0x0c, 0x3a, 0xd9, 0xe2, 0xee, 0xdd,
@@ -88,16 +88,16 @@ pub struct ExtractionEvidence {
 fn pinned_manifest() -> Result<HistoricalSegmentManifest> {
     ensure!(
         sha256_hex_string(&Sha256::digest(SOURCE_MANIFEST).into()) == SOURCE_MANIFEST_SHA256,
-        "225 reviewed manifest source digest differs"
+        "epoch 225 reviewed manifest source digest differs"
     );
     Ok(serde_json::from_slice(SOURCE_MANIFEST)?)
 }
 /// Binds all fields of the exact completed private source; the candidate runtime
-/// and retained226 tail confer no canonical artifact or runtime qualification.
+/// and retained epoch 226 tail confer no canonical artifact or runtime qualification.
 pub fn validate_scope(m: &HistoricalSegmentManifest, worker: [u8; 32]) -> Result<()> {
     ensure!(
         worker == PINNED_WORKER_SHA256 && *m == pinned_manifest()?,
-        "225 source differs from its exact archive SHA, candidate runtime, worker, checkpoints or complete retained226 tail"
+        "epoch 225 source differs from its exact archive SHA, candidate runtime, worker, checkpoints or complete retained epoch 226 tail"
     );
     Ok(())
 }
@@ -112,19 +112,19 @@ fn source_scope(
             && manifest == PathBuf::from(format!("{SOURCE_ARCHIVE}.segment.json"))
             && sha256_hex_string(&manifest_sha256) == SOURCE_MANIFEST_SHA256
             && worker == PINNED_WORKER_SHA256,
-        "225 extraction accepts only its original completed source, manifest and worker"
+        "epoch 225 extraction accepts only its original completed source, manifest and worker"
     );
     Ok(())
 }
 fn immutable(path: &Path) -> Result<fs::Metadata> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
-        "225 input must be canonical"
+        "epoch 225 input must be canonical"
     );
     let m = fs::symlink_metadata(path)?;
     ensure!(
         m.is_file() && m.nlink() == 1 && m.mode() & 0o222 == 0,
-        "225 input must be frozen, singly linked and regular"
+        "epoch 225 input must be frozen, singly linked and regular"
     );
     Ok(m)
 }
@@ -145,12 +145,12 @@ impl PinnedSource {
                 && am.len() == SOURCE_ARCHIVE_BYTES
                 && mm.uid() == 1000
                 && mm.len() <= 1 << 20,
-            "225 original source custody, byte length or manifest bound differs"
+            "epoch 225 original source custody, byte length or manifest bound differs"
         );
         let bytes = fs::read(manifest)?;
         ensure!(
             <[u8; 32]>::from(Sha256::digest(&bytes)) == manifest_sha256,
-            "225 manifest SHA differs"
+            "epoch 225 manifest SHA differs"
         );
         let file = open_regular_nofollow(archive)?;
         let identity = archive_file_identity(&file)?;
@@ -161,7 +161,7 @@ impl PinnedSource {
             archive_file_identity(&file)? == identity
                 && path_matches_archive_identity(archive, identity)?
                 && <[u8; 32]>::from(Sha256::digest(fs::read(manifest)?)) == manifest_sha256,
-            "225 source/manifest changed during qualification"
+            "epoch 225 source/manifest changed during qualification"
         );
         let source = Self {
             path: archive.into(),
@@ -187,7 +187,7 @@ impl PinnedSource {
                 && path_matches_archive_identity(&self.manifest_path, self.manifest_identity)?
                 && <[u8; 32]>::from(Sha256::digest(fs::read(&self.manifest_path)?))
                     == self.manifest_sha256,
-            "225 pinned source or retained manifest changed"
+            "epoch 225 pinned source or retained manifest changed"
         );
         Ok(())
     }
@@ -205,11 +205,31 @@ impl PinnedSource {
     where
         G: FnMut(u64) -> io::Result<()>,
     {
+        self.extract_private_with_progress(
+            root,
+            maximum_bytes,
+            |written, delta| guard(written + delta),
+            |_, _| Ok(()),
+        )
+    }
+    /// Phase transitions use existing in-process work; this adds no resource
+    /// observation or second archive verification pass.
+    pub fn extract_private_with_progress<G, P>(
+        &mut self,
+        root: &Path,
+        maximum_bytes: u64,
+        mut guard: G,
+        mut progress: P,
+    ) -> Result<ExtractionEvidence>
+    where
+        G: FnMut(u64, u64) -> io::Result<()>,
+        P: FnMut(&str, u64) -> Result<()>,
+    {
         ensure!(
             (1..=MAXIMUM_OUTPUT_BYTES).contains(&maximum_bytes),
-            "225 output bound exceeds the320GiB source ceiling"
+            "epoch 225 output bound exceeds the 320 GiB source ceiling"
         );
-        guard(0)?;
+        guard(0, 0)?;
         let m = fs::symlink_metadata(root)?;
         ensure!(
             root.is_absolute()
@@ -217,7 +237,7 @@ impl PinnedSource {
                 && m.is_dir()
                 && m.uid() == unsafe { libc::geteuid() }
                 && m.mode() & 0o077 == 0,
-            "225 destination must be a canonical owner-private directory"
+            "epoch 225 destination must be a canonical owner-private directory"
         );
         ensure!(
             root.parent() == Some(Path::new("/home/ubuntu/.jetstreamer-private"))
@@ -225,7 +245,7 @@ impl PinnedSource {
                     .file_name()
                     .and_then(|s| s.to_str())
                     .is_some_and(|n| n.starts_with("epoch225-prefix-extract-") && n.len() > 24),
-            "225 destination namespace differs"
+            "epoch 225 destination namespace differs"
         );
         let target = root.join("epoch-225.jet");
         for name in [
@@ -235,12 +255,12 @@ impl PinnedSource {
         ] {
             ensure!(
                 !root.join(name).try_exists()?,
-                "225 candidate must have no publication/terminal sidecar"
+                "epoch 225 candidate must have no publication/terminal sidecar"
             );
         }
         ensure!(
             self.path != target,
-            "225 extraction cannot replace its source"
+            "epoch 225 extraction cannot replace its source"
         );
         self.unchanged()?;
         let original_output = if target.try_exists()? {
@@ -254,7 +274,7 @@ impl PinnedSource {
                 .provenance()?
             {
                 Some(ArchiveProvenance::V2(p)) => p,
-                _ => anyhow::bail!("225 source lost V2 provenance"),
+                _ => anyhow::bail!("epoch 225 source lost V2 provenance"),
             };
         expected.base.requested_slot_count = CANONICAL_SLOTS;
         let mut temporary = if original_output.is_none() {
@@ -263,6 +283,7 @@ impl PinnedSource {
             None
         };
         let stats = if let Some(t) = temporary.as_mut() {
+            progress("prefix-reencode-start", 0)?;
             let output = Limited {
                 sink: t.as_file_mut(),
                 bytes: 0,
@@ -279,6 +300,7 @@ impl PinnedSource {
             t.as_file().sync_all()?;
             stats
         } else {
+            progress("prefix-reencode-receipt-recovery", 0)?;
             // Receipt-recovery retry: derive the expected output semantics
             // without allocating or replacing another archive.
             reencode_archive_prefix(
@@ -300,9 +322,13 @@ impl PinnedSource {
                 && stats.slots_reencoded == CANONICAL_SLOTS
                 && stats.source_zero_parent_resume_artifacts == 0
                 && stats.output_zero_parent_resume_artifacts == 0,
-            "225 prefix export shape or strict chain differs"
+            "epoch 225 prefix export shape or strict chain differs"
         );
         let output_identity = archive_file_identity(&open_regular_nofollow(output_path)?)?;
+        progress(
+            "independent-semantic-reread-start",
+            fs::metadata(output_path)?.len(),
+        )?;
         let mut reader = ArchiveReader::open(BufReader::new(open_regular_nofollow(output_path)?))?;
         reader.verify_chain = true;
         reader.chain_mismatch_policy = ChainMismatchPolicy::Reject;
@@ -311,48 +337,54 @@ impl PinnedSource {
                 && reader.header().slot_start == FIRST_SLOT
                 && reader.header().slot_count == CANONICAL_SLOTS
                 && reader.has_complete_slot_coverage()?,
-            "225 output does not cover exactly one complete epoch"
+            "epoch 225 output does not cover exactly one complete epoch"
         );
         ensure!(
             reader.provenance()? == Some(ArchiveProvenance::V2(expected)),
-            "225 output provenance changed"
+            "epoch 225 output provenance changed"
         );
         let mut semantic = SemanticDigest::new();
         ensure!(
             reader.read_slots(FIRST_SLOT, CANONICAL_SLOTS, &mut semantic)? == CANONICAL_SLOTS
                 && semantic.finish()? == stats.output_semantic_sha256,
-            "225 independent output semantic reread failed"
+            "epoch 225 independent output semantic reread failed"
         );
         let mut output = open_regular_nofollow(output_path)?;
+        progress("output-sha256-start", output.metadata()?.len())?;
         ensure!(
             archive_file_identity(&output)? == output_identity,
-            "225 candidate changed after independent semantic reread"
+            "epoch 225 candidate changed after independent semantic reread"
         );
         let mut hash = Sha256::new();
         io::copy(&mut output, &mut hash)?;
         let bytes = output.metadata()?.len();
-        ensure!(bytes <= maximum_bytes, "225 output exceeds admitted bound");
+        ensure!(
+            bytes <= maximum_bytes,
+            "epoch 225 output exceeds admitted bound"
+        );
         ensure!(
             archive_file_identity(&output)? == output_identity
                 && path_matches_archive_identity(output_path, output_identity)?,
-            "225 candidate changed during independent hash"
+            "epoch 225 candidate changed during independent hash"
         );
         self.unchanged()?;
-        guard(bytes)?;
+        guard(bytes, 0)?;
+        progress("candidate-fsync-start", bytes)?;
         if let Some(t) = temporary {
             t.as_file()
                 .set_permissions(fs::Permissions::from_mode(0o400))?;
             t.persist_noclobber(&target)
-                .map_err(|e| anyhow::anyhow!("225 candidate publication conflict: {e}"))?;
+                .map_err(|e| anyhow::anyhow!("epoch 225 candidate publication conflict: {e}"))?;
             File::open(root)?.sync_all()?;
         } else {
             ensure!(
                 original_output == Some(archive_file_identity(&output)?)
                     && path_matches_archive_identity(&target, original_output.unwrap())?,
-                "225 existing candidate changed during receipt recovery"
+                "epoch 225 existing candidate changed during receipt recovery"
             );
         }
         self.unchanged()?;
+        progress("private-candidate-complete", bytes)?;
         Ok(ExtractionEvidence {
             schema: "jetstreamer-private-epoch225-canonical-prefix-extraction-v1",
             epoch: 225,
@@ -389,16 +421,16 @@ struct Limited<'a, W, G> {
     maximum: u64,
     guard: &'a mut G,
 }
-impl<W: Write, G: FnMut(u64) -> io::Result<()>> Write for Limited<'_, W, G> {
+impl<W: Write, G: FnMut(u64, u64) -> io::Result<()>> Write for Limited<'_, W, G> {
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         let next = self
             .bytes
             .checked_add(b.len() as u64)
-            .ok_or_else(|| io::Error::other("225 output bound overflow"))?;
+            .ok_or_else(|| io::Error::other("epoch 225 output bound overflow"))?;
         if next > self.maximum {
-            return Err(io::Error::other("225 output bound crossed"));
+            return Err(io::Error::other("epoch 225 output bound crossed"));
         }
-        (self.guard)(next)?;
+        (self.guard)(self.bytes, b.len() as u64)?;
         let n = self.sink.write(b)?;
         self.bytes += n as u64;
         Ok(n)
@@ -480,7 +512,7 @@ mod tests {
                     data: if marker == 2 {
                         b"private226 tail"
                     } else {
-                        b"retained225"
+                        b"retained epoch 225"
                     },
                 })
                 .unwrap();
@@ -547,11 +579,15 @@ mod tests {
         assert_eq!(
             markers.0,
             vec![
-                (FIRST_SLOT, 9_007_199_254_740_993, b"retained225".to_vec()),
+                (
+                    FIRST_SLOT,
+                    9_007_199_254_740_993,
+                    b"retained epoch 225".to_vec()
+                ),
                 (
                     FIRST_SLOT + CANONICAL_SLOTS - 1,
                     9_007_199_254_740_994,
-                    b"retained225".to_vec()
+                    b"retained epoch 225".to_vec()
                 ),
             ]
         );
@@ -577,8 +613,8 @@ mod tests {
         );
         assert_eq!(before, Sha256::digest(&source));
         assert_eq!(stats.source_slot_count - stats.slots_reencoded, 431_465);
-        // The retained source still contains226's private tail, while output
-        // keeps candidate admission and cannot represent a complete226 epoch.
+        // The retained source still contains epoch 226's private tail, while output
+        // keeps candidate admission and cannot represent a complete epoch 226 epoch.
         assert_eq!(FIRST_SLOT + CANONICAL_SLOTS - 1, 97_631_999);
         assert_eq!(FIRST_SLOT + FOCUSED_SLOTS - 1, TERMINAL_ROOT);
         let truncated = &output[..output.len() / 2];
@@ -693,8 +729,8 @@ mod tests {
     #[test]
     fn e225_extract_output_cap_and_guard_reject_before_excess_write() {
         let mut calls = Vec::new();
-        let mut guard = |n| {
-            calls.push(n);
+        let mut guard = |written, delta| {
+            calls.push((written, delta));
             Ok(())
         };
         let mut out = Limited {
@@ -707,8 +743,8 @@ mod tests {
         assert!(out.write(b"cd").is_err());
         assert_eq!(out.sink, b"ab");
         drop(out);
-        assert_eq!(calls, vec![2]);
-        let mut guard = |_| Err(io::Error::other("floor"));
+        assert_eq!(calls, vec![(0, 2)]);
+        let mut guard = |_, _| Err(io::Error::other("floor"));
         let mut out = Limited {
             sink: Vec::new(),
             bytes: 0,
@@ -717,5 +753,35 @@ mod tests {
         };
         assert!(out.write(b"a").is_err());
         assert!(out.sink.is_empty());
+    }
+    #[test]
+    fn e225_extract_partial_writes_guard_actual_bytes_and_next_allocation() {
+        struct Short(Vec<u8>);
+        impl Write for Short {
+            fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+                let n = b.len().min(1);
+                self.0.extend_from_slice(&b[..n]);
+                Ok(n)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut calls = Vec::new();
+        let mut guard = |written, delta| {
+            calls.push((written, delta));
+            Ok(())
+        };
+        let mut out = Limited {
+            sink: Short(Vec::new()),
+            bytes: 0,
+            maximum: 3,
+            guard: &mut guard,
+        };
+        out.write_all(b"abc").unwrap();
+        assert_eq!(out.sink.0, b"abc");
+        assert_eq!(out.bytes, 3);
+        drop(out);
+        assert_eq!(calls, vec![(0, 3), (1, 2), (2, 1)]);
     }
 }

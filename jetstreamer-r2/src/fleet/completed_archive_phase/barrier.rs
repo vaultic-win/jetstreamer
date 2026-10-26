@@ -412,9 +412,22 @@ pub(super) fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, St
 }
 
 fn timer_object_path(timer: &str) -> Result<String> {
+    let extraction225 = timer
+        .strip_prefix("horizon-qualify-225-prefix-extract-")
+        .and_then(|name| name.strip_suffix("-guard.timer"))
+        .is_some_and(|attempt| {
+            !attempt.is_empty()
+                && attempt.len() <= 64
+                && !attempt.ends_with("-guard")
+                && attempt
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        });
     ensure!(
         timer.ends_with(".timer")
-            && (timer.starts_with("horizon-generic") || timer.starts_with("horizon-205-delivery-"))
+            && (timer.starts_with("horizon-generic")
+                || timer.starts_with("horizon-205-delivery-")
+                || extraction225)
             && timer
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
@@ -976,6 +989,30 @@ mod tests {
         let mut actual = release["process"].clone();
         actual["invocation_id"] = release["invocation_id"].clone();
         (s, a, release, plan, actual)
+    }
+    #[test]
+    fn e225_guard_timer_path_accepts_only_exact_extraction_guard_scope() {
+        assert_eq!(
+            timer_object_path("horizon-qualify-225-prefix-extract-v1-guard.timer").unwrap(),
+            "/org/freedesktop/systemd1/unit/horizon_2dqualify_2d225_2dprefix_2dextract_2dv1_2dguard_2etimer"
+        );
+        for timer in [
+            "horizon-qualify-226-prefix-extract-v1-guard.timer",
+            "horizon-qualify-225-prefix-extract-v1.timer",
+            "horizon-qualify-225-prefix-extract--guard.timer",
+            "horizon-qualify-225-prefix-extract-v1-guard-guard.timer",
+            "horizon-qualify-225-prefix-extract-v_1-guard.timer",
+            "horizon-qualify-225-prefix-extract-v1-guard.service",
+        ] {
+            assert!(timer_object_path(timer).is_err(), "{timer}");
+        }
+        assert!(
+            timer_object_path(&format!(
+                "horizon-qualify-225-prefix-extract-{}-guard.timer",
+                "a".repeat(65)
+            ))
+            .is_err()
+        );
     }
     #[test]
     fn completed_barrier_timer_calendar_requires_typed_empty_reply_and_exact_unit_path() {
