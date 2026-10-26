@@ -11,11 +11,39 @@ struct Model {
     observer: BoundFile,
     fleet: BoundFile,
     launch: BoundFile,
+    #[serde(default)]
+    launch_capture_helper_sha256: Option<String>,
     estimate: private_prefix::Estimate,
     estimate_basis: String,
     estimate_evidence: Vec<BoundFile>,
     estimate_receipt: PathBuf,
     receipt_directory: PathBuf,
+}
+fn validate_publisher(p: &Model, launch: &Value, publisher: &str) -> Result<()> {
+    let capture = p
+        .launch_capture_helper_sha256
+        .as_deref()
+        .unwrap_or(publisher);
+    ensure!(
+        is_lower_hex(publisher, 64)
+            && is_lower_hex(capture, 64)
+            && launch["capture_helper_sha256"] == capture,
+        "first root 233 publisher does not bind the authenticated original capture helper"
+    );
+    Ok(())
+}
+fn validate_frozen_publisher(p: &Model, launch: &Value, evidence: &Value) -> Result<()> {
+    let publisher = evidence["helper_sha256"]
+        .as_str()
+        .context("first root 233 frozen publisher digest absent")?;
+    validate_publisher(p, launch, publisher)?;
+    ensure!(
+        (p.launch_capture_helper_sha256.is_none()
+            && evidence.get("capture_helper_sha256").is_none())
+            || evidence["capture_helper_sha256"] == launch["capture_helper_sha256"],
+        "first root 233 frozen capture helper binding differs"
+    );
+    Ok(())
 }
 fn claim(b: &BoundFile) -> Result<(DiagnosticClaim, Value)> {
     let v = native209::immutable_json(b)?;
@@ -252,10 +280,7 @@ fn frozen(r: &StatusPublicationReceipt) -> Result<DiagnosticClaim> {
         "first root 233 frozen model substituted its evidence"
     );
     let (d, launch) = claim(&p.launch)?;
-    ensure!(
-        launch["capture_helper_sha256"] == e["helper_sha256"],
-        "first root 233 status must use the same qualified R2 generation as launch capture"
-    );
+    validate_frozen_publisher(&p, &launch, &e)?;
     let f = bound_json(&p.fleet)?;
     let o = bound_json(&p.observer)?;
     let observed = accepted(&p, &f, &o)?;
@@ -317,10 +342,7 @@ pub(super) async fn run() -> Result<()> {
         "horizon-first-root233-status-",
     )?;
     let (d, launch) = claim(&p.launch)?;
-    ensure!(
-        launch["capture_helper_sha256"] == self_sha,
-        "first root 233 status must use the same qualified R2 generation as launch capture"
-    );
+    validate_publisher(&p, &launch, &self_sha)?;
     let f = bound_json(&p.fleet)?;
     let o = bound_json(&p.observer)?;
     let observed = accepted(&p, &f, &o)?;
@@ -369,6 +391,7 @@ pub(super) async fn run() -> Result<()> {
             phase,
         };
         let e = json!({"schema":OBSERVATION,"model":private157::binding(&bound),"helper_sha256":self_sha,
+            "capture_helper_sha256":launch["capture_helper_sha256"],
             "observer":private157::binding(&p.observer),"fleet":private157::binding(&p.fleet),
             "launch":private157::binding(&p.launch),"progress":progress,"status":status,"clock_anchor":launch["clock_anchor"],
             "estimate_basis":p.estimate_basis,"estimate_evidence":p.estimate_evidence,"resource_samples_taken":0,
@@ -440,6 +463,7 @@ mod tests {
             observer: b(),
             fleet: b(),
             launch: b(),
+            launch_capture_helper_sha256: None,
             estimate: private_prefix::Estimate {
                 initialization_allowance_millis: 600_000,
                 fallback_slots_per_second: 2.0,
@@ -453,6 +477,46 @@ mod tests {
             estimate_receipt: "/private/estimate.json".into(),
             receipt_directory: "/private/receipts".into(),
         }
+    }
+    #[test]
+    fn firstroot233_legacy_publisher_retains_original_capture_and_old_receipts() {
+        let original = "a".repeat(64);
+        let launch = json!({"capture_helper_sha256":original});
+        let p = model();
+        validate_publisher(&p, &launch, &original).unwrap();
+        validate_frozen_publisher(&p, &launch, &json!({"helper_sha256":original})).unwrap();
+        assert!(validate_publisher(&p, &launch, &"b".repeat(64)).is_err());
+        assert!(
+            validate_frozen_publisher(&p, &launch, &json!({"helper_sha256":"b".repeat(64)}))
+                .is_err()
+        );
+    }
+    #[test]
+    fn firstroot233_migrated_publisher_binds_capture_without_substituting_owner_evidence() {
+        let original = "a".repeat(64);
+        let publisher = "b".repeat(64);
+        let launch = json!({"capture_helper_sha256":original});
+        let mut p = model();
+        p.launch_capture_helper_sha256 = Some(original.clone());
+        validate_publisher(&p, &launch, &publisher).unwrap();
+        validate_frozen_publisher(
+            &p,
+            &launch,
+            &json!({"helper_sha256":publisher,"capture_helper_sha256":original}),
+        )
+        .unwrap();
+        for bad in [
+            json!({"helper_sha256":publisher}),
+            json!({"helper_sha256":publisher,"capture_helper_sha256":"c".repeat(64)}),
+            json!({"helper_sha256":"bad","capture_helper_sha256":original}),
+            json!({"capture_helper_sha256":original}),
+        ] {
+            assert!(validate_frozen_publisher(&p, &launch, &bad).is_err());
+        }
+        p.launch_capture_helper_sha256 = Some("c".repeat(64));
+        assert!(validate_publisher(&p, &launch, &publisher).is_err());
+        p.launch_capture_helper_sha256 = Some("bad".into());
+        assert!(validate_publisher(&p, &launch, &publisher).is_err());
     }
     #[test]
     fn frozen_payload_reproduces_original_start_and_keeps_delivery_after_terminal() {
