@@ -1,0 +1,46 @@
+155 37 259:1 / / ro,nosuid,relatime shared:47 master:1 - ext4 /dev/nvme0n1p1 rw,discard,errors=remount-ro,commit=30
+430 155 0:28 / /run rw,nosuid,nodev shared:50 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+446 430 0:50 / /run/user/1000 rw,nosuid,nodev,relatime shared:58 master:288 - tmpfs tmpfs rw,size=118372748k,nr_inodes=29593187,mode=700,uid=1000,gid=1000,inode64
+451 155 259:3 / /boot ro,nosuid,relatime shared:296 master:87 - ext4 /dev/nvme0n1p13 rw
+452 451 259:5 / /boot/efi ro,nosuid,relatime shared:297 master:90 - vfat /dev/nvme0n1p15 rw,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+453 155 0:67 / /home/ubuntu/.jetstreamer-private/ram-resource-203-storage-probe-v1 ro,nosuid,nodev,relatime shared:298 master:357 - tmpfs tmpfs rw,size=805306368k,mode=700,uid=1000,gid=1000,inode64
+454 155 0:68 / /home/ubuntu/.jetstreamer-private/ram-resource-203-baseline-capability-v1 ro,nosuid,nodev,relatime shared:299 master:372 - tmpfs tmpfs rw,size=805306368k,mode=700,uid=1000,gid=1000,inode64
+455 155 0:69 / /home/ubuntu/.jetstreamer-private/ram-resource-203-shrink-capability-v1 ro,nosuid,nodev,relatime shared:300 master:387 - tmpfs tmpfs rw,size=805306368k,mode=700,uid=1000,gid=1000,inode64
+456 155 0:56 / /home/ubuntu/.jetstreamer-private/reader203-build-SnDmx4dK ro,nosuid,nodev,relatime shared:301 master:327 - tmpfs tmpfs rw,size=50331648k,mode=700,uid=1000,gid=1000,inode64
+457 155 0:59 / /dev ro,nosuid,noexec shared:302 - tmpfs tmpfs rw,size=4096k,nr_inodes=65536,mode=755,inode64
+458 457 0:27 / /dev/pts rw,nosuid,noexec,relatime shared:303 master:4 - devpts devpts rw,gid=5,mode=600,ptmxmode=000
+459 457 0:26 / /dev/shm rw,nosuid,nodev shared:304 master:3 - tmpfs tmpfs rw,inode64,usrquota
+460 457 0:23 / /dev/mqueue rw,nosuid,nodev,noexec,relatime shared:305 master:16 - mqueue mqueue rw
+461 457 0:34 / /dev/hugepages rw,nosuid,nodev,relatime shared:306 master:15 - hugetlbfs hugetlbfs rw,pagesize=2M
+177 155 259:1 /home/ubuntu/.jetstreamer-private/full209-generic-delivery-v11/full /home/ubuntu/.jetstreamer-private/full209-generic-delivery-v11/full rw,nosuid,relatime shared:307 master:1 - ext4 /dev/nvme0n1p1 rw,discard,errors=remount-ro,commit=30
+179 155 0:60 / /proc rw,nosuid,nodev,noexec,relatime shared:308 - proc proc rw
+180 179 0:43 / /proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime shared:309 master:93 - binfmt_misc binfmt_misc rw
+229 179 0:60 /acpi /proc/acpi ro,nosuid,nodev,noexec,relatime shared:310 - proc proc rw
+231 179 0:60 /bus /proc/bus ro,nosuid,nodev,noexec,relatime shared:311 - proc proc rw
+421 179 0:60 /fs /proc/fs ro,nosuid,nodev,noexec,relatime shared:312 - proc proc rw
+428 179 0:60 /irq /proc/irq ro,nosuid,nodev,noexec,relatime shared:313 - proc proc rw
+429 179 0:28 /systemd/inaccessible/reg /proc/kallsyms ro,nosuid,nodev,noexec shared:314 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+462 179 0:28 /systemd/inaccessible/reg /proc/kcore ro,nosuid,nodev,noexec shared:315 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+463 179 0:60 /latency_stats /proc/latency_stats ro,nosuid,nodev,noexec,relatime shared:316 - proc proc rw
+464 179 0:60 /mtrr /proc/mtrr ro,nosuid,nodev,noexec,relatime shared:317 - proc proc rw
+465 179 0:60 /scsi /proc/scsi ro,nosuid,nodev,noexec,relatime shared:318 - proc proc rw
+466 179 0:60 /sys /proc/sys ro,nosuid,nodev,noexec,relatime shared:319 - proc proc rw
+467 466 0:43 / /proc/sys/fs/binfmt_misc ro,nosuid,nodev,noexec,relatime shared:320 master:93 - binfmt_misc binfmt_misc rw
+468 179 0:60 /sysrq-trigger /proc/sysrq-trigger ro,nosuid,nodev,noexec,relatime shared:321 - proc proc rw
+443 430 0:28 /systemd/inaccessible/dir /run/credentials ro,nosuid,nodev,noexec shared:61 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+444 430 0:28 /user /run/user ro,nosuid,nodev shared:279 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+447 444 0:50 / /run/user/1000 ro,nosuid,nodev,relatime shared:282 master:288 - tmpfs tmpfs rw,size=118372748k,nr_inodes=29593187,mode=700,uid=1000,gid=1000,inode64
+448 155 0:61 / /sys ro,nosuid,nodev,noexec,relatime shared:322 - sysfs sysfs rw
+317 448 0:31 / /sys/firmware/efi/efivars ro,nosuid,nodev,noexec,relatime shared:323 master:9 - efivarfs efivarfs rw
+319 448 0:32 / /sys/fs/bpf ro,nosuid,nodev,noexec,relatime shared:324 master:10 - bpf bpf rw,mode=700
+323 448 0:29 / /sys/fs/cgroup ro,nosuid,nodev,noexec,relatime shared:325 master:7 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot,memory_hugetlb_accounting
+393 448 0:37 / /sys/fs/fuse/connections ro,nosuid,nodev,noexec,relatime shared:328 master:21 - fusectl fusectl rw
+394 448 0:30 / /sys/fs/pstore ro,nosuid,nodev,noexec,relatime shared:390 master:8 - pstore none rw
+395 448 0:21 / /sys/kernel/config ro,nosuid,nodev,noexec,relatime shared:391 master:11 - configfs configfs rw
+396 448 0:9 / /sys/kernel/debug ro,nosuid,nodev,noexec,relatime shared:392 master:17 - debugfs debugfs rw
+397 448 0:8 / /sys/kernel/security ro,nosuid,nodev,noexec,relatime shared:393 master:6 - securityfs securityfs rw
+419 448 0:14 / /sys/kernel/tracing ro,nosuid,nodev,noexec,relatime shared:394 master:18 - tracefs tracefs rw
+420 323 0:29 /system.slice/r2meta-v11-mount-probe.service/memory.pressure /sys/fs/cgroup/system.slice/r2meta-v11-mount-probe.service/memory.pressure rw,nosuid,nodev,noexec,relatime shared:326 master:7 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot,memory_hugetlb_accounting
+449 155 0:28 /systemd/inaccessible/dir /tmp ro,nosuid,nodev,noexec shared:395 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+450 155 0:28 /systemd/inaccessible/dir /usr/lib/modules ro,nosuid,nodev,noexec shared:396 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
+469 155 0:28 /systemd/inaccessible/dir /var/tmp ro,nosuid,nodev,noexec shared:399 master:13 - tmpfs tmpfs rw,size=236745504k,nr_inodes=819200,mode=755,inode64
