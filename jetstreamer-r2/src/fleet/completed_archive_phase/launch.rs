@@ -712,6 +712,10 @@ pub(super) fn release() -> Result<()> {
             && c.startup_release.is_none(),
         "completed startup release spec differs"
     );
+    // The shared selector has a whole-second journal cutoff. Let the completed
+    // first guard enter that cutoff without inventing a future receipt time.
+    let fraction = SystemTime::now().duration_since(UNIX_EPOCH)?.subsec_nanos();
+    std::thread::sleep(Duration::from_nanos(1_000_000_000 - u64::from(fraction)));
     let (s, value) = collect(&c, &binding, &self_sha, true, None)?;
     barrier::issue(&s, &c.output, &value)
 }
