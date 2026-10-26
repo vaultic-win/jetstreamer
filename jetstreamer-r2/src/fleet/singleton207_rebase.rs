@@ -1,6 +1,7 @@
 //! Closed, metadata-only migration of the existing207 guard selector. Original
 //! launch evidence is immutable. A separate old-floor bridge covers reconfiguration.
 use super::*;
+use std::os::unix::fs::MetadataExt;
 const OLD_FLOOR: u64 = 2_034_359_738_368;
 const OLD_PLAN_SHA: &str = "6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c";
 const LAUNCH_SHA: &str = "7712ae90f84c1e4870579893e9e184b28d1b644ea0099ab5c23110bc03165ec0";
@@ -8,7 +9,7 @@ const BUFFER: u64 = 64 << 30;
 const METADATA: u64 = 1 << 30;
 const BRIDGE: &str = "horizon-singleton207-bridge-v1.service";
 const BRIDGE_DIR: &str = "/var/lib/jetstreamer/horizon-singleton207-bridge-receipts-v1";
-const DEST: &str = "/var/lib/jetstreamer/horizon-singleton207-rebase-v2";
+const PLAN_PREFIX: &str = "horizon-singleton207-rebase-";
 const PREP: &str = "jetstreamer-singleton207-guard-rebase-preparation-v1";
 const CAPTURE: &str = "jetstreamer-singleton207-guard-rebase-capture-v1";
 #[derive(Deserialize)]
@@ -18,8 +19,7 @@ struct Prepare {
     resource_basis: Value,
     original_launch: BoundFile,
     original_plan: BoundFile,
-    approved_plan: BoundFile,
-    bridge_plan: BoundFile,
+    plan_directory: PathBuf,
     output: PathBuf,
 }
 #[derive(Deserialize)]
@@ -412,6 +412,10 @@ fn guard_shape(g: &Value, p: &Value, b: &BoundFile, u: &Value, time: u64) -> Res
             && g["producer"]["kill_mode"] == "control-group"
             && g["producer"]["delegated"] == false
             && g["producer_stop_enabled"] == true
+            && g["bounded_measurement"] == false
+            && ["native_main", "bounded_canary", "target_handoff"]
+                .iter()
+                .all(|k| g.get(*k).is_some_and(Value::is_null))
             && g["minimum_free_bytes"] == p["minimum_free_bytes"]
             && n(g, "available_bytes")? >= n(p, "minimum_free_bytes")?
             && g["maximum_root_physical_bytes"] == 437_438_953_472u64
@@ -555,6 +559,30 @@ fn issuer() -> Result<()> {
     );
     Ok(())
 }
+fn plan_directory(path: &Path) -> Result<()> {
+    let leaf = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("207 plan directory name invalid")?;
+    let suffix = leaf
+        .strip_prefix(PLAN_PREFIX)
+        .context("207 plan directory namespace differs")?;
+    ensure!(
+        path.parent() == Some(Path::new("/var/lib/jetstreamer"))
+            && !suffix.is_empty()
+            && suffix.len() <= 96
+            && suffix
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b)),
+        "207 plan directory has an unsafe suffix"
+    );
+    let m = fs::symlink_metadata(path)?;
+    ensure!(
+        path.canonicalize()? == path && m.is_dir() && m.uid() == 0 && m.mode() & 0o077 == 0,
+        "207 plan directory must be canonical root-private metadata"
+    );
+    Ok(())
+}
 fn prepare(binding: &BoundFile, self_sha: &str) -> Result<()> {
     let s: Prepare = serde_json::from_value(read(binding)?)?;
     ensure!(
@@ -563,10 +591,11 @@ fn prepare(binding: &BoundFile, self_sha: &str) -> Result<()> {
             && s.original_plan.sha256 == OLD_PLAN_SHA,
         "207 rebase changed original admitted scope"
     );
+    plan_directory(&s.plan_directory)?;
     ensure!(
-        s.approved_plan.path == Path::new(DEST).join("guard-plan.json")
-            && s.bridge_plan.path == Path::new(DEST).join("bridge-plan.json"),
-        "207 approved/bridge plan paths differ"
+        s.output == s.plan_directory.join("preparation.json")
+            && fs::read_dir(&s.plan_directory)?.next().is_none(),
+        "207 preparation needs a new empty metadata generation; preserve prior failed attempts"
     );
     let fb: BoundFile = serde_json::from_value(s.resource_basis["fleet"].clone())?;
     let ob: BoundFile = serde_json::from_value(s.resource_basis["observer"].clone())?;
@@ -604,13 +633,23 @@ fn prepare(binding: &BoundFile, self_sha: &str) -> Result<()> {
         "207 original launch/guard plan binding differs"
     );
     let original = read(&s.original_plan)?;
-    let approved = read(&s.approved_plan)?;
-    let bridge = read(&s.bridge_plan)?;
+    let mut approved = original.clone();
+    approved["minimum_free_bytes"] = json!(stop);
+    let mut bridge = original.clone();
+    bridge["receipt_directory"] = json!(BRIDGE_DIR);
     plan_shape(&approved, &original, stop, false)?;
     plan_shape(&bridge, &original, stop, true)?;
     let current = census(&names, 201, 300)?;
     ensure!(before == current, "207 peer changed during preparation");
-    let record = json!({"schema":PREP,"issuer_sha256":self_sha,"spec":binding,"resource_basis":s.resource_basis,"original_launch":s.original_launch,"original_plan":s.original_plan,"approved_plan":s.approved_plan,"bridge_plan":s.bridge_plan,"century_floor_bytes":floor,"approved_floor_bytes":stop,"buffer_bytes":BUFFER,"transition_metadata_allowance_bytes":METADATA,"capacity":capacity,"producer":current[singleton207::UNIT],"recorded_unix_seconds":now()?,"replay_launch_authorized":false,"capacity_credit_authorized":false,"producer_mutations":false,"r2_mutations":false});
+    let approved_path = s.plan_directory.join("guard-plan.json");
+    let bridge_path = s.plan_directory.join("bridge-plan.json");
+    write(&approved_path, &approved)?;
+    write(&bridge_path, &bridge)?;
+    let approved_binding: BoundFile =
+        serde_json::from_value(private157::file_binding(&approved_path)?)?;
+    let bridge_binding: BoundFile =
+        serde_json::from_value(private157::file_binding(&bridge_path)?)?;
+    let record = json!({"schema":PREP,"issuer_sha256":self_sha,"spec":binding,"resource_basis":s.resource_basis,"original_launch":s.original_launch,"original_plan":s.original_plan,"plan_directory":s.plan_directory,"approved_plan":approved_binding,"bridge_plan":bridge_binding,"century_floor_bytes":floor,"approved_floor_bytes":stop,"buffer_bytes":BUFFER,"transition_metadata_allowance_bytes":METADATA,"capacity":capacity,"producer":current[singleton207::UNIT],"recorded_unix_seconds":now()?,"replay_launch_authorized":false,"capacity_credit_authorized":false,"producer_mutations":false,"r2_mutations":false});
     write(&s.output, &record)
 }
 fn growth_census(f: &Value, capacity: &Value) -> Result<()> {
@@ -689,6 +728,22 @@ fn validate_preparation(p: &Value) -> Result<()> {
             && p["capacity"]["all_live_growth_and_century_floor_protected"] == true
             && p["capacity"]["additional_bytes"] == METADATA,
         "207 preparation authority or resource envelope differs"
+    );
+    let source: Prepare =
+        serde_json::from_value(read(&serde_json::from_value(p["spec"].clone())?)?)?;
+    plan_directory(&source.plan_directory)?;
+    ensure!(
+        source.schema == "jetstreamer-singleton207-guard-rebase-spec-v1"
+            && source.output == source.plan_directory.join("preparation.json")
+            && p["resource_basis"] == source.resource_basis
+            && p["original_launch"] == private157::binding(&source.original_launch)
+            && p["original_plan"] == private157::binding(&source.original_plan)
+            && p["plan_directory"] == serde_json::to_value(&source.plan_directory)?
+            && p["approved_plan"]["path"].as_str()
+                == source.plan_directory.join("guard-plan.json").to_str()
+            && p["bridge_plan"]["path"].as_str()
+                == source.plan_directory.join("bridge-plan.json").to_str(),
+        "207 preparation inputs/plans do not match its actual issuer spec"
     );
     let f = assembly204_recovery::accepted_context(
         &serde_json::from_value(p["resource_basis"]["fleet"].clone())?,
@@ -1195,5 +1250,21 @@ mod tests {
         let mut changed = good;
         changed["unit_census_after"]["peer225"]["InvocationID"] = json!("3".repeat(32));
         assert!(stage_census(&changed, &p).is_err());
+    }
+    #[test]
+    fn rebase207_preparer_generates_plans_and_rejects_caller_floor_authority() {
+        let bound = json!({"path":"/sealed/original.json","sha256":"a".repeat(64)});
+        let good = json!({"schema":"jetstreamer-singleton207-guard-rebase-spec-v1","resource_basis":{},"original_launch":bound,"original_plan":bound,"plan_directory":"/var/lib/jetstreamer/horizon-singleton207-rebase-attempt1","output":"/var/lib/jetstreamer/horizon-singleton207-rebase-attempt1/preparation.json"});
+        assert!(serde_json::from_value::<Prepare>(good.clone()).is_ok());
+        for key in [
+            "minimum_free_bytes",
+            "approved_floor_bytes",
+            "approved_plan",
+            "skip205release",
+        ] {
+            let mut bad = good.clone();
+            bad[key] = json!(1);
+            assert!(serde_json::from_value::<Prepare>(bad).is_err(), "{key}");
+        }
     }
 }
