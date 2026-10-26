@@ -14,6 +14,7 @@ mod assembly223_capacity;
 mod assembly223_live_peer;
 mod assembly223_prepare;
 mod bounded205;
+mod bounded228;
 mod canary227;
 mod canary227_admission;
 mod canary227_allocation;
@@ -38,6 +39,7 @@ mod continuation203_ops;
 mod continuation203_runtime;
 mod continuation205_delivery;
 mod epoch136;
+mod epoch225_extraction;
 mod first_root233;
 mod foundation_holding203;
 mod foundation_holding_capacity;
@@ -53,6 +55,36 @@ mod full210_terminal;
 mod full227_failure;
 mod full227_status;
 mod maintenance_capacity;
+pub(super) fn epoch225_extraction_inactive_owner(
+    r: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    epoch225_extraction::inactive_owner(r)
+}
+pub(super) fn epoch225_extraction_cleanup_current(
+    row: &Value,
+    current: &Value,
+    owner: &(String, String),
+) -> Result<()> {
+    epoch225_extraction::cleanup_current(row, current, owner)
+}
+pub(super) fn validate_epoch225_extraction_role() -> Result<()> {
+    epoch225_extraction::validate_role()
+}
+pub(super) fn capture_epoch225_extraction_source() -> Result<()> {
+    epoch225_extraction::capture_source()
+}
+pub(super) fn admit_epoch225_extraction() -> Result<()> {
+    epoch225_extraction::admit()
+}
+pub(super) fn release_epoch225_extraction() -> Result<()> {
+    epoch225_extraction::release()
+}
+pub(super) fn prepare_epoch225_extraction_event() -> Result<()> {
+    epoch225_extraction::prepare_event()
+}
+pub(super) async fn publish_epoch225_extraction_status() -> Result<()> {
+    epoch225_extraction::publish().await
+}
 
 pub(super) fn capture_demotion223_task() -> Result<()> {
     demotion223_status::capture()
@@ -181,6 +213,7 @@ mod singleton227_terminal;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
+mod terminal225_peer;
 mod verification223;
 mod verification223_capacity;
 mod verification223_live_peer;
@@ -228,6 +261,23 @@ pub(super) fn prefix223_native20_status_inactive_owner(
     receipt: &StatusPublicationReceipt,
 ) -> Result<Option<(String, String)>> {
     prefix223_native20_status::inactive_owner(receipt)
+}
+pub(super) fn admit_bounded228() -> Result<()> {
+    bounded228::admit()
+}
+pub(super) fn probe_bounded228_parent() -> Result<()> {
+    bounded228::probe_parent()
+}
+pub(super) fn capture_bounded228() -> Result<()> {
+    bounded228::capture_launch()
+}
+pub(super) async fn publish_bounded228_status() -> Result<()> {
+    bounded228::publish_status().await
+}
+pub(super) fn bounded228_status_inactive_owner(
+    r: &StatusPublicationReceipt,
+) -> Result<Option<(String, String)>> {
+    bounded228::inactive_owner(r)
 }
 pub(super) fn admit_first_root233() -> Result<()> {
     first_root233::admit()
@@ -341,6 +391,12 @@ pub(super) fn admit_singleton210_jit() -> Result<()> {
 }
 pub(super) fn prepare_completed209_full_event() -> Result<()> {
     completed_archive_phase::prepare_full209_event()
+}
+pub(super) fn prepare_completed207_phase_event() -> Result<()> {
+    completed_archive_phase::prepare_delivery207_event()
+}
+pub(super) async fn publish_completed207_phase_status() -> Result<()> {
+    completed_archive_phase::publish_delivery207_status().await
 }
 pub(super) async fn publish_completed209_full_status() -> Result<()> {
     completed_archive_phase::publish_full209_status().await
@@ -932,6 +988,9 @@ fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     if first_root233::namespace(claim) {
         first_root233::bindings(claim, &launch)?;
     }
+    if bounded228::namespace(claim) {
+        bounded228::bindings(claim, &launch)?;
+    }
     if private_225_verification(claim) {
         let evidence: BoundFile = serde_json::from_value(launch["terminal_evidence"].clone())?;
         validate_private_225_terminal(&bound_json(&evidence)?)?;
@@ -1383,6 +1442,8 @@ struct Plan {
     #[serde(default)]
     epoch203_ram_auxiliary: Option<ram_auxiliary::Claim>,
     #[serde(default)]
+    epoch225_extraction: Option<BoundFile>,
+    #[serde(default)]
     pipeline_claims: Vec<PipelineClaim>,
     #[serde(default)]
     runtime_handoff157: Option<BoundFile>,
@@ -1500,6 +1561,7 @@ fn validate_same_sample_admission(
         223 if prefix223_native20::namespace(claim) => prefix223_native20::GUARD_SHA,
         207 if singleton207::namespace(claim) => singleton207::GUARD_SHA,
         233 if first_root233::namespace(claim) => first_root233::GUARD_SHA,
+        228 if bounded228::namespace(claim) => bounded228::GUARD_SHA,
         224 if claim
             .unit
             .starts_with("horizon-qualify-224-bounded-resource-") =>
@@ -1701,6 +1763,10 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| singleton207::guard_matches(claim, &r, plan));
     }
+    if bounded228::namespace(claim) {
+        return bound_json(&claim.launch_receipt)
+            .is_ok_and(|r| bounded228::guard_matches(claim, &r, plan));
+    }
     if first_root233::namespace(claim) {
         return bound_json(&claim.launch_receipt)
             .is_ok_and(|r| first_root233::guard_matches(claim, &r, plan));
@@ -1848,6 +1914,13 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
         ensure!(
             singleton207::launch_matches(claim, receipt),
             "singleton 207 namespace, schema, or private prefix scope differs"
+        );
+        return Ok(());
+    }
+    if bounded228::namespace(claim) || receipt["schema"] == bounded228::SCHEMA {
+        ensure!(
+            bounded228::launch_matches(claim, receipt),
+            "bounded228 namespace, schema or root-tail scope differs"
         );
         return Ok(());
     }
@@ -3018,7 +3091,25 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if completed_archive_phase::is_delivery209_event(&event) {
+            if event["schema"] == epoch225_extraction::EVENT {
+                epoch225_extraction::event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == completed_archive_phase::DELIVERY207_EVENT_SCHEMA {
+                completed_archive_phase::delivery207_event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if completed_archive_phase::is_delivery209_event(&event) {
                 completed_archive_phase::full209_event_predecessor(
                     &previous,
                     &plan,
@@ -3217,6 +3308,9 @@ pub(super) async fn run() -> Result<()> {
         .as_array()
         .context("observer replays missing")?;
     let mut names: BTreeSet<_> = plan.tracked_units.iter().cloned().collect();
+    if let Some(b) = &plan.epoch225_extraction {
+        names.extend(epoch225_extraction::names(b)?);
+    }
     for gate in plan.gates.values() {
         if let Some(stop) = &gate.reserve_stop {
             names.extend(stop.owners().into_iter().map(|(name, _)| name));
@@ -3513,6 +3607,19 @@ pub(super) async fn run() -> Result<()> {
         singleton227_event::event_census(&previous, &before, claims[0])?;
     }
     if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == completed_archive_phase::DELIVERY207_EVENT_SCHEMA
+    {
+        completed_archive_phase::delivery207_event_census(
+            &bound_json(
+                plan.previous_fleet
+                    .as_ref()
+                    .context("207 delivery predecessor missing")?,
+            )?,
+            &before,
+            &bound_json(binding)?,
+        )?;
+    }
+    if let Some(binding) = &plan.metadata_event
         && completed_archive_phase::is_delivery209_event(&bound_json(binding)?)
     {
         completed_archive_phase::full209_event_census(
@@ -3526,6 +3633,19 @@ pub(super) async fn run() -> Result<()> {
         )?;
     }
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == epoch225_extraction::EVENT
+    {
+        epoch225_extraction::event_census(
+            &bound_json(
+                plan.previous_fleet
+                    .as_ref()
+                    .context("epoch 225 predecessor missing")?,
+            )?,
+            &before,
+            &bound_json(binding)?,
+        )?;
+    }
     let mut terminal_replays = Vec::new();
     for (epoch, gate) in &plan.gates {
         if let Some(stop) = &gate.reserve_stop {
@@ -3724,6 +3844,9 @@ pub(super) async fn run() -> Result<()> {
             if first_root233::namespace(claim) {
                 first_root233::validate_live(claim, current)?;
             }
+            if bounded228::namespace(claim) {
+                bounded228::validate_live(claim, current)?;
+            }
             if private157::namespace(claim) {
                 private157::live_limits()?;
             }
@@ -3919,6 +4042,7 @@ pub(super) async fn run() -> Result<()> {
             } else if prefix223::namespace(claim)
                 || prefix223_native20::namespace(claim)
                 || first_root233::namespace(claim)
+                || bounded228::namespace(claim)
                 || prefix205::namespace(claim)
                 || prefix204::namespace(claim)
             {
@@ -4031,6 +4155,21 @@ pub(super) async fn run() -> Result<()> {
         }
     }
     let mut remote_entries = Vec::new();
+    let extraction225_rows = plan
+        .epoch225_extraction
+        .as_ref()
+        .map(|b| epoch225_extraction::rows(b, &observer))
+        .transpose()?
+        .unwrap_or_default();
+    for row in &extraction225_rows {
+        if row["live"] == true {
+            ensure!(
+                !active.iter().any(|other| other["epoch"] == row["epoch"]),
+                "epoch 225/226 extraction overlaps another active owner"
+            );
+            active.push(row.clone());
+        }
+    }
     let requested_epochs = (plan.first_epoch..=plan.last_epoch).collect::<Vec<_>>();
     let remote_inventory =
         inventory_batch::collect(&requested_epochs, |epoch| inventory_epoch(&s3, &r2, epoch))
@@ -4109,6 +4248,14 @@ pub(super) async fn run() -> Result<()> {
             state = "post-replay-pipeline";
             next = "Continue exact205 guarded Full, current-plugin, import and authenticated upload/readback";
         }
+        if extraction225_rows
+            .iter()
+            .any(|row| row["epoch"] == epoch && row["terminal_outcome"] == "failed-needs-repair")
+            && !active.iter().any(|row| row["epoch"] == epoch)
+        {
+            state = "failed-needs-repair";
+            next = "Preserve the exact extraction failure, original source and private epoch 226 tail; diagnose and admit a separate repair owner before retry or publication";
+        }
         let mut live = None;
         for replay in replays {
             let range = parse_observer_claim_range(observer_string(replay, &["range"])?)?;
@@ -4166,13 +4313,18 @@ pub(super) async fn run() -> Result<()> {
                         || canary227_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
+                        || epoch225_extraction::matches(receipt, epoch, &observer, &before)
                         || completed_archive_phase::full209_event_status_matches(
+                            receipt, epoch, &observer, &before,
+                        )
+                        || completed_archive_phase::delivery207_event_status_matches(
                             receipt, epoch, &observer, &before,
                         )
                         || full210_status::matches(receipt, epoch, &observer, &before)
                         || demotion223_status::matches(receipt, epoch, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || first_root233::status_matches(receipt, epoch, &observer, &before)
+                        || bounded228::status_matches(receipt, epoch, &observer, &before)
                         || singleton207::status_matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
@@ -4209,10 +4361,14 @@ pub(super) async fn run() -> Result<()> {
             let production_matches = production_status_binding_matches(matches, state)
                 || (matches && private_qualification_binding);
             let capped_current = publication.as_ref().is_ok_and(|(r, _, _)| {
-                capped204205_work::status_matches(r, epoch, &capped_work)
+                epoch225_extraction::matches(r, epoch, &observer, &before)
+                    || capped204205_work::status_matches(r, epoch, &capped_work)
                     || assembly204_recovery::status_matches(r, epoch, &recovery_work)
                     || continuation205_delivery::status_matches(r, epoch, &continuation205_work)
                     || completed_archive_phase::full209_event_status_matches(
+                        r, epoch, &observer, &before,
+                    )
+                    || completed_archive_phase::delivery207_event_status_matches(
                         r, epoch, &observer, &before,
                     )
             });
@@ -4247,6 +4403,7 @@ pub(super) async fn run() -> Result<()> {
     let mut receipt = receipt;
     receipt["assembly204_recovery"] = json!(recovery_work);
     receipt["continuation205_delivery"] = json!(continuation205_work);
+    receipt["epoch225_extraction"] = json!(extraction225_rows);
     receipt["assembly204_recovery_history"] = json!(plan.assembly204_recovery_history);
     receipt["capped204205_work"] = json!(capped_work);
     receipt["capped204205_history"] = json!(plan.capped204205_history);

@@ -1,0 +1,16 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-event-request-v1",
+  "launch": {
+    "path": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1/launch.json",
+    "sha256": "ACTUAL_LAUNCH_SHA256"
+  },
+  "observer": {
+    "path": "ACTUAL_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_OBSERVER_SHA256"
+  },
+  "previous_fleet": {
+    "path": "ACTUAL_ACCEPTED_TERMINAL225_FLEET_PATH",
+    "sha256": "ACTUAL_FLEET_SHA256"
+  },
+  "output_directory": "/var/lib/jetstreamer/horizon-campaign-fleet/epoch225-extraction-event-v1"
+}

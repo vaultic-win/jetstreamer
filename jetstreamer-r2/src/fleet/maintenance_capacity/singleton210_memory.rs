@@ -26,6 +26,43 @@ pub(super) fn first_root233_required(
         candidate,
     )
 }
+pub(super) fn bounded228_required(
+    fleet: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    let mut policy = native223_policy(fleet)?;
+    policy["schema"] = json!("jetstreamer-bounded228-native223-memory-policy-v1");
+    bounded228_recompute(&policy, total, growth, candidate)
+}
+pub(super) fn bounded228_saved_floor(policy: &Value, total: u64) -> Result<u64> {
+    ensure!(
+        policy["schema"] == "jetstreamer-bounded228-native223-memory-policy-v1",
+        "bounded228 floor borrowed another candidate profile"
+    );
+    let mut neutral = policy.clone();
+    neutral["schema"] = json!("jetstreamer-first-root233-native223-memory-policy-v1");
+    first_root233_saved_floor(&neutral, total)
+}
+pub(super) fn bounded228_recompute(
+    policy: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<(u64, Value)> {
+    ensure!(
+        candidate == bounded228::MEMORY && total >= candidate,
+        "bounded228 hard candidate differs"
+    );
+    bounded228_saved_floor(policy, total)?;
+    let mut neutral = policy.clone();
+    neutral["schema"] = json!("jetstreamer-first-root233-native223-memory-policy-v1");
+    let (n, mut result) = first_root233_recompute(&neutral, total, growth, candidate)?;
+    result["schema"] = json!("jetstreamer-bounded228-native223-memory-policy-v1");
+    Ok((n, result))
+}
+
 fn native223_policy(fleet: &Value) -> Result<Value> {
     let owners = fleet["active"]
         .as_array()
@@ -834,6 +871,31 @@ mod tests {
         );
         // The older closed 209/210 policies retain their own candidate rules.
         assert!(required(&fleet(), total, growth, first_root233::MEMORY - 1).is_err());
+    }
+    #[test]
+    fn bounded228_retains_complete_hard_growth_without_rss_credit_or_233_receipt_reuse() {
+        let total = 1_024_000_000_000;
+        let growth = 12345;
+        let (needed, policy) =
+            bounded228_required(&fleet(), total, growth, bounded228::MEMORY).unwrap();
+        assert_eq!(
+            needed,
+            (480u64 << 30) + growth + bounded228::MEMORY + (2u64 << 30)
+        );
+        assert_eq!(
+            policy["schema"],
+            "jetstreamer-bounded228-native223-memory-policy-v1"
+        );
+        assert_eq!(
+            policy["protected_existing_hard_memory_growth_bytes"],
+            growth
+        );
+        assert!(bounded228_required(&fleet(), total, u64::MAX, bounded228::MEMORY).is_err());
+        assert!(bounded228_required(&fleet(), total, growth, bounded228::MEMORY - 1).is_err());
+        let (_, foreign) =
+            first_root233_required(&fleet(), total, growth, first_root233::MEMORY).unwrap();
+        assert!(bounded228_saved_floor(&foreign, total).is_err());
+        assert!(first_root233_saved_floor(&policy, total).is_err());
     }
 
     #[test]

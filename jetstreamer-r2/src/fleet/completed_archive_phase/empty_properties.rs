@@ -16,9 +16,19 @@ const FIELDS: [(&str, &str, &str); 11] = [
     ("EnvironmentFiles", SERVICE, "a(sb)"),
     ("PassEnvironment", SERVICE, "as"),
 ];
+fn extraction225_scope(name: &str) -> bool {
+    name.strip_prefix("horizon-qualify-225-prefix-extract-")
+        .and_then(|n| n.strip_suffix(".service"))
+        .is_some_and(|n| {
+            !n.is_empty()
+                && n.len() <= 80
+                && n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
+}
 fn object_path(service: &str) -> Result<String> {
     ensure!(
         guard_scope(service, 201, 300)
+            || extraction225_scope(service)
             || singleton210_admission::jit_issuer_scope(service)
             || assembly204_recovery::scope(service, 204, 204)
             || continuation205_delivery::scope(service)
@@ -208,6 +218,29 @@ pub(super) fn jit210_properties(name: &str, fields: &str) -> Result<BTreeMap<Str
     }
     normalize(name, &show, &Value::Object(proof), false, false)
 }
+pub(super) fn extraction225_properties(
+    name: &str,
+    guard: bool,
+) -> Result<BTreeMap<String, String>> {
+    ensure!(
+        extraction225_scope(name) && guard == name.ends_with("-guard.service"),
+        "epoch 225 empty-array query escaped its exact role"
+    );
+    let fields = "ExecStartPre,ExecStartPost,ExecCondition,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment";
+    let show = singleton227_capture::properties(name, fields)?;
+    let path = object_path(name)?;
+    let mut proof = serde_json::Map::new();
+    for (property, interface, _) in roster(guard, false) {
+        if !show.contains_key(property) {
+            proof.insert(property.into(), query(name, &path, interface, property)?);
+        }
+    }
+    ensure!(
+        singleton227_capture::properties(name, fields)? == show,
+        "epoch 225 command/environment arrays changed during proof"
+    );
+    normalize(name, &show, &Value::Object(proof), guard, false)
+}
 
 pub(super) fn properties(s: &Spec, guard: bool, fields: &str) -> Result<BTreeMap<String, String>> {
     properties_with(s, guard, fields, singleton227_capture::properties)
@@ -296,6 +329,23 @@ fn selected_fields(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn e225_empty_control_scope_is_exact_and_grants_no_foreign_role() {
+        for name in [
+            "horizon-qualify-225-prefix-extract-v1.service",
+            "horizon-qualify-225-prefix-extract-v1-guard.service",
+        ] {
+            assert!(extraction225_scope(name));
+            assert!(object_path(name).is_ok());
+        }
+        for name in [
+            "horizon-qualify-226-prefix-extract-v1.service",
+            "horizon-qualify-225-prefix-extract-.service",
+            "horizon-qualify-225-prefix-extract-v1.service;other",
+        ] {
+            assert!(!extraction225_scope(name));
+        }
+    }
     fn proof(service: &str, guard: bool, credentials: bool) -> Value {
         let path = object_path(service).unwrap();
         Value::Object(roster(guard, credentials).into_iter().map(|(p,i,s)| (p.into(), json!({"unit":service,"object_path":path,"interface":i,"property":p,"signature":s,"exit_code":0,"stdout":serde_json::to_string(&json!({"type":s,"data":[]})).unwrap(),"stderr":""}))).collect())

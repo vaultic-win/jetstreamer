@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-release-request-v1",
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extract-inputs-v1/plan.json",
+    "sha256": "ACTUAL_SEALED_PLAN_SHA256"
+  },
+  "guard_plan": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extract-guard-plan-v1/guard-plan.json",
+    "sha256": "ACTUAL_GUARD_PLAN_SHA256"
+  }
+}

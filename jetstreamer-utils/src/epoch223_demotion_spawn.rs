@@ -184,6 +184,11 @@ fn wait(p: &Plan, iid: &str, x: &Prerequisites, s: &mut Session, start: Instant)
                     &json!({
                     "schema":"jetstreamer-epoch223-demotion-spawn-accepted-v1","runner":g.runner,
                     "request":request,"token":token_binding,"grant":token.grant,
+                    // Preserve the typed issuer declaration as provenance, not
+                    // authority: the fresh grant proof was independently
+                    // opened, hashed and validated above by validate_allocation.
+                    "issuer_declared_allocation_proof":binding_value(&issue.allocation_proof),
+                    "validated_allocation_proof":binding_value(&g.allocation_proof),
                     "original_start_unix_millis":c.original_start_unix_millis,"worker_spawned":false,
                     "native_execution_authorized":true,"ordinary_replay_authorized":false,
                     "publication_authorized":false,"r2_mutations":false}),

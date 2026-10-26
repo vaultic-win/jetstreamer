@@ -3544,6 +3544,29 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-pipeline") {
         return pipeline_status::run().await;
     }
+    match env::args().nth(1).as_deref() {
+        Some("validate-epoch225-extraction-role") => {
+            return fleet::validate_epoch225_extraction_role();
+        }
+        Some("admit-epoch225-prefix-extraction") => return fleet::admit_epoch225_extraction(),
+        Some("capture-epoch225-terminal-handoff") => {
+            return fleet::capture_epoch225_extraction_source();
+        }
+        Some("release-epoch225-prefix-extraction") => return fleet::release_epoch225_extraction(),
+        Some("prepare-epoch225-extraction-event") => {
+            return fleet::prepare_epoch225_extraction_event();
+        }
+        Some("status-publish-epoch225-extraction") => {
+            return fleet::publish_epoch225_extraction_status().await;
+        }
+        _ => (),
+    }
+    if env::args().nth(1).as_deref() == Some("prepare-completed207-phase-event") {
+        return fleet::prepare_completed207_phase_event();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-completed207-phase") {
+        return fleet::publish_completed207_phase_status().await;
+    }
     if env::args().nth(1).as_deref().is_some_and(|c| {
         matches!(
             c,
@@ -3768,6 +3791,18 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-publish-prefix223-native20") {
         return fleet::publish_prefix223_native20_status().await;
+    }
+    if env::args().nth(1).as_deref() == Some("probe-bounded228-parent") {
+        return fleet::probe_bounded228_parent();
+    }
+    if env::args().nth(1).as_deref() == Some("admit-bounded228") {
+        return fleet::admit_bounded228();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-bounded228") {
+        return fleet::capture_bounded228();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-bounded228") {
+        return fleet::publish_bounded228_status().await;
     }
     if env::args().nth(1).as_deref() == Some("admit-first-root233") {
         return fleet::admit_first_root233();

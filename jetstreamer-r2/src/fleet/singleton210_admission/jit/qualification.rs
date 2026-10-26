@@ -2,7 +2,7 @@
 //! validator authenticates sealed report/result/log copies; no asserted passed
 //! flag substitutes for the real full-test and strict-Clippy result records.
 use super::*;
-pub(super) const REQUIRED: [&str; 13] = [
+pub(super) const REQUIRED: [&str; 16] = [
     "fleet::singleton210_admission::custody::tests::full210_prehashed_tuple_covers_content_identity_custody_and_exact_mode",
     "fleet::singleton210_admission::custody::tests::full210_prehashed_descriptor_cannot_hide_path_replacement_or_mode_change",
     "fleet::singleton210_admission::custody::tests::full210_prehashed_input_changed_through_preexisting_writer_is_rejected",
@@ -10,6 +10,9 @@ pub(super) const REQUIRED: [&str; 13] = [
     "fleet::singleton210_admission::jit::tests::full210_jit_roster_uses_authenticated_completed209_profile_without_omitting_legacy_peers",
     "fleet::singleton210_admission::jit::tests::full210_jit_selection_rejects_foreign_stale_tripped_and_replaced_guard",
     "fleet::singleton210_admission::jit::tests::full210_jit_wire_cannot_import_guard_choices_skip_checks_or_gain_authority",
+    "fleet::terminal225_peer::tests::terminal225_retains_reservation_without_fabricating_a_live_iid_or_guard",
+    "fleet::terminal225_peer::tests::terminal225_rejects_changed_manifest_reservation_omission_and_duplicate_owner",
+    "fleet::terminal225_peer::tests::extractor225_requires_its_own_admitted_generation_and_retains_the_same_reservation",
     "fleet::singleton210_admission::jit::issuer::tests::full210_jit_same_process_proof_rejects_replaced_caller_and_effective_contract",
     "fleet::singleton210_admission::jit::issuer::tests::full210_jit_caller_scope_and_native_capabilities_are_closed",
     "fleet::singleton210_admission::jit::qualification::tests::full210_jit_role_rejects_failed_foreign_source_and_filtered_actual_qa",

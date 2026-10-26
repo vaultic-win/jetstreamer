@@ -2,6 +2,7 @@
 use super::*;
 mod admission;
 mod capture;
+pub(super) mod delivery;
 mod status;
 mod terminal;
 pub(super) fn capture_terminal() -> Result<()> {

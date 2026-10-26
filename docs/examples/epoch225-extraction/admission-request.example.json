@@ -1,0 +1,23 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-admission-request-v1",
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extract-inputs-v1/plan.json",
+    "sha256": "ACTUAL_SEALED_PLAN_SHA256"
+  },
+  "resource_basis": {
+    "observer": {
+      "path": "ACTUAL_COORDINATED_OBSERVER_PATH",
+      "sha256": "ACTUAL_OBSERVER_SHA256"
+    },
+    "fleet": {
+      "path": "ACTUAL_ACCEPTED_TERMINAL225_FLEET_PATH",
+      "sha256": "ACTUAL_FLEET_SHA256"
+    },
+    "protected_guards": {
+      "ACTUAL_CURRENT_OWNER_UNIT": {
+        "path": "ACTUAL_CURRENT_PROTECTIVE_SAMPLE",
+        "sha256": "ACTUAL_GUARD_SAMPLE_SHA256"
+      }
+    }
+  }
+}

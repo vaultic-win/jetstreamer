@@ -1,0 +1,54 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-sidecar-policy-v1",
+  "launch": {
+    "path": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1/launch.json",
+    "sha256": "ACTUAL_LAUNCH_SHA256"
+  },
+  "observer": {
+    "path": "ACTUAL_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_OBSERVER_SHA256"
+  },
+  "sampled_at_utc": "ACTUAL_CAPTURE_EVENT_OR_NEW_COORDINATED_OBSERVER_UTC",
+  "sidecar_inclusive": true,
+  "current_best_guesses": true,
+  "missing226_suffix_slots": 535,
+  "remaining_stage_millis": {
+    "225": {
+      "source_validation": 7200000,
+      "extraction_and_assembly": 14400000,
+      "runtime_qualification": 86400000,
+      "full_verification": 7200000,
+      "current_plugin_verification": 14400000,
+      "boundary_checks": 1800000,
+      "upload": 7200000,
+      "readback": 7200000,
+      "source_revalidation_and_sidecar": 3600000,
+      "recovery": 14400000
+    },
+    "226": {
+      "source_validation": 7200000,
+      "extraction_and_assembly": 28800000,
+      "runtime_qualification": 86400000,
+      "full_verification": 7200000,
+      "current_plugin_verification": 14400000,
+      "boundary_checks": 1800000,
+      "upload": 7200000,
+      "readback": 7200000,
+      "source_revalidation_and_sidecar": 3600000,
+      "recovery": 28800000,
+      "suffix_restore_and_replay": 64800000
+    }
+  },
+  "estimate_basis": "Explicit provisional planning guesses, not upper bounds: include the mandatory full 265,610,094,371-byte source decode inside PinnedSource::open even after a standalone reader receipt. Include prefix encoding, independent output semantic reread and output SHA. Runtime qualification and the epoch 226 native restore plus 535-slot suffix remain unresolved. Update these guesses from actual phase logs and current queue before sealing.",
+  "evidence": [
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1/launch.json",
+      "sha256": "ACTUAL_LAUNCH_SHA256"
+    },
+    {
+      "path": "ACTUAL_PHASE_PLANNING_EVIDENCE_JSON",
+      "sha256": "ACTUAL_EVIDENCE_SHA256"
+    }
+  ],
+  "source_validation_complete": false
+}

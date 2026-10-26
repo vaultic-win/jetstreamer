@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-guard-qualification-v1",
+  "executable": {
+    "path": "ACTUAL_EXISTING_QUALIFIED_STANDALONE_GUARD_PATH",
+    "sha256": "ACTUAL_GUARD_SHA256"
+  },
+  "standalone_guard_qa_passed": false,
+  "empty_worker_set_supported": false,
+  "producer_stop_supported": false,
+  "source_qa_passed": false,
+  "publication_authorized": false
+}

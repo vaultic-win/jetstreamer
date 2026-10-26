@@ -41,6 +41,41 @@ fn journal_shape(rows: &[Value], iid: &str, pid: u64, succeeded: bool) -> Result
     );
     Ok(())
 }
+pub(super) fn validate_saved(
+    proof: &Value,
+    launch_binding: &BoundFile,
+    launch: &Value,
+) -> Result<()> {
+    let iid = launch["evidence"]["units"][0]["invocation_id"]
+        .as_str()
+        .context("207 terminal launch IID absent")?;
+    let pid = launch["evidence"]["units"][0]["main_pid"]
+        .as_u64()
+        .context("207 terminal launch PID absent")?;
+    ensure!(
+        proof["schema"] == "jetstreamer-private-singleton207-terminal-v1"
+            && scope_matches(proof)
+            && proof["launch"] == private157::binding(launch_binding)
+            && proof["invocation_id"] == iid
+            && proof["main_pid"] == pid
+            && proof["natural_parent_completion_observed"] == true
+            && proof["delivery_admission_still_required"] == true
+            && proof["resource_samples_taken"] == 0,
+        "207 delivery requires genuine successful original terminal proof"
+    );
+    deny_authority(proof)?;
+    delivery::terminal_manager(&proof["terminal_manager"], iid)?;
+    let b: BoundFile = serde_json::from_value(proof["journal"].clone())?;
+    let raw = read_stable_bounded(&b.path, 16 << 20, "207 immutable terminal journal")?;
+    ensure!(
+        hex_lower(&Sha256::digest(&raw)) == b.sha256,
+        "207 terminal journal changed"
+    );
+    let rows = serde_json::Deserializer::from_slice(&raw)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    journal_shape(&rows, iid, pid, true)
+}
 pub(super) fn run() -> Result<()> {
     let (bound, helper_sha) = publication203::parsed_args("capture-singleton207-terminal")?;
     let spec: Spec = serde_json::from_value(native209::immutable_json(&bound)?)?;

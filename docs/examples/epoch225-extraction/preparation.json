@@ -1,0 +1,176 @@
+{
+  "schema": "jetstreamer-epoch225-prefix-extraction-source-preparation-v1",
+  "source_only": true,
+  "original_owner": {
+    "unit": "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+    "invocation_id": "4cd76ae1353a4411885b997f04306402",
+    "terminal_journal_time_utc": "2026-10-26T13:49:02Z",
+    "segment_published_then_deactivated_successfully": true,
+    "current_live_owner_claimed": false,
+    "launch": {
+      "path": "/var/lib/jetstreamer/horizon-225-shrink-natural-root-launch-222936-v1/launch.json",
+      "sha256": "491baf3214515c8ad324d0d0de43a3fa680bb35892bfae32fd027b8ce6c6b071"
+    }
+  },
+  "original_source": {
+    "archive": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet",
+    "archive_bytes": 265610094371,
+    "archive_sha256_from_manifest": "77c0f95a020ceb6c45e323f4ce1bb48066fd0b379615bd5c9dbcb67f9082d6f9",
+    "archive_body_rehashed_by_this_source_task": false,
+    "manifest": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet.segment.json",
+    "manifest_sha256": "53a69d801e70866b0bc048e1b3a75d9c16c1fb93995503157fc206742f3cdcf6",
+    "worker_sha256": "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd",
+    "runtime_profile": "solana-v1.6.25",
+    "runtime_revision": "7de8a55b54d3e11058b82f9483bb405d143b455c",
+    "runtime_admission": "candidate",
+    "output_slot_start": 97200000,
+    "output_slot_count": 863465,
+    "terminal_slot": 98063464,
+    "canonical225_slot_count": 432000,
+    "canonical225_final_slot": 97631999,
+    "retained226_private_slots": 431465,
+    "missing226_suffix_slots": 535,
+    "canonical226_final_slot": 98063999
+  },
+  "extraction_core": {
+    "module": "jetstreamer_node::epoch225_extract",
+    "open": "PinnedSource::open(original_archive, original_manifest, exact_manifest_digest, exact_worker_digest)",
+    "extract": "PinnedSource::extract_private(new_private_root, separately_admitted_maximum_bytes, live_guard_callback)",
+    "output_root_namespace": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-UNIQUE_ATTEMPT",
+    "output_filename": "epoch-225.jet",
+    "maximum_accepted_output_ceiling_bytes": 343597383680,
+    "ceiling_is_not_a_resource_admission_or_size_prediction": true,
+    "fresh_source_sha256_and_complete_deep_decode_required": true,
+    "strict_reencode_and_independent_output_semantic_reread_required": true,
+    "output_candidate_runtime_provenance_preserved": true,
+    "receipt_recovery_does_not_replace_existing_candidate": true,
+    "source_and_manifest_unchanged_before_and_after": true
+  },
+  "root_qualification_build_targets_not_run_here": [
+    "cargo test --release -p jetstreamer-horizon-observe --lib epoch225_extraction::tests:: --frozen --offline",
+    "cargo test --release -p jetstreamer-node --lib epoch225_extract::tests:: --frozen --offline",
+    "cargo test --release -p jetstreamer-node --bin jetstreamer-epoch225-prefix-extract --frozen --offline",
+    "cargo test --release -p jetstreamer-r2 --bin jetstreamer-r2 --frozen --offline",
+    "cargo clippy --release -p jetstreamer-horizon-observe --lib --frozen --offline -- -D warnings",
+    "cargo clippy --release -p jetstreamer-node --lib --bin jetstreamer-epoch225-prefix-extract --frozen --offline -- -D warnings",
+    "cargo clippy --release -p jetstreamer-r2 --bin jetstreamer-r2 --frozen --offline -- -D warnings",
+    "cargo build --release -p jetstreamer-node --bin jetstreamer-epoch225-prefix-extract --bin jetstreamer-qualification-verify --frozen --offline"
+  ],
+  "current_source_independent_reader_arguments": [
+    "NEW_QUALIFIED_jetstreamer-qualification-verify",
+    "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet",
+    "--private-root=/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1",
+    "--expected-epoch=225",
+    "--expected-output-start-slot=97200000",
+    "--expected-bootstrap-slot=97199617",
+    "--expected-terminal-slot=98063464",
+    "--expected-runtime-profile=solana-v1.6.25",
+    "--expected-worker-sha256=2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd",
+    "--receipt=NEW_PRIVATE_RECEIPT_DIRECTORY/epoch-225.complete-span.validation.json"
+  ],
+  "capability_steps_required_before_execution": [
+    "Qualify the exact joined source, required test leaves, native CLI and the existing standalone guard. Rust-seal the extractor, metadata helper and control packages. The example QA flags are false until actual qualification; never turn them true without recorded evidence.",
+    "Preserve source bytes and uid 1000. After confirming terminal ownership, empty cgroup and no open source writer, freeze the exact original archive and manifest permissions. The source capture helper rejects writable evidence and does not chmod it.",
+    "Using the sole current coordinated terminal fleet, invoke capture-epoch225-terminal-handoff. It saves actual PID1 history, terminal properties and a frozen source profile without reading the archive body.",
+    "Fill the sealed plan from actual artifact hashes, QA receipts, installed unit path and captured terminal profile. Seal the plan first; then render, freeze and install the exact native unit with its actual plan SHA. Run validate-epoch225-extraction-role. The plan uses a path for the unit; the admitted and native snapshots bind its validated frozen SHA, avoiding a plan/unit hash cycle.",
+    "Run admit-epoch225-prefix-extraction with the actual observer, terminal fleet and complete protected guard roster. It retains 640 GiB without reclamation credit and adds 320 GiB output, 256 MiB metadata and 98 GiB hard memory (96 GiB task, 1 GiB guard, 1 GiB metadata issuer).",
+    "Start only the separately authorized exact native service. It validates installed and native caps, direct argv, mapped executable and source read-only capability before writing waiting.json. No archive body is opened while waiting.",
+    "From the actual waiting IID and admission.capacity.minimum_free_bytes, fill and Rust-seal the exact standalone guard plan. Use its existing --validate-plan-only metadata CLI as a capability check; it proves no running guard. Start the actual guard and its exact 30-second timer. Never substitute required_initial_free_bytes as the stop floor.",
+    "Run release-epoch225-prefix-extraction. It proves the unchanged native waiter, complete previous owner census, current disk envelope, no source references, latest successful PID1 guard firing and exact timer controls before granting reads. Waiting expires after 300 seconds.",
+    "Immediately after launch.json appears, run prepare-epoch225-extraction-event and fleet-reconcile on the generated plan. It appends only the two actual task rows and tracked units, preserves all gates/history, emits a live-profile.json for subsequent JIT/admission accounting, and takes no new resource observation.",
+    "Fill and seal the current numeric status policy from actual launch and phase evidence. Run status-publish-epoch225-extraction in initial mode for the actual event, then observation mode once for each sole new coordinated cycle. Both epochs are emitted as verification with explicit epoch 226 debt; no historical worker observation is fabricated.",
+    "The runner performs the complete mandatory source SHA/deep decode, prefix encode, independent output semantic reread and output SHA, with phase messages and in-process output-byte counters. The live independent guard protects all phases; per-write checks reserve the next possible allocation. It writes extraction.json and exits without canonical checksum, import, deletion or R2 authority.",
+    "After success, fleet reconciliation records typed private completion from the actual PID1 terminal events and unchanged candidate identity. The finished task cannot keep publishing a live countdown. Transfer status promptly to a separately admitted actual downstream owner; do not hide epoch 226 or delete its status while work advances.",
+    "Before canonical publication, independently qualify exact epoch 225 candidate runtime/worker/checkpoint compatibility, Full/current-plugin scans, required adjacent boundaries and import/publication gates, then authenticated upload/readback/source revalidation/sidecar commit. The default runtime registry remains unchanged.",
+    "Epoch 226 retains 431,465 private source slots and still needs a separately qualified 535-slot suffix, native restore, assembly, Full/current-plugin/boundary checks and delivery. This executor never declares epoch 226 complete."
+  ],
+  "authority": {
+    "replay_launch_authorized": false,
+    "runtime_promotion_authorized": false,
+    "full_verification_claimed": false,
+    "current_plugin_verification_claimed": false,
+    "canonical_sidecar_authorized": false,
+    "publication_authorized": false,
+    "retirement_authorized": false,
+    "r2_mutations": false
+  },
+  "status_transition_blockers": [
+    "All new code still needs root compiler/QA, independent source review, Rust sealing and fresh actual admission before execution.",
+    "The original controller is terminal and cannot own a live verification status; only a proved actual running task may publish.",
+    "After this extraction task exits, further active work requires a separately qualified downstream owner/status route; extraction alone never qualifies the runtime or publishes a canonical archive."
+  ],
+  "provisional_task_status_policy_planning": {
+    "not_a_status_payload_or_supported_publisher_request": true,
+    "bind_to_new_actual_task_and_latest_coordinated_observation_before_use": true,
+    "current_best_guesses_not_upper_bounds": true,
+    "evidence_basis": "Original 265610094371-byte combined segment closed at 12:14:40.271722166Z; built-in 16-thread segment verification published its manifest at 13:49:02.171556779Z, about 94 minutes later. Reserve 2 hours for independent source reread and 4 hours for new prefix reencode plus semantic output reread. Remaining runtime qualification, current-plugin, transfer and recovery allowances are explicit uncertain planning guesses, not measured progress. Epoch 226 includes the proven missing 535-slot suffix and unqualified restore/assembly route.",
+    "uncertainty": "Substantial. Runtime compatibility and native epoch 226 suffix qualification are unresolved and may require revising estimates upward. Recompute at the actual task capture and every sole coordinated observation; do not mechanically restart these countdowns.",
+    "epochs": {
+      "225": {
+        "remaining_stage_millis": {
+          "independent_source_reread": 7200000,
+          "prefix_reencode_and_output_semantic_reread": 14400000,
+          "runtime_compatibility_qualification": 86400000,
+          "independent_full_verification": 7200000,
+          "current_plugin_verification": 14400000,
+          "required_boundary_checks": 1800000,
+          "upload": 7200000,
+          "authenticated_whole_object_readback": 7200000,
+          "source_revalidation_and_sidecar_commit": 3600000,
+          "recovery": 14400000
+        },
+        "sidecar_inclusive_total_millis": 163800000
+      },
+      "226": {
+        "remaining_stage_millis": {
+          "shared_source_reread_and225_prefix_work": 21600000,
+          "runtime_compatibility_qualification": 86400000,
+          "native_restore_and_missing535slot_route_qualification": 57600000,
+          "suffix_execution": 7200000,
+          "private_tail_extraction_and_assembly": 14400000,
+          "independent_full_verification": 7200000,
+          "current_plugin_verification": 14400000,
+          "required_boundary_checks": 1800000,
+          "upload": 7200000,
+          "authenticated_whole_object_readback": 7200000,
+          "source_revalidation_and_sidecar_commit": 3600000,
+          "recovery": 28800000
+        },
+        "sidecar_inclusive_total_millis": 257400000
+      }
+    }
+  },
+  "native_executor_source_implemented": true,
+  "native_executor_or_metadata_commands_run_by_this_source_task": false,
+  "repeated_pass_review_note": "PinnedSource::open always rehashes and deep-decodes the entire 265 GB source. A separate standalone qualification reader repeats much of that read if run immediately beforehand. Its independent receipt may be useful for tooling/provenance qualification; any consolidation requires later review of retained file identity and receipt independence. No required check is skipped here.",
+  "guard_metadata_capability_command": [
+    "ACTUAL_QUALIFIED_GUARD",
+    "ACTUAL_SEALED_GUARD_PLAN",
+    "--plan-sha256",
+    "ACTUAL_GUARD_PLAN_SHA256",
+    "--self-sha256",
+    "ACTUAL_GUARD_SHA256",
+    "--validate-plan-only"
+  ],
+  "source_qa_role_inputs": [
+    "role-qualification.example.json",
+    "guard-qualification.example.json"
+  ],
+  "wire_policy_example_totals_millis": {
+    "225": 163800000,
+    "226": 257400000
+  },
+  "plan_unit_binding_note": "The sealed plan contains the installed unit path only. The service can therefore bind the actual plan SHA without a hash cycle. The Rust role/admission validators parse the exact allowed service controls and snapshot the frozen installed unit SHA into admission; the native actor revalidates that SHA before release and during status checks.",
+  "phase_progress_note": "The executor writes immutable phase receipts before each expensive phase, logs source validation through the existing in-process decoder counters when root joins verifier logging, and logs existing output-byte counts. Mandatory PinnedSource::open source validation is never skipped. Only a source-validation-complete receipt at or before the report sample permits a zero source-validation allowance; later planning must remove that completed work.",
+  "metadata_cli_commands": [
+    "capture-epoch225-terminal-handoff",
+    "validate-epoch225-extraction-role",
+    "admit-epoch225-prefix-extraction",
+    "release-epoch225-prefix-extraction",
+    "prepare-epoch225-extraction-event",
+    "status-publish-epoch225-extraction"
+  ],
+  "metadata_cli_arguments": "REQUEST --spec-sha256 ACTUAL_REQUEST_SHA256 --self-sha256 ACTUAL_QUALIFIED_R2_SHA256",
+  "native_cli_arguments": "PLAN --plan-sha256 ACTUAL_PLAN_SHA256 --self-sha256 ACTUAL_QUALIFIED_EXTRACTOR_SHA256",
+  "new_production_shell_or_python_business_logic": false
+}

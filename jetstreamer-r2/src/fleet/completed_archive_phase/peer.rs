@@ -50,7 +50,7 @@ pub(super) fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, S
     );
     launch::validate_saved(&launch, &spec, spec.phase, issuer)?;
     let admission = read(&serde_json::from_value(launch["admission"].clone())?)?;
-    let archive = Path::new(singleton209::ROOT).join("output");
+    let archive = spec.origin.root().join("output");
     ensure!(
         spec.epoch == claim.epoch
             && spec.units[spec.phase.name()] == claim.unit
@@ -277,11 +277,30 @@ fn source(p: &Peer) -> Result<()> {
             && state.mode() & 0o077 == 0,
         "completed peer metadata root custody changed"
     );
+    if let Origin::Singleton207 {
+        launch,
+        native_input,
+        terminal,
+        cohort_publication,
+    } = &p.spec.origin
+    {
+        singleton207::delivery::custody(launch, native_input, terminal, cohort_publication)?;
+        let pair = read_local_archive(&p.spec.origin.root().join("output"), 207)?;
+        singleton207::delivery::cohort(&read(cohort_publication)?, &pair)?;
+        ensure!(
+            p.admission["archive"] == singleton209_delivery::pair_identity(&pair),
+            "207 completed peer source changed"
+        );
+        return Ok(());
+    }
     let Origin::Singleton209 {
         launch,
         native_input,
         cohort_publication,
-    } = &p.spec.origin;
+    } = &p.spec.origin
+    else {
+        bail!("unsupported completed peer origin")
+    };
     let (_, original) = full209_status::claim(launch)?;
     ensure!(
         original["native_input"] == private157::binding(native_input)

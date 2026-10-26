@@ -276,7 +276,7 @@ pub(super) fn run() -> Result<()> {
     let before = census(&names, 201, 300)?;
     let mut prior = before.clone();
     prior.remove(c::UNIT);
-    singleton210_admission::owners(&f, &prior)?;
+    singleton210_admission::owners(&f, &prior, &a["resource_basis"])?;
     let u = before.get(c::UNIT).context("210 full producer omitted")?;
     ensure!(
         u["InvocationID"] == iid
@@ -334,6 +334,6 @@ pub(super) fn run() -> Result<()> {
         before == census(&names, 201, 300)?,
         "210 full capture owner census changed"
     );
-    singleton210_admission::owners(&f, &prior)?;
+    singleton210_admission::owners(&f, &prior, &a["resource_basis"])?;
     private157::immutable_receipt(&s.output, &v)
 }

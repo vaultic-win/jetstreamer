@@ -203,15 +203,11 @@ fn process_as(s: &Spec, owner: &Value, argv: &[String], waiting: bool) -> Result
         pids.contains(&pid) && pids.len() <= 512,
         "completed launch main process is outside native task census"
     );
-    let archive = match &s.origin {
-        Origin::Singleton209 { .. } => Path::new(singleton209::ROOT).join("output"),
-    };
+    let archive = s.origin.root().join("output");
     let mounts = fs::read_to_string(proc.join("mountinfo"))?;
     let source_mount_proof = barrier::archive_readonly_mount(&archive, &mounts)?;
-    let references = jetstreamer_horizon_observe::process_references::scan(
-        Path::new("/proc"),
-        Path::new(singleton209::ROOT),
-    )?;
+    let references =
+        jetstreamer_horizon_observe::process_references::scan(Path::new("/proc"), s.origin.root())?;
     for reference in &references.references {
         let words = reference.split_whitespace().collect::<Vec<_>>();
         ensure!(

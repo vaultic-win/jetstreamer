@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-epoch225-terminal-handoff-capture-request-v1",
+  "observer": {
+    "path": "ACTUAL_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_OBSERVER_SHA256"
+  },
+  "fleet": {
+    "path": "ACTUAL_ACCEPTED_TERMINAL225_FLEET_PATH",
+    "sha256": "ACTUAL_FLEET_SHA256"
+  },
+  "output_directory": "/var/lib/jetstreamer/horizon-epoch225-terminal-handoff-v1"
+}

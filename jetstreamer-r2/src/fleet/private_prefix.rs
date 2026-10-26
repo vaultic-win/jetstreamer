@@ -274,7 +274,7 @@ pub(super) fn capture_census(
     let peers = capture_peer_view(fleet, current, unit, invocation, command)?;
     maintenance_capacity::current_owners(fleet, &peers)
 }
-fn capture_peer_view(
+pub(super) fn capture_peer_view(
     fleet: &Value,
     current: &BTreeMap<String, Value>,
     unit: &str,
@@ -304,6 +304,16 @@ fn capture_peer_view(
 }
 
 pub(super) fn assigned_cpus_available(value: &str) -> Result<()> {
+    assigned_cpu_range_available(value, 8..16)
+}
+pub(super) fn assigned_cpu_range_available(
+    value: &str,
+    required: std::ops::Range<u32>,
+) -> Result<()> {
+    ensure!(
+        required.start < required.end && required.end <= 4096,
+        "private prefix requested CPU assignment invalid"
+    );
     let mut available = BTreeSet::new();
     for token in value.trim().split(',') {
         let (start, end) = if let Some((a, b)) = token.split_once('-') {
@@ -324,7 +334,7 @@ pub(super) fn assigned_cpus_available(value: &str) -> Result<()> {
         }
     }
     ensure!(
-        (8..16).all(|cpu| available.contains(&cpu)),
+        required.into_iter().all(|cpu| available.contains(&cpu)),
         "private prefix separately assigned CPUs are unavailable"
     );
     Ok(())

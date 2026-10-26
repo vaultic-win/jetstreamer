@@ -1,0 +1,23 @@
+{
+  "schema": "jetstreamer-epoch225-extraction-status-request-v1",
+  "mode": "observation",
+  "observer": {
+    "path": "ACTUAL_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_OBSERVER_SHA256"
+  },
+  "fleet": {
+    "path": "ACTUAL_NEW_COORDINATED_FLEET_PATH",
+    "sha256": "ACTUAL_REGISTERED_FLEET_SHA256"
+  },
+  "launch": {
+    "path": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-v1/launch.json",
+    "sha256": "ACTUAL_LAUNCH_SHA256"
+  },
+  "event": null,
+  "policy": {
+    "path": "/var/lib/jetstreamer/horizon-epoch225-extract-inputs-v1/status-policy.json",
+    "sha256": "ACTUAL_CURRENT_POLICY_SHA256"
+  },
+  "estimate_receipt": "/var/lib/jetstreamer/horizon-epoch225-status-observation-v1/estimate.json",
+  "receipt_directory": "/home/ubuntu/.jetstreamer-private/r2-status-receipts"
+}

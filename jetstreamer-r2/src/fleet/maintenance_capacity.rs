@@ -11,10 +11,28 @@ enum MemoryMode {
     Full210,
     Full209Delivery,
     CompletedArchivePhase,
+    CompletedArchive207Phase,
     FirstRoot233,
+    Bounded228,
     Capped204V4,
     AssemblyRecovery204,
     Continuation205Delivery,
+    Epoch225Extraction,
+}
+fn epoch225_mode(mode: MemoryMode, present: bool) -> Result<()> {
+    ensure!(
+        (!matches!(mode, MemoryMode::Epoch225Extraction) || present)
+            && (!present
+                || matches!(
+                    mode,
+                    MemoryMode::Full210
+                        | MemoryMode::Epoch225Extraction
+                        | MemoryMode::Bounded228
+                        | MemoryMode::CompletedArchive207Phase
+                )),
+        "epoch 225 terminal handoff is required for extraction and scoped to its exact admitted consumer"
+    );
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -23,6 +41,8 @@ struct Spec {
     observer: BoundFile,
     fleet: BoundFile,
     protected_guards: BTreeMap<String, BoundFile>,
+    #[serde(default)]
+    epoch225_handoff: Option<BoundFile>,
 }
 fn envelope(minimum: u64, additional: u64, available: u64) -> Result<u64> {
     let required = minimum
@@ -150,6 +170,20 @@ pub(super) fn check_singleton210(value: &Value, minimum_disk: u64) -> Result<Val
 pub(super) fn singleton210_memory_proven(capacity: &Value) -> Result<()> {
     singleton210_memory::validate_capacity(capacity)
 }
+pub(super) fn check_bounded228(value: &Value) -> Result<Value> {
+    check_inner(
+        value,
+        Candidate {
+            additional_bytes: bounded228::DISK_RESERVATION,
+            memory_max_bytes: bounded228::MEMORY,
+            minimum_protected_disk_bytes: 0,
+        },
+        MemoryMode::Bounded228,
+    )
+}
+pub(super) fn bounded228_saved_memory_floor(policy: &Value, total: u64) -> Result<u64> {
+    singleton210_memory::bounded228_saved_floor(policy, total)
+}
 pub(super) fn check_first_root233(value: &Value) -> Result<Value> {
     check_inner(
         value,
@@ -195,6 +229,18 @@ pub(super) fn check_completed_archive_phase(value: &Value, candidate: Candidate)
         "completed archive phase envelope differs"
     );
     check_inner(value, candidate, MemoryMode::CompletedArchivePhase)
+}
+pub(super) fn check_completed_archive207_phase(
+    value: &Value,
+    candidate: Candidate,
+) -> Result<Value> {
+    ensure!(
+        candidate.additional_bytes == 1 << 30
+            && matches!(candidate.memory_max_bytes,n if n==16<<30 || n==32<<30 || n==64<<30)
+            && candidate.minimum_protected_disk_bytes > 0,
+        "207 completed delivery envelope differs"
+    );
+    check_inner(value, candidate, MemoryMode::CompletedArchive207Phase)
 }
 pub(super) fn check_capped204_v4_delivery(
     value: &Value,
@@ -409,11 +455,12 @@ fn memory_sample(
             let (n, p) = singleton210_memory::required(f, total, reserve, candidate)?;
             (n, Some(("full210_memory_policy", p)))
         }
+        MemoryMode::Epoch225Extraction => (memory_required(reserve, total, candidate)?, None),
         MemoryMode::Full209Delivery => {
             let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
             (n, Some(("full209_delivery_memory_policy", p)))
         }
-        MemoryMode::CompletedArchivePhase => {
+        MemoryMode::CompletedArchivePhase | MemoryMode::CompletedArchive207Phase => {
             let (n, p) =
                 singleton210_memory::completed_phase_required(f, total, reserve, candidate)?;
             (n, Some(("completed_archive_phase_memory_policy", p)))
@@ -421,6 +468,10 @@ fn memory_sample(
         MemoryMode::Capped204V4 => {
             let (n, p) = capped204_native223::required(f, total, reserve, candidate)?;
             (n, Some(("capped204_v4_memory_policy", p)))
+        }
+        MemoryMode::Bounded228 => {
+            let (n, p) = singleton210_memory::bounded228_required(f, total, reserve, candidate)?;
+            (n, Some(("bounded228_memory_policy", p)))
         }
         MemoryMode::FirstRoot233 => {
             let (n, p) = singleton210_memory::first_root233_required(f, total, reserve, candidate)?;
@@ -634,6 +685,31 @@ pub(super) fn check_assembly204_waiting(
         Some(CandidateContext::Waiting204(context)),
     )
 }
+pub(in crate::fleet) fn check_epoch225_extraction(
+    value: &Value,
+    handoff: &BoundFile,
+) -> Result<Value> {
+    let mut basis = value.clone();
+    ensure!(
+        basis.is_object()
+            && basis
+                .get("epoch225_handoff")
+                .is_none_or(|v| *v == private157::binding(handoff)),
+        "epoch 225 extraction handoff differs from its resource basis"
+    );
+    basis["epoch225_handoff"] = private157::binding(handoff);
+    check_inner_with(
+        &basis,
+        Candidate {
+            additional_bytes: terminal225_peer::OUTPUT_BYTES
+                + terminal225_peer::OUTPUT_METADATA_BYTES,
+            memory_max_bytes: terminal225_peer::EXTRACTION_ADMISSION_MEMORY_BYTES,
+            minimum_protected_disk_bytes: 0,
+        },
+        MemoryMode::Epoch225Extraction,
+        None,
+    )
+}
 fn check_inner_with(
     value: &Value,
     candidate: Candidate,
@@ -653,13 +729,36 @@ fn check_inner_with(
         &assembly204_recovery::accepted_context,
         &bound_json,
     )?;
+    let epoch225 = s
+        .epoch225_handoff
+        .as_ref()
+        .map(|binding| terminal225_peer::Profile::load(binding, &f))
+        .transpose()?;
+    epoch225_mode(mode, epoch225.is_some())?;
     ensure!(
         f["observer_receipt"].as_str() == s.observer.path.to_str()
             && f["observer_sha256"] == s.observer.sha256,
         "Maintenance fleet is not bound to the exact observer"
     );
     let accounting_o = native227_terminal_observer_view(&f, &o)?;
-    let (legacy, legacy_o) = accounting_views(&f, &accounting_o)?;
+    // Authenticate the handoff against the complete raw fleet before deriving
+    // a legacy-only view. Its full reservations are added separately below.
+    let peer_f = epoch225
+        .as_ref()
+        .map(|p| p.without(&f))
+        .transpose()?
+        .unwrap_or_else(|| f.clone());
+    let peer_o = epoch225
+        .as_ref()
+        .map(|p| p.without_observer(&accounting_o, &f))
+        .transpose()?
+        .unwrap_or_else(|| accounting_o.clone());
+    let peer_guards = epoch225
+        .as_ref()
+        .map(|p| p.without_guards(&s.protected_guards))
+        .transpose()?
+        .unwrap_or_else(|| s.protected_guards.clone());
+    let (legacy, legacy_o) = accounting_views(&peer_f, &peer_o)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let t = sampled(&legacy_o, &legacy, now)?;
     prefix223_live_peer::roster(&legacy)?;
@@ -677,28 +776,55 @@ fn check_inner_with(
         .keys()
         .cloned()
         .collect::<BTreeSet<_>>();
+    if let Some(profile) = &epoch225 {
+        names.extend(profile.census_names());
+    }
     if let Some(context) = candidate_context {
         names.extend(context.names()?);
     }
     let raw_before = census(&names, 201, 300)?;
+    if let Some(profile) = &epoch225 {
+        profile.current(&f, &raw_before)?;
+    }
     let (before, candidate_before) = candidate_context
         .map(|c| c.peer_view(&f, &raw_before))
         .transpose()?
         .unwrap_or_else(|| (raw_before.clone(), Value::Null));
-    current_owners(&f, &before)?;
+    let peer_before = epoch225
+        .as_ref()
+        .map(|p| p.without_current(&f, &before))
+        .transpose()?
+        .unwrap_or_else(|| before.clone());
+    current_owners(&peer_f, &peer_before)?;
     // Share the already qualified sibling accounting policy, including the
     // complete guard-key union, genuine latest fires and independent guard caps.
-    let guard_history = capped204205_admission::guards(&f, &s.protected_guards, &before, t, now)?;
-    let caps = capped204205_admission::combined_limits(&f, &s.protected_guards, &before, now)?;
-    let (growth, measurements, memory_growth, memory_evidence) =
+    let guard_history =
+        capped204205_admission::guards(&peer_f, &peer_guards, &peer_before, t, now)?;
+    let epoch225_guard_before = epoch225
+        .as_ref()
+        .map(|profile| profile.guard(&s.protected_guards, &raw_before, t, now))
+        .transpose()?;
+    let caps = capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_before, now)?;
+    let (mut growth, mut measurements, mut memory_growth, mut memory_evidence) =
         capped204205_admission::combined_resources(
-            &f,
-            &accounting_o,
-            &s.protected_guards,
-            &before,
+            &peer_f,
+            &peer_o,
+            &peer_guards,
+            &peer_before,
             t,
             now,
         )?;
+    if let Some(profile) = &epoch225 {
+        let (disk, disk_evidence, memory, hard_memory_evidence) = profile.resources();
+        growth = growth
+            .checked_add(disk)
+            .context("epoch 225 retained reservation overflow")?;
+        measurements.push(disk_evidence);
+        memory_growth = memory_growth
+            .checked_add(memory)
+            .context("epoch 225 extractor memory reservation overflow")?;
+        memory_evidence.push(hard_memory_evidence);
+    }
     let (minimum, largest_guard_floor) =
         native228_admission::protected_floor(floor, growth, &s.protected_guards)?;
     let minimum = minimum.max(candidate.minimum_protected_disk_bytes);
@@ -717,20 +843,38 @@ fn check_inner_with(
     let actual_free = singleton227_admission::disk_free()?;
     envelope(minimum, candidate.additional_bytes, actual_free)?;
     let raw_after = census(&names, 201, 300)?;
+    if let Some(profile) = &epoch225 {
+        profile.current(&f, &raw_after)?;
+    }
     let (after, candidate_after) = candidate_context
         .map(|c| c.peer_view(&f, &raw_after))
         .transpose()?
         .unwrap_or_else(|| (raw_after.clone(), Value::Null));
-    current_owners(&f, &after)?;
+    let peer_after = epoch225
+        .as_ref()
+        .map(|p| p.without_current(&f, &after))
+        .transpose()?
+        .unwrap_or_else(|| after.clone());
+    current_owners(&peer_f, &peer_after)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         before == after
             && caps
-                == capped204205_admission::combined_limits(&f, &s.protected_guards, &after, now)?,
+                == capped204205_admission::combined_limits(
+                    &peer_f,
+                    &peer_guards,
+                    &peer_after,
+                    now
+                )?,
         "Maintenance owners/caps changed during capacity admission"
     );
     let after_accounting_o = native227_terminal_observer_view(&f, &o)?;
-    let (after_legacy, after_legacy_o) = accounting_views(&f, &after_accounting_o)?;
+    let after_peer_o = epoch225
+        .as_ref()
+        .map(|p| p.without_observer(&after_accounting_o, &f))
+        .transpose()?
+        .unwrap_or_else(|| after_accounting_o.clone());
+    let (after_legacy, after_legacy_o) = accounting_views(&peer_f, &after_peer_o)?;
     sampled(&after_legacy_o, &after_legacy, now)?;
     ensure!(
         accounting_o["terminal_observation_accounting"]
@@ -738,19 +882,42 @@ fn check_inner_with(
         "Maintenance terminal observation accounting changed during admission"
     );
     let guard_history_after =
-        capped204205_admission::guards(&f, &s.protected_guards, &after, t, now)?;
-    let (after_growth, after_measurements, after_memory_growth, after_memory_evidence) =
-        capped204205_admission::combined_resources(
-            &f,
-            &after_accounting_o,
-            &s.protected_guards,
-            &after,
-            t,
-            now,
-        )?;
+        capped204205_admission::guards(&peer_f, &peer_guards, &peer_after, t, now)?;
+    let epoch225_guard_after = epoch225
+        .as_ref()
+        .map(|profile| profile.guard(&s.protected_guards, &raw_after, t, now))
+        .transpose()?;
+    let (
+        mut after_growth,
+        mut after_measurements,
+        mut after_memory_growth,
+        mut after_memory_evidence,
+    ) = capped204205_admission::combined_resources(
+        &peer_f,
+        &after_peer_o,
+        &peer_guards,
+        &peer_after,
+        t,
+        now,
+    )?;
+    if let Some(profile) = &epoch225 {
+        let (disk, disk_evidence, memory, hard_memory_evidence) = profile.resources();
+        after_growth = after_growth
+            .checked_add(disk)
+            .context("epoch 225 retained after-reservation overflow")?;
+        after_measurements.push(disk_evidence);
+        after_memory_growth = after_memory_growth
+            .checked_add(memory)
+            .context("epoch 225 extractor after-memory reservation overflow")?;
+        after_memory_evidence.push(hard_memory_evidence);
+    }
     let bracketed = matches!(
         mode,
-        MemoryMode::FirstRoot233 | MemoryMode::CompletedArchivePhase | MemoryMode::GuardRebase207
+        MemoryMode::FirstRoot233
+            | MemoryMode::Bounded228
+            | MemoryMode::CompletedArchivePhase
+            | MemoryMode::CompletedArchive207Phase
+            | MemoryMode::GuardRebase207
     );
     ensure!(
         bracketed || (after_growth <= growth && after_memory_growth <= memory_growth),
@@ -765,13 +932,21 @@ fn check_inner_with(
         mode,
     )?;
     let raw_current = census(&names, 201, 300)?;
+    if let Some(profile) = &epoch225 {
+        profile.current(&f, &raw_current)?;
+    }
     let (current, candidate_current) = candidate_context
         .map(|c| c.peer_view(&f, &raw_current))
         .transpose()?
         .unwrap_or_else(|| (raw_current.clone(), Value::Null));
-    current_owners(&f, &current)?;
+    let peer_current = epoch225
+        .as_ref()
+        .map(|p| p.without_current(&f, &current))
+        .transpose()?
+        .unwrap_or_else(|| current.clone());
+    current_owners(&peer_f, &peer_current)?;
     let final_caps =
-        capped204205_admission::combined_limits(&f, &s.protected_guards, &current, now)?;
+        capped204205_admission::combined_limits(&peer_f, &peer_guards, &peer_current, now)?;
     ensure!(
         before == current && caps == final_caps,
         "maintenance owners/caps changed across final memory/guard checks"
@@ -795,7 +970,10 @@ fn check_inner_with(
         };
         let hard = n(&memory_before, "protected_existing_memory_growth_bytes")?
             .max(n(&memory_after, "protected_existing_memory_growth_bytes")?);
-        let (recomputed_memory, policy) = if matches!(mode, MemoryMode::CompletedArchivePhase) {
+        let (recomputed_memory, policy) = if matches!(
+            mode,
+            MemoryMode::CompletedArchivePhase | MemoryMode::CompletedArchive207Phase
+        ) {
             singleton210_memory::completed_phase_recompute(
                 &memory_after["completed_archive_phase_memory_policy"],
                 n(&memory_after, "host_total_memory_bytes")?,
@@ -805,6 +983,13 @@ fn check_inner_with(
         } else if matches!(mode, MemoryMode::GuardRebase207) {
             singleton210_memory::rebase207_recompute(
                 &memory_after["guard_rebase207_memory_policy"],
+                n(&memory_after, "host_total_memory_bytes")?,
+                hard,
+                candidate.memory_max_bytes,
+            )?
+        } else if matches!(mode, MemoryMode::Bounded228) {
+            singleton210_memory::bounded228_recompute(
+                &memory_after["bounded228_memory_policy"],
                 n(&memory_after, "host_total_memory_bytes")?,
                 hard,
                 candidate.memory_max_bytes,
@@ -881,6 +1066,18 @@ fn check_inner_with(
     if let Some(evidence) = accounting_o.get("terminal_observation_accounting") {
         capacity["terminal_observation_accounting"] = evidence.clone();
     }
+    if let Some(profile) = &epoch225 {
+        capacity["epoch225_handoff"] = json!({"profile":s.epoch225_handoff.as_ref().map(private157::binding),
+            "phase":profile.phase(),"guard_before":epoch225_guard_before,
+            "guard_after":epoch225_guard_after,
+            "retained_disk_reservation_bytes":terminal225_peer::RETAINED_DISK_BYTES,
+            "extractor_output_bytes":terminal225_peer::OUTPUT_BYTES,
+            "output_metadata_bytes":terminal225_peer::OUTPUT_METADATA_BYTES,
+            "extractor_hard_memory_bytes":terminal225_peer::EXTRACTOR_MEMORY_BYTES,
+            "independent_guard_hard_memory_bytes":terminal225_peer::GUARD_MEMORY_BYTES,
+            "metadata_issuer_hard_memory_bytes":terminal225_peer::METADATA_ISSUER_MEMORY_BYTES,
+            "reclamation_credit_bytes":0,"old_worker_rss_credit_bytes":0});
+    }
     if bracketed {
         let accounted = memory_after["available_floor_component_accounted_once_bytes"]
             .as_u64()
@@ -917,11 +1114,14 @@ fn fleet_for_mode(
     if matches!(
         mode,
         MemoryMode::Full210
+            | MemoryMode::Bounded228
+            | MemoryMode::Epoch225Extraction
             | MemoryMode::Foundation203
             | MemoryMode::AssemblyRecovery204
             | MemoryMode::Continuation205Delivery
             | MemoryMode::Full209Delivery
             | MemoryMode::CompletedArchivePhase
+            | MemoryMode::CompletedArchive207Phase
             | MemoryMode::GuardRebase207
     ) {
         return accepted(fleet, observer);
@@ -936,6 +1136,39 @@ fn fleet_for_mode(
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn completed207_handoff_cannot_broaden209_or_bypass_the_complete_authenticated_context() {
+        use super::*;
+        epoch225_mode(MemoryMode::CompletedArchive207Phase, true).unwrap();
+        epoch225_mode(MemoryMode::CompletedArchive207Phase, false).unwrap();
+        epoch225_mode(MemoryMode::Bounded228, true).unwrap();
+        for mode in [
+            MemoryMode::CompletedArchivePhase,
+            MemoryMode::Full209Delivery,
+            MemoryMode::Existing,
+        ] {
+            assert!(epoch225_mode(mode, true).is_err());
+        }
+        assert!(epoch225_mode(MemoryMode::Epoch225Extraction, false).is_err());
+        let fleet = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-campaign-fleet/207-event/fleet.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let observer = BoundFile {
+            path: "/sealed/observer.json".into(),
+            sha256: "b".repeat(64),
+        };
+        assert!(
+            fleet_for_mode(
+                MemoryMode::CompletedArchive207Phase,
+                &fleet,
+                &observer,
+                &|_, _| bail!("exact context authentication failed"),
+                &|_| panic!("207 may not fall back to an unverified canonical reader")
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn root204_delivery_candidate_entry_accepts_exact_independent_guard_envelopes() {
         use super::*;

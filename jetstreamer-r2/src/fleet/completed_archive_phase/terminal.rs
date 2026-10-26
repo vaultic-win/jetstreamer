@@ -235,7 +235,10 @@ fn source_pair(s: &Spec, a: &Value) -> Result<LocalArchive> {
         launch,
         native_input,
         cohort_publication,
-    } = &s.origin;
+    } = &s.origin
+    else {
+        bail!("completed209 terminal bridge cannot borrow another epoch origin")
+    };
     let (_, l) = full209_status::claim(launch)?;
     ensure!(
         l["native_input"] == private157::binding(native_input)

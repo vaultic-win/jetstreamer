@@ -1,0 +1,26 @@
+[Unit]
+Description=Protect the actual epoch 225 extraction owner and output budget
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=ACTUAL_EXISTING_QUALIFIED_STANDALONE_GUARD_PATH /var/lib/jetstreamer/horizon-epoch225-extract-guard-plan-v1/guard-plan.json --plan-sha256 ACTUAL_GUARD_PLAN_SHA256 --self-sha256 ACTUAL_GUARD_SHA256
+MemoryMax=1G
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=256
+Restart=no
+KillMode=control-group
+Delegate=no
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/jetstreamer/horizon-epoch225-extract-guard-v1
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT BASH_ENV ENV PYTHONPATH PYTHONHOME RUBYOPT PERL5OPT GCONV_PATH
+StandardOutput=journal
+StandardError=journal
