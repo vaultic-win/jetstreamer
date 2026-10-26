@@ -927,6 +927,14 @@ pub(super) async fn publish(v: &Value, _spec: &BoundFile, self_sha: &str) -> Res
     Ok(())
 }
 
+fn fresh_sample(sampled: u64, now: u64) -> Result<()> {
+    ensure!(
+        sampled <= now && now - sampled <= 1800,
+        "205 coordinated observer is stale or future-dated"
+    );
+    Ok(())
+}
+
 pub(super) fn capture_work(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let w: WorkSpec = serde_json::from_value(v.clone())?;
     ensure!(
@@ -994,6 +1002,15 @@ fn transport_phase(owner: &Value) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn continuation205_work_requires_fresh_nonfuture_observer() {
+        assert!(super::fresh_sample(100, 100).is_ok());
+        assert!(super::fresh_sample(100, 1900).is_ok());
+        assert!(super::fresh_sample(100, 1901).is_err());
+        assert!(super::fresh_sample(101, 100).is_err());
+        assert!(super::fresh_sample(u64::MAX, 0).is_err());
+    }
     #[test]
     fn continuation205_owner_allows_manager_display_changes_but_preserves_identity_and_argv() {
         let command = "{ path=/sealed/helper ; argv[]=/sealed/helper run ; ignore_errors=no";

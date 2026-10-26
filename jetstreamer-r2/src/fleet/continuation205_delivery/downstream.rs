@@ -1,6 +1,7 @@
 //! Strict epoch205 post-continuation stages. First Full measures the previously
 //! unknown source digest; subsequent stages consume that genuine Full outcome.
 use super::*;
+use anyhow::Context as _;
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum Stage {
