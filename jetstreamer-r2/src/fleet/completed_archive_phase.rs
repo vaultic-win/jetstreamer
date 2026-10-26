@@ -145,7 +145,7 @@ fn validate_guard_timer(p: &BTreeMap<String, String>, service: &str) -> Result<(
         p.get("InvocationID").is_some_and(|v| is_lower_hex(v, 32))
             && !next.is_empty()
             && next.split(' ').all(|part| {
-                ["us", "ms", "min", "s", "h", "d", "w", "month", "y"]
+                ["month", "min", "us", "ms", "s", "h", "d", "w", "y"]
                     .iter()
                     .find_map(|suffix| part.strip_suffix(*suffix))
                     .is_some_and(|number| {
