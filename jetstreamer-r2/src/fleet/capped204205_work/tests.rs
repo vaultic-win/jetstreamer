@@ -303,7 +303,7 @@ fn terminal_history_needs_an_actual_terminal_event_after_the_exact_start() {
     let terminal = json!({"_PID":"1","_UID":"0","UNIT":name,"INVOCATION_ID":iid,
         "__REALTIME_TIMESTAMP":"2000000","__CURSOR":"end",
         "MESSAGE":format!("{name}: Failed with result 'exit-code'."),
-        "MESSAGE_ID":"d9b373ed55a64feb8242e02dbe79a49c"});
+        "MESSAGE_ID":"be02cf6855d2428ba40df7e9d022f03d"});
     raw.push(b'\n');
     raw.extend(serde_json::to_vec(&terminal).unwrap());
     capture::manager_terminal(&raw, name, &iid).unwrap();
@@ -482,7 +482,7 @@ fn compat_warning_does_not_hide_missing_iid_lifecycle_or_foreign_invocations() {
         ),
         (
             "original: Failed with result 'exit-code'.",
-            "d9b373ed55a64feb8242e02dbe79a49c",
+            "be02cf6855d2428ba40df7e9d022f03d",
         ),
     ] {
         for iid in [None, Some("ffffffffffffffffffffffffffffffff")] {
@@ -505,7 +505,7 @@ fn compat_warning_does_not_hide_missing_iid_lifecycle_or_foreign_invocations() {
     );
     let mut rows = compat_rows();
     rows[3]["INVOCATION_ID"] = json!(COMPAT_IID);
-    rows[3]["MESSAGE_ID"] = json!("d9b373ed55a64feb8242e02dbe79a49c");
+    rows[3]["MESSAGE_ID"] = json!("be02cf6855d2428ba40df7e9d022f03d");
     rows[3]["MESSAGE"] = json!("original: Failed with result 'exit-code'.");
     assert!(
         capture::manager_history(&compat_encode(&rows), COMPAT_UNIT, COMPAT_IID, true).is_err()

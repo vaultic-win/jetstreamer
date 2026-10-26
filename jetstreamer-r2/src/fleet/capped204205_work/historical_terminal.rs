@@ -19,6 +19,51 @@ fn candidate(name: &str, v: &Value) -> bool {
             .is_some_and(|n| n > 0)
         && v["InvocationID"].as_str().is_some_and(id)
 }
+// This capability exists only for failed historical capped204/205 owners.
+// Modern native223 failures retain their independent narrow release contract;
+// no generic terminal helper or live-owner gate gains a modern failure branch.
+struct HistoricalFailedOwner<'a> {
+    name: &'a str,
+    invocation: &'a str,
+}
+impl<'a> HistoricalFailedOwner<'a> {
+    fn new(epoch: u64, name: &'a str, current: &'a Value) -> Result<Self> {
+        ensure!(
+            (204..=205).contains(&epoch)
+                && capture::epoch_scope(epoch, name)
+                && candidate(name, current),
+            "historical failed-owner capability requires exact failed current state and capped epoch scope"
+        );
+        Ok(Self {
+            name,
+            invocation: string(current, "InvocationID")?,
+        })
+    }
+    fn authenticate(&self, raw: &[u8]) -> Result<()> {
+        // Shared identity, bounded row count, unique start, ordering, cursor,
+        // UNIT/PID/UID/IID and no-replacement checks remain unchanged.
+        let start = capture::manager_history(raw, self.name, self.invocation, false)?
+            .checked_mul(1000)
+            .context("historical terminal clock overflow")?;
+        let mut failed = false;
+        for line in std::str::from_utf8(raw)?.lines() {
+            let row: Value = serde_json::from_str(line)?;
+            let at = string(&row, "__REALTIME_TIMESTAMP")?.parse::<u64>()?;
+            failed |= at >= start
+                && row["INVOCATION_ID"] == self.invocation
+                && row["MESSAGE_ID"] == "d9b373ed55a64feb8242e02dbe79a49c"
+                && row["MESSAGE"] == format!("{}: Failed with result 'exit-code'.", self.name);
+        }
+        ensure!(
+            failed,
+            "exact historical PID 1 failed-result event missing for unit {}, invocation {}",
+            self.name,
+            self.invocation
+        );
+        Ok(())
+    }
+}
+
 fn excluded(p: &Value, actors: &[Actor], name: &str) -> bool {
     p["producer_unit"] == name || p["guard_unit"] == name || actors.iter().any(|a| a.unit == name)
 }
@@ -87,7 +132,7 @@ pub(super) fn capture(
             ensure!(jobs.status.success(), "historical queued-job query failed");
             let pending = inactive_status::queued_job_units(&jobs.stdout)?;
             let raw = capture::journal(name)?;
-            capture::manager_terminal(&raw, name, string(current, "InvocationID")?)?;
+            HistoricalFailedOwner::new(epoch, name, current)?.authenticate(&raw)?;
             let journal_path = out.join(format!(
                 "historical-{}-manager.json",
                 string(current, "InvocationID")?
@@ -136,11 +181,8 @@ pub(super) fn validate(
         proof(epoch, name, current, v)?;
         let journal =
             evidence::bound(&serde_json::from_value(v["manager_journal"].clone())?, true)?;
-        capture::manager_terminal(
-            string(&journal, "raw")?.as_bytes(),
-            name,
-            string(current, "InvocationID")?,
-        )?;
+        HistoricalFailedOwner::new(epoch, name, current)?
+            .authenticate(string(&journal, "raw")?.as_bytes())?;
         accepted.insert(name.clone());
     }
     Ok(accepted)
@@ -165,6 +207,14 @@ pub(super) fn current(frame: &Value, census: &BTreeMap<String, Value>) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn failed_owner(name: &str, iid: &str) -> Value {
+        json!({"Id":name,"LoadState":"loaded","ActiveState":"failed","SubState":"failed",
+            "MainPID":"0","Result":"exit-code","ExecMainStatus":"1","NRestarts":"2","InvocationID":iid})
+    }
+    fn scoped_terminal(raw: &[u8], name: &str, iid: &str) -> Result<()> {
+        let current = failed_owner(name, iid);
+        HistoricalFailedOwner::new(205, name, &current)?.authenticate(raw)
+    }
     #[test]
     fn restart_history_requires_exact_terminal_ownership_and_no_queued_job() {
         let name = "horizon-qualify-205-replay.service";
@@ -226,8 +276,8 @@ mod tests {
             &format!("{name}: Failed with result 'exit-code'."),
         );
         let raw = format!("{started}\n{failed}\n");
-        capture::manager_terminal(raw.as_bytes(), name, &iid).unwrap();
-        assert!(capture::manager_terminal(format!("{started}\n").as_bytes(), name, &iid).is_err());
+        scoped_terminal(raw.as_bytes(), name, &iid).unwrap();
+        assert!(scoped_terminal(format!("{started}\n").as_bytes(), name, &iid).is_err());
         let replacement = row(
             "3000000",
             "c",
@@ -235,11 +285,8 @@ mod tests {
             "39f53479d3a045ac8e11786248231fbf",
             "Started replacement.",
         );
-        assert!(
-            capture::manager_terminal(format!("{raw}{replacement}\n").as_bytes(), name, &iid)
-                .is_err()
-        );
-        assert!(capture::manager_terminal(raw.as_bytes(), name, &"2".repeat(32)).is_err());
+        assert!(scoped_terminal(format!("{raw}{replacement}\n").as_bytes(), name, &iid).is_err());
+        assert!(scoped_terminal(raw.as_bytes(), name, &"2".repeat(32)).is_err());
     }
     #[test]
     fn historical205_genuine_failed_result_is_distinct_from_failed_to_start() {
@@ -277,21 +324,19 @@ mod tests {
             "Failed to start horizon-qualify-205-replay.service - Horizon epoch 205 focused v1.6.16 canonical checkpoint replay.",
         );
         let raw = format!("{started}\n{exited}\n{failed}\n{failed_start}\n");
-        capture::manager_terminal(raw.as_bytes(), unit, iid).unwrap();
+        scoped_terminal(raw.as_bytes(), unit, iid).unwrap();
         let missing = format!("{started}\n{exited}\n{failed_start}\n");
-        let error = capture::manager_terminal(missing.as_bytes(), unit, iid).unwrap_err();
+        let error = scoped_terminal(missing.as_bytes(), unit, iid).unwrap_err();
         assert!(error.to_string().contains(unit) && error.to_string().contains(iid));
         let mut false_result = failed.clone();
         false_result["MESSAGE_ID"] = json!("be02cf6855d2428ba40df7e9d022f03d");
         assert!(
-            capture::manager_terminal(format!("{started}\n{false_result}\n").as_bytes(), unit, iid)
-                .is_err()
+            scoped_terminal(format!("{started}\n{false_result}\n").as_bytes(), unit, iid).is_err()
         );
         let mut false_start = failed_start.clone();
         false_start["MESSAGE_ID"] = json!("d9b373ed55a64feb8242e02dbe79a49c");
         assert!(
-            capture::manager_terminal(format!("{started}\n{false_start}\n").as_bytes(), unit, iid)
-                .is_err()
+            scoped_terminal(format!("{started}\n{false_start}\n").as_bytes(), unit, iid).is_err()
         );
         for (key, bad) in [
             ("_PID", "2"),
@@ -302,11 +347,38 @@ mod tests {
             let mut forged = failed.clone();
             forged[key] = json!(bad);
             assert!(
-                capture::manager_terminal(format!("{started}\n{forged}\n").as_bytes(), unit, iid)
-                    .is_err(),
+                scoped_terminal(format!("{started}\n{forged}\n").as_bytes(), unit, iid).is_err(),
                 "{key}"
             );
         }
-        assert!(capture::manager_terminal(format!("{failed}\n").as_bytes(), unit, iid).is_err());
+        assert!(scoped_terminal(format!("{failed}\n").as_bytes(), unit, iid).is_err());
+    }
+    #[test]
+    fn historical_failure_scope_never_promotes_modern_native223_or_live_owners() {
+        let name = "horizon-qualify-205-replay.service";
+        let iid = "e32e088b878b41fe8df96c4ba8415940";
+        let good = failed_owner(name, iid);
+        HistoricalFailedOwner::new(205, name, &good).unwrap();
+        for (key, value) in [
+            ("ActiveState", "active"),
+            ("SubState", "running"),
+            ("MainPID", "42"),
+            ("Result", "success"),
+            ("NRestarts", "0"),
+            ("ExecMainStatus", "0"),
+            ("InvocationID", ""),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = json!(value);
+            assert!(
+                HistoricalFailedOwner::new(205, name, &bad).is_err(),
+                "{key}"
+            );
+        }
+        let native = "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service";
+        let native_state = failed_owner(native, iid);
+        assert!(HistoricalFailedOwner::new(205, native, &native_state).is_err());
+        assert!(HistoricalFailedOwner::new(223, native, &native_state).is_err());
+        assert!(HistoricalFailedOwner::new(203, name, &good).is_err());
     }
 }

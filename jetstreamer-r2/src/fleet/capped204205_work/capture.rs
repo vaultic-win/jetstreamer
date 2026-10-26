@@ -216,7 +216,7 @@ pub(super) fn manager_terminal(raw: &[u8], unit: &str, iid: &str) -> Result<()> 
         let message = string(&row, "MESSAGE")?;
         terminal |= (row["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
             && message == format!("{unit}: Deactivated successfully."))
-            || (row["MESSAGE_ID"] == "d9b373ed55a64feb8242e02dbe79a49c"
+            || (row["MESSAGE_ID"] == "be02cf6855d2428ba40df7e9d022f03d"
                 && message.starts_with(&format!("{unit}: Failed with result '"))
                 && message.ends_with("'."))
             || (row["MESSAGE_ID"] == "9d1aaa27d60140bd96365438aad20286"
