@@ -373,6 +373,22 @@ fn validate_horizon_source(
     archive: File,
     manifest: &HistoricalSegmentManifest,
 ) -> Result<(), SegmentManifestError> {
+    let progress = crate::segment_progress::SegmentProgress::new(manifest.epoch);
+    let result = validate_horizon_source_with_progress(archive_path, archive, manifest, &progress);
+    progress.phase(if result.is_ok() {
+        "source_validation_completed"
+    } else {
+        "source_validation_failed"
+    });
+    result
+}
+
+fn validate_horizon_source_with_progress(
+    archive_path: &Path,
+    archive: File,
+    manifest: &HistoricalSegmentManifest,
+    progress: &crate::segment_progress::SegmentProgress,
+) -> Result<(), SegmentManifestError> {
     let initial_identity = archive_file_identity(&archive)
         .map_err(|source| io_err("identifying archive", archive_path, source))?;
     let reader =
@@ -489,6 +505,7 @@ fn validate_horizon_source(
         .thread_name(|index| format!("segment-verify-{index:02}"))
         .build()
         .map_err(|error| invalid(format!("failed to build segment validation pool: {error}")))?;
+    progress.phase("bucket_decode_started");
     let evidence = pool.install(|| {
         ranges
             .into_par_iter()
@@ -499,10 +516,12 @@ fn validate_horizon_source(
                     first_bucket,
                     end_bucket,
                     manifest.emitted_raw_write_versions.clone(),
+                    progress,
                 )
             })
             .collect::<Result<Vec<_>, _>>()
     })?;
+    progress.phase("range_merge_started");
     let decoded_slots = merge_horizon_bucket_ranges(archive_path, manifest, evidence)?;
     if decoded_slots != manifest.output_slot_count {
         return Err(invalid(format!(
@@ -510,6 +529,7 @@ fn validate_horizon_source(
             manifest.output_slot_count
         )));
     }
+    progress.phase("identity_recheck_started");
     if !path_matches_archive_identity(archive_path, initial_identity)
         .map_err(|source| io_err("rechecking archive identity", archive_path, source))?
     {
@@ -740,6 +760,7 @@ fn validate_horizon_bucket_range(
     first_bucket: usize,
     end_bucket: usize,
     expected_writes: Range<u64>,
+    progress: &crate::segment_progress::SegmentProgress,
 ) -> Result<SegmentBucketRangeEvidence, SegmentManifestError> {
     let archive = open_regular_nofollow(archive_path)
         .map_err(|source| io_err("opening parallel archive worker", archive_path, source))?;
@@ -771,6 +792,7 @@ fn validate_horizon_bucket_range(
         visited_slots = visited_slots
             .checked_add(visited)
             .ok_or_else(|| invalid("decoded slot count overflows u64"))?;
+        progress.decoded(visited);
     }
     visitor.finish(first_bucket, visited_slots)
 }
