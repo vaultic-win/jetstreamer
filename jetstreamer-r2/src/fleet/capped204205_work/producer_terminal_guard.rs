@@ -145,6 +145,13 @@ fn authenticate(
         &serde_json::from_value(terminal["manager_journal"].clone())?,
         true,
     )?;
+    ensure!(
+        records_equal(
+            &producer_raw,
+            &capture::journal(string(p, "producer_unit")?)?
+        )?,
+        "producer manager history changed after natural completion"
+    );
     history(p, l, terminal, &producer_raw, guard_raw)
 }
 pub(super) fn capture(
@@ -249,6 +256,21 @@ pub(super) fn current(f: &Value, current: &BTreeMap<String, Value>) -> Result<()
     ensure!(
         current.get(name) == Some(&v["current_unit"]),
         "original terminal guard changed current identity"
+    );
+    let terminal = evidence::bound(
+        &serde_json::from_value(v["terminal_snapshot"].clone())?,
+        true,
+    )?;
+    let producer_raw = evidence::bytes(
+        &serde_json::from_value(terminal["manager_journal"].clone())?,
+        true,
+    )?;
+    ensure!(
+        records_equal(
+            &producer_raw,
+            &capture::journal(string(&terminal, "unit")?)?
+        )?,
+        "producer was replaced after natural terminal guard capture"
     );
     let saved = evidence::bound(&serde_json::from_value(v["manager_journal"].clone())?, true)?;
     ensure!(
