@@ -152,7 +152,7 @@ fn retained_manifest(bound: &Bound) -> Result<Value> {
             && meta.is_file()
             && meta.uid() == 1000
             && meta.nlink() == 1
-            && meta.mode() & 0o077 == 0,
+            && retained_mode(meta.mode(), false),
         "natural225 retained manifest custody differs"
     );
     let bytes = read_stable_bounded(&bound.path, 1 << 20, "natural225 manifest")?;
@@ -163,6 +163,17 @@ fn retained_manifest(bound: &Bound) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 
+// Cleanup may precede or follow the independently required extraction freeze.
+// Both describe the same pinned retained bytes; no chmod or archive mutation is
+// performed here. Preserve exact non-executable custody and reject broader writes.
+fn retained_mode(mode: u32, archive: bool) -> bool {
+    if archive {
+        matches!(mode & 0o7777, 0o644 | 0o444 | 0o400)
+    } else {
+        matches!(mode & 0o7777, 0o600 | 0o444 | 0o400)
+    }
+}
+
 fn source_stat(evidence: &Evidence) -> Result<()> {
     let meta = fs::symlink_metadata(&evidence.source_archive)?;
     ensure!(
@@ -171,7 +182,7 @@ fn source_stat(evidence: &Evidence) -> Result<()> {
             && meta.is_file()
             && meta.uid() == 1000
             && meta.nlink() == 1
-            && meta.mode() & 0o777 == 0o644
+            && retained_mode(meta.mode(), true)
             && meta.len() == evidence.source_archive_bytes,
         "natural225 retained source metadata differs"
     );
@@ -377,12 +388,23 @@ fn lifecycle(rows: &[Value]) -> Result<u64> {
 }
 
 fn journal_rows(bytes: &[u8]) -> Result<Vec<Value>> {
-    let rows = serde_json::Deserializer::from_slice(bytes)
+    let mut rows = serde_json::Deserializer::from_slice(bytes)
         .into_iter::<Value>()
         .collect::<std::result::Result<Vec<_>, _>>()?;
+    // The existing typed terminal-handoff capturer seals its selected PID1
+    // history as one JSON array. Raw journalctl JSONL remains supported; both
+    // must reproduce the complete current lifecycle below, with no owner filter.
+    if rows.len() == 1 && rows[0].is_array() {
+        rows = rows
+            .pop()
+            .context("natural225 sealed history absent")?
+            .as_array()
+            .context("natural225 history array absent")?
+            .clone();
+    }
     ensure!(
         !rows.is_empty() && rows.len() <= 4096 && rows.iter().all(Value::is_object),
-        "natural225 sealed manager journal is not a bounded raw row stream"
+        "natural225 sealed manager journal is not a bounded row stream or handoff array"
     );
     Ok(rows)
 }
@@ -491,6 +513,40 @@ pub(super) fn validate_current(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cleanup_retains_its_exact_evidence_after_the_readonly_extraction_freeze() {
+        for mode in [0o644, 0o444, 0o400] {
+            assert!(retained_mode(mode, true));
+        }
+        for mode in [0o600, 0o444, 0o400] {
+            assert!(retained_mode(mode, false));
+        }
+        for mode in [0o666, 0o664, 0o660, 0o777, 0o4755, 0o4644, 0o2444, 0o000] {
+            assert!(!retained_mode(mode, true), "archive {mode:o}");
+            assert!(!retained_mode(mode, false), "manifest {mode:o}");
+        }
+    }
+    #[test]
+    fn sealed_handoff_array_and_raw_manager_stream_require_the_same_complete_history() {
+        let expected = rows();
+        let array = serde_json::to_vec(&expected).unwrap();
+        let raw = expected
+            .iter()
+            .map(|v| format!("{}\n", serde_json::to_string(v).unwrap()))
+            .collect::<String>();
+        assert_eq!(journal_rows(&array).unwrap(), expected);
+        assert_eq!(journal_rows(raw.as_bytes()).unwrap(), expected);
+        assert_eq!(
+            lifecycle(&journal_rows(&array).unwrap()).unwrap(),
+            3_000_000
+        );
+        for bad in [b"[]".as_slice(), b"[null]", b"[[]]", b"[]\n{}"] {
+            assert!(journal_rows(bad).is_err());
+        }
+        let mut foreign = expected;
+        foreign[2]["INVOCATION_ID"] = json!("c".repeat(32));
+        assert!(lifecycle(&journal_rows(&serde_json::to_vec(&foreign).unwrap()).unwrap()).is_err());
+    }
 
     fn bound(path: &str, sha256: &str) -> Value {
         json!({"path":path,"sha256":sha256})
@@ -587,13 +643,15 @@ mod tests {
         let mut changed = history;
         changed[1]["MESSAGE"] = json!("changed");
         assert!(validate_observation(&loaded, &terminal(""), &owners, &changed).is_err());
-        assert!(validate_observation(
-            &loaded,
-            &terminal(""),
-            &[("foreign.service".into(), IID.into())],
-            &loaded.journal,
-        )
-        .is_err());
+        assert!(
+            validate_observation(
+                &loaded,
+                &terminal(""),
+                &[("foreign.service".into(), IID.into())],
+                &loaded.journal,
+            )
+            .is_err()
+        );
     }
 
     #[test]

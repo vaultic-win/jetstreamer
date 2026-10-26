@@ -407,8 +407,7 @@ pub(super) fn release() -> Result<()> {
     let mut units = census(&names, 201, 300)?;
     units.remove(&p.unit);
     units.remove(&p.guard_unit);
-    let profile = terminal225_peer::Profile::load(&fb(&p.terminal_handoff), &previous)?;
-    profile.current(&previous, &units)?;
+    let profile = terminal225_peer::current(&fb(&p.terminal_handoff), &previous, &units)?;
     maintenance_capacity::current_owners(
         &profile.without(&previous)?,
         &profile.without_current(&previous, &units)?,

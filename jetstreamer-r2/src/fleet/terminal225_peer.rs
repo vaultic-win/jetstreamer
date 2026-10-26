@@ -701,8 +701,10 @@ pub(in crate::fleet) fn current(
     binding: &BoundFile,
     previous_fleet: &Value,
     census: &BTreeMap<String, Value>,
-) -> Result<()> {
-    Profile::load(binding, previous_fleet)?.current(previous_fleet, census)
+) -> Result<Profile> {
+    let profile = Profile::load(binding, previous_fleet)?;
+    profile.current(previous_fleet, census)?;
+    Ok(profile)
 }
 
 #[cfg(test)]
