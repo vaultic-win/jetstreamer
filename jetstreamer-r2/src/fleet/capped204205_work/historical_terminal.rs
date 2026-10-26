@@ -68,38 +68,45 @@ pub(super) fn capture(
         if !capture::epoch_scope(epoch, name) || idle(current) || excluded(p, actors, name) {
             continue;
         }
-        ensure!(
-            candidate(name, current),
-            "unregistered historical owner is not positively terminal"
-        );
-        inactive_status::no_pending_owner_trigger(name, false)?;
-        let jobs = ProcessCommand::new("/usr/bin/systemctl")
-            .args([
-                "list-jobs",
-                "--no-legend",
-                "--no-pager",
-                "--plain",
-                "--full",
-            ])
-            .output()?;
-        ensure!(jobs.status.success(), "historical queued-job query failed");
-        let pending = inactive_status::queued_job_units(&jobs.stdout)?;
-        let raw = capture::journal(name)?;
-        capture::manager_terminal(&raw, name, string(current, "InvocationID")?)?;
-        let journal_path = out.join(format!(
-            "historical-{}-manager.json",
-            string(current, "InvocationID")?
-        ));
-        // Reuse sealed bounded metadata publication, with the journal encoded as
-        // JSON text so the exact durable raw bytes are recovered independently.
-        let journal_value = json!({"raw":std::str::from_utf8(&raw)?});
-        capture::write_sealed(&journal_path, &journal_value)?;
-        let v = json!({"schema":"jetstreamer-capped204205-historical-terminal-owner-v1",
-            "epoch":epoch,"unit":name,"current_unit":current,"manager_journal_complete":true,
-            "manager_journal":{"path":journal_path,"sha256":capture::file_sha(&journal_path)?},
-            "pending_owner_triggers_absent":true,"pending_job_units":pending,"cgroup":capture::group(name)?,
-            "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
-        proof(epoch, name, current, &v)?;
+        let invocation = current["InvocationID"].as_str().unwrap_or("<missing>");
+        let v = (|| -> Result<Value> {
+            ensure!(
+                candidate(name, current),
+                "unregistered historical owner is not positively terminal"
+            );
+            inactive_status::no_pending_owner_trigger(name, false)?;
+            let jobs = ProcessCommand::new("/usr/bin/systemctl")
+                .args([
+                    "list-jobs",
+                    "--no-legend",
+                    "--no-pager",
+                    "--plain",
+                    "--full",
+                ])
+                .output()?;
+            ensure!(jobs.status.success(), "historical queued-job query failed");
+            let pending = inactive_status::queued_job_units(&jobs.stdout)?;
+            let raw = capture::journal(name)?;
+            capture::manager_terminal(&raw, name, string(current, "InvocationID")?)?;
+            let journal_path = out.join(format!(
+                "historical-{}-manager.json",
+                string(current, "InvocationID")?
+            ));
+            // Reuse sealed bounded metadata publication, with the journal encoded as
+            // JSON text so the exact durable raw bytes are recovered independently.
+            let journal_value = json!({"raw":std::str::from_utf8(&raw)?});
+            capture::write_sealed(&journal_path, &journal_value)?;
+            let v = json!({"schema":"jetstreamer-capped204205-historical-terminal-owner-v1",
+                "epoch":epoch,"unit":name,"current_unit":current,"manager_journal_complete":true,
+                "manager_journal":{"path":journal_path,"sha256":capture::file_sha(&journal_path)?},
+                "pending_owner_triggers_absent":true,"pending_job_units":pending,"cgroup":capture::group(name)?,
+                "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});
+            proof(epoch, name, current, &v)?;
+            Ok(v)
+        })()
+        .with_context(|| {
+            format!("historical terminal capture for epoch {epoch}, unit {name}, invocation {invocation}")
+        })?;
         proofs.insert(name.clone(), v);
     }
     Ok(Value::Object(proofs))
@@ -215,7 +222,7 @@ mod tests {
             "2000000",
             "b",
             &iid,
-            "be02cf6855d2428ba40df7e9d022f03d",
+            "d9b373ed55a64feb8242e02dbe79a49c",
             &format!("{name}: Failed with result 'exit-code'."),
         );
         let raw = format!("{started}\n{failed}\n");
@@ -233,5 +240,73 @@ mod tests {
                 .is_err()
         );
         assert!(capture::manager_terminal(raw.as_bytes(), name, &"2".repeat(32)).is_err());
+    }
+    #[test]
+    fn historical205_genuine_failed_result_is_distinct_from_failed_to_start() {
+        let unit = "horizon-qualify-205-replay.service";
+        let iid = "e32e088b878b41fe8df96c4ba8415940";
+        let row = |at: &str, cursor: &str, event: &str, message: &str| {
+            json!({"_PID":"1","_UID":"0","UNIT":unit,"INVOCATION_ID":iid,
+                "__REALTIME_TIMESTAMP":at,"__CURSOR":cursor,"MESSAGE_ID":event,"MESSAGE":message})
+        };
+        // Actual PID 1 event shapes, IDs, invocation and times from the preserved
+        // historical 205 failure. Failed-to-start also followed the result event;
+        // it must neither replace that result nor count as terminal by itself.
+        let started = row(
+            "1791078028570847",
+            "actual205-start",
+            "39f53479d3a045ac8e11786248231fbf",
+            "Started horizon-qualify-205-replay.service - Horizon epoch 205 focused v1.6.16 canonical checkpoint replay.",
+        );
+        let exited = row(
+            "1791078723913707",
+            "actual205-exit",
+            "98e322203f7a4ed290d09fe03c09fe15",
+            "horizon-qualify-205-replay.service: Main process exited, code=exited, status=1/FAILURE",
+        );
+        let failed = row(
+            "1791078723914139",
+            "actual205-result",
+            "d9b373ed55a64feb8242e02dbe79a49c",
+            "horizon-qualify-205-replay.service: Failed with result 'exit-code'.",
+        );
+        let failed_start = row(
+            "1791078754042136",
+            "actual205-start-limit",
+            "be02cf6855d2428ba40df7e9d022f03d",
+            "Failed to start horizon-qualify-205-replay.service - Horizon epoch 205 focused v1.6.16 canonical checkpoint replay.",
+        );
+        let raw = format!("{started}\n{exited}\n{failed}\n{failed_start}\n");
+        capture::manager_terminal(raw.as_bytes(), unit, iid).unwrap();
+        let missing = format!("{started}\n{exited}\n{failed_start}\n");
+        let error = capture::manager_terminal(missing.as_bytes(), unit, iid).unwrap_err();
+        assert!(error.to_string().contains(unit) && error.to_string().contains(iid));
+        let mut false_result = failed.clone();
+        false_result["MESSAGE_ID"] = json!("be02cf6855d2428ba40df7e9d022f03d");
+        assert!(
+            capture::manager_terminal(format!("{started}\n{false_result}\n").as_bytes(), unit, iid)
+                .is_err()
+        );
+        let mut false_start = failed_start.clone();
+        false_start["MESSAGE_ID"] = json!("d9b373ed55a64feb8242e02dbe79a49c");
+        assert!(
+            capture::manager_terminal(format!("{started}\n{false_start}\n").as_bytes(), unit, iid)
+                .is_err()
+        );
+        for (key, bad) in [
+            ("_PID", "2"),
+            ("_UID", "1000"),
+            ("UNIT", "foreign.service"),
+            ("INVOCATION_ID", "22222222222222222222222222222222"),
+        ] {
+            let mut forged = failed.clone();
+            forged[key] = json!(bad);
+            assert!(
+                capture::manager_terminal(format!("{started}\n{forged}\n").as_bytes(), unit, iid)
+                    .is_err(),
+                "{key}"
+            );
+        }
+        assert!(capture::manager_terminal(format!("{failed}\n").as_bytes(), unit, iid).is_err());
     }
 }
