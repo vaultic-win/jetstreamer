@@ -87,7 +87,7 @@ impl WaitingContext {
         {
             let owner = singleton227_admission::active_owner(row)?;
             ensure!(
-                !names.contains(s(&owner, "Id")?),
+                !names.contains(s(owner, "Id")?),
                 "205 waiter cannot remove an already accepted owner"
             );
         }
@@ -132,10 +132,11 @@ impl WaitingContext {
         let owner = raw
             .get(self.stage.stage.unit())
             .context("205 waiting owner absent")?;
+        let expected_pid = n(&process, "pid")?.to_string();
         ensure!(
             owner["Id"] == self.stage.stage.unit()
                 && owner["InvocationID"] == process["invocation_id"]
-                && owner["MainPID"] == n(&process, "pid")?.to_string()
+                && owner["MainPID"].as_str() == Some(expected_pid.as_str())
                 && owner["ControlGroup"] == process["cgroup"]
                 && owner["NRestarts"] == "0"
                 && owner["ActiveState"] == "active"

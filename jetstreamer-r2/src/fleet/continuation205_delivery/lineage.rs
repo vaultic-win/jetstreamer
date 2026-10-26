@@ -109,6 +109,7 @@ fn manifest_scope(m: &Manifest) -> Result<()> {
     Ok(())
 }
 pub(super) struct Expected {
+    #[cfg(test)]
     pub provenance: ArchiveProvenanceV4,
     pub digest: String,
     pub document: Value,
@@ -231,6 +232,7 @@ pub(super) fn derive(prefix: &Manifest, suffix: &Manifest, proof: &Value) -> Res
         "prefix_raw_write_versions":prefix.emitted_raw_write_versions,"suffix_raw_write_versions":suffix.emitted_raw_write_versions,
         "terminal_blockhash":suffix.terminal.last_blockhash,"native_checkpoint":native,"metadata":"observed","logical_write_versions":next});
     Ok(Expected {
+        #[cfg(test)]
         provenance,
         digest: hash,
         document,
