@@ -411,7 +411,7 @@ mod tests {
         assert!(!namespace(&wrong_owner));
         assert!(command().contains("--qualification-end-slot=98928278"));
         assert!(!command().contains("--root-checkpoint-cohort"));
-        assert!(environment().contains(&format!("JETSTREAMER_HISTORICAL_WORKER_V1_6_20=/var/lib/jetstreamer/horizon-228-capped-candidate-1bfa8d51-v1/jetstreamer-historical-worker-v1-6-20")));
+        assert!(environment().contains("JETSTREAMER_HISTORICAL_WORKER_V1_6_20=/var/lib/jetstreamer/horizon-228-capped-candidate-1bfa8d51-v1/jetstreamer-historical-worker-v1-6-20"));
     }
     #[test]
     fn guard_cannot_borrow_233_or_a_different_tail_budget() {

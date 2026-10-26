@@ -470,7 +470,7 @@ fn validate_observation(
     journal: &[Value],
 ) -> Result<()> {
     ensure!(
-        owners == &[(UNIT.into(), IID.into())],
+        owners == [(UNIT.into(), IID.into())],
         "natural225 status publication belongs to another owner"
     );
     terminal_shape(supplied)?;
