@@ -102,18 +102,49 @@ pub(in crate::fleet) fn source_terminal(
         before == unit(UNIT)?,
         "207 source manager changed during terminal proof"
     );
-    Ok(
-        json!({"schema":"jetstreamer-singleton207-delivery-terminal-snapshot-v1","invocation_id":iid,
+    let snapshot = json!({"schema":"jetstreamer-singleton207-delivery-terminal-snapshot-v1","invocation_id":iid,
         "terminal_proof":private157::binding(proof_binding),"manager":before,"events":events,
-        "journal_rows":rows,"journal_sha256":hex_lower(&Sha256::digest(&out.stdout))}),
-    )
+        "journal_rows":rows,"journal_sha256":hex_lower(&Sha256::digest(&out.stdout))});
+    snapshot_shape(&snapshot)?;
+    Ok(snapshot)
+}
+fn snapshot_shape(v: &Value) -> Result<()> {
+    ensure!(
+        v["schema"] == "jetstreamer-singleton207-delivery-terminal-snapshot-v1",
+        "207 terminal snapshot schema differs"
+    );
+    let iid = v["invocation_id"]
+        .as_str()
+        .context("207 terminal snapshot IID missing")?;
+    terminal_manager(&v["manager"], iid)?;
+    let proof: BoundFile = serde_json::from_value(v["terminal_proof"].clone())?;
+    ensure!(
+        proof.path.is_absolute()
+            && is_lower_hex(&proof.sha256, 64)
+            && v["journal_sha256"]
+                .as_str()
+                .is_some_and(|s| is_lower_hex(s, 64)),
+        "207 terminal snapshot proof/raw digest absent"
+    );
+    let rows = v["journal_rows"]
+        .as_array()
+        .context("207 terminal snapshot full history absent")?;
+    ensure!(
+        rows.iter()
+            .all(|r| r["_PID"] == "1" && r["_UID"] == "0" && r["UNIT"] == UNIT),
+        "207 terminal snapshot contains foreign manager rows"
+    );
+    ensure!(
+        json!(singleton209_delivery::terminal_history_for(
+            rows, UNIT, iid
+        )?) == v["events"],
+        "207 selected terminal history differs from complete manager history"
+    );
+    Ok(())
 }
 pub(in crate::fleet) fn same_terminal(a: &Value, b: &Value) -> Result<()> {
-    ensure!(
-        a["schema"] == "jetstreamer-singleton207-delivery-terminal-snapshot-v1"
-            && b["schema"] == a["schema"],
-        "207 terminal comparison borrowed a foreign source"
-    );
+    snapshot_shape(a)?;
+    snapshot_shape(b)?;
     for key in [
         "invocation_id",
         "terminal_proof",
@@ -308,11 +339,21 @@ mod tests {
             changed[key] = bad;
             assert!(terminal_manager(&changed, &iid).is_err(), "{key}");
         }
-        let snapshot = json!({"schema":"jetstreamer-singleton207-delivery-terminal-snapshot-v1","invocation_id":iid,"terminal_proof":{"path":"/sealed/terminal.json","sha256":"a".repeat(64)},"manager":u,"events":[],"journal_rows":[]});
+        let event = |t: &str, message: String| json!({"_PID":"1","_UID":"0","UNIT":UNIT,"INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":t,"MESSAGE":message});
+        let events = json!([
+            event("100", format!("Started {UNIT} - Original replay.")),
+            event("200", format!("{UNIT}: Deactivated successfully."))
+        ]);
+        let snapshot = json!({"schema":"jetstreamer-singleton207-delivery-terminal-snapshot-v1","invocation_id":iid,"terminal_proof":{"path":"/sealed/terminal.json","sha256":"a".repeat(64)},"manager":u,"events":events,"journal_rows":events,"journal_sha256":"c".repeat(64)});
         same_terminal(&snapshot, &snapshot).unwrap();
         let mut changed = snapshot.clone();
         changed["journal_rows"] = json!([{"replacement":true}]);
         assert!(same_terminal(&snapshot, &changed).is_err());
+        let mut replaced = snapshot.clone();
+        let mut event = event("300", format!("Started {UNIT} - Replacement."));
+        event["INVOCATION_ID"] = json!("d".repeat(32));
+        replaced["journal_rows"].as_array_mut().unwrap().push(event);
+        assert!(same_terminal(&snapshot, &replaced).is_err());
     }
     #[test]
     fn native_producer_pin_cannot_borrow_the_209_route() {
