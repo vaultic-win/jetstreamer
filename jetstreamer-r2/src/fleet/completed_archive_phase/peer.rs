@@ -61,7 +61,7 @@ pub(super) fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, S
             )
             && admission["schema"] == RECEIPT
             && admission["admitted"] == true
-            && admission["issuer_sha256"] == issuer
+            && admission["issuer_sha256"] == spec.programs["launcher"].artifact.sha256
             && admission["epoch"] == spec.epoch
             && admission["phase"] == spec.phase.name()
             && admission["origin"] == serde_json::to_value(&spec.origin)?
@@ -526,7 +526,7 @@ fn host_shape(p: &Peer, o: &Value) -> Result<Value> {
     );
     let post_sample = started > at;
     ensure!(
-        post_sample || captured <= at,
+        post_sample || captured <= at || p.launch.get("capture_recovery").is_some(),
         "completed peer pre-sample owner lacks contemporaneous launch evidence"
     );
     let mut observations = Vec::new();
@@ -590,6 +590,18 @@ fn host_shape(p: &Peer, o: &Value) -> Result<Value> {
         "included_in_whole_host_resident_memory":!post_sample,"executing_entry_replay":false,
         "fabricated_worker_rss":false,"disk_or_hard_memory_growth_exempted":false}),
     )
+}
+// The caller first authenticates the scoped saved capture through claim_launch.
+pub(super) fn capture_observer(claim: &PipelineClaim, o: &Value) -> Result<Value> {
+    let (binding, launch, spec, admission) = claim_launch(claim)?;
+    let p = Peer {
+        binding,
+        launch,
+        spec,
+        admission,
+        row: Value::Null,
+    };
+    host_shape(&p, o)
 }
 fn reject_replay_alias(p: &Peer, r: &Value) -> Result<()> {
     for role in [
@@ -793,14 +805,12 @@ mod tests {
                 assert_eq!(total, cap + (2u64 << 30));
                 assert_eq!(memory["remaining_hard_memory_growth_bytes"], total);
             }
-            assert!(
-                resource_evidence(
-                    &p,
-                    &json!({"native_memory_current":(cap+1).to_string()}),
-                    Value::Null
-                )
-                .is_err()
-            );
+            assert!(resource_evidence(
+                &p,
+                &json!({"native_memory_current":(cap+1).to_string()}),
+                Value::Null
+            )
+            .is_err());
         }
     }
     #[test]
@@ -844,6 +854,26 @@ mod tests {
         bad["diagnostic_replays"] =
             json!([{"producer_unit":p.spec.units["full"],"status":"unavailable"}]);
         assert!(host_shape(&p, &bad).is_err());
+    }
+    #[test]
+    fn completed209_recovered_presample_child_needs_both_actual_rss_brackets() {
+        let (mut p, _, _, o) = fixture(Phase::Full);
+        p.launch["captured_unix_seconds"] = json!(1100);
+        assert!(host_shape(&p, &o).is_err());
+        // Production reaches this branch only after claim_launch authenticates
+        // the exact recovery pins and both old/new sealed binary attestations.
+        p.launch["capture_recovery"] = json!({"authenticated_by_claim_launch":true});
+        let proof = host_shape(&p, &o).unwrap();
+        assert_eq!(proof["host_processes"].as_array().unwrap().len(), 2);
+        assert_eq!(proof["post_sample_initial_event"], false);
+        for phase in ["before", "after"] {
+            let mut bad = o.clone();
+            bad["host_resident_memory"][phase]["rss"]["processes"] = json!([]);
+            assert!(host_shape(&p, &bad).is_err());
+            let mut bad = o.clone();
+            bad["host_resident_memory"][phase]["rss"]["processes"][0]["start_ticks"] = json!(999);
+            assert!(host_shape(&p, &bad).is_err());
+        }
     }
     #[test]
     fn completed_peer_positive_postsample_start_never_fabricates_earlier_rss_or_credit() {

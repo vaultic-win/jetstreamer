@@ -1,5 +1,6 @@
 //! Capture actual execution identity before a completed phase can gate its peer.
 use super::*;
+mod recovery;
 const LAUNCH: &str = "jetstreamer-completed-archive-phase-launch-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -11,6 +12,7 @@ struct Capture {
     guard_sample: Option<BoundFile>,
     startup_release: Option<BoundFile>,
     output: PathBuf,
+    capture_recovery: Option<recovery::Recovery>,
 }
 fn n(v: &Value, k: &str) -> Result<u64> {
     v[k].as_u64()
@@ -419,11 +421,30 @@ fn guard_manager(
     );
     let timer = barrier::guard_timer_properties(name)?;
     validate_guard_timer(&timer, name)?;
-    let (rows, sha) = singleton227_capture::journal(name)?;
+    // Read the entire admission interval: a recurring guard can legitimately
+    // have more than 256 events, and a tail limit can hide an earlier failure.
+    let output = ProcessCommand::new("/usr/bin/journalctl")
+        .args([
+            "--unit",
+            name,
+            "--output=json",
+            "--no-pager",
+            "--since",
+            &format!("@{admitted}"),
+        ])
+        .output()?;
     ensure!(
-        !rows.is_empty() && rows.len() < 256,
-        "completed launch guard manager history truncated"
+        output.status.success() && output.stdout.len() <= 16 << 20,
+        "completed launch guard manager history unavailable/oversized"
     );
+    let rows = serde_json::Deserializer::from_slice(&output.stdout)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        !rows.is_empty(),
+        "completed launch guard manager history absent"
+    );
+    let sha = hex_lower(&Sha256::digest(&output.stdout));
     let success = rows
         .iter()
         .filter(|r| {
@@ -460,6 +481,7 @@ pub(in crate::fleet::completed_archive_phase) fn saved_shape(
     self_sha: &str,
     a: &Value,
 ) -> Result<()> {
+    recovery::issuer_shape(v, s, a, self_sha)?;
     barrier::transition_shape(
         &v["startup_release_contents"],
         s,
@@ -554,8 +576,65 @@ pub(in crate::fleet::completed_archive_phase) fn saved_shape(
         &v["guard_plan_contents"],
         &v["guard_sample_contents"],
         &v["owner"],
-        n(v, "captured_unix_seconds")?,
+        if v.get("current_protection").is_some() {
+            n(&v["startup_release_contents"], "captured_unix_seconds")?
+        } else {
+            n(v, "captured_unix_seconds")?
+        },
     )?;
+    if v.get("current_protection").is_some() {
+        protection_shape(v, &prior, a)?;
+    }
+    Ok(())
+}
+fn protection_shape(v: &Value, s: &Spec, a: &Value) -> Result<()> {
+    let p = &v["current_protection"];
+    let sample = &p["sample_contents"];
+    let plan = &v["guard_plan_contents"];
+    let now = n(v, "captured_unix_seconds")?;
+    current_guard_shape(
+        s,
+        a,
+        plan,
+        sample,
+        &v["owner"],
+        now.saturating_sub(1800),
+        now,
+    )?;
+    ensure!(
+        sample["plan"] == v["guard_plan"]["path"]
+            && sample["plan_sha256"] == v["guard_plan"]["sha256"]
+            && p["completion"]["binding"] == p["sample"]
+            && p["manager"]["manager_completion"]["INVOCATION_ID"] == sample["guard_invocation_id"]
+            && p["manager"]["properties"]["InvocationID"]
+                .as_str()
+                .is_some_and(
+                    |iid| iid.is_empty() || sample["guard_invocation_id"].as_str() == Some(iid)
+                )
+            && p["manager"]["manager_completion"]["_PID"] == "1"
+            && p["manager"]["manager_completion"]["_UID"] == "0"
+            && p["manager"]["manager_completion"]["UNIT"] == s.guard_units[s.phase.name()]
+            && p["manager"]["manager_completion"]["MESSAGE"]
+                == format!(
+                    "{}: Deactivated successfully.",
+                    s.guard_units[s.phase.name()]
+                ),
+        "completed capture current guard manager/plan binding differs"
+    );
+    let history = &p["completion"]["history"];
+    warmup223::validate_selected_guard_events(
+        history,
+        sample,
+        history["events"]
+            .as_array()
+            .context("completed current guard events absent")?,
+    )?;
+    ensure!(
+        history["executable"] == serde_json::to_value(&s.programs["guard"].artifact.path)?
+            && history["events"][0]["_BOOT_ID"]
+                == string(&v["process"]["native_start_clock"], "boot_id")?.replace('-', ""),
+        "completed current protection guard executable/boot differs"
+    );
     Ok(())
 }
 pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) -> Result<Value> {
@@ -589,6 +668,7 @@ pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) 
         "completed phase captured phase differs"
     );
     saved_shape(v, &prior, phase, self_sha, &a)?;
+    recovery::validate_files(v)?;
     let plan: BoundFile = serde_json::from_value(v["guard_plan"].clone())?;
     let sample: BoundFile = serde_json::from_value(v["guard_sample"].clone())?;
     ensure!(
@@ -606,6 +686,18 @@ pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) 
         barrier::saved_release(&prior, &startup)? == v["startup_release_contents"],
         "completed saved startup release changed"
     );
+    if v.get("current_protection").is_some() {
+        let p = &v["current_protection"];
+        let b: BoundFile = serde_json::from_value(p["sample"].clone())?;
+        ensure!(
+            read_sample(&b, &v["guard_plan_contents"])? == p["sample_contents"],
+            "completed capture current guard receipt changed"
+        );
+        warmup223::validate_completed_guard_history(
+            &p["completion"]["history"],
+            &p["sample_contents"],
+        )?;
+    }
     Ok(v.clone())
 }
 fn selected_guard_sample(
@@ -639,12 +731,16 @@ fn collect(
     ensure!(
         admission["schema"] == RECEIPT
             && admission["admitted"] == true
-            && admission["issuer_sha256"] == self_sha
-            && s.programs["launcher"].artifact.sha256 == self_sha
             && admission["spec"] == private157::binding(&c.phase_spec)
             && admission["epoch"] == s.epoch
             && admission["phase"] == s.phase.name(),
         "completed launch admission binding differs"
+    );
+    recovery::capture_shape(c, &s, &admission, self_sha, waiting, startup)?;
+    let launcher_sha = &s.programs["launcher"].artifact.sha256;
+    ensure!(
+        admission["issuer_sha256"] == *launcher_sha,
+        "completed capture changed the original admission issuer"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let owner = unit(&s.units[s.phase.name()])?;
@@ -659,16 +755,12 @@ fn collect(
     let effective = check_unit(&s, &argv)?;
     let snapshot = process_as(&s, &owner, &argv, waiting)?;
     let plan = read(&c.guard_plan)?;
-    let latest = if waiting {
-        warmup223::completed_guard_binding(
-            &s.guard_units[s.phase.name()],
-            Path::new(string(&plan, "receipt_directory")?),
-            n(&admission, "recorded_unix_seconds")?,
-            now,
-        )?
-    } else {
-        Value::Null
-    };
+    let latest = warmup223::completed_guard_binding(
+        &s.guard_units[s.phase.name()],
+        Path::new(string(&plan, "receipt_directory")?),
+        n(&admission, "recorded_unix_seconds")?,
+        now,
+    )?;
     let selected_sample =
         selected_guard_sample(c.guard_sample.as_ref(), waiting, &latest, startup)?;
     let sample = read_sample(&selected_sample, &plan)?;
@@ -677,14 +769,38 @@ fn collect(
             && sample["plan"] == serde_json::to_value(&c.guard_plan.path)?,
         "completed launch first guard plan binding differs"
     );
-    guard_shape(&s, &admission, &plan, &sample, &owner, now)?;
-    let manager = guard_manager(
+    let first_at = if waiting {
+        now
+    } else {
+        n(
+            startup.context("completed capture startup release absent")?,
+            "captured_unix_seconds",
+        )?
+    };
+    guard_shape(&s, &admission, &plan, &sample, &owner, first_at)?;
+    let current_binding: BoundFile = serde_json::from_value(latest["binding"].clone())?;
+    let current_sample = read_sample(&current_binding, &plan)?;
+    current_guard_shape(
+        &s,
+        &admission,
+        &plan,
+        &current_sample,
+        &owner,
+        now.saturating_sub(1800),
+        now,
+    )?;
+    let current_manager = guard_manager(
         &s,
         &c.guard_plan,
         &plan,
-        &sample,
+        &current_sample,
         n(&admission, "recorded_unix_seconds")?,
     )?;
+    let manager = if waiting {
+        current_manager.clone()
+    } else {
+        startup.context("completed startup release absent")?["guard_manager"].clone()
+    };
     ensure!(
         owner == unit(&s.units[s.phase.name()])?
             && effective == check_unit(&s, &argv)?
@@ -692,12 +808,27 @@ fn collect(
         "completed launch owner changed during first guard capture"
     );
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    guard_shape(&s, &admission, &plan, &sample, &owner, now)?;
-    let launch = json!({"schema":if waiting {barrier::RELEASE}else{LAUNCH},"epoch":s.epoch,"phase":s.phase,"issuer_sha256":self_sha,"capture_spec":private157::binding(binding),"phase_spec":c.phase_spec,"admission":c.admission,
+    guard_shape(&s, &admission, &plan, &sample, &owner, first_at)?;
+    current_guard_shape(
+        &s,
+        &admission,
+        &plan,
+        &current_sample,
+        &owner,
+        now.saturating_sub(1800),
+        now,
+    )?;
+    let mut launch = json!({"schema":if waiting {barrier::RELEASE}else{LAUNCH},"epoch":s.epoch,"phase":s.phase,"issuer_sha256":self_sha,"capture_spec":private157::binding(binding),"phase_spec":c.phase_spec,"admission":c.admission,
         "unit":s.units[s.phase.name()],"invocation_id":owner["InvocationID"],"owner":owner,"effective_unit":effective,"argv":argv,"process":snapshot,
         "guard_unit":s.guard_units[s.phase.name()],"guard_plan":c.guard_plan,"guard_sample":selected_sample,"guard_plan_contents":plan,"guard_sample_contents":sample,"guard_manager":manager,"captured_unix_seconds":now,
         "startup_plan":s.startup_plan,"startup_plan_contents":barrier::validate_plan(&s,&argv)?,"phase_spec_contents":s,"admission_contents":admission,"guard_latest_completion":latest,"child_execution_authorized":waiting,
         "publication_authorized":false,"local_retirement_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    if !waiting {
+        launch["current_protection"] = json!({"sample":current_binding,"sample_contents":current_sample,"completion":latest,"manager":current_manager});
+        if let Some(r) = &c.capture_recovery {
+            launch["capture_recovery"] = serde_json::to_value(r)?;
+        }
+    }
     Ok((s, launch))
 }
 pub(super) fn release() -> Result<()> {
@@ -768,6 +899,77 @@ pub(super) mod tests {
         launch["startup_release"] = json!({"path":"/var/lib/jetstreamer/horizon-generic209-full-release-test/release.json","sha256":"a".repeat(64)});
         launch["startup_release_contents"] = barrier::fixture_release(&s, &admission, &launch);
         (s, admission, launch, helper)
+    }
+    #[test]
+    fn completed_late_capture_preserves_first_guard_and_requires_new_current_protection() {
+        let (s, a, mut good, helper) = fixture();
+        let original = good["startup_release_contents"].clone();
+        good["captured_unix_seconds"] = json!(10000);
+        // A legacy receipt cannot extend the old admission interval by itself.
+        assert!(saved_shape(&good, &s, Phase::Full, &helper, &a).is_err());
+        let iid = "d".repeat(32);
+        let mut sample = good["guard_sample_contents"].clone();
+        sample["guard_invocation_id"] = json!(iid);
+        sample["recorded_unix_seconds"] = json!(9990);
+        let binding = json!({"path":format!("/sealed/sample-{iid}.json"),"sha256":"a".repeat(64)});
+        let mut completion = original["guard_latest_completion"].clone();
+        completion["binding"] = binding.clone();
+        completion["history"]["guard_invocation_id"] = json!(iid);
+        completion["history"]["selected_unix_seconds"] = json!(10000);
+        for (i, time) in [9989000000u64, 9990000000, 9990000001, 9990000002]
+            .into_iter()
+            .enumerate()
+        {
+            let row = &mut completion["history"]["events"][i];
+            row["__REALTIME_TIMESTAMP"] = json!(time.to_string());
+            if i == 1 {
+                row["_SYSTEMD_INVOCATION_ID"] = json!(iid);
+                row["MESSAGE"] = json!(serde_json::to_string(&sample).unwrap());
+            } else {
+                row["INVOCATION_ID"] = json!(iid);
+            }
+        }
+        good["current_protection"] = json!({"sample":binding,"sample_contents":sample,"completion":completion,
+            "manager":{"properties":{"InvocationID":iid},"manager_completion":completion["history"]["events"][2]}});
+        saved_shape(&good, &s, Phase::Full, &helper, &a).unwrap();
+        assert_eq!(good["startup_release_contents"], original);
+        assert_ne!(
+            good["guard_sample_contents"]["guard_invocation_id"],
+            good["current_protection"]["sample_contents"]["guard_invocation_id"]
+        );
+        for (pointer, value) in [
+            (
+                "/current_protection/sample_contents/producer_invocation_id",
+                json!("0".repeat(32)),
+            ),
+            (
+                "/current_protection/sample_contents/producer_stop_enabled",
+                json!(false),
+            ),
+            (
+                "/current_protection/sample_contents/recorded_unix_seconds",
+                json!(100),
+            ),
+            (
+                "/current_protection/sample_contents/plan_sha256",
+                json!("0".repeat(64)),
+            ),
+            (
+                "/current_protection/manager/properties/InvocationID",
+                json!("0".repeat(32)),
+            ),
+            (
+                "/current_protection/completion/history/events/2/INVOCATION_ID",
+                json!("0".repeat(32)),
+            ),
+        ] {
+            let mut bad = good.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                saved_shape(&bad, &s, Phase::Full, &helper, &a).is_err(),
+                "{pointer}"
+            );
+        }
     }
     #[test]
     fn completed_launch_binds_real_script_interpreter_and_rejects_historical_command_rewrites() {

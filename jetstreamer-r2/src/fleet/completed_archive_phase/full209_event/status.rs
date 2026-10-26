@@ -537,4 +537,17 @@ mod tests {
         );
         assert!(report_clock("observation", 1000, 920, Some(actual)).is_err());
     }
+    #[test]
+    fn completed209_late_capture_initial_status_uses_new_capture_clock_then_real_observer() {
+        assert_eq!(
+            report_clock("initial", 9900, 10000, Some("1970-01-01T02:46:40Z")).unwrap(),
+            "1970-01-01T02:46:40Z"
+        );
+        assert!(report_clock("observation", 9900, 10000, None).is_err());
+        assert_eq!(
+            report_clock("observation", 11000, 10000, None).unwrap(),
+            "1970-01-01T03:03:20Z"
+        );
+        assert!(report_clock("initial", 9900, 10000, Some("1970-01-01T00:15:00Z")).is_err());
+    }
 }

@@ -1,6 +1,7 @@
 //! A captured Full209 child may join one accepted resource sample. This is
 //! metadata ownership, never replay, archive readiness, or capacity credit.
 use super::*;
+mod late_capture;
 mod status;
 pub(in crate::fleet) use status::{publish, status_matches};
 pub(in crate::fleet) const EVENT_SCHEMA: &str = "jetstreamer-completed209-full-captured-event-v1";
@@ -220,10 +221,10 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
     private_output(&r.output_directory)?;
     let previous = read(&r.previous_fleet)?;
     let o = read(&r.observer)?;
-    accepted(&previous, &r.observer, &o)?;
     let (c, l, s, a) = checked_launch(&r.launch)?;
+    let late = late_capture::context(&previous, &r.observer, &o, &l, &a, &c)?;
     ensure!(
-        a["resource_basis"]["observer"] == private157::binding(&r.observer)
+        (late || a["resource_basis"]["observer"] == private157::binding(&r.observer))
             && a["resource_basis"]["fleet"] == private157::binding(&r.previous_fleet),
         "completed209 event substituted the child's admitted resource context"
     );
@@ -260,6 +261,9 @@ pub(in crate::fleet) fn prepare() -> Result<()> {
         if !tracked.iter().any(|n| n.as_str() == Some(name.as_str())) {
             tracked.push(json!(name));
         }
+    }
+    if late {
+        plan["observer"] = private157::binding(&r.observer);
     }
     plan["previous_fleet"] = private157::binding(&r.previous_fleet);
     plan["metadata_event"] = private157::binding(&event_bound);
@@ -299,7 +303,7 @@ pub(in crate::fleet) fn event_predecessor(
 ) -> Result<()> {
     let (c, l, s, a) = event_launch(event)?;
     let o = read(&p.observer)?;
-    accepted(previous, &p.observer, &o)?;
+    let late = late_capture::context(previous, &p.observer, &o, &l, &a, &c)?;
     let t = event_clock(previous, &o, &l, at)?;
     ensure!(
         p.first_epoch == 201
@@ -310,7 +314,7 @@ pub(in crate::fleet) fn event_predecessor(
                 .is_some_and(|b| event["previous_fleet"] == private157::binding(b))
             && event["observer"] == private157::binding(&p.observer)
             && sample == string(&o, "recorded_at_utc")?
-            && a["resource_basis"]["observer"] == event["observer"]
+            && (late || a["resource_basis"]["observer"] == event["observer"])
             && a["resource_basis"]["fleet"] == event["previous_fleet"]
             && number(event, "recorded_unix_seconds")? == t,
         "completed209 event lost its exact admitted predecessor/observation"
@@ -335,7 +339,13 @@ pub(in crate::fleet) fn event_predecessor(
         json!({"path":previous["plan"],"sha256":previous["plan_sha256"]}),
     )?)?;
     let new = read(pb)?;
-    plan_delta(&old, &new, &c, &s.guard_units["full"])?;
+    plan_delta(
+        &old,
+        &new,
+        &c,
+        &s.guard_units["full"],
+        if late { Some(&p.observer) } else { None },
+    )?;
     let old_claims: Vec<PipelineClaim> = serde_json::from_value(
         old.get("pipeline_claims")
             .cloned()
@@ -363,7 +373,13 @@ pub(in crate::fleet) fn event_predecessor(
     );
     Ok(())
 }
-fn plan_delta(old: &Value, new: &Value, c: &PipelineClaim, guard: &str) -> Result<()> {
+fn plan_delta(
+    old: &Value,
+    new: &Value,
+    c: &PipelineClaim,
+    guard: &str,
+    observer: Option<&BoundFile>,
+) -> Result<()> {
     let old_claims = old
         .get("pipeline_claims")
         .cloned()
@@ -390,6 +406,13 @@ fn plan_delta(old: &Value, new: &Value, c: &PipelineClaim, guard: &str) -> Resul
         "completed209 tracked census changed or duplicated"
     );
     let mut left = old.clone();
+    if let Some(b) = observer {
+        ensure!(
+            new["observer"] == private157::binding(b),
+            "completed209 late event substituted observer"
+        );
+        left["observer"] = private157::binding(b);
+    }
     let mut right = new.clone();
     let expected_gate = pipeline_gate(&old["gates"]["209"], c)?;
     ensure!(
@@ -591,7 +614,7 @@ mod tests {
         new["pipeline_claims"] = json!([c]);
         new["gates"]["209"] = pipeline_gate(&old["gates"]["209"], &c).unwrap();
         new["tracked_units"] = json!(["peer.service", c.unit, s.guard_units["full"]]);
-        plan_delta(&old, &new, &c, &s.guard_units["full"]).unwrap();
+        plan_delta(&old, &new, &c, &s.guard_units["full"], None).unwrap();
         for (pointer, value) in [
             ("/gates/209/state", json!("remote-ready")),
             ("/capped204205_history", json!([])),
@@ -601,10 +624,60 @@ mod tests {
             let mut bad = new.clone();
             *bad.pointer_mut(pointer).unwrap() = value;
             assert!(
-                plan_delta(&old, &bad, &c, &s.guard_units["full"]).is_err(),
+                plan_delta(&old, &bad, &c, &s.guard_units["full"], None).is_err(),
                 "{pointer}"
             );
         }
+    }
+    #[test]
+    fn g209_late_event_changes_only_the_explicit_fresh_observer_and_new_owner() {
+        let (s, _, l, _) = fixture();
+        let c = claim(
+            &BoundFile {
+                path: "/sealed/launch.json".into(),
+                sha256: "a".repeat(64),
+            },
+            &l,
+        )
+        .unwrap();
+        let old = json!({"tracked_units":["peer.service"],"pipeline_claims":[],
+            "gates":{"209":{"state":"blocked-qualification","evidence":["original"]}},
+            "observer":{"path":"/sealed/old.json","sha256":"a".repeat(64)},
+            "protected_peer":{"invocation_id":"b".repeat(32)}});
+        let observer = BoundFile {
+            path: "/sealed/fresh.json".into(),
+            sha256: "c".repeat(64),
+        };
+        let mut new = old.clone();
+        new["observer"] = private157::binding(&observer);
+        new["pipeline_claims"] = json!([c]);
+        new["tracked_units"] = json!(["peer.service", c.unit, s.guard_units["full"]]);
+        new["gates"]["209"] = pipeline_gate(&old["gates"]["209"], &c).unwrap();
+        assert!(plan_delta(&old, &new, &c, &s.guard_units["full"], None).is_err());
+        plan_delta(&old, &new, &c, &s.guard_units["full"], Some(&observer)).unwrap();
+        for (pointer, value) in [
+            ("/observer/sha256", json!("0".repeat(64))),
+            ("/protected_peer/invocation_id", json!("0".repeat(32))),
+            ("/gates/209/state", json!("remote-ready")),
+        ] {
+            let mut bad = new.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                plan_delta(&old, &bad, &c, &s.guard_units["full"], Some(&observer)).is_err(),
+                "{pointer}"
+            );
+        }
+    }
+    #[test]
+    fn g209_late_event_keeps_old_native_start_but_requires_fresh_observer_and_capture() {
+        let (_, _, mut l, _) = fixture();
+        l["captured_unix_seconds"] = json!(10000);
+        let previous = json!({"recorded_unix_seconds":910});
+        let old = json!({"recorded_at_utc":"1970-01-01T00:15:00Z"});
+        assert!(event_clock(&previous, &old, &l, 10001).is_err());
+        let fresh = json!({"recorded_at_utc":"1970-01-01T02:45:00Z"});
+        assert_eq!(event_clock(&previous, &fresh, &l, 10001).unwrap(), 10000);
+        assert!(event_clock(&previous, &fresh, &l, 10301).is_err());
     }
     #[test]
     fn g209_event_request_cannot_import_skip_flags_or_authority() {
