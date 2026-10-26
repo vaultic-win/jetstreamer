@@ -438,7 +438,7 @@ pub(super) fn capture_completion(v: &Value, spec: &BoundFile, self_sha: &str) ->
     frozen.frozen()?;
     let writers_after = custody::no_writers(Path::new("/proc"), &frozen)?;
     ensure!(
-        frozen == custody::Stamp::of(&fs::symlink_metadata(OUTPUT)?)? && unit(UNIT)? == current,
+        frozen == custody::Stamp::of(&fs::symlink_metadata(OUTPUT)?) && unit(UNIT)? == current,
         "205 source changed during metadata-only freeze"
     );
     // Metadata capture intentionally leaves the final digest unknown.
