@@ -260,22 +260,7 @@ fn a_new_lane_waits_for_a_complete_clean_expanded_observation_window() {
 }
 #[test]
 fn the_same_prefix_cannot_be_relabelled_as_another_epoch_or_complete_archive() {
-    let mut v = scope();
-    deny_fields(&mut v);
-    v["schema"] = json!(SCHEMA);
-    v["launched"] = json!(true);
-    v["ordinary_replay_claim"] = json!(false);
-    v["entry_replay"] = json!(true);
-    v["public_sidecar_countdown_authorized"] = json!(true);
-    v["evidence"] = json!({"units":[{"unit":UNIT,"invocation_id":"c".repeat(32),"restarts":0}]});
-    v["expected_exec_start"] = json!(format!("{} ; ignore_errors=no ; pid=0 }}", command()));
-    let claim = DiagnosticClaim {
-        epoch: 233,
-        unit: UNIT.into(),
-        invocation_id: "c".repeat(32),
-        scratch_path: ROOT.into(),
-        launch_receipt: binding("/sealed/launch.json", &"0".repeat(64)),
-    };
+    let (claim, v) = launch_fixture();
     assert!(launch_matches(&claim, &v));
     for (key, value) in [
         ("terminal_root_slot", json!(101087999)),

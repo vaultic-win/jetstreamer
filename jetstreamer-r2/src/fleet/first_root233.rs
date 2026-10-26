@@ -339,3 +339,24 @@ pub(super) fn bindings(c: &DiagnosticClaim, v: &Value) -> Result<()> {
     warmup223::validate_completed_guard_history(&selected["history"], &g)?;
     Ok(())
 }
+
+#[cfg(test)]
+pub(super) fn launch_fixture() -> (DiagnosticClaim, Value) {
+    let mut v = scope();
+    deny_fields(&mut v);
+    v["schema"] = json!(SCHEMA);
+    v["launched"] = json!(true);
+    v["ordinary_replay_claim"] = json!(false);
+    v["entry_replay"] = json!(true);
+    v["public_sidecar_countdown_authorized"] = json!(true);
+    v["evidence"] = json!({"units":[{"unit":UNIT,"invocation_id":"c".repeat(32),"restarts":0}]});
+    v["expected_exec_start"] = json!(format!("{} ; ignore_errors=no ; pid=0 }}", command()));
+    let claim = DiagnosticClaim {
+        epoch: 233,
+        unit: UNIT.into(),
+        invocation_id: "c".repeat(32),
+        scratch_path: ROOT.into(),
+        launch_receipt: binding("/sealed/launch.json", &"0".repeat(64)),
+    };
+    (claim, v)
+}

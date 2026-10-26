@@ -61,6 +61,7 @@ struct GuardProfile {
     receipt_directory: PathBuf,
     registered_completed: Option<completed_archive_phase::GuardSelectionProfile>,
     registered_extractor: Option<terminal225_peer::Extractor>,
+    registered_first_root233: Option<prefix223_live_peer::FirstRoot233GuardProfile>,
 }
 fn legacy_profile(owner: &str, epoch: u64, iid: &str) -> Result<GuardProfile> {
     let (unit, directory) = prefix223_native20_admission::guard_selector(owner)?;
@@ -72,12 +73,14 @@ fn legacy_profile(owner: &str, epoch: u64, iid: &str) -> Result<GuardProfile> {
         receipt_directory: directory.into(),
         registered_completed: None,
         registered_extractor: None,
+        registered_first_root233: None,
     })
 }
-fn roster_with(
+fn roster_with_closed(
     f: &Value,
     handoff: &terminal225_peer::Profile,
     mut completed: BTreeMap<String, completed_archive_phase::GuardSelectionProfile>,
+    mut first_root233: BTreeMap<String, prefix223_live_peer::FirstRoot233GuardProfile>,
 ) -> Result<BTreeMap<String, GuardProfile>> {
     let mut found = BTreeMap::new();
     let selected225 = handoff.selected_owner(f)?;
@@ -114,6 +117,7 @@ fn roster_with(
                             receipt_directory: extractor.guard_receipt_directory.clone(),
                             registered_completed: None,
                             registered_extractor: Some(extractor.clone()),
+                            registered_first_root233: None,
                         },
                     )
                     .is_none(),
@@ -123,6 +127,22 @@ fn roster_with(
         }
         let profile = match name {
             singleton207::UNIT => legacy_profile(name, 207, IID207)?,
+            first_root233::UNIT => {
+                let p = first_root233
+                    .remove(name)
+                    .context("210 JIT first root 233 lacks an authenticated accepted launch")?;
+                ensure!(
+                    p.owner == name
+                        && row["phase"] == "private-known-root-prefix"
+                        && row["ordinary_replay_claim"] == false
+                        && row["launch_receipt"].as_str() == p.authenticated_launch.path.to_str()
+                        && row["launch_receipt_sha256"] == p.authenticated_launch.sha256,
+                    "210 JIT first root 233 source or qualification scope changed"
+                );
+                let mut profile = legacy_profile(name, 233, &p.owner_invocation_id)?;
+                profile.registered_first_root233 = Some(p);
+                profile
+            }
             _ => {
                 let p = completed.remove(name).with_context(|| {
                     format!("210 JIT has an unsupported or unregistered accepted owner: {name}")
@@ -139,6 +159,7 @@ fn roster_with(
                     receipt_directory: p.receipt_directory.clone(),
                     registered_completed: Some(p),
                     registered_extractor: None,
+                    registered_first_root233: None,
                 }
             }
         };
@@ -158,8 +179,8 @@ fn roster_with(
         );
     }
     ensure!(
-        completed.is_empty(),
-        "210 JIT completed peer selection omitted an authenticated owner"
+        completed.is_empty() && first_root233.is_empty(),
+        "210 JIT peer selection omitted an authenticated owner"
     );
     // Keep positively live raw owners visible even if a malformed active roster
     // omits them. All remaining global live-competitor checks run in the core.
@@ -168,6 +189,7 @@ fn roster_with(
         .context("210 JIT raw accepted census missing")?
     {
         if (name == singleton207::UNIT
+            || name.starts_with("horizon-qualify-233-first-root-")
             || name.starts_with("horizon-qualify-225-prefix-extract-")
             || name.starts_with("horizon-qualify-209-generic-"))
             && diagnostic_stage_running(owner)
@@ -184,11 +206,20 @@ fn roster(
     f: &Value,
     handoff: &terminal225_peer::Profile,
 ) -> Result<BTreeMap<String, GuardProfile>> {
-    roster_with(
+    roster_with_closed(
         f,
         handoff,
         completed_archive_phase::peer_guard_selection_profiles(f)?,
+        prefix223_live_peer::first_root233_guard_selection_profiles(f)?,
     )
+}
+#[cfg(test)]
+fn roster_with(
+    f: &Value,
+    handoff: &terminal225_peer::Profile,
+    completed: BTreeMap<String, completed_archive_phase::GuardSelectionProfile>,
+) -> Result<BTreeMap<String, GuardProfile>> {
+    roster_with_closed(f, handoff, completed, BTreeMap::new())
 }
 fn ordinary_spec(r: &Request, guards: BTreeMap<String, BoundFile>) -> Spec {
     Spec {
@@ -254,6 +285,18 @@ fn selected_shape(
                 && receipt["plan_sha256"] == x.guard_plan.sha256
                 && receipt["guard_sha256"] == x.guard_sha256,
             "210 JIT extractor guard changed its admitted plan or executable"
+        );
+    }
+    if let Some(p) = &profile.registered_first_root233 {
+        ensure!(
+            profile.owner == first_root233::UNIT
+                && profile.epoch == 233
+                && profile.guard_unit == first_root233::PROTECTIVE
+                && profile.receipt_directory == Path::new(first_root233::GUARD_RECEIPTS)
+                && receipt["plan"] == serde_json::to_value(&p.guard_plan.path)?
+                && receipt["plan_sha256"] == p.guard_plan.sha256
+                && receipt["guard_sha256"] == first_root233::GUARD_SHA,
+            "210 JIT first root 233 guard changed its exact authenticated plan or executable"
         );
     }
     // Preserve the exact existing per-generation validators in ordinary capacity;
@@ -488,6 +531,154 @@ mod tests {
     use super::*;
     fn row(epoch: u64, name: &str, iid: &str) -> Value {
         json!({"epoch":epoch,"producer":{"Id":name,"InvocationID":iid,"NRestarts":"0","ActiveState":"active","SubState":"running","MainPID":"42"}})
+    }
+    #[test]
+    fn full210_jit_accepts_only_authenticated_first_root233_and_retains_the_complete_census() {
+        let (row, authenticated) = prefix223_live_peer::first_root233_fixture();
+        let handoff = terminal225_peer::fixture_terminal_profile();
+        let old = self::row(207, singleton207::UNIT, IID207);
+        let mut f = terminal225_peer::fixture_terminal_fleet(vec![old.clone(), row.clone()]);
+        f["unit_census"][singleton207::UNIT] = old["producer"].clone();
+        f["unit_census"][first_root233::UNIT] = row["producer"].clone();
+        let source = BTreeMap::from([(first_root233::UNIT.into(), authenticated.clone())]);
+        let before = f.clone();
+        let profiles = roster_with_closed(&f, &handoff, BTreeMap::new(), source.clone()).unwrap();
+        assert_eq!(profiles.len(), 2);
+        assert!(profiles.contains_key(singleton207::UNIT));
+        let chosen = &profiles[first_root233::UNIT];
+        assert_eq!(chosen.epoch, 233);
+        assert_eq!(
+            chosen.owner_invocation_id,
+            authenticated.owner_invocation_id
+        );
+        assert_eq!(chosen.guard_unit, first_root233::PROTECTIVE);
+        assert_eq!(
+            chosen.receipt_directory,
+            Path::new(first_root233::GUARD_RECEIPTS)
+        );
+        assert!(chosen.registered_completed.is_none());
+        assert!(chosen.registered_extractor.is_none());
+        assert!(chosen.registered_first_root233.is_some());
+        assert_eq!(f, before);
+        assert!(roster_with_closed(&f, &handoff, BTreeMap::new(), BTreeMap::new()).is_err());
+        let mut missing = f.clone();
+        missing["active"].as_array_mut().unwrap().pop();
+        assert!(roster_with_closed(&missing, &handoff, BTreeMap::new(), source.clone()).is_err());
+        // Even an omitted provider must not hide a positively live raw owner.
+        assert!(roster_with_closed(&missing, &handoff, BTreeMap::new(), BTreeMap::new()).is_err());
+        let mut duplicate = f.clone();
+        duplicate["active"]
+            .as_array_mut()
+            .unwrap()
+            .push(row.clone());
+        assert!(roster_with_closed(&duplicate, &handoff, BTreeMap::new(), source.clone()).is_err());
+        let mut omitted_raw = f.clone();
+        omitted_raw["unit_census"]
+            .as_object_mut()
+            .unwrap()
+            .remove(first_root233::UNIT);
+        assert!(
+            roster_with_closed(&omitted_raw, &handoff, BTreeMap::new(), source.clone()).is_err()
+        );
+        for pointer in [
+            "/producer/InvocationID",
+            "/producer/NRestarts",
+            "/producer/MainPID",
+            "/producer/ActiveState",
+            "/launch_receipt_sha256",
+            "/launch_receipt",
+            "/phase",
+            "/ordinary_replay_claim",
+            "/epoch",
+        ] {
+            let mut changed = f.clone();
+            *changed["active"][1].pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(
+                roster_with_closed(&changed, &handoff, BTreeMap::new(), source.clone()).is_err(),
+                "{pointer}"
+            );
+        }
+        // Synchronizing the forged roster and raw census still cannot replace
+        // the invocation authenticated by the accepted claim and launch.
+        let mut replaced = f.clone();
+        replaced["active"][1]["producer"]["InvocationID"] = json!("e".repeat(32));
+        replaced["unit_census"][first_root233::UNIT] = replaced["active"][1]["producer"].clone();
+        assert!(roster_with_closed(&replaced, &handoff, BTreeMap::new(), source.clone()).is_err());
+        let mut foreign = source;
+        foreign.get_mut(first_root233::UNIT).unwrap().owner = "foreign.service".into();
+        assert!(roster_with_closed(&f, &handoff, BTreeMap::new(), foreign).is_err());
+    }
+
+    #[test]
+    fn full210_jit_first_root233_cannot_hide_unregistered_live_generations() {
+        let handoff = terminal225_peer::fixture_terminal_profile();
+        let f = terminal225_peer::fixture_terminal_fleet(vec![]);
+        for name in [
+            first_root233::UNIT,
+            "horizon-qualify-233-first-root-foreign.service",
+        ] {
+            let raw = self::row(233, name, &"e".repeat(32));
+            let mut hidden = f.clone();
+            hidden["unit_census"][name] = raw["producer"].clone();
+            assert!(
+                roster_with_closed(&hidden, &handoff, BTreeMap::new(), BTreeMap::new()).is_err()
+            );
+            hidden["active"].as_array_mut().unwrap().push(raw);
+            assert!(
+                roster_with_closed(&hidden, &handoff, BTreeMap::new(), BTreeMap::new()).is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn full210_jit_first_root233_selection_binds_its_exact_guard_plan_executable_and_owner() {
+        let (row, p) = prefix223_live_peer::first_root233_fixture();
+        let handoff = terminal225_peer::fixture_terminal_profile();
+        let mut f = terminal225_peer::fixture_terminal_fleet(vec![row.clone()]);
+        f["unit_census"][first_root233::UNIT] = row["producer"].clone();
+        let profiles = roster_with_closed(
+            &f,
+            &handoff,
+            BTreeMap::new(),
+            BTreeMap::from([(p.owner.clone(), p.clone())]),
+        )
+        .unwrap();
+        let profile = &profiles[first_root233::UNIT];
+        let iid = "a".repeat(32);
+        let selected = json!({"binding":{"path":Path::new(first_root233::GUARD_RECEIPTS).join(format!("sample-{iid}.json")),"sha256":"b".repeat(64)},
+            "history":{"unit":first_root233::PROTECTIVE,"guard_invocation_id":iid}});
+        let receipt = json!({"schema":"jetstreamer-horizon-standalone-guard-sample-v1","guard_invocation_id":iid,
+            "producer_invocation_id":p.owner_invocation_id,"producer":{"cgroup":format!("/system.slice/{}",p.owner),
+            "invocation_id":p.owner_invocation_id,"restarts":0,"active":"active","sub":"running"},
+            "recorded_unix_seconds":1000,"trip_reason":null,"worker_observation_error":null,
+            "plan":p.guard_plan.path,"plan_sha256":p.guard_plan.sha256,"guard_sha256":first_root233::GUARD_SHA});
+        selected_shape(profile, &selected, &receipt, 900, 1000).unwrap();
+        for pointer in [
+            "/guard_sha256",
+            "/plan",
+            "/plan_sha256",
+            "/producer_invocation_id",
+            "/producer/invocation_id",
+        ] {
+            let mut bad = receipt.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(
+                selected_shape(profile, &selected, &bad, 900, 1000).is_err(),
+                "{pointer}"
+            );
+        }
+        let mut wrong = selected.clone();
+        wrong["history"]["unit"] = json!(singleton207::PROTECTIVE);
+        assert!(selected_shape(profile, &wrong, &receipt, 900, 1000).is_err());
+        let mut wrong = selected.clone();
+        wrong["binding"]["path"] = json!("/foreign/sample.json");
+        assert!(selected_shape(profile, &wrong, &receipt, 900, 1000).is_err());
+        assert!(selected_shape(profile, &selected, &receipt, 1001, 1001).is_err());
+        assert!(selected_shape(profile, &selected, &receipt, 900, 2801).is_err());
+        assert!(
+            selected_scope(profile, &selected, &receipt, 900, 1000).is_err(),
+            "asserted history still needs genuine completed-fire evidence"
+        );
     }
     #[test]
     fn full210_jit_roster_cannot_omit_duplicate_replace_or_add_a_live_owner() {

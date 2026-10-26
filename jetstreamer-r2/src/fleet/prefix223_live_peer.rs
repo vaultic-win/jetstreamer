@@ -1,9 +1,15 @@
 //! Lossless resource adapters for the closed 207 full epoch and 233 first root.
 //! No historical view may erase one of these owners or grant allocation credit.
 use super::{demotion223_live_peer as base, *};
+mod first_root233_selection;
 mod legacy_memory;
 #[cfg(test)]
 pub(super) use base::fixture_row;
+#[cfg(test)]
+pub(super) use first_root233_selection::fixture as first_root233_fixture;
+pub(super) use first_root233_selection::{
+    FirstRoot233GuardProfile, first_root233_guard_selection_profiles,
+};
 pub(super) use legacy_memory::validate_saved_row;
 fn profile(name: &str) -> Option<(u64, &'static str)> {
     match name {
@@ -247,9 +253,7 @@ pub(super) fn disk(
             &timer,
             &[("ActiveState", "active"), ("SubState", "waiting")],
         )?;
-        let budget = l["candidate_incremental_disk_reservation_bytes"]
-            .as_u64()
-            .context("closed peer disk cap missing")?;
+        let budget = disk_reservation(&d, &l)?;
         extra = extra
             .checked_add(budget)
             .context("closed peer disk overflow")?;
@@ -267,12 +271,53 @@ pub(super) fn disk(
 fn binding(path: PathBuf, sha256: String) -> BoundFile {
     BoundFile { path, sha256 }
 }
+fn disk_reservation(d: &DiagnosticClaim, launch: &Value) -> Result<u64> {
+    let expected = match d.epoch {
+        207 if singleton207::launch_matches(d, launch) => singleton207::DISK_RESERVATION,
+        233 if first_root233::launch_matches(d, launch) => first_root233::DISK_RESERVATION,
+        _ => bail!("closed peer disk reservation lacks its exact launch"),
+    };
+    ensure!(
+        launch["candidate_incremental_disk_reservation_bytes"] == expected,
+        "closed peer full disk reservation differs"
+    );
+    Ok(expected)
+}
+fn memory_obligation(
+    d: &DiagnosticClaim,
+    launch: &Value,
+    cap: u64,
+    charge: u64,
+    swap: u64,
+    page: u64,
+) -> Result<u64> {
+    let expected = match d.epoch {
+        207 if singleton207::launch_matches(d, launch) => singleton207::MEMORY,
+        233 if first_root233::launch_matches(d, launch) => first_root233::MEMORY,
+        _ => bail!("closed peer memory lacks its exact launch"),
+    };
+    ensure!(
+        page.is_power_of_two()
+            && (4096..=65536).contains(&page)
+            && launch["maximum_memory_bytes"] == expected
+            && cap == expected / page * page
+            && charge <= cap
+            && swap == 0,
+        "closed peer kernel hard memory differs"
+    );
+    // Host available memory already reflects the live kernel charge. Protect
+    // every remaining byte of the hard cap plus the independent guard ceiling;
+    // sampled RSS or expected peak usage never reduces this obligation.
+    (cap - charge)
+        .checked_add(1 << 30)
+        .context("closed peer guard memory overflow")
+}
 pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
     roster(f)?;
     let mut extra = 0u64;
     let mut proof = Vec::new();
     for row in rows(f)? {
-        let (d, _) = claim(f, row)?;
+        let (d, launch) = claim(f, row)?;
         live(&d, singleton227_admission::active_owner(row)?)?;
         let path = Path::new("/sys/fs/cgroup/system.slice").join(&d.unit);
         ensure!(
@@ -284,22 +329,12 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
         let cap = read("memory.max")?;
         let charge = read("memory.current")?;
         let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
-        ensure!(
-            page.is_power_of_two()
-                && (4096..=65536).contains(&page)
-                && cap == singleton207::MEMORY / page * page
-                && charge <= cap
-                && read("memory.swap.max")? == 0,
-            "closed peer kernel hard memory differs"
-        );
+        let growth = memory_obligation(&d, &launch, cap, charge, read("memory.swap.max")?, page)?;
         // The guard can be between oneshot invocations; reserve its full hard
         // ceiling instead of silently zeroing it when its cgroup is absent.
         let (service, _) = prefix223_native20_admission::guard_selector(&d.unit)?;
         let properties = singleton227_capture::properties(service, "MemoryMax")?;
         singleton227_capture::require(&properties, &[("MemoryMax", "1073741824")])?;
-        let growth = (cap - charge)
-            .checked_add(1 << 30)
-            .context("closed peer guard memory overflow")?;
         extra = extra
             .checked_add(growth)
             .context("closed peer memory overflow")?;
