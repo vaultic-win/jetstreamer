@@ -76,6 +76,12 @@ fn plan(x: &downstream::StageSpec) -> Result<(BoundFile, Plan)> {
         "204 root startup plan scope differs"
     );
     private(&p.guard_receipt_directory)?;
+    ensure!(
+        p.guard_receipt_directory != Path::new(ROOT)
+            && p.release.parent() != Some(Path::new(ROOT))
+            && p.release.parent() != Some(p.guard_receipt_directory.as_path()),
+        "204 startup release or guard receipts escaped separate custody roots"
+    );
     private(p.release.parent().context("204 release parent missing")?)?;
     sealed(&p.runner, 256 << 20)?;
     artifact::validate_member_binding(&p.runner_seal, &p.runner, 256 << 20)?;

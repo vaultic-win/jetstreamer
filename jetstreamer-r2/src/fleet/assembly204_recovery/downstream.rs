@@ -103,6 +103,10 @@ pub(super) fn stage_spec(v: &Value) -> Result<StageSpec> {
     );
     private(&x.output_directory)?;
     private(&x.scan_directory)?;
+    ensure!(
+        x.output_directory != Path::new(ROOT) && x.scan_directory != Path::new(ROOT),
+        "204 downstream cannot use its genuine source root as writable staging"
+    );
     let device = fs::metadata(CANONICAL)?.dev();
     ensure!(
         fs::metadata(&x.output_directory)?.dev() == device

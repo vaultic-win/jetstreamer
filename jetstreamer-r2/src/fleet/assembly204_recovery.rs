@@ -18,8 +18,8 @@ pub(super) fn accepted_context(fleet: &BoundFile, observer: &BoundFile) -> Resul
     }
     .historical()
 }
-mod downstream;
 mod delivery;
+mod downstream;
 mod startup;
 pub(super) fn delivery_command_matches(actual: &str, expected: &str) -> bool {
     ownership::command_matches(actual, expected)
