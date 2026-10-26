@@ -11,12 +11,28 @@ enum MemoryMode {
     Full210,
     Full209Delivery,
     CompletedArchivePhase,
+    CompletedArchive207Phase,
     FirstRoot233,
     Bounded228,
     Capped204V4,
     AssemblyRecovery204,
     Continuation205Delivery,
     Epoch225Extraction,
+}
+fn epoch225_mode(mode: MemoryMode, present: bool) -> Result<()> {
+    ensure!(
+        (!matches!(mode, MemoryMode::Epoch225Extraction) || present)
+            && (!present
+                || matches!(
+                    mode,
+                    MemoryMode::Full210
+                        | MemoryMode::Epoch225Extraction
+                        | MemoryMode::Bounded228
+                        | MemoryMode::CompletedArchive207Phase
+                )),
+        "epoch 225 terminal handoff is required for extraction and scoped to its exact admitted consumer"
+    );
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -213,6 +229,18 @@ pub(super) fn check_completed_archive_phase(value: &Value, candidate: Candidate)
         "completed archive phase envelope differs"
     );
     check_inner(value, candidate, MemoryMode::CompletedArchivePhase)
+}
+pub(super) fn check_completed_archive207_phase(
+    value: &Value,
+    candidate: Candidate,
+) -> Result<Value> {
+    ensure!(
+        candidate.additional_bytes == 1 << 30
+            && matches!(candidate.memory_max_bytes,n if n==16<<30 || n==32<<30 || n==64<<30)
+            && candidate.minimum_protected_disk_bytes > 0,
+        "207 completed delivery envelope differs"
+    );
+    check_inner(value, candidate, MemoryMode::CompletedArchive207Phase)
 }
 pub(super) fn check_capped204_v4_delivery(
     value: &Value,
@@ -432,7 +460,7 @@ fn memory_sample(
             let (n, p) = singleton210_memory::delivery_required(f, total, reserve, candidate)?;
             (n, Some(("full209_delivery_memory_policy", p)))
         }
-        MemoryMode::CompletedArchivePhase => {
+        MemoryMode::CompletedArchivePhase | MemoryMode::CompletedArchive207Phase => {
             let (n, p) =
                 singleton210_memory::completed_phase_required(f, total, reserve, candidate)?;
             (n, Some(("completed_archive_phase_memory_policy", p)))
@@ -706,15 +734,7 @@ fn check_inner_with(
         .as_ref()
         .map(|binding| terminal225_peer::Profile::load(binding, &f))
         .transpose()?;
-    ensure!(
-        (!matches!(mode, MemoryMode::Epoch225Extraction) || epoch225.is_some())
-            && (epoch225.is_none()
-                || matches!(
-                    mode,
-                    MemoryMode::Full210 | MemoryMode::Epoch225Extraction | MemoryMode::Bounded228
-                )),
-        "epoch 225 terminal handoff is required for extraction and scoped to Full 210"
-    );
+    epoch225_mode(mode, epoch225.is_some())?;
     ensure!(
         f["observer_receipt"].as_str() == s.observer.path.to_str()
             && f["observer_sha256"] == s.observer.sha256,
@@ -896,6 +916,7 @@ fn check_inner_with(
         MemoryMode::FirstRoot233
             | MemoryMode::Bounded228
             | MemoryMode::CompletedArchivePhase
+            | MemoryMode::CompletedArchive207Phase
             | MemoryMode::GuardRebase207
     );
     ensure!(
@@ -949,7 +970,10 @@ fn check_inner_with(
         };
         let hard = n(&memory_before, "protected_existing_memory_growth_bytes")?
             .max(n(&memory_after, "protected_existing_memory_growth_bytes")?);
-        let (recomputed_memory, policy) = if matches!(mode, MemoryMode::CompletedArchivePhase) {
+        let (recomputed_memory, policy) = if matches!(
+            mode,
+            MemoryMode::CompletedArchivePhase | MemoryMode::CompletedArchive207Phase
+        ) {
             singleton210_memory::completed_phase_recompute(
                 &memory_after["completed_archive_phase_memory_policy"],
                 n(&memory_after, "host_total_memory_bytes")?,
@@ -1097,6 +1121,7 @@ fn fleet_for_mode(
             | MemoryMode::Continuation205Delivery
             | MemoryMode::Full209Delivery
             | MemoryMode::CompletedArchivePhase
+            | MemoryMode::CompletedArchive207Phase
             | MemoryMode::GuardRebase207
     ) {
         return accepted(fleet, observer);
@@ -1111,6 +1136,39 @@ fn fleet_for_mode(
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn completed207_handoff_cannot_broaden209_or_bypass_the_complete_authenticated_context() {
+        use super::*;
+        epoch225_mode(MemoryMode::CompletedArchive207Phase, true).unwrap();
+        epoch225_mode(MemoryMode::CompletedArchive207Phase, false).unwrap();
+        epoch225_mode(MemoryMode::Bounded228, true).unwrap();
+        for mode in [
+            MemoryMode::CompletedArchivePhase,
+            MemoryMode::Full209Delivery,
+            MemoryMode::Existing,
+        ] {
+            assert!(epoch225_mode(mode, true).is_err());
+        }
+        assert!(epoch225_mode(MemoryMode::Epoch225Extraction, false).is_err());
+        let fleet = BoundFile {
+            path: "/var/lib/jetstreamer/horizon-campaign-fleet/207-event/fleet.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let observer = BoundFile {
+            path: "/sealed/observer.json".into(),
+            sha256: "b".repeat(64),
+        };
+        assert!(
+            fleet_for_mode(
+                MemoryMode::CompletedArchive207Phase,
+                &fleet,
+                &observer,
+                &|_, _| bail!("exact context authentication failed"),
+                &|_| panic!("207 may not fall back to an unverified canonical reader")
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn root204_delivery_candidate_entry_accepts_exact_independent_guard_envelopes() {
         use super::*;

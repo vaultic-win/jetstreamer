@@ -22,6 +22,8 @@ struct Request {
     fleet: BoundFile,
     launch: BoundFile,
     event: Option<BoundFile>,
+    #[serde(default)]
+    epoch225_handoff: Option<BoundFile>,
     policy: BoundFile,
     estimate_receipt: PathBuf,
     receipt_directory: PathBuf,
@@ -215,7 +217,12 @@ fn original_clock(s: &Spec) -> Result<(DiagnosticClaim, Value, u64)> {
     ensure!(micros > 0, "207 original clock is zero");
     Ok((c, evidence, micros / 1000))
 }
-fn live_census(f: &Value, l: &Value, c: &PipelineClaim) -> Result<BTreeMap<String, Value>> {
+fn live_census(
+    r: &Request,
+    f: &Value,
+    l: &Value,
+    c: &PipelineClaim,
+) -> Result<BTreeMap<String, Value>> {
     let names = f["unit_census"]
         .as_object()
         .context("completed207 complete census missing")?
@@ -223,7 +230,7 @@ fn live_census(f: &Value, l: &Value, c: &PipelineClaim) -> Result<BTreeMap<Strin
         .cloned()
         .collect::<BTreeSet<_>>();
     let current = census(&names, 201, 300)?;
-    maintenance_capacity::current_owners(f, &current)?;
+    current_peers(f, &current, r.epoch225_handoff.as_ref())?;
     owner_shape(
         l,
         current
@@ -261,7 +268,7 @@ pub(in crate::fleet) async fn publish() -> Result<()> {
         .and_then(|n| n.checked_sub(start))
         .context("completed207 status predates its original producer")?;
     let (_, id) = measured(&admission)?;
-    live_census(&f, &l, &c)?;
+    live_census(&r, &f, &l, &c)?;
     let status = EpochStatus {
         epoch: 207,
         jet_size_bytes: id.length,
@@ -326,7 +333,7 @@ pub(in crate::fleet) async fn publish() -> Result<()> {
     }
     let estimate_binding: BoundFile =
         serde_json::from_value(private157::file_binding(&r.estimate_receipt)?)?;
-    live_census(&f, &l, &c)?;
+    live_census(&r, &f, &l, &c)?;
     ensure!(
         measured(&admission)?.1 == id,
         "completed207 archive changed across status checks"
@@ -473,6 +480,7 @@ mod tests {
             fleet: bound(),
             launch: bound(),
             event: Some(bound()),
+            epoch225_handoff: None,
             policy: bound(),
             estimate_receipt: "/private/estimate.json".into(),
             receipt_directory: "/private/receipts".into(),

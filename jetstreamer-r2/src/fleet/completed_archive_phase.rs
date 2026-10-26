@@ -1264,7 +1264,12 @@ pub(super) fn run() -> Result<()> {
     } else {
         None
     };
-    let capacity = maintenance_capacity::check_completed_archive_phase(
+    let capacity_check = if matches!(&s.origin, Origin::Singleton207 { .. }) {
+        maintenance_capacity::check_completed_archive207_phase
+    } else {
+        maintenance_capacity::check_completed_archive_phase
+    };
+    let capacity = capacity_check(
         &s.resource_basis,
         maintenance_capacity::Candidate {
             additional_bytes: METADATA,

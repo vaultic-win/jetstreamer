@@ -41,6 +41,20 @@ fn denied() -> Value {
         "capacity_credit_authorized":false,"publication_authorized":false,
         "remote_mutations":false,"r2_mutations":false})
 }
+fn current_peers(
+    f: &Value,
+    current: &BTreeMap<String, Value>,
+    handoff: Option<&BoundFile>,
+) -> Result<()> {
+    if let Some(binding) = handoff {
+        let p = terminal225_peer::Profile::load(binding, f)?;
+        return maintenance_capacity::current_owners(
+            &p.without(f)?,
+            &p.without_current(f, current)?,
+        );
+    }
+    maintenance_capacity::current_owners(f, current)
+}
 fn capture_shape(l: &Value) -> Result<()> {
     ensure!(
         l["schema"] == "jetstreamer-completed-archive-phase-launch-v1"
@@ -476,7 +490,13 @@ pub(in crate::fleet) fn event_census(
             peers.insert(name.clone(), old.clone());
         }
     }
-    maintenance_capacity::current_owners(previous, &peers)?;
+    let handoff = s
+        .resource_basis
+        .get("epoch225_handoff")
+        .filter(|v| !v.is_null())
+        .map(|v| serde_json::from_value::<BoundFile>(v.clone()))
+        .transpose()?;
+    current_peers(previous, &peers, handoff.as_ref())?;
     owner_shape(
         &l,
         current.get(&c.unit).context("completed207 child missing")?,
