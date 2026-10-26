@@ -473,6 +473,156 @@ pub(super) fn validate_provenance(v: &Value) -> Result<()> {
     }
     Ok(())
 }
+/// Constructed only by release from its exact immutable stage spec and actual
+/// childless waiting process. No JSON candidate exemption is accepted.
+pub(in crate::fleet) struct WaitingContext {
+    stage: downstream::StageSpec,
+    spec: BoundFile,
+    waiting: BoundFile,
+    expected_process: Value,
+    archive_bytes: u64,
+}
+impl WaitingContext {
+    pub(in crate::fleet) fn candidate(&self) -> Result<maintenance_capacity::Candidate> {
+        candidate_with_anchor(
+            self.stage.stage,
+            self.archive_bytes,
+            downstream::anchor_reserve(&self.stage)?,
+        )
+    }
+    pub(in crate::fleet) fn names(&self) -> Result<BTreeSet<String>> {
+        let (guard, _) = startup::capacity_waiter(
+            &self.stage,
+            &self.spec,
+            &self.waiting,
+            &self.expected_process,
+        )?;
+        Ok(BTreeSet::from([self.stage.stage.unit().into(), guard]))
+    }
+    fn retained_view(
+        stage: downstream::Stage,
+        guard: &str,
+        f: &Value,
+        raw: &BTreeMap<String, Value>,
+    ) -> Result<BTreeMap<String, Value>> {
+        let names = BTreeSet::from([stage.unit().to_owned(), guard.to_owned()]);
+        for row in f["active"]
+            .as_array()
+            .context("204 waiting capacity accepted roster missing")?
+        {
+            let owner = singleton227_admission::active_owner(row)?;
+            ensure!(
+                !names.contains(s(&owner, "Id")?),
+                "204 waiter cannot remove an already accepted owner"
+            );
+        }
+        let guard_row = raw
+            .get(guard)
+            .context("204 waiting guard omitted from census")?;
+        ensure!(
+            guard_row["Id"] == guard
+                && guard_row["MainPID"] == "0"
+                && guard_row["NRestarts"] == "0"
+                && guard_row["ActiveState"] == "inactive"
+                && guard_row["SubState"] == "dead"
+                && guard_row["Result"] == "success"
+                && guard_row["ExecMainStatus"] == "0",
+            "204 waiting guard is active/restarted/uncertain"
+        );
+        let mut view = raw.clone();
+        ensure!(
+            view.remove(stage.unit()).is_some(),
+            "204 waiting candidate omitted from raw census"
+        );
+        view.remove(guard);
+        Ok(view)
+    }
+    pub(in crate::fleet) fn peer_view(
+        &self,
+        f: &Value,
+        raw: &BTreeMap<String, Value>,
+    ) -> Result<(BTreeMap<String, Value>, Value)> {
+        let (guard, process) = startup::capacity_waiter(
+            &self.stage,
+            &self.spec,
+            &self.waiting,
+            &self.expected_process,
+        )?;
+        let owner = raw
+            .get(self.stage.stage.unit())
+            .context("204 waiting owner absent")?;
+        ensure!(
+            owner["Id"] == self.stage.stage.unit()
+                && owner["InvocationID"] == process["invocation_id"]
+                && owner["MainPID"] == n(&process, "pid")?.to_string()
+                && owner["ControlGroup"] == process["cgroup"]
+                && owner["NRestarts"] == "0"
+                && owner["ActiveState"] == "active"
+                && owner["SubState"] == "running",
+            "204 waiting raw census disagrees with authenticated native candidate"
+        );
+        // Prove the raw command against the immutable native argv as well as the
+        // native process snapshot, retaining both raw census and process proof.
+        let argv = process["argv"]
+            .as_array()
+            .context("204 waiting native argv absent")?
+            .iter()
+            .map(|a| a.as_str().context("204 waiting argv is not text"))
+            .collect::<Result<Vec<_>>>()?;
+        let runner = argv.first().context("204 waiting argv empty")?;
+        let display = format!(
+            "{{ path={runner} ; argv[]={} ; ignore_errors=no }}",
+            argv.join(" ")
+        );
+        ensure!(
+            ownership::command_matches(s(owner, "ExecStart")?, &display),
+            "204 waiting raw command differs"
+        );
+        let view = Self::retained_view(self.stage.stage, &guard, f, raw)?;
+        let cgroup = capped204205_work::empty_terminal_cgroup(&guard)?;
+        let candidate = self.candidate()?;
+        Ok((
+            view,
+            json!({"schema":"jetstreamer-root204-childless-waiter-accounting-v1",
+            "stage_spec":self.spec,"waiting":self.waiting,"native_process":process,"guard_unit":guard,"guard_cgroup":cgroup,
+            "candidate_memory_max_bytes":candidate.memory_max_bytes,"actor_full_hard_cap_bytes":self.stage.stage.memory(),
+            "independent_guard_full_hard_cap_bytes":startup::GUARD_MEMORY,"allocation_credit_bytes":0,
+            "accepted_owner_removed":false,"raw_fleet_and_census_preserved":true}),
+        ))
+    }
+}
+pub(super) fn waiting_stage_capacity(
+    basis: &Value,
+    stage: &downstream::StageSpec,
+    spec: &BoundFile,
+    waiting: &BoundFile,
+    process: &Value,
+) -> Result<Value> {
+    let exact = downstream::stage_spec(&read(spec)?)?;
+    ensure!(
+        serde_json::to_value(&exact)? == serde_json::to_value(stage)?,
+        "204 waiting capacity stage spec changed"
+    );
+    ensure!(
+        exact.stage != downstream::Stage::Assembly,
+        "204 assembly is not a childless delivery waiter"
+    );
+    let (source, _) = lineage::load_source(&exact.source)?;
+    let archive_bytes = n(&source, "archive_bytes")?;
+    let context = WaitingContext {
+        archive_bytes,
+        stage: exact,
+        spec: spec.clone(),
+        waiting: waiting.clone(),
+        expected_process: process.clone(),
+    };
+    let c = context.candidate()?;
+    let result = maintenance_capacity::check_assembly204_waiting(basis, &context)?;
+    validate_capacity(&result, c.memory_max_bytes, c.additional_bytes)?;
+    validate_provenance(&result)?;
+    Ok(result)
+}
+
 #[cfg(test)]
 mod roster_tests {
     use super::*;
@@ -589,7 +739,7 @@ mod full_anchor_reservation_tests {
         let anchor = 103_802_397_352;
         let c = candidate_with_anchor(downstream::Stage::Full, 114_228_848_867, anchor).unwrap();
         assert_eq!(c.additional_bytes, OUTPUT_MAX + METADATA + anchor);
-        assert_eq!(c.memory_max_bytes, MEMORY);
+        assert_eq!(c.memory_max_bytes, MEMORY + startup::GUARD_MEMORY);
         assert!(candidate(downstream::Stage::Full, 114_228_848_867).is_err());
         assert!(candidate_with_anchor(downstream::Stage::Full, 0, 0).is_err());
         assert!(candidate_with_anchor(downstream::Stage::Full, 0, OUTPUT_MAX + 1).is_err());
@@ -602,5 +752,103 @@ mod full_anchor_reservation_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod waiting_context_tests {
+    use super::*;
+    fn waiter_census() -> BTreeMap<String, Value> {
+        BTreeMap::from([
+            (
+                downstream::Stage::Full.unit().into(),
+                json!({"Id":downstream::Stage::Full.unit(),"MainPID":"123","InvocationID":"a".repeat(32)}),
+            ),
+            (
+                "horizon-204-delivery-full-protective-v1.service".into(),
+                json!({"Id":"horizon-204-delivery-full-protective-v1.service","MainPID":"0","NRestarts":"0","ActiveState":"inactive","SubState":"dead","Result":"success","ExecMainStatus":"0"}),
+            ),
+            (
+                "horizon-qualify-227-peer.service".into(),
+                json!({"Id":"horizon-qualify-227-peer.service","MainPID":"456","InvocationID":"b".repeat(32)}),
+            ),
+        ])
+    }
+    #[test]
+    fn root204_waiter_view_keeps_every_peer_and_raw_census_without_memory_credit() {
+        let raw = waiter_census();
+        let saved = raw.clone();
+        let f = json!({"active":[],"failed_history":{"227":"retained"}});
+        let saved_f = f.clone();
+        let view = WaitingContext::retained_view(
+            downstream::Stage::Full,
+            "horizon-204-delivery-full-protective-v1.service",
+            &f,
+            &raw,
+        )
+        .unwrap();
+        assert_eq!(view.len(), 1);
+        assert_eq!(
+            view.get("horizon-qualify-227-peer.service"),
+            raw.get("horizon-qualify-227-peer.service")
+        );
+        assert_eq!(raw, saved);
+        assert_eq!(f, saved_f);
+        assert_eq!(
+            candidate_with_anchor(downstream::Stage::Full, 114_228_848_867, 100)
+                .unwrap()
+                .memory_max_bytes,
+            MEMORY + startup::GUARD_MEMORY
+        );
+    }
+    #[test]
+    fn root204_waiter_view_rejects_accepted_owner_live_guard_or_missing_candidate() {
+        let raw = waiter_census();
+        let guard = "horizon-204-delivery-full-protective-v1.service";
+        let accepted = json!({"active":[{"unit":raw[downstream::Stage::Full.unit()]}]});
+        assert!(
+            WaitingContext::retained_view(downstream::Stage::Full, guard, &accepted, &raw).is_err()
+        );
+        for (key, value) in [
+            ("MainPID", "99"),
+            ("NRestarts", "1"),
+            ("ActiveState", "active"),
+            ("Result", "timeout"),
+            ("ExecMainStatus", "1"),
+        ] {
+            let mut changed = raw.clone();
+            changed.get_mut(guard).unwrap()[key] = json!(value);
+            assert!(
+                WaitingContext::retained_view(
+                    downstream::Stage::Full,
+                    guard,
+                    &json!({"active":[]}),
+                    &changed
+                )
+                .is_err()
+            );
+        }
+        let mut missing = raw.clone();
+        missing.remove(downstream::Stage::Full.unit());
+        assert!(
+            WaitingContext::retained_view(
+                downstream::Stage::Full,
+                guard,
+                &json!({"active":[]}),
+                &missing
+            )
+            .is_err()
+        );
+        let mut missing_guard = raw.clone();
+        missing_guard.remove(guard);
+        assert!(
+            WaitingContext::retained_view(
+                downstream::Stage::Full,
+                guard,
+                &json!({"active":[]}),
+                &missing_guard
+            )
+            .is_err()
+        );
     }
 }

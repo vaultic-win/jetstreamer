@@ -28,7 +28,7 @@ pub(super) fn root205_properties(name: &str, fields: &str) -> Result<BTreeMap<St
         continuation205_delivery::scope(name) || continuation205_delivery::guard_scope(name),
         "205 manager query escaped typed namespace"
     );
-    barrier::properties(name, fields)
+    empty_properties::delivery_properties(name, fields)
 }
 pub(super) fn root205_guard_timer(name: &str) -> Result<Value> {
     ensure!(
@@ -71,7 +71,7 @@ pub(super) fn root204_properties(name: &str, fields: &str) -> Result<BTreeMap<St
         assembly204_recovery::scope(name, 204, 204) || guard_scope(name, 204, 204),
         "204 manager query escaped typed actor/guard namespace"
     );
-    barrier::properties(name, fields)
+    empty_properties::delivery_properties(name, fields)
 }
 // Reuse low-level manager/native checks without admitting a204 generic origin.
 pub(super) fn root204_guard_timer(name: &str) -> Result<Value> {

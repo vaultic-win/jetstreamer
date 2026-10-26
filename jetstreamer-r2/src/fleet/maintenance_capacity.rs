@@ -588,12 +588,14 @@ pub(super) fn check_demotion223(
 enum CandidateContext<'a> {
     Demotion223(&'a demotion223_capacity::Context),
     Waiting205(&'a continuation205_delivery::WaitingContext),
+    Waiting204(&'a assembly204_recovery::WaitingContext),
 }
 impl CandidateContext<'_> {
     fn names(self) -> Result<BTreeSet<String>> {
         match self {
             Self::Demotion223(c) => c.names(),
             Self::Waiting205(c) => c.names(),
+            Self::Waiting204(c) => c.names(),
         }
     }
     fn peer_view(
@@ -604,6 +606,7 @@ impl CandidateContext<'_> {
         match self {
             Self::Demotion223(c) => c.peer_view(f, raw),
             Self::Waiting205(c) => c.peer_view(f, raw),
+            Self::Waiting204(c) => c.peer_view(f, raw),
         }
     }
 }
@@ -617,6 +620,18 @@ pub(super) fn check_continuation205_waiting(
         candidate,
         MemoryMode::Continuation205Delivery,
         Some(CandidateContext::Waiting205(context)),
+    )
+}
+pub(super) fn check_assembly204_waiting(
+    value: &Value,
+    context: &assembly204_recovery::WaitingContext,
+) -> Result<Value> {
+    let candidate = context.candidate()?;
+    check_inner_with(
+        value,
+        candidate,
+        MemoryMode::AssemblyRecovery204,
+        Some(CandidateContext::Waiting204(context)),
     )
 }
 fn check_inner_with(

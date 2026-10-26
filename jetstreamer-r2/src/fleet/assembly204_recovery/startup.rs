@@ -427,6 +427,45 @@ fn guard_manager(p: &Plan, binding: &BoundFile, g: &Value, sample: &Value) -> Re
         json!({"properties":props,"timer":completed_archive_phase::root204_guard_timer(&p.guard_unit)?}),
     )
 }
+pub(super) fn capacity_waiter(
+    x: &downstream::StageSpec,
+    spec: &BoundFile,
+    waiting: &BoundFile,
+    expected: &Value,
+) -> Result<(String, Value)> {
+    let (pb, p) = plan(x)?;
+    no_file(&p.release)?;
+    let saved = read(waiting)?;
+    ensure!(
+        waiting.path == p.waiting
+            && saved["schema"] == "jetstreamer-root204-delivery-waiting-v1"
+            && saved["stage_spec"] == private157::binding(spec)
+            && saved["startup_plan"] == private157::binding(&pb)
+            && saved["process"] == *expected,
+        "204 capacity context is not the exact issued waiting marker"
+    );
+    let (source, _) = lineage::load_source(&x.source)?;
+    let admission = downstream::issued_admission(x, spec, n(&source, "archive_bytes")?)?;
+    let a = read(&admission)?;
+    ensure!(
+        a["runner"] == private157::binding(&p.runner),
+        "204 capacity waiter changed admitted runner"
+    );
+    downstream::installed_stage(
+        x,
+        spec,
+        &p.runner,
+        &serde_json::from_value(a["unit_file"].clone())?,
+        &p.runner.sha256,
+    )?;
+    let actual = snapshot(x, spec, &p, &unit(x.stage.unit())?, true)?;
+    ensure!(
+        actual == *expected,
+        "204 capacity waiter PID/ticks/IID/native scope changed"
+    );
+    native_deadline(&actual, now()?)?;
+    Ok((p.guard_unit, actual))
+}
 pub(super) fn release(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let r: ReleaseSpec = serde_json::from_value(v.clone())?;
     ensure!(
@@ -463,11 +502,12 @@ pub(super) fn release(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()>
     let process = snapshot(&x, &r.stage_spec, &p, &owner, true)?;
     native_deadline(&process, now()?)?;
     ensure!(waiting["process"] == process, "204 waiter was replaced");
-    let cap = capacity::stage_capacity(
+    let cap = capacity::waiting_stage_capacity(
         &r.resource_basis,
-        x.stage,
-        n(&completion, "archive_bytes")?,
-        downstream::anchor_reserve(&x)?,
+        &x,
+        &r.stage_spec,
+        &r.waiting,
+        &process,
     )?;
     let capacity = write(&r.capacity_output, &cap)?;
     let g = read(&r.guard_plan)?;

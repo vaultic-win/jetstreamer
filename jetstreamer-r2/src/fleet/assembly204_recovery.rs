@@ -5,6 +5,7 @@ use super::*;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 mod artifact;
 mod capacity;
+pub(super) use capacity::WaitingContext;
 mod context;
 mod custody;
 mod full209_terminal_peer;

@@ -20,6 +20,9 @@ fn object_path(service: &str) -> Result<String> {
     ensure!(
         guard_scope(service, 201, 300)
             || singleton210_admission::jit_issuer_scope(service)
+            || assembly204_recovery::scope(service, 204, 204)
+            || continuation205_delivery::scope(service)
+            || continuation205_delivery::guard_scope(service)
             || [
                 "full-verification",
                 "plugin-verification",
@@ -126,12 +129,19 @@ fn normalize(
     guard: bool,
     credentials: bool,
 ) -> Result<BTreeMap<String, String>> {
-    let path = object_path(service)?;
     ensure!(!guard || !credentials, "guard cannot import credentials");
+    normalize_fields(service, show, proof, &roster(guard, credentials))
+}
+fn normalize_fields(
+    service: &str,
+    show: &BTreeMap<String, String>,
+    proof: &Value,
+    fields: &[(&str, &str, &str)],
+) -> Result<BTreeMap<String, String>> {
+    let path = object_path(service)?;
     let replies = proof
         .as_object()
         .context("completed typed empty replies missing")?;
-    let fields = roster(guard, credentials);
     let omitted = fields
         .iter()
         .filter(|(p, _, _)| !show.contains_key(*p))
@@ -142,7 +152,7 @@ fn normalize(
         "completed typed reply roster differs from omitted fields"
     );
     let mut effective = show.clone();
-    for (property, interface, signature) in fields {
+    for &(property, interface, signature) in fields {
         if let Some(value) = show.get(property) {
             ensure!(
                 value.is_empty(),
@@ -247,12 +257,117 @@ pub(super) fn properties_with(
     );
     normalize(name, &raw, &Value::Object(replies), guard, credentials)
 }
+/// Root204 and distinct205 share only the native-property adapter. Exact
+/// namespace authorization remains in their separate public wrapper functions.
+pub(super) fn delivery_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+    object_path(name)?;
+    let guard = guard_scope(name, 204, 204) || continuation205_delivery::guard_scope(name);
+    let credentials = matches!(
+        name,
+        "horizon-upload-204-assembly-recovery-v2.service"
+            | "horizon-upload-205-continuation-delivery-v1.service"
+    );
+    let selected = selected_fields(fields, guard, credentials);
+    let path = object_path(name)?;
+    let raw = barrier::properties(name, fields)?;
+    let mut replies = serde_json::Map::new();
+    for &(property, interface, _) in &selected {
+        if !raw.contains_key(property) {
+            replies.insert(property.into(), query(name, &path, interface, property)?);
+        }
+    }
+    ensure!(
+        barrier::properties(name, fields)? == raw,
+        "delivery native properties changed across typed replies"
+    );
+    normalize_fields(name, &raw, &Value::Object(replies), &selected)
+}
+fn selected_fields(
+    fields: &str,
+    guard: bool,
+    credentials: bool,
+) -> Vec<(&'static str, &'static str, &'static str)> {
+    let requested = fields.split(',').collect::<BTreeSet<_>>();
+    roster(guard, credentials)
+        .into_iter()
+        .filter(|(p, _, _)| requested.contains(p))
+        .collect()
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     fn proof(service: &str, guard: bool, credentials: bool) -> Value {
         let path = object_path(service).unwrap();
         Value::Object(roster(guard, credentials).into_iter().map(|(p,i,s)| (p.into(), json!({"unit":service,"object_path":path,"interface":i,"property":p,"signature":s,"exit_code":0,"stdout":serde_json::to_string(&json!({"type":s,"data":[]})).unwrap(),"stderr":""}))).collect())
+    }
+    #[test]
+    fn delivery_typed_empty_properties_cover_distinct204_and205_workers_and_guards() {
+        for service in [
+            "horizon-full-verify-204-assembly-recovery-v2.service",
+            "horizon-full-verify-205-continuation-delivery-v1.service",
+        ] {
+            let raw = BTreeMap::from([("Environment".into(), "TOKIO_WORKER_THREADS=4".into())]);
+            let p = proof(service, false, false);
+            let effective = normalize(service, &raw, &p, false, false).unwrap();
+            assert_eq!(effective["Environment"], raw["Environment"]);
+            assert_eq!(effective["EnvironmentFiles"], "");
+            assert_eq!(
+                effective["TypedEmptyRawShow"],
+                serde_json::to_string(&raw).unwrap()
+            );
+        }
+        for service in [
+            "horizon-generic204-full-protective-root204-v1.service",
+            "horizon-205-delivery-full-protective-v1.service",
+        ] {
+            let p = proof(service, true, false);
+            let effective = normalize(service, &BTreeMap::new(), &p, true, false).unwrap();
+            for (key, _, _) in FIELDS {
+                assert_eq!(effective[key], "");
+            }
+        }
+        assert!(object_path("horizon-full-verify-205-unregistered.service").is_err());
+        assert!(object_path("horizon-upload-204-unregistered.service").is_err());
+    }
+    #[test]
+    fn delivery_typed_empty_partial_metadata_queries_never_invent_unrequested_properties() {
+        let service = "horizon-full-verify-204-assembly-recovery-v2.service";
+        let fields = selected_fields("Id,MainPID,NRestarts", false, false);
+        assert!(fields.is_empty());
+        let raw = BTreeMap::from([("MainPID".into(), "0".into())]);
+        let effective = normalize_fields(service, &raw, &json!({}), &fields).unwrap();
+        assert!(!effective.contains_key("EnvironmentFiles"));
+        assert!(!effective.contains_key("ExecStop"));
+        assert!(normalize_fields(service, &raw, &proof(service, false, false), &fields).is_err());
+    }
+    #[test]
+    fn delivery_typed_empty_upload_requires_explicit_bound_environment_file() {
+        let file = BoundFile {
+            path: "/private/credentials".into(),
+            sha256: "a".repeat(64),
+        };
+        for service in [
+            "horizon-upload-204-assembly-recovery-v2.service",
+            "horizon-upload-205-continuation-delivery-v1.service",
+        ] {
+            let mut raw =
+                BTreeMap::from([("UnsetEnvironment".into(), UNSAFE_ENVIRONMENT.join(" "))]);
+            let p = proof(service, false, true);
+            let effective = normalize(service, &raw, &p, false, true).unwrap();
+            assert!(validate_environment_sources(&effective, Some(&file)).is_err());
+            raw.insert(
+                "EnvironmentFiles".into(),
+                "/private/credentials (ignore_errors=no)".into(),
+            );
+            let effective = normalize(service, &raw, &p, false, true).unwrap();
+            validate_environment_sources(&effective, Some(&file)).unwrap();
+            let mut wrong = effective.clone();
+            wrong.insert(
+                "EnvironmentFiles".into(),
+                "/foreign (ignore_errors=no)".into(),
+            );
+            assert!(validate_environment_sources(&wrong, Some(&file)).is_err());
+        }
     }
     #[test]
     fn completed_typed_empty_worker_preserves_declared_environment_and_credential_requirements() {
