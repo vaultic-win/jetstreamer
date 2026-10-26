@@ -1,6 +1,7 @@
 //! Closed status-only cleanup for the genuinely completed assembly204/full209.
 //! This dispatch never changes archive, readiness or generic deletion gates.
 use super::*;
+mod historical209;
 const SCHEMA: &str = "jetstreamer-assembly204-full209-status-cleanup-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -13,6 +14,8 @@ struct Evidence {
     full209_reference_fleet: Option<BoundFile>,
     #[serde(default)]
     full209_terminal_peer: Option<full209_terminal_peer::Proof>,
+    #[serde(default)]
+    historical209_failed_owner: Option<historical209::Proof>,
 }
 fn parse(epoch: u64, e: &Value) -> Result<Option<Evidence>> {
     if e["schema"] != SCHEMA {
@@ -26,7 +29,8 @@ fn parse(epoch: u64, e: &Value) -> Result<Option<Evidence>> {
                 204 =>
                     e.assembly_terminal.is_some()
                         && e.full209_reference_fleet.is_none()
-                        && e.full209_terminal_peer.is_none(),
+                        && e.full209_terminal_peer.is_none()
+                        && e.historical209_failed_owner.is_none(),
                 209 =>
                     e.assembly_terminal.is_none()
                         && e.full209_reference_fleet.is_some()
@@ -133,6 +137,9 @@ pub(in crate::fleet) fn cleanup_current(
                 .context("full209 cleanup reference fleet missing")?,
         )?;
         proof.project(&fleet, current, true)?;
+        if let Some(historical) = &e.historical209_failed_owner {
+            historical.validate_current(current)?;
+        }
         // Any other current 209 owner remains protected; the peer proof checks
         // the exact original singleton, not a general epoch-wide exemption.
         for (name, row) in current {
@@ -141,7 +148,10 @@ pub(in crate::fleet) fn cleanup_current(
                 .any(|part| part == "209")
             {
                 ensure!(
-                    is_idle(row),
+                    is_idle(row)
+                        || e.historical209_failed_owner
+                            .as_ref()
+                            .is_some_and(|p| p.covers(name, row)),
                     "full209 cleanup overlaps live replacement owner"
                 );
                 inactive_status::no_pending_owner_trigger(name, row["LoadState"] == "not-found")?;
@@ -153,6 +163,7 @@ pub(in crate::fleet) fn cleanup_current(
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod historical209;
     #[test]
     fn cleanup_dispatch_is_closed_to_exact_terminal_origin_and_epoch() {
         assert!(parse(204, &json!({"schema":"other"})).unwrap().is_none());
@@ -205,29 +216,25 @@ mod tests {
         assert!(
             owner_snapshot(&current, &expected, raw.as_bytes(), raw.as_bytes(), &[name]).is_err()
         );
-        assert!(
-            owner_snapshot(
-                &current,
-                &expected,
-                raw.as_bytes(),
-                raw.as_bytes(),
-                &["horizon-qualify-204-new.service"]
-            )
-            .is_err()
-        );
+        assert!(owner_snapshot(
+            &current,
+            &expected,
+            raw.as_bytes(),
+            raw.as_bytes(),
+            &["horizon-qualify-204-new.service"]
+        )
+        .is_err());
         let mut replacement = start;
         replacement["INVOCATION_ID"] = json!("2".repeat(32));
         replacement["__REALTIME_TIMESTAMP"] = json!("3000000");
-        assert!(
-            owner_snapshot(
-                &current,
-                &expected,
-                raw.as_bytes(),
-                format!("{raw}{replacement}\n").as_bytes(),
-                &[]
-            )
-            .is_err()
-        );
+        assert!(owner_snapshot(
+            &current,
+            &expected,
+            raw.as_bytes(),
+            format!("{raw}{replacement}\n").as_bytes(),
+            &[]
+        )
+        .is_err());
         assert!(owner_snapshot(&current, &expected, b"", raw.as_bytes(), &[]).is_err());
     }
 }
