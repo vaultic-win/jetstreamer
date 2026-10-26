@@ -23,6 +23,9 @@ pub(super) fn jit210_native_text(path: impl AsRef<Path>, maximum: u64) -> Result
 
 mod launch;
 mod peer;
+pub(super) fn root204_bound_log(binding: &BoundFile) -> Result<Vec<u8>> {
+    bound_bytes(binding, 64 << 20, 0)
+}
 pub(super) fn root204_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     ensure!(
         assembly204_recovery::scope(name, 204, 204) || guard_scope(name, 204, 204),

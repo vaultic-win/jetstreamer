@@ -89,7 +89,7 @@ fn plugin_probe(binding: &BoundFile, tool: &Tool, required: u64) -> Result<Value
         path: s(&child, "log")?.into(),
         sha256: s(&child, "log_sha256")?.into(),
     };
-    let raw = bound_bytes(&log, 64 << 20, 0)?;
+    let raw = completed_archive_phase::root204_bound_log(&log)?;
     let text = std::str::from_utf8(&raw)?;
     let rows = text
         .lines()
@@ -332,14 +332,10 @@ pub(super) fn capture_plugin_capacity(v: &Value, spec: &BoundFile, self_sha: &st
         &p.plugin.artifact.sha256,
         &["--archive-capacity-probe".into()],
     )?;
-    let raw = bound_bytes(
-        &BoundFile {
-            path: log,
-            sha256: s(&child, "log_sha256")?.into(),
-        },
-        64 << 20,
-        0,
-    )?;
+    let raw = completed_archive_phase::root204_bound_log(&BoundFile {
+        path: log,
+        sha256: s(&child, "log_sha256")?.into(),
+    })?;
     let rows = std::str::from_utf8(&raw)?
         .lines()
         .filter(|line| line.starts_with('{'))
