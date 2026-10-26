@@ -1016,11 +1016,11 @@ pub(super) fn run() -> Result<()> {
     )?;
     let after = census(&names, 201, 300)?;
     let (archive_after, origin_after) = origin(&s)?;
+    singleton209_delivery::same_source_terminal(&original["terminal"], &origin_after["terminal"])?;
     ensure!(
         before == after
             && effective == check_unit(&s, &argv)?
             && origin_after["origin"] == original["origin"]
-            && origin_after["terminal"] == original["terminal"]
             && origin_after["cgroup"] == original["cgroup"]
             && singleton209_delivery::pair_identity(&archive_after)
                 == singleton209_delivery::pair_identity(&archive),
@@ -1052,7 +1052,7 @@ pub(super) fn run() -> Result<()> {
     decoder_capacity::validate(&s, &original["producer"])?;
     private157::immutable_receipt(
         &s.output,
-        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"startup_plan":s.startup_plan,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
+        &json!({"schema":RECEIPT,"epoch":s.epoch,"phase":s.phase,"admitted":true,"spec":private157::binding(&binding),"issuer_sha256":self_sha,"origin":s.origin,"origin_evidence":original,"origin_evidence_after":origin_after,"archive":singleton209_delivery::pair_identity(&archive),"tools":s.tools,"decoder_capacity":s.decoder_capacity,"programs":s.programs,"startup_plan":s.startup_plan,"units":s.units,"guard_units":s.guard_units,"state_root":s.state_root,"interpreter":s.interpreter,"unit_file":s.unit_file,"effective_unit":effective,"argv":argv,"prior":prior,"capacity":capacity,"unit_census_before":before,"unit_census_after":after,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"maximum_age_seconds":900,"new_stage_IID_and_first_guard_fire_pending":true,"replay_launch_authorized":false,"publication_authorized":false,"local_retirement_authorized":false,"archive_body_reads":0,"remote_mutations":false,"r2_mutations":false}),
     )
 }
 

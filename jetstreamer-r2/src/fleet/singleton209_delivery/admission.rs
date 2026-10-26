@@ -350,10 +350,11 @@ pub(in crate::fleet) fn run() -> Result<()> {
     let after = census(&names, 201, 300)?;
     no_downstream_owner(&after)?;
     pending()?;
+    let terminal_after = source_terminal(&launch)?;
+    same_source_terminal(&terminal, &terminal_after)?;
     ensure!(
         before == after
             && properties == effective(&s, &a.unit_file)?
-            && terminal == source_terminal(&launch)?
             && pair_identity(&read_local_archive(&output, 209)?) == pair_identity(&archive),
         "209 delivery owner, unit, terminal or pair changed during admission"
     );
@@ -376,7 +377,7 @@ pub(in crate::fleet) fn run() -> Result<()> {
             "control_helper_sha256":self_sha,"delivery_helper_path":HELPER,"delivery_helper_sha256":HELPER_SHA,
             "launch":private157::binding(&s.launch),"cohort_publication":private157::binding(&s.cohort_publication),
             "origin_unit":c::UNIT,"origin_invocation_id":launch["evidence"]["units"][0]["invocation_id"],
-            "producer_terminal":terminal,"archive_metadata_only":pair_identity(&archive),
+            "producer_terminal":terminal,"producer_terminal_after":terminal_after,"archive_metadata_only":pair_identity(&archive),
             "capacity":capacity,"unit_file":private157::binding(&a.unit_file),"effective_unit":properties,
             "unit_census_before":before,"unit_census_after":after,"resource_basis":a.resource_basis,
             "environment_file":a.environment_file.as_ref().map(private157::binding),
