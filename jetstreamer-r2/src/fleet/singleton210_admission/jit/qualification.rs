@@ -2,7 +2,7 @@
 //! validator authenticates sealed report/result/log copies; no asserted passed
 //! flag substitutes for the real full-test and strict-Clippy result records.
 use super::*;
-pub(super) const REQUIRED: [&str; 11] = [
+pub(super) const REQUIRED: [&str; 13] = [
     "fleet::singleton210_admission::custody::tests::full210_prehashed_tuple_covers_content_identity_custody_and_exact_mode",
     "fleet::singleton210_admission::custody::tests::full210_prehashed_descriptor_cannot_hide_path_replacement_or_mode_change",
     "fleet::singleton210_admission::custody::tests::full210_prehashed_input_changed_through_preexisting_writer_is_rejected",
@@ -13,7 +13,9 @@ pub(super) const REQUIRED: [&str; 11] = [
     "fleet::singleton210_admission::jit::issuer::tests::full210_jit_same_process_proof_rejects_replaced_caller_and_effective_contract",
     "fleet::singleton210_admission::jit::issuer::tests::full210_jit_caller_scope_and_native_capabilities_are_closed",
     "fleet::singleton210_admission::jit::qualification::tests::full210_jit_role_rejects_failed_foreign_source_and_filtered_actual_qa",
+    "fleet::singleton210_admission::jit::qualification::tests::full210_jit_role_accepts_only_approved_job_counts_including_actual662_j4",
     "fleet::singleton210_admission::jit::qualification::tests::full210_jit_role_needs_exact_passed_regressions_and_unfiltered_summary",
+    "fleet::singleton210_admission::jit::qualification::tests::full210_jit_role_uses_final_outer_summary_not_nested_child_summaries",
 ];
 fn binding(v: &Value, key: &str) -> Result<BoundFile> {
     Ok(serde_json::from_value(v[key].clone())?)
@@ -154,6 +156,7 @@ fn command_scope(result: &Value, commit: &str, log: &BoundFile, clippy: bool) ->
         "210 JIT QA selected a foreign/ambiguous package"
     );
     let mut index = 2;
+    let mut job_options = 0usize;
     while index < cargo.len() {
         match cargo[index] {
             "-p" | "--package" => {
@@ -165,19 +168,28 @@ fn command_scope(result: &Value, commit: &str, log: &BoundFile, clippy: bool) ->
             }
             "-j" | "--jobs" => {
                 ensure!(
-                    matches!(cargo.get(index + 1).copied(), Some("1" | "2")),
+                    matches!(cargo.get(index + 1).copied(), Some("1" | "2" | "4")),
                     "210 JIT QA jobs operand differs"
                 );
+                job_options += 1;
                 index += 2;
             }
             "--release" | "--frozen" | "--locked" | "--offline" | "--verbose" | "-v"
-            | "--quiet" | "-q" | "-j1" | "-j2" | "--jobs=1" | "--jobs=2" => index += 1,
+            | "--quiet" | "-q" => index += 1,
+            "-j1" | "-j2" | "-j4" | "--jobs=1" | "--jobs=2" | "--jobs=4" => {
+                job_options += 1;
+                index += 1;
+            }
             "--all-targets" | "--all-features" if clippy => index += 1,
             _ => {
                 bail!("210 JIT actual QA has an unreviewed option, name filter or source override")
             }
         }
     }
+    ensure!(
+        job_options == 1,
+        "210 JIT QA requires one exact approved jobs option"
+    );
     for needed in ["--release", "--frozen", "--locked", "--offline"] {
         ensure!(
             cargo.contains(&needed),
@@ -222,6 +234,42 @@ fn command_scope(result: &Value, commit: &str, log: &BoundFile, clippy: bool) ->
     }
     Ok(())
 }
+#[derive(Debug, PartialEq, Eq)]
+struct TestSummary {
+    passed: u64,
+    failed: u64,
+    filtered: u64,
+}
+fn successful_test_summary(line: &str) -> Result<Option<TestSummary>> {
+    let Some(summary) = line.trim().strip_prefix("test result: ok. ") else {
+        return Ok(None);
+    };
+    let fields = summary.split("; ").collect::<Vec<_>>();
+    ensure!(
+        fields.len() == 6
+            && fields[5].starts_with("finished in ")
+            && fields[5].ends_with('s'),
+        "210 JIT full test summary truncated"
+    );
+    let count = |index: usize, label: &str| -> Result<u64> {
+        Ok(fields[index]
+            .strip_suffix(label)
+            .context("210 JIT full test summary label differs")?
+            .parse()?)
+    };
+    // Parse every standard count so a malformed outer summary cannot hide
+    // behind the three fields used by this role policy.
+    let passed = count(0, " passed")?;
+    let failed = count(1, " failed")?;
+    count(2, " ignored")?;
+    count(3, " measured")?;
+    let filtered = count(4, " filtered out")?;
+    Ok(Some(TestSummary {
+        passed,
+        failed,
+        filtered,
+    }))
+}
 fn required_tests(raw: &[u8]) -> Result<()> {
     let text = std::str::from_utf8(raw)?;
     let passed = text
@@ -232,30 +280,21 @@ fn required_tests(raw: &[u8]) -> Result<()> {
         REQUIRED.iter().all(|name| passed.contains(name)),
         "210 JIT exact required regressions did not actually pass in the full default run"
     );
-    let mut total_passed = 0u64;
-    for line in text
+    // A genuine full-default libtest can run a child copy of itself. Its inner
+    // exact-filter summary is ordinary test output, while the final nonempty
+    // line is the outer harness commit for the unfiltered Cargo invocation.
+    // Never accept an earlier valid-looking child summary for a truncated,
+    // failed or filtered outer run.
+    let final_line = text
         .lines()
-        .filter_map(|l| l.trim().strip_prefix("test result: ok. "))
-    {
-        let f = line.split("; ").collect::<Vec<_>>();
-        ensure!(f.len() >= 5, "210 JIT full test summary truncated");
-        let count = |index: usize, label: &str| -> Result<u64> {
-            Ok(f[index]
-                .strip_suffix(label)
-                .context("210 JIT full test summary label differs")?
-                .parse()?)
-        };
-        ensure!(
-            count(1, " failed")? == 0 && count(4, " filtered out")? == 0,
-            "210 JIT default test log has failures or filters"
-        );
-        total_passed = total_passed
-            .checked_add(count(0, " passed")?)
-            .context("210 JIT QA passed count overflow")?;
-    }
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .context("210 JIT default test log is empty")?;
+    let outer = successful_test_summary(final_line)?
+        .context("210 JIT default test log lacks a successful final outer summary")?;
     ensure!(
-        total_passed >= REQUIRED.len() as u64,
-        "210 JIT default test log has no actual passed group"
+        outer.failed == 0 && outer.filtered == 0 && outer.passed >= REQUIRED.len() as u64,
+        "210 JIT final outer default test summary failed, filtered or passed too few tests"
     );
     Ok(())
 }
@@ -315,6 +354,15 @@ pub(super) fn validate(role: &issuer::Role) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn result(argv: Value, commit: &str, log: &BoundFile) -> Value {
+        json!({"argv":argv,"exit_code":0,"stop_reason":null,"source_revision":commit,"log_sha256":log.sha256})
+    }
+    fn passed_names() -> String {
+        REQUIRED
+            .iter()
+            .map(|name| format!("test {name} ... ok\n"))
+            .collect()
+    }
     #[test]
     fn full210_jit_role_rejects_failed_foreign_source_and_filtered_actual_qa() {
         let log = BoundFile {
@@ -322,7 +370,7 @@ mod tests {
             sha256: "a".repeat(64),
         };
         let commit = "b".repeat(40);
-        let r = json!({"argv":["cargo","test","-p","jetstreamer-r2","--release","--frozen","--locked","--offline","--","--test-threads=1"],"exit_code":0,"stop_reason":null,"source_revision":commit,"log_sha256":log.sha256});
+        let r = json!({"argv":["cargo","test","-j1","-p","jetstreamer-r2","--release","--frozen","--locked","--offline","--","--test-threads=1"],"exit_code":0,"stop_reason":null,"source_revision":commit,"log_sha256":log.sha256});
         command_scope(&r, &commit, &log, false).unwrap();
         for (key, value) in [
             ("exit_code", json!(1)),
@@ -356,6 +404,7 @@ mod tests {
             "--frozen",
             "--locked",
             "--offline",
+            "-j1",
             "--all-targets",
             "--all-features",
             "--",
@@ -379,11 +428,110 @@ mod tests {
         }
     }
     #[test]
+    fn full210_jit_role_accepts_only_approved_job_counts_including_actual662_j4() {
+        let test_log = BoundFile {
+            path: "/sealed/candidate-evidence--qa-02-full-default.log".into(),
+            sha256: "f90e9f3ea36c9f13eb4bdb64978abd156e2de9c472c82098595ee91da7e5ed13"
+                .into(),
+        };
+        let clippy_log = BoundFile {
+            path: "/sealed/candidate-evidence--qa-01-strict-clippy.log".into(),
+            sha256: "bc91a3ed6ff9b29145787c6d9882965f4f24899753f0d8be62d8adc772989545"
+                .into(),
+        };
+        let commit = "662218876e6d81e754dd3802a3fad9524f080cbe";
+        let actual_test = result(
+            json!(["/home/ubuntu/.cargo/bin/cargo","test","--release","--frozen","--locked","--offline","-j4","-p","jetstreamer-r2","--","--test-threads=1"]),
+            commit,
+            &test_log,
+        );
+        command_scope(&actual_test, commit, &test_log, false).unwrap();
+        let actual_clippy = result(
+            json!(["/home/ubuntu/.cargo/bin/cargo","clippy","--release","--frozen","--locked","--offline","-j4","-p","jetstreamer-r2","--all-targets","--all-features","--","-D","warnings"]),
+            commit,
+            &clippy_log,
+        );
+        command_scope(&actual_clippy, commit, &clippy_log, true).unwrap();
+        for job in [
+            vec!["-j1"],
+            vec!["-j2"],
+            vec!["-j4"],
+            vec!["--jobs=1"],
+            vec!["--jobs=2"],
+            vec!["--jobs=4"],
+            vec!["-j", "1"],
+            vec!["--jobs", "2"],
+            vec!["-j", "4"],
+        ] {
+            let mut argv = vec!["cargo", "test"];
+            argv.extend(job);
+            argv.extend([
+                "--release",
+                "--frozen",
+                "--locked",
+                "--offline",
+                "-p",
+                "jetstreamer-r2",
+                "--",
+                "--test-threads=1",
+            ]);
+            command_scope(
+                &result(json!(argv), commit, &test_log),
+                commit,
+                &test_log,
+                false,
+            )
+            .unwrap();
+        }
+        for job in [
+            vec!["-j0"],
+            vec!["-j3"],
+            vec!["-j5"],
+            vec!["--jobs=0"],
+            vec!["--jobs=3"],
+            vec!["--jobs=5"],
+            vec!["-j", "0"],
+            vec!["--jobs", "3"],
+            vec!["-j", "5"],
+        ] {
+            let mut argv = vec!["cargo", "test"];
+            argv.extend(job);
+            argv.extend([
+                "--release",
+                "--frozen",
+                "--locked",
+                "--offline",
+                "-p",
+                "jetstreamer-r2",
+            ]);
+            assert!(
+                command_scope(
+                    &result(json!(argv), commit, &test_log),
+                    commit,
+                    &test_log,
+                    false
+                )
+                .is_err()
+            );
+        }
+        for argv in [
+            json!(["cargo","test","--release","--frozen","--locked","--offline","-p","jetstreamer-r2"]),
+            json!(["cargo","test","-j1","--jobs=2","--release","--frozen","--locked","--offline","-p","jetstreamer-r2"]),
+        ] {
+            assert!(
+                command_scope(
+                    &result(argv, commit, &test_log),
+                    commit,
+                    &test_log,
+                    false
+                )
+                .is_err()
+            );
+        }
+    }
+    #[test]
     fn full210_jit_role_needs_exact_passed_regressions_and_unfiltered_summary() {
-        let mut text = REQUIRED
-            .iter()
-            .map(|n| format!("test {n} ... ok\n"))
-            .collect::<String>();
+        let mut text = passed_names();
         text.push_str(&format!("test result: ok. {} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0s\n",REQUIRED.len()));
         required_tests(text.as_bytes()).unwrap();
         for bad in [
@@ -393,6 +541,29 @@ mod tests {
             text.replace(" ... ok", " ... ignored"),
         ] {
             assert!(required_tests(bad.as_bytes()).is_err());
+        }
+    }
+    #[test]
+    fn full210_jit_role_uses_final_outer_summary_not_nested_child_summaries() {
+        let mut actual662_shape = passed_names();
+        actual662_shape.push_str(
+            "running 1 test\n\
+             test fleet::singleton209_delivery::admission::tests::limited_child ... ok\n\n\
+             test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1348 filtered out; finished in 0.01s\n\n\
+             ok\n\
+             test result: ok. 1292 passed; 0 failed; 57 ignored; 0 measured; 0 filtered out; finished in 24.84s\n",
+        );
+        required_tests(actual662_shape.as_bytes()).unwrap();
+
+        let valid_inner = "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n";
+        for invalid_outer in [
+            "test result: ok. 1292 passed; 0 failed; 57 ignored; 0 measured; 1 filtered out; finished in 24.84s\n",
+            "test result: ok. 1292 passed; 1 failed; 57 ignored; 0 measured; 0 filtered out; finished in 24.84s\n",
+            "test result: FAILED. 1292 passed; 1 failed; 57 ignored; 0 measured; 0 filtered out; finished in 24.84s\n",
+            "outer harness summary missing\n",
+        ] {
+            let text = format!("{}{valid_inner}{invalid_outer}", passed_names());
+            assert!(required_tests(text.as_bytes()).is_err(), "{invalid_outer}");
         }
     }
 }
