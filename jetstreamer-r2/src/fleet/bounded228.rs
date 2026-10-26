@@ -34,8 +34,12 @@ const BOOTSTRAP: u64 = 98_495_291;
 const FIRST: u64 = 98_496_000;
 const TERMINAL: u64 = 98_928_278;
 pub(super) const MEMORY: u64 = 225_000_000_000;
+// An upper output allowance, not an expected archive size. Ready epoch221 is
+// already within 0.3% of the old128GiB limit; later epochs are not bounded by
+// the smaller ready-inventory mean. Keep output and whole-tree obligations tied.
+const OUTPUT_ALLOWANCE: u64 = 256 << 30;
 const DRAINAGE: u64 = 32 << 30;
-const TREE_STOP: u64 = 300_000_000_000 + (128 << 30);
+const TREE_STOP: u64 = 300_000_000_000 + OUTPUT_ALLOWANCE;
 pub(super) const DISK_RESERVATION: u64 = TREE_STOP + DRAINAGE + (32 << 20);
 
 pub(super) fn admit() -> Result<()> {
@@ -86,6 +90,7 @@ fn scope() -> Value {
         "extraction_executor_qualified":false,"full_verification_required":true,
         "plugin_verification_required":true,"independent_publication_gates_required":true,
         "maximum_scratch_bytes":300_000_000_000u64,"scratch_is_trial_allowance_not_quota":true,
+        "maximum_output_file_bytes":OUTPUT_ALLOWANCE,
         "own_tree_guard_threshold_bytes":TREE_STOP,"candidate_incremental_disk_reservation_bytes":DISK_RESERVATION,
         "maximum_memory_bytes":MEMORY,"maximum_runtime_seconds":259200,"remote_mutations":false,"r2_mutations":false,
         "capability":private157::binding(&binding(CAPABILITY,CAPABILITY_SHA)),
@@ -197,8 +202,8 @@ pub(super) fn sandbox(p: &BTreeMap<String, String>) -> Result<()> {
             ("CPUQuotaPerSecUSec", "8s"),
             ("TasksMax", "512"),
             ("RuntimeMaxUSec", "3d"),
-            ("LimitFSIZE", "137438953472"),
-            ("LimitFSIZESoft", "137438953472"),
+            ("LimitFSIZE", "274877906944"),
+            ("LimitFSIZESoft", "274877906944"),
             ("ProtectHome", "read-only"),
             ("ProtectSystem", "strict"),
             ("ProtectControlGroups", "yes"),
@@ -427,5 +432,20 @@ mod tests {
             changed[key] = bad;
             assert!(!guard_matches(&d, &v, &changed), "{key}");
         }
+    }
+    #[test]
+    fn bounded228_output_budget_is_reserved_by_the_guard_and_every_launch_consumer() {
+        let (d, v) = launch_fixture();
+        assert_eq!(OUTPUT_ALLOWANCE, 274_877_906_944);
+        assert_eq!(v["maximum_output_file_bytes"], OUTPUT_ALLOWANCE);
+        assert_eq!(TREE_STOP, 574_877_906_944);
+        assert_eq!(DISK_RESERVATION, 609_271_199_744);
+        let mut old = v.clone();
+        old["own_tree_guard_threshold_bytes"] = json!(437_438_953_472u64);
+        old["candidate_incremental_disk_reservation_bytes"] = json!(471_832_246_272u64);
+        assert!(!launch_matches(&d, &old));
+        let mut old = v;
+        old["maximum_output_file_bytes"] = json!(128u64 << 30);
+        assert!(!launch_matches(&d, &old));
     }
 }
