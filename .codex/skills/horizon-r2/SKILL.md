@@ -242,6 +242,17 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- Make long operations and control transitions observable in private stdout/stderr logs. Emit
+  timestamped phase start, substantive progress, completion and failure records with the epoch,
+  operation, elapsed time and last substantive progress time. For bounded waits, include the exact
+  awaited condition, deadline or remaining time, and next action on expiry. Emit a rate-limited
+  heartbeat at least once per minute from existing in-process work/wait loops; distinguish it from
+  advancing work and never reset the last-progress clock merely because a heartbeat was emitted.
+  Use existing counters or already captured evidence, without extra replay/resource observations
+  or R2 reads. Keep routine fleet/status refreshes on the single 30-minute cadence. Logging is
+  observational, grants no gate authority, must redact credentials and presigned URLs, and must
+  not restart healthy work or modify sealed deployments just to add output. When resuming a quiet
+  operation, inspect its real handle and phase log before deciding that it has stalled.
 - Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
   campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
   coordination and user reporting. Keep the loop work-conserving while repair agents investigate;
