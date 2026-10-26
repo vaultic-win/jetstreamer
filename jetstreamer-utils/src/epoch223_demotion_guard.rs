@@ -181,8 +181,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let plan: GuardPlan = read_bound(binding)?;
     let value: Value = read_bound(&plan.runtime_plan)?;
     let native = value["schema"] == "jetstreamer-epoch223-demotion-native-supervisor-plan-v1";
-    let maximum_private;
-    if native {
+    let maximum_private = if native {
         let context = native_supervisor::guard_context(&plan.runtime_plan)?;
         ensure!(
             plan.run_root == context.run_root
@@ -193,7 +192,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
                 && plan.admission_policy == context.admission_policy,
             "223 native guard exact context differs"
         );
-        maximum_private = 301u64 << 30;
+        301u64 << 30
     } else {
         let runtime: RuntimePlan = serde_json::from_value(value)?;
         ensure!(
@@ -213,8 +212,8 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
                 && prerequisites.admission_policy == plan.admission_policy,
             "223 guard executable/policy differs"
         );
-        maximum_private = 471_798_691_840;
-    }
+        471_798_691_840
+    };
     ensure!(
         plan.schema == "jetstreamer-epoch223-demotion-guard-plan-v1"
             && plan.worker_sha256 == WORKER

@@ -607,6 +607,14 @@ struct Session {
     hashing_started: Option<Instant>,
     spawn_accepted: Option<spawn::Accepted>,
 }
+// Immutable bindings that identify this exact waiting runner. Session state and
+// the original wait start remain separate and are never recreated by the wait.
+struct RunnerContext<'a> {
+    plan: &'a Plan,
+    invocation_id: &'a str,
+    runtime_plan: &'a BoundFile,
+    executable_sha256: &'a str,
+}
 pub(super) struct Runtime {
     decoded: OnceLock<(RuntimePlan, String)>,
     session: std::sync::Mutex<Session>,
@@ -674,7 +682,13 @@ impl Runtime {
             .map_err(|_| anyhow::anyhow!("223 rendezvous lock poisoned"))?;
         session.gate.begin(x.maximum_wait_millis)?;
         let start = Instant::now();
-        let result = self.wait(p, iid, binding, self_sha, x, start, &mut session);
+        let runner = RunnerContext {
+            plan: p,
+            invocation_id: iid,
+            runtime_plan: binding,
+            executable_sha256: self_sha,
+        };
+        let result = self.wait(runner, x, start, &mut session);
         if let Err(error) = &result {
             session.gate.phase = Phase::Closed;
             persist(
@@ -694,14 +708,17 @@ impl Runtime {
     }
     fn wait(
         &self,
-        p: &Plan,
-        iid: &str,
-        binding: &BoundFile,
-        self_sha: &str,
+        runner: RunnerContext<'_>,
         x: &Prerequisites,
         start: Instant,
         session: &mut Session,
     ) -> Result<()> {
+        let RunnerContext {
+            plan: p,
+            invocation_id: iid,
+            runtime_plan: binding,
+            executable_sha256: self_sha,
+        } = runner;
         let actor = own_actor(p, iid, binding, self_sha)?;
         let origin: OriginClock = read_bound(&x.origin_clock)?;
         validate_origin(&origin, millis()?)?;
