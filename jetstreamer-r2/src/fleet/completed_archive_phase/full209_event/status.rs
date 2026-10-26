@@ -186,7 +186,9 @@ fn measured(admission: &Value) -> Result<(PathBuf, FileIdentity)> {
     Ok((path, id))
 }
 fn original_clock(s: &Spec) -> Result<(DiagnosticClaim, Value, u64)> {
-    let Origin::Singleton209 { launch, .. } = &s.origin;
+    let Origin::Singleton209 { launch, .. } = &s.origin else {
+        bail!("completed209 status cannot borrow a207 origin")
+    };
     let (c, l) = full209_status::claim(launch)?;
     let terminal = singleton209_delivery::source_terminal(&l)?;
     let micros = terminal["events"][0]["__REALTIME_TIMESTAMP"]

@@ -146,7 +146,7 @@ fn plan_matches(s: &Spec, p: &Startup, argv: &[String]) -> Result<()> {
             && p.child_program == s.programs[role].artifact
             && p.child_argv == argv
             && p.interpreter == s.interpreter
-            && p.archive_directory == Path::new(singleton209::ROOT).join("output"),
+            && p.archive_directory == s.origin.root().join("output"),
         "completed startup plan changed its admitted phase/child/guard"
     );
     Ok(())

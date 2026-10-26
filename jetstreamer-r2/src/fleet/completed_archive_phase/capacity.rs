@@ -25,13 +25,6 @@ struct Inputs {
     plugin_source_revision: String,
 }
 
-fn manifest_binding() -> BoundFile {
-    BoundFile {
-        path: singleton209::PREFLIGHT.into(),
-        sha256: singleton209::PREFLIGHT_SHA.into(),
-    }
-}
-
 fn metadata_binding(binding: &BoundFile) -> Result<()> {
     token(&binding.path)?;
     ensure!(
@@ -45,14 +38,13 @@ fn metadata_binding(binding: &BoundFile) -> Result<()> {
 
 fn shape(s: &CapacitySpec) -> Result<()> {
     ensure!(
-        s.schema == SPEC && s.epoch == 209,
+        s.schema == SPEC && s.epoch == s.origin.epoch(),
         "plugin capacity scope differs"
     );
-    let Origin::Singleton209 {
-        launch,
-        native_input,
-        cohort_publication,
-    } = &s.origin;
+    let (launch, native_input, cohort_publication) = s.origin.parts();
+    if let Origin::Singleton207 { terminal, .. } = &s.origin {
+        metadata_binding(terminal)?;
+    }
     for b in [
         launch,
         native_input,
@@ -78,7 +70,7 @@ fn shape(s: &CapacitySpec) -> Result<()> {
                 .file_name()
                 .and_then(|v| v.to_str())
                 .is_some_and(|v| {
-                    v.strip_prefix("horizon-generic209-plugin-capacity-")
+                    v.strip_prefix(&format!("horizon-generic{}-plugin-capacity-", s.epoch))
                         .is_some_and(|suffix| !suffix.is_empty())
                 }),
         "plugin capacity output directory is outside its dedicated namespace"
@@ -93,7 +85,20 @@ fn producer_shape(
     cohort: &Value,
     manifest: &Value,
 ) -> Result<Value> {
-    let Origin::Singleton209 { native_input, .. } = &s.origin;
+    let (_, native_input, _) = s.origin.parts();
+    if let Origin::Singleton207 { .. } = &s.origin {
+        ensure!(
+            s.epoch == 207,
+            "207 decoder capacity borrowed another epoch"
+        );
+        return singleton207::delivery::producer_shape(
+            launch,
+            native,
+            cohort,
+            manifest,
+            native_input,
+        );
+    }
     ensure!(
         s.epoch == 209
             && launch["schema"] == singleton209::SCHEMA
@@ -123,16 +128,15 @@ fn producer_shape(
 }
 
 fn inputs(s: &CapacitySpec) -> Result<Inputs> {
-    let Origin::Singleton209 {
-        launch,
-        native_input,
-        cohort_publication,
-    } = &s.origin;
+    let (launch, native_input, cohort_publication) = s.origin.parts();
     let original = read(launch)?;
     // This authenticates saved launch/first-guard metadata only. In particular,
     // do not call origin(), which checks the current archive and live custody.
     ensure!(
-        full209_status::claim(launch)?.1 == original,
+        match &s.origin {
+            Origin::Singleton207 { .. } => singleton207::delivery::claim(launch)?.1 == original,
+            Origin::Singleton209 { .. } => full209_status::claim(launch)?.1 == original,
+        },
         "plugin capacity launch changed"
     );
     let producer = producer_shape(
@@ -140,7 +144,7 @@ fn inputs(s: &CapacitySpec) -> Result<Inputs> {
         &original,
         &read(native_input)?,
         &read(cohort_publication)?,
-        &read(&manifest_binding())?,
+        &read(&s.origin.manifest())?,
     )?;
     let full_source = read(&s.full.qualification)?;
     let plugin_source = read(&s.plugin.qualification)?;
@@ -202,7 +206,7 @@ fn report(
         json!({
             "schema": REPORT, "epoch": s.epoch, "spec": private157::binding(binding),
             "issuer_sha256": self_sha, "launcher": s.launcher, "origin": s.origin,
-            "producer_manifest": manifest_binding(), "producer": inputs.producer,
+            "producer_manifest": s.origin.manifest(), "producer": inputs.producer,
             "full": s.full, "plugin": s.plugin, "full_capacity": s.full_capacity,
             "full_source_revision": inputs.full_source_revision,
             "plugin_source_revision": inputs.plugin_source_revision,
@@ -282,7 +286,10 @@ mod tests {
             launch,
             native_input,
             cohort_publication,
-        } = &mut spec.origin;
+        } = &mut spec.origin
+        else {
+            panic!("209 fixture origin changed")
+        };
         launch.path = "/var/lib/jetstreamer/launch.json".into();
         native_input.path = "/var/lib/jetstreamer/native.json".into();
         cohort_publication.path = "/var/lib/jetstreamer/cohort.json".into();
@@ -324,7 +331,9 @@ mod tests {
     #[test]
     fn plugin_capacity_producer_binding_rejects_foreign_native_manifest_and_cohort() {
         let s = fixture();
-        let Origin::Singleton209 { native_input, .. } = &s.origin;
+        let Origin::Singleton209 { native_input, .. } = &s.origin else {
+            panic!("209 fixture origin changed")
+        };
         let launch = json!({"schema":singleton209::SCHEMA,"epoch":209,"node_sha256":singleton209::NODE_SHA,"worker_sha256":singleton209::WORKER_SHA,"manifest_fingerprint":singleton209::FINGERPRINT,"native_input":private157::binding(native_input)});
         let native = json!({"schema":"jetstreamer-private-epoch209-native-terminal-proof-v1","epoch":209,"native_input_qualified":true});
         let cohort = json!({"schema":"jetstreamer-root-cohort-publication-receipt-v2","epochs":[209],"manifest_fingerprint":singleton209::FINGERPRINT,"root_checkpoint_gate":{"kind":"sealed-root-checkpoint-cohort","version":1},"outcome":{"kind":"committed"}});

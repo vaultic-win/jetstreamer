@@ -428,11 +428,61 @@ impl Phase {
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum Origin {
+    Singleton207 {
+        launch: BoundFile,
+        native_input: BoundFile,
+        terminal: BoundFile,
+        cohort_publication: BoundFile,
+    },
     Singleton209 {
         launch: BoundFile,
         native_input: BoundFile,
         cohort_publication: BoundFile,
     },
+}
+impl Origin {
+    fn epoch(&self) -> u64 {
+        match self {
+            Self::Singleton207 { .. } => 207,
+            Self::Singleton209 { .. } => 209,
+        }
+    }
+    fn root(&self) -> &'static Path {
+        Path::new(match self {
+            Self::Singleton207 { .. } => singleton207::ROOT,
+            Self::Singleton209 { .. } => singleton209::ROOT,
+        })
+    }
+    fn parts(&self) -> (&BoundFile, &BoundFile, &BoundFile) {
+        match self {
+            Self::Singleton207 {
+                launch,
+                native_input,
+                cohort_publication,
+                ..
+            }
+            | Self::Singleton209 {
+                launch,
+                native_input,
+                cohort_publication,
+            } => (launch, native_input, cohort_publication),
+        }
+    }
+    fn manifest(&self) -> BoundFile {
+        match self {
+            Self::Singleton207 { .. } => singleton207::delivery::manifest_binding(),
+            Self::Singleton209 { .. } => BoundFile {
+                path: singleton209::PREFLIGHT.into(),
+                sha256: singleton209::PREFLIGHT_SHA.into(),
+            },
+        }
+    }
+    fn same_terminal(&self, a: &Value, b: &Value) -> Result<()> {
+        match self {
+            Self::Singleton207 { .. } => singleton207::delivery::same_terminal(a, b),
+            Self::Singleton209 { .. } => singleton209_delivery::same_source_terminal(a, b),
+        }
+    }
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -518,7 +568,7 @@ fn bound_bytes(b: &BoundFile, max: u64, uid: u32) -> Result<Vec<u8>> {
 }
 fn shape(s: &Spec) -> Result<()> {
     ensure!(
-        s.schema == SCHEMA && (201..=300).contains(&s.epoch),
+        s.schema == SCHEMA && s.epoch == s.origin.epoch(),
         "completed phase scope differs"
     );
     ensure!(
@@ -641,6 +691,47 @@ fn shape(s: &Spec) -> Result<()> {
 }
 fn origin(s: &Spec) -> Result<(LocalArchive, Value)> {
     match &s.origin {
+        Origin::Singleton207 {
+            launch,
+            native_input,
+            terminal,
+            cohort_publication,
+        } => {
+            ensure!(
+                s.epoch == 207,
+                "207 completed origin cannot qualify another epoch"
+            );
+            let (producer, terminal) = singleton207::delivery::custody(
+                launch,
+                native_input,
+                terminal,
+                cohort_publication,
+            )?;
+            let root = s.origin.root();
+            let references =
+                jetstreamer_horizon_observe::process_references::scan(Path::new("/proc"), root)?;
+            ensure!(
+                references.references.is_empty(),
+                "207 completed source still has process references"
+            );
+            let dir = root.join("output");
+            ensure!(
+                dir.canonicalize()? == dir && !s.state_root.starts_with(root),
+                "207 completed source/state namespace differs"
+            );
+            let a = read_local_archive(&dir, 207)?;
+            ensure!(
+                fs::metadata(&s.state_root)?.dev() == a.identity.device
+                    && fs::metadata("/")?.dev() == a.identity.device,
+                "207 completed source filesystem differs"
+            );
+            singleton207::delivery::cohort(&read(cohort_publication)?, &a)?;
+            let cgroup = capped204205_work::empty_terminal_cgroup(singleton207::UNIT)?;
+            Ok((
+                a,
+                json!({"origin":s.origin,"terminal":terminal,"producer":producer,"process_reference_census":references,"cgroup":cgroup}),
+            ))
+        }
         Origin::Singleton209 {
             launch,
             native_input,
@@ -1176,7 +1267,8 @@ pub(super) fn run() -> Result<()> {
     )?;
     let after = census(&names, 201, 300)?;
     let (archive_after, origin_after) = origin(&s)?;
-    singleton209_delivery::same_source_terminal(&original["terminal"], &origin_after["terminal"])?;
+    s.origin
+        .same_terminal(&original["terminal"], &origin_after["terminal"])?;
     ensure!(
         before == after
             && effective == check_unit(&s, &argv)?
