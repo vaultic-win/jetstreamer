@@ -2,6 +2,7 @@
 //! launch evidence is immutable. A separate old-floor bridge covers reconfiguration.
 use super::*;
 use std::os::unix::fs::MetadataExt;
+mod empty_properties;
 const OLD_FLOOR: u64 = 2_034_359_738_368;
 const OLD_PLAN_SHA: &str = "6b46b5ca40e1c1fde1aadf12b09c172e73a681c16c4646db54156e638b042c1c";
 const LAUNCH_SHA: &str = "7712ae90f84c1e4870579893e9e184b28d1b644ea0099ab5c23110bc03165ec0";
@@ -329,7 +330,7 @@ fn guard(service: &str, b: &BoundFile, p: &Value, current: &Value, minimum: u64)
     guard_shape(&sample, p, b, current, time)?;
     let properties = props(
         service,
-        "Id,Type,User,Restart,NRestarts,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,ExecStart,DropInPaths,NeedDaemonReload,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,KillMode,Delegate,MemorySwapMax",
+        "Id,Type,User,Restart,NRestarts,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,ExecStart,DropInPaths,NeedDaemonReload,ExecStartPre,ExecStartPost,ExecCondition,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,KillMode,Delegate,MemorySwapMax",
     )?;
     singleton227_capture::require(
         &properties,
@@ -350,23 +351,9 @@ fn guard(service: &str, b: &BoundFile, p: &Value, current: &Value, minimum: u64)
             ("NeedDaemonReload", "no"),
         ],
     )?;
-    for key in [
-        "ExecStartPre",
-        "ExecStartPost",
-        "ExecReload",
-        "ExecStop",
-        "ExecStopPost",
-        "OnSuccess",
-        "OnFailure",
-        "Environment",
-        "EnvironmentFiles",
-        "PassEnvironment",
-    ] {
-        ensure!(
-            properties.get(key).is_some_and(String::is_empty),
-            "207 guard has an unqualified extra hook or environment source:{key}"
-        );
-    }
+    let typed_empty_properties = empty_properties::capture(service, &properties)?;
+    ensure!(props(service, "Id,Type,User,Restart,NRestarts,MemoryMax,TasksMax,CPUQuotaPerSecUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,ExecStart,DropInPaths,NeedDaemonReload,ExecStartPre,ExecStartPost,ExecCondition,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,Environment,EnvironmentFiles,PassEnvironment,KillMode,Delegate,MemorySwapMax")? == properties,
+        "207 guard properties changed across typed empty-property reads");
     ensure!(
         properties.get("KillMode").map(String::as_str) == Some("control-group")
             && properties.get("Delegate").map(String::as_str) == Some("no"),
@@ -388,7 +375,7 @@ fn guard(service: &str, b: &BoundFile, p: &Value, current: &Value, minimum: u64)
         "207 guard effective executable/plan differs"
     );
     Ok(
-        json!({"selected":selected,"sample":sample,"properties":properties,"timer":timer(service,true)?}),
+        json!({"selected":selected,"sample":sample,"properties":properties,"typed_empty_properties":typed_empty_properties,"timer":timer(service,true)?}),
     )
 }
 fn guard_shape(g: &Value, p: &Value, b: &BoundFile, u: &Value, time: u64) -> Result<()> {
@@ -718,6 +705,8 @@ fn saved_protection(
     service: &str,
 ) -> Result<()> {
     guard_shape(&v["sample"], plan, binding, producer, time)?;
+    let properties: BTreeMap<String, String> = serde_json::from_value(v["properties"].clone())?;
+    empty_properties::validate(service, &properties, &v["typed_empty_properties"])?;
     let sample = bound_json(&serde_json::from_value(v["selected"]["binding"].clone())?)?;
     ensure!(
         sample == v["sample"] && v["selected"]["history"]["unit"] == service,
@@ -1234,12 +1223,10 @@ mod tests {
         let current = BTreeMap::new();
         let live =
             json!({"active":[{"epoch":205,"phase":"assembly","live":true}],"capped204205_work":[]});
-        assert!(
-            release205(&live, &current)
-                .unwrap_err()
-                .to_string()
-                .contains("still live")
-        );
+        assert!(release205(&live, &current)
+            .unwrap_err()
+            .to_string()
+            .contains("still live"));
         let suffix_only = json!({"active":[],"capped204205_work":[{"epoch":205,"positive_inactivity_confirmed":false,"live":false,"actual_suffix_native_barrier_passed":true}]});
         assert!(release205(&suffix_only, &current).is_err());
         let missing = json!({"active":[],"capped204205_work":[]});
