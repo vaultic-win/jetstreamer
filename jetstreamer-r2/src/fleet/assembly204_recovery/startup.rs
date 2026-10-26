@@ -506,9 +506,19 @@ pub(super) fn wait(
     );
     guard_shape(&p, x, &r["capacity_contents"], &gp, &g, &sample, &owner)?;
     warmup223::validate_completed_guard_history(&r["guard_history"], &sample)?;
+    ensure!(
+        r["guard_history"]["unit"] == p.guard_unit
+            && r["guard_history"]["executable"] == serde_json::to_value(&p.guard.path)?,
+        "204 consumed first guard unit or ELF changed"
+    );
     guard_manager(&p, &gp, &g, &sample)?;
     let admission: BoundFile = serde_json::from_value(r["admission"].clone())?;
     let a = read(&admission)?;
+    ensure!(
+        admission == downstream::issued_admission(x, spec, n(&source, "archive_bytes")?)?
+            && r["issuer"]["executable_sha256"] == p.runner.sha256,
+        "204 consumed release changed actual admission or issuer"
+    );
     downstream::installed_stage(
         x,
         spec,
@@ -571,6 +581,23 @@ fn saved_consumption(x: &downstream::StageSpec) -> Result<(BoundFile, Value)> {
     );
     deny(&c["authority"])?;
     deny(&r["authority"])?;
+    let cap: BoundFile = serde_json::from_value(r["capacity"].clone())?;
+    ensure!(
+        read(&cap)? == r["capacity_contents"],
+        "204 saved startup capacity changed"
+    );
+    capacity::validate_provenance(&r["capacity_contents"])?;
+    let (source, _) = lineage::load_source(&x.source)?;
+    let candidate = capacity::candidate_with_anchor(
+        x.stage,
+        n(&source, "archive_bytes")?,
+        downstream::anchor_reserve(x)?,
+    )?;
+    capacity::validate_capacity(
+        &r["capacity_contents"],
+        candidate.memory_max_bytes,
+        candidate.additional_bytes,
+    )?;
     fresh(
         n(&r, "released_unix_seconds")?,
         n(&r["guard_sample_contents"], "recorded_unix_seconds")?,
@@ -594,7 +621,9 @@ fn saved_consumption(x: &downstream::StageSpec) -> Result<(BoundFile, Value)> {
     )?;
     warmup223::validate_completed_guard_history(&r["guard_history"], &r["guard_sample_contents"])?;
     ensure!(
-        r["guard_history"]["executable"] == serde_json::to_value(&p.guard.path)?,
+        r["guard_history"]["unit"] == p.guard_unit
+            && r["guard_history"]["executable"] == serde_json::to_value(&p.guard.path)?
+            && r["issuer"]["executable_sha256"] == p.runner.sha256,
         "204 historical first guard ELF differs"
     );
     Ok((consumed, r))

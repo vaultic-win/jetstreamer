@@ -98,7 +98,7 @@ pub(super) fn stage_spec(v: &Value) -> Result<StageSpec> {
     ensure!(
         x.schema == "jetstreamer-epoch204-assembly-recovery-stage-spec-v1"
             && x.stage != Stage::Assembly
-            && (x.stage == Stage::Upload || x.environment_file.is_none()),
+            && (x.environment_file.is_some() == (x.stage == Stage::Upload)),
         "204 downstream stage spec scope"
     );
     private(&x.output_directory)?;
