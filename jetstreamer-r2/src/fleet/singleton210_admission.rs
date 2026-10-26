@@ -2,7 +2,9 @@
 use super::{singleton210 as c, *};
 mod custody;
 mod jit;
-pub(super) use jit::run as run_jit;
+pub(super) fn run_jit() -> Result<()> {
+    jit::run()
+}
 pub(super) fn jit_issuer_scope(name: &str) -> bool {
     jit::issuer_scope(name)
 }
