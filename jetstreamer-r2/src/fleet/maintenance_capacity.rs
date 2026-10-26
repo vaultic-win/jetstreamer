@@ -1087,15 +1087,19 @@ fn check_inner_with(
         "replay_launch_authorized":false,"local_retirement_authorized":false,"publication_authorized":false,"r2_mutations":false,
         "protected_guard_history_before":guard_history,"protected_guard_history_after":guard_history_after,
         "unit_census_after_memory_and_guard_checks":current,"memory_before":memory_before,"memory_after":memory_after,
-        "raw_unit_census_before":raw_before,"raw_unit_census_after":raw_after,
-        "raw_unit_census_after_memory_and_guard_checks":raw_current,
-        "completed_guard_endpoints_before":completed_guard_endpoints_before,
-        "completed_guard_endpoints_after":completed_guard_endpoints_after,
-        "completed_guard_endpoints_after_memory_and_guard_checks":completed_guard_endpoints_current,
-        "authenticated_completed_guard_rollover_brackets":raw_guard_rollover_brackets,
-        "authenticated_peer_guard_rollover_brackets":peer_guard_rollover_brackets,
         "capped_peer_accounting":{"raw_fleet_and_observer_preserved":true,"producer_and_independent_guard_hard_memory_charged":true,
             "full_admitted_disk_envelopes_charged":true,"allocation_credit_bytes":0}});
+    capacity["raw_unit_census_before"] = serde_json::to_value(&raw_before)?;
+    capacity["raw_unit_census_after"] = serde_json::to_value(&raw_after)?;
+    capacity["raw_unit_census_after_memory_and_guard_checks"] = serde_json::to_value(&raw_current)?;
+    capacity["completed_guard_endpoints_before"] =
+        serde_json::to_value(&completed_guard_endpoints_before)?;
+    capacity["completed_guard_endpoints_after"] =
+        serde_json::to_value(&completed_guard_endpoints_after)?;
+    capacity["completed_guard_endpoints_after_memory_and_guard_checks"] =
+        serde_json::to_value(&completed_guard_endpoints_current)?;
+    capacity["authenticated_completed_guard_rollover_brackets"] = raw_guard_rollover_brackets;
+    capacity["authenticated_peer_guard_rollover_brackets"] = peer_guard_rollover_brackets;
     if candidate_context.is_some() {
         capacity["candidate_accounting_before"] = candidate_before;
         capacity["candidate_accounting_after"] = candidate_after;
