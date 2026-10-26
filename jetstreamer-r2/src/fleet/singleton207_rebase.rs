@@ -382,7 +382,7 @@ fn guard(service: &str, b: &BoundFile, p: &Value, current: &Value, minimum: u64)
         properties["ReadWritePaths"] == text(p, "receipt_directory")?
             && private_prefix::same_command(
                 &json!(properties["ExecStart"]),
-                &selected["history"]["expected_exec_start"]
+                text(&selected["history"], "expected_exec_start")?,
             )
             && selected["history"]["executable"].as_str() == Some(singleton207::GUARD),
         "207 guard effective executable/plan differs"
