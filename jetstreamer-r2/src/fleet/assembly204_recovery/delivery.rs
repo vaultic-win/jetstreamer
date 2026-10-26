@@ -365,6 +365,34 @@ pub(super) fn capture_plugin_capacity(v: &Value, spec: &BoundFile, self_sha: &st
 mod tests {
     use super::*;
     #[test]
+    fn typed204_capacity_issuer_accepts_no_archive_or_arbitrary_child_arguments() {
+        let b = BoundFile {
+            path: "/sealed/b.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let tool = json!({"artifact":b,"qualification":b});
+        let recipe = json!({"original_plan":b,"original_terminal":b,"suffix_proof":b,"source_capture":b,
+            "recovery_plan":b,"admission":b,"launch":b,"outcome":b,"recovery_terminal":b});
+        let base = json!({"schema":"jetstreamer-epoch204-plugin-capacity-spec-v1","recipe":recipe,
+            "full":tool,"plugin":tool,"full_capacity":b,"launcher":b,"launcher_seal":b,
+            "output_directory":"/var/lib/jetstreamer/horizon-204-assembly-plugin-capacity-test"});
+        serde_json::from_value::<PluginProbeSpec>(base.clone()).unwrap();
+        for key in [
+            "arguments",
+            "archive",
+            "resource_basis",
+            "publication_authorized",
+            "epoch",
+        ] {
+            let mut changed = base.clone();
+            changed[key] = json!(true);
+            assert!(
+                serde_json::from_value::<PluginProbeSpec>(changed).is_err(),
+                "{key}"
+            );
+        }
+    }
+    #[test]
     fn typed204_actual_stage_cannot_borrow_another_binarys_capacity_or_anchor() {
         let b = BoundFile {
             path: "/sealed/b.json".into(),
