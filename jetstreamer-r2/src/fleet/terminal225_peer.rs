@@ -396,6 +396,7 @@ fn source_anchor(
     Ok(())
 }
 impl Profile {
+    #[cfg(test)]
     fn source_manifest_placeholder() -> BoundFile {
         BoundFile {
             path: SOURCE_MANIFEST.into(),
@@ -817,7 +818,7 @@ mod tests {
         let current = BTreeMap::from([(ORIGINAL_UNIT.into(), terminal())]);
         p.current(&f, &current).unwrap();
         assert!(p.extractor().is_none());
-        assert_eq!(p.without(&f)["active"], json!([]));
+        assert_eq!(p.without(&f).unwrap()["active"], json!([]));
         assert_eq!(p.without_current(&f, &current).unwrap().len(), 0);
         assert_eq!(p.retained_disk_reservation_bytes, 640u64 << 30);
         assert_eq!(p.reclamation_credit_bytes, 0);

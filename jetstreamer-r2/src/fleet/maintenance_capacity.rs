@@ -1011,7 +1011,7 @@ fn check_inner_with(
         capacity["terminal_observation_accounting"] = evidence.clone();
     }
     if let Some(profile) = &epoch225 {
-        capacity["epoch225_handoff"] = json!({"profile":s.epoch225_handoff.as_ref().map(|b|private157::binding(b)),
+        capacity["epoch225_handoff"] = json!({"profile":s.epoch225_handoff.as_ref().map(private157::binding),
             "phase":profile.phase(),"guard_before":epoch225_guard_before,
             "guard_after":epoch225_guard_after,
             "retained_disk_reservation_bytes":terminal225_peer::RETAINED_DISK_BYTES,
