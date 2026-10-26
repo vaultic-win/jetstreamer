@@ -1,0 +1,26 @@
+{
+  "schema": "jetstreamer-completed209-full-status-request-v1",
+  "mode": "initial",
+  "observer": {
+    "path": "ACTUAL_ADMITTED_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_ADMITTED_OBSERVER_SHA256"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-event-v10/fleet.json",
+    "sha256": "ACTUAL_RECONCILED_EVENT_FLEET_SHA256"
+  },
+  "launch": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-capture-v10/launch.json",
+    "sha256": "ACTUAL_744_CHILD_CAPTURE_SHA256"
+  },
+  "event": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-event-v10/event.json",
+    "sha256": "ACTUAL_RUST_GENERATED_EVENT_SHA256"
+  },
+  "policy": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-status-inputs-v10-initial/policy.json",
+    "sha256": "ACTUAL_CURRENT_POLICY_SHA256"
+  },
+  "estimate_receipt": "/var/lib/jetstreamer/horizon-generic209-full-status-v10-initial/estimate.json",
+  "receipt_directory": "/home/ubuntu/.jetstreamer-private/r2-status-receipts"
+}

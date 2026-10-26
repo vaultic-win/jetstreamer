@@ -22,7 +22,7 @@ fn selected(row: &Value) -> bool {
         .and_then(|u| u["Id"].as_str())
         .is_some_and(|n| n.starts_with("horizon-qualify-") && n.contains("-generic-"))
 }
-fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, Spec, Value)> {
+pub(super) fn claim_launch(claim: &PipelineClaim) -> Result<(BoundFile, Value, Spec, Value)> {
     ensure!(
         pipeline_scope(&claim.phase, &claim.unit) == Some(claim.epoch),
         "completed peer claim namespace differs"
@@ -412,6 +412,49 @@ fn guard(
 }
 fn sample_seconds(f: &Value) -> Result<u64> {
     utc_seconds(string(f, "sampled_at_utc")?)
+}
+/// Authenticate a captured child before its first fleet registration. Reuses
+/// exactly the live native/source and installed protective-control validators.
+pub(super) fn captured_live(claim: &PipelineClaim) -> Result<Value> {
+    let (binding, launch, spec, admission) = claim_launch(claim)?;
+    let p = Peer {
+        spec,
+        binding,
+        launch,
+        admission,
+        row: Value::Null,
+    };
+    let names = BTreeSet::from([
+        claim.unit.clone(),
+        p.spec.guard_units[p.spec.phase.name()].clone(),
+    ]);
+    // The caller separately brackets the complete campaign census. This local
+    // proof must not run global discovery with only the new child's two names.
+    let census = names
+        .iter()
+        .map(|name| Ok((name.clone(), unit(name)?)))
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    let (effective, process) = current(&p, &census)?;
+    let plan = read(&serde_json::from_value(p.launch["guard_plan"].clone())?)?;
+    let minimum = number(&p.admission, "recorded_unix_seconds")?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let selected = warmup223::completed_guard_binding(
+        &p.spec.guard_units[p.spec.phase.name()],
+        Path::new(string(&plan, "receipt_directory")?),
+        minimum,
+        now,
+    )?;
+    let bound: BoundFile = serde_json::from_value(selected["binding"].clone())?;
+    let protection = guard(
+        &p,
+        &BTreeMap::from([(claim.unit.clone(), bound)]),
+        &census,
+        minimum,
+        now,
+    )?;
+    Ok(
+        json!({"owner":census[&claim.unit],"effective_unit":effective,"process":process,"protection":protection}),
+    )
 }
 pub(in crate::fleet) fn peer_limits(
     f: &Value,

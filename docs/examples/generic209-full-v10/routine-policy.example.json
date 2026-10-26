@@ -1,0 +1,35 @@
+{
+  "schema": "jetstreamer-completed209-full-sidecar-policy-v1",
+  "epoch": 209,
+  "launch": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-capture-v10/launch.json",
+    "sha256": "ACTUAL_744_CHILD_CAPTURE_SHA256"
+  },
+  "observer": {
+    "path": "ACTUAL_NEXT_SCHEDULED_OBSERVER_PATH",
+    "sha256": "ACTUAL_NEXT_SCHEDULED_OBSERVER_SHA256"
+  },
+  "sampled_at_utc": "ACTUAL_NEXT_SCHEDULED_OBSERVER_CANONICAL_UTC",
+  "sidecar_inclusive": true,
+  "estimates_are_current_best_guesses": true,
+  "remaining_stage_millis": {
+    "remaining_full_verification": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS",
+    "plugin_verification": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS",
+    "boundary_checks": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS",
+    "upload": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS",
+    "readback": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS",
+    "sidecar_commit": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS",
+    "recovery": "REPLACE_WITH_CURRENT_POSITIVE_INTEGER_MILLIS"
+  },
+  "estimate_basis": "Replace with current evidence-backed best guess and uncertainty. Re-estimate remaining Full from actual progress/duration or an explicit recovery allowance; do not restart the initial countdown. Keep all remaining downstream work through sidecar commit.",
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-generic209-full-capture-v10/launch.json",
+      "sha256": "ACTUAL_744_CHILD_CAPTURE_SHA256"
+    },
+    {
+      "path": "ACTUAL_CURRENT_ESTIMATE_EVIDENCE_JSON_PATH",
+      "sha256": "ACTUAL_IMMUTABLE_FILE_SHA256"
+    }
+  ]
+}

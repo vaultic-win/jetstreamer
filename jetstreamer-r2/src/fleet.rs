@@ -339,6 +339,12 @@ pub(super) fn admit_singleton210() -> Result<()> {
 pub(super) fn admit_singleton210_jit() -> Result<()> {
     singleton210_admission::run_jit()
 }
+pub(super) fn prepare_completed209_full_event() -> Result<()> {
+    completed_archive_phase::prepare_full209_event()
+}
+pub(super) async fn publish_completed209_full_status() -> Result<()> {
+    completed_archive_phase::publish_full209_status().await
+}
 pub(super) fn capture_singleton210() -> Result<()> {
     singleton210_capture::run()
 }
@@ -3006,7 +3012,16 @@ pub(super) async fn run() -> Result<()> {
                 "metadata event cannot borrow replay admission"
             );
             let event = bound_json(binding)?;
-            if event["schema"] == assembly204_recovery::EVENT_SCHEMA {
+            if event["schema"] == completed_archive_phase::FULL209_EVENT_SCHEMA {
+                completed_archive_phase::full209_event_predecessor(
+                    &previous,
+                    &plan,
+                    &plan_bound,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == assembly204_recovery::EVENT_SCHEMA {
                 assembly204_recovery::event_predecessor(
                     &previous,
                     &plan,
@@ -3490,6 +3505,19 @@ pub(super) async fn run() -> Result<()> {
             "native227 event requires exactly one bound new owner"
         );
         singleton227_event::event_census(&previous, &before, claims[0])?;
+    }
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == completed_archive_phase::FULL209_EVENT_SCHEMA
+    {
+        completed_archive_phase::full209_event_census(
+            &bound_json(
+                plan.previous_fleet
+                    .as_ref()
+                    .context("completed209 predecessor missing")?,
+            )?,
+            &before,
+            &bound_json(binding)?,
+        )?;
     }
     ram_auxiliary::validate_census(plan.epoch203_ram_auxiliary.as_ref(), &before)?;
     let mut terminal_replays = Vec::new();
@@ -4132,6 +4160,9 @@ pub(super) async fn run() -> Result<()> {
                         || canary227_status::matches(receipt, epoch, &observer, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
+                        || completed_archive_phase::full209_event_status_matches(
+                            receipt, epoch, &observer, &before,
+                        )
                         || full210_status::matches(receipt, epoch, &observer, &before)
                         || demotion223_status::matches(receipt, epoch, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
@@ -4175,6 +4206,9 @@ pub(super) async fn run() -> Result<()> {
                 capped204205_work::status_matches(r, epoch, &capped_work)
                     || assembly204_recovery::status_matches(r, epoch, &recovery_work)
                     || continuation205_delivery::status_matches(r, epoch, &continuation205_work)
+                    || completed_archive_phase::full209_event_status_matches(
+                        r, epoch, &observer, &before,
+                    )
             });
             json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && (status.sampled_at_utc == sample || capped_current)})
         } else {

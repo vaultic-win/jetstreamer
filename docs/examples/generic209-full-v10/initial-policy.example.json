@@ -1,0 +1,43 @@
+{
+  "schema": "jetstreamer-completed209-full-sidecar-policy-v1",
+  "epoch": 209,
+  "launch": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-capture-v10/launch.json",
+    "sha256": "ACTUAL_744_CHILD_CAPTURE_SHA256"
+  },
+  "observer": {
+    "path": "ACTUAL_ADMITTED_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_ADMITTED_OBSERVER_SHA256"
+  },
+  "sampled_at_utc": "ACTUAL_CAPTURE_EVENT_CANONICAL_UTC",
+  "sidecar_inclusive": true,
+  "estimates_are_current_best_guesses": true,
+  "remaining_stage_millis": {
+    "remaining_full_verification": 14400000,
+    "plugin_verification": 21600000,
+    "boundary_checks": 1800000,
+    "upload": 14400000,
+    "readback": 14400000,
+    "sidecar_commit": 60000,
+    "recovery": 7200000
+  },
+  "estimate_basis": "Explicit provisional current best guess: 4 hours remaining Full, 6 hours current-plugin, 30 minutes boundary checks, 4 hours upload, 4 hours independent authenticated readback, 1 minute sidecar commit, and 2 hours recovery. Uncertainty is substantial; adjust from actual stage evidence before sealing. No allowance is a verification or publication gate.",
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-generic209-full-capture-v10/launch.json",
+      "sha256": "ACTUAL_744_CHILD_CAPTURE_SHA256"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-full209-status-initial336-model-v1/status-plan.json",
+      "sha256": "044bf4481950de79f7a69ceb0af9f68f21a831e051f1453b1f24b2469027d10d"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-generic209-probe-inputs-v2/full-capacity-receipt.json",
+      "sha256": "40b2d89178ef7bef3265ec5a4ad10d8766bd9dc0a0c91d4da78aa4fe1f390def"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-generic209-plugin-capacity-d663d6ef-v1/plugin-capacity-child.json",
+      "sha256": "3e349709a05f59d653f4c8de5ce0cb590163367bd160b331b0dd4cb3f69e63d2"
+    }
+  ]
+}

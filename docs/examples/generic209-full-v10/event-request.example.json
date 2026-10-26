@@ -1,0 +1,16 @@
+{
+  "schema": "jetstreamer-completed209-full-event-request-v1",
+  "observer": {
+    "path": "ACTUAL_ADMITTED_COORDINATED_OBSERVER_PATH",
+    "sha256": "ACTUAL_ADMITTED_OBSERVER_SHA256"
+  },
+  "previous_fleet": {
+    "path": "ACTUAL_ADMITTED_ACCEPTED_FLEET_PATH",
+    "sha256": "ACTUAL_ADMITTED_FLEET_SHA256"
+  },
+  "launch": {
+    "path": "/var/lib/jetstreamer/horizon-generic209-full-capture-v10/launch.json",
+    "sha256": "ACTUAL_744_CHILD_CAPTURE_SHA256"
+  },
+  "output_directory": "/var/lib/jetstreamer/horizon-generic209-full-event-v10"
+}

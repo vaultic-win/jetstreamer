@@ -6,6 +6,13 @@ mod barrier;
 mod capacity;
 mod decoder_capacity;
 mod empty_properties;
+mod full209_event;
+pub(super) use full209_event::{
+    event_census as full209_event_census, event_predecessor as full209_event_predecessor,
+    prepare as prepare_full209_event, publish as publish_full209_status,
+    status_matches as full209_event_status_matches,
+};
+pub(super) const FULL209_EVENT_SCHEMA: &str = full209_event::EVENT_SCHEMA;
 // Scope-limited metadata reuse for the separate Full 210 JIT issuer. These
 // helpers confer no generic completed-archive origin or execution authority.
 pub(super) fn jit210_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {

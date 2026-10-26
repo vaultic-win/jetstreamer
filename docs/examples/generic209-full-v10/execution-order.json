@@ -1,0 +1,83 @@
+{
+  "schema": "generic209-full-v10-event-status-source-examples-v1",
+  "examples_are_not_runtime_ready_until_all_actual_bindings_and_numeric_guesses_are_filled": true,
+  "runtime744_startup_and_worker_deployments_remain_byte_exact": true,
+  "metadata_helper": "NEW_ROOT_QUALIFIED_AND_RUST_SEALED_HELPER_CONTAINING_THIS_ADAPTER",
+  "metadata_helper_is_not_the_old744_binary_which_has_no_new_commands": true,
+  "provision_only_under_later_root_execution_authority": [
+    "New empty root0700 event output directory /var/lib/jetstreamer/horizon-generic209-full-event-v10",
+    "New root0700 estimate output directory /var/lib/jetstreamer/horizon-generic209-full-status-v10-initial",
+    "Rust-sealed root-owned readonly request/policy JSON packages; never hand-assemble a runtime deployment"
+  ],
+  "sequence": [
+    "Use unchanged744 for actual v10 admission, native waiter, correct-minimum-floor protective guard, root release and actual post-exec Full capture. Those commands require the exact744 issuer bound by its sealed phase/startup controls.",
+    "After capture and under one serialized metadata lease, fill/seal event-request with the exact observer and fleet used by that actual admission, plus actual captured launch. Run prepare-completed209-full-event using the newly qualified adapter helper.",
+    "Preserve the helper actual result and all generated immutable files. Run fleet-reconcile with the exact generated fleet-plan.json and freshly computed digest. Do not relabel the event as a new resource observation or claim sampled RSS credit.",
+    "Fill initial policy sampled_at_utc from the actual event (the actual captured child timestamp), bind the actual reconciled event fleet/event and current explicit positive sidecar-inclusive allowances, then Rust-seal status request/policy.",
+    "Run status-publish-completed209-full immediately. It produces verification phase only, derives original replay elapsed clock and actual jet metadata, authenticates current native child/source/guard/timer proof, then uses the existing conditional authenticated status writer.",
+    "At each sole normal coordinated observer, reconcile that real sample, generate a newly evidence-bound current policy and new observation-mode request, event=null. Publish once for the same coordinated cycle.",
+    "If the Full child ends or is replaced, this adapter rejects live publication. Handle the genuine next phase through its separately supported typed lifecycle; never mislabel replay, hide an active downstream owner, or treat missing status as archive completion."
+  ],
+  "commands": {
+    "prepare": [
+      "NEW_ADAPTER_HELPER",
+      "prepare-completed209-full-event",
+      "ROOT_SEALED_EVENT_REQUEST",
+      "--spec-sha256",
+      "ACTUAL_REQUEST_SHA256",
+      "--self-sha256",
+      "NEW_ADAPTER_HELPER_SHA256"
+    ],
+    "fleet": [
+      "NEW_ADAPTER_HELPER",
+      "fleet-reconcile",
+      "/var/lib/jetstreamer/horizon-generic209-full-event-v10/fleet-plan.json",
+      "--plan-sha256",
+      "ACTUAL_GENERATED_PLAN_SHA256"
+    ],
+    "initial_status": [
+      "NEW_ADAPTER_HELPER",
+      "status-publish-completed209-full",
+      "ROOT_SEALED_INITIAL_STATUS_REQUEST",
+      "--spec-sha256",
+      "ACTUAL_STATUS_REQUEST_SHA256",
+      "--self-sha256",
+      "NEW_ADAPTER_HELPER_SHA256"
+    ],
+    "routine_status": [
+      "NEW_ADAPTER_HELPER",
+      "status-publish-completed209-full",
+      "ROOT_SEALED_NEW_ROUTINE_STATUS_REQUEST",
+      "--spec-sha256",
+      "ACTUAL_NEW_STATUS_REQUEST_SHA256",
+      "--self-sha256",
+      "NEW_ADAPTER_HELPER_SHA256"
+    ]
+  },
+  "bounded_metadata_profile": {
+    "root": true,
+    "MemoryMax": 1073741824,
+    "MemorySwapMax": 0,
+    "CPUQuota": "100%",
+    "TasksMax": 256,
+    "TimeoutStartSec": 120,
+    "TOKIO_WORKER_THREADS": 4,
+    "capabilities": [
+      "CAP_DAC_OVERRIDE",
+      "CAP_SYS_PTRACE"
+    ],
+    "ProtectSystem": "strict",
+    "ProtectHome": "read-only",
+    "no_precreated_issuer_log": true,
+    "PrivateNetwork_for_prepare": true,
+    "R2_environment_file_for_fleet_and_status": "/etc/jetstreamer/horizon-r2-upload.env",
+    "neutral_issuer_units": [
+      "r2meta-v10-event",
+      "r2meta-v10-fleet",
+      "r2meta-v10-status"
+    ]
+  },
+  "guard_minimum_free_bytes_source": "ACTUAL_ADMISSION.capacity.minimum_free_bytes",
+  "archive_body_hashes_or_copies_by_adapter": 0,
+  "archive_or_sidecar_mutation_authority": false
+}

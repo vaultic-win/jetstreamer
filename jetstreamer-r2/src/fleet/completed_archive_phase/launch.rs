@@ -453,7 +453,13 @@ fn guard_manager(
     );
     Ok(json!({"properties":p,"timer":timer,"manager_completion":success[0],"journal_sha256":sha}))
 }
-fn saved_shape(v: &Value, s: &Spec, phase: Phase, self_sha: &str, a: &Value) -> Result<()> {
+pub(in crate::fleet::completed_archive_phase) fn saved_shape(
+    v: &Value,
+    s: &Spec,
+    phase: Phase,
+    self_sha: &str,
+    a: &Value,
+) -> Result<()> {
     barrier::transition_shape(
         &v["startup_release_contents"],
         s,
