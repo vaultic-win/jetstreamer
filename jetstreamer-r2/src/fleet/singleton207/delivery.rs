@@ -326,18 +326,34 @@ mod tests {
         let iid = "a".repeat(32);
         let u = json!({"Id":UNIT,"LoadState":"loaded","MainPID":"0","NRestarts":"0","InvocationID":iid,
             "ActiveState":"inactive","SubState":"dead","Result":"success","ExecMainStatus":"0",
-            "ExecStart":format!("{} ; ignore_errors=no }}",command())});
+            "ExecStart":format!("{} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",command())});
         terminal_manager(&u, &iid).unwrap();
+        let mut cleared = u.clone();
+        cleared["InvocationID"] = json!("");
+        terminal_manager(&cleared, &iid).unwrap();
         for (key, bad) in [
             ("InvocationID", json!("b".repeat(32))),
             ("MainPID", json!("42")),
             ("NRestarts", json!("1")),
+            ("ActiveState", json!("active")),
+            ("SubState", json!("running")),
             ("Result", json!("signal")),
+            ("ExecMainStatus", json!("1")),
+            ("LoadState", json!("not-found")),
             ("Id", json!(singleton209::UNIT)),
+            (
+                "ExecStart",
+                json!(format!(
+                    "{} --extra ; ignore_errors=no ; pid=0 }}",
+                    command()
+                )),
+            ),
         ] {
-            let mut changed = u.clone();
-            changed[key] = bad;
-            assert!(terminal_manager(&changed, &iid).is_err(), "{key}");
+            for manager in [&u, &cleared] {
+                let mut changed = manager.clone();
+                changed[key] = bad.clone();
+                assert!(terminal_manager(&changed, &iid).is_err(), "{key}");
+            }
         }
         let event = |t: &str, message: String| json!({"_PID":"1","_UID":"0","UNIT":UNIT,"INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":t,"MESSAGE":message});
         let events = json!([
@@ -346,6 +362,12 @@ mod tests {
         ]);
         let snapshot = json!({"schema":"jetstreamer-singleton207-delivery-terminal-snapshot-v1","invocation_id":iid,"terminal_proof":{"path":"/sealed/terminal.json","sha256":"a".repeat(64)},"manager":u,"events":events,"journal_rows":events,"journal_sha256":"c".repeat(64)});
         same_terminal(&snapshot, &snapshot).unwrap();
+        let mut cleared_snapshot = snapshot.clone();
+        cleared_snapshot["manager"] = cleared;
+        same_terminal(&cleared_snapshot, &cleared_snapshot).unwrap();
+        let mut missing_history = cleared_snapshot;
+        missing_history["journal_rows"] = json!([]);
+        assert!(same_terminal(&missing_history, &missing_history).is_err());
         let mut changed = snapshot.clone();
         changed["journal_rows"] = json!([{"replacement":true}]);
         assert!(same_terminal(&snapshot, &changed).is_err());
