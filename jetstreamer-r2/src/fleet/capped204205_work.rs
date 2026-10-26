@@ -4,6 +4,7 @@ use super::*;
 mod capture;
 mod evidence;
 mod historical_terminal;
+mod producer_terminal_guard;
 mod lifecycle;
 mod observer_handoff;
 mod peer;

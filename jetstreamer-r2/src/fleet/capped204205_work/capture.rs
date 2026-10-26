@@ -576,10 +576,6 @@ pub(super) fn run() -> Result<()> {
             artifacts.push(value);
         }
     }
-    let all_idle = names
-        .iter()
-        .filter(|n| epoch_scope(epoch, n))
-        .all(|n| idle(&before[n]) || historical_terminal.get(n.as_str()).is_some());
     let mut inactivity = Value::Null;
     let (stamp, ms) = current_stamp()?;
     let mut terminal_binding = Value::Null;
@@ -614,6 +610,25 @@ pub(super) fn run() -> Result<()> {
         )?;
         terminal_binding = private157::binding(&binding(&terminal_path)?);
     }
+    let terminal_guard = producer_terminal_guard::capture(
+        &p,
+        &l,
+        &before,
+        &terminal_binding,
+        &actors,
+        &s.authenticated_other_host_handoffs,
+        &s.output_directory,
+    )?;
+    let all_idle = names.iter().filter(|n| epoch_scope(epoch, n)).all(|n| {
+        if p["epoch"] == 205
+            && n == string(&p, "guard_unit").unwrap_or("")
+            && before[n]["ActiveState"] == "failed"
+        {
+            !terminal_guard.is_null()
+        } else {
+            idle(&before[n]) || historical_terminal.get(n.as_str()).is_some()
+        }
+    });
     if all_idle && s.authenticated_other_host_handoffs.is_empty() {
         let iid = string(&l, "invocation_id")?;
         let mut downstream_terminals = serde_json::Map::new();
@@ -677,7 +692,7 @@ pub(super) fn run() -> Result<()> {
         "previous_fleet":private157::binding(&s.previous_fleet),
         "next_observer_registration":private157::binding(&binding(&registration_path)?),
         "accepted_observer_is_context_not_new_producer_measurement":true,
-        "historical_terminal_owners":historical_terminal,"guard_snapshot":guard_binding,"downstream_actors":actors,"generated_archives":artifacts,"inactivity_snapshot":inactivity,
+        "historical_terminal_owners":historical_terminal,"producer_terminal_guard":terminal_guard,"guard_snapshot":guard_binding,"downstream_actors":actors,"generated_archives":artifacts,"inactivity_snapshot":inactivity,
         "terminal_snapshot":terminal_binding,
         "authenticated_other_host_handoffs":s.authenticated_other_host_handoffs,
         "resource_samples_taken":0,"archive_body_reads":0,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false});

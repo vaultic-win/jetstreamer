@@ -164,7 +164,9 @@ pub(super) fn validate(
     census: &BTreeMap<String, Value>,
 ) -> Result<BTreeSet<String>> {
     let Some(proofs) = frame.get("historical_terminal_owners") else {
-        return Ok(BTreeSet::new());
+        return Ok(producer_terminal_guard::validate(p, frame, census)?
+            .into_iter()
+            .collect());
     };
     let mut accepted = BTreeSet::new();
     for (name, v) in proofs
@@ -185,9 +187,13 @@ pub(super) fn validate(
             .authenticate(string(&journal, "raw")?.as_bytes())?;
         accepted.insert(name.clone());
     }
+    if let Some(name) = producer_terminal_guard::validate(p, frame, census)? {
+        accepted.insert(name);
+    }
     Ok(accepted)
 }
 pub(super) fn current(frame: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
+    producer_terminal_guard::current(frame, census)?;
     if let Some(proofs) = frame.get("historical_terminal_owners") {
         for (name, v) in proofs.as_object().context("invalid historical proof map")? {
             ensure!(
