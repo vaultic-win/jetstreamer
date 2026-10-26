@@ -575,7 +575,7 @@ pub(super) fn check_demotion223(
         candidate.additional_bytes == exact.additional_bytes
             && candidate.memory_max_bytes == exact.memory_max_bytes
             && candidate.minimum_protected_disk_bytes == exact.minimum_protected_disk_bytes,
-        "223candidate envelope differs"
+        "223 candidate envelope differs"
     );
     check_inner_with(
         value,

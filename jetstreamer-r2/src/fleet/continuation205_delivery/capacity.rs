@@ -1,4 +1,4 @@
-//! Distinct205 policy, sharing only the complete existing host/guard/floor math.
+//! Distinct 205 policy, sharing only the complete existing host/guard/floor math.
 use super::*;
 pub(super) fn candidate_with_anchor(
     stage: downstream::Stage,
