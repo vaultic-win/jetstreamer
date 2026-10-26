@@ -216,9 +216,12 @@ fn release_value(p: &Startup, binding: Option<&BoundFile>) -> Result<(BoundFile,
     Ok((b, serde_json::from_slice(&raw)?))
 }
 pub(super) fn saved_release(s: &Spec, binding: &BoundFile) -> Result<Value> {
+    Ok(resolve_release(s, Some(binding))?.1)
+}
+pub(super) fn resolve_release(s: &Spec, binding: Option<&BoundFile>) -> Result<(BoundFile, Value)> {
     let p = read_plan(&s.startup_plan)?;
     plan_shape(&p)?;
-    Ok(release_value(&p, Some(binding))?.1)
+    release_value(&p, binding)
 }
 pub(super) fn release_shape(v: &Value, s: &Spec, a: &Value) -> Result<()> {
     let p: Startup = serde_json::from_value(v["startup_plan_contents"].clone())?;

@@ -8,7 +8,7 @@ struct Capture {
     phase_spec: BoundFile,
     admission: BoundFile,
     guard_plan: BoundFile,
-    guard_sample: BoundFile,
+    guard_sample: Option<BoundFile>,
     startup_release: Option<BoundFile>,
     output: PathBuf,
 }
@@ -612,11 +612,29 @@ pub(super) fn validate_saved(v: &Value, s: &Spec, phase: Phase, self_sha: &str) 
     );
     Ok(v.clone())
 }
+fn selected_guard_sample(
+    supplied: Option<&BoundFile>,
+    waiting: bool,
+    latest: &Value,
+    startup: Option<&Value>,
+) -> Result<BoundFile> {
+    let selected: BoundFile = serde_json::from_value(if waiting {
+        latest["binding"].clone()
+    } else {
+        startup.context("completed child capture lacks startup release")?["guard_sample"].clone()
+    })?;
+    ensure!(
+        supplied.is_none_or(|bound| *bound == selected),
+        "completed explicitly bound guard sample differs from its genuine startup source"
+    );
+    Ok(selected)
+}
 fn collect(
     c: &Capture,
     binding: &BoundFile,
     self_sha: &str,
     waiting: bool,
+    startup: Option<&Value>,
 ) -> Result<(Spec, Value)> {
     let s: Spec = serde_json::from_value(read(&c.phase_spec)?)?;
     shape(&s)?;
@@ -645,7 +663,19 @@ fn collect(
     let effective = check_unit(&s, &argv)?;
     let snapshot = process_as(&s, &owner, &argv, waiting)?;
     let plan = read(&c.guard_plan)?;
-    let sample = read_sample(&c.guard_sample, &plan)?;
+    let latest = if waiting {
+        warmup223::completed_guard_binding(
+            &s.guard_units[s.phase.name()],
+            Path::new(string(&plan, "receipt_directory")?),
+            n(&admission, "recorded_unix_seconds")?,
+            now,
+        )?
+    } else {
+        Value::Null
+    };
+    let selected_sample =
+        selected_guard_sample(c.guard_sample.as_ref(), waiting, &latest, startup)?;
+    let sample = read_sample(&selected_sample, &plan)?;
     ensure!(
         sample["plan_sha256"] == c.guard_plan.sha256
             && sample["plan"] == serde_json::to_value(&c.guard_plan.path)?,
@@ -659,21 +689,6 @@ fn collect(
         &sample,
         n(&admission, "recorded_unix_seconds")?,
     )?;
-    let latest = if waiting {
-        let completed = warmup223::completed_guard_binding(
-            &s.guard_units[s.phase.name()],
-            Path::new(string(&plan, "receipt_directory")?),
-            n(&admission, "recorded_unix_seconds")?,
-            now,
-        )?;
-        ensure!(
-            completed["binding"] == private157::binding(&c.guard_sample),
-            "completed startup first guard is not latest completed firing"
-        );
-        completed
-    } else {
-        Value::Null
-    };
     ensure!(
         owner == unit(&s.units[s.phase.name()])?
             && effective == check_unit(&s, &argv)?
@@ -684,7 +699,7 @@ fn collect(
     guard_shape(&s, &admission, &plan, &sample, &owner, now)?;
     let launch = json!({"schema":if waiting {barrier::RELEASE}else{LAUNCH},"epoch":s.epoch,"phase":s.phase,"issuer_sha256":self_sha,"capture_spec":private157::binding(binding),"phase_spec":c.phase_spec,"admission":c.admission,
         "unit":s.units[s.phase.name()],"invocation_id":owner["InvocationID"],"owner":owner,"effective_unit":effective,"argv":argv,"process":snapshot,
-        "guard_unit":s.guard_units[s.phase.name()],"guard_plan":c.guard_plan,"guard_sample":c.guard_sample,"guard_plan_contents":plan,"guard_sample_contents":sample,"guard_manager":manager,"captured_unix_seconds":now,
+        "guard_unit":s.guard_units[s.phase.name()],"guard_plan":c.guard_plan,"guard_sample":selected_sample,"guard_plan_contents":plan,"guard_sample_contents":sample,"guard_manager":manager,"captured_unix_seconds":now,
         "startup_plan":s.startup_plan,"startup_plan_contents":barrier::validate_plan(&s,&argv)?,"phase_spec_contents":s,"admission_contents":admission,"guard_latest_completion":latest,"child_execution_authorized":waiting,
         "publication_authorized":false,"local_retirement_authorized":false,"remote_mutations":false,"r2_mutations":false});
     Ok((s, launch))
@@ -697,7 +712,7 @@ pub(super) fn release() -> Result<()> {
             && c.startup_release.is_none(),
         "completed startup release spec differs"
     );
-    let (s, value) = collect(&c, &binding, &self_sha, true)?;
+    let (s, value) = collect(&c, &binding, &self_sha, true, None)?;
     barrier::issue(&s, &c.output, &value)
 }
 pub(super) fn run() -> Result<()> {
@@ -708,13 +723,11 @@ pub(super) fn run() -> Result<()> {
         "completed launch capture schema differs"
     );
     validate_output_destination(&c.output)?;
-    let startup = c
-        .startup_release
-        .as_ref()
-        .context("completed launch requires real startup release")?;
-    let (s, mut value) = collect(&c, &binding, &self_sha, false)?;
-    let release = barrier::saved_release(&s, startup)?;
-    value["startup_release"] = private157::binding(startup);
+    let spec: Spec = serde_json::from_value(read(&c.phase_spec)?)?;
+    shape(&spec)?;
+    let (startup, release) = barrier::resolve_release(&spec, c.startup_release.as_ref())?;
+    let (s, mut value) = collect(&c, &binding, &self_sha, false, Some(&release))?;
+    value["startup_release"] = private157::binding(&startup);
     value["startup_release_contents"] = release;
     saved_shape(&value, &s, s.phase, &self_sha, &value["admission_contents"])?;
     private157::immutable_receipt(&c.output, &value)
@@ -838,6 +851,33 @@ pub(super) mod tests {
                 "accepted {key}"
             );
         }
+    }
+    #[test]
+    fn completed_launch_intrinsic_guard_selection_never_falls_back_to_supplied_or_future_evidence()
+    {
+        let first = BoundFile {
+            path: "/sealed/first-sample.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let future = BoundFile {
+            path: "/sealed/later-sample.json".into(),
+            sha256: "b".repeat(64),
+        };
+        let latest = json!({"binding":first});
+        let startup = json!({"guard_sample":first});
+        assert_eq!(
+            selected_guard_sample(None, true, &latest, None).unwrap(),
+            first
+        );
+        assert!(selected_guard_sample(Some(&future), true, &latest, None).is_err());
+        assert!(selected_guard_sample(Some(&first), true, &Value::Null, None).is_err());
+        let later = json!({"binding":future});
+        assert_eq!(
+            selected_guard_sample(None, false, &later, Some(&startup)).unwrap(),
+            first
+        );
+        assert!(selected_guard_sample(Some(&future), false, &later, Some(&startup)).is_err());
+        assert!(selected_guard_sample(Some(&first), false, &later, None).is_err());
     }
     #[test]
     fn completed_launch_cannot_use_a_caller_iid_in_place_of_actual_launch_capture() {
