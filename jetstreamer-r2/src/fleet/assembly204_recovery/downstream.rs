@@ -749,6 +749,29 @@ fn mutation_lock() -> Result<File> {
     );
     Ok(file)
 }
+/// Shared by the actual strict204 runner and its metadata-only preparation.
+/// The anchor values come from the real203 decoder, never from the204 target.
+pub(super) fn full_arguments(
+    scan: &Path,
+    anchor_slot: String,
+    anchor_hash: String,
+    expected: &lineage::Expected,
+) -> Result<Vec<String>> {
+    Ok(vec![
+        scan.display().to_string(),
+        "--full".into(),
+        "--anchor".into(),
+        anchor_slot,
+        anchor_hash,
+        "--expected-terminal".into(),
+        "88559999".into(),
+        s(&expected.document, "terminal_blockhash")?.into(),
+        "--expected-provenance-sha256".into(),
+        expected.digest.clone(),
+        "--threads".into(),
+        "8".into(),
+    ])
+}
 pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     let x = stage_spec(v)?;
     let (c, l) = lineage::load_source(&x.source)?;
@@ -828,20 +851,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
             commands.push(anchor_result);
             commands.push(child(
                 &t,
-                &[
-                    scan.display().to_string(),
-                    "--full".into(),
-                    "--anchor".into(),
-                    anchor_slot,
-                    anchor_hash,
-                    "--expected-terminal".into(),
-                    "88559999".into(),
-                    s(&l.expected.document, "terminal_blockhash")?.into(),
-                    "--expected-provenance-sha256".into(),
-                    l.expected.digest.clone(),
-                    "--threads".into(),
-                    "8".into(),
-                ],
+                &full_arguments(&scan, anchor_slot, anchor_hash, &l.expected)?,
                 &x.output_directory,
                 "full",
             )?);
