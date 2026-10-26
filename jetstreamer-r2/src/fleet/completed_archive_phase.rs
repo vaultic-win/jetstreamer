@@ -5,8 +5,15 @@ use super::*;
 mod barrier;
 mod capacity;
 mod decoder_capacity;
+mod delivery207_event;
 mod empty_properties;
 mod full209_event;
+pub(super) use delivery207_event::{
+    event_census as delivery207_event_census, event_predecessor as delivery207_event_predecessor,
+    prepare as prepare_delivery207_event, publish as publish_delivery207_status,
+    status_matches as delivery207_event_status_matches,
+};
+pub(super) const DELIVERY207_EVENT_SCHEMA: &str = delivery207_event::EVENT_SCHEMA;
 pub(super) use full209_event::{
     event_census as full209_event_census, event_predecessor as full209_event_predecessor,
     prepare as prepare_full209_event, publish as publish_full209_status,
@@ -1311,6 +1318,45 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typed207_consumers_use_its_archive_namespace_and_preserve_independent_stage_order() {
+        for phase in [Phase::Full, Phase::Plugin, Phase::Upload] {
+            let mut s = fixture(phase);
+            s.epoch = 207;
+            s.origin = Origin::Singleton207 {
+                launch: b("launch207"),
+                native_input: b("native207"),
+                terminal: b("terminal207"),
+                cohort_publication: b("cohort207"),
+            };
+            s.state_root = "/home/ubuntu/.jetstreamer-private/generic-delivery207".into();
+            for unit in s.units.values_mut() {
+                *unit = unit.replace("209", "207");
+            }
+            for unit in s.guard_units.values_mut() {
+                *unit = unit.replace("209", "207");
+            }
+            shape(&s).unwrap();
+            let directory = s.origin.root().join("output");
+            assert_eq!(directory, Path::new(singleton207::ROOT).join("output"));
+            let argv = command(&s, &directory).unwrap();
+            assert!(argv.iter().any(|arg| arg == directory.to_str().unwrap()));
+            assert!(argv.iter().any(|arg| arg == "207"));
+            assert!(
+                !argv
+                    .iter()
+                    .any(|arg| arg == "209" || arg.starts_with(singleton209::ROOT))
+            );
+            let mut changed = s.clone();
+            changed.epoch = 209;
+            assert!(shape(&changed).is_err());
+            if phase != Phase::Full {
+                let mut changed = s;
+                changed.prior.clear();
+                assert!(shape(&changed).is_err());
+            }
+        }
+    }
     fn b(name: &str) -> BoundFile {
         BoundFile {
             path: Path::new("/sealed").join(name),

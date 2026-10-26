@@ -3564,6 +3564,12 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("prepare-completed209-full-event") {
         return fleet::prepare_completed209_full_event();
     }
+    if env::args().nth(1).as_deref() == Some("prepare-completed207-phase-event") {
+        return fleet::prepare_completed207_phase_event();
+    }
+    if env::args().nth(1).as_deref() == Some("status-publish-completed207-phase") {
+        return fleet::publish_completed207_phase_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-completed209-full") {
         return fleet::publish_completed209_full_status().await;
     }
