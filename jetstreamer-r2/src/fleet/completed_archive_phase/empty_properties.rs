@@ -301,7 +301,7 @@ mod tests {
         Value::Object(roster(guard, credentials).into_iter().map(|(p,i,s)| (p.into(), json!({"unit":service,"object_path":path,"interface":i,"property":p,"signature":s,"exit_code":0,"stdout":serde_json::to_string(&json!({"type":s,"data":[]})).unwrap(),"stderr":""}))).collect())
     }
     #[test]
-    fn delivery_scope_additions_retain_exact_registered_JIT210_issuer_scope() {
+    fn delivery_scope_additions_retain_exact_registered_jit210_issuer_scope() {
         assert!(object_path("horizon-capacity210-jit-reviewed-v1.service").is_ok());
         assert!(object_path("horizon-capacity210-jit-.service").is_err());
         assert!(object_path("horizon-capacity210-jit-foreign.name.service").is_err());
