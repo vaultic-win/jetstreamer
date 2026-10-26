@@ -160,8 +160,14 @@ fn normalize(
             );
             empty_reply(
                 true,
-                text(r, "stdout")?.as_bytes(),
-                text(r, "stderr")?.as_bytes(),
+                r["stdout"]
+                    .as_str()
+                    .context("completed typed stdout is not text")?
+                    .as_bytes(),
+                r["stderr"]
+                    .as_str()
+                    .context("completed typed stderr is not text")?
+                    .as_bytes(),
                 signature,
             )?;
             effective.insert(property.into(), String::new());
