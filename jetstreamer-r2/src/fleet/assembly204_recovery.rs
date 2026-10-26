@@ -20,6 +20,7 @@ pub(super) fn accepted_context(fleet: &BoundFile, observer: &BoundFile) -> Resul
 }
 mod downstream;
 mod delivery;
+mod startup;
 pub(super) fn delivery_command_matches(actual: &str, expected: &str) -> bool {
     ownership::command_matches(actual, expected)
 }
@@ -253,6 +254,7 @@ pub(super) fn command_name(name: &str) -> bool {
         name,
         "capture-assembly204-recovery-terminal"
             | "prepare-assembly204-delivery"
+            | "release-assembly204-delivery-stage"
             | "capture-assembly204-recovery-sources"
             | "issue-assembly204-recovery-plan"
             | "admit-assembly204-recovery"
@@ -277,6 +279,7 @@ pub(super) async fn run(command: &str) -> Result<()> {
     let value = read(&spec)?;
     match command {
         "prepare-assembly204-delivery" => delivery::prepare(&value, &spec, &self_sha),
+        "release-assembly204-delivery-stage" => startup::release(&value, &spec, &self_sha),
         "capture-assembly204-recovery-terminal" => {
             custody::capture_terminal(&value, &spec, &self_sha)
         }

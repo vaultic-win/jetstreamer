@@ -1,4 +1,4 @@
-//! Metadata-only adapter for the genuine two-segment epoch204 assembly.
+//! Metadata-only adapter for the genuine two-segment epoch 204 assembly.
 //! This is preparation, never admission or an alternate payload executor.
 use super::*;
 
@@ -24,7 +24,7 @@ struct Preparation {
 
 // The generic verifier probe has four producer fields. For this distinct typed
 // origin their meaning is explicit: actual assembler ELF, genuine runtime worker,
-// recovery plan, and independently derived V4 provenance, respectively. No209
+// recovery plan, and independently derived V4 provenance, respectively. No 209
 // preflight or synthetic normal-producer manifest can stand in for these inputs.
 fn producer(recipe: &lineage::Recipe, plan: &Value, digest: &str) -> Result<Value> {
     ensure!(
@@ -167,6 +167,66 @@ pub(super) fn prepare(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()>
             "runtime_admission":false,"startup_release_issued":false,"authority":denied()
         }),
     )?;
+    Ok(())
+}
+
+pub(super) fn validate_saved(
+    binding: &BoundFile,
+    source: &lineage::DownstreamSource,
+) -> Result<()> {
+    let saved = read(binding)?;
+    ensure!(
+        saved["schema"] == "jetstreamer-epoch204-delivery-preparation-v1"
+            && saved["epoch"] == 204
+            && saved["kind"] == "AssemblyRecovery204"
+            && saved["runtime_admission"] == false
+            && saved["startup_release_issued"] == false,
+        "204 startup requires typed metadata preparation, not borrowed admission"
+    );
+    deny(&saved["authority"])?;
+    let recipe: lineage::Recipe = serde_json::from_value(saved["recipe"].clone())?;
+    let loaded = lineage::load_recipe(recipe.clone())?;
+    let (completion, _) = lineage::load_source(source)?;
+    ensure!(
+        completion["recipe"] == saved["recipe"]
+            && saved["expected_lineage"] == loaded.expected.document
+            && saved["archive_sha256_from_outcome"] == loaded.outcome["archive_sha256"]
+            && saved["archive_bytes_from_outcome"] == loaded.outcome["archive_bytes"],
+        "204 startup preparation differs from genuine completed source"
+    );
+    let identity = producer(
+        &recipe,
+        &read(&recipe.recovery_plan)?,
+        &loaded.expected.digest,
+    )?;
+    ensure!(
+        saved["producer_capacity_identity"] == identity,
+        "204 prepared producer changed"
+    );
+    let mut tools = BTreeMap::new();
+    for (key, role) in [
+        ("full", "full"),
+        ("plugin", "plugin"),
+        ("anchor", "boundary"),
+        ("upload", "upload"),
+    ] {
+        let tool: Tool = serde_json::from_value(saved["tools"][key].clone())?;
+        downstream::qualified_tool(role, &tool.artifact, &tool.qualification)?;
+        tools.insert(key, tool);
+    }
+    let full: BoundFile = serde_json::from_value(saved["full_capacity"].clone())?;
+    let count = full_capacity(
+        &read(&full)?,
+        &tools["full"],
+        &identity,
+        &read(&tools["full"].qualification)?,
+    )?;
+    let plugin: BoundFile =
+        serde_json::from_value(saved["plugin_capacity"]["bound_child"].clone())?;
+    ensure!(
+        plugin_probe(&plugin, &tools["plugin"], count)? == saved["plugin_capacity"],
+        "204 prepared plugin capacity changed"
+    );
     Ok(())
 }
 

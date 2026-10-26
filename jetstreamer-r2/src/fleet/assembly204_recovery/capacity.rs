@@ -57,7 +57,13 @@ pub(super) fn candidate_with_anchor(
     ensure!(bytes <= OUTPUT_MAX, "204 candidate bounds missing");
     Ok(maintenance_capacity::Candidate {
         additional_bytes: additional,
-        memory_max_bytes: memory,
+        memory_max_bytes: if stage == downstream::Stage::Assembly {
+            memory
+        } else {
+            memory
+                .checked_add(startup::GUARD_MEMORY)
+                .context("204 delivery guard memory overflow")?
+        },
         minimum_protected_disk_bytes: 0,
     })
 }

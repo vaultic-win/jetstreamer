@@ -78,6 +78,10 @@ pub(super) struct StageSpec {
     context: AcceptedContext,
     pub stage: Stage,
     pub source: lineage::DownstreamSource,
+    #[serde(default)]
+    pub startup: Option<BoundFile>,
+    #[serde(default)]
+    pub environment_file: Option<BoundFile>,
     gates: Vec<Gate>,
     tool: Option<BoundFile>,
     tool_qualification: Option<BoundFile>,
@@ -85,15 +89,16 @@ pub(super) struct StageSpec {
     anchor_tool_qualification: Option<BoundFile>,
     pub admission: PathBuf,
     pub output_directory: PathBuf,
-    scan_directory: PathBuf,
+    pub scan_directory: PathBuf,
     upload_receipt: Option<PathBuf>,
     neighbors: Vec<Neighbor>,
 }
-fn stage_spec(v: &Value) -> Result<StageSpec> {
+pub(super) fn stage_spec(v: &Value) -> Result<StageSpec> {
     let x: StageSpec = serde_json::from_value(v.clone())?;
     ensure!(
         x.schema == "jetstreamer-epoch204-assembly-recovery-stage-spec-v1"
-            && x.stage != Stage::Assembly,
+            && x.stage != Stage::Assembly
+            && (x.stage == Stage::Upload || x.environment_file.is_none()),
         "204 downstream stage spec scope"
     );
     private(&x.output_directory)?;
@@ -115,6 +120,9 @@ pub(super) fn stage_gate(g: &Gate, source: &lineage::DownstreamSource) -> Result
     let t = read(&g.terminal)?;
     ownership::validate_success_terminal(&t, g.stage.unit(), s(&t, "invocation_id")?)?;
     let o = read(&serde_json::from_value(t["outcome"].clone())?)?;
+    let spec: BoundFile = serde_json::from_value(o["spec"].clone())?;
+    let x = stage_spec(&read(&spec)?)?;
+    startup::validate_outcome(&x, &spec, &o)?;
     ensure!(
         o["schema"] == "jetstreamer-epoch204-assembly-recovery-stage-outcome-v1"
             && o["stage"] == serde_json::to_value(g.stage)?
@@ -167,7 +175,7 @@ fn full_anchor(x: &StageSpec) -> Result<&Neighbor> {
     )?;
     Ok(n)
 }
-fn anchor_reserve(x: &StageSpec) -> Result<u64> {
+pub(super) fn anchor_reserve(x: &StageSpec) -> Result<u64> {
     if x.stage == Stage::Full {
         Ok(full_anchor(x)?.bytes)
     } else {
@@ -213,7 +221,7 @@ pub(super) fn required_gates(stage: Stage) -> Result<&'static [Stage]> {
 pub(super) fn retirement_neighbor_epochs() -> [u64; 2] {
     [203, 205]
 }
-fn gates(x: &StageSpec) -> Result<Vec<Value>> {
+pub(super) fn gates(x: &StageSpec) -> Result<Vec<Value>> {
     let wanted = required_gates(x.stage)?;
     ensure!(
         x.gates.len() == wanted.len(),
@@ -339,7 +347,7 @@ struct StageAdmission {
     unit_file: BoundFile,
     capacity_output: PathBuf,
 }
-fn installed_stage(
+pub(super) fn installed_stage(
     x: &StageSpec,
     spec: &BoundFile,
     runner: &BoundFile,
@@ -423,10 +431,55 @@ fn installed_stage(
             == writes.iter().map(String::as_str).collect(),
         "204 stage writable namespace differs"
     );
-    let actual = singleton227_capture::properties(
+    let actual = completed_archive_phase::root204_properties(
         x.stage.unit(),
-        "FragmentPath,DropInPaths,NeedDaemonReload,Transient,ExecStart,MemoryMax,MemoryHigh,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,TasksMax,Type,User,Restart,ProtectSystem,ProtectHome,NoNewPrivileges,PrivateNetwork,Environment",
+        "FragmentPath,DropInPaths,NeedDaemonReload,Transient,ExecStart,MemoryMax,MemoryHigh,MemorySwapMax,RuntimeMaxUSec,CPUQuotaPerSecUSec,TasksMax,Type,User,Restart,KillMode,Delegate,ProtectSystem,ProtectHome,NoNewPrivileges,PrivateNetwork,PrivateTmp,PrivateDevices,InaccessiblePaths,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,CapabilityBoundingSet,AmbientCapabilities,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure,ReadWritePaths,LimitCORE,LimitCORESoft,LimitFSIZE,LimitFSIZESoft",
     )?;
+    completed_archive_phase::root204_environment(&actual, x.environment_file.as_ref())?;
+    for key in [
+        "ExecCondition",
+        "ExecStartPre",
+        "ExecStartPost",
+        "ExecReload",
+        "ExecStop",
+        "ExecStopPost",
+        "OnSuccess",
+        "OnFailure",
+    ] {
+        ensure!(
+            actual.get(key).is_some_and(String::is_empty),
+            "204 stage has unqualified hook: {key}"
+        );
+    }
+    singleton227_capture::require(
+        &actual,
+        &[
+            ("KillMode", "control-group"),
+            ("Delegate", "no"),
+            ("PrivateTmp", "yes"),
+            ("PrivateDevices", "yes"),
+            ("CapabilityBoundingSet", "cap_dac_override"),
+            ("AmbientCapabilities", "cap_dac_override"),
+            ("LimitCORE", "0"),
+            ("LimitCORESoft", "0"),
+            ("LimitFSIZE", "171798691840"),
+            ("LimitFSIZESoft", "171798691840"),
+        ],
+    )?;
+    ensure!(
+        actual
+            .get("InaccessiblePaths")
+            .map(|v| v.split_whitespace().collect::<BTreeSet<_>>())
+            == Some(BTreeSet::from(["/tmp", "/var/tmp"])),
+        "204 stage has writable temporary paths outside admitted root"
+    );
+    ensure!(
+        actual
+            .get("ReadWritePaths")
+            .map(|v| v.split_whitespace().collect::<BTreeSet<_>>())
+            == Some(writes.iter().map(String::as_str).collect()),
+        "204 effective writable namespace differs"
+    );
     ensure!(
         actual
             .get("FragmentPath")
@@ -478,6 +531,7 @@ pub(super) fn admit_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result
         "204 stage admission spec"
     );
     let x = stage_spec(&read(&a.stage_spec)?)?;
+    startup::before_admission(&x)?;
     x.context.matches_basis(&a.resource_basis)?;
     let (source, _) = lineage::load_source(&x.source)?;
     gates(&x)?;
@@ -517,7 +571,7 @@ pub(super) fn admit_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Result
     )?;
     Ok(())
 }
-fn issued_admission(x: &StageSpec, spec: &BoundFile, bytes: u64) -> Result<BoundFile> {
+pub(super) fn issued_admission(x: &StageSpec, spec: &BoundFile, bytes: u64) -> Result<BoundFile> {
     let b = binding(&x.admission)?;
     let a = read(&b)?;
     deny(&a["authority"])?;
@@ -776,17 +830,20 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
     let x = stage_spec(v)?;
     let (c, l) = lineage::load_source(&x.source)?;
     let predecessors = gates(&x)?;
-    let _mutation_lease = if matches!(x.stage, Stage::Import | Stage::Upload) {
-        Some(mutation_lock()?)
-    } else {
-        None
-    };
     if x.stage != Stage::Import {
         tool(&x)?;
     }
     let admission = issued_admission(&x, spec, n(&c, "archive_bytes")?)?;
     let current = ownership::current_actor(x.stage, spec, self_sha)?;
     ownership::no_overlap(&x.context, Some(x.stage))?;
+    // Same root process waits here before taking any archive handle, hashing,
+    // copying, acquiring a mutation lease, or starting any child.
+    let startup_release = startup::wait(&x, spec, self_sha)?;
+    let _mutation_lease = if matches!(x.stage, Stage::Import | Stage::Upload) {
+        Some(mutation_lock()?)
+    } else {
+        None
+    };
     let scan = x.scan_directory.join("epoch-204.jet");
     let sha = s(&c, "archive_sha256")?;
     let bytes = n(&c, "archive_bytes")?;
@@ -1027,7 +1084,7 @@ pub(super) async fn run_stage(v: &Value, spec: &BoundFile, self_sha: &str) -> Re
     write(
         &x.output_directory.join("outcome.json"),
         &json!({"schema":"jetstreamer-epoch204-assembly-recovery-stage-outcome-v1",
-        "stage":x.stage,"source":x.source,"unit":x.stage.unit(),"invocation_id":current["InvocationID"],
+        "stage":x.stage,"source":x.source,"startup_release":startup_release,"unit":x.stage.unit(),"invocation_id":current["InvocationID"],
         "spec":spec,"admission":admission,"archive_sha256":sha,"archive_bytes":bytes,"commands":commands,
         "retirement_boundary_only":x.stage==Stage::Boundary,"local_retirement_authorized":false,"predecessor_gates":x.gates,"predecessor_outcomes":predecessors,"imported":imported,"passed":true,
         "issuer":issuer(spec,self_sha),"authority":denied()}),

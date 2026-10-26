@@ -415,6 +415,8 @@ fn assembly204_recovery_memory_required(
 ) -> Result<(u64, Value)> {
     let base = if candidate == (64u64 << 30) + (128u64 << 20) {
         64u64 << 30
+    } else if candidate == 65u64 << 30 || candidate == 17u64 << 30 {
+        candidate - (1u64 << 30)
     } else {
         candidate
     };
@@ -459,6 +461,8 @@ pub(super) fn validate_assembly204_recovery_memory_policy(
     };
     let base = if candidate == (64u64 << 30) + (128u64 << 20) {
         64u64 << 30
+    } else if candidate == 65u64 << 30 || candidate == 17u64 << 30 {
+        candidate - (1u64 << 30)
     } else {
         candidate
     };

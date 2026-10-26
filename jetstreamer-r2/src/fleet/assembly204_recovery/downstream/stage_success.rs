@@ -241,6 +241,8 @@ pub(in crate::fleet::assembly204_recovery) fn validate(t: &Value, raw: &[u8]) ->
     context.validate_saved(&origin.census_before)?;
     let outcome = read(&serde_json::from_value(t["outcome"].clone())?)?;
     let x: StageSpec = serde_json::from_value(input.stage_spec.clone())?;
+    let stage_binding: BoundFile = serde_json::from_value(input.launch["stage_spec"].clone())?;
+    startup::validate_outcome(&x, &stage_binding, &outcome)?;
     ensure!(
         t["outcome"]["path"]
             == x.output_directory

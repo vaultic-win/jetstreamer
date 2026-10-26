@@ -143,6 +143,15 @@ fn current(p: &Peer, census: &BTreeMap<String, Value>) -> Result<()> {
             .context("204 recovery resource guard omitted")?;
         ensure!(is_live(guard), "204 recovery guard inactive");
         same_owner(&p.launch["guard"], guard)?;
+    } else {
+        let b: BoundFile = serde_json::from_value(p.launch["stage_spec"].clone())?;
+        let x = downstream::stage_spec(&read(&b)?)?;
+        startup::current_protection(
+            &x,
+            &b,
+            owner,
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        )?;
     }
     let old = census
         .get(OLD_UNIT)
@@ -162,6 +171,8 @@ pub(in crate::fleet) fn peer_current(
         current(&p, census)?;
         if p.stage == downstream::Stage::Assembly {
             view.remove(GUARD);
+        } else {
+            view.remove(startup::guard_for_stage(p.stage)?);
         }
     }
     Ok(view)
@@ -189,7 +200,12 @@ fn protection(p: &Peer, bounds: &BTreeMap<String, BoundFile>, now: u64) -> Resul
             at / 1000 <= now && now - at / 1000 <= 900,
             "204 downstream protection frame stale"
         );
-        Ok(frame)
+        let b: BoundFile = serde_json::from_value(p.launch["stage_spec"].clone())?;
+        let x = downstream::stage_spec(&read(&b)?)?;
+        let current = unit(p.stage.unit())?;
+        Ok(
+            json!({"frame":frame,"root204_startup":startup::current_protection(&x,&b,&current,now)?}),
+        )
     }
 }
 fn assembly_protection_with(
@@ -235,7 +251,9 @@ pub(in crate::fleet) fn peer_limits(
         let guard = if p.stage == downstream::Stage::Assembly {
             kernel(census.get(GUARD).context("204 peer guard")?, GUARD_MEMORY)?
         } else {
-            Value::Null
+            json!({"memory_max_bytes":startup::GUARD_MEMORY,"memory_current_bytes":0,
+                "remaining_hard_memory_growth_bytes":startup::GUARD_MEMORY,
+                "accounting":"full independent root204 guard cap; no allocation credit"})
         };
         limits.insert(
             p.stage.unit().into(),
@@ -264,7 +282,9 @@ pub(in crate::fleet) fn peer_resources(
         let guard = if p.stage == downstream::Stage::Assembly {
             kernel(census.get(GUARD).context("204 peer guard")?, GUARD_MEMORY)?
         } else {
-            Value::Null
+            json!({"memory_max_bytes":startup::GUARD_MEMORY,"memory_current_bytes":0,
+                "remaining_hard_memory_growth_bytes":startup::GUARD_MEMORY,
+                "accounting":"full independent root204 guard cap; no allocation credit"})
         };
         // Retain the full admitted disk envelope even when files have already
         // allocated blocks. No caller-asserted or RSS credit is available.

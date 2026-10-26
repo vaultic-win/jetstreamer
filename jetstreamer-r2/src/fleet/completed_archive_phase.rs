@@ -23,6 +23,32 @@ pub(super) fn jit210_native_text(path: impl AsRef<Path>, maximum: u64) -> Result
 
 mod launch;
 mod peer;
+pub(super) fn root204_properties(name:&str,fields:&str)->Result<BTreeMap<String,String>> {
+    ensure!(assembly204_recovery::scope(name,204,204) || guard_scope(name,204,204),
+        "204 manager query escaped typed actor/guard namespace");
+    barrier::properties(name,fields)
+}
+// Reuse low-level manager/native checks without admitting a204 generic origin.
+pub(super) fn root204_guard_timer(name: &str) -> Result<Value> {
+    ensure!(guard_scope(name, 204, 204), "204 guard timer namespace differs");
+    let p = barrier::guard_timer_properties(name)?;
+    validate_guard_timer(&p, name)?;
+    Ok(serde_json::to_value(p)?)
+}
+pub(super) fn root204_guard_controls(p: &BTreeMap<String, String>) -> Result<()> {
+    validate_guard_controls(p)
+}
+pub(super) fn root204_start_ticks(raw: &str) -> Result<u64> {
+    launch::start_ticks(raw)
+}
+pub(super) fn root204_start_clock(ticks: u64) -> Result<Value> {
+    launch::native_start_clock(ticks)
+}
+pub(super) fn root204_environment(p: &BTreeMap<String,String>, file:Option<&BoundFile>) -> Result<()> {
+    validate_environment_sources(p,file)?;
+    if let Some(b)=file { validate_credential_bytes(&bound_bytes(b,64<<10,0)?)?; }
+    Ok(())
+}
 pub(super) use peer::{
     GuardSelectionProfile, claim_names, peer_current, peer_guard_selection_profiles, peer_guards,
     peer_limits, peer_memory_views, peer_names, peer_observation, peer_resources, peer_view,

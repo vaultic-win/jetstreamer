@@ -394,7 +394,7 @@ fn manager_reply(mut command: ProcessCommand) -> Result<std::process::Output> {
     );
     Ok(output)
 }
-fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+pub(super) fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     let mut command = ProcessCommand::new("/usr/bin/systemctl");
     command.args(["show", name, "--no-pager", &format!("--property={fields}")]);
     let output = manager_reply(command)?;
