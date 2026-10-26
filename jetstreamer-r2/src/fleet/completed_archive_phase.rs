@@ -530,7 +530,7 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
             == vec![format!("ExecStart={}", unit_argv.join(" "))],
         "completed phase command differs"
     );
-    let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
+    let fields = "Id,LoadState,Type,User,Group,Restart,KillMode,Delegate,FragmentPath,DropInPaths,NeedDaemonReload,Transient,MemoryHigh,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,LimitFSIZE,LimitFSIZESoft,LimitCORE,LimitCORESoft,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateTmp,PrivateDevices,PrivateNetwork,InaccessiblePaths,CapabilityBoundingSet,AmbientCapabilities,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,OnSuccess,OnFailure,ExecStart,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost";
     let p = singleton227_capture::properties(name, fields)?;
     let (high, max, runtime) = s.phase.profile();
     for (k, v) in [
@@ -576,6 +576,12 @@ fn check_unit(s: &Spec, argv: &[String]) -> Result<Value> {
             "completed phase has extra capabilities"
         );
     }
+    ensure!(
+        p.get("InaccessiblePaths")
+            .map(|v| v.split_whitespace().collect::<BTreeSet<_>>())
+            == Some(BTreeSet::from(["/tmp", "/var/tmp"])),
+        "completed phase has writable temporary paths outside its guarded metadata namespace"
+    );
     let environments = BTreeSet::from([
         "PATH=/usr/bin:/bin",
         "LC_ALL=C",
