@@ -276,14 +276,8 @@ fn snapshot(
         "205 waiter has already started another process"
     );
     let mount = native(proc.join("mountinfo"), 4 << 20)?;
-    ensure!(
-        mount.lines().any(|line| {
-            let f = line.split_whitespace().collect::<Vec<_>>();
-            f.get(4).copied() == Some(ROOT)
-                && f.get(5).is_some_and(|v| v.split(',').any(|v| v == "ro"))
-        }),
-        "205 startup genuine source mount is not readonly"
-    );
+    let source_mount_proof =
+        completed_archive_phase::delivery_source_readonly_mount(Path::new(ROOT), &mount)?;
     ensure!(
         completed_archive_phase::root205_start_ticks(&native(proc.join("stat"), 64 << 10)?)?
             == ticks,
@@ -292,7 +286,7 @@ fn snapshot(
     Ok(
         json!({"pid":pid,"start_ticks":ticks,"clock":completed_archive_phase::root205_start_clock(ticks)?,
         "invocation_id":owner["InvocationID"],"cgroup":group,"limits":limits,"runner":p.runner,"argv":expected,
-        "credential_environment_sha256":credential_digest,"native_credentials":capabilities}),
+        "source_mount_proof":source_mount_proof,"credential_environment_sha256":credential_digest,"native_credentials":capabilities}),
     )
 }
 fn fresh(release: u64, guard: u64, at: u64, elapsed: Duration) -> Result<()> {

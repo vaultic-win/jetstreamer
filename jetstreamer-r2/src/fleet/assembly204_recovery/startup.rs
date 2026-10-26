@@ -163,6 +163,31 @@ fn native(path: impl AsRef<Path>, maximum: u64) -> Result<String> {
     );
     Ok(String::from_utf8(bytes)?)
 }
+fn native_credentials(raw: &str) -> Result<Value> {
+    let fields = raw
+        .lines()
+        .filter_map(|l| l.split_once(':'))
+        .collect::<BTreeMap<_, _>>();
+    for key in ["Uid", "Gid"] {
+        ensure!(
+            fields
+                .get(key)
+                .is_some_and(|v| v.split_whitespace().collect::<Vec<_>>() == ["0", "0", "0", "0"]),
+            "204 native root credentials differ"
+        );
+    }
+    for key in ["CapEff", "CapPrm", "CapBnd", "CapAmb"] {
+        ensure!(
+            fields
+                .get(key)
+                .is_some_and(|v| v.trim() == "0000000000080002"),
+            "204 exact native capabilities differ: {key}"
+        );
+    }
+    Ok(
+        json!({"uid":0,"gid":0,"effective":"0000000000080002","permitted":"0000000000080002","bounding":"0000000000080002","ambient":"0000000000080002"}),
+    )
+}
 fn snapshot(
     x: &downstream::StageSpec,
     spec: &BoundFile,
@@ -204,12 +229,7 @@ fn snapshot(
             "204 startup inherited unsafe execution variable"
         );
     }
-    ensure!(
-        native(proc.join("status"), 64 << 10)?
-            .lines()
-            .any(|v| v == "CapEff:\t0000000000000002"),
-        "204 startup effective root capability set differs"
-    );
+    let capabilities = native_credentials(&native(proc.join("status"), 64 << 10)?)?;
     let expected = vec![
         p.runner.path.display().to_string(),
         "run-assembly204-recovery-stage".into(),
@@ -255,14 +275,8 @@ fn snapshot(
         "204 waiter has already started another process"
     );
     let mount = native(proc.join("mountinfo"), 4 << 20)?;
-    ensure!(
-        mount.lines().any(|line| {
-            let f = line.split_whitespace().collect::<Vec<_>>();
-            f.get(4).copied() == Some(ROOT)
-                && f.get(5).is_some_and(|v| v.split(',').any(|v| v == "ro"))
-        }),
-        "204 startup genuine source mount is not readonly"
-    );
+    let source_mount_proof =
+        completed_archive_phase::delivery_source_readonly_mount(Path::new(ROOT), &mount)?;
     ensure!(
         completed_archive_phase::root204_start_ticks(&native(proc.join("stat"), 64 << 10)?)?
             == ticks,
@@ -271,7 +285,7 @@ fn snapshot(
     Ok(
         json!({"pid":pid,"start_ticks":ticks,"clock":completed_archive_phase::root204_start_clock(ticks)?,
         "invocation_id":owner["InvocationID"],"cgroup":group,"limits":limits,"runner":p.runner,"argv":expected,
-        "credential_environment_sha256":credential_digest}),
+        "source_mount_proof":source_mount_proof,"credential_environment_sha256":credential_digest,"native_credentials":capabilities}),
     )
 }
 fn fresh(release: u64, guard: u64, at: u64, elapsed: Duration) -> Result<()> {
@@ -847,6 +861,28 @@ pub(super) fn validate_outcome(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn root204_native_credentials_require_exact_root_dac_and_ptrace_sets_for_existing_reference_census()
+     {
+        let valid = "Uid:\t0\t0\t0\t0\nGid:\t0\t0\t0\t0\nCapEff:\t0000000000080002\nCapPrm:\t0000000000080002\nCapBnd:\t0000000000080002\nCapAmb:\t0000000000080002\n";
+        native_credentials(valid).unwrap();
+        for key in ["Uid", "Gid", "CapEff", "CapPrm", "CapBnd", "CapAmb"] {
+            let missing = valid
+                .lines()
+                .filter(|row| !row.starts_with(&format!("{key}:")))
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(native_credentials(&missing).is_err(), "{key}");
+        }
+        for value in ["0000000000000002", "0000000000080000", "0000000000080003"] {
+            assert!(native_credentials(&valid.replace("0000000000080002", value)).is_err());
+        }
+        assert!(
+            native_credentials(&valid.replace("Uid:\t0\t0\t0\t0", "Uid:\t1000\t1000\t1000\t1000"))
+                .is_err()
+        );
+    }
+
     #[test]
     fn root204_startup_deadline_and_final_guard_freshness_are_strict() {
         fresh(100, 90, 110, Duration::from_secs(299)).unwrap();

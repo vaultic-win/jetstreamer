@@ -63,6 +63,11 @@ pub(super) fn root205_credential_digest(
 pub(super) fn root205_bound_log(b: &BoundFile) -> Result<Vec<u8>> {
     bound_bytes(b, 64 << 20, 0)
 }
+/// Use the already qualified covering-mount and writable-descendant checks for
+/// both new delivery routes; systemd may elide a redundant child bind mount.
+pub(super) fn delivery_source_readonly_mount(source: &Path, raw: &str) -> Result<Value> {
+    barrier::archive_readonly_mount(source, raw)
+}
 pub(super) fn root204_bound_log(binding: &BoundFile) -> Result<Vec<u8>> {
     bound_bytes(binding, 64 << 20, 0)
 }
@@ -141,36 +146,6 @@ pub(super) fn root204_credential_digest(
             "204 non-upload process inherited unbound R2 credentials"
         );
         Ok(None)
-    }
-}
-#[cfg(test)]
-mod root204_credential_tests {
-    use super::*;
-    #[test]
-    fn root204_upload_credentials_bind_actual_values_without_disclosing_them() {
-        let expected = BTreeMap::from([
-            ("HORIZON_S3_ENDPOINT".into(), "fake-endpoint".into()),
-            ("HORIZON_ACCESS_KEY_ID".into(), "fake-access".into()),
-            ("HORIZON_SECRET_ACCESS_KEY".into(), "fake-secret".into()),
-        ]);
-        let actual = "HORIZON_S3_ENDPOINT=fake-endpoint\0HORIZON_ACCESS_KEY_ID=fake-access\0HORIZON_SECRET_ACCESS_KEY=fake-secret\0TOKIO_WORKER_THREADS=4\0";
-        let digest = normalized_credential_digest(&expected, actual).unwrap();
-        assert!(is_lower_hex(&digest, 64));
-        for changed in [
-            actual.replace("fake-secret", "wrong-secret"),
-            actual.replace("HORIZON_ACCESS_KEY_ID=fake-access\0", ""),
-        ] {
-            let error = normalized_credential_digest(&expected, &changed)
-                .unwrap_err()
-                .to_string();
-            assert!(!error.contains("fake-secret") && !error.contains("wrong-secret"));
-        }
-        assert!(root204_credential_digest(actual, None).is_err());
-        assert!(
-            root204_credential_digest("TOKIO_WORKER_THREADS=4\0", None)
-                .unwrap()
-                .is_none()
-        );
     }
 }
 pub(super) use peer::{
@@ -1684,5 +1659,62 @@ mod tests {
         let mut bad = events;
         bad[0]["__REALTIME_TIMESTAMP"] = json!("899000000");
         assert!(launch_terminal_order(&launch, &bad, &admission).is_err());
+    }
+}
+
+#[cfg(test)]
+mod root204_credential_tests {
+    use super::*;
+    #[test]
+    fn root204_upload_credentials_bind_actual_values_without_disclosing_them() {
+        let expected = BTreeMap::from([
+            ("HORIZON_S3_ENDPOINT".into(), "fake-endpoint".into()),
+            ("HORIZON_ACCESS_KEY_ID".into(), "fake-access".into()),
+            ("HORIZON_SECRET_ACCESS_KEY".into(), "fake-secret".into()),
+        ]);
+        let actual = "HORIZON_S3_ENDPOINT=fake-endpoint\0HORIZON_ACCESS_KEY_ID=fake-access\0HORIZON_SECRET_ACCESS_KEY=fake-secret\0TOKIO_WORKER_THREADS=4\0";
+        let digest = normalized_credential_digest(&expected, actual).unwrap();
+        assert!(is_lower_hex(&digest, 64));
+        for changed in [
+            actual.replace("fake-secret", "wrong-secret"),
+            actual.replace("HORIZON_ACCESS_KEY_ID=fake-access\0", ""),
+        ] {
+            let error = normalized_credential_digest(&expected, &changed)
+                .unwrap_err()
+                .to_string();
+            assert!(!error.contains("fake-secret") && !error.contains("wrong-secret"));
+        }
+        assert!(root204_credential_digest(actual, None).is_err());
+        assert!(
+            root204_credential_digest("TOKIO_WORKER_THREADS=4\0", None)
+                .unwrap()
+                .is_none()
+        );
+    }
+}
+
+#[cfg(test)]
+mod delivery_mount_integration_tests {
+    use super::*;
+    #[test]
+    fn root204_and205_delivery_mounts_reuse_covering_readonly_checks_without_writable_source_exemption()
+     {
+        for source in [
+            "/var/lib/jetstreamer/horizon-204-assembly-only-recovery-v2",
+            "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-205-bounded8-refresh421-v1",
+        ] {
+            let root = "1 0 8:1 / / ro - ext4 /dev/root rw\n";
+            let writable_sibling = format!(
+                "{root}2 1 8:1 / /var/lib/jetstreamer/metadata-state rw - ext4 /dev/root rw\n"
+            );
+            let proof =
+                delivery_source_readonly_mount(Path::new(source), &writable_sibling).unwrap();
+            assert_eq!(proof["covering_mountpoint"], "/");
+            let writable_source = format!("{root}2 1 8:1 / {source} rw - ext4 /dev/root rw\n");
+            assert!(delivery_source_readonly_mount(Path::new(source), &writable_source).is_err());
+            let writable_file =
+                format!("{root}2 1 8:1 / {source}/epoch.jet rw - ext4 /dev/root rw\n");
+            assert!(delivery_source_readonly_mount(Path::new(source), &writable_file).is_err());
+        }
     }
 }
