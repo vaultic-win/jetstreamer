@@ -1,0 +1,94 @@
+{
+  "account_updates_rebased": 673276971,
+  "admission_sha256": "96f006b520e6d2f16d77ec12960c7c6887e5ddfee6def3a4a3ed978fe7ba22f4",
+  "assembly_profile": "jetstreamer-node/0.9.0/old-faithful-to-horizon-v2@6a327d89ef7ef7677f66d75bac99e9b0f7baf733/epoch205-capped-checkpoint-continuation-v1",
+  "authority": {
+    "canonical_sidecar_authorized": false,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "retirement_authorized": false
+  },
+  "current_plugin_verification_passed": false,
+  "epoch": 205,
+  "guard_invocation_id": "d5c72b4c1c504153a63855d6abf2edd5",
+  "independent_adjacent_boundary_receipts_still_required": true,
+  "independent_final_archive_verification_passed": false,
+  "native_checkpoint": {
+    "accounts_hash": "BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp",
+    "accounts_hash_kind": "legacy_accounts_hash",
+    "bank_hash": "5d9cMsxrGmDchGmBgbAVwhbavUKhMhjF49DfK1H41Neo",
+    "bootstrap_write_count": 0,
+    "capitalization": 500377265077495508,
+    "initialized_next_write_version": 85166343051,
+    "initialized_ticks_per_slot": 64,
+    "last_blockhash": "CC3KGb8NXJFKdccQPQKFgUY3FKeyuBna6eZWCS2wCYAm",
+    "next_write_version": 85166343051,
+    "slot": 88991050,
+    "slot_complete": true,
+    "tick_height": 5695427264,
+    "transaction_count": 22123545205,
+    "worker_sha256": "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc"
+  },
+  "plan_sha256": "70acad78bb6f654a869fe006881266dc225d7a000dd3c2da5a416c5c3d04f5cc",
+  "prefix_archive": {
+    "path": "/home/ubuntu/.jetstreamer-private/shrink-root-prefix-resource-205-5c01bf93-v1/output/epoch-205-prefix.jet",
+    "sha256": "3188ea5552b65b0ef7ef0de7876b04b98b7bd31c1c1bb2f73667e61050fac138"
+  },
+  "private_output": "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-205-bounded8-refresh421-v1/output/epoch-205-checkpoint-restart-v4.jet",
+  "producer_invocation_id": "f8b69eb89f0847588afc0f405751344a",
+  "provenance_version": 4,
+  "schema": "jetstreamer-capped204205-private-continuation-v1",
+  "slots_merged": 432000,
+  "source_archives": 2,
+  "source_capture": {
+    "path": "/var/lib/jetstreamer/horizon-capped-capture-205-bounded8-refresh421-v1/source-capture.json",
+    "sha256": "0ff5cabebf5e812871ad4c2fc93b8ca7e8a184de718510a3f500253b7590fc2f"
+  },
+  "suffix_manifest": {
+    "archive_sha256": "d7aff587adf414d9f6400bb0199b372390fa32981212ec3aca070f56e6cf1ff1",
+    "bootstrap": {
+      "accounts_hash": "BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp",
+      "bank_hash": "5d9cMsxrGmDchGmBgbAVwhbavUKhMhjF49DfK1H41Neo",
+      "capitalization": 500377265077495508,
+      "last_blockhash": "CC3KGb8NXJFKdccQPQKFgUY3FKeyuBna6eZWCS2wCYAm",
+      "next_write_version": 85166343051,
+      "slot": 88991050,
+      "slot_complete": true,
+      "tick_height": 5695427264,
+      "transaction_count": 22123545205,
+      "write_count": 0
+    },
+    "bootstrap_archive_sha256": "1b2a41f022847dc2ba9609e5a13aadc0e79b213b5245166b06954bf8c6d9042f",
+    "emitted_raw_write_versions": {
+      "end": 85168052493,
+      "start": 85166343051
+    },
+    "epoch": 205,
+    "output_slot_count": 949,
+    "output_slot_start": 88991051,
+    "runtime": {
+      "generation_profile": "jetstreamer-node/0.9.0/old-faithful-to-horizon-v2@6a327d89ef7ef7677f66d75bac99e9b0f7baf733",
+      "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "runtime_admission": "candidate",
+      "runtime_profile": "solana-v1.6.16",
+      "runtime_revision": "86c26f843276581509c3434acc2efbf4202c44e0",
+      "runtime_target": "x86_64-unknown-linux-gnu",
+      "runtime_toolchain": "rustc 1.51.0 (2fd73fabe 2021-03-23); target=x86_64-unknown-linux-gnu"
+    },
+    "schema_version": 1,
+    "terminal": {
+      "accounts_hash": "Gue5XY8R6gjkBtW76yv43sUwFKSdRmyw6Z9BVFEkcnJ2",
+      "bank_hash": "3ukyEMYw2xzS22rwqEbZ4oBXTx2TLTCNjV6VZKUT4Cca",
+      "capitalization": 500377263616321035,
+      "last_blockhash": "HuZtkhXnzaJ9BvDazHHSUgQWTFg3u2Uvf12AHBWqYuji",
+      "next_write_version": 85168052493,
+      "slot": 88991999,
+      "slot_complete": true,
+      "tick_height": 5695488000,
+      "transaction_count": 22124034339,
+      "write_count": 604
+    },
+    "worker_executable_sha256": "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc"
+  }
+}

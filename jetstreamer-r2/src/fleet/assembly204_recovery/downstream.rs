@@ -139,6 +139,100 @@ pub(super) fn stage_gate(g: &Gate, source: &lineage::DownstreamSource) -> Result
     deny(&o["authority"])?;
     Ok(o)
 }
+/// Revalidate the actual strict204 Full and its independently decoded203 anchor.
+/// No archive body is opened here; the205 guarded anchor copy must match this SHA.
+pub(super) fn private_full_anchor(terminal: &BoundFile) -> Result<Value> {
+    let t = read(terminal)?;
+    let o = read(&serde_json::from_value(t["outcome"].clone())?)?;
+    let source: lineage::DownstreamSource = serde_json::from_value(o["source"].clone())?;
+    let full = stage_gate(
+        &Gate {
+            stage: Stage::Full,
+            terminal: terminal.clone(),
+        },
+        &source,
+    )?;
+    let spec: BoundFile = serde_json::from_value(full["spec"].clone())?;
+    let x = stage_spec(&read(&spec)?)?;
+    ensure!(
+        x.stage == Stage::Full,
+        "private204 anchor is not strict Full"
+    );
+    tool(&x)?;
+    let mut anchor = x.clone();
+    anchor.stage = Stage::Boundary;
+    anchor.tool = x.anchor_tool.clone();
+    anchor.tool_qualification = x.anchor_tool_qualification.clone();
+    let decoder = tool(&anchor)?;
+    ensure!(
+        x.neighbors.len() == 1 && x.neighbors[0].epoch == 203,
+        "private204 Full lost203 ancestry"
+    );
+    neighbor_ready(&x.neighbors[0])?;
+    let commands = full["commands"]
+        .as_array()
+        .context("private204 Full commands absent")?;
+    ensure!(
+        commands.len() == 2
+            && commands[0]["tool"] == private157::binding(&decoder)
+            && commands[0]["arguments"] == json!([x.scan_directory.join("epoch-203.jet")])
+            && commands[0]["exit_code"] == 0
+            && commands[1]["exit_code"] == 0,
+        "private204 Full has foreign/failed anchor decoder"
+    );
+    let stdout = sealed(
+        &serde_json::from_value(commands[0]["stdout"].clone())?,
+        8 << 20,
+    )?;
+    let text = std::str::from_utf8(&stdout)?;
+    let lines = text.lines().collect::<Vec<_>>();
+    ensure!(lines.len() == 1, "private204 real203 terminal arity");
+    let fields = lines[0].split('\t').collect::<Vec<_>>();
+    ensure!(
+        fields.len() == 12
+            && fields[0] == x.scan_directory.join("epoch-203.jet").to_string_lossy()
+            && fields[1] == "203"
+            && fields[2] == "87696000"
+            && fields[3] == "432000"
+            && fields[8].parse::<u64>()? < 88128000,
+        "private204 real203 terminal scope differs"
+    );
+    let (c, l) = lineage::load_source(&source)?;
+    ensure!(
+        commands[1]["tool"] == private157::binding(x.tool.as_ref().context("204 Full tool")?)
+            && commands[1]["arguments"]
+                == serde_json::to_value(full_arguments(
+                    &x.scan_directory.join("epoch-204.jet"),
+                    fields[8].into(),
+                    fields[9].into(),
+                    &l.expected
+                )?)?
+            && full["archive_sha256"] == c["archive_sha256"]
+            && full["archive_bytes"] == c["archive_bytes"],
+        "private204 strict Full arguments/digest differ from its independently anchored source"
+    );
+    let owner = unit(Stage::Full.unit())?;
+    ensure!(
+        is_idle(&owner)
+            && owner["Result"] == "success"
+            && owner["ExecMainStatus"] == "0"
+            && (owner["InvocationID"] == t["invocation_id"] || owner["InvocationID"] == "")
+            && ownership::command_matches(
+                s(&owner, "ExecStart")?,
+                s(&t["current_unit"], "ExecStart")?
+            ),
+        "private204 Full was replaced or is active"
+    );
+    inactive_status::no_pending_owner_trigger(Stage::Full.unit(), false)?;
+    let cgroup = capped204205_work::empty_terminal_cgroup(Stage::Full.unit())?;
+    Ok(
+        json!({"schema":"jetstreamer-genuine-private204-full-anchor-v1","epoch":204,
+        "archive":{"path":x.scan_directory.join("epoch-204.jet"),"sha256":full["archive_sha256"]},"bytes":full["archive_bytes"],
+        "terminal":terminal,"outcome":t["outcome"],"source":source,"stage_spec":spec,
+        "independent203_ready":x.neighbors[0].ready_evidence,"independent203_decoder":commands[0],
+        "strict_full_command":commands[1],"startup_consumption":full["startup_release"],"current_owner":owner,"cgroup":cgroup}),
+    )
+}
 fn neighbor_ready(n: &Neighbor) -> Result<()> {
     let ready = read(&n.ready_evidence)?;
     ensure!(
@@ -782,6 +876,14 @@ fn child(tool: &BoundFile, args: &[String], directory: &Path, label: &str) -> Re
     Ok(
         json!({"tool":tool,"arguments":args,"exit_code":status.code(),"stdout":binding(&stdout)?,"stderr":binding(&stderr)?}),
     )
+}
+pub(super) fn delivery_child(
+    tool: &BoundFile,
+    args: &[String],
+    directory: &Path,
+    label: &str,
+) -> Result<Value> {
+    child(tool, args, directory, label)
 }
 fn mutation_lock() -> Result<File> {
     let path = Path::new("/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock");

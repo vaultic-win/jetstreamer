@@ -33,16 +33,19 @@ pub(super) fn plan_scope(p: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn origin(c: &Claim, i: &Inputs) -> Result<()> {
-    let p = &i.plan;
+pub(super) fn origin_metadata(
+    epoch: u64,
+    producer_plan: &BoundFile,
+    p: &Value,
+    a: &Value,
+    l: &Value,
+) -> Result<()> {
     plan_scope(p)?;
-    let l = &i.launch;
-    let a = &i.admission;
-    let (old, old_iid, _, _) = profile(c.epoch)?;
+    let (old, old_iid, _, _) = profile(epoch)?;
     let capture = evidence::bound(&serde_json::from_value(p["source_capture"].clone())?, true)?;
     ensure!(
         capture["schema"] == "jetstreamer-capped204205-source-capture-v1"
-            && capture["epoch"] == c.epoch
+            && capture["epoch"] == epoch
             && capture["original_unit"] == old
             && capture["original_invocation_id"] == old_iid
             && capture["prefix_archive"] == p["prefix_archive"]
@@ -64,7 +67,7 @@ pub(super) fn origin(c: &Claim, i: &Inputs) -> Result<()> {
         let idle = &capture[key];
         ensure!(
             idle["schema"] == "jetstreamer-capped204205-source-idle-v1"
-                && idle["epoch"] == c.epoch
+                && idle["epoch"] == epoch
                 && idle["unit"] == old
                 && idle["historical_invocation_id"] == old_iid
                 && idle["current_source_idle"] == true
@@ -81,7 +84,7 @@ pub(super) fn origin(c: &Claim, i: &Inputs) -> Result<()> {
         number(l, "epoch_started_unix_millis")? == origin_start,
         "continuation elapsed time differs from the original authoritative start"
     );
-    let expected = evidence::expected_command(p, a, &c.producer_plan)?;
+    let expected = evidence::expected_command(p, a, producer_plan)?;
     ensure!(
         evidence::command_matches(&expected, string(l, "expected_exec_start")?),
         "continuation launch command differs from the actual admitted node and plan"
@@ -92,7 +95,7 @@ pub(super) fn origin(c: &Claim, i: &Inputs) -> Result<()> {
     evidence::guard(p, l, &first, &census, first_ms)?;
     ensure!(
         evidence::command_matches(
-            &evidence::expected_guard_command(p, a, &c.producer_plan, string(l, "invocation_id")?)?,
+            &evidence::expected_guard_command(p, a, producer_plan, string(l, "invocation_id")?)?,
             string(
                 census
                     .get(string(p, "guard_unit")?)

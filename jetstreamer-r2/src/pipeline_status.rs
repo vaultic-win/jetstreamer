@@ -93,12 +93,38 @@ fn same_unit_census(expected: &Value, current: &Value) -> bool {
 
 impl Binding {
     pub fn validate(&self, epoch: u64, phase: &str) -> Result<()> {
+        if self.claim_phase == "continuation-delivery205" {
+            fleet::continuation205_delivery_binding_scope(
+                epoch,
+                &self.unit,
+                &self.origin_unit,
+                &self.origin_invocation_id,
+                phase,
+            )?;
+            ensure!(
+                unit_name(&self.unit)
+                    && hex_id(&self.invocation_id, 32)
+                    && !self.expected_exec_start.trim().is_empty()
+                    && self.model_path.is_absolute()
+                    && self.fleet_path.is_absolute()
+                    && hex_id(&self.model_sha256, 64)
+                    && hex_id(&self.fleet_sha256, 64),
+                "invalid exact205 delivery status binding"
+            );
+            return Ok(());
+        }
         if self.claim_phase == "epoch223-demotion-repair" {
             fleet::demotion223_binding_scope(self, epoch, phase)?;
-            ensure!(unit_name(&self.unit) && hex_id(&self.invocation_id, 32)
-                && !self.expected_exec_start.trim().is_empty() && self.model_path.is_absolute()
-                && self.fleet_path.is_absolute() && hex_id(&self.model_sha256, 64) && hex_id(&self.fleet_sha256, 64),
-                "invalid exact223 repair status binding");
+            ensure!(
+                unit_name(&self.unit)
+                    && hex_id(&self.invocation_id, 32)
+                    && !self.expected_exec_start.trim().is_empty()
+                    && self.model_path.is_absolute()
+                    && self.fleet_path.is_absolute()
+                    && hex_id(&self.model_sha256, 64)
+                    && hex_id(&self.fleet_sha256, 64),
+                "invalid exact223 repair status binding"
+            );
             return Ok(());
         }
         if self.claim_phase == "assembly-recovery204" {

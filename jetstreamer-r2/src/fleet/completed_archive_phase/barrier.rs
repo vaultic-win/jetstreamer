@@ -414,7 +414,7 @@ pub(super) fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, St
 fn timer_object_path(timer: &str) -> Result<String> {
     ensure!(
         timer.ends_with(".timer")
-            && timer.starts_with("horizon-generic")
+            && (timer.starts_with("horizon-generic") || timer.starts_with("horizon-205-delivery-"))
             && timer
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),

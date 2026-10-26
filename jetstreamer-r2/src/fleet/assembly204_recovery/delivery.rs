@@ -67,6 +67,40 @@ fn full_capacity(v: &Value, tool: &Tool, expected: &Value, qa: &Value) -> Result
     }
     Ok(decoded)
 }
+pub(super) fn component_full_requirement(
+    artifact: &BoundFile,
+    qualification: &BoundFile,
+    capacity: &BoundFile,
+    producer: &Value,
+) -> Result<u64> {
+    downstream::qualified_tool("full", artifact, qualification)?;
+    full_capacity(
+        &read(capacity)?,
+        &Tool {
+            artifact: artifact.clone(),
+            qualification: qualification.clone(),
+        },
+        producer,
+        &read(qualification)?,
+    )
+}
+pub(super) fn component_plugin_coverage(
+    artifact: &BoundFile,
+    qualification: &BoundFile,
+    capacity: &BoundFile,
+    required: u64,
+) -> Result<()> {
+    downstream::qualified_tool("plugin", artifact, qualification)?;
+    plugin_probe(
+        capacity,
+        &Tool {
+            artifact: artifact.clone(),
+            qualification: qualification.clone(),
+        },
+        required,
+    )?;
+    Ok(())
+}
 fn plugin_capacity(v: &Value, required: u64) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-horizon-plugin-capacity-probe-v1"

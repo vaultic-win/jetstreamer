@@ -23,6 +23,46 @@ pub(super) fn jit210_native_text(path: impl AsRef<Path>, maximum: u64) -> Result
 
 mod launch;
 mod peer;
+pub(super) fn root205_properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+    ensure!(
+        continuation205_delivery::scope(name) || continuation205_delivery::guard_scope(name),
+        "205 manager query escaped typed namespace"
+    );
+    barrier::properties(name, fields)
+}
+pub(super) fn root205_guard_timer(name: &str) -> Result<Value> {
+    ensure!(
+        continuation205_delivery::guard_scope(name),
+        "205 guard timer namespace differs"
+    );
+    let p = barrier::guard_timer_properties(name)?;
+    validate_guard_timer(&p, name)?;
+    Ok(serde_json::to_value(p)?)
+}
+pub(super) fn root205_guard_controls(p: &BTreeMap<String, String>) -> Result<()> {
+    validate_guard_controls(p)
+}
+pub(super) fn root205_start_ticks(raw: &str) -> Result<u64> {
+    launch::start_ticks(raw)
+}
+pub(super) fn root205_start_clock(ticks: u64) -> Result<Value> {
+    launch::native_start_clock(ticks)
+}
+pub(super) fn root205_environment(
+    p: &BTreeMap<String, String>,
+    file: Option<&BoundFile>,
+) -> Result<()> {
+    root204_environment(p, file)
+}
+pub(super) fn root205_credential_digest(
+    actual: &str,
+    file: Option<&BoundFile>,
+) -> Result<Option<String>> {
+    root204_credential_digest(actual, file)
+}
+pub(super) fn root205_bound_log(b: &BoundFile) -> Result<Vec<u8>> {
+    bound_bytes(b, 64 << 20, 0)
+}
 pub(super) fn root204_bound_log(binding: &BoundFile) -> Result<Vec<u8>> {
     bound_bytes(binding, 64 << 20, 0)
 }

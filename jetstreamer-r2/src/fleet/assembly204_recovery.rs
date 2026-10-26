@@ -130,6 +130,45 @@ fn sealed(b: &BoundFile, maximum: u64) -> Result<Vec<u8>> {
 fn read(b: &BoundFile) -> Result<Value> {
     Ok(serde_json::from_slice(&sealed(b, 16 << 20)?)?)
 }
+pub(super) fn sealed_delivery_metadata(b: &BoundFile) -> Result<Value> {
+    read(b)
+}
+pub(super) fn sealed_delivery_bytes(b: &BoundFile, maximum: u64) -> Result<Vec<u8>> {
+    sealed(b, maximum)
+}
+pub(super) fn private_full204_anchor(terminal: &BoundFile) -> Result<Value> {
+    downstream::private_full_anchor(terminal)
+}
+pub(super) fn component_full_requirement(
+    artifact: &BoundFile,
+    qualification: &BoundFile,
+    capacity: &BoundFile,
+    producer: &Value,
+) -> Result<u64> {
+    delivery::component_full_requirement(artifact, qualification, capacity, producer)
+}
+pub(super) fn component_plugin_coverage(
+    artifact: &BoundFile,
+    qualification: &BoundFile,
+    capacity: &BoundFile,
+    required: u64,
+) -> Result<()> {
+    delivery::component_plugin_coverage(artifact, qualification, capacity, required)
+}
+pub(super) fn validate205_capacity(v: &Value, memory: u64, additional: u64) -> Result<()> {
+    capacity::validate205_capacity(v, memory, additional)
+}
+pub(super) fn validate_shared_capacity_provenance(v: &Value) -> Result<()> {
+    capacity::validate_provenance(v)
+}
+pub(super) fn delivery_child(
+    tool: &BoundFile,
+    args: &[String],
+    directory: &Path,
+    label: &str,
+) -> Result<Value> {
+    downstream::delivery_child(tool, args, directory, label)
+}
 fn deny(v: &Value) -> Result<()> {
     for k in [
         "canonical_sidecar_authorized",

@@ -36,6 +36,7 @@ mod continuation203;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
+mod continuation205_delivery;
 mod epoch136;
 mod first_root233;
 mod foundation_holding203;
@@ -253,6 +254,12 @@ pub(super) fn capped_assembly_memory_owners(
             "duplicate typed assembly memory owner"
         );
     }
+    for (name, proof) in continuation205_delivery::peer_memory_owners(f, o)? {
+        ensure!(
+            owners.insert(name, proof).is_none(),
+            "duplicate typed205 delivery memory owner"
+        );
+    }
     Ok(owners)
 }
 pub(super) fn demotion223_memory_views(
@@ -380,10 +387,14 @@ pub(super) fn admit_singleton209_delivery() -> Result<()> {
     singleton209_delivery::admission::run()
 }
 pub(super) fn assembly204_recovery_command_name(command: &str) -> bool {
-    assembly204_recovery::command_name(command)
+    assembly204_recovery::command_name(command) || continuation205_delivery::command_name(command)
 }
 pub(super) async fn assembly204_recovery_command(command: &str) -> Result<()> {
-    assembly204_recovery::run(command).await
+    if continuation205_delivery::command_name(command) {
+        continuation205_delivery::run(command).await
+    } else {
+        assembly204_recovery::run(command).await
+    }
 }
 pub(super) fn admit_capped204_v4_delivery() -> Result<()> {
     capped204_v4_admission::run()
@@ -595,6 +606,21 @@ pub(super) fn assembly204_recovery_binding_scope(
 }
 pub(super) fn capped204205_binding_scope(epoch: u64, unit: &str, phase: &str) -> Result<()> {
     capped204205_work::binding_scope(epoch, unit, phase)
+}
+pub(super) fn continuation205_delivery_binding_scope(
+    epoch: u64,
+    unit: &str,
+    origin: &str,
+    iid: &str,
+    phase: &str,
+) -> Result<()> {
+    ensure!(
+        continuation205_delivery::binding_scope(epoch, unit, phase)
+            && origin == "horizon-qualify-205-capped-continuation-bounded8-refresh421-v1.service"
+            && iid == "f8b69eb89f0847588afc0f405751344a",
+        "205 status changed genuine continuation origin"
+    );
+    Ok(())
 }
 pub(super) fn capped204205_origin_scope(epoch: u64, unit: &str) -> Result<()> {
     capped204205_work::origin_scope(epoch, unit)
@@ -1362,6 +1388,8 @@ struct Plan {
     capped204205_history: Vec<Value>,
     #[serde(default)]
     assembly204_recovery: Option<assembly204_recovery::Claim>,
+    #[serde(default)]
+    continuation205_delivery: Option<continuation205_delivery::Claim>,
     #[serde(default)]
     assembly204_recovery_history: Vec<Value>,
     #[serde(default)]
@@ -2596,6 +2624,7 @@ pub(super) fn census(
             || name.starts_with("horizon-controller-")
             || name.starts_with("horizon-qualify-")
             || completed_archive_phase::guard_scope(name,first_epoch,last_epoch)
+            || ((first_epoch..=last_epoch).contains(&205) && continuation205_delivery::discovery_scope(name))
             || assigned_singleton_owner(name, first_epoch, last_epoch)
             || original_capped204205::repair_unit(name, first_epoch, last_epoch)
             // Private RAM supervisors are entry owners too. Until the explicit
@@ -3180,6 +3209,9 @@ pub(super) async fn run() -> Result<()> {
     let mut diagnostic_units = BTreeSet::new();
     if let Some(claim) = &plan.assembly204_recovery {
         names.extend(assembly204_recovery::names(claim)?);
+    }
+    if let Some(claim) = &plan.continuation205_delivery {
+        names.extend(continuation205_delivery::names(claim)?);
     }
     for claim in &plan.capped204205_work {
         names.extend(capped204205_work::names(claim)?);
@@ -3946,6 +3978,24 @@ pub(super) async fn run() -> Result<()> {
             active.push(row.clone());
         }
     }
+    let continuation205_work = plan
+        .continuation205_delivery
+        .as_ref()
+        .map(|c| continuation205_delivery::row(c, &observer, &before, started_seconds))
+        .transpose()?
+        .into_iter()
+        .collect::<Vec<_>>();
+    for row in &continuation205_work {
+        ensure!(
+            !active
+                .iter()
+                .any(|r| r["epoch"] == 205 && r["live"] == true),
+            "205 delivery overlaps another accepted live owner"
+        );
+        if row["live"] == true {
+            active.push(row.clone());
+        }
+    }
     let mut remote_entries = Vec::new();
     let requested_epochs = (plan.first_epoch..=plan.last_epoch).collect::<Vec<_>>();
     let remote_inventory =
@@ -4021,6 +4071,10 @@ pub(super) async fn run() -> Result<()> {
             state = "post-replay-pipeline";
             next = "Continue the exact assembly recovery and its separately admitted verification, boundary, import and upload stages";
         }
+        if epoch == 205 && continuation205_work.iter().any(|r| r["live"] == true) {
+            state = "post-replay-pipeline";
+            next = "Continue exact205 guarded Full, current-plugin, import and authenticated upload/readback";
+        }
         let mut live = None;
         for replay in replays {
             let range = parse_observer_claim_range(observer_string(replay, &["range"])?)?;
@@ -4087,6 +4141,11 @@ pub(super) async fn run() -> Result<()> {
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
                         || capped204205_work::status_matches(receipt, epoch, &capped_work)
                         || assembly204_recovery::status_matches(receipt, epoch, &recovery_work)
+                        || continuation205_delivery::status_matches(
+                            receipt,
+                            epoch,
+                            &continuation205_work,
+                        )
                 });
             // Missing local publication history is explicitly unbound, never current.
             let matches = publication.as_ref().is_ok_and(|(receipt, _, _)| {
@@ -4115,6 +4174,7 @@ pub(super) async fn run() -> Result<()> {
             let capped_current = publication.as_ref().is_ok_and(|(r, _, _)| {
                 capped204205_work::status_matches(r, epoch, &capped_work)
                     || assembly204_recovery::status_matches(r, epoch, &recovery_work)
+                    || continuation205_delivery::status_matches(r, epoch, &continuation205_work)
             });
             json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && (status.sampled_at_utc == sample || capped_current)})
         } else {
@@ -4146,6 +4206,7 @@ pub(super) async fn run() -> Result<()> {
     let receipt = json!({"schema":SCHEMA,"first_epoch":plan.first_epoch,"last_epoch":plan.last_epoch,"sampled_at_utc":sample,"observer_receipt":plan.observer.path,"observer_sha256":plan.observer.sha256,"previous_fleet":plan.previous_fleet.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"plan":plan_bound.path,"plan_sha256":plan_bound.sha256,"admission_transition_guard":plan.admission_transition_guard.as_ref().map(|p|json!({"path":p.path,"sha256":p.sha256})),"inventory":inventory,"unit_census":after,"active":active,"diagnostics":diagnostics,"transitions":changes,"epochs":entries,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"remote_mutations":false,"producer_mutations":false,"publication_authorized":false});
     let mut receipt = receipt;
     receipt["assembly204_recovery"] = json!(recovery_work);
+    receipt["continuation205_delivery"] = json!(continuation205_work);
     receipt["assembly204_recovery_history"] = json!(plan.assembly204_recovery_history);
     receipt["capped204205_work"] = json!(capped_work);
     receipt["capped204205_history"] = json!(plan.capped204205_history);
@@ -6399,6 +6460,15 @@ pub(super) fn qualification_recovery204_successor(
     iid: &str,
     actor_launch: &Value,
 ) -> Result<()> {
+    if continuation205_delivery::discovery_scope(unit) {
+        return continuation205_delivery::qualification_successor(
+            f,
+            current,
+            unit,
+            iid,
+            &serde_json::from_value(actor_launch.clone())?,
+        );
+    }
     assembly204_recovery::qualification_successor(
         f,
         current,

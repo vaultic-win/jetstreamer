@@ -14,6 +14,7 @@ enum MemoryMode {
     FirstRoot233,
     Capped204V4,
     AssemblyRecovery204,
+    Continuation205Delivery,
 }
 
 #[derive(Deserialize)]
@@ -225,6 +226,15 @@ pub(super) fn check_assembly204_recovery(value: &Value, candidate: Candidate) ->
     assembly204_candidate_shape(candidate)?;
     check_inner(value, candidate, MemoryMode::AssemblyRecovery204)
 }
+pub(super) fn check_continuation205_delivery(value: &Value, candidate: Candidate) -> Result<Value> {
+    ensure!(
+        candidate.minimum_protected_disk_bytes == 0
+            && candidate.additional_bytes > 0
+            && matches!(candidate.memory_max_bytes,n if n==65u64<<30 || n==17u64<<30),
+        "205 guarded delivery candidate envelope differs"
+    );
+    check_inner(value, candidate, MemoryMode::Continuation205Delivery)
+}
 fn assembly204_candidate_shape(candidate: Candidate) -> Result<()> {
     ensure!(
         candidate.minimum_protected_disk_bytes == 0
@@ -263,14 +273,18 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
     capped204205_work::peer_observation(f, o)?;
     assembly204_recovery::peer_observation(f, o)?;
     completed_archive_phase::peer_observation(f, o)?;
+    continuation205_delivery::peer_observation(f, o)?;
     let (_, repair_observer, repair) = demotion223_live_peer::memory_views(f, o)?;
     let mut names = capped204205_work::peer_names(f)?;
     names.extend(assembly204_recovery::peer_names(f)?);
     names.extend(completed_archive_phase::peer_names(f)?);
+    names.extend(continuation205_delivery::peer_names(f)?);
     names.extend(repair.keys().cloned());
     Ok((
-        demotion223_live_peer::without(&completed_archive_phase::peer_view(
-            &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
+        demotion223_live_peer::without(&continuation205_delivery::peer_view(
+            &completed_archive_phase::peer_view(&assembly204_recovery::peer_view(
+                &capped204205_work::peer_legacy_view(f)?,
+            )?)?,
         )?)?,
         legacy_observer(&repair_observer, &names)?,
     ))
@@ -278,8 +292,8 @@ fn accounting_views(f: &Value, o: &Value) -> Result<(Value, Value)> {
 pub(super) fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Result<()> {
     native210_peer_history::current(f, current)?;
     prefix223_live_peer::current(
-        &completed_archive_phase::peer_view(&assembly204_recovery::peer_view(
-            &capped204205_work::peer_legacy_view(f)?,
+        &continuation205_delivery::peer_view(&completed_archive_phase::peer_view(
+            &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
         )?)?,
         current,
     )?;
@@ -287,9 +301,15 @@ pub(super) fn current_owners(f: &Value, current: &BTreeMap<String, Value>) -> Re
     // in the raw active roster, so an omitted or changed actor still fails.
     singleton227_admission::owners(
         f,
-        &completed_archive_phase::peer_current(
+        &continuation205_delivery::peer_current(
             f,
-            &assembly204_recovery::peer_current(f, &capped204205_work::peer_current(f, current)?)?,
+            &completed_archive_phase::peer_current(
+                f,
+                &assembly204_recovery::peer_current(
+                    f,
+                    &capped204205_work::peer_current(f, current)?,
+                )?,
+            )?,
         )?,
     )
 }
@@ -373,6 +393,16 @@ fn memory_sample(
             (
                 required,
                 Some(("assembly204_recovery_memory_policy", policy)),
+            )
+        }
+        MemoryMode::Continuation205Delivery => {
+            let (required, mut policy) =
+                assembly204_recovery_memory_required(f, total, reserve, candidate)?;
+            policy["schema"] = json!("jetstreamer-continuation205-delivery-hard-memory-policy-v1");
+            policy["available_floor_component_accounted_once_bytes"] = json!(accounted_floor);
+            (
+                required,
+                Some(("continuation205_delivery_memory_policy", policy)),
             )
         }
         MemoryMode::Full210 => {
@@ -498,6 +528,21 @@ pub(super) fn validate_assembly204_recovery_memory_policy(
         "204 native-floor/guard policy was understated or changed"
     );
     Ok(required)
+}
+pub(super) fn validate_continuation205_memory_policy(
+    p: &Value,
+    total: u64,
+    growth: u64,
+    candidate: u64,
+) -> Result<u64> {
+    ensure!(
+        p["schema"] == "jetstreamer-continuation205-delivery-hard-memory-policy-v1"
+            && matches!(candidate,n if n==65u64<<30 || n==17u64<<30),
+        "205 hard-memory policy discriminator/profile differs"
+    );
+    let mut common = p.clone();
+    common["schema"] = json!("jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1");
+    validate_assembly204_recovery_memory_policy(&common, total, growth, candidate)
 }
 #[cfg(test)]
 pub(super) fn assembly204_native_terminal_fixture() -> Value {
@@ -819,6 +864,7 @@ fn fleet_for_mode(
         MemoryMode::Full210
             | MemoryMode::Foundation203
             | MemoryMode::AssemblyRecovery204
+            | MemoryMode::Continuation205Delivery
             | MemoryMode::Full209Delivery
             | MemoryMode::CompletedArchivePhase
             | MemoryMode::GuardRebase207

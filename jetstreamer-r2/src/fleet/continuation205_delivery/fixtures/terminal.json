@@ -1,0 +1,33 @@
+{
+  "continuation_result": {
+    "path": "/var/lib/jetstreamer/horizon-capped205-work-cycle433-handoff-v1/continuation-result.json",
+    "sha256": "7e046bf03219cfc7008d99d79ed1444e1bd70aaab9f5340b9c6302b1b6396e20"
+  },
+  "current_unit": {
+    "ActiveState": "inactive",
+    "ControlGroup": "",
+    "ExecMainStatus": "0",
+    "ExecStart": "{ path=/var/lib/jetstreamer/horizon-capped204205-bounded8-6a327d89-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-capped204205-bounded8-6a327d89-v1/jetstreamer-node 205 /home/ubuntu/.jetstreamer-private/checkpoint-continuation-205-bounded8-refresh421-v1/ledger --verify --checkpoint-continuation-plan=/var/lib/jetstreamer/horizon-capped205-continuation-plan-bounded8-refresh421-v1/producer-plan.json --checkpoint-continuation-plan-sha256=70acad78bb6f654a869fe006881266dc225d7a000dd3c2da5a416c5c3d04f5cc ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+    "Id": "horizon-qualify-205-capped-continuation-bounded8-refresh421-v1.service",
+    "InvocationID": "",
+    "LoadState": "loaded",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead",
+    "Type": "exec"
+  },
+  "epoch": 205,
+  "invocation_id": "f8b69eb89f0847588afc0f405751344a",
+  "manager_journal": {
+    "path": "/var/lib/jetstreamer/horizon-capped205-work-cycle433-handoff-v1/terminal-manager.jsonl",
+    "sha256": "d3e25934d925c5fd1fd04d41adbed81d3415f65f7fbad29e2657c578c04d0c4a"
+  },
+  "manager_journal_complete": true,
+  "outcome": "natural_success",
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "replay_launch_authorized": false,
+  "schema": "jetstreamer-capped204205-terminal-v1",
+  "unit": "horizon-qualify-205-capped-continuation-bounded8-refresh421-v1.service"
+}

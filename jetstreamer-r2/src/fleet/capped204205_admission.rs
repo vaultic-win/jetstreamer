@@ -413,13 +413,16 @@ pub(super) fn original_idle(unit: &Value, epoch: u64) -> Result<()> {
 fn current(p: &Value, f: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
     candidate_idle(p, census)?;
     native210_peer_history::current(f, census)?;
-    let legacy = completed_archive_phase::peer_view(&assembly204_recovery::peer_view(
-        &capped204205_work::peer_legacy_view(f)?,
+    let legacy = continuation205_delivery::peer_view(&completed_archive_phase::peer_view(
+        &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
     )?)?;
     prefix223_live_peer::current(&legacy, census)?;
-    let owners = completed_archive_phase::peer_current(
+    let owners = continuation205_delivery::peer_current(
         f,
-        &assembly204_recovery::peer_current(f, &capped204205_work::peer_current(f, census)?)?,
+        &completed_archive_phase::peer_current(
+            f,
+            &assembly204_recovery::peer_current(f, &capped204205_work::peer_current(f, census)?)?,
+        )?,
     )?;
     singleton227_admission::owners(f, &owners)
 }
@@ -430,12 +433,13 @@ pub(super) fn guards(
     sample: u64,
     now: u64,
 ) -> Result<Value> {
-    let legacy = completed_archive_phase::peer_view(&assembly204_recovery::peer_view(
-        &capped204205_work::peer_legacy_view(f)?,
+    let legacy = continuation205_delivery::peer_view(&completed_archive_phase::peer_view(
+        &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
     )?)?;
     let mut peers = capped204205_work::peer_names(f)?;
     peers.extend(assembly204_recovery::peer_names(f)?);
     peers.extend(completed_archive_phase::peer_names(f)?);
+    peers.extend(continuation205_delivery::peer_names(f)?);
     let mut names = prefix223_live_peer::roster(&legacy)?;
     ensure!(
         peers.iter().all(|name| names.insert(name.clone())),
@@ -446,9 +450,15 @@ pub(super) fn guards(
         "capped guard set omits or adds a protected owner"
     );
     let mut evidence = BTreeMap::new();
-    for (name, b) in &completed_archive_phase::peer_guards(
+    for (name, b) in &continuation205_delivery::peer_guards(
         f,
-        &assembly204_recovery::peer_guards(f, &capped204205_work::peer_legacy_guards(f, bounds)?)?,
+        &completed_archive_phase::peer_guards(
+            f,
+            &assembly204_recovery::peer_guards(
+                f,
+                &capped204205_work::peer_legacy_guards(f, bounds)?,
+            )?,
+        )?,
     )? {
         if let Some(actual) = demotion223_live_peer::guard_evidence(f, name, b)? {
             evidence.insert(name.clone(), actual);
@@ -489,7 +499,7 @@ pub(super) fn guards(
         evidence.insert(name.clone(), json!({"completed":completed,"timer":timer}));
     }
     Ok(
-        json!({"legacy":evidence,"capped":capped204205_work::peer_limits(f,bounds,census,now)?,"assembly204_recovery":assembly204_recovery::peer_limits(f,bounds,census,now)?,"completed_archive_phase":completed_archive_phase::peer_limits(f,bounds,census,now)?}),
+        json!({"legacy":evidence,"capped":capped204205_work::peer_limits(f,bounds,census,now)?,"assembly204_recovery":assembly204_recovery::peer_limits(f,bounds,census,now)?,"completed_archive_phase":completed_archive_phase::peer_limits(f,bounds,census,now)?,"continuation205_delivery":continuation205_delivery::peer_limits(f,bounds,census,now)?}),
     )
 }
 pub(super) fn combined_limits(
@@ -499,7 +509,7 @@ pub(super) fn combined_limits(
     now: u64,
 ) -> Result<Value> {
     Ok(
-        json!({"legacy":prefix223_live_peer::limits(&completed_archive_phase::peer_view(&assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?)?)?,"capped":capped204205_work::peer_limits(f,bounds,census,now)?,"assembly204_recovery":assembly204_recovery::peer_limits(f,bounds,census,now)?,"completed_archive_phase":completed_archive_phase::peer_limits(f,bounds,census,now)?}),
+        json!({"legacy":prefix223_live_peer::limits(&continuation205_delivery::peer_view(&completed_archive_phase::peer_view(&assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?)?)?)?,"capped":capped204205_work::peer_limits(f,bounds,census,now)?,"assembly204_recovery":assembly204_recovery::peer_limits(f,bounds,census,now)?,"completed_archive_phase":completed_archive_phase::peer_limits(f,bounds,census,now)?,"continuation205_delivery":continuation205_delivery::peer_limits(f,bounds,census,now)?}),
     )
 }
 pub(super) fn combined_resources(
@@ -511,12 +521,19 @@ pub(super) fn combined_resources(
     now: u64,
 ) -> Result<(u64, Vec<Value>, u64, Vec<Value>)> {
     completed_archive_phase::peer_observation(f, o)?;
-    let legacy = completed_archive_phase::peer_view(&assembly204_recovery::peer_view(
-        &capped204205_work::peer_legacy_view(f)?,
+    continuation205_delivery::peer_observation(f, o)?;
+    let legacy = continuation205_delivery::peer_view(&completed_archive_phase::peer_view(
+        &assembly204_recovery::peer_view(&capped204205_work::peer_legacy_view(f)?)?,
     )?)?;
-    let legacy_guards = completed_archive_phase::peer_guards(
+    let legacy_guards = continuation205_delivery::peer_guards(
         f,
-        &assembly204_recovery::peer_guards(f, &capped204205_work::peer_legacy_guards(f, bounds)?)?,
+        &completed_archive_phase::peer_guards(
+            f,
+            &assembly204_recovery::peer_guards(
+                f,
+                &capped204205_work::peer_legacy_guards(f, bounds)?,
+            )?,
+        )?,
     )?;
     let (disk, mut disk_evidence) =
         prefix223_live_peer::disk(&legacy, o, &legacy_guards, sample, now)?;
@@ -534,16 +551,22 @@ pub(super) fn combined_resources(
         completed_archive_phase::peer_resources(f, bounds, census, now)?;
     disk_evidence.extend(phase_de);
     memory_evidence.extend(phase_me);
+    let (delivery_disk, delivery_de, delivery_memory, delivery_me) =
+        continuation205_delivery::peer_resources(f, bounds, census, now)?;
+    disk_evidence.extend(delivery_de);
+    memory_evidence.extend(delivery_me);
     Ok((
         disk.checked_add(peer_disk)
             .and_then(|n| n.checked_add(recovery_disk))
             .and_then(|n| n.checked_add(phase_disk))
+            .and_then(|n| n.checked_add(delivery_disk))
             .context("capped complete peer disk overflow")?,
         disk_evidence,
         memory
             .checked_add(peer_memory)
             .and_then(|n| n.checked_add(recovery_memory))
             .and_then(|n| n.checked_add(phase_memory))
+            .and_then(|n| n.checked_add(delivery_memory))
             .context("capped complete peer memory overflow")?,
         memory_evidence,
     ))

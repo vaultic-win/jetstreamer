@@ -208,30 +208,44 @@ fn read_inputs(c: &Claim) -> Result<Inputs> {
     })
 }
 fn validate_origin(c: &Claim, i: &Inputs) -> Result<()> {
-    let p = &i.plan;
-    let a = &i.admission;
-    let l = &i.launch;
-    let (_, _, restart, end) = profile(c.epoch)?;
+    validate_origin_metadata(
+        c.epoch,
+        &c.producer_plan,
+        &c.admission,
+        &i.plan,
+        &i.admission,
+        &i.launch,
+    )
+}
+fn validate_origin_metadata(
+    epoch: u64,
+    producer_plan: &BoundFile,
+    admission: &BoundFile,
+    p: &Value,
+    a: &Value,
+    l: &Value,
+) -> Result<()> {
+    let (_, _, restart, end) = profile(epoch)?;
     let unit = string(p, "producer_unit")?;
     let iid = string(l, "invocation_id")?;
     ensure!(
         p["schema"] == "jetstreamer-capped204205-continuation-plan-v1"
-            && p["epoch"] == c.epoch
-            && namespace(c.epoch, unit)
+            && p["epoch"] == epoch
+            && namespace(epoch, unit)
             && p["worker"]["sha256"] == WORKER_SHA
             && a["schema"] == "jetstreamer-capped204205-continuation-admission-v1"
             && a["admitted"] == true
-            && a["producer_plan"] == private157::binding(&c.producer_plan)
-            && a["plan_sha256"] == c.producer_plan.sha256
-            && a["epoch"] == c.epoch
+            && a["producer_plan"] == private157::binding(producer_plan)
+            && a["plan_sha256"] == producer_plan.sha256
+            && a["epoch"] == epoch
             && a["producer_unit"] == p["producer_unit"]
             && a["guard_unit"] == p["guard_unit"]
             && a["node_sha256"] == p["node_sha256"]
             && a["guard_sha256"] == p["guard_sha256"]
             && l["schema"] == "jetstreamer-capped204205-continuation-launch-v1"
-            && l["epoch"] == c.epoch
-            && l["producer_plan"] == private157::binding(&c.producer_plan)
-            && l["admission"] == private157::binding(&c.admission)
+            && l["epoch"] == epoch
+            && l["producer_plan"] == private157::binding(producer_plan)
+            && l["admission"] == private157::binding(admission)
             && l["unit"] == p["producer_unit"]
             && l["guard_unit"] == p["guard_unit"]
             && id(iid)
@@ -245,7 +259,7 @@ fn validate_origin(c: &Claim, i: &Inputs) -> Result<()> {
         "capped work lacks the actual exact admitted launch/source identities"
     );
     denied(l)?;
-    lifecycle::origin(c, i)?;
+    lifecycle::origin_metadata(epoch, producer_plan, p, a, l)?;
     for key in [
         "canonical_sidecar_authorized",
         "publication_authorized",
@@ -254,6 +268,28 @@ fn validate_origin(c: &Claim, i: &Inputs) -> Result<()> {
         ensure!(a[key] == false, "admission grants final archive authority");
     }
     Ok(())
+}
+pub(super) fn validate205_delivery_origin(
+    plan: &BoundFile,
+    launch: &BoundFile,
+    terminal: &BoundFile,
+) -> Result<Value> {
+    let p = evidence::bound(plan, true)?;
+    let l = evidence::bound(launch, true)?;
+    let admission: BoundFile = serde_json::from_value(l["admission"].clone())?;
+    let a = evidence::bound(&admission, true)?;
+    ensure!(
+        p["epoch"] == 205 && l["epoch"] == 205,
+        "typed205 delivery origin epoch differs"
+    );
+    validate_origin_metadata(205, plan, &admission, &p, &a, &l)?;
+    let t = evidence::bound(terminal, true)?;
+    evidence::terminal_proof(&p, &l, &t)?;
+    ensure!(
+        t["outcome"] == "natural_success",
+        "205 delivery requires genuine natural completion"
+    );
+    Ok(t)
 }
 fn stage_from_guard(g: &Value) -> Result<Stage> {
     Ok(match string(&g["phase"], "stage")? {
@@ -678,6 +714,11 @@ pub(super) fn exact_manager_history(raw: &[u8], unit: &str, iid: &str) -> Result
 pub(super) fn exact_terminal_manager(raw: &[u8], unit: &str, iid: &str) -> Result<()> {
     capture::manager_history(raw, unit, iid, false)?;
     capture::manager_terminal(raw, unit, iid)
+}
+pub(super) fn delivery_natural_manager(raw: &[u8], unit: &str, iid: &str) -> Result<u64> {
+    let start = capture::manager_history(raw, unit, iid, true)?;
+    capture::manager_terminal(raw, unit, iid)?;
+    Ok(start)
 }
 pub(super) fn empty_terminal_cgroup(unit: &str) -> Result<Value> {
     capture::group(unit)

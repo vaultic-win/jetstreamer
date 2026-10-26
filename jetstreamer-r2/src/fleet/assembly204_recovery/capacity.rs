@@ -226,6 +226,37 @@ pub(super) fn admit(v: &Value, spec: &BoundFile, self_sha: &str) -> Result<()> {
     Ok(())
 }
 pub(super) fn validate_capacity(v: &Value, candidate_memory: u64, additional: u64) -> Result<()> {
+    validate_capacity_with_policy(
+        v,
+        candidate_memory,
+        additional,
+        "assembly204_recovery_memory_policy",
+        "jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1",
+        &maintenance_capacity::validate_assembly204_recovery_memory_policy,
+    )
+}
+pub(super) fn validate205_capacity(
+    v: &Value,
+    candidate_memory: u64,
+    additional: u64,
+) -> Result<()> {
+    validate_capacity_with_policy(
+        v,
+        candidate_memory,
+        additional,
+        "continuation205_delivery_memory_policy",
+        "jetstreamer-continuation205-delivery-hard-memory-policy-v1",
+        &maintenance_capacity::validate_continuation205_memory_policy,
+    )
+}
+fn validate_capacity_with_policy(
+    v: &Value,
+    candidate_memory: u64,
+    additional: u64,
+    key: &str,
+    schema: &str,
+    memory_policy: &impl Fn(&Value, u64, u64, u64) -> Result<u64>,
+) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-horizon-maintenance-capacity-v1"
             && v["first_epoch"] == 201
@@ -241,7 +272,7 @@ pub(super) fn validate_capacity(v: &Value, candidate_memory: u64, additional: u6
     );
     for phase in ["memory_before", "memory_after"] {
         let m = &v[phase];
-        let policy = &m["assembly204_recovery_memory_policy"];
+        let policy = &m[key];
         let growth = n(m, "protected_existing_memory_growth_bytes")?;
         let mut names = BTreeSet::new();
         let mut complete = 0u64;
@@ -262,14 +293,9 @@ pub(super) fn validate_capacity(v: &Value, candidate_memory: u64, additional: u6
             "204 protected hard-memory growth understates owner evidence"
         );
         let total = n(m, "host_total_memory_bytes")?;
-        let required = maintenance_capacity::validate_assembly204_recovery_memory_policy(
-            policy,
-            total,
-            growth,
-            candidate_memory,
-        )?;
+        let required = memory_policy(policy, total, growth, candidate_memory)?;
         ensure!(
-            policy["schema"] == "jetstreamer-epoch204-assembly-recovery-hard-memory-policy-v1"
+            policy["schema"] == schema
                 && policy["protected_existing_hard_memory_growth_bytes"] == growth
                 && policy["candidate_hard_memory_bytes"] == candidate_memory
                 && policy["required_available_memory_bytes"] == required
