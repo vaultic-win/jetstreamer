@@ -425,8 +425,7 @@ fn guard_manager(
         assembly204_recovery::delivery_command_matches(&p["ExecStart"], &expected),
         "completed launch guard command differs"
     );
-    let timer =
-        singleton227_capture::properties(&name.replace(".service", ".timer"), GUARD_TIMER_FIELDS)?;
+    let timer = barrier::guard_timer_properties(name)?;
     validate_guard_timer(&timer, name)?;
     let (rows, sha) = singleton227_capture::journal(name)?;
     ensure!(

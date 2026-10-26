@@ -125,6 +125,7 @@ fn validate_guard_timer(p: &BTreeMap<String, String>, service: &str) -> Result<(
             ("SubState", "waiting"),
             ("Triggers", service),
             ("TimersCalendar", ""),
+            ("TimersCalendarTypedReply", "a(sst) 0"),
             ("AccuracyUSec", "1s"),
             ("RandomizedDelayUSec", "0"),
             ("Persistent", "no"),
@@ -142,7 +143,8 @@ fn validate_guard_timer(p: &BTreeMap<String, String>, service: &str) -> Result<(
         .and_then(|v| v.strip_suffix(" }"))
         .context("completed guard timer lacks its sole approved 30-second recurrence")?;
     ensure!(
-        p.get("InvocationID").is_some_and(|v| is_lower_hex(v, 32))
+        p.get("InvocationID")
+            .is_some_and(|v| is_lower_hex(v, 32) && v.bytes().any(|b| b != b'0'))
             && !next.is_empty()
             && next.split(' ').all(|part| {
                 ["month", "min", "us", "ms", "s", "h", "d", "w", "y"]
@@ -1350,6 +1352,7 @@ mod tests {
                 "{ OnUnitActiveUSec=30s ; next_elapse=3d 2h 17min 30s }".into(),
             ),
             ("TimersCalendar".into(), String::new()),
+            ("TimersCalendarTypedReply".into(), "a(sst) 0".into()),
             ("AccuracyUSec".into(), "1s".into()),
             ("RandomizedDelayUSec".into(), "0".into()),
             ("Persistent".into(), "no".into()),
@@ -1395,6 +1398,8 @@ mod tests {
                 "TimersCalendar",
                 "{ OnCalendar=daily ; next_elapse=tomorrow }",
             ),
+            ("TimersCalendarTypedReply", "a(stt) 0"),
+            ("InvocationID", "00000000000000000000000000000000"),
             ("AccuracyUSec", "1d"),
             ("RandomizedDelayUSec", "1d"),
             ("OnClockChange", "yes"),

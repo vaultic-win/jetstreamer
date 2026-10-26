@@ -370,10 +370,9 @@ pub(super) fn transition_shape(
     );
     Ok(())
 }
-fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+fn manager_reply(mut command: ProcessCommand) -> Result<std::process::Output> {
     use std::process::Stdio;
-    let mut child = ProcessCommand::new("/usr/bin/systemctl")
-        .args(["show", name, "--no-pager", &format!("--property={fields}")])
+    let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -393,6 +392,12 @@ fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
             && output.stderr.len() <= 64 << 10,
         "completed startup manager reply failed or exceeded bound"
     );
+    Ok(output)
+}
+fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
+    let mut command = ProcessCommand::new("/usr/bin/systemctl");
+    command.args(["show", name, "--no-pager", &format!("--property={fields}")]);
+    let output = manager_reply(command)?;
     let mut p = BTreeMap::new();
     for line in std::str::from_utf8(&output.stdout)?.lines() {
         let (k, v) = line
@@ -405,6 +410,62 @@ fn properties(name: &str, fields: &str) -> Result<BTreeMap<String, String>> {
     }
     Ok(p)
 }
+
+fn timer_object_path(timer: &str) -> Result<String> {
+    ensure!(
+        timer.ends_with(".timer")
+            && timer.starts_with("horizon-generic")
+            && timer
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)),
+        "completed guard timer D-Bus unit name differs"
+    );
+    let mut path = String::from("/org/freedesktop/systemd1/unit/");
+    for byte in timer.bytes() {
+        if byte.is_ascii_alphanumeric() {
+            path.push(char::from(byte));
+        } else {
+            path.push_str(&format!("_{byte:02x}"));
+        }
+    }
+    Ok(path)
+}
+fn empty_calendar_reply(raw: &[u8]) -> Result<()> {
+    ensure!(
+        raw == b"a(sst) 0\n",
+        "completed guard timer calendar is not a supported empty typed array"
+    );
+    Ok(())
+}
+pub(super) fn guard_timer_properties(service: &str) -> Result<BTreeMap<String, String>> {
+    let timer = service.replace(".service", ".timer");
+    let path = timer_object_path(&timer)?;
+    let mut properties = properties(&timer, GUARD_TIMER_FIELDS)?;
+    // systemctl omits an empty TimersCalendar even with --all. Require a
+    // successful typed D-Bus read; absence is never treated as an empty schedule.
+    let mut command = ProcessCommand::new("/usr/bin/busctl");
+    command.args([
+        "--system",
+        "get-property",
+        "org.freedesktop.systemd1",
+        &path,
+        "org.freedesktop.systemd1.Timer",
+        "TimersCalendar",
+    ]);
+    let reply = manager_reply(command)?;
+    empty_calendar_reply(&reply.stdout)?;
+    ensure!(
+        reply.stderr.is_empty()
+            && properties
+                .get("TimersCalendar")
+                .is_none_or(String::is_empty),
+        "completed guard timer calendar replies disagree"
+    );
+    properties.insert("TimersCalendar".into(), String::new());
+    properties.insert("TimersCalendarTypedReply".into(), "a(sst) 0".into());
+    Ok(properties)
+}
+
 fn self_snapshot(p: &Startup) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 1000 && unsafe { libc::getegid() } == 1000,
@@ -585,10 +646,7 @@ fn current_manager(p: &Startup, s: &Spec, v: &Value, actual: &Value) -> Result<(
         guard["ReadWritePaths"] == string(&v["guard_plan_contents"], "receipt_directory")?,
         "completed startup guard writable namespace changed"
     );
-    let timer = properties(
-        &p.guard_unit.replace(".service", ".timer"),
-        GUARD_TIMER_FIELDS,
-    )?;
+    let timer = guard_timer_properties(&p.guard_unit)?;
     validate_guard_timer(&timer, &p.guard_unit)?;
     Ok(())
 }
@@ -782,6 +840,29 @@ mod tests {
         let mut actual = release["process"].clone();
         actual["invocation_id"] = release["invocation_id"].clone();
         (s, a, release, plan, actual)
+    }
+    #[test]
+    fn completed_barrier_timer_calendar_requires_typed_empty_reply_and_exact_unit_path() {
+        empty_calendar_reply(b"a(sst) 0\n").unwrap();
+        for unsupported in [
+            b"".as_slice(),
+            b"\n",
+            b"a(stt) 0\n",
+            b"a(sst) 1 daily\n",
+            b"TimersCalendar=\n",
+        ] {
+            assert!(empty_calendar_reply(unsupported).is_err());
+        }
+        assert_eq!(
+            timer_object_path("horizon-generic209-full-protective-v3.timer").unwrap(),
+            "/org/freedesktop/systemd1/unit/horizon_2dgeneric209_2dfull_2dprotective_2dv3_2etimer"
+        );
+        assert_eq!(
+            timer_object_path("horizon-generic209-full-protective-v_3.timer").unwrap(),
+            "/org/freedesktop/systemd1/unit/horizon_2dgeneric209_2dfull_2dprotective_2dv_5f3_2etimer"
+        );
+        assert!(timer_object_path("foreign.timer").is_err());
+        assert!(timer_object_path("horizon-generic209/bad.timer").is_err());
     }
     #[test]
     fn completed_barrier_plan_is_acyclic_phase_exact_and_bounded_before_release() {

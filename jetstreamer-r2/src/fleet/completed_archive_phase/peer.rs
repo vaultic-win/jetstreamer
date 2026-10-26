@@ -352,10 +352,7 @@ fn guard(
                 == serde_json::to_value(&p.spec.programs["guard"].artifact.path)?,
         "completed peer installed guard namespace or command changed"
     );
-    let timer = singleton227_capture::properties(
-        &p.spec.guard_units[p.spec.phase.name()].replace(".service", ".timer"),
-        GUARD_TIMER_FIELDS,
-    )?;
+    let timer = barrier::guard_timer_properties(&p.spec.guard_units[p.spec.phase.name()])?;
     validate_guard_timer(&timer, &p.spec.guard_units[p.spec.phase.name()])?;
     Ok(
         json!({"binding":bound,"sample":sample,"completed":completed,"properties":props,"timer":timer}),
