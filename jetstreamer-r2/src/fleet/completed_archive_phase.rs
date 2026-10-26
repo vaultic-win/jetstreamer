@@ -147,7 +147,7 @@ fn validate_guard_timer(p: &BTreeMap<String, String>, service: &str) -> Result<(
             && next.split(' ').all(|part| {
                 ["us", "ms", "min", "s", "h", "d", "w", "month", "y"]
                     .iter()
-                    .find_map(|suffix| part.strip_suffix(suffix))
+                    .find_map(|suffix| part.strip_suffix(*suffix))
                     .is_some_and(|number| {
                         let digits =
                             |v: &str| !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit());
