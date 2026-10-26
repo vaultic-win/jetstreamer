@@ -5,8 +5,7 @@ use std::os::unix::fs::MetadataExt;
 
 pub(super) const CANONICAL: &str = "/home/ubuntu/horizon";
 const PHASE: &str = "continuation-delivery205";
-const STATUS_DIRECTORY: &str =
-    "/home/ubuntu/.jetstreamer-private/continuation205-delivery-status-receipts";
+const STATUS_DIRECTORY: &str = "/home/ubuntu/.jetstreamer-private/r2-status-receipts";
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::fleet) struct Claim {
@@ -121,7 +120,7 @@ fn unit(name: &str) -> Result<Value> {
         )?,
     )?)
 }
-fn same_owner(old: &Value, current: &Value) -> Result<()> {
+pub(super) fn same_owner(old: &Value, current: &Value) -> Result<()> {
     for k in [
         "Id",
         "LoadState",
@@ -995,6 +994,31 @@ fn transport_phase(owner: &Value) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn continuation205_owner_allows_manager_display_changes_but_preserves_identity_and_argv() {
+        let command = "{ path=/sealed/helper ; argv[]=/sealed/helper run ; ignore_errors=no";
+        let owner = json!({"Id":"horizon-full-verify-205-continuation-delivery-v1.service","LoadState":"loaded","ActiveState":"active","SubState":"running","MainPID":"42","InvocationID":"a".repeat(32),"NRestarts":"0","ControlGroup":"/system.slice/horizon-full-verify-205-continuation-delivery-v1.service","ExecStart":format!("{command} ; start_time=[old] ; stop_time=[n/a] ; pid=42 ; code=(null) ; status=0/0 }}")});
+        let mut fresh = owner.clone();
+        fresh["ExecStart"] = json!(format!(
+            "{command} ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}"
+        ));
+        same_owner(&owner, &fresh).unwrap();
+        for key in [
+            "Id",
+            "LoadState",
+            "ActiveState",
+            "SubState",
+            "MainPID",
+            "InvocationID",
+            "NRestarts",
+            "ControlGroup",
+            "ExecStart",
+        ] {
+            let mut bad = fresh.clone();
+            bad[key] = json!("foreign");
+            assert!(same_owner(&owner, &bad).is_err(), "{key}");
+        }
+    }
     fn rows() -> Vec<Value> {
         vec![
             json!({"_PID":"1","_UID":"0","UNIT":"horizon-205-delivery-full-v1.service","INVOCATION_ID":"a".repeat(32),"__REALTIME_TIMESTAMP":"1000000","__CURSOR":"first","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started Full."}),
