@@ -1,0 +1,135 @@
+{
+  "schema": "jetstreamer-epoch225-prefix-extraction-source-preparation-v1",
+  "source_only": true,
+  "actual_executor_is_not_yet_implemented_or_admitted": true,
+  "original_owner": {
+    "unit": "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service",
+    "invocation_id": "4cd76ae1353a4411885b997f04306402",
+    "terminal_journal_time_utc": "2026-10-26T13:49:02Z",
+    "segment_published_then_deactivated_successfully": true,
+    "current_live_owner_claimed": false,
+    "launch": {
+      "path": "/var/lib/jetstreamer/horizon-225-shrink-natural-root-launch-222936-v1/launch.json",
+      "sha256": "491baf3214515c8ad324d0d0de43a3fa680bb35892bfae32fd027b8ce6c6b071"
+    }
+  },
+  "original_source": {
+    "archive": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet",
+    "archive_bytes": 265610094371,
+    "archive_sha256_from_manifest": "77c0f95a020ceb6c45e323f4ce1bb48066fd0b379615bd5c9dbcb67f9082d6f9",
+    "archive_body_rehashed_by_this_source_task": false,
+    "manifest": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet.segment.json",
+    "manifest_sha256": "53a69d801e70866b0bc048e1b3a75d9c16c1fb93995503157fc206742f3cdcf6",
+    "worker_sha256": "2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd",
+    "runtime_profile": "solana-v1.6.25",
+    "runtime_revision": "7de8a55b54d3e11058b82f9483bb405d143b455c",
+    "runtime_admission": "candidate",
+    "output_slot_start": 97200000,
+    "output_slot_count": 863465,
+    "terminal_slot": 98063464,
+    "canonical225_slot_count": 432000,
+    "canonical225_final_slot": 97631999,
+    "retained226_private_slots": 431465,
+    "missing226_suffix_slots": 535,
+    "canonical226_final_slot": 98063999
+  },
+  "extraction_core": {
+    "module": "jetstreamer_node::epoch225_extract",
+    "open": "PinnedSource::open(original_archive, original_manifest, exact_manifest_digest, exact_worker_digest)",
+    "extract": "PinnedSource::extract_private(new_private_root, separately_admitted_maximum_bytes, live_guard_callback)",
+    "output_root_namespace": "/home/ubuntu/.jetstreamer-private/epoch225-prefix-extract-UNIQUE_ATTEMPT",
+    "output_filename": "epoch-225.jet",
+    "maximum_accepted_output_ceiling_bytes": 343597383680,
+    "ceiling_is_not_a_resource_admission_or_size_prediction": true,
+    "fresh_source_sha256_and_complete_deep_decode_required": true,
+    "strict_reencode_and_independent_output_semantic_reread_required": true,
+    "output_candidate_runtime_provenance_preserved": true,
+    "receipt_recovery_does_not_replace_existing_candidate": true,
+    "source_and_manifest_unchanged_before_and_after": true
+  },
+  "root_qualification_build_targets_not_run_here": [
+    "cargo test --release -p jetstreamer-node --lib epoch225_extract::tests:: --frozen --offline",
+    "cargo clippy --release -p jetstreamer-node --lib --frozen --offline -- -D warnings",
+    "cargo build --release -p jetstreamer-node --bin jetstreamer-qualification-verify --frozen --offline"
+  ],
+  "current_source_independent_reader_arguments": [
+    "NEW_QUALIFIED_jetstreamer-qualification-verify",
+    "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1/output/epoch-225.jet",
+    "--private-root=/home/ubuntu/.jetstreamer-private/qualification-225-v1625-natural-root-shrink-budget-2f856bd-v1",
+    "--expected-epoch=225",
+    "--expected-output-start-slot=97200000",
+    "--expected-bootstrap-slot=97199617",
+    "--expected-terminal-slot=98063464",
+    "--expected-runtime-profile=solana-v1.6.25",
+    "--expected-worker-sha256=2dcc9b84a6ce27edba3d3b053c6e6170f66a2337f12a5aae54900c3ad9e2eedd",
+    "--receipt=NEW_PRIVATE_RECEIPT_DIRECTORY/epoch-225.complete-span.validation.json"
+  ],
+  "capability_steps_required_before_execution": [
+    "Root captures exact successful terminal original invocation/PID1 history, checks no replacement producer, empty original cgroup and no live source references; preserve225 and226 status history.",
+    "Freeze original archive and manifest without changing bytes or ownership, preserving their exact paths and uid1000; core rejects writable source metadata. Do not delete or retire source or226 tail.",
+    "Qualify current-source independent complete-span reader for actual shrink-budget2dcc worker. Old b261 deployment documents7cd48 scope and cannot be assumed to accept this variant.",
+    "Qualify a separately reviewed concrete native225 extractor runner that binds this core, original terminal/launch and independent reader receipts; this commit supplies no executable runner and no launch/admission commands.",
+    "Use the sole fresh coordinated observer/fleet and current full owner/guard census to admit the actual runner hard memory, CPU, source read cache and up-to320GiB new output without old225 worker/RSS credit. The output cap alone confers no capacity.",
+    "Root Rust-seals runner/control packages and enforces actual live output-budget/floor guard through every core write and before no-clobber publication. Keep original source/manifest immutable throughout.",
+    "Capture genuine running runner unit, invocation ID, PID start, exact executable/argv/work plan and original replay start clock. Implement and qualify supported task-based status publication for both225 and226 with fresh numeric sidecar-inclusive policies; agent intent and terminal replay are not live task evidence.",
+    "After extraction, independently qualify exact225 candidate runtime/worker/checkpoint provenance and compare its canonical225-only bytes using the normal independent Full and current-plugin gates. Candidate status must remain explicit; no global default-runtime registry rewrite follows.",
+    "Qualify required adjacent boundaries, separately reviewed canonical import/sidecar authorization and authenticated R2 upload/whole-object readback/source revalidation. Current core creates neither canonical checksum nor terminal segment manifest.",
+    "Keep226 active in the task plan: retain431465slot tail and separately qualify native restore plus missing535slot suffix, assembly, Full/current-plugin/boundary checks and delivery. This core cannot extract or publish226."
+  ],
+  "authority": {
+    "replay_launch_authorized": false,
+    "runtime_promotion_authorized": false,
+    "full_verification_claimed": false,
+    "current_plugin_verification_claimed": false,
+    "canonical_sidecar_authorized": false,
+    "publication_authorized": false,
+    "retirement_authorized": false,
+    "r2_mutations": false
+  },
+  "status_transition_blockers": [
+    "Original controller terminal; workerless live original publisher would be untruthful.",
+    "No separately admitted running native extractor/qualification owner or matching supported task-status route exists in this commit.",
+    "Retained226 source is535slots short of complete canonical226."
+  ],
+  "provisional_task_status_policy_planning": {
+    "not_a_status_payload_or_supported_publisher_request": true,
+    "bind_to_new_actual_task_and_latest_coordinated_observation_before_use": true,
+    "current_best_guesses_not_upper_bounds": true,
+    "evidence_basis": "Original265610094371-byte combined segment closed at12:14:40.271722166Z; built-in16-thread segment verification published its manifest at13:49:02.171556779Z, about94minutes later. Reserve2hours for independent source reread and4hours for new prefix reencode plus semantic output reread. Remaining runtime qualification, current-plugin, transfer and recovery allowances are explicit uncertain planning guesses, not measured progress.226 includes the proven missing535slot suffix and unqualified restore/assembly route.",
+    "uncertainty": "Substantial. Runtime compatibility and native226 suffix qualification are unresolved and may require revising estimates upward. Recompute at the actual task capture and every sole coordinated observation; do not mechanically restart these countdowns.",
+    "epochs": {
+      "225": {
+        "remaining_stage_millis": {
+          "independent_source_reread": 7200000,
+          "prefix_reencode_and_output_semantic_reread": 14400000,
+          "runtime_compatibility_qualification": 86400000,
+          "independent_full_verification": 7200000,
+          "current_plugin_verification": 14400000,
+          "required_boundary_checks": 1800000,
+          "upload": 7200000,
+          "authenticated_whole_object_readback": 7200000,
+          "source_revalidation_and_sidecar_commit": 3600000,
+          "recovery": 14400000
+        },
+        "sidecar_inclusive_total_millis": 163800000
+      },
+      "226": {
+        "remaining_stage_millis": {
+          "shared_source_reread_and225_prefix_work": 21600000,
+          "runtime_compatibility_qualification": 86400000,
+          "native_restore_and_missing535slot_route_qualification": 57600000,
+          "suffix_execution": 7200000,
+          "private_tail_extraction_and_assembly": 14400000,
+          "independent_full_verification": 7200000,
+          "current_plugin_verification": 14400000,
+          "required_boundary_checks": 1800000,
+          "upload": 7200000,
+          "authenticated_whole_object_readback": 7200000,
+          "source_revalidation_and_sidecar_commit": 3600000,
+          "recovery": 28800000
+        },
+        "sidecar_inclusive_total_millis": 257400000
+      }
+    }
+  }
+}

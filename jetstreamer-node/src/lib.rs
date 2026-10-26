@@ -2,6 +2,7 @@
 
 pub mod archive_checksum;
 pub mod archive_publish;
+pub mod epoch225_extract;
 pub mod epoch228_extract;
 pub mod handoff_snapshot;
 pub mod segment_manifest;
