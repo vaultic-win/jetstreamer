@@ -53,6 +53,12 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   replace an existing package directory. The seal receipt explicitly denies replay launch,
   publication, and remote mutation; exact-node capability probes and fresh admission remain
   independent requirements.
+- For the deployed sealer with SHA-256
+  `96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24`, use
+  process `umask 0022`, or `UMask=0022` in a metadata service that invokes it. This generation
+  applies the inherited umask to generated `0444` members and rejects their resulting mode under
+  `0077`. Keep private state directories explicitly `0700` and private writable receipts `0600`;
+  scope the setting to this sealer or its invoking metadata service.
 
 For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Optional local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
 
