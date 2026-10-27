@@ -1617,6 +1617,58 @@ mod tests {
         assert!(singleton209_delivery::terminal_history_for(&changed, name, &iid).is_err());
     }
     #[test]
+    fn completed_phase_terminal_history_accepts_only_exact_unscoped_cpu_accounting_warning() {
+        let name = "horizon-qualify-207-generic-full-cycle462-808f4683-v1.service";
+        let iid = "b02e0a3a4bdf4255955cc7436610929e";
+        let mut rows = vec![
+            json!({"_PID":"1","_UID":"0","UNIT":name,"INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":"1000","MESSAGE":format!("Started {name} - Full verification.")}),
+            json!({"_PID":"1","_UID":"0","UNIT":name,"INVOCATION_ID":iid,"__REALTIME_TIMESTAMP":"2000","MESSAGE":format!("{name}: Deactivated successfully.")}),
+            json!({"_PID":"1","_UID":"0","UNIT":name,"__REALTIME_TIMESTAMP":"3000",
+                "MESSAGE_ID":"c772d24e9a884cbeb9ea12625c306c01","CODE_FILE":"src/shared/conf-parser.c",
+                "CODE_FUNC":"config_parse_warn_compat","CONFIG_FILE":format!("/etc/systemd/system/{name}"),"CONFIG_LINE":"22",
+                "MESSAGE":format!("/etc/systemd/system/{name}:22: Support for option CPUAccounting= has been removed and it is ignored")}),
+        ];
+        let accepted = singleton209_delivery::terminal_history_for(&rows, name, iid).unwrap();
+        assert_eq!(accepted, rows[..2]);
+        for (key, value) in [
+            ("INVOCATION_ID", json!("a".repeat(32))),
+            ("MESSAGE_ID", json!("39f53479d3a045ac8e11786248231fbf")),
+            ("CODE_FILE", json!("src/core/unit.c")),
+            ("CODE_FUNC", json!("unit_log_success")),
+            ("CONFIG_FILE", json!("/etc/systemd/system/foreign.service")),
+            ("CONFIG_LINE", json!("022")),
+            ("CONFIG_LINE", json!("0")),
+            ("CONFIG_LINE", json!(null)),
+            (
+                "MESSAGE",
+                json!(format!("Started {name} - Replaced Full verifier.")),
+            ),
+            (
+                "MESSAGE",
+                json!(format!("{name}: Failed with result 'exit-code'.")),
+            ),
+            ("__REALTIME_TIMESTAMP", json!("not-a-clock")),
+        ] {
+            let mut changed = rows.clone();
+            changed[2][key] = value;
+            assert!(
+                singleton209_delivery::terminal_history_for(&changed, name, iid).is_err(),
+                "{key}"
+            );
+        }
+        rows.push(rows[0].clone());
+        assert!(singleton209_delivery::terminal_history_for(&rows, name, iid).is_err());
+        rows.pop();
+        rows.push(rows[1].clone());
+        assert!(singleton209_delivery::terminal_history_for(&rows, name, iid).is_err());
+        rows.pop();
+        rows[0]["INVOCATION_ID"] = json!(null);
+        assert!(singleton209_delivery::terminal_history_for(&rows, name, iid).is_err());
+        rows[0]["INVOCATION_ID"] = json!(iid);
+        rows[1]["INVOCATION_ID"] = json!(null);
+        assert!(singleton209_delivery::terminal_history_for(&rows, name, iid).is_err());
+    }
+    #[test]
     fn completed_phase_spec_rejects_unknown_authority_and_unimplemented_origin() {
         let s = serde_json::to_value(fixture(Phase::Full)).unwrap();
         for key in [

@@ -195,6 +195,27 @@ pub(super) fn source_terminal(launch: &Value) -> Result<Value> {
 fn terminal_history(rows: &[Value], iid: &str) -> Result<Vec<Value>> {
     terminal_history_for(rows, c::UNIT, iid)
 }
+fn unscoped_cpu_accounting_warning(row: &Value, name: &str) -> bool {
+    let Some(line) = row["CONFIG_LINE"].as_str() else {
+        return false;
+    };
+    if line.starts_with('0') || line.starts_with('+') || line.parse::<u64>().is_err() {
+        return false;
+    }
+    let file = format!("/etc/systemd/system/{name}");
+    row["_PID"] == "1"
+        && row["_UID"] == "0"
+        && row["UNIT"] == name
+        && row["INVOCATION_ID"].is_null()
+        && row["MESSAGE_ID"] == "c772d24e9a884cbeb9ea12625c306c01"
+        && row["CODE_FILE"] == "src/shared/conf-parser.c"
+        && row["CODE_FUNC"] == "config_parse_warn_compat"
+        && row["CONFIG_FILE"] == file
+        && row["MESSAGE"]
+            == format!(
+                "{file}:{line}: Support for option CPUAccounting= has been removed and it is ignored"
+            )
+}
 pub(super) fn terminal_history_for(rows: &[Value], name: &str, iid: &str) -> Result<Vec<Value>> {
     ensure!(
         !rows.is_empty() && rows.len() < 256,
@@ -233,9 +254,13 @@ pub(super) fn terminal_history_for(rows: &[Value], name: &str, iid: &str) -> Res
     let start = clock(starts[0])?;
     ensure!(
         clock(ends[0])? > start
-            && own
-                .iter()
-                .all(|r| clock(r).is_ok_and(|t| t < start || r["INVOCATION_ID"] == iid)),
+            && own.iter().all(|r| {
+                clock(r).is_ok_and(|t| {
+                    t < start
+                        || r["INVOCATION_ID"] == iid
+                        || unscoped_cpu_accounting_warning(r, name)
+                })
+            }),
         "209 manager outcome reordered or producer replaced"
     );
     Ok(vec![(*starts[0]).clone(), (*ends[0]).clone()])
