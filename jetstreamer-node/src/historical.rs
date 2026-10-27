@@ -32,6 +32,9 @@ use solana_transaction::{
 };
 use tempfile::{Builder as TempDirBuilder, TempDir};
 
+#[path = "historical_epoch136_gate.rs"]
+mod hourly136_gate;
+
 pub const HASH_BYTES: usize = 32;
 pub const SIGNATURE_BYTES: usize = 64;
 
@@ -1353,6 +1356,8 @@ impl HistoricalRuntimeClient {
         spawn: WorkerSpawn,
         timeouts: HistoricalRuntimeTimeouts,
     ) -> Result<Self, HistoricalRuntimeError> {
+        let mut spawn = spawn;
+        let hourly136_gate = hourly136_gate::bind_if_enabled(profile, &mut spawn.initialization)?;
         let executable = canonical_regular_file(&spawn.executable, true)?;
         let initialization = &spawn.initialization;
         let scratch_parent = match initialization {
@@ -1497,6 +1502,17 @@ impl HistoricalRuntimeClient {
         };
         if let Err(error) = verify_handshake(profile, &handshake) {
             return client.abort_after_response(error);
+        }
+
+        if hourly136_gate {
+            hourly136_gate::before_initialize(
+                client
+                    .child
+                    .as_ref()
+                    .expect("spawned client retains worker")
+                    .id(),
+                executable_sha256,
+            )?;
         }
 
         let body = client.exchange(RequestBody::Initialize {
@@ -3682,6 +3698,10 @@ fn canonical_directory(path: &Path, kind: &'static str) -> Result<PathBuf, Histo
     } else {
         Err(HistoricalRuntimeError::ScratchParentNotDirectory(canonical))
     }
+}
+
+pub(crate) fn worker_scratch_parent(replay_scratch: &Path) -> PathBuf {
+    replay_scratch.join(".historical-runtime")
 }
 
 fn make_private_work_dir(parent: Option<&Path>) -> Result<TempDir, HistoricalRuntimeError> {
