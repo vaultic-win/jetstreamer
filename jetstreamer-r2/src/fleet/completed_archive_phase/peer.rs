@@ -342,6 +342,92 @@ fn endpoint_shape(
     terminal_guard_row(&endpoint["raw_guard"], guard_name, &endpoint["protection"])
 }
 
+fn json_pointer_field(prefix: &str, field: &str) -> String {
+    format!("{prefix}/{}", field.replace('~', "~0").replace('/', "~1"))
+}
+
+fn differing_property_paths(
+    prefix: &str,
+    before: &BTreeMap<String, String>,
+    after: &BTreeMap<String, String>,
+) -> Vec<String> {
+    before
+        .keys()
+        .chain(after.keys())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter(|field| before.get(*field) != after.get(*field))
+        .map(|field| json_pointer_field(prefix, field))
+        .collect()
+}
+
+type GuardPropertySplit = (String, BTreeMap<String, String>, BTreeMap<String, String>);
+
+/// `systemctl show` renders a completed oneshot's timestamps and PID into
+/// ExecStart. A genuine periodic guard firing therefore changes that renderer
+/// at the effective-property level and in the retained raw-show evidence. The
+/// executable, argv and ignore-errors bit remain exact through
+/// `same_exec_start`; every other control and every typed-empty reply remains
+/// byte-for-byte stable.
+fn stable_guard_properties(before: &Value, after: &Value) -> Result<()> {
+    fn split(value: &Value) -> Result<GuardPropertySplit> {
+        let mut effective: BTreeMap<String, String> = serde_json::from_value(value.clone())
+            .context("completed guard properties are not a string map")?;
+        let raw_json = effective
+            .remove("TypedEmptyRawShow")
+            .context("completed guard /protection/properties/TypedEmptyRawShow is absent")?;
+        ensure!(
+            effective.contains_key("TypedEmptyReplies"),
+            "completed guard /protection/properties/TypedEmptyReplies is absent"
+        );
+        let rendered = effective
+            .remove("ExecStart")
+            .context("completed guard /protection/properties/ExecStart is absent")?;
+        let mut raw: BTreeMap<String, String> = serde_json::from_str(&raw_json)
+            .context("completed guard /protection/properties/TypedEmptyRawShow is malformed")?;
+        ensure!(
+            !raw.contains_key("TypedEmptyRawShow") && !raw.contains_key("TypedEmptyReplies"),
+            "completed guard raw show contains reserved typed-empty fields"
+        );
+        let raw_rendered = raw.remove("ExecStart").context(
+            "completed guard /protection/properties/TypedEmptyRawShow/ExecStart is absent",
+        )?;
+        ensure!(
+            rendered == raw_rendered,
+            "completed guard effective and raw-show /ExecStart renderers differ"
+        );
+        Ok((rendered, effective, raw))
+    }
+
+    let (before_exec, before_effective, before_raw) = split(before)?;
+    let (after_exec, after_effective, after_raw) = split(after)?;
+    ensure!(
+        pipeline_status::same_exec_start(&before_exec, &after_exec),
+        "completed guard command identity changed at /protection/properties/ExecStart"
+    );
+    let effective_changes = differing_property_paths(
+        "/protection/properties",
+        &before_effective,
+        &after_effective,
+    );
+    ensure!(
+        effective_changes.is_empty(),
+        "completed guard controls changed at {}",
+        effective_changes.join(", ")
+    );
+    let raw_changes = differing_property_paths(
+        "/protection/properties/TypedEmptyRawShow",
+        &before_raw,
+        &after_raw,
+    );
+    ensure!(
+        raw_changes.is_empty(),
+        "completed guard raw-show controls changed at {}",
+        raw_changes.join(", ")
+    );
+    Ok(())
+}
+
 /// Compare complete raw censuses without normalizing either one. Only the two
 /// volatile fields of an independently authenticated, terminal-success
 /// completed-phase periodic guard may differ. The returned evidence retains both raw
@@ -374,19 +460,55 @@ pub(in crate::fleet) fn authenticated_guard_rollovers(
         endpoint_shape(before_endpoint, before, name)?;
         endpoint_shape(after_endpoint, after, name)?;
         let owner = string(before_endpoint, "protected_unit")?;
+        let changed_bindings = [
+            (
+                "/protected_unit",
+                &before_endpoint["protected_unit"],
+                &after_endpoint["protected_unit"],
+            ),
+            (
+                "/claim",
+                &before_endpoint["claim"],
+                &after_endpoint["claim"],
+            ),
+            (
+                "/authenticated_launch",
+                &before_endpoint["authenticated_launch"],
+                &after_endpoint["authenticated_launch"],
+            ),
+            (
+                "/guard_plan",
+                &before_endpoint["guard_plan"],
+                &after_endpoint["guard_plan"],
+            ),
+            (
+                "/guard_executable",
+                &before_endpoint["guard_executable"],
+                &after_endpoint["guard_executable"],
+            ),
+            (
+                "/phase_spec",
+                &before_endpoint["phase_spec"],
+                &after_endpoint["phase_spec"],
+            ),
+        ]
+        .into_iter()
+        .filter(|(_, before, after)| before != after)
+        .map(|(path, _, _)| path)
+        .collect::<Vec<_>>();
         ensure!(
-            before_endpoint["protected_unit"] == after_endpoint["protected_unit"]
-                && before_endpoint["claim"] == after_endpoint["claim"]
-                && before_endpoint["authenticated_launch"]
-                    == after_endpoint["authenticated_launch"]
-                && before_endpoint["guard_plan"] == after_endpoint["guard_plan"]
-                && before_endpoint["guard_executable"] == after_endpoint["guard_executable"]
-                && before_endpoint["phase_spec"] == after_endpoint["phase_spec"]
-                && before_endpoint["protection"]["properties"]
-                    == after_endpoint["protection"]["properties"]
-                && before.get(owner) == after.get(owner)
+            changed_bindings.is_empty(),
+            "completed guard rollover changed stable bindings at {}",
+            changed_bindings.join(", ")
+        );
+        stable_guard_properties(
+            &before_endpoint["protection"]["properties"],
+            &after_endpoint["protection"]["properties"],
+        )?;
+        ensure!(
+            before.get(owner) == after.get(owner)
                 && before_endpoint["raw_owner"] == after_endpoint["raw_owner"],
-            "completed guard rollover changed its claim, executable, plan, controls, or producer"
+            "completed guard rollover changed producer at /unit_census or /raw_owner"
         );
         let before_iid = string(before_row, "InvocationID")?;
         let after_row = after
@@ -1177,7 +1299,65 @@ mod tests {
             "ActiveState":"inactive","SubState":"dead","InvocationID":iid,"MainPID":"0","ControlGroup":"",
             "NRestarts":"0","Result":"success","ExecMainStatus":"0","ExecStart":command(start,pid)})
         };
+        let guard_properties = |rendered: &str| {
+            // Sanitized from the captured Upload209 property shape. The raw
+            // systemctl map is retained as JSON inside the effective map, and
+            // only omitted native arrays have typed empty replies.
+            let mut raw: BTreeMap<String, String> = BTreeMap::from([
+                ("CPUQuotaPerSecUSec".into(), "1s".into()),
+                ("Delegate".into(), "no".into()),
+                ("DropInPaths".into(), "".into()),
+                ("Environment".into(), "".into()),
+                ("ExecStart".into(), rendered.into()),
+                ("KillMode".into(), "control-group".into()),
+                ("MemoryMax".into(), "1073741824".into()),
+                ("MemorySwapMax".into(), "0".into()),
+                ("NeedDaemonReload".into(), "no".into()),
+                ("NoNewPrivileges".into(), "yes".into()),
+                ("OnFailure".into(), "".into()),
+                ("OnSuccess".into(), "".into()),
+                ("PassEnvironment".into(), "".into()),
+                ("PrivateNetwork".into(), "yes".into()),
+                ("ProtectHome".into(), "read-only".into()),
+                ("ProtectSystem".into(), "strict".into()),
+                ("ReadWritePaths".into(), "/private/guard-receipts".into()),
+                ("Restart".into(), "no".into()),
+                ("TasksMax".into(), "256".into()),
+                ("Transient".into(), "no".into()),
+                ("Type".into(), "oneshot".into()),
+                ("UnsetEnvironment".into(), UNSAFE_ENVIRONMENT.join(" ")),
+                ("User".into(), "root".into()),
+            ]);
+            let raw_json = serde_json::to_string(&raw).unwrap();
+            let object_path = "/org/freedesktop/systemd1/unit/horizon_2dgeneric209_2dplugin_2dprotective_2dv12_2eservice";
+            let mut replies = serde_json::Map::new();
+            for (property, signature) in [
+                ("EnvironmentFiles", "a(sb)"),
+                ("ExecCondition", "a(sasbttttuii)"),
+                ("ExecReload", "a(sasbttttuii)"),
+                ("ExecStartPost", "a(sasbttttuii)"),
+                ("ExecStartPre", "a(sasbttttuii)"),
+                ("ExecStop", "a(sasbttttuii)"),
+                ("ExecStopPost", "a(sasbttttuii)"),
+            ] {
+                replies.insert(
+                    property.into(),
+                    json!({"unit":guard,"object_path":object_path,
+                        "interface":"org.freedesktop.systemd1.Service","property":property,
+                        "signature":signature,"exit_code":0,
+                        "stdout":format!("{{\"type\":\"{signature}\",\"data\":[]}}\n"),"stderr":""}),
+                );
+                raw.insert(property.into(), String::new());
+            }
+            raw.insert("TypedEmptyRawShow".into(), raw_json);
+            raw.insert(
+                "TypedEmptyReplies".into(),
+                serde_json::to_string(&Value::Object(replies)).unwrap(),
+            );
+            json!(raw)
+        };
         let endpoint = |iid: &str, raw: Value, recorded: u64| {
+            let properties = guard_properties(raw["ExecStart"].as_str().unwrap());
             json!({
                 "schema":"jetstreamer-completed-archive-nonlaunching-guard-endpoint-v1",
                 "epoch":209,"phase":"plugin",
@@ -1193,7 +1373,7 @@ mod tests {
                 "protection":{"sample":{"guard_invocation_id":iid,"recorded_unix_seconds":recorded},
                     "latest_sample":{"guard_invocation_id":iid,"recorded_unix_seconds":recorded},
                     "completed":{"history":{"guard_invocation_id":iid,"expected_exec_start":command("n/a",0)}},
-                    "properties":{"ExecStart":"immutable exact guard command","ExecStop":""}},
+                    "properties":properties},
                 "no_stop_files_confirmed":true,
                 "pending_jobs":{"units":[owner,guard],"raw_stdout":"","exit_code":0}
             })
@@ -1271,15 +1451,94 @@ mod tests {
     #[test]
     fn completed209_periodic_guard_rollover_accepts_only_authenticated_terminal_success_iids() {
         let (before, after, before_endpoints, after_endpoints) = rollover_fixture();
+        let guard = "horizon-generic209-plugin-protective-v12.service";
+        let before_properties = &before_endpoints[guard]["protection"]["properties"];
+        let after_properties = &after_endpoints[guard]["protection"]["properties"];
+        assert_ne!(
+            before_properties["ExecStart"],
+            after_properties["ExecStart"]
+        );
+        assert_ne!(
+            before_properties["TypedEmptyRawShow"],
+            after_properties["TypedEmptyRawShow"]
+        );
+        assert_eq!(
+            before_properties["TypedEmptyReplies"],
+            after_properties["TypedEmptyReplies"]
+        );
         let proof =
             authenticated_guard_rollovers(&before, &after, &before_endpoints, &after_endpoints)
                 .unwrap();
         assert_eq!(proof.len(), 1);
-        let guard = proof[0]["guard_unit"].as_str().unwrap();
-        assert_eq!(proof[0]["raw_before"], before[guard]);
-        assert_eq!(proof[0]["raw_after"], after[guard]);
+        let selected = proof[0]["guard_unit"].as_str().unwrap();
+        assert_eq!(proof[0]["raw_before"], before[selected]);
+        assert_eq!(proof[0]["raw_after"], after[selected]);
         assert_eq!(proof[0]["producer_unchanged"], true);
         assert_eq!(proof[0]["nonlaunching_guard_only"], true);
+    }
+    #[test]
+    fn completed209_guard_renderer_exception_preserves_every_other_control_and_typed_reply() {
+        let (before, after, before_endpoints, after_endpoints) = rollover_fixture();
+        let guard = "horizon-generic209-plugin-protective-v12.service";
+        for (pointer, value, expected_path) in [
+            (
+                "/protection/properties/MemoryMax",
+                json!("2147483648"),
+                "/protection/properties/MemoryMax",
+            ),
+            (
+                "/protection/properties/TypedEmptyReplies",
+                json!("{}"),
+                "/protection/properties/TypedEmptyReplies",
+            ),
+        ] {
+            let mut endpoints = before_endpoints.clone();
+            *endpoints
+                .get_mut(guard)
+                .unwrap()
+                .pointer_mut(pointer)
+                .unwrap() = value;
+            let error =
+                authenticated_guard_rollovers(&before, &after, &endpoints, &after_endpoints)
+                    .unwrap_err()
+                    .to_string();
+            assert!(error.contains(expected_path), "{pointer}: {error}");
+        }
+
+        let mut endpoints = before_endpoints.clone();
+        let encoded = endpoints[guard]["protection"]["properties"]["TypedEmptyRawShow"]
+            .as_str()
+            .unwrap();
+        let mut raw: BTreeMap<String, String> = serde_json::from_str(encoded).unwrap();
+        raw.insert("ReadWritePaths".into(), "/foreign".into());
+        endpoints.get_mut(guard).unwrap()["protection"]["properties"]["TypedEmptyRawShow"] =
+            json!(serde_json::to_string(&raw).unwrap());
+        let error = authenticated_guard_rollovers(&before, &after, &endpoints, &after_endpoints)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("/protection/properties/TypedEmptyRawShow/ReadWritePaths"),
+            "{error}"
+        );
+
+        let mut endpoints = before_endpoints;
+        let properties = &mut endpoints.get_mut(guard).unwrap()["protection"]["properties"];
+        let changed = properties["ExecStart"]
+            .as_str()
+            .unwrap()
+            .replace("/sealed/guard /sealed/plan", "/sealed/guard /foreign/plan");
+        let mut raw: BTreeMap<String, String> =
+            serde_json::from_str(properties["TypedEmptyRawShow"].as_str().unwrap()).unwrap();
+        raw.insert("ExecStart".into(), changed.clone());
+        properties["ExecStart"] = json!(changed);
+        properties["TypedEmptyRawShow"] = json!(serde_json::to_string(&raw).unwrap());
+        let error = authenticated_guard_rollovers(&before, &after, &endpoints, &after_endpoints)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("/protection/properties/ExecStart"),
+            "{error}"
+        );
     }
     #[test]
     fn maintenance_three_brackets_accept_authenticated_auxiliary_turnover_only() {
