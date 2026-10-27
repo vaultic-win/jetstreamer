@@ -3392,6 +3392,8 @@ async fn main() -> Result<()> {
                 | "holding-inspect185"
                 | "holding-check-retire185"
                 | "holding-retire185"
+                | "holding-check185-scratch"
+                | "holding-retire185-scratch"
                 | "holding-inspect136"
                 | "holding-disable136-retry"
                 | "holding-check-retire136"
@@ -3518,6 +3520,14 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-qualification") {
         return qualification_status::run().await;
     }
+    if matches!(
+        env::args().nth(1).as_deref(),
+        Some(
+            "check-original191-growth" | "transfer-original191-growth" | "read-original191-growth"
+        )
+    ) {
+        return cohort191_delivery::original_growth_transfer();
+    }
     if env::args().nth(1).as_deref() == Some("capture-terminal191") {
         return cohort191_delivery::capture_terminal_transition();
     }
@@ -3529,6 +3539,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("capture-controller-terminal-191") {
         return cohort191_delivery::capture_controller_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("observe-public191") {
+        return cohort191_delivery::observe_public();
     }
     if env::args().nth(1).as_deref() == Some("check-delivery-191") {
         return cohort191_delivery::check();

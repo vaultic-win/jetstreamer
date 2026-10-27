@@ -351,15 +351,79 @@ fn no_queued_entry_jobs(jobs: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn queued_entry_check() -> Result<()> {
-    let out = std::process::Command::new("/usr/bin/systemctl")
-        .args(["list-jobs", "--output=json", "--no-pager"])
+pub(super) fn queued_entry_check() -> Result<()> {
+    let out = std::process::Command::new("/usr/bin/busctl")
+        .args([
+            "--system",
+            "--json=short",
+            "call",
+            "org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1",
+            "org.freedesktop.systemd1.Manager",
+            "ListJobs",
+        ])
         .output()?;
     ensure!(
         out.status.success() && out.stdout.len() <= 1 << 20,
         "185 queued-job census unavailable"
     );
-    no_queued_entry_jobs(&serde_json::from_slice(&out.stdout)?)
+    no_queued_entry_jobs(&decode_native_jobs(
+        &serde_json::from_slice(&out.stdout).context("185 native ListJobs JSON framing")?,
+    )?)
+}
+fn decode_native_jobs(v: &Value) -> Result<Value> {
+    ensure!(
+        v["type"] == "a(usssoo)",
+        "185 native ListJobs signature differs"
+    );
+    let returns = v["data"]
+        .as_array()
+        .context("185 native ListJobs method returns")?;
+    ensure!(
+        returns.len() == 1,
+        "185 native ListJobs return count differs"
+    );
+    let jobs = returns[0]
+        .as_array()
+        .context("185 native ListJobs job array")?;
+    let mut rows = Vec::new();
+    let mut ids = std::collections::BTreeSet::new();
+    for value in jobs {
+        let job = value.as_array().context("185 native ListJobs tuple")?;
+        ensure!(job.len() == 6, "185 native ListJobs tuple arity differs");
+        let id = job[0]
+            .as_u64()
+            .filter(|id| *id > 0 && *id <= u64::from(u32::MAX))
+            .context("185 native ListJobs job ID")?;
+        let unit = job[1]
+            .as_str()
+            .filter(|unit| {
+                !unit.is_empty()
+                    && unit.len() <= 255
+                    && !unit
+                        .bytes()
+                        .any(|b| b.is_ascii_control() || b.is_ascii_whitespace())
+            })
+            .context("185 native ListJobs unit")?;
+        let mut unit_object = String::from("/org/freedesktop/systemd1/unit/");
+        for b in unit.bytes() {
+            if b.is_ascii_alphanumeric() {
+                unit_object.push(char::from(b));
+            } else {
+                unit_object.push_str(&format!("_{b:02x}"));
+            }
+        }
+        ensure!(
+            ids.insert(id)
+                && job[2].as_str().is_some_and(|s| !s.is_empty())
+                && matches!(job[3].as_str(), Some("waiting" | "running"))
+                && job[4] == format!("/org/freedesktop/systemd1/job/{id}")
+                && job[5] == unit_object,
+            "185 native ListJobs identity, state or object path differs"
+        );
+        rows.push(json!({"unit":unit}));
+    }
+    Ok(Value::Array(rows))
 }
 fn fresh(p: &Close) -> Result<Value> {
     let c = bound(&p.census)?;
@@ -603,7 +667,7 @@ fn project_reservations(rows: &[ReservationRow]) -> Result<(Vec<ReservationRow>,
     );
     Ok((projected, delta))
 }
-pub(super) fn read(m: &Mapping, p: &ReadClosure) -> Result<()> {
+fn read_view(m: &Mapping, p: &ReadClosure) -> Result<Value> {
     ensure!(
         p.schema == "jetstreamer-horizon-old185-attempt-growth-read-plan-v2"
             && p.closure.path == Path::new(ROOT).join("closure.json"),
@@ -634,17 +698,39 @@ pub(super) fn read(m: &Mapping, p: &ReadClosure) -> Result<()> {
     );
     intent_scope(&bound(&ib)?, desc)?;
     let (rows, delta) = project_reservations(&p.reservation_rows)?;
-    println!(
-        "{}",
-        serde_json::to_string(
-            &json!({"schema":"jetstreamer-horizon-old185-closed-reservation-view-v2",
+    Ok(
+        json!({"schema":"jetstreamer-horizon-old185-closed-reservation-view-v2",
         "closure":p.closure,"subject":subject(),"closed_original_reservation_bytes":RESERVATION,
         "applied_reservation_disposition_bytes":delta,"projected_reservation_rows":rows,
         "reservation_disposition_is_not_additive_free_space":true,
         "physical_space_credit_bytes":0,"minimum_inherited_guard_floor_bytes":v["minimum_inherited_guard_floor_bytes"],
         "new_flexible_owner_census_and_cold_admission_required":true,"old_five_owner_formula_validated":false,
-        "guard_handoff_required_before_any_lower_floor":true,"new_replay_or_restore_authorized":false})
-        )?
+        "guard_handoff_required_before_any_lower_floor":true,"new_replay_or_restore_authorized":false}),
+    )
+}
+pub(super) fn read(m: &Mapping, p: &ReadClosure) -> Result<()> {
+    println!("{}", serde_json::to_string(&read_view(m, p)?)?);
+    Ok(())
+}
+pub(super) fn retired_after_closure_basis(
+    m: &Mapping,
+    expected_mapping: &Bound,
+    plan: &Bound,
+) -> Result<Value> {
+    let p: ReadClosure = serde_json::from_value(bound(plan)?)?;
+    ensure!(
+        serde_json::to_value(&p.mapping)? == serde_json::to_value(expected_mapping)?,
+        "185 retirement closure projection has foreign mapping"
+    );
+    let view = read_view(m, &p)?;
+    require_already_closed(&p.reservation_rows, &view)?;
+    Ok(view)
+}
+fn require_already_closed(rows: &[ReservationRow], view: &Value) -> Result<()> {
+    ensure!(
+        view["applied_reservation_disposition_bytes"] == 0
+            && view["projected_reservation_rows"] == serde_json::to_value(rows)?,
+        "185 retirement requires already-closed original row0; it cannot release growth itself"
     );
     Ok(())
 }
@@ -761,6 +847,20 @@ mod tests {
         let mut alias = old_row(RESERVATION);
         alias.claim_key = "foreign-alias".into();
         assert!(project_reservations(&[old_row(RESERVATION), alias]).is_err());
+    }
+    #[test]
+    fn retirement_projection_cannot_apply_a_new_disposition_or_change_other_rows() {
+        let rows = vec![old_row(0)];
+        let view =
+            json!({"applied_reservation_disposition_bytes":0,"projected_reservation_rows":rows});
+        require_already_closed(&rows, &view).unwrap();
+        let mut new_credit = view.clone();
+        new_credit["applied_reservation_disposition_bytes"] = json!(RESERVATION);
+        assert!(require_already_closed(&rows, &new_credit).is_err());
+        assert!(require_already_closed(&[old_row(RESERVATION)], &view).is_err());
+        let mut changed = view.clone();
+        changed["projected_reservation_rows"] = json!([]);
+        assert!(require_already_closed(&rows, &changed).is_err());
     }
     fn ledger(desc: &Value) -> Value {
         json!({"schema":"jetstreamer-horizon-old185-attempt-growth-closed-v2",
@@ -889,6 +989,61 @@ mod tests {
             assert!(no_queued_entry_jobs(&json!([{"unit":unit}])).is_err());
         }
         assert!(no_queued_entry_jobs(&json!([{}])).is_err());
+    }
+    #[test]
+    fn native_job_method_return_preserves_empty_and_running_queue_semantics() {
+        let empty = json!({"type":"a(usssoo)","data":[[]]});
+        assert_eq!(decode_native_jobs(&empty).unwrap(), json!([]));
+        let row = json!([
+            16313068,
+            "horizon-old185-listjobs-format-proof.service",
+            "start",
+            "running",
+            "/org/freedesktop/systemd1/job/16313068",
+            "/org/freedesktop/systemd1/unit/horizon_2dold185_2dlistjobs_2dformat_2dproof_2eservice"
+        ]);
+        let valid = json!({"type":"a(usssoo)","data":[[row]]});
+        let decoded = decode_native_jobs(&valid).unwrap();
+        // Even this sterile captured probe contains 185 in a Horizon name and
+        // correctly hits the existing conservative entry fence.
+        assert!(no_queued_entry_jobs(&decoded).is_err());
+        let mut benign = valid.clone();
+        benign["data"][0][0][1] = json!("jetstreamer-holding-check.service");
+        benign["data"][0][0][5] =
+            json!("/org/freedesktop/systemd1/unit/jetstreamer_2dholding_2dcheck_2eservice");
+        no_queued_entry_jobs(&decode_native_jobs(&benign).unwrap()).unwrap();
+        let mut entry = valid.clone();
+        entry["data"][0][0][1] = json!("jetstreamer-root-sweep-e185-replacement.service");
+        entry["data"][0][0][5] = json!(
+            "/org/freedesktop/systemd1/unit/jetstreamer_2droot_2dsweep_2de185_2dreplacement_2eservice"
+        );
+        assert!(no_queued_entry_jobs(&decode_native_jobs(&entry).unwrap()).is_err());
+        for bad in [
+            json!({"type":"a(usssoo)","data":[]}),
+            json!({"type":"a(usssoo)","data":[row]}),
+            json!({"type":"wrong","data":[[]]}),
+            json!({"type":"a(usssoo)","data":[[row,row]]}),
+        ] {
+            assert!(decode_native_jobs(&bad).is_err());
+        }
+        for (i, value) in [
+            (0, json!(0)),
+            (1, json!("")),
+            (2, json!(false)),
+            (3, json!("unknown")),
+            (4, json!("/org/freedesktop/systemd1/job/1")),
+            (5, json!("/foreign/object")),
+        ] {
+            let mut bad = valid.clone();
+            bad["data"][0][0][i] = value;
+            assert!(decode_native_jobs(&bad).is_err(), "field{i}");
+        }
+        assert!(
+            serde_json::from_str::<Value>(
+                "16313068 horizon-old185-listjobs-format-proof.service start running\n"
+            )
+            .is_err()
+        );
     }
     #[test]
     fn guards_cover_exact_live_replay_owners_without_relabelling_private_work() {

@@ -259,6 +259,11 @@ the normal work-conserving backfill path rather than waiting for another status 
 - Overlap independent full verification, plugin verification, authenticated R2 upload, and remote
   readback with replay. Keep their receipt gates independent, and account for their measured I/O,
   CPU, and memory pressure when admitting another replay lane.
+  Before the real verifier launch, prepare every directory required by its sealed wrapper,
+  including nested receipt directories, with the exact owner and private modes. Run the wrapper's
+  non-executing preflight in the actual sandbox. Creating only the state root can pass dispatcher
+  preparation and still fail before the first archive hash. Preserve that failed invocation;
+  reconcile a qualified replacement into the queue without restarting a healthy verifier.
   A completed private assembly releases its producer claim even while its independent scan is
   being prepared. Record the real terminal event and the pending delivery action; count only an
   actually launched scanner as active. Admit that scan against the current producer census and
@@ -277,6 +282,12 @@ latest accepted resource sample. Preserve that sample's original clock, bind the
 clean terminal proof and the new live command/invocation, and retain the complete fleet history.
 The event clock is not a new resource observation or launch permission. Clear an event selector
 when constructing the next normal-cycle plan, while retaining its evidence and owner history.
+
+Validate native queue-census framing on the actual systemd version before using it as an admission
+gate. On systemd255, `systemctl list-jobs --output=json` can still emit text. Use the reviewed typed
+`Manager.ListJobs` D-Bus adapter where that occurs; validate its signature, return nesting, job and
+unit identities, and preserve the existing queued-entry denials. Never treat a parse failure as an
+empty queue or bypass the census to unblock admission.
 
 ## Prioritize time to verified sidecar
 
@@ -341,6 +352,26 @@ capability, resource, checkpoint, verification and publication gate.
 When agent slots are full, retain a prioritized repair queue with a named next action and keep
 the fleet loop moving. Do not silently drop failed epochs or replace the campaign objective with
 the easiest repair. Close an incident only on the usual verified ready-pair evidence.
+
+### Avoid wasted native qualification windows
+
+Before granting a timed native lease, check that the latest creation deadline leaves time for
+handoff, pre-creation input readback and setup, using observed preparation timings with a margin.
+The worker's runtime allowance does not cover work done before it exists. Recheck the clock
+immediately before provisioning. If the creation window expires, preserve the unused admission
+and start from a fresh accepted frame; never extend a live deadline.
+
+For retained manual qualification scripts, run reusable blocks in isolated scopes with explicit
+inputs and outputs. Exercise the remaining pure lookups together against saved actual artifacts;
+separate document checks can miss a variable overwritten by another block. Keep saved observations
+distinct from the fresh process, descriptor, clock and guard evidence required at launch.
+
+Validate actual systemd values using their documented representation, including canonical mount
+options such as `:rbind`, while retaining exact roots and option checks. Obtain log-file identity
+from actual descriptors when the queried API has no file-path property. Apply the exact launcher's
+lock and worker-census contract: an ordinary paused launcher may have no historical worker, while
+a native gate may require same-PID lock ownership. Preserve separate positive-worker capability
+requirements; do not invent an extra census predicate at a boundary where it cannot hold.
 
 ## Scale beyond the proven point
 

@@ -3,13 +3,16 @@
 use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261023T081357Z-controller-rebind-repair185-repair183-upload144-census141-boundaries-native141-all-retry-public160-timed-scans-upload198-v1";
 const LEDGER_SHA: &str = "bb9ea6318c17027a72fa71b64e2a09f4b2cf18b2db27a3e41e6e23dabd07f724";
-pub(super) fn candidate(p: &Plan) -> bool {
+fn legacy_candidate(p: &Plan) -> bool {
     p.schema == PLAN_SCHEMA_101
         && p.previous_fleet.path == Path::new(ROOT).join("public198-provisional-fleet.json")
 }
+pub(super) fn candidate(p: &Plan) -> bool {
+    legacy_candidate(p) || cohort191_raw0546::candidate(p)
+}
 fn checked_receipt(p: &Plan, v: &Value) -> Result<()> {
     ensure!(
-        candidate(p)
+        legacy_candidate(p)
             && p.previous_fleet.sha256 == LEDGER_SHA
             && p.previous_observer.sha256
                 == "5cb6d07c82f38c9a122c0bd71623acb0886a71ef5dc0a612f70274783cf7d122"
@@ -44,6 +47,9 @@ fn checked_receipt(p: &Plan, v: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn canonical_predecessor(p: &Plan, v: &Value) -> Result<Option<Bound>> {
+    if cohort191_raw0546::candidate(p) {
+        return cohort191_raw0546::canonical_predecessor(p, v);
+    }
     if !candidate(p) {
         return Ok(None);
     }

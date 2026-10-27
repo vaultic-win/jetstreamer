@@ -1,11 +1,21 @@
 //! Closed 191–194 native metadata custody. Never creates a ready/archive receipt.
 use super::*;
+#[path = "cohort191_collected.rs"]
+mod collected;
+#[path = "cohort191_growth_transfer.rs"]
+mod growth_transfer;
 #[path = "cohort191_import_pending.rs"]
 mod import_pending;
+#[path = "cohort191_public.rs"]
+mod public;
 #[path = "cohort191_terminal.rs"]
 mod terminal_transition;
+pub(super) fn original_growth_transfer() -> Result<()> {
+    growth_transfer::run()
+}
 use serde_json::json;
 mod queue;
+pub(super) mod readback_handoff;
 use std::{
     collections::{BTreeMap, BTreeSet},
     os::unix::fs::PermissionsExt,
@@ -71,6 +81,10 @@ struct Capture {
     source_revalidation_policy: Option<Bound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     native_pending_proof: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native_terminal_proof: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    native_event_clock: Option<Bound>,
     output: PathBuf,
 }
 pub(super) fn bound(b: &Bound, sealed: bool) -> Result<Value> {
@@ -567,6 +581,12 @@ fn controller_lifecycle(
         !require_live,
         "191 pending import has no live original controller"
     );
+    if collected::current_program()? {
+        return collected::lifecycle(current, history, cutoff);
+    }
+    if growth_transfer::native_context()? {
+        return collected::growth_lifecycle(current, history, cutoff);
+    }
     let events = controller_terminal_events(history, cutoff)?;
     let actual = controller_properties()?;
     ensure!(
@@ -1255,6 +1275,8 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
         ("gate_tools", json!(p.gate_tools)),
         ("ready_receipts", json!(p.ready_receipts)),
         ("queue", json!(p.queue)),
+        ("native_terminal_proof", json!(p.native_terminal_proof)),
+        ("native_event_clock", json!(p.native_event_clock)),
         (
             "source_revalidation_policy",
             json!(p.source_revalidation_policy),
@@ -1267,7 +1289,7 @@ pub(super) fn validate_event(v: &Value, cutoff: u64) -> Result<()> {
     }
     let observer = bound(&p.observer, false)?;
     ensure!(
-        v["sampled_at_utc"] == observer["recorded_at_utc"]
+        v["sampled_at_utc"] == native_clock::sample(&p, &observer)?
             && observer["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
             && fleet::utc_seconds(v["sampled_at_utc"].as_str().context("191 event time")?)?
                 == cutoff,
@@ -1441,6 +1463,28 @@ fn sync_observation(
     } else {
         bail!("191 sync phase has no actual active work");
     };
+    let observation = sync_progress(c, u, stage, cutoff, tail_policy)?;
+    let remaining = observation["remaining_millis"]
+        .as_u64()
+        .context("191 sync numeric projection")?;
+    let expected = match stage {
+        "upload" => &e.upload,
+        "readback" => &e.readback,
+        _ => &e.source_revalidation_and_sidecar,
+    };
+    ensure!(
+        matches!(expected,Work::Active {remaining_millis} if *remaining_millis == remaining),
+        "191 sync forecast is not its own measured phase rate plus stall age"
+    );
+    Ok(observation)
+}
+fn sync_progress(
+    c: &Claim,
+    u: &Value,
+    stage: &str,
+    cutoff: u64,
+    tail_policy: Option<&Bound>,
+) -> Result<Value> {
     let result = Command::new("/usr/bin/journalctl")
         .args([
             "--no-pager",
@@ -1546,15 +1590,6 @@ fn sync_observation(
     } else {
         progress_remaining(&progress, length, cutoff_ms)?
     };
-    let expected = match stage {
-        "upload" => &e.upload,
-        "readback" => &e.readback,
-        _ => &e.source_revalidation_and_sidecar,
-    };
-    ensure!(
-        matches!(expected,Work::Active {remaining_millis} if *remaining_millis == remaining),
-        "191 sync forecast is not its own measured phase rate plus stall age"
-    );
     Ok(
         json!({"phase":stage,"unit":c.unit,"invocation_id":c.invocation_id,"pid":pid,
         "key":key,"total_bytes":length,"remaining_millis":remaining,"markers":selected,
@@ -1563,10 +1598,8 @@ fn sync_observation(
 }
 fn capture(p: &Capture) -> Result<Value> {
     let o = bound(&p.observer, false)?;
-    let sample = o["recorded_at_utc"]
-        .as_str()
-        .context("191 coordinated sample")?;
-    let cutoff = fleet::utc_seconds(sample)?;
+    let sample = native_clock::sample(p, &o)?;
+    let cutoff = fleet::utc_seconds(&sample)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         p.schema == "jetstreamer-cohort191-delivery-capture-plan-v2"
@@ -1576,8 +1609,14 @@ fn capture(p: &Capture) -> Result<Value> {
         "191 capture scope/staleness"
     );
     let history = inputs()?;
+    ensure!(
+        p.native_pending_proof.is_none() || p.native_terminal_proof.is_none(),
+        "191 pending and all-public native caches are mutually exclusive"
+    );
     let events = if let Some(proof) = &p.native_pending_proof {
         import_pending::retained_events(proof, p, cutoff)?
+    } else if let Some(proof) = &p.native_terminal_proof {
+        terminal_transition::retained_events(proof, p, cutoff)?
     } else {
         native_events(cutoff)?
     };
@@ -1772,8 +1811,8 @@ fn capture(p: &Capture) -> Result<Value> {
         );
     }
     let v = json!({"schema":EVENT_SCHEMA,"first_epoch":191,"last_epoch":194,"sampled_at_utc":sample,"sample_unix_seconds":cutoff,
-        "observer":p.observer,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
-        "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"controller":controller,"controller_lifecycle":controller_history,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
+        "observer":p.observer,"native_event_clock":p.native_event_clock,"origins":p.origins,"forecast":p.forecast,"estimated_remaining_millis":eta,"claims":p.claims,"unit_census":census,
+        "sync_observations":sync_observations,"origin_start_unix_millis":origin_start,"elapsed_execution_millis":elapsed,"archives":artifacts,"native_events":events,"native_terminal_proof":p.native_terminal_proof,"controller":controller,"controller_lifecycle":controller_history,"producer":producer,"controller_handoff":state,"source_batch":p.source_batch,"public_batch":p.public_batch,
         "gate_receipts":p.gate_receipts,"gate_tools":p.gate_tools,"ready_receipts":p.ready_receipts,
         "queue":p.queue,"queue_observation":queue_observation,"source_revalidation_policy":p.source_revalidation_policy,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"r2_mutations":false,"archive_readiness_claimed":false});
     Ok(v)
@@ -1831,7 +1870,8 @@ pub(super) fn fleet_proof(
     if !(191..=194).contains(&epoch) || evidence["schema"] != EVENT_SCHEMA {
         return Ok(None);
     }
-    validate_event(evidence, sample)?;
+    let event_sample = native_clock::fleet_sample(evidence, sample)?;
+    validate_event(evidence, event_sample)?;
     let claims: Vec<Claim> = serde_json::from_value(evidence["claims"].clone())?;
     let c = claims
         .iter()
@@ -1954,6 +1994,9 @@ pub(super) fn dispatch_import_check(
 
 pub(super) fn capture_terminal_transition() -> Result<()> {
     terminal_transition::run()
+}
+pub(super) fn observe_public() -> Result<()> {
+    public::run()
 }
 pub(super) fn capture_import_pending() -> Result<()> {
     import_pending::run(false)
@@ -2113,6 +2156,32 @@ mod tests {
         }
         assert!(validate_event(&base, 2).is_err());
     }
+    #[test]
+    #[ignore = "root-only exact original9ff03:16 native event; run while the original sample/owners remain current; no resource observation or mutation"]
+    fn actual_old9ff_pending_event_remains_compatible_without_new_cache_fields() {
+        let proof = Bound {
+            path: "/var/lib/jetstreamer/horizon-cohort191-delivery-events-20261024-import-v1/event-20261024T031600Z.json".into(),
+            sha256: "d986ae11f06377cb742eb78f9412b1cd398683ec9604ede6e347bee0518dc588".into(),
+        };
+        let v = bound(&proof, false).unwrap();
+        assert_eq!(
+            v["capture_self_sha256"],
+            "9ff8bd9896da179d67ba030153e31917177fc706af0a79ec2d5aa68f90ccfa96"
+        );
+        assert!(v.get("native_pending_proof").is_none());
+        assert!(v.get("native_terminal_proof").is_none());
+        let p: Capture = serde_json::from_value(
+            bound(
+                &serde_json::from_value(v["capture_plan"].clone()).unwrap(),
+                true,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(p.native_pending_proof.is_some());
+        assert!(p.native_terminal_proof.is_none());
+        validate_event(&v, v["sample_unix_seconds"].as_u64().unwrap()).unwrap();
+    }
     fn terminal_controller_fixture() -> (Value, Value) {
         let command = "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /sealed/controller --execute ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0 }";
         (
@@ -2210,4 +2279,10 @@ mod tests {
             .push(row);
         assert!(ready_import_binding(&r, &duplicate).is_err());
     }
+}
+
+#[path = "cohort191_delivery/native_clock.rs"]
+mod native_clock;
+pub(super) fn fleet_peers(evidence: &Value) -> Result<Vec<String>> {
+    native_clock::fleet_peers(evidence)
 }
