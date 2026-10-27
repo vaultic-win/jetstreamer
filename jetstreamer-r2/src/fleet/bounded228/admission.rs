@@ -171,7 +171,11 @@ fn readiness(b: &BoundFile, helper_sha: &str) -> Result<()> {
         "bounded epoch 228 exact outer guard profile was not statically validated"
     );
     let parent: BoundFile = serde_json::from_value(r["parent_cli_capability"].clone())?;
-    capability::validate(&native209::immutable_json(&parent)?, helper_sha)?;
+    capability::validate(
+        &native209::immutable_json(&parent)?,
+        helper_sha,
+        &parent.path,
+    )?;
     deny_authority(&r)
 }
 
