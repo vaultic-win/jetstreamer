@@ -12281,7 +12281,7 @@ async fn run_geyser_replay(
                         );
                     }
                     let executable = configured_historical_worker_executable(runtime_descriptor)?;
-                    let scratch_parent = replay_scratch_dir.join(".historical-runtime");
+                    let scratch_parent = historical::worker_scratch_parent(replay_scratch_dir);
                     fs::create_dir_all(&scratch_parent).map_err(|err| {
                         format!(
                             "failed to create historical runtime scratch directory {}: {err}",
