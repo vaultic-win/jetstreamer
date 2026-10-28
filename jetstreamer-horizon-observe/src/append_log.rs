@@ -85,7 +85,12 @@ fn timestamp(line: &str) -> Result<u64> {
         .ok_or_else(|| anyhow!("timestamp overflow"))
 }
 
-fn points(bytes: &[u8], offset: u64, since: u64, until: u64) -> Result<Vec<ProgressPoint>> {
+pub(super) fn points(
+    bytes: &[u8],
+    offset: u64,
+    since: u64,
+    until: u64,
+) -> Result<Vec<ProgressPoint>> {
     let text = std::str::from_utf8(bytes).context("log tail is not UTF-8")?;
     let mut lines = text.split_inclusive('\n');
     if offset > 0 {

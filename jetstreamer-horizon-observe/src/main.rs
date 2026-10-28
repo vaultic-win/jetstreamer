@@ -29,6 +29,7 @@ mod append_log;
 mod host_pressure;
 mod native_input_diagnostic;
 mod rss;
+mod suffix136_log;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_PREVIOUS_SAMPLE_BYTES: u64 = 4 * 1024 * 1024;
@@ -169,6 +170,8 @@ struct ProgressPoint {
 
 #[derive(Debug, Serialize)]
 struct ProgressWindow {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suffix136_log_evidence: Option<suffix136_log::Evidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     append_log_evidence: Option<append_log::Evidence>,
     journal_invocation_id: String,
@@ -1562,6 +1565,7 @@ fn progress_window_from_points(
     };
     Ok(ProgressWindow {
         append_log_evidence: None,
+        suffix136_log_evidence: None,
         journal_invocation_id: invocation_id.to_owned(),
         since_unix_seconds,
         until_unix_seconds,
@@ -1706,6 +1710,8 @@ fn observe_replay_for_role(
         && producer_cgroup_counter_delta.io_counters_comparable;
     let useful_work = if let Some(log) = &replay.append_log {
         append_log::observe(log, &producer_before, progress_since_unix, started_unix)?
+    } else if suffix136_log::matches(replay) {
+        suffix136_log::observe(&producer_before, progress_since_unix, started_unix)?
     } else {
         observe_progress(
             &replay.expected_producer_invocation_id,
@@ -2876,6 +2882,7 @@ mod tests {
         };
         let useful_work = ProgressWindow {
             append_log_evidence: None,
+            suffix136_log_evidence: None,
             journal_invocation_id: invocation.to_owned(),
             since_unix_seconds: parse_utc("2026-10-16T08:36:00Z").unwrap(),
             until_unix_seconds: parse_utc("2026-10-16T09:06:00Z").unwrap(),
