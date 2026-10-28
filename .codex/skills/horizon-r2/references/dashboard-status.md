@@ -13,6 +13,12 @@ or admission work. Recording an incident or telling the user that the ETA is sta
 correction. Do not wait for the next scheduled poll, a producer restart, a production build or
 archive qualification. Status metadata must remain maintainable independently of those gates.
 
+An observed missed arrival, failed attempt, newly discovered blocker or changed delivery plan
+requires immediate reassessment of the published ETA. Before replying that the estimate is stale
+or resuming the blocked epoch's work, publish the corrected estimate and authenticate its readback.
+If publication fails, record and report the exact failure and make correction the next action.
+Do not claim success from a local payload or leave the old countdown described as current.
+
 Publish a fresh `sampled_at_utc` and a definite integer `estimated_remaining_millis` representing
 the current reasonable best guess until the verified `.sha256` sidecar appears. Include remaining
 repair, build, qualification, queueing, replay, import, verification, upload and readback time as
