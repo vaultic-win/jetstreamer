@@ -68,6 +68,15 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   history view. Read [references/dashboard-status.md](references/dashboard-status.md) before
   changing an ETA model, handling a dropped/failed lane, or retiring stale status metadata.
   A plausible old countdown is not an acceptable substitute for a current, evidence-backed estimate.
+- **Correct a known stale ETA immediately.** When available evidence shows an active epoch's
+  estimate is wrong, overdue or bound to an old phase/owner, replace its R2 status in the same
+  work cycle with a fresh timestamp and a reasonable current best guess through verified sidecar
+  creation. Do this before returning to lengthy repairs, builds or admissions; do not wait for the
+  next routine poll, replay restart or archive qualification. Use a planning estimate when measured
+  progress is insufficient, including remaining repair/build/qualification time and all delivery
+  stages. Bind the actual active repair/task owner, even with zero replay lanes; never reuse a dead
+  producer's identity. Keep status publishing usable independently of production build gates.
+  Follow [the immediate correction procedure](references/dashboard-status.md#correct-known-stale-estimates-immediately).
 - Always provide a definite numeric ETA for active work, including active repair. Do not propose
   hiding its countdown or displaying "ETA unavailable" as the solution to a failed estimate.
   Repair the estimate model and owner binding; include explicit recovery and delivery allowances
@@ -179,13 +188,15 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   stable live identities and sufficient slot rates, and fsync a private no-clobber estimate receipt.
   Pass only the resulting integer millisecond values to the matching status publications. A missing
   rate, identity change, stale timestamp, model mismatch, or estimator failure publishes no
-  replacement status object for the affected range; never substitute hand arithmetic after that
-  fail-closed result. When one observed range lacks rates but another remains healthy, a reviewed
+  replacement from that rejected model. Never bypass ownership or identity checks; promptly use
+  a reviewed planning/repair estimate with the actual current owner for affected active epochs.
+  An estimator failure does not authorize leaving a known stale countdown unchanged.
+  When one observed range lacks rates but another remains healthy, a reviewed
   schema-v3 partial model may estimate only the healthy range with the same previously validated
   legacy formula. It must bind the complete observer range census, all current invocation IDs, the
   root-owned owner-only estimate directory, prior estimate receipts that reproduce the formula, and
-  the exact coordinated observer receipt. Leave every excluded range's status objects unchanged;
-  never weaken the census or relabel a post-replay range as rate-bearing merely to refresh it.
+  the exact coordinated observer receipt. Correct excluded active ranges through the planning/repair
+  status path; never weaken the census or relabel post-replay work as rate-bearing to refresh it.
 - Once a legacy producer advances into a later epoch while its controller still withholds every
   archive until whole-cohort import, stop using the pairwise legacy formula: a completed replay is
   not yet a sidecar. Use the reviewed schema-v4 cohort-gated model instead. Bind the current epoch's
@@ -193,8 +204,9 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   exposed before the shared import gate, and give each epoch an evidence-backed downstream
   allowance for import, verification, upload, readback, and its position in sidecar commit order.
   Require the per-epoch replay-offset and downstream-allowance maps to cover the modeled range
-  exactly. If that model is unavailable or its evidence is incomplete, leave the affected status
-  objects unchanged rather than publishing the old pairwise ETA.
+  exactly. If that model is unavailable or its evidence is incomplete, promptly publish a reviewed
+  planning estimate that includes the whole cohort gate, queue and delivery allowances; never
+  reuse the old pairwise ETA or leave a known stale countdown unchanged.
 - There are two authorized status-deletion lifecycles: verified archive completion, and positively
   confirmed inactive/orphaned work. Both apply only to the exact `epoch-N.epoch-status.json` key;
   neither authorizes an archive, sidecar, receipt, prefix, or bulk deletion.
