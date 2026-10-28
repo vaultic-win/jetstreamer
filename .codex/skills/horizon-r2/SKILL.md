@@ -40,6 +40,12 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   producer merely to change implementation language. Replace these components with reviewed Rust
   implementations at the earliest safe opportunity, but do not let language migration delay,
   block, or destabilize the active Horizon campaign.
+- A known stale status JSON is a reversible metadata correction. Prefer the qualified Rust
+  publisher, but when missing repair-owner support or a production build blocks it, an existing
+  authenticated S3 client may perform the narrowly scoped conditional correction in
+  [the status-only fallback](references/dashboard-status.md#status-only-fallback).
+  This grants no archive, sidecar, verification or replay authority and does not permit a new
+  non-Rust background controller.
 - When materially extending an existing non-Rust component, prefer replacing that behavior with a
   tested, immutable Rust tool and migrate only through the normal sealing and capability gates. If
   an urgent safety repair must remain in the existing language, keep it narrowly scoped, preserve
@@ -87,7 +93,8 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   until its canonical `.sha256` sidecar is committed. Internal labels such as "private" or
   "diagnostic" must never hide active work from the dashboard. Label the real phase and bind its
   live producer or current repair/task owner; a queued plan alone is not active work. Keep these objects out
-  of `HORIZON_DIR`; build them in private state and publish them with reviewed Rust tooling. The
+  of `HORIZON_DIR`; build them in private state and prefer the reviewed Rust publisher, with the
+  narrow status-only fallback available for immediate corrections. The
   object is operational metadata, never an archive, verification receipt, lease, or publication
   gate.
 - Use this JSON shape. The four numeric fields are mandatory JSON integers, never `null`, strings,
@@ -169,9 +176,11 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   ```
 
   This status command intentionally needs no public-origin environment setting. A failed observer
-  binding publishes nothing. Do not substitute a hand-written `put-object` command when publication
-  or authenticated readback fails. Run it with the identity that can traverse and write the configured
-  private receipt directory; validate that access before the first remote mutation. The reviewed
+  binding publishes nothing from that model. Do not use an S3 command to bypass a failed ownership,
+  identity, conditional-write or readback check. Missing repair-owner functionality instead uses the
+  separately validated status-only fallback. Run with the identity that can traverse and write the configured
+  private receipt directory; validate that access before the first remote mutation. Never bypass a
+  failed ownership, identity, ETag or readback check through the fallback. The reviewed
   publisher treats an existing byte-for-byte identical status payload with the same sample timestamp
   as an idempotent receipt-recovery retry: it performs no `PutObject`, repeats authenticated readback,
   and durably writes the missing receipt. It must continue to reject the same timestamp with different

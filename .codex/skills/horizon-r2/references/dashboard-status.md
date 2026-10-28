@@ -31,6 +31,23 @@ This is an event-driven correction using available evidence, not permission to a
 Routine full-range audits and refreshes remain every 30 minutes; user-requested status polls remain
 allowed out of band. Genuinely inactive work still follows the separate cleanup lifecycle below.
 
+### Status-only fallback
+
+When the qualified Rust publisher cannot represent the actual active repair owner or is waiting
+on a production build, use an existing authenticated S3 client for this metadata-only correction.
+Do not make status accuracy depend on that build. This fallback may replace only the exact
+assigned `epoch-N.epoch-status.json` keys; it cannot create, modify or remove archives, sidecars,
+verification evidence or replay claims.
+
+Read the current object and ETag, confirm the known stale publication and exclusive current repair
+ownership, and validate all six wire fields. Record the actual operator/task owner, original start
+evidence, current repair activity and estimate assumptions privately; never invent a live producer
+IID. Issue one conditional PUT with that exact ETag, then GET and compare the complete corrected
+bytes. Save durable private before/after hashes, ETags, timestamps and the authenticated readback
+result. Stop and reconcile an ownership change, HTTP precondition failure or readback mismatch;
+never retry unconditionally. These receipts document a status correction and confer no archive
+publication authority. Normal qualified publishing can take over after the actual phase handoff.
+
 ## Range-wide audit every 30 minutes
 
 The operator is responsible for every `epoch-N.epoch-status.json` in the assigned range, not only
