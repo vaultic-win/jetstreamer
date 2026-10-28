@@ -82,6 +82,9 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   progress is insufficient, including remaining repair/build/qualification time and all delivery
   stages. Bind the actual active repair/task owner, even with zero replay lanes; never reuse a dead
   producer's identity. Keep status publishing usable independently of production build gates.
+  This is a required event-driven exception to the routine 30-minute status-update cadence,
+  not an optional action for the next poll. The correction is complete only after authenticated
+  readback confirms the replacement in R2; a local edit, incident note or promised fix is insufficient.
   Follow [the immediate correction procedure](references/dashboard-status.md#correct-known-stale-estimates-immediately).
 - Always provide a definite numeric ETA for active work, including active repair. Do not propose
   hiding its countdown or displaying "ETA unavailable" as the solution to a failed estimate.
@@ -319,11 +322,14 @@ not stall otherwise admissible ordinary campaign work.
   test, queued retry or new invocation alone does not close it.
 - Authenticated-read every in-range `epoch-N.epoch-status.json` that exists and compare its epoch,
   sample timestamp, controller/producer binding from the local publication receipt when available,
-  and corresponding live claim. Report its freshness separately from its ETA. If no matching live
-  invocation exists, classify the object as stale/orphaned operational metadata, exclude that epoch
-  from the active list, and never present its remaining-milliseconds value or projected finish time
-  as current. Check for a replacement live invocation, downstream delivery stage or authenticated
-  handoff before declaring work inactive. When inactivity and ownership are positively established,
+  and corresponding live claim or actual active repair/task owner. Report its freshness separately
+  from its ETA. A missing replay invocation alone does not make an epoch inactive or its report
+  orphaned: first check replacement work, downstream delivery, active operator/sub-agent repair and
+  authenticated handoffs. If work remains active, immediately correct a stale owner, phase or ETA
+  through the status procedure above; do not hide it from the active list or delete its report.
+  Never present a superseded owner's remaining time as current. Classify the report as inactive or
+  orphaned only after positively excluding all active owners and handoffs.
+  When inactivity and ownership are positively established,
   perform the conditional inactive-status cleanup promptly; a missing ready pair must not keep a
   dead job visible on the dashboard. Uncertain ownership or a transient failed probe is not deletion
   authority. Status cleanup never authorizes restarting a replay or declaring the epoch complete.
@@ -1246,7 +1252,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   replay/resource observations; do not manually poll inside that window without a user request.
   Use that same identity-stable observation to refresh every claimed epoch's
   `epoch-N.epoch-status.json` and to reconcile the authoritative campaign fleet ledger; do not poll
-  separately for the table, active list, or R2 metadata. After arming
+  separately for the table, active list, or R2 metadata. This interval does not delay correction
+  of an already-known stale ETA: conditionally replace that exact status object immediately using
+  available evidence and verify it through authenticated readback, without starting another routine
+  replay/resource poll or resetting the scheduled audit clock. After arming
   a persistent timer or watcher, do not poll it in short empty loops or emit repeated no-change
   status turns. Let it run unattended and inspect it once the cadence interval has elapsed or its
   scheduled event should have completed. A user request for a status update always authorizes one
