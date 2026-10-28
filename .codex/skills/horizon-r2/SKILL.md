@@ -124,6 +124,15 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   evidence-bound publisher; do not keep labeling it replay or delete it just because replay ended.
   Confirmed inactive work must have its misleading status removed through the separate inactive-status
   lifecycle below, rather than retaining a countdown until an archive eventually completes.
+- In that same 30-minute cycle, audit **every R2 status object in the entire assigned epoch range**,
+  including reports omitted from the current active-lane list. Use authenticated R2 inventory and
+  read the current JSON; local publication receipts alone do not establish what the dashboard sees.
+  Reconcile each report with the complete fleet, current owner, phase, sample and sidecar state.
+  Refresh every active report with a newly calculated estimate and authenticated readback; retire
+  stale reports through the qualified completion or inactive-status lifecycle. Follow
+  [the range-wide audit procedure](references/dashboard-status.md#range-wide-audit-every-30-minutes).
+  Finish this status-maintenance step before lengthy repair, admission or build work. A remaining
+  stale report is an open operational incident, not a successfully maintained status cycle.
 - Status objects are the sole routine R2 mutation exception: later 30-minute samples may replace
   only the matching `epoch-N.epoch-status.json`, preferably with an ETag/version precondition so an
   older writer cannot replace a newer sample. Verify the exact uploaded bytes through authenticated
