@@ -5,6 +5,49 @@ dashboard. An object must represent actual in-flight work with an evidence-backe
 verified R2 sidecar commit, not a historical attempt, staging plan or promise to retry later.
 Absence means no published live estimate; it never means the epoch is storage-complete.
 
+## Correct known stale estimates immediately
+
+As soon as existing evidence shows an active epoch's ETA is wrong, overdue or tied to an old
+owner/phase, correct the R2 JSON in the same work cycle, before continuing lengthy build, repair
+or admission work. Recording an incident or telling the user that the ETA is stale is not the
+correction. Do not wait for the next scheduled poll, a producer restart, a production build or
+archive qualification. Status metadata must remain maintainable independently of those gates.
+
+Publish a fresh `sampled_at_utc` and a definite integer `estimated_remaining_millis` representing
+the current reasonable best guess until the verified `.sha256` sidecar appears. Include remaining
+repair, build, qualification, queueing, replay, import, verification, upload and readback time as
+applicable. If measured rates are missing or a previous model fails, use a reviewed planning
+estimate and record its assumptions and uncertainty privately. Never reset the old countdown,
+clamp an unfinished epoch to zero or leave an elapsed estimate unchanged.
+
+Bind the real active repair/task owner and honest phase (`verification` for preparation/repair),
+including operator or sub-agent work while zero replay lanes run. Never impersonate the terminated
+producer or delete active work's report to hide a bad estimate. If the publisher cannot represent
+that owner, fixing the narrow metadata path takes priority over the production build; it must not
+remain dependent on the archive tool's next release. Preserve conditional ownership checks and
+verify the corrected bytes through authenticated R2 readback before reporting success.
+
+This is an event-driven correction using available evidence, not permission to add a polling loop.
+Routine full-range audits and refreshes remain every 30 minutes; user-requested status polls remain
+allowed out of band. Genuinely inactive work still follows the separate cleanup lifecycle below.
+
+### Status-only fallback
+
+When the qualified Rust publisher cannot represent the actual active repair owner or is waiting
+on a production build, use an existing authenticated S3 client for this metadata-only correction.
+Do not make status accuracy depend on that build. This fallback may replace only the exact
+assigned `epoch-N.epoch-status.json` keys; it cannot create, modify or remove archives, sidecars,
+verification evidence or replay claims.
+
+Read the current object and ETag, confirm the known stale publication and exclusive current repair
+ownership, and validate all six wire fields. Record the actual operator/task owner, original start
+evidence, current repair activity and estimate assumptions privately; never invent a live producer
+IID. Issue one conditional PUT with that exact ETag, then GET and compare the complete corrected
+bytes. Save durable private before/after hashes, ETags, timestamps and the authenticated readback
+result. Stop and reconcile an ownership change, HTTP precondition failure or readback mismatch;
+never retry unconditionally. These receipts document a status correction and confer no archive
+publication authority. Normal qualified publishing can take over after the actual phase handoff.
+
 ## Range-wide audit every 30 minutes
 
 The operator is responsible for every `epoch-N.epoch-status.json` in the assigned range, not only
@@ -61,8 +104,9 @@ this requirement does not authorize additional autonomous polling inside the 30-
   contention. Do not mechanically count down an old estimate, clamp an overdue job to zero, insist
   that ETAs decrease monotonically, or conceal a slowdown to keep the dashboard looking stable.
   Keep the required JSON integers and use `sampled_at_utc` and `phase` honestly.
-- A running producer with temporarily missing rates is not inactive. Never invent a replacement
-  estimate after an estimator fails closed. Treat a stale or invalid projection, failed status
+- A running producer with temporarily missing rates is not inactive. A failed rate model requires
+  a reviewed planning estimate; a failed identity check requires binding the actual current owner.
+  Treat a stale or invalid projection, failed status
   publication, unsupported downstream phase or missing authenticated readback as an operational
   incident: record it, repair the model/tooling promptly, and do not present the last known ETA as
   current. Leaving misleading metadata indefinitely is not a completed repair.
@@ -84,8 +128,10 @@ this requirement does not authorize additional autonomous polling inside the 30-
 
 ## Remove confirmed inactive status objects
 
-A failed, stopped, abandoned or qualification/admission-blocked epoch with no live replacement or
-downstream work must not keep a live countdown. This status-only cleanup does **not** require a
+A failed, stopped, abandoned or qualification/admission-blocked epoch with no live replacement,
+downstream work or active operator/sub-agent repair must not keep a live countdown. A stopped
+producer with an active repair owner needs an updated repair estimate, not inactive cleanup.
+This status-only cleanup does **not** require a
 ready archive or sidecar and does not authorize removing any archive, sidecar or retained work.
 
 Use a reviewed, sealed Rust cleanup path with the following gates:
@@ -96,7 +142,8 @@ Use a reviewed, sealed Rust cleanup path with the following gates:
    the owned publication being retired, not a newer sample or another server's object.
 2. Positively prove that the owner is terminal or its disappearance is established by durable
    terminal evidence. Check the full claim census for a replacement replay, queued/activating
-   replacement, active verifier/uploader/readback and authenticated other-host handoff. A timeout,
+   replacement, active operator/sub-agent repair, active verifier/uploader/readback and authenticated
+   other-host handoff. A timeout,
    stale sample, expired ETA, missing rate or one failed `systemctl` request is not proof of
    inactivity. Protect any newer active owner and repair that owner's status instead.
 3. Recheck ownership and absence of replacement/downstream claims immediately before mutation.
