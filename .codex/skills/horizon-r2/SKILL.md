@@ -91,6 +91,11 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   This is a required event-driven exception to the routine 30-minute status-update cadence,
   not an optional action for the next poll. The correction is complete only after authenticated
   readback confirms the replacement in R2; a local edit, incident note or promised fix is insufficient.
+  Treat an observed missed arrival, failed attempt, newly discovered blocker or changed delivery
+  plan as a trigger to reassess the published ETA immediately. Before answering a user that an ETA
+  is stale or resuming the blocked epoch's work, publish and read back the corrected estimate.
+  If that fails, state the exact publication failure and keep the correction as the next action;
+  do not describe the old countdown as current or the correction as completed.
   Follow [the immediate correction procedure](references/dashboard-status.md#correct-known-stale-estimates-immediately).
 - Always provide a definite numeric ETA for active work, including active repair. Do not propose
   hiding its countdown or displaying "ETA unavailable" as the solution to a failed estimate.
@@ -138,12 +143,14 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   required boundary verification, upload, whole-object readback, source revalidation, and sidecar
   commit. Use `0` only when the sidecar is already committed and the status object is awaiting its
   final verified deletion.
-- Update every in-flight epoch's status exactly once per normal 30-minute replay observation, from
+- Refresh every in-flight epoch's status at each normal 30-minute replay observation, from
   the same identity-stable sample and ETA model. Do not add a second polling loop. Require the bound
   controller/producer invocation IDs and restart counts to remain stable across the sample; a
   failed or identity-changing sample publishes no replacement. For a legacy multi-epoch replay,
   publish a status object for every still-uncommitted epoch claimed by that replay, even when a
   later member has not begun and its current size is `0`.
+  This scheduled refresh is not a limit on event-driven corrections: a known stale estimate must
+  be corrected immediately under the rule above, including after a refresh in the same interval.
   Handle positively observed failure, dropout, phase handoff and sidecar-completion events promptly
   without adding a routine polling loop. Update a genuinely active downstream phase with a supported,
   evidence-bound publisher; do not keep labeling it replay or delete it just because replay ended.
