@@ -34,6 +34,12 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   shell business logic when the behavior can be owned by a reviewed Rust binary. Keep archive
   parsing, hashing and integrity decisions, publication gates, R2 access, and local retirement in
   Rust.
+- Before replacing a shared helper, derive its required Cargo features from the last accepted
+  helper's actual artifact proof plus the new routes. Retained diagnostics still require their
+  generation features when no lanes are active. Preserve that exact union, test it, and verify the
+  production artifact's actual feature list and rustc flags; a matching source commit or a passing
+  different configuration is insufficient. In this campaign, retained history requires both
+  `native210-small` and `native227-small` alongside the enabled integration routes.
 - Existing reviewed and sealed Python or shell components may continue when they are already bound
   into an active or prepared workflow and replacing them would invalidate durable evidence,
   require restarting healthy work, or add migration risk. Do not stop, restart, or mutate a healthy
