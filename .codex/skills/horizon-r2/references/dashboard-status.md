@@ -5,6 +5,32 @@ dashboard. An object must represent actual in-flight work with an evidence-backe
 verified R2 sidecar commit, not a historical attempt, staging plan or promise to retry later.
 Absence means no published live estimate; it never means the epoch is storage-complete.
 
+## Range-wide audit every 30 minutes
+
+The operator is responsible for every `epoch-N.epoch-status.json` in the assigned range, not only
+reports belonging to currently running lanes. At each coordinated 30-minute observation:
+
+1. Use authenticated R2 inventory to discover every canonical status key in the full range and
+   read its current payload and ETag. Compare remote bytes with the exact publication receipt;
+   do not substitute local receipts, the dashboard cache or an active-only list for this audit.
+2. Reconcile every discovered report against the complete fleet and ready-pair inventory. Check
+   its actual owner, phase, sample time, definite integer fields and estimate through verified
+   sidecar commit. Also identify active epochs missing a report. An overdue ETA must be diagnosed
+   against actual progress or terminal evidence, rather than left counting down or set to zero.
+3. Refresh all active reports from the same accepted observation and current estimate model,
+   including repair, qualification and delivery phases. Verify the published bytes through
+   authenticated readback. Retire obsolete reports only through the qualified completion or
+   confirmed-inactive lifecycle; protect newer owners and other-host handoffs.
+4. Record the per-epoch outcome in the cycle evidence: refreshed, already complete and cleaned,
+   inactive and cleaned, or a specific unresolved publication/cleanup incident. Keep unresolved
+   incidents in the authoritative backlog and prioritize their repair before lengthy unrelated
+   work. Audit them again next cycle; acknowledging a stale report does not make it current.
+
+Run this audit and status maintenance before lengthy repair, build or admission work, even when
+zero replay lanes are running. Handle known failure and handoff events promptly between cycles.
+User-requested status updates authorize the same audit out of band. Keep one observation cadence;
+this requirement does not authorize additional autonomous polling inside the 30-minute minimum.
+
 ## Maintain useful estimates
 
 - Always show an ETA for active work, including active recovery after a failed producer. When
