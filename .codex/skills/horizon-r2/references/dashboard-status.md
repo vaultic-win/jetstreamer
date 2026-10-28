@@ -27,7 +27,12 @@ that owner, fixing the narrow metadata path takes priority over the production b
 remain dependent on the archive tool's next release. Preserve conditional ownership checks and
 verify the corrected bytes through authenticated R2 readback before reporting success.
 
-This is an event-driven correction using available evidence, not permission to add a polling loop.
+This immediate correction is mandatory even inside the 30-minute interval. Use available evidence
+and the targeted authenticated status read/write/readback; do not wait for or trigger another routine
+replay/resource poll. It does not reset or replace the next scheduled full-range audit. For example,
+if an epoch's advertised arrival has passed and a known import repair still blocks delivery, publish
+a new best guess including that repair and all remaining delivery stages before resuming the repair.
+
 Routine full-range audits and refreshes remain every 30 minutes; user-requested status polls remain
 allowed out of band. Genuinely inactive work still follows the separate cleanup lifecycle below.
 
