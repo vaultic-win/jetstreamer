@@ -509,6 +509,10 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 ## Produce and verify
 
 - Use the repository's sealed historical replay/controller path and automatic slot-range runtime selection. Do not invent a compatibility override.
+- Before launching epoch 225 prefix extraction, read
+  [references/epoch225-extraction.md](references/epoch225-extraction.md) for its exact actor,
+  guard, timer and initial status handoff requirements. Prepare the full launch sequence before
+  starting its bounded waiter.
 - Before cold-replaying an epoch with a retained verified prefix, read
   [references/checkpoint-continuation.md](references/checkpoint-continuation.md). Prefer a qualified
   checkpoint continuation when its complete validation-to-sidecar path is faster and freshly
@@ -529,7 +533,9 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 - Before starting a recurring status timer, initialize its last-observed state to the replay's
   authoritative launch time and validate the monitor once manually. A timer that exists without
   this state is not monitoring the replay; diagnose monitor failures without restarting a healthy
-  producer. After any `systemctl daemon-reload` while monotonic monitor timers are active, re-observe
+  producer. First respect each live producer's identity contract: epoch 225 extraction's raw actor
+  snapshot forbids global `daemon-reload` throughout its live lifetime. After a permitted
+  `systemctl daemon-reload` while monotonic monitor timers are active, re-observe
   every timer's next deadline: systemd can move a pending `OnActiveSec` deadline relative to the
   reload. If that delays an already-due check, run only the oneshot monitor immediately and confirm
   that `OnUnitActiveSec` has re-anchored the next interval; never restart the producer to repair its
