@@ -294,6 +294,9 @@ not stall otherwise admissible ordinary campaign work.
   do not let one difficult epoch monopolize the main agent or stall independent admissible work.
   Follow [the repair coordination guidance](references/host-utilization.md#delegate-epoch-specific-repairs)
   when assigning work or admitting a repair experiment.
+  Use the `collaboration` namespace directly for internal agent messages and waits. Never send
+  internal coordination, placeholders or resolved/no-action notices through user-input tools;
+  those tools create questions for the human, even when their text says no response is needed.
 - Maintain one authoritative fleet ledger for the complete assigned campaign, not merely a list of
   the ranges that happened to appear in the latest live-resource observer config. Reconcile it in
   the same 30-minute control cycle as the coordinated replay/resource observation and status-object
