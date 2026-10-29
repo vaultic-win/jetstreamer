@@ -87,6 +87,17 @@ this requirement does not authorize additional autonomous polling inside the 30-
 
 ## Maintain useful estimates
 
+For deployed guard-history readers that query `journalctl --until @NOW` with whole-second
+`NOW`, a guard completed during that same second is absent from the query even though its
+receipt already exists. After a genuine normal guard completion, let that second pass before
+using its authenticated history; preserve the active timer and every ownership check. Diagnose
+the exact cutoff before retrying a latest-completion mismatch. A status-only retry must use the
+same sealed request and unchanged frozen estimate, remain within the original freshness window,
+and authenticate readback. Changed ownership, candidate size, policy or request requires a fresh
+qualified request rather than rewriting the old estimate. For admission, prepare static inputs
+first and require enough actual monotonic timer budget for sealing and the native command;
+selecting a receipt near the next guard fire is not a usable admission window.
+
 - Always show an ETA for active work, including active recovery after a failed producer. When
   measured progress is insufficient, use a reviewed planning estimate with explicit repair,
   restart/qualification, replay and delivery allowances, bound to the current active repair owner.
