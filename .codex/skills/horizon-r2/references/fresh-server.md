@@ -125,6 +125,37 @@ one epoch, an explicit snapshot, canonical checkpoint file, private output, `--v
 candidate opt-in; and leave the diagnostic archive without a checksum sidecar. Its success is
 evidence for a later reviewed registry change, not permission to publish by itself.
 
+## Prepare compiler admissions without interrupting live work
+
+Preserve healthy producers and their protective timers while repairing tooling. Keep the compiler
+lease with one operator and use the reviewed admission and full effective namespace, including
+the actual unprivileged UID, capabilities, mounts and resource limits. A formatter or source-only
+packet check does not establish that Cargo, Clippy or Rust tests passed.
+
+- Before freezing a source clone, preserve Git's executable bits: tracked `100755` files become
+  `0555`, and ordinary `100644` files become `0444`. Verify every tracked mode and a clean Git
+  status after freezing, using the actual compiler UID and the existing repository-scoped Git
+  wrapper. Never hide a mode error by disabling `core.filemode` or changing global Git trust.
+- Validate every immutable context/control input with its actual reader before invoking a
+  no-clobber constructor. Use root ownership and `0444` where that reader requires an immutable
+  control. Keep writable private receipts separate; their usual `0600` mode does not satisfy an
+  immutable-control predicate.
+- Run the real full-namespace metadata probe and authenticate its natural terminal result.
+  After the native raw report and root-qualified proof exist, validate the complete allocation
+  union before dispatching Cargo. In the existing maintenance workflow, only the exact canonical
+  `maintenance-namespace-preflight.raw.json` retains its genuine producer UID/GID `1000` and mode
+  `0600`; authenticate its stable inode, bytes, phase, process and namespace against the immutable
+  root-qualified proof. Other credited paths retain their original root-ownership requirements.
+  Never chown, rewrite or omit the raw report to force accounting to pass.
+- Preserve failed attempts and their actual command, logs, exit code, unit and invocation ID.
+  Reconcile real target growth against the original baseline before the next admission; failed
+  Cargo work is still charged. Do not reset the baseline, add an implicit allowance or label a
+  metadata failure as a Rust test result.
+- A failed terminal collector may retry the same genuine completed invocation only after
+  diagnosing the failure, checking that its canonical outputs were never created, and satisfying
+  all current gates. Preserve both collector attempts. This is receipt recovery, not authority to
+  restart a healthy producer, reset a clock or weaken a pending-job check.
+
 ## Qualify the next unsupported era
 
 Keep native input qualification separate from entry replay. A successful cold-snapshot
