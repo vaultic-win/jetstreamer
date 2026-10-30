@@ -1207,6 +1207,21 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- When an unprivileged build or verifier recursively accounts its current execution directory,
+  keep root-only status and custody metadata outside that directory. Place it in an explicitly
+  ledger-backed private leaf, retain its private ownership and modes, and include that leaf in the
+  complete retained allocation and required sandbox bindings before freezing the phase. Do not add
+  an unreadable descendant after preflight: the next growth scan will fail before useful work.
+  Exercise the actual current-directory scan under the phase identity before launch; validating
+  only the frozen-ledger constructors does not prove this access path.
+- Check generated launch arguments against the host's per-argument and total argument/environment
+  limits before invoking `systemd-run`. For the reviewed append-only `BindReadOnlyPaths` and
+  `NoExecPaths` transport, preserve the sealed logical argv and split only those assignments at whole
+  tokens into nonempty ordered chunks of at most 60,000 UTF-8 bytes including prefix and NUL.
+  Preserve optional-path and bind syntax exactly, record original and actual argv hashes and ordered
+  token equivalence in charged execution metadata, and retain the normal effective-property,
+  mount and kernel-limit checks. Apply the transport to both preflights and the build launch;
+  never truncate paths, broaden mounts or infer equivalent semantics for other properties.
 - Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
   exhausted by Tokio's core runtime threads. `retire-local` performs its archive
   proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
