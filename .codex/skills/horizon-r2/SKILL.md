@@ -259,6 +259,14 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   and bind the resulting exact path and digest into the deletion receipt. Do not discover the
   latest receipt with a shell glob or mtime.
 
+  Bind cleanup watchers to a qualified helper that accepts every phase and receipt schema their
+  publisher can emit, including `readback` with the `upload-readback` pipeline binding. Recheck
+  this compatibility when changing the publisher; support for `status-delete` alone is insufficient.
+  If an older cleanup helper rejects the latest receipt, stop that epoch's failing retry and use
+  an already-qualified compatible helper with the same ready-pair, ownership and conditional-delete
+  gates. Retain the failure evidence and require authenticated absence plus a durable deletion
+  receipt. Do not relabel a completed phase or rewrite its publication receipt to satisfy the old helper.
+
   The command must revalidate the durable whole-object archive receipt and authenticated archive/
   sidecar pair before and after deletion, require the current status bytes and ETag to match the
   bound publication receipt, issue one conditional delete for only the canonical status key,
