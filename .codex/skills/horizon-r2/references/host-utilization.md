@@ -26,6 +26,13 @@ arguments and `ignore_errors`, alongside unchanged invocation ID, `MainPID`, sta
 count. Preserve raw observations. Do not treat display metadata loss as a restart, or normalize
 away an actual command or owner change.
 
+For qualified guard observation metadata whose source mode is mutable (for example root-owned
+`0600` receipts), use its reviewed size bound and a no-follow stable capture of the exact original
+bytes. Bind source path, SHA-256 and file identity before/after the read and at path recheck; ignore
+only access-time changes caused by reading. Preserve the source ownership/mode and original schema,
+then preserve the captured bytes as separate immutable observation evidence. Do not chmod the original,
+relax immutable authority readers or promote a captured observation into launch/stop authority.
+
 Match a new job's systemd lifetime to its terminal verifier. If that verifier requires
 `LoadState=loaded`, use its persistent service file; `systemd-run --wait` does not by itself
 retain a transient unit after completion. Preserve the actual running receipt and exact PID1
@@ -277,6 +284,21 @@ latest accepted resource sample. Preserve that sample's original clock, bind the
 clean terminal proof and the new live command/invocation, and retain the complete fleet history.
 The event clock is not a new resource observation or launch permission. Clear an event selector
 when constructing the next normal-cycle plan, while retaining its evidence and owner history.
+
+### Prove protective guard cadence
+
+Configure the guard service's start-rate limit to permit its requested timer cadence. For a
+one-second compiler guard, set `[Unit] StartLimitIntervalSec=0` and verify the manager's actual
+`StartLimitIntervalUSec=0`; timer configuration alone does not disable service start limiting.
+Before relying on protection, verify successful service exits and a sustained sequence of fresh,
+hash-bound native guard receipts matching the exact plan and producer invocation, with stop
+semantics enabled and no trip or observation error. Cover a bounded window beyond the default
+start-limit window, and check
+receipt age and gaps against the requested cadence. An active/waiting timer or one successful
+manual fire does not prove that later scheduled guard starts are executing. Preserve failure and
+repair evidence; keep healthy producers and their guard thresholds unchanged. This fast protective
+cadence is not a replay/resource observation loop: routine coordinated observations and status
+audits remain on the single 30-minute cadence, with the existing user-requested and event exceptions.
 
 ## Prioritize time to verified sidecar
 
