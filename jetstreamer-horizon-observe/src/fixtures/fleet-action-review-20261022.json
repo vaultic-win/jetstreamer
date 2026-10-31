@@ -1,0 +1,41 @@
+{
+  "schema": "jetstreamer-private-horizon-fleet-next-action-correction-review-v1",
+  "source_template": {
+    "path": "/var/lib/jetstreamer/horizon-routine-cycles-v1/20261022T152716Z-v1/sealed/fleet-plan.json",
+    "sha256": "99b4a17c6a2b955be6a875804a552fd66fd8ddbcb617aa65fedac60310984822"
+  },
+  "evidence": [
+    {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/horizon-live-resource-sample-20261022T152716Z-v272.json",
+      "sha256": "c5bbb678f285d3b1faa5d0ec4a61de2863bb4fad7f8ad4001ab958619d7c3579"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-continuation-1001-globalpsi-diskblocked-v1/state.json",
+      "sha256": "3f75751f6b6811dcdfd3a265cfc2c1eb2c067c10a9f4040554940cf3cd789eab"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-bootstrap227-cache-retirement-v1/completion.json",
+      "sha256": "cbaa2b93fcabb7c684d6a2f2d19a12895d04e5b0f6cc7655826122b72e4a1508"
+    }
+  ],
+  "changes": {
+    "203": {
+      "old_next_action": "05:27:16 stable capped-shrink producer748ffa... slot87879548 at3.916461slot/s; preserve through canonicalroot88127580. Dormant independently sandbox-path-qualified full-prefix reader unit sealed at /var/lib/jetstreamer/horizon-prefix203-reader-dormant-76e5194-v1 (reader660199... binds complete manifest content). No unit/trigger installed. Dispatch only after exact clean natural producer terminal success and durable real manifest. Then native admission/guard/restore,419slot suffix/V4assembly/final/plugin/publication remain separate unqualified gates.",
+      "new_next_action": "Preserve exact capped-shrink producer 748ffa40e0a2408da0a10fc9e160cf0a through canonical root 88127580; use the active-list useful-work sample, not this note, for current progress. Dispatch the dormant independently sandbox-path-qualified full-prefix reader at /var/lib/jetstreamer/horizon-prefix203-reader-dormant-76e5194-v1 only after exact clean natural producer terminal success and a durable real manifest. Separate native admission/guard/restore, 419-slot suffix, V4 assembly, independent final/current-plugin and publication gates remain unqualified."
+    },
+    "205": {
+      "old_next_action": "Real-input plan and service are sealed dormant at /var/lib/jetstreamer/horizon-205-bounded-resource-prepared-0610-v1; private UID1000/0700 directories precreated, service syntax verified, not installed/no trigger. New 06:27 window has 203 memory.high702/fullpressure380988us and225 memory.high41/fullpressure423159us, no OOM. Do not experimentally add lane during pressure events. Candidate2231152GiB remains unadopted. Require fresh clean complete admission and exact new IID/first-fire guard before launch; all suffix/full/plugin/publication gates stay open.",
+      "new_next_action": "Keep the real-input plan and service dormant at /var/lib/jetstreamer/horizon-205-bounded-resource-prepared-0610-v1; no unit or trigger is installed. Later coordinated host-global PSI measurements supersede the earlier interpretation of lane-local memory.high events: local cgroup-cap events alone do not establish host-wide saturation. Disk remains the demonstrated blocker: the 15:27:16Z sample has 3555261067264 available bytes, below the 3649903281043 bytes required for the 416-GiB experiment even under the unadopted 223 1152-GiB proposal. Keep active 223 1536-GiB protection and all existing guards unchanged. Require fresh complete admission and exact new invocation/first-real-sandboxed guard proof before launch; suffix/full/plugin/publication gates remain closed."
+    },
+    "227": {
+      "old_next_action": "Verified compressed bootstrap sealed into distinct immutable v1.6.20 package; exact-package fingerprint and schema probes reached expected gates with candidate opt-in and no replay. Preserve cache/evidence. Full cold resource envelope, admission and first-fire guard remain unqualified. No replay or status claimed.",
+      "new_next_action": "Verified compressed bootstrap retained in distinct immutable v1.6.20 deployment /var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1, with exact-package fingerprint/schema capability evidence. The redundant original acquisition cache was retired under its durable completion receipt; do not redownload it or delete the deployed input or evidence. Full cold resource envelope, fresh admission and first-fire guard remain unqualified. No replay or status claimed."
+    }
+  },
+  "states_changed": false,
+  "resource_claims_changed": false,
+  "launch_authorized": false,
+  "publication_authorized": false,
+  "remote_mutations": false,
+  "activation": "Dormant review only. Bind into separately sealed successor fleet template after accepting pending 15:57 cycle; preserve every gate, history, claim and predecessor."
+}

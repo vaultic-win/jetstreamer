@@ -1,0 +1,37 @@
+{
+  "candidate": "solana-v1.6.25",
+  "status": "private-diagnostic-only",
+  "upstream": {
+    "tag": "v1.6.25",
+    "commit": "7de8a55b54d3e11058b82f9483bb405d143b455c",
+    "runtime_tree": "dc3003d7709a77ac8f41e883e8fd98bed1a4f4c8",
+    "bpf_loader_tree": "6b7942c5806d43dc1b5ba7d77b4cd76db5a3a976"
+  },
+  "admission": {
+    "bootstrap_snapshot_slot": 96767522,
+    "first_entry_slot": 96767523,
+    "max_slot_exclusive": 96767527,
+    "target_epoch": 224,
+    "scope": "build-bound comparison through the first previously observed downstream mismatch; no publication authority"
+  },
+  "bootstrap": {
+    "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/96767522/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst#1632093412056045",
+    "accounts_hash": "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7",
+    "size": 9705551147,
+    "crc32c_base64": "woMSaA==",
+    "md5_base64": "vVpo0VoKsPfVgsQaYG6n/g=="
+  },
+  "local_validation": {
+    "completed_at_utc": "2026-10-18T19:17:21Z",
+    "cargo_test_workspace_locked": "pass with epoch224-v1-6-25-diagnostic (16 protocol, 53 worker, 2 ignored boundary-snapshot tests, 1 stdio)",
+    "cargo_test_forced_soft_poh": "not rerun for this diagnostic build",
+    "cargo_build_workspace_release_locked": "pass",
+    "worker_sha256": "ce11632f4ffdf9764c8c3158e692c096efebe349e8fe35274d8f2808f08d9b68",
+    "worker_size": 8965712
+  },
+  "loader_key_attribution": {
+    "invariant": "signature attribution includes only writable non-loader keys, matching runtime account storage",
+    "runtime_source_sha256": "c328abd7b1e2054355ac02c98df3e92022ebb7dd099f556fec404bb5afa3de4e"
+  },
+  "publication_gate": "not authorized; source review, commit, push, immutable sealing, exact-package capability proof, and fresh diagnostic admission are required before launch"
+}

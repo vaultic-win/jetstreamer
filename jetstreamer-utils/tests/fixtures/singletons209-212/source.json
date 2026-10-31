@@ -1,0 +1,1198 @@
+{
+  "free_bytes": 7137842528256,
+  "inventory_objects": {
+    "hourly": 0,
+    "root": 13
+  },
+  "manifest": {
+    "account": "sam.johnson@anza.xyz",
+    "billing_project": "principal-lane-200702",
+    "bucket": "gs://mainnet-beta-ledger-us-ny5",
+    "epoch_slots": 432000,
+    "epochs": [
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "CYEr1vEwJyh2d4SSmnmYPYYj6EPhrDWTAJJCuzF2VhLX",
+          "anchor_slot": 87695515,
+          "crc32c": "RxYNSQ==",
+          "extension": ".tar.zst",
+          "generation": 1634789825095802,
+          "size": 8142103526,
+          "slot": 87695515,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/87695515/snapshot-87695515-CYEr1vEwJyh2d4SSmnmYPYYj6EPhrDWTAJJCuzF2VhLX.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/87695515/snapshot-87695515-CYEr1vEwJyh2d4SSmnmYPYYj6EPhrDWTAJJCuzF2VhLX.tar.zst#1634789825095802"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 87695999,
+          "start": 87264000
+        },
+        "epoch": 203,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf",
+            "anchor_slot": 88127580,
+            "crc32c": "BCMJdA==",
+            "extension": ".tar.zst",
+            "generation": 1634789927715373,
+            "size": 8215471895,
+            "slot": 88127580,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst#1634789927715373"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 203,
+          "last_epoch": 203
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf",
+          "anchor_slot": 88127580,
+          "crc32c": "BCMJdA==",
+          "extension": ".tar.zst",
+          "generation": 1634789927715373,
+          "size": 8215471895,
+          "slot": 88127580,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst#1634789927715373"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 88127999,
+          "start": 87696000
+        },
+        "epoch": 204,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA",
+            "anchor_slot": 88559361,
+            "crc32c": "DZX5lA==",
+            "extension": ".tar.zst",
+            "generation": 1634789983470707,
+            "size": 8225957010,
+            "slot": 88559361,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst#1634789983470707"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 204,
+          "last_epoch": 204
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA",
+          "anchor_slot": 88559361,
+          "crc32c": "DZX5lA==",
+          "extension": ".tar.zst",
+          "generation": 1634789983470707,
+          "size": 8225957010,
+          "slot": 88559361,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst#1634789983470707"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 88559999,
+          "start": 88128000
+        },
+        "epoch": 205,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp",
+            "anchor_slot": 88991050,
+            "crc32c": "9/mUyw==",
+            "extension": ".tar.zst",
+            "generation": 1634790073611030,
+            "size": 8407269066,
+            "slot": 88991050,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst#1634790073611030"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 205,
+          "last_epoch": 205
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp",
+          "anchor_slot": 88991050,
+          "crc32c": "9/mUyw==",
+          "extension": ".tar.zst",
+          "generation": 1634790073611030,
+          "size": 8407269066,
+          "slot": 88991050,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst#1634790073611030"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 88991999,
+          "start": 88560000
+        },
+        "epoch": 206,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px",
+            "anchor_slot": 89423444,
+            "crc32c": "Qynv0g==",
+            "extension": ".tar.zst",
+            "generation": 1634790167725358,
+            "size": 8474139490,
+            "slot": 89423444,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst#1634790167725358"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 206,
+          "last_epoch": 206
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px",
+          "anchor_slot": 89423444,
+          "crc32c": "Qynv0g==",
+          "extension": ".tar.zst",
+          "generation": 1634790167725358,
+          "size": 8474139490,
+          "slot": 89423444,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst#1634790167725358"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 89423999,
+          "start": 88992000
+        },
+        "epoch": 207,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik",
+            "anchor_slot": 89523820,
+            "crc32c": "qIeOcA==",
+            "extension": ".tar.zst",
+            "generation": 1633927404656451,
+            "size": 8419571372,
+            "slot": 89523820,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst#1633927404656451"
+          },
+          {
+            "accounts_hash": "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK",
+            "anchor_slot": 89855469,
+            "crc32c": "iut2Vg==",
+            "extension": ".tar.zst",
+            "generation": 1628257305771350,
+            "size": 8529253264,
+            "slot": 89855469,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst#1628257305771350"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 207,
+          "last_epoch": 207
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK",
+          "anchor_slot": 89855469,
+          "crc32c": "iut2Vg==",
+          "extension": ".tar.zst",
+          "generation": 1628257305771350,
+          "size": 8529253264,
+          "slot": 89855469,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst#1628257305771350"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 89855999,
+          "start": 89424000
+        },
+        "epoch": 208,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp",
+            "anchor_slot": 90287519,
+            "crc32c": "nje1nQ==",
+            "extension": ".tar.zst",
+            "generation": 1628496316031397,
+            "size": 8543246873,
+            "slot": 90287519,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst#1628496316031397"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 208,
+          "last_epoch": 208
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp",
+          "anchor_slot": 90287519,
+          "crc32c": "nje1nQ==",
+          "extension": ".tar.zst",
+          "generation": 1628496316031397,
+          "size": 8543246873,
+          "slot": 90287519,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst#1628496316031397"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 90287999,
+          "start": 89856000
+        },
+        "epoch": 209,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ",
+            "anchor_slot": 90719638,
+            "crc32c": "rBQmbQ==",
+            "extension": ".tar.zst",
+            "generation": 1628731675837475,
+            "size": 8579041139,
+            "slot": 90719638,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst#1628731675837475"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 209,
+          "last_epoch": 209
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ",
+          "anchor_slot": 90719638,
+          "crc32c": "rBQmbQ==",
+          "extension": ".tar.zst",
+          "generation": 1628731675837475,
+          "size": 8579041139,
+          "slot": 90719638,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst#1628731675837475"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 90719999,
+          "start": 90288000
+        },
+        "epoch": 210,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx",
+            "anchor_slot": 91151575,
+            "crc32c": "4Sr/GA==",
+            "extension": ".tar.zst",
+            "generation": 1628983801891966,
+            "size": 8731506223,
+            "slot": 91151575,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst#1628983801891966"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 210,
+          "last_epoch": 210
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx",
+          "anchor_slot": 91151575,
+          "crc32c": "4Sr/GA==",
+          "extension": ".tar.zst",
+          "generation": 1628983801891966,
+          "size": 8731506223,
+          "slot": 91151575,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst#1628983801891966"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 91151999,
+          "start": 90720000
+        },
+        "epoch": 211,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV",
+            "anchor_slot": 91583512,
+            "crc32c": "Ve4m1Q==",
+            "extension": ".tar.zst",
+            "generation": 1629232341551900,
+            "size": 8715614412,
+            "slot": 91583512,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst#1629232341551900"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 211,
+          "last_epoch": 211
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV",
+          "anchor_slot": 91583512,
+          "crc32c": "Ve4m1Q==",
+          "extension": ".tar.zst",
+          "generation": 1629232341551900,
+          "size": 8715614412,
+          "slot": 91583512,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst#1629232341551900"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 91583999,
+          "start": 91152000
+        },
+        "epoch": 212,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU",
+            "anchor_slot": 92015419,
+            "crc32c": "iU3mfg==",
+            "extension": ".tar.zst",
+            "generation": 1629495308790561,
+            "size": 8981889115,
+            "slot": 92015419,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst#1629495308790561"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 212,
+          "last_epoch": 212
+        }
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU",
+          "anchor_slot": 92015419,
+          "crc32c": "iU3mfg==",
+          "extension": ".tar.zst",
+          "generation": 1629495308790561,
+          "size": 8981889115,
+          "slot": 92015419,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst#1629495308790561"
+        },
+        "bootstrap_window": {
+          "end_inclusive": 92015999,
+          "start": 91584000
+        },
+        "epoch": 213,
+        "post_bootstrap_root_checkpoints": [
+          {
+            "accounts_hash": "4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd",
+            "anchor_slot": 92447542,
+            "crc32c": "2aRcEQ==",
+            "extension": ".tar.zst",
+            "generation": 1629744948337785,
+            "size": 8894131881,
+            "slot": 92447542,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/92447542/snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92447542/snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst#1629744948337785"
+          }
+        ],
+        "runtime": "solana-v1.6.16",
+        "runtime_state_source": "root-bootstrap",
+        "verification_cohort": {
+          "first_epoch": 213,
+          "last_epoch": 213
+        }
+      }
+    ],
+    "first_epoch": 203,
+    "inventory_patterns": {
+      "hourly": "gs://mainnet-beta-ledger-us-ny5/*/hourly/snapshot-*",
+      "root": "gs://mainnet-beta-ledger-us-ny5/*/snapshot-*"
+    },
+    "last_epoch": 213,
+    "runtime_routes": [
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 1,
+        "last_epoch": 1,
+        "runtime": "solana-v1.0.7-to-v1.0.8"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 2,
+        "last_epoch": 7,
+        "runtime": "solana-v1.0.8"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 8,
+        "last_epoch": 8,
+        "runtime": "solana-v1.0.13"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 9,
+        "last_epoch": 10,
+        "runtime": "solana-v1.0.14"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 11,
+        "last_epoch": 11,
+        "runtime": "solana-v1.0.14"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 12,
+        "last_epoch": 29,
+        "runtime": "solana-v1.0.23"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 30,
+        "last_epoch": 30,
+        "runtime": "solana-v1.1.15"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2"
+        ],
+        "first_epoch": 31,
+        "last_epoch": 60,
+        "runtime": "solana-v1.1.23"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 61,
+        "last_epoch": 66,
+        "runtime": "solana-v1.2.32"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 67,
+        "last_epoch": 68,
+        "runtime": "solana-v1.2.32-mainnet-epoch68-transition"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 69,
+        "last_epoch": 91,
+        "runtime": "solana-v1.2.32"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 92,
+        "last_epoch": 100,
+        "runtime": "solana-v1.3.19"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 101,
+        "last_epoch": 128,
+        "runtime": "solana-v1.3.23"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 129,
+        "last_epoch": 130,
+        "runtime": "solana-v1.4.17"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 131,
+        "last_epoch": 133,
+        "runtime": "solana-v1.4.19"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 134,
+        "last_epoch": 147,
+        "runtime": "solana-v1.4.25"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 148,
+        "last_epoch": 149,
+        "runtime": "solana-v1.5.5"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 150,
+        "last_epoch": 153,
+        "runtime": "solana-v1.5.6"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 154,
+        "last_epoch": 154,
+        "runtime": "solana-v1.5.8"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 155,
+        "last_epoch": 173,
+        "runtime": "solana-v1.5.6"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 174,
+        "last_epoch": 200,
+        "runtime": "solana-v1.6.15"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "first_epoch": 201,
+        "last_epoch": 213,
+        "runtime": "solana-v1.6.16"
+      }
+    ],
+    "schema": "jetstreamer-gcs-snapshot-preflight-v2",
+    "selection_policy": {
+      "bootstrap_sources": [
+        "root",
+        "hourly"
+      ],
+      "bootstrap_window": "prior-epoch",
+      "checkpoint_gap_bootstrap_source": "root",
+      "checkpoint_gap_runtime_boundary": "reject",
+      "checkpoint_source": "root",
+      "checkpoint_window": "after-bootstrap-through-cohort-end",
+      "newest_slot_must_be_unique": true,
+      "publication": "withhold-complete-cohort-until-final-root"
+    },
+    "verification_cohorts": [
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "CYEr1vEwJyh2d4SSmnmYPYYj6EPhrDWTAJJCuzF2VhLX",
+          "anchor_slot": 87695515,
+          "crc32c": "RxYNSQ==",
+          "extension": ".tar.zst",
+          "generation": 1634789825095802,
+          "size": 8142103526,
+          "slot": 87695515,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/87695515/snapshot-87695515-CYEr1vEwJyh2d4SSmnmYPYYj6EPhrDWTAJJCuzF2VhLX.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/87695515/snapshot-87695515-CYEr1vEwJyh2d4SSmnmYPYYj6EPhrDWTAJJCuzF2VhLX.tar.zst#1634789825095802"
+        },
+        "first_epoch": 203,
+        "last_epoch": 203,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf",
+            "anchor_slot": 88127580,
+            "crc32c": "BCMJdA==",
+            "extension": ".tar.zst",
+            "generation": 1634789927715373,
+            "size": 8215471895,
+            "slot": 88127580,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst#1634789927715373"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf",
+          "anchor_slot": 88127580,
+          "crc32c": "BCMJdA==",
+          "extension": ".tar.zst",
+          "generation": 1634789927715373,
+          "size": 8215471895,
+          "slot": 88127580,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst#1634789927715373"
+        },
+        "first_epoch": 204,
+        "last_epoch": 204,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA",
+            "anchor_slot": 88559361,
+            "crc32c": "DZX5lA==",
+            "extension": ".tar.zst",
+            "generation": 1634789983470707,
+            "size": 8225957010,
+            "slot": 88559361,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst#1634789983470707"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA",
+          "anchor_slot": 88559361,
+          "crc32c": "DZX5lA==",
+          "extension": ".tar.zst",
+          "generation": 1634789983470707,
+          "size": 8225957010,
+          "slot": 88559361,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst#1634789983470707"
+        },
+        "first_epoch": 205,
+        "last_epoch": 205,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp",
+            "anchor_slot": 88991050,
+            "crc32c": "9/mUyw==",
+            "extension": ".tar.zst",
+            "generation": 1634790073611030,
+            "size": 8407269066,
+            "slot": 88991050,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst#1634790073611030"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp",
+          "anchor_slot": 88991050,
+          "crc32c": "9/mUyw==",
+          "extension": ".tar.zst",
+          "generation": 1634790073611030,
+          "size": 8407269066,
+          "slot": 88991050,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst#1634790073611030"
+        },
+        "first_epoch": 206,
+        "last_epoch": 206,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px",
+            "anchor_slot": 89423444,
+            "crc32c": "Qynv0g==",
+            "extension": ".tar.zst",
+            "generation": 1634790167725358,
+            "size": 8474139490,
+            "slot": 89423444,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst#1634790167725358"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px",
+          "anchor_slot": 89423444,
+          "crc32c": "Qynv0g==",
+          "extension": ".tar.zst",
+          "generation": 1634790167725358,
+          "size": 8474139490,
+          "slot": 89423444,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst#1634790167725358"
+        },
+        "first_epoch": 207,
+        "last_epoch": 207,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik",
+            "anchor_slot": 89523820,
+            "crc32c": "qIeOcA==",
+            "extension": ".tar.zst",
+            "generation": 1633927404656451,
+            "size": 8419571372,
+            "slot": 89523820,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst#1633927404656451"
+          },
+          {
+            "accounts_hash": "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK",
+            "anchor_slot": 89855469,
+            "crc32c": "iut2Vg==",
+            "extension": ".tar.zst",
+            "generation": 1628257305771350,
+            "size": 8529253264,
+            "slot": 89855469,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst#1628257305771350"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK",
+          "anchor_slot": 89855469,
+          "crc32c": "iut2Vg==",
+          "extension": ".tar.zst",
+          "generation": 1628257305771350,
+          "size": 8529253264,
+          "slot": 89855469,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst#1628257305771350"
+        },
+        "first_epoch": 208,
+        "last_epoch": 208,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp",
+            "anchor_slot": 90287519,
+            "crc32c": "nje1nQ==",
+            "extension": ".tar.zst",
+            "generation": 1628496316031397,
+            "size": 8543246873,
+            "slot": 90287519,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst#1628496316031397"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp",
+          "anchor_slot": 90287519,
+          "crc32c": "nje1nQ==",
+          "extension": ".tar.zst",
+          "generation": 1628496316031397,
+          "size": 8543246873,
+          "slot": 90287519,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst#1628496316031397"
+        },
+        "first_epoch": 209,
+        "last_epoch": 209,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ",
+            "anchor_slot": 90719638,
+            "crc32c": "rBQmbQ==",
+            "extension": ".tar.zst",
+            "generation": 1628731675837475,
+            "size": 8579041139,
+            "slot": 90719638,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst#1628731675837475"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ",
+          "anchor_slot": 90719638,
+          "crc32c": "rBQmbQ==",
+          "extension": ".tar.zst",
+          "generation": 1628731675837475,
+          "size": 8579041139,
+          "slot": 90719638,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst#1628731675837475"
+        },
+        "first_epoch": 210,
+        "last_epoch": 210,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx",
+            "anchor_slot": 91151575,
+            "crc32c": "4Sr/GA==",
+            "extension": ".tar.zst",
+            "generation": 1628983801891966,
+            "size": 8731506223,
+            "slot": 91151575,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst#1628983801891966"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx",
+          "anchor_slot": 91151575,
+          "crc32c": "4Sr/GA==",
+          "extension": ".tar.zst",
+          "generation": 1628983801891966,
+          "size": 8731506223,
+          "slot": 91151575,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst#1628983801891966"
+        },
+        "first_epoch": 211,
+        "last_epoch": 211,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV",
+            "anchor_slot": 91583512,
+            "crc32c": "Ve4m1Q==",
+            "extension": ".tar.zst",
+            "generation": 1629232341551900,
+            "size": 8715614412,
+            "slot": 91583512,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst#1629232341551900"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV",
+          "anchor_slot": 91583512,
+          "crc32c": "Ve4m1Q==",
+          "extension": ".tar.zst",
+          "generation": 1629232341551900,
+          "size": 8715614412,
+          "slot": 91583512,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst#1629232341551900"
+        },
+        "first_epoch": 212,
+        "last_epoch": 212,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU",
+            "anchor_slot": 92015419,
+            "crc32c": "iU3mfg==",
+            "extension": ".tar.zst",
+            "generation": 1629495308790561,
+            "size": 8981889115,
+            "slot": 92015419,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst#1629495308790561"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      },
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU",
+          "anchor_slot": 92015419,
+          "crc32c": "iU3mfg==",
+          "extension": ".tar.zst",
+          "generation": 1629495308790561,
+          "size": 8981889115,
+          "slot": 92015419,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst#1629495308790561"
+        },
+        "first_epoch": 213,
+        "last_epoch": 213,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd",
+            "anchor_slot": 92447542,
+            "crc32c": "2aRcEQ==",
+            "extension": ".tar.zst",
+            "generation": 1629744948337785,
+            "size": 8894131881,
+            "slot": 92447542,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/92447542/snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92447542/snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst#1629744948337785"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      }
+    ]
+  },
+  "manifest_fingerprint": "sha256:63e4f6b5f858ed636b2c22bc15f971d0f4a1009b50f39f66b779df782060976d",
+  "missing_local_bootstrap_bytes": 85403388487,
+  "selected_bootstrap_bytes": 93545492013,
+  "storage": {
+    "conflicting_local_paths": 0,
+    "enough_free_bytes_for_missing_bootstraps": true,
+    "free_bytes": 7137842528256,
+    "local_root": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots",
+    "missing_bootstrap_objects": [
+      {
+        "expected_bytes": 8215471895,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88127580/snapshot-88127580-4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf.tar.zst#1634789927715373"
+      },
+      {
+        "expected_bytes": 8225957010,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88559361/snapshot-88559361-83H83cZe1j8pnukHcZiXxKRyvCNUAZjcR43Wv9aQtnYA.tar.zst#1634789983470707"
+      },
+      {
+        "expected_bytes": 8407269066,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/88991050/snapshot-88991050-BAsq3Vn4KyLYuLqrevCL2dnE1fjLyA6NSX9qQjG7VCDp.tar.zst#1634790073611030"
+      },
+      {
+        "expected_bytes": 8474139490,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst#1634790167725358"
+      },
+      {
+        "expected_bytes": 8529253264,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst#1628257305771350"
+      },
+      {
+        "expected_bytes": 8543246873,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90287519/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst#1628496316031397"
+      },
+      {
+        "expected_bytes": 8579041139,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst#1628731675837475"
+      },
+      {
+        "expected_bytes": 8731506223,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91151575/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst#1628983801891966"
+      },
+      {
+        "expected_bytes": 8715614412,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/91583512/snapshot-91583512-548ThATYndZ7kSzuEgkRx9eVd4MD4hbLgU9ydtjZbbKV.tar.zst#1629232341551900"
+      },
+      {
+        "expected_bytes": 8981889115,
+        "local_path": "/home/ubuntu/.jetstreamer-private/qualification-203-213/snapshots/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst",
+        "reason": "absent",
+        "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/92015419/snapshot-92015419-VkTNdojvP5U4pPTSUQfK997eJsxMVfwt8HYxhgcV4nU.tar.zst#1629495308790561"
+      }
+    ],
+    "missing_local_bootstrap_bytes": 85403388487,
+    "preflight_ok": true,
+    "present_bootstrap_bytes": 8142103526,
+    "selected_bootstrap_bytes": 93545492013,
+    "selected_bootstrap_objects": 11
+  }
+}

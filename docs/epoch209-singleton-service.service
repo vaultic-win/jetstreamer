@@ -1,0 +1,40 @@
+# Dormant template for horizon-singleton-209-capped-4aeca563-v1.service.
+# Load/start only after the full 209 native/capability/admission gates pass.
+[Unit]
+Description=Horizon epoch 209 independent capped singleton
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=259200
+TimeoutStopSec=300
+MemoryHigh=150000000000
+MemoryMax=225000000000
+MemorySwapMax=0
+TasksMax=512
+CPUQuota=1600%
+Nice=10
+IOWeight=50
+CPUWeight=100
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1
+Environment=RUST_MIN_STACK=134217728
+Environment=SOLANA_RAYON_THREADS=16
+Environment=JETSTREAMER_HISTORICAL_POH_THREADS=8
+Environment=TOKIO_WORKER_THREADS=8
+Environment=JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1
+Environment=JETSTREAMER_PRIVATE_RUN_ROOT=/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1/private
+Environment=JETSTREAMER_HISTORICAL_WORKER_V1_6_16=/var/lib/jetstreamer/horizon-v1616-shrink-budget-worker-003fe15-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget
+ExecStartPre=/usr/bin/install -m 0444 /var/lib/jetstreamer/horizon-focused-209-complete-span-store8-ca2e38b-v2/genesis.tar.bz2 /home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1/output/genesis.tar.bz2
+ExecStart=/var/lib/jetstreamer/horizon-singletons209-212-node-0d2856e7-v1/jetstreamer-node 209 /home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-singletons209-212-metadata-0d2856e7-v1/preflight209-singleton.json --cohort-manifest-fingerprint=sha256:00b0891f2acb9e6ea0e0fdc1b7b5f551a858760dc00b662ee6adb24b1b7d2b1f --snapshot-archive=/var/lib/jetstreamer/horizon-focused-209-complete-span-store8-ca2e38b-v2/snapshot-90287519-6hSbTbwcGhgRGtxQ6iH2aWBhqRzGwhNBPCVDCBZ1fAxp.tar.zst

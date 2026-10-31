@@ -1,0 +1,91 @@
+{
+  "manifest": {
+    "bucket": "gs://mainnet-beta-ledger-us-ny5",
+    "epoch_slots": 432000,
+    "first_epoch": 207,
+    "last_epoch": 207,
+    "schema": "jetstreamer-gcs-snapshot-preflight-v4",
+    "verification_cohorts": [
+      {
+        "accepted_extensions": [
+          ".tar.bz2",
+          ".tar.zst"
+        ],
+        "bootstrap": {
+          "accounts_hash": "3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px",
+          "anchor_slot": 89423444,
+          "crc32c": "Qynv0g==",
+          "extension": ".tar.zst",
+          "generation": 1634790167725358,
+          "md5_hash": "Dil5cEJL57SGxIfql2EAHQ==",
+          "size": 8474139490,
+          "slot": 89423444,
+          "source": "root",
+          "uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+          "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst#1634790167725358"
+        },
+        "first_epoch": 207,
+        "last_epoch": 207,
+        "publication_gate": "all-archives-validated-and-final-root-verified",
+        "root_checkpoints": [
+          {
+            "accounts_hash": "7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik",
+            "anchor_slot": 89523820,
+            "crc32c": "qIeOcA==",
+            "extension": ".tar.zst",
+            "generation": 1633927404656451,
+            "md5_hash": null,
+            "size": 8419571372,
+            "slot": 89523820,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89523820/snapshot-89523820-7NUvFRrgkc2pc9DPmD7vrrooZkEwc6r8KqUMq5MrG3ik.tar.zst#1633927404656451"
+          },
+          {
+            "accounts_hash": "9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK",
+            "anchor_slot": 89855469,
+            "crc32c": "iut2Vg==",
+            "extension": ".tar.zst",
+            "generation": 1628257305771350,
+            "md5_hash": "hRwEKGoNIuKt+wDt7jdEJA==",
+            "size": 8529253264,
+            "slot": 89855469,
+            "source": "root",
+            "uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst",
+            "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/89855469/snapshot-89855469-9i59TwLmzXvbomizFZNuXgPygtx8zJ3P4nWDQuNxrTxK.tar.zst#1628257305771350"
+          }
+        ],
+        "runtime": "solana-v1.6.16"
+      }
+    ]
+  },
+  "manifest_fingerprint": "sha256:50896e94150b8ca275a628bf1c760d81b45a8e5ac7bb5425c7e0d0b0d2f8b1e4",
+  "preparation": {
+    "bindings": {
+      "path": "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/snapshot-bindings-207.json",
+      "sha256": "804c7c90f765226164d0b8d840d9122fc2a83d1e9e5cf19ed5630b2c0789f8e2"
+    },
+    "epoch208_input_required": false,
+    "final_output_slot": 89855999,
+    "fresh_exact_generation_reobservation_still_required": true,
+    "launch_authorized": false,
+    "legacy_v2_md5_unobserved_slots": [
+      89523820
+    ],
+    "native_input_qualified": false,
+    "post_root_slot_count": 530,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "replay_qualified": false,
+    "resource_observation_taken": false,
+    "runtime_registry_promoted": false,
+    "schema": "jetstreamer-private-epoch207-singleton-offline-preparation-v1",
+    "source": {
+      "manifest_fingerprint": "sha256:63e4f6b5f858ed636b2c22bc15f971d0f4a1009b50f39f66b779df782060976d",
+      "path": "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/preflight-root-only-203-213.json",
+      "sha256": "7389720afed30d7480f952b240f3469974e5a18ceb02e01c8e3086fd6f71eb97"
+    },
+    "worker_started": false
+  }
+}

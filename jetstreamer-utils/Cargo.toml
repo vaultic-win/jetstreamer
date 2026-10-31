@@ -9,8 +9,68 @@ license.workspace = true
 repository.workspace = true
 documentation.workspace = true
 
+[features]
+epoch210-native-main-guard = ["epoch227-native-main-guard"]
+epoch227-native-main-guard = []
+# Reuse the native observer, with one additional closed 207 tuple. Each plan
+# must match its full tuple; this remains compatible with utils --all-features.
+epoch207-native-main-guard = ["epoch227-native-main-guard"]
+epoch209-native-main-guard = ["epoch227-native-main-guard"]
+epoch228-native-main-guard = ["epoch227-native-main-guard"]
+epoch227-v1625-native-main-guard = ["epoch227-native-main-guard"]
+epoch227-singleton-guard = []
+epoch209-singleton-guard = []
+epoch223-native20-prefix-guard = []
+epoch223-v1620-prefix-capability = []
+sst-capability-tests = ["dep:rocksdb"]
+# Pins the separate bounded epoch 225 upstream-comparison worker, not an era.
+epoch225-v1-6-25-diagnostic = []
+# Separate capped-shrink epoch 225 prefix measurement; no route promotion.
+epoch225-shrink-budget-resource = []
+# Private same-input epoch 203 resource comparison; no runtime promotion.
+epoch203-single-thread-resource = []
+# Exact private comparison of the v1.6.16 upstream shrink-budget cap.
+epoch203-shrink-budget-resource = []
+# Private, resource-limited canonical-root prefix qualification, not publication.
+epoch203-root-prefix-resource = []
+# Same canonical root and safety envelope, separately pinned capped-shrink worker.
+epoch203-shrink-root-prefix-resource = ["epoch203-root-prefix-resource"]
+# Closed private cold epoch 223 prefix ending at the independently known root.
+epoch223-root-prefix-resource = []
+# Separate native v1.6.20 prefix; not a full epoch or publication route.
+epoch223-v1620-root-prefix-resource = []
+# Private first 16-slot worker envelope; never epoch or root qualification.
+epoch223-warmup-resource = []
+# Separate exact v1.6.20 first 16-entry qualification; no root promotion.
+epoch223-v1620-warmup-resource = []
+# Private fixed-span epoch 224 measurement against its pinned v1.6.25 package.
+epoch224-bounded-resource = []
+# Dormant exact epoch 205 checkpoint-prefix measurement; no ordinary replay.
+epoch205-bounded-resource = []
+# Private capped-shrink prefix ending at epoch 205's independently known checkpoint.
+epoch205-shrink-root-prefix-resource = []
+# Private capped-shrink204 prefix; publication and638-slot suffix remain closed.
+epoch204-shrink-root-prefix-resource = []
+epoch186-shrink-root-prefix-resource = []
+
 [lib]
 name = "jetstreamer_utils"
+
+[[bin]]
+name = "jetstreamer-epoch227-input-capability"
+path = "src/epoch227_input_capability_bin.rs"
+
+[[bin]]
+name = "jetstreamer-cached-singleton-prepare"
+path = "src/cached_singleton_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch207-singleton-prepare"
+path = "src/epoch207_singleton_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch227-native-retain"
+path = "src/epoch227_native_retain_bin.rs"
 
 [[bin]]
 name = "clickhouse-server"
@@ -20,6 +80,268 @@ path = "src/clickhouse_server_bin.rs"
 name = "clickhouse-client"
 path = "src/clickhouse_client_bin.rs"
 
+[[bin]]
+name = "jetstreamer-blockzilla-poh-extract"
+path = "src/blockzilla_poh_extract_bin.rs"
+
+[[bin]]
+name = "jetstreamer-blockzilla-boundary-collect"
+path = "src/blockzilla_boundary_collect_bin.rs"
+
+[[bin]]
+name = "jetstreamer-seal-deployment"
+path = "src/seal_deployment_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-boundary-metadata"
+path = "src/epoch203_boundary_metadata_bin.rs"
+
+[[bin]]
+name = "jetstreamer-focused-capability-probe"
+path = "src/focused_capability_probe_bin.rs"
+
+[[bin]]
+name = "jetstreamer-focused-package-attest"
+path = "src/focused_package_attest_bin.rs"
+
+[[bin]]
+name = "jetstreamer-native-snapshot-census"
+path = "src/native_snapshot_census_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-tail-attest"
+path = "src/epoch223_tail_attest_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-prefix-capability"
+path = "src/epoch223_prefix_capability_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-root-prefix-resource"
+path = "src/epoch223_root_prefix_resource_bin.rs"
+required-features = ["epoch223-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch223-v1620-root-prefix-resource"
+path = "src/epoch223_v1620_root_prefix_resource_bin.rs"
+required-features = ["epoch223-v1620-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch223-warmup-resource"
+path = "src/epoch223_warmup_resource_bin.rs"
+required-features = ["epoch223-warmup-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch223-v1620-warmup-resource"
+path = "src/epoch223_v1620_warmup_resource_bin.rs"
+required-features = ["epoch223-v1620-warmup-resource"]
+
+[[bin]]
+name = "jetstreamer-gcs-metadata-observe"
+path = "src/gcs_metadata_observe_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-ledger-metadata"
+path = "src/epoch141_ledger_metadata_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-ledger-download"
+path = "src/epoch141_ledger_download_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-ledger-reverify"
+path = "src/epoch141_ledger_reverify_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-ledger-census"
+path = "src/epoch141_ledger_census_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-census-poh-diagnostic"
+path = "src/epoch141_census_poh_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-source-equivalence"
+path = "src/epoch141_source_equivalence_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-reward-reference"
+path = "src/epoch141_reward_reference_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-original-bundle"
+path = "src/epoch141_original_bundle_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-boundary-collect"
+path = "src/epoch141_boundary_collect_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-ledger-collect"
+path = "src/epoch141_ledger_collect_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-ledger-native"
+path = "src/epoch141_ledger_native_bin.rs"
+required-features = ["sst-capability-tests"]
+
+[[bin]]
+name = "jetstreamer-epoch140-checkpoint-journal"
+path = "src/epoch140_checkpoint_journal_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch140-native-launch-capture"
+path = "src/epoch140_native_launch_capture_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch140-snapshot-download"
+path = "src/epoch140_snapshot_download_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch140-snapshot-metadata"
+path = "src/epoch140_snapshot_metadata_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch144-snapshot-metadata"
+path = "src/epoch144_snapshot_metadata_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch144-snapshot-download"
+path = "src/epoch144_snapshot_download_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-bootstrap-prepare"
+path = "src/epoch223_bootstrap_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch227-bootstrap-prepare"
+path = "src/epoch227_bootstrap_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch205-terminal-snapshot-prepare"
+path = "src/epoch205_terminal_snapshot_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-boundary-bridge"
+path = "src/horizon_boundary_bridge_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-retire-scratch"
+path = "src/horizon_retire_scratch_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-growth-claim"
+path = "src/horizon_growth_claim_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-retire-failed-diagnostic"
+path = "src/horizon_retire_failed_diagnostic_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-full-verification-evidence"
+path = "src/horizon_full_verification_evidence_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch140-initial-boundary"
+path = "src/epoch140_initial_boundary_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-standalone-guard"
+path = "src/horizon_standalone_guard_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch225-bounded-resource"
+path = "src/epoch225_bounded_resource_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch225-shrink-budget-resource"
+path = "src/epoch225_shrink_budget_resource_bin.rs"
+required-features = ["epoch225-shrink-budget-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch224-bounded-resource"
+path = "src/epoch224_bounded_resource_bin.rs"
+required-features = ["epoch224-bounded-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch203-bounded-resource"
+path = "src/epoch203_bounded_resource_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch205-bounded-resource"
+path = "src/epoch205_bounded_resource_bin.rs"
+required-features = ["epoch205-bounded-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch203-resource-compare"
+path = "src/epoch203_resource_compare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-root-prefix-resource"
+path = "src/epoch203_root_prefix_resource_bin.rs"
+required-features = ["epoch203-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch203-shrink-root-prefix-resource"
+path = "src/epoch203_shrink_root_prefix_resource_bin.rs"
+required-features = ["epoch203-shrink-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch213-private-verify"
+path = "src/epoch213_private_verify_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-private-verify"
+path = "src/epoch203_private_verify_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch205-shrink-root-prefix-resource"
+path = "src/epoch205_shrink_root_prefix_resource_bin.rs"
+required-features = ["epoch205-shrink-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch204-shrink-root-prefix-resource"
+path = "src/epoch204_shrink_root_prefix_resource_bin.rs"
+required-features = ["epoch204-shrink-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch186-shrink-root-prefix-resource"
+path = "src/epoch186_shrink_root_prefix_resource_bin.rs"
+required-features = ["epoch186-shrink-root-prefix-resource"]
+
+[[bin]]
+name = "jetstreamer-epoch144-private-verify"
+path = "src/epoch144_private_verify_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch144-publication-evidence"
+path = "src/epoch144_publication_evidence_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-byte-diagnostic"
+path = "src/epoch141_byte_diagnostic_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-poh-diagnostic"
+path = "src/epoch141_poh_diagnostic_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-gap-audit"
+path = "src/horizon_gap_audit_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch140-gap-metadata-fetch"
+path = "src/epoch140_gap_metadata_fetch_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch225-vote-audit"
+path = "src/epoch225_vote_audit_bin.rs"
+
+[[test]]
+name = "sst_decoder_capability"
+path = "tests/sst_decoder_capability.rs"
+required-features = ["sst-capability-tests"]
+
 [dependencies]
 tokio = { workspace = true, features = ["full"] }
 log.workspace = true
@@ -27,3 +349,26 @@ tempfile.workspace = true
 libc.workspace = true
 solana-logger.workspace = true
 ctrlc.workspace = true
+bs58 = { workspace = true, features = ["alloc"] }
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true, features = ["std"] }
+sha2.workspace = true
+md-5.workspace = true
+base64.workspace = true
+crc.workspace = true
+anyhow.workspace = true
+tar.workspace = true
+zstd.workspace = true
+bzip2 = "=0.4.4"
+rocksdb = { version = "0.23", default-features = false, features = ["lz4"], optional = true }
+
+[dev-dependencies]
+bincode.workspace = true
+
+[[bin]]
+name = "jetstreamer-native210-prepare"
+path = "src/native210_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-native227-v1625-prepare"
+path = "src/native227_v1625_prepare_bin.rs"

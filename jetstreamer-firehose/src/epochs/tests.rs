@@ -166,6 +166,44 @@ async fn test_fetch_epoch_stream() {
 }
 
 #[tokio::test]
+async fn successor_car_rate_limit_is_not_decoded_as_a_header_and_clean_eof() {
+    // Epochs 183 and 198 failed in the boundary scanner with rseek 0.4.0:
+    // this real response's leading '{' is the varint 123 and the remaining
+    // 123 bytes look like a complete CAR header. The next read then sees EOF,
+    // hiding the HTTP status as "CAR ended before a block".
+    let body = b"{\n  \"code\": \"too_many_requests\",\n  \"message\": \"Your account has made too many requests; try again later.\",\n  \"status\": 429\n}";
+    assert_eq!(body.len(), 124);
+    assert_eq!(usize::from(body[0]), body.len() - 1);
+
+    let bytes = vec![0; 4096];
+    let server = TestServer::start(vec![
+        Reply::range(0, 0, &bytes),
+        Reply {
+            request_line: "GET /archive/670/epoch-670.car HTTP/1.1".into(),
+            range: Some("bytes=0-4095".into()),
+            request_json: None,
+            status: "429 Too Many Requests",
+            headers: "Content-Type: application/json;charset=utf-8\r\n".into(),
+            body: body.to_vec(),
+        },
+    ])
+    .await;
+    let stream = fetch_epoch_stream_at(670, &client(), None, &server.location()).await;
+    let mut reader = crate::node_reader::NodeReader::new(stream);
+    let error = reader.read_raw_header().await.unwrap_err();
+    let io_error = error.downcast_ref::<std::io::Error>().unwrap();
+    let http_error = io_error
+        .get_ref()
+        .and_then(|error| error.downcast_ref::<reqwest::Error>())
+        .expect("HTTP error must retain its status before CAR decoding");
+    assert_eq!(
+        http_error.status(),
+        Some(reqwest::StatusCode::TOO_MANY_REQUESTS)
+    );
+    server.finish().await;
+}
+
+#[tokio::test]
 async fn test_epoch_exists() {
     let server = TestServer::start(vec![
         Reply::head("HEAD /archive/670/epoch-670.car HTTP/1.1", "200 OK"),
