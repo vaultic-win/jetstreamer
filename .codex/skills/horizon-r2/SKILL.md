@@ -296,6 +296,14 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- For a bounded qualification transaction, validate the complete operator wrapper and its parameter
+  shapes, paths and bindings against the sealed contract before opening the original clock. Run
+  already reviewed dependent stages from the independent before-counter through gated worker
+  launch consecutively in one retained process; do not consume the remaining readiness budget with
+  intervening model turns. Abort the sequence on any failed gate, preserve the actual result and
+  resume only through the applicable recovery path. Keep all native checks, genuine waits, source
+  and accounting proofs, deadline checks and publication gates; sequencing grants no retry,
+  deadline extension or permission to reset the original clock.
 - Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
   campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
   coordination and user reporting. Keep the loop work-conserving while repair agents investigate;
