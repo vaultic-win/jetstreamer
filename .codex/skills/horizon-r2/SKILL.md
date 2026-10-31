@@ -520,6 +520,13 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 ## Produce and verify
 
 - Use the repository's sealed historical replay/controller path and automatic slot-range runtime selection. Do not invent a compatibility override.
+- Before releasing a prelaunch gate, require a worker-ready journal event or durable receipt emitted
+  after metadata, source and prerequisite validation, bound to the live PID/start ticks, invocation
+  ID and admission hash. Capture the final successful guard sample after readiness and publish the
+  gate within its freshness bound. An active PID and an absent gate do not prove readiness. If the
+  worker cannot reach the barrier by its deadline, stop only that scope and preserve its failure
+  evidence and genuine map state; never overwrite its one-shot gate or initialize absent worker
+  facts for a retry.
 - Before launching epoch 225 prefix extraction, read
   [references/epoch225-extraction.md](references/epoch225-extraction.md) for its exact actor,
   guard, timer and initial status handoff requirements. Prepare the full launch sequence before
