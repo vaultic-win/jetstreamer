@@ -296,6 +296,10 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- Before arming a coordinated observer, check that epoch ranges do not overlap across `replays`
+  and `diagnostic_replays`. Keep a replacement in `replays`; retain its failed predecessor in the
+  fleet and repair backlog instead of adding a duplicate observer row. Preserve earlier configs
+  and failure receipts when correcting a rejected configuration.
 - For a bounded qualification transaction, validate the complete operator wrapper and its parameter
   shapes, paths and bindings against the sealed contract before opening the original clock. Run
   already reviewed dependent stages from the independent before-counter through gated worker
