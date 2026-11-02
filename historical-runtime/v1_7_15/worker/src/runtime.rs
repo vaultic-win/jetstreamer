@@ -691,10 +691,15 @@ impl RuntimeState {
     /// manufacture an account update that the archive would fail to observe.
     fn maintain_accounts_storage(&mut self) -> Result<(), String> {
         let write_version = self.bank.accounts().accounts_db.next_write_version();
-        self.accounts_shrink_consumed_budget = self.bank.process_stale_slot_with_budget(
-            self.accounts_shrink_consumed_budget,
-            ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
-        );
+        // Match the pinned AccountsBackgroundService: one large shrink must
+        // not suppress storage maintenance for hundreds of rooted banks.
+        self.accounts_shrink_consumed_budget = self
+            .bank
+            .process_stale_slot_with_budget(
+                self.accounts_shrink_consumed_budget,
+                ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
+            )
+            .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
 
         let block_height = self.bank.block_height();
         if block_height.saturating_sub(self.last_accounts_clean_block_height)
@@ -2155,6 +2160,44 @@ mod tests {
         let second_tick = request_for(&state, 0, 1, 1, &[]);
         state.process_entry(second_tick).unwrap();
         assert!(state.freeze_checkpoint(0).unwrap().slot_complete);
+    }
+
+    #[test]
+    fn storage_maintenance_caps_shrink_debt_like_pinned_background_service() {
+        let (mut state, mint_keypair) = test_state(1, Some(2));
+        let tick = request_for(&state, 0, 0, 2, &[]);
+        state.process_entry(tick).unwrap();
+        state.freeze_checkpoint(0).unwrap();
+        let original_cursor = state.bank.accounts().accounts_db.next_write_version();
+        let original_balance = state.bank.get_balance(&mint_keypair.pubkey());
+        let original_capitalization = state.bank.capitalization();
+        let original_blockhash = state.bank.last_blockhash();
+        let original_bank_hash = state.bank.hash();
+        for debt in &[251usize, 500, 25_000, usize::MAX] {
+            state.accounts_shrink_consumed_budget = *debt;
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(
+                state.accounts_shrink_consumed_budget,
+                debt.saturating_sub(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
+                    .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT),
+                "a large shrink must not defer cleanup for hundreds of roots"
+            );
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(state.accounts_shrink_consumed_budget, 0);
+            state.maintain_accounts_storage().unwrap();
+            assert!(state.accounts_shrink_consumed_budget <= ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
+            assert_eq!(
+                state.bank.accounts().accounts_db.next_write_version(),
+                original_cursor
+            );
+            assert_eq!(
+                state.bank.get_balance(&mint_keypair.pubkey()),
+                original_balance
+            );
+            assert_eq!(state.bank.capitalization(), original_capitalization);
+            assert_eq!(state.bank.last_blockhash(), original_blockhash);
+            assert_eq!(state.bank.hash(), original_bank_hash);
+        }
     }
 
     #[test]
