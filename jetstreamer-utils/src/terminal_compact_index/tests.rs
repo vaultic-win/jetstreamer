@@ -47,6 +47,7 @@ fn plan() -> Plan {
             actors: vec![Actor {
                 unit: "horizon-qualify-original202.service".into(),
                 invocation_id: "a".repeat(32),
+                historical_provenance: None,
             }],
             preserved: vec![Preserved {
                 path: Path::new(PRIVATE).join("qualification-202/output/epoch-202.jet"),
@@ -67,6 +68,103 @@ fn plan() -> Plan {
         remote_mutations: false,
         r2_mutations: false,
     }
+}
+fn collected_actor() -> (Actor, Value) {
+    let mut a = plan().owners.remove(0).actors.remove(0);
+    a.historical_provenance = Some(ActorProvenance {
+        evidence: Evidence {
+            path: "/var/lib/test/original-observation.json".into(),
+            sha256: "c".repeat(64),
+            uid: 0,
+        },
+        unit_json_pointer: "/original/unit".into(),
+        invocation_id_json_pointer: "/original/invocation_id".into(),
+    });
+    let history = json!({"original":{"unit":a.unit,"invocation_id":a.invocation_id}});
+    (a, history)
+}
+#[test]
+fn collected_loaded_actor_requires_exact_historical_provenance_and_explicit_terminal_state() {
+    let (a, history) = collected_actor();
+    let show = include_str!("fixtures/collected-loaded.show");
+    let v = actor_state(&a, show, Some(0), Some(&history)).unwrap();
+    assert_eq!(v["collected_current_invocation"], true);
+    assert!(actor_state(&a, show, Some(1), Some(&history)).is_err());
+    assert!(actor_state(&a, show, Some(0), None).is_err());
+    let mut wrong = history.clone();
+    wrong["original"]["invocation_id"] = json!("b".repeat(32));
+    assert!(actor_state(&a, show, Some(0), Some(&wrong)).is_err());
+    wrong = history.clone();
+    wrong["original"]["unit"] = json!("another.service");
+    assert!(actor_state(&a, show, Some(0), Some(&wrong)).is_err());
+    let mut absent_binding = a;
+    absent_binding.historical_provenance = None;
+    assert!(actor_state(&absent_binding, show, Some(0), Some(&history)).is_err());
+}
+#[test]
+fn true_not_found_show_nonzero_is_accepted_only_with_complete_collected_closure() {
+    let (a, history) = collected_actor();
+    let show = include_str!("fixtures/collected-not-found.show");
+    for exit in [0, 1, 4] {
+        actor_state(&a, show, Some(exit), Some(&history)).unwrap();
+    }
+    for exit in [None, Some(2), Some(5), Some(255)] {
+        assert!(actor_state(&a, show, exit, Some(&history)).is_err());
+    }
+    assert!(actor_state(&a, "", Some(1), Some(&history)).is_err());
+    assert!(
+        actor_state(
+            &a,
+            "Failed to connect to bus: Permission denied\n",
+            Some(1),
+            Some(&history)
+        )
+        .is_err()
+    );
+    for old in [
+        "MainPID=0\n",
+        "ControlPID=0\n",
+        "NRestarts=0\n",
+        "Restart=\n",
+        "Job=\n",
+        "InvocationID=\n",
+    ] {
+        assert!(
+            actor_state(&a, &show.replace(old, ""), Some(1), Some(&history)).is_err(),
+            "missing {old}"
+        );
+    }
+}
+#[test]
+fn replacement_invocations_restart_jobs_live_pids_and_ambiguous_properties_never_qualify() {
+    let (a, history) = collected_actor();
+    let show = include_str!("fixtures/collected-loaded.show");
+    for (old, new) in [
+        (
+            "InvocationID=\n",
+            format!("InvocationID={}\n", "b".repeat(32)),
+        ),
+        ("MainPID=0", "MainPID=42".into()),
+        ("ControlPID=0", "ControlPID=42".into()),
+        ("NRestarts=0", "NRestarts=1".into()),
+        ("Restart=no", "Restart=on-failure".into()),
+        ("Job=\n", "Job=42\n".into()),
+        ("ActiveState=inactive", "ActiveState=active".into()),
+        ("SubState=dead", "SubState=running".into()),
+        ("LoadState=loaded", "LoadState=error".into()),
+    ] {
+        assert!(
+            actor_state(&a, &show.replace(old, &new), Some(0), Some(&history)).is_err(),
+            "{new}"
+        );
+    }
+    assert!(actor_state(&a, &format!("{show}MainPID=0\n"), Some(0), Some(&history)).is_err());
+    let original = show.replace(
+        "InvocationID=\n",
+        &format!("InvocationID={}\n", a.invocation_id),
+    );
+    actor_state(&a, &original, Some(0), None).unwrap();
+    assert!(actor_state(&a, &original, Some(1), None).is_err());
 }
 #[test]
 fn real_headers_use_actual_epoch_cid_network_kind_and_value_width() {
@@ -164,6 +262,17 @@ fn source_archives_actors_and_root_bound_evidence_are_mandatory() {
     assert!(validate_plan(&p).is_err());
     let mut p = plan();
     p.r2_mutations = true;
+    assert!(validate_plan(&p).is_err());
+    let (actor, _) = collected_actor();
+    let mut p = plan();
+    p.owners[0].actors[0] = actor;
+    validate_plan(&p).unwrap();
+    p.owners[0].actors[0]
+        .historical_provenance
+        .as_mut()
+        .unwrap()
+        .evidence
+        .uid = 1000;
     assert!(validate_plan(&p).is_err());
 }
 #[test]

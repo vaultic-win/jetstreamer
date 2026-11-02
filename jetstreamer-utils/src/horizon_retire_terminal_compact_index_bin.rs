@@ -103,6 +103,14 @@ struct Preserved {
 struct Actor {
     unit: String,
     invocation_id: String,
+    historical_provenance: Option<ActorProvenance>,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ActorProvenance {
+    evidence: Evidence,
+    unit_json_pointer: String,
+    invocation_id_json_pointer: String,
 }
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -368,6 +376,17 @@ fn validate_plan(p: &Plan) -> Result<()> {
                     && actor.invocation_id.bytes().all(|b| b.is_ascii_hexdigit()),
                 "invalid terminal actor binding"
             );
+            if let Some(h) = &actor.historical_provenance {
+                ensure!(
+                    h.evidence.uid == 0
+                        && valid_sha(&h.evidence.sha256)
+                        && [&h.unit_json_pointer, &h.invocation_id_json_pointer]
+                            .iter()
+                            .all(|s| s.starts_with('/') && s.len() <= 512)
+                        && h.unit_json_pointer != h.invocation_id_json_pointer,
+                    "historical actor provenance must pin original Root-bound JSON fields"
+                );
+            }
         }
         for f in &owner.preserved {
             ensure!(
@@ -506,42 +525,116 @@ fn systemctl(args: &[&str]) -> Result<String> {
     );
     Ok(String::from_utf8(o.stdout)?)
 }
+fn actor_state(
+    a: &Actor,
+    text: &str,
+    code: Option<i32>,
+    historical: Option<&Value>,
+) -> Result<Value> {
+    let mut s = BTreeMap::new();
+    for line in text.lines() {
+        let (key, value) = line.split_once('=').context("malformed manager row")?;
+        ensure!(s.insert(key, value).is_none(), "duplicate manager property");
+    }
+    let load = s.get("LoadState").copied().context("missing LoadState")?;
+    let active = s
+        .get("ActiveState")
+        .copied()
+        .context("missing ActiveState")?;
+    let sub = s.get("SubState").copied().context("missing SubState")?;
+    let iid = s
+        .get("InvocationID")
+        .copied()
+        .context("missing InvocationID")?;
+    ensure!(
+        ["MainPID", "ControlPID", "NRestarts"]
+            .iter()
+            .all(|k| s.get(k) == Some(&"0"))
+            && s.get("Job").is_some_and(|v| v.is_empty() || *v == "0")
+            && ((active == "inactive" && sub == "dead") || (active == "failed" && sub == "failed")),
+        "actor remains active/restarting/queued or lacks explicit closure properties"
+    );
+    ensure!(
+        iid.is_empty() || iid == a.invocation_id,
+        "replacement nonempty actor invocation"
+    );
+    let collected = iid.is_empty();
+    if load == "not-found" {
+        ensure!(
+            matches!(code, Some(0 | 1 | 4))
+                && active == "inactive"
+                && sub == "dead"
+                && collected
+                && s.get("Restart").is_some_and(|v| v.is_empty() || *v == "no"),
+            "not a positively identified collected not-found actor"
+        );
+    } else {
+        ensure!(
+            load == "loaded" && code == Some(0) && s.get("Restart") == Some(&"no"),
+            "manager query failed or actor is not loaded and non-restartable"
+        );
+        if collected {
+            ensure!(
+                active == "inactive" && sub == "dead",
+                "cleared invocation is not collected inactive/dead"
+            );
+        }
+    }
+    if collected {
+        let h = a
+            .historical_provenance
+            .as_ref()
+            .context("collected actor lacks pinned historical provenance")?;
+        let original =
+            historical.context("collected actor historical evidence was not inspected")?;
+        ensure!(
+            original
+                .pointer(&h.unit_json_pointer)
+                .and_then(Value::as_str)
+                == Some(a.unit.as_str())
+                && original
+                    .pointer(&h.invocation_id_json_pointer)
+                    .and_then(Value::as_str)
+                    == Some(a.invocation_id.as_str()),
+            "historical provenance does not identify this original actor"
+        );
+    }
+    Ok(
+        json!({"unit":a.unit,"original_invocation_id":a.invocation_id,"actual_manager":s,
+        "show_exit_code":code,"collected_current_invocation":collected,
+        "historical_provenance":a.historical_provenance}),
+    )
+}
 fn terminal(p: &Plan) -> Result<Value> {
     let mut states = Vec::new();
     let jobs = systemctl(&["list-jobs", "--no-legend", "--plain"])?;
     for a in p.owners.iter().flat_map(|o| &o.actors) {
-        let text = systemctl(&[
+        let out = Command::new("/usr/bin/systemctl").args([
             "show",
             &a.unit,
+            "--all",
             "--property=LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Restart,Job",
-        ])?;
-        let s: BTreeMap<_, _> = text
-            .lines()
-            .map(|l| l.split_once('=').context("malformed manager row"))
-            .collect::<Result<_>>()?;
+        ]).output()?;
         ensure!(
-            matches!(s.get("ActiveState"), Some(&"inactive" | &"failed"))
-                && matches!(s.get("SubState"), Some(&"dead" | &"failed"))
-                && ["MainPID", "ControlPID", "NRestarts"]
-                    .iter()
-                    .all(|k| s.get(k).is_none_or(|v| *v == "0"))
-                && s.get("Job").is_none_or(|v| v.is_empty()),
-            "actor remains active/restarting/queued"
+            out.stdout.len() as u64 <= LIMIT && out.stderr.len() as u64 <= LIMIT,
+            "manager show output oversized"
         );
-        if s.get("LoadState") != Some(&"not-found") {
-            ensure!(
-                s.get("InvocationID") == Some(&a.invocation_id.as_str())
-                    && s.get("Restart") == Some(&"no"),
-                "original terminal actor replaced/restartable"
-            );
-        }
+        let historical: Option<Value> = a
+            .historical_provenance
+            .as_ref()
+            .map(|h| -> Result<Value> { Ok(serde_json::from_slice(&evidence(&h.evidence)?)?) })
+            .transpose()?;
+        let state = actor_state(
+            a,
+            std::str::from_utf8(&out.stdout)?,
+            out.status.code(),
+            historical.as_ref(),
+        )?;
         ensure!(
             !jobs.split_whitespace().any(|v| v == a.unit),
             "queued terminal actor relaunch"
         );
-        states.push(
-            json!({"unit":a.unit,"original_invocation_id":a.invocation_id,"actual_manager":s}),
-        );
+        states.push(json!({"state":state,"show_stderr":std::str::from_utf8(&out.stderr)?}));
     }
     for root in UNIT_ROOTS {
         if !absent(Path::new(root))? {

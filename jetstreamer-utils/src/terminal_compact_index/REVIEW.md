@@ -78,8 +78,25 @@ changes. No old237 operational scope is imported. Staged symlink bodies,
 systemd masks and device/inode mmap aliases retain that reviewed behavior.
 The source checks for this proposal compare those bodies against the base.
 
-All bound actors must be terminal with no PIDs, restart, queued job or changed
-invocation. Referencing staged recipes fail unless they are the exact original
+All bound actors must be terminal with explicit zero MainPID, ControlPID and
+NRestarts, no restart and no queued job. A loaded actor normally retains its
+exact original invocation ID. A loaded inactive/dead actor with a cleared ID,
+or a genuinely collected not-found/inactive/dead actor, additionally requires
+`historical_provenance`: an existing Root-owned hash-bound JSON evidence file
+and exact JSON pointers to its original unit and invocation ID. This is a pointer
+into genuine original evidence, not a newly invented historical schema. Its
+bytes are inspected and hashed before acceptance. Any replacement nonempty ID
+fails, even when valid old provenance remains available.
+
+`systemctl show --all` status 1 or 4 is accepted only for the complete positive
+not-found/inactive/dead result above, with empty current IID and explicit zero
+PIDs/restarts, empty/no Restart and empty/zero Job. Loaded results still require
+exit 0 and Restart=no. Empty/truncated output, bus/permission failures, other exit
+statuses, missing or duplicate properties and unknown LoadState values fail.
+All staged-recipe, queued-job and live-reference closure checks still run;
+historical evidence never replaces any of them.
+
+Referencing staged recipes fail unless they are the exact original
 direct inert actor entries with pinned bodies. Enabled links, timers and foreign
 recipes fail. Full process command, maps, descriptor, cwd/root/exe checks fail
 closed, including permission failures and renamed inode aliases with closed
@@ -125,15 +142,27 @@ outputs for review; never make room by deleting old targets.
 After admission, use a dedicated absolute `CARGO_TARGET_DIR` and independently
 bound Cargo/rustc/rustdoc images with the repository lockfile:
 
+Set `DOCS_RS=1` for both phases: the existing utils build script otherwise
+attempts a ClickHouse network download and shell execution. That unrelated
+embedding is excluded from this tool. Set `CARGO_BUILD_JOBS=1`,
+`CARGO_INCREMENTAL=0`, `CARGO_PROFILE_DEV_DEBUG=0` and
+`CARGO_PROFILE_TEST_DEBUG=0`. Preserve the resulting build-script output and
+effective environment with the artifact proof. No default or optional utils
+features are enabled. Run the test harness with one test thread.
+
 ```text
-cargo +1.98.0 test --locked --offline -j 1 -p jetstreamer-utils --no-default-features --bin jetstreamer-horizon-retire-terminal-compact-index
+cargo +1.98.0 test --locked --offline -j 1 -p jetstreamer-utils --no-default-features --bin jetstreamer-horizon-retire-terminal-compact-index -- --test-threads=1
 cargo +1.98.0 build --locked --offline -j 1 --release -p jetstreamer-utils --no-default-features --bin jetstreamer-horizon-retire-terminal-compact-index
 ```
 
-There are 12 prepared tests: actual header binding and corruption, exact source
+There are 15 prepared tests: actual header binding and corruption, exact source
 scope, receipt rejection for partial/holding/unreadback evidence, original inode
 receipt binding, reviewed mmap aliases, staged external recipes, custody
 interruption states, and no-clobber rename with a preserved dummy archive.
+The additional synthetic systemctl-format fixtures exercise cleared loaded
+actors, collected not-found status 1/4, pinned history mismatch, replacement IIDs,
+live PIDs, restart/job state, missing/duplicate properties and genuine manager
+errors. They are parser fixtures, not observations of current host actors.
 They have not run. Source-only rustfmt validation is not compilation evidence.
 
 Required later sequence: independent source review; admitted isolated tests and
