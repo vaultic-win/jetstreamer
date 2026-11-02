@@ -64,6 +64,20 @@ start/completion journal. If systemd collects a completed unit, retain the real 
 state and qualify recovery from those original proofs before promoting its result. Recreating
 an idle unit does not restore the historical invocation or prove its execution.
 
+Before an expected completion, check the deployed observer's terminal behavior. A live-only
+primary role can reject a completed or collected producer and suppress the entire next sample.
+Prepare an existing supported terminal-tolerant telemetry route without restarting healthy work.
+If that route uses fallible diagnostic observations, preserve the original invocation, complete
+unit census, memory and growth reservations until genuine terminal evidence establishes closure.
+An unavailable diagnostic or missing primary row does not establish completion or free capacity.
+Keep active work's status current through a compatible publisher or the authorized status-only
+fallback; never rewrite an observer receipt or invent a diagnostic claim to satisfy a consumer.
+If fleet accounting cannot consume that role, retain an explicit qualified capacity supplement
+and do not use an incomplete lane count to authorize admission. Bind the actual terminal journal,
+committed publication receipt and downstream owner before handing off delivery. Check the exact
+producer's post-commit cleanup before adding a separate cleaner; credit only actual closed-owner
+resource evidence, preserving archives, inputs and receipts.
+
 Choose the desired lane count from memory alone, targeting 90% of total host memory used. Estimate
 the marginal lane RSS from this century's observations, subtract measured non-lane usage once, and
 update the count from actual host usage at the regular observation. Track the difference between
