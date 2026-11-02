@@ -1,10 +1,17 @@
-//! Lossless resource adapters for the closed 207 full epoch and 233 first root.
+//! Lossless resource adapters for exact private peers and ordinary cohort replay.
 //! No historical view may erase one of these owners or grant allocation credit.
 use super::{full_root_demotion223_live_peer as base, *};
+mod general;
 mod legacy_memory;
+pub(super) fn general_guard_selector(name: &str) -> Option<(&'static str, &'static str)> {
+    general::selector(name)
+}
 #[cfg(test)]
 pub(super) use base::fixture_row;
-pub(super) use legacy_memory::validate_saved_row;
+pub(super) fn validate_saved_row(row: &Value) -> Result<()> {
+    legacy_memory::validate_saved_row(row)?;
+    general::validate_saved_row(row)
+}
 fn profile(name: &str) -> Option<(u64, &'static str)> {
     match name {
         singleton207::UNIT => Some((207, "private-full-epoch-qualification")),
@@ -58,7 +65,7 @@ fn without(f: &Value) -> Result<Value> {
         .as_array_mut()
         .context("closed peer census")?
         .retain(|r| !selected(r));
-    Ok(copy)
+    general::without(&copy)
 }
 fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
     let u = singleton227_admission::active_owner(row)?;
@@ -92,6 +99,9 @@ fn claim(f: &Value, row: &Value) -> Result<(DiagnosticClaim, Value)> {
 }
 pub(super) fn roster(f: &Value) -> Result<BTreeSet<String>> {
     let mut names = base::roster(&without(f)?)?;
+    for name in general::names(f)? {
+        ensure!(names.insert(name), "ordinary peer duplicate roster owner");
+    }
     for row in rows(f)? {
         let name = singleton227_admission::active_owner(row)?["Id"]
             .as_str()
@@ -234,6 +244,11 @@ pub(super) fn disk(
         proof.push(json!({"epoch":d.epoch,"unit":d.unit,"invocation_id":d.invocation_id,
             "remaining_growth_bytes":budget,"scratch_growth_credit_bytes":0,"guard":private157::binding(&gb),"source":"full conservative closed-owner reservation"}));
     }
+    let (ordinary, ordinary_proof) = general::disk(f, &mut rest, sample, now)?;
+    extra = extra
+        .checked_add(ordinary)
+        .context("ordinary peer combined disk overflow")?;
+    proof.extend(ordinary_proof);
     let (n, more) = base::disk(&without(f)?, o, &rest, sample, now)?;
     proof.extend(more);
     Ok((
@@ -287,6 +302,11 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
             "remaining_hard_memory_growth_bytes":growth}),
         );
     }
+    let (ordinary, ordinary_proof) = general::memory(f)?;
+    extra = extra
+        .checked_add(ordinary)
+        .context("ordinary peer combined memory overflow")?;
+    proof.extend(ordinary_proof);
     let (n, more) = base::memory(&without(f)?)?;
     proof.extend(more);
     legacy_memory::complete(
@@ -299,6 +319,19 @@ pub(super) fn memory(f: &Value) -> Result<(u64, Vec<Value>)> {
 pub(super) fn limits(f: &Value) -> Result<Value> {
     roster(f)?;
     let mut result = base::limits(&without(f)?)?;
+    for (name, caps) in general::limits(f)?
+        .as_object()
+        .context("ordinary peer caps object")?
+    {
+        ensure!(
+            result
+                .as_object_mut()
+                .context("closed peer caps object")?
+                .insert(name.clone(), caps.clone())
+                .is_none(),
+            "ordinary peer cap collision"
+        );
+    }
     for row in rows(f)? {
         let (d, _) = claim(f, row)?;
         live(&d, singleton227_admission::active_owner(row)?)?;
@@ -321,6 +354,7 @@ pub(super) fn limits(f: &Value) -> Result<Value> {
 }
 pub(super) fn current(f: &Value, census: &BTreeMap<String, Value>) -> Result<()> {
     roster(f)?;
+    general::current(f, census)?;
     base::current(&without(f)?, census)?;
     for row in rows(f)? {
         let (d, _) = claim(f, row)?;

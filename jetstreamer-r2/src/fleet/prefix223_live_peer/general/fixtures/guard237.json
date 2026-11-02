@@ -1,0 +1,65 @@
+{
+  "available_bytes": 1350280253440,
+  "bounded_canary": null,
+  "bounded_measurement": false,
+  "canary_target_error": null,
+  "canary_target_stop_valid": false,
+  "guard_invocation_id": "05527a2fbaa94bc59ba01e98b40d7c33",
+  "guard_sha256": "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f",
+  "maximum_root_physical_bytes": 620000000000,
+  "maximum_worker_vmas": 3500000,
+  "minimum_free_bytes": 749249191922,
+  "native_main": null,
+  "plan": "/var/lib/jetstreamer/horizon-237-budget620-guard-bound-v2/guard-plan.json",
+  "plan_sha256": "97c5791aafe0f930c867ae857d4aa6f9a505fc2065ad7fb14fbb92c8b04b9702",
+  "producer": {
+    "active": "active",
+    "cgroup": "/system.slice/horizon-qualify-237-general-target1-budget620-v2.service",
+    "delegated": false,
+    "invocation_id": "3949b88a4ca34fc892a19f219cebd476",
+    "kill_mode": "control-group",
+    "load_state": "loaded",
+    "pid": 2030542,
+    "restart_policy": "no",
+    "restarts": 0,
+    "result": "success",
+    "sub": "running"
+  },
+  "producer_invocation_id": "3949b88a4ca34fc892a19f219cebd476",
+  "producer_stop_enabled": true,
+  "r2_mutations": false,
+  "recorded_unix_seconds": 1793568782,
+  "remote_mutations": false,
+  "root_physical_observation": {
+    "conservative_physical_bytes": 22033362944,
+    "exceeds_budget": false,
+    "first": {
+      "directories": 23,
+      "entries": 112786,
+      "physical_bytes": 21798076416,
+      "symlinks": 0,
+      "vanished_entries": 0
+    },
+    "maximum_physical_bytes": 620000000000,
+    "second": {
+      "directories": 23,
+      "entries": 115363,
+      "physical_bytes": 22033362944,
+      "symlinks": 0,
+      "vanished_entries": 0
+    }
+  },
+  "root_physical_observation_error": null,
+  "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+  "scratch_deleted": false,
+  "target_handoff": null,
+  "target_handoff_error": null,
+  "trip_reason": null,
+  "worker_observation_error": null,
+  "workers": [
+    [
+      2030971,
+      76
+    ]
+  ]
+}

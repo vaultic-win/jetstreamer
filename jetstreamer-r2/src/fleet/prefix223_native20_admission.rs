@@ -97,6 +97,9 @@ pub(super) fn owners(f: &Value, current: &BTreeMap<String, Value>, candidate: bo
     Ok(())
 }
 pub(super) fn guard_selector(name: &str) -> Result<(&'static str, &'static str)> {
+    if let Some(profile) = prefix223_live_peer::general_guard_selector(name) {
+        return Ok(profile);
+    }
     Ok(match name {
         "horizon-qualify-225-natural-root-resource-shrink-budget-2f856bd-v1.service" => (
             "horizon-ownroot225-protective-v1.service",

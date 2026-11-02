@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+  "unit": "horizon-qualify-237-general-target1-budget620-v2.service",
+  "invocation_id": "3949b88a4ca34fc892a19f219cebd476",
+  "filesystem": "/",
+  "minimum_free_bytes": 749249191922,
+  "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2",
+  "maximum_worker_vmas": 3500000,
+  "maximum_root_physical_bytes": 620000000000,
+  "receipt_directory": "/var/lib/jetstreamer/horizon-237-budget620-guard-receipts-v2"
+}

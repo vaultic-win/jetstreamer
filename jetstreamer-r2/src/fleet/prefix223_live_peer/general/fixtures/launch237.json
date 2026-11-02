@@ -1,0 +1,49 @@
+{
+  "schema": "operator-ordinary237-budget620-actual-launch-v2",
+  "epoch": 237,
+  "launched": true,
+  "evidence": {
+    "units": [
+      {
+        "unit": "horizon-qualify-237-general-target1-budget620-v2.service",
+        "invocation_id": "3949b88a4ca34fc892a19f219cebd476"
+      }
+    ]
+  },
+  "manager": {
+    "Id": "horizon-qualify-237-general-target1-budget620-v2.service",
+    "LoadState": "loaded",
+    "ActiveState": "active",
+    "SubState": "running",
+    "InvocationID": "3949b88a4ca34fc892a19f219cebd476",
+    "Restart": "no",
+    "MainPID": "2030542",
+    "NRestarts": "0",
+    "ExecMainStartTimestamp": "Sun 2026-11-01 21:32:01 UTC",
+    "ExecMainStartTimestampMonotonic": "2522494655490",
+    "ExecStart": "{ path=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node 237 /home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/preflight-233-301-target1-offline-publish300.json --cohort-manifest-fingerprint=sha256:3f0e03105ba1e6b166091d3519e1aea1f432d81e51044c3a35f49fb3e8991970 --snapshot-archive=/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/snapshot-102383737-59seMYbTe6MBQPFhEJFcbK3J3wfwBGs6NubdbFQED6UN.tar.zst ; ignore_errors=no ; start_time=[Sun 2026-11-01 21:32:01 UTC] ; stop_time=[n/a] ; pid=2030542 ; code=(null) ; status=0/0 }",
+    "ControlGroup": "/system.slice/horizon-qualify-237-general-target1-budget620-v2.service",
+    "CPUQuotaPerSecUSec": "8s",
+    "AllowedCPUs": "16-31",
+    "MemoryHigh": "150000000000",
+    "MemoryMax": "225000000000",
+    "MemorySwapMax": "0",
+    "LimitFSIZE": "infinity",
+    "CPUAffinity": "16-31",
+    "ReadWritePaths": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2",
+    "ProtectHome": "read-only",
+    "ProtectSystem": "strict"
+  },
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon-237-budget620-preparation-v2/launch-admission.json",
+    "sha256": "6599260a225e9b0794e6d17814afb19e0dfd08e1d06df11eb5817b9d93f2e151"
+  },
+  "resource_review": {
+    "path": "/var/lib/jetstreamer/horizon-237-budget620-prelaunch-v2/resource-review.json",
+    "sha256": "e345d88a933896a1f83472e11decc038018fe8f278079e13f9556e3d96cb3cd5"
+  },
+  "private_output_only": true,
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "guard_first_fire_still_required": true
+}

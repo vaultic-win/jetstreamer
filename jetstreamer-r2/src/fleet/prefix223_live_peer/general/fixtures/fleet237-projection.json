@@ -1,0 +1,167 @@
+{
+  "schema": "test-only-retained731-projection-not-an-accepted-fleet",
+  "active": [
+    {
+      "controller": {
+        "ActiveState": "active",
+        "ControlGroup": "/system.slice/horizon-qualify-237-general-target1-budget620-v2.service",
+        "ExecMainStatus": "0",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node 237 /home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/preflight-233-301-target1-offline-publish300.json --cohort-manifest-fingerprint=sha256:3f0e03105ba1e6b166091d3519e1aea1f432d81e51044c3a35f49fb3e8991970 --snapshot-archive=/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/snapshot-102383737-59seMYbTe6MBQPFhEJFcbK3J3wfwBGs6NubdbFQED6UN.tar.zst ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "Id": "horizon-qualify-237-general-target1-budget620-v2.service",
+        "InvocationID": "3949b88a4ca34fc892a19f219cebd476",
+        "LoadState": "loaded",
+        "MainPID": "2030542",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "running",
+        "Type": "exec"
+      },
+      "epoch": 237,
+      "phase": "replay",
+      "producer": {
+        "ActiveState": "active",
+        "ControlGroup": "/system.slice/horizon-qualify-237-general-target1-budget620-v2.service",
+        "ExecMainStatus": "0",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node 237 /home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/preflight-233-301-target1-offline-publish300.json --cohort-manifest-fingerprint=sha256:3f0e03105ba1e6b166091d3519e1aea1f432d81e51044c3a35f49fb3e8991970 --snapshot-archive=/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/snapshot-102383737-59seMYbTe6MBQPFhEJFcbK3J3wfwBGs6NubdbFQED6UN.tar.zst ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "Id": "horizon-qualify-237-general-target1-budget620-v2.service",
+        "InvocationID": "3949b88a4ca34fc892a19f219cebd476",
+        "LoadState": "loaded",
+        "MainPID": "2030542",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "running",
+        "Type": "exec"
+      },
+      "sampled_at_utc": "2026-11-02T05:58:29Z",
+      "scratch_path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/scratch",
+      "useful_work": {
+        "account_update_delta": 18622956,
+        "account_updates_per_second": 10044.244936061246,
+        "counter_resets": 0,
+        "elapsed_seconds": 1854.092181,
+        "first": {
+          "account_updates": 270878644,
+          "realtime_microseconds": 1793597254350146,
+          "slot": 102458164,
+          "terminal_slot": 102815999,
+          "transactions": 99197848
+        },
+        "journal_invocation_id": "3949b88a4ca34fc892a19f219cebd476",
+        "last": {
+          "account_updates": 289501600,
+          "realtime_microseconds": 1793599108442327,
+          "slot": 102463382,
+          "terminal_slot": 102815999,
+          "transactions": 106040670
+        },
+        "matching_markers": 619,
+        "since_unix_seconds": 1793597252,
+        "slot_delta": 5218,
+        "slots_per_second": 2.814315303991889,
+        "sufficient_for_rates": true,
+        "transaction_delta": 6842822,
+        "transactions_per_second": 3690.65900289237,
+        "until_unix_seconds": 1793599109
+      }
+    }
+  ],
+  "unit_census": {
+    "horizon-qualify-237-general-target1-budget620-v2.service": {
+      "ActiveState": "active",
+      "ControlGroup": "/system.slice/horizon-qualify-237-general-target1-budget620-v2.service",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/jetstreamer-node 237 /home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/preflight-233-301-target1-offline-publish300.json --cohort-manifest-fingerprint=sha256:3f0e03105ba1e6b166091d3519e1aea1f432d81e51044c3a35f49fb3e8991970 --snapshot-archive=/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/snapshot-102383737-59seMYbTe6MBQPFhEJFcbK3J3wfwBGs6NubdbFQED6UN.tar.zst ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "Id": "horizon-qualify-237-general-target1-budget620-v2.service",
+      "InvocationID": "3949b88a4ca34fc892a19f219cebd476",
+      "LoadState": "loaded",
+      "MainPID": "2030542",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "running",
+      "Type": "exec"
+    }
+  },
+  "epochs": [
+    {
+      "epoch": 237,
+      "gate_evidence": [
+        {
+          "path": "/var/lib/jetstreamer/horizon-campaign-fleet/20261019T140442Z/fleet-ledger.json",
+          "sha256": "6f236d2fbf36d9c29f7e6d6bc69e44e62836be92d9718e2e86603abb57375561"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-singleton-capability-v1/capability.json",
+          "sha256": "5eb6f889f8c39564b605deab24a037486d142558a564a4609d2908844c375f1b"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-general-target1-launch-bound-v1/launch.json",
+          "sha256": "4d5bfa694fd532bdf4d5553869f3616a9b6370d61c3c0944af2bb3459692e3bb"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-general-target1-operational-handoff-v1/first-fire.json",
+          "sha256": "5de20eceac1cec4d5980a59d2d8057a678fc100897b564c7918e14c6e59fae0a"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-replay-launch-status-event-v1/completion.json",
+          "sha256": "24a72c69a3becd0658eb0206f7877309d24a921eb8fd54ae6360a6a750c3c0b9"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-guard-stop-discovered-cycle717-v1/terminal-evidence.json",
+          "sha256": "626cf18776763ad9ba2edaf6fd32b206aa7d6c95eb6e345a5f0546712d49f93a"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-guard-stop-discovered-cycle717-v1/guard-stop-binding.json",
+          "sha256": "9a19047b426a38d94f7eebcbade6760e46104d7d9f14a1e3ef70cf330a17a204"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-guard-stop-discovered-cycle717-v1/status-completion.json",
+          "sha256": "d8df081c7e85c1ccd5beb04fef7bcffda2e9e407f64adc5499eedd074ec6b5b9"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-campaign-fleet/normal-cycle717-v1/fleet.json",
+          "sha256": "4b22b2c875e2e3cc1d8f9f7927bcac262b9b8563353c2a74635beef484cbbb02"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-budget620-preparation-v2/actual-launch.json",
+          "sha256": "9647e8c4e7989c6ca3909b83cf11f77a0a2eb5e1e69dce87067ba01526645bb6"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-budget620-operational-handoff-v2/first-fire.json",
+          "sha256": "14f0c42a454912c8ebd568ef651688570452d286114a2daee4f32278931288a2"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-budget620-initial-status-v2/completion.json",
+          "sha256": "a48e83d9d9603cf45acdf4ba1634ca51343e749c75420d6b15a34daa021b5766"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-237-budget620-owner-transition-v2/event.json",
+          "sha256": "b3f2b87f505aa941010fe3f8f76f6b5866f96c7b089d748b5052c8e389b504af"
+        },
+        {
+          "path": "/home/ubuntu/workspace/horizon-cycle720-observer-duplicate-correction-v3/original-failure.json",
+          "sha256": "647143234da8553331350bbaff8a2e56271f4577f4c155a92031236a356eac3a"
+        }
+      ],
+      "next_action": "Complete replay and canonical checkpoint, then import and dispatch receipt-gated verification",
+      "state": "live-replay",
+      "status": {
+        "classification": "bound-live-status",
+        "current_eta_valid": true,
+        "etag": "16014d487cd038794c15a4c2eed12809",
+        "key": "epoch-237.epoch-status.json",
+        "owner_binding_matches": true,
+        "payload": {
+          "elapsed_execution_millis": 30388000,
+          "epoch": 237,
+          "estimated_remaining_millis": 190094064,
+          "jet_size_bytes": 32496638372,
+          "phase": "replay",
+          "sampled_at_utc": "2026-11-02T05:58:29Z"
+        },
+        "production_claim_eligible": true,
+        "sample_matches_observer": true,
+        "sha256": "dfb17063ac1ca4a1a9cc20a04d4f8119332496cdd205fbcc1ef16e036444365e"
+      }
+    }
+  ]
+}

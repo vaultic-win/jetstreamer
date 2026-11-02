@@ -22,6 +22,10 @@ pub(super) fn active_owner(row: &Value) -> Result<&Value> {
     match (row.get("producer"), row.get("unit"), row.get("controller")) {
         (Some(p), None, None) => Ok(p),
         (None, Some(p), None) => Ok(p),
+        // Ordinary root-cohort observation records the same actor in both
+        // roles. Equality of the complete manager objects proves an alias,
+        // without hiding a separate controller or granting profile admission.
+        (Some(p), None, Some(c)) if p == c && row["phase"] == "replay" => Ok(p),
         _ => anyhow::bail!(
             "227 unsupported/ambiguous active owner; reconcile its full envelope first"
         ),
@@ -611,10 +615,12 @@ fn owners_inner(
     let old = f["unit_census"]
         .as_object()
         .context("227 predecessor census")?;
-    full_root_demotion223_live_peer::current_guards(f,current)?;
+    full_root_demotion223_live_peer::current_guards(f, current)?;
     demotion223_live_peer::current_guards(f, current)?;
     let mut active = demotion223_live_peer::accepted_guard_names(f)?;
-    for name in full_root_demotion223_live_peer::accepted_guard_names(f)? {ensure!(active.insert(name),"duplicate protected repair guard");}
+    for name in full_root_demotion223_live_peer::accepted_guard_names(f)? {
+        ensure!(active.insert(name), "duplicate protected repair guard");
+    }
     for row in f["active"].as_array().context("227 active owners")? {
         let p = active_owner(row)?;
         let unit = p["Id"].as_str().context("227 owner name")?;
