@@ -1,3 +1,5 @@
+> Historical v3 contract below. The continuous v4 successor in this overlay supersedes its prior-bracket requirement; follow [the continuous causal-to-root preparation](epoch223-continuous-causal-root-source.md). No sealed historical artifact is modified.
+
 # Separate epoch 223 full-root source
 
 This is unbuilt, unqualified source. No new harness, worker, capability, guard,

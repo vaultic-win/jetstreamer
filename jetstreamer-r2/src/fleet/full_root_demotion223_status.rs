@@ -4,39 +4,19 @@ use super::*;
 use std::os::unix::fs::PermissionsExt;
 mod model;
 mod resource;
-mod bracket_checks {
-    include!("../../../historical-runtime/epoch223_bracket_proof.rs");
+mod causal_checks {
+    include!("../../../historical-runtime/epoch223_continuous_causal_basis.rs");
 }
 fn future_harness(v: &Value) -> bool {
     canonical_digest(v)
         && v != "a280b1f48f0bb430c482e01a03b4b800ee8f95f326590059e4cdf4873b14a22b"
         && v != "0".repeat(64)
 }
-pub(super) fn prior_bracket(runtime: &Value) -> Result<()> {
-    let binding: BoundFile = serde_json::from_value(runtime["bracket_proof"].clone())?;
-    let p = bound_json(&binding)?;
-    let get = |key: &str| -> Result<BoundFile> { Ok(serde_json::from_value(p[key].clone())?) };
-    let task = bound_json(&get("task")?)?;
-    let result = bound_json(&get("result")?)?;
-    let journal_binding = get("journal")?;
-    let journal = read_stable_bounded(
-        &journal_binding.path,
-        16 << 20,
-        "full-root prior bracket journal",
-    )?;
-    ensure!(
-        hex_lower(&Sha256::digest(&journal)) == journal_binding.sha256,
-        "prior bracket raw journal digest differs"
-    );
-    bracket_checks::validate(
-        &p,
-        &task,
-        &result,
-        &journal,
-        &bound_json(&get("role_qualification")?)?,
-        &bound_json(&get("capture_spec")?)?,
-    )
-    .map_err(anyhow::Error::msg)
+pub(super) fn causal_basis(runtime: &Value) -> Result<()> {
+    let binding: BoundFile = serde_json::from_value(runtime["canonical_diagnosis"].clone())?;
+    ensure!(binding.sha256 == causal_checks::DIAGNOSIS_SHA256,
+        "continuous root canonical diagnosis digest differs");
+    causal_checks::validate(&bound_json(&binding)?).map_err(anyhow::Error::msg)
 }
 use model::{ORIGIN_IID, ORIGIN_UNIT, Policy, Progress};
 const CLAIM: &str = "epoch223-full-root-demotion-repair";
@@ -467,7 +447,7 @@ pub(super) fn capture() -> Result<()> {
 fn validate_task_value(t: &Task) -> Result<()> {
     actor_shape(&t.actor, &t.job_kind, &t.runtime_plan)?;
     let runtime = bound_json(&t.runtime_plan)?;
-    prior_bracket(&runtime)?;
+    causal_basis(&runtime)?;
     ensure!(
         t.run_root == runtime_root(&runtime, &t.job_kind)?
             && t.run_root_device > 0
@@ -535,7 +515,7 @@ fn validate_task_value(t: &Task) -> Result<()> {
     if t.job_kind == "native-input" {
         ensure!(
             runtime["schema"]
-                == "jetstreamer-epoch223-full-root-demotion-native-supervisor-plan-v1"
+                == "jetstreamer-epoch223-continuous-root-demotion-native-supervisor-plan-v2"
                 && runtime["unit"] == t.actor.unit
                 && runtime["bootstrap_slot"] == 96_335_538u64
                 && future_harness(&runtime["harness"]["sha256"])
@@ -545,7 +525,7 @@ fn validate_task_value(t: &Task) -> Result<()> {
         );
     } else {
         ensure!(
-            runtime["schema"] == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+            runtime["schema"] == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
                 && runtime["mode"] == "full-root"
                 && runtime["plan"]["unit"] == t.actor.unit
                 && runtime["plan"]["terminal_slot"] == 96_767_522u64
@@ -708,7 +688,7 @@ fn guard_for(t: &Task) -> Result<Actor> {
     let plan: BoundFile = serde_json::from_value(value["guard_plan"].clone())?;
     let body = bound_json(&plan)?;
     let runtime = bound_json(&t.runtime_plan)?;
-    prior_bracket(&runtime)?;
+    causal_basis(&runtime)?;
     let floor = if t.job_kind == "native-input" {
         &runtime["local_floor_bytes"]
     } else {

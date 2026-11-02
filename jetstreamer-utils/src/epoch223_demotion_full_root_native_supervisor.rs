@@ -8,7 +8,7 @@ const TEST: &str =
 #[serde(deny_unknown_fields)]
 struct Plan {
     schema: String,
-    bracket_proof: BoundFile,
+    canonical_diagnosis: BoundFile,
     capability: BoundFile,
     unit: String,
     harness: BoundFile,
@@ -256,9 +256,9 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     configured_artifacts()?;
     capability::validate(&plan.capability)?;
     worker_qualification(&plan.source_qa)?;
-    bracket_proof::validate(&plan.bracket_proof)?;
+    canonical_diagnosis::validate(&plan.canonical_diagnosis)?;
     ensure!(
-        plan.schema == "jetstreamer-epoch223-full-root-demotion-native-supervisor-plan-v1"
+        plan.schema == "jetstreamer-epoch223-continuous-root-demotion-native-supervisor-plan-v2"
             && plan.harness.sha256 == HARNESS
             && plan.snapshot.sha256 == SNAPSHOT
             && plan.genesis.sha256 == GENESIS
@@ -529,9 +529,9 @@ pub(super) fn guard_context(binding: &BoundFile) -> Result<GuardContext> {
     configured_artifacts()?;
     capability::validate(&plan.capability)?;
     worker_qualification(&plan.source_qa)?;
-    bracket_proof::validate(&plan.bracket_proof)?;
+    canonical_diagnosis::validate(&plan.canonical_diagnosis)?;
     ensure!(
-        plan.schema == "jetstreamer-epoch223-full-root-demotion-native-supervisor-plan-v1"
+        plan.schema == "jetstreamer-epoch223-continuous-root-demotion-native-supervisor-plan-v2"
             && plan.harness.sha256 == HARNESS
             && plan.bootstrap_slot == 96_335_538,
         "223 native guard plan purpose differs"
@@ -576,7 +576,7 @@ pub(super) fn issue(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     configured_artifacts()?;
     capability::validate(&plan.capability)?;
     worker_qualification(&plan.source_qa)?;
-    bracket_proof::validate(&plan.bracket_proof)?;
+    canonical_diagnosis::validate(&plan.canonical_diagnosis)?;
     let context = guard_context(&spec.runtime_plan)?;
     ensure!(
         plan.issuer_executable == *executable

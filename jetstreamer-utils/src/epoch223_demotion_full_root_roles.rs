@@ -30,7 +30,6 @@ pub(super) fn dispatch() -> Option<Result<()>> {
     if !matches!(
         role,
         "capture-epoch223-full-root-demotion-capability"
-            | "capture-epoch223-full-root-demotion-bracket-proof"
             | "capture-epoch223-full-root-origin"
             | "capture-epoch223-full-root-task"
             | "guard-epoch223-full-root-demotion"
@@ -68,9 +67,6 @@ fn run(args: &[String]) -> Result<()> {
     match args[1].as_str() {
         "capture-epoch223-full-root-demotion-capability" => {
             super::capability::capture(&binding, &executable)?
-        }
-        "capture-epoch223-full-root-demotion-bracket-proof" => {
-            super::bracket_proof::capture(&binding, &executable)?
         }
         "issue-epoch223-full-root-demotion-native" => {
             super::native_supervisor::issue(&binding, &executable)?
@@ -133,13 +129,13 @@ fn run(args: &[String]) -> Result<()> {
                     .as_ref()
                     .context("full-root worker qualification missing")?,
             )?;
-            bracket_proof::validate(
-                plan.bracket_proof
+            canonical_diagnosis::validate(
+                plan.canonical_diagnosis
                     .as_ref()
-                    .context("full-root requires genuine prior bracket proof")?,
+                    .context("continuous root requires the exact retained canonical diagnosis")?,
             )?;
             ensure!(
-                plan.schema == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+                plan.schema == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
                     && plan.mode == "full-root"
                     && plan.plan.unit == spec.runner.unit
                     && spec

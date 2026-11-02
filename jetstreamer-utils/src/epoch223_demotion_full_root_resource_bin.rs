@@ -197,10 +197,16 @@ mod bounded {
                 "target_slot":TARGET,"terminal_slot":TERMINAL,"minimum_free_bytes":1,"maximum_runtime_seconds":MAX_RUNTIME});
             let p: Plan = serde_json::from_value(plan.clone()).unwrap();
             validate_plan(&p).unwrap();
-            let capability = json!({"schema":"jetstreamer-epoch223-full-root-demotion-runtime-plan-v3","mode":"capability","plan":plan});
+            let capability = json!({"schema":"jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4","mode":"capability","plan":plan});
             FullRoot::new()
                 .decode_plan(&serde_json::to_vec(&capability).unwrap())
                 .unwrap();
+            let mut old_schema = capability.clone();
+            old_schema["schema"] = json!("jetstreamer-epoch223-full-root-demotion-runtime-plan-v3");
+            assert!(FullRoot::new().decode_plan(&serde_json::to_vec(&old_schema).unwrap()).is_err());
+            let mut borrowed_bracket = capability.clone();
+            borrowed_bracket["bracket_proof"] = json!({"path":"/sealed/old-proof","sha256":"a".repeat(64)});
+            assert!(FullRoot::new().decode_plan(&serde_json::to_vec(&borrowed_bracket).unwrap()).is_err());
             let mut missing = capability.clone();
             missing["mode"] = json!("full-root");
             assert!(

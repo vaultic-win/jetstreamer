@@ -49,8 +49,8 @@ const HARNESS: &str = FULL_ROOT_HARNESS;
 mod capability {
     include!("epoch223_demotion_full_root_capability.rs");
 }
-mod bracket_proof {
-    include!("epoch223_demotion_full_root_bracket_proof.rs");
+mod canonical_diagnosis {
+    include!("epoch223_demotion_continuous_causal_basis.rs");
 }
 fn configured_artifacts() -> Result<()> {
     ensure!(
@@ -117,7 +117,7 @@ pub(super) struct RuntimePlan {
     mode: String,
     pub plan: Plan,
     prerequisites: Option<Prerequisites>,
-    bracket_proof: Option<BoundFile>,
+    canonical_diagnosis: Option<BoundFile>,
     worker_qualification: Option<BoundFile>,
     capability: Option<BoundFile>,
 }
@@ -706,14 +706,14 @@ impl Runtime {
     pub fn decode(&self, bytes: &[u8]) -> Result<Plan> {
         let r: RuntimePlan = serde_json::from_slice(bytes)?;
         ensure!(
-            r.schema == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+            r.schema == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
                 && ((r.mode == "capability"
                     && r.prerequisites.is_none()
-                    && r.bracket_proof.is_none()
+                    && r.canonical_diagnosis.is_none()
                     && r.worker_qualification.is_none()
                     && r.capability.is_none())
                     || (r.mode == "full-root"
-                        && r.bracket_proof.is_some()
+                        && r.canonical_diagnosis.is_some()
                         && r.worker_qualification.is_some()
                         && r.capability.is_some()
                         && r.prerequisites
@@ -766,10 +766,10 @@ impl Runtime {
                 .as_ref()
                 .context("full-root worker source qualification absent")?,
         )?;
-        bracket_proof::validate(
-            r.bracket_proof
+        canonical_diagnosis::validate(
+            r.canonical_diagnosis
                 .as_ref()
-                .context("full-root genuine prior bracket proof absent")?,
+                .context("continuous root canonical diagnosis absent")?,
         )?;
         let x = r
             .prerequisites
@@ -1344,7 +1344,7 @@ mod tests {
                 .decode(&serde_json::to_vec(&base).unwrap())
                 .is_err()
         );
-        let envelope = json!({"schema":"jetstreamer-epoch223-full-root-demotion-runtime-plan-v3","mode":"capability","plan":base,"prerequisites":null});
+        let envelope = json!({"schema":"jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4","mode":"capability","plan":base,"prerequisites":null});
         let runtime = Runtime::new();
         runtime
             .decode(&serde_json::to_vec(&envelope).unwrap())
@@ -1379,7 +1379,7 @@ mod tests {
         DiskStorage
             .decode_plan(&serde_json::to_vec(&base).unwrap())
             .unwrap();
-        let envelope = json!({"schema":"jetstreamer-epoch223-full-root-demotion-runtime-plan-v3","mode":"capability","plan":base,"prerequisites":null});
+        let envelope = json!({"schema":"jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4","mode":"capability","plan":base,"prerequisites":null});
         assert!(
             DiskStorage
                 .decode_plan(&serde_json::to_vec(&envelope).unwrap())

@@ -1,6 +1,9 @@
 // Proof capture from actual new harness output and terminal manager evidence.
 // This role never launches a harness or promotes an old cold-input proof.
 use super::*;
+mod terminal {
+    include!("epoch223_demotion_native_terminal.rs");
+}
 const TEST: &str =
     "runtime::tests::native_epoch223_cold_input_matches_canonical_accounts_commitment";
 const SOURCE: &str = "551728fda72afd36ce6f8652ddb0020ec249e860";
@@ -140,47 +143,6 @@ fn output_valid(bytes: &[u8]) -> Result<Tuple> {
     );
     observed_tuple(&actual_marker, passed, ignored)
 }
-fn journal_valid(bytes: &[u8], actor: &Actor) -> Result<()> {
-    let (mut start, mut terminal) = (None, None);
-    for (index, row) in serde_json::Deserializer::from_slice(bytes)
-        .into_iter::<Value>()
-        .enumerate()
-    {
-        let row = row?;
-        if row["_PID"] != "1"
-            || row["UNIT"] != actor.unit
-            || row["INVOCATION_ID"] != actor.invocation_id
-        {
-            continue;
-        }
-        let message = row["MESSAGE"]
-            .as_str()
-            .context("223 native PID1 journal message")?;
-        if message.starts_with(&format!("Started {} - ", actor.unit)) {
-            ensure!(
-                start.replace(index).is_none(),
-                "223 duplicate native PID1 start"
-            );
-        }
-        if message == format!("{}: Deactivated successfully.", actor.unit) {
-            ensure!(
-                terminal.replace(index).is_none(),
-                "223 duplicate native PID1 success"
-            );
-        }
-        ensure!(
-            !message.contains("Failed")
-                && !message.contains("Main process exited")
-                && !message.contains("Scheduled restart job"),
-            "223 native manager failure/restart observed"
-        );
-    }
-    ensure!(
-        start.zip(terminal).is_some_and(|(s, t)| s < t),
-        "223 actual native PID1 clean completion missing"
-    );
-    Ok(())
-}
 pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let spec: Spec = read_bound(binding)?;
     ensure!(
@@ -265,10 +227,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             && launch.snapshot.path
                 == Path::new("/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1")
                     .join(SNAPSHOT_NAME)
-            && launch.genesis.path
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1/genesis.bin"
-                ),
+            && native_genesis_archive_matches(&launch.genesis),
         "223 native launch boot or actual pinned input paths differ"
     );
     bound_file(
@@ -294,46 +253,21 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let stdout = bound_bytes(&result.harness_stdout, 0, 64 << 20)?;
     let tuple = output_valid(&stdout)?;
     let journal = bound_bytes(&spec.journal, 0, 16 << 20)?;
-    journal_valid(&journal, &launch.supervisor)?;
-    let keys = "Id,InvocationID,NRestarts,MainPID,ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,Type,User,Restart,ExecStart";
-    let terminal = properties_with(&launch.supervisor.unit, keys)?;
-    for (key, value) in [
-        ("Id", launch.supervisor.unit.as_str()),
-        ("InvocationID", launch.supervisor.invocation_id.as_str()),
-        ("NRestarts", "0"),
-        ("MainPID", "0"),
-        ("ActiveState", "inactive"),
-        ("SubState", "dead"),
-        ("Result", "success"),
-        ("ExecMainCode", "1"),
-        ("ExecMainStatus", "0"),
-        ("Type", "exec"),
-        ("User", "root"),
-        ("Restart", "no"),
-    ] {
-        ensure!(
-            terminal.get(key).map(String::as_str) == Some(value),
-            "223 actual native terminal manager differs:{key}"
-        );
-    }
-    ensure!(
-        terminal
-            .get("ExecStart")
-            .is_some_and(|s| command_matches(s, &launch.supervisor.expected_exec_start)),
-        "223 native terminal command differs"
-    );
+    let original = terminal::lifecycle(&terminal::rows(&journal)?, &launch.supervisor)?;
+    let terminal = terminal::snapshot(&launch.supervisor, &original)?;
     observe(&issuer)?;
     let provenance = issuance::published(
         &spec.provenance_output,
         &json!({
         "schema":"jetstreamer-epoch223-demotion-native-proof-capture-v1","spec":binding,"issuer":issuer,
-        "actual_terminal_manager":terminal,"launch":spec.launch,"result":spec.result,"journal":spec.journal,
+        "actual_terminal_manager":terminal.manager,"terminal_adapter":"natural-success-cleared-or-collected-v1",
+        "actual_terminal_evidence":terminal,"launch":spec.launch,"result":spec.result,"journal":spec.journal,
         "new_harness_sha256":HARNESS,"actual_ordered_output_validated":true,
         "publication_authorized":false,"r2_mutations":false}),
     )?;
     ensure!(
-        properties_with(&launch.supervisor.unit, keys)? == terminal,
-        "223 native terminal manager changed"
+        terminal.stable_with(&terminal::snapshot(&launch.supervisor, &original)?),
+        "223 native terminal manager or complete PID1 history changed"
     );
     let proof = NativeProof {
         schema: "jetstreamer-epoch223-demotion-native-input-proof-v1".into(),
@@ -342,8 +276,12 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
         harness_sha256: launch.harness.sha256,
         test_name: TEST.into(),
         source_qa_sha256: launch.source_qa_sha256,
-        manager_success: terminal.get("Result").map(String::as_str) == Some("success"),
+        // Natural success and zero restarts are required independently in both
+        // the original and fresh complete PID1 histories, including collected
+        // units whose current ExecMainCode and InvocationID have been cleared.
+        manager_success: terminal.manager.get("Result").map(String::as_str) == Some("success"),
         restart_count: terminal
+            .manager
             .get("NRestarts")
             .context("223 actual restart count")?
             .parse()?,
@@ -394,8 +332,15 @@ mod tests {
         output_valid(good.as_bytes()).unwrap();
         for bad in [
             good.replace("503889539326183230", "503889539326183200"),
+            good.replace("replay_entries=0", "replay_entries=1"),
+            good.replace("bootstrap_writes=0", "bootstrap_writes=1"),
+            good.replace(
+                "8LxWwzEvnAvZC6FwgcqFMxeswZD5skZ7zacYhf1eYW1F",
+                "changed-bank-hash",
+            ),
             good.replace("0 ignored", "1 ignored"),
             good.replace("1 passed", "0 passed"),
+            good.replace("0 failed", "1 failed"),
             format!("{good}{MARKER}\n"),
             format!("test result: ok. 1 passed; 0 failed; 0 ignored;\n{MARKER}\n"),
         ] {

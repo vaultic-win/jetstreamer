@@ -11,8 +11,8 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-mod bracket {
-    include!("../../historical-runtime/epoch223_bracket_proof.rs");
+mod causal_checks {
+    include!("../../historical-runtime/epoch223_continuous_causal_basis.rs");
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -119,17 +119,11 @@ fn actor(a: &Value) -> Result<(), String> {
     bytes(&exe, 256 << 20)?;
     Ok(())
 }
-fn prior(v: &Value) -> Result<(), String> {
-    let p = bound(v)?;
-    let raw = bytes(&binding(&p["journal"])?, 16 << 20)?;
-    bracket::validate(
-        &p,
-        &bound(&p["task"])?,
-        &bound(&p["result"])?,
-        &raw,
-        &bound(&p["role_qualification"])?,
-        &bound(&p["capture_spec"])?,
-    )
+fn causal_basis(v: &Value) -> Result<(), String> {
+    let b = binding(v)?;
+    check(b.sha256 == causal_checks::DIAGNOSIS_SHA256,
+        "continuous root canonical diagnosis digest differs")?;
+    causal_checks::validate(&value(&b)?)
 }
 struct Accepted {
     runtime: Binding,
@@ -228,14 +222,14 @@ pub(super) fn authorize() -> Result<(), String> {
     };
     let r = value(&runtime)?;
     check(
-        r["schema"] == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+        r["schema"] == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
             && r["mode"] == "full-root"
             && r["plan"]["target_slot"] == END
             && r["plan"]["terminal_slot"] == END
             && r["plan"]["schema"] == "jetstreamer-private-epoch223-full-root-demotion-plan-v1",
         "foreign root runtime/plan/mode",
     )?;
-    prior(&r["bracket_proof"])?;
+    causal_basis(&r["canonical_diagnosis"])?;
     let p = &r["plan"];
     let x = &r["prerequisites"];
     let own = binding(&p["node"])?;

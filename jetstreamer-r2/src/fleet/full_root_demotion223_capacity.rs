@@ -57,14 +57,14 @@ impl Context {
         let prefix = match self.job_kind.as_str() {
             "full-root" => "horizon-qualify-223-full-root-demotion-",
             "native-input" => "horizon-native-input-223-full-root-demotion-",
-            _ => bail!("unknown223candidate purpose"),
+            _ => bail!("unknown223 candidate purpose"),
         };
         ensure!(
             matches!(self.phase.as_str(), "control" | "spawn")
                 && valid_unit(&self.producer.unit, prefix)
                 && valid_unit(&self.guard.unit, "horizon-guard-223-full-root-demotion-")
                 && valid_unit(&self.issuer.unit, "horizon-admit-223-full-root-demotion-"),
-            "foreign223candidate actors"
+            "foreign223 candidate actors"
         );
         ensure!(
             self.local_floor_bytes > 0,
@@ -82,7 +82,7 @@ impl Context {
                     && pids.insert(a.pid)
                     && iids.insert(a.invocation_id.clone())
                     && a.cgroup == format!("/system.slice/{}", a.unit),
-                "223candidate actor collision"
+                "223 candidate actor collision"
             );
         }
         Ok(())
@@ -93,32 +93,32 @@ impl Context {
             ("control", _) => (GIB, 16 * GIB),
             ("spawn", "full-root") => (471_798_691_840, 225_000_000_000),
             ("spawn", "native-input") => (301 * GIB, 128 * GIB),
-            _ => bail!("unclosed223candidate"),
+            _ => bail!("unclosed 223 candidate"),
         };
         Ok(maintenance_capacity::Candidate {
             additional_bytes: disk,
             memory_max_bytes: main
                 .checked_add(2 * GIB)
-                .context("223candidate memory overflow")?,
+                .context("223 candidate memory overflow")?,
             minimum_protected_disk_bytes: self.local_floor_bytes,
         })
     }
     fn validate_plan(&self) -> Result<()> {
         let plan = bound_json(&self.runtime_plan)?;
-        full_root_demotion223_status::prior_bracket(&plan)?;
+        full_root_demotion223_status::causal_basis(&plan)?;
         if self.job_kind == "full-root" {
             ensure!(
-                plan["schema"] == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+                plan["schema"] == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
                     && plan["mode"] == "full-root"
                     && plan["plan"]["unit"] == self.producer.unit
                     && plan["plan"]["minimum_free_bytes"] == self.local_floor_bytes
                     && plan["plan"]["terminal_slot"] == 96_767_522u64
                     && plan["plan"]["target_slot"] == 96_767_522u64,
-                "223bracket allocation plan changed"
+                "223 continuous root allocation plan changed"
             );
         } else {
             ensure!(
-                plan["schema"] == "jetstreamer-epoch223-full-root-demotion-native-supervisor-plan-v1"
+                plan["schema"] == "jetstreamer-epoch223-continuous-root-demotion-native-supervisor-plan-v2"
                     && plan["unit"] == self.producer.unit
                     && plan["local_floor_bytes"] == self.local_floor_bytes
                     && plan["harness"]["sha256"].as_str().is_some_and(|s| s.len()==64 && s != "a280b1f48f0bb430c482e01a03b4b800ee8f95f326590059e4cdf4873b14a22b" && s != "0".repeat(64))
@@ -135,7 +135,7 @@ impl Context {
                 && g["schema"] == "jetstreamer-epoch223-full-root-demotion-role-qualification-v1"
                 && g["executable_sha256"] == self.guard.executable.sha256
                 && g["protective_guard_qualified"] == true,
-            "223candidate producer/guard are not qualified immutable roles"
+            "223 candidate producer/guard are not qualified immutable roles"
         );
         Ok(())
     }
@@ -153,27 +153,27 @@ impl Context {
                 && row["ExecStart"]
                     .as_str()
                     .is_some_and(|s| same_command(s, &a.expected_exec_start)),
-            "223candidate actor changed"
+            "223 candidate actor changed"
         );
         let stat = fs::read_to_string(format!("/proc/{}/stat", a.pid))?;
         ensure!(
             stat.rsplit_once(')')
-                .context("223candidate stat")?
+                .context("223 candidate stat")?
                 .1
                 .split_whitespace()
                 .nth(19)
-                .context("223candidate start ticks")?
+                .context("223 candidate start ticks")?
                 .parse::<u64>()?
                 == a.start_ticks
                 && fs::read_to_string(format!("/proc/{}/cgroup", a.pid))?.trim()
                     == format!("0::{}", a.cgroup)
                 && fs::read_link(format!("/proc/{}/exe", a.pid))? == a.executable.path,
-            "223candidate process reused"
+            "223 candidate process reused"
         );
         let actual = private157::file_binding(&a.executable.path)?;
         ensure!(
             actual["sha256"] == a.executable.sha256,
-            "223candidate executable differs"
+            "223 candidate executable differs"
         );
         let props = singleton227_capture::properties(
             &a.unit,
@@ -191,7 +191,7 @@ impl Context {
         let root = Path::new("/sys/fs/cgroup").join(a.cgroup.trim_start_matches('/'));
         ensure!(
             root.canonicalize()? == root,
-            "223candidate cgroup redirected"
+            "223 candidate cgroup redirected"
         );
         let read = |name: &str| -> Result<u64> {
             Ok(fs::read_to_string(root.join(name))?.trim().parse()?)
@@ -202,7 +202,7 @@ impl Context {
                 && read("memory.high")? == high
                 && read("memory.swap.max")? == 0
                 && charge <= max,
-            "223candidate hard cap/high/swap changed"
+            "223 candidate hard cap/high/swap changed"
         );
         Ok(
             json!({"actor":a,"hard_cap_bytes":max,"memory_high_bytes":high,
@@ -227,7 +227,7 @@ impl Context {
             &self.producer,
             current
                 .get(&self.producer.unit)
-                .context("223candidate producer omitted")?,
+                .context("223 candidate producer omitted")?,
             16 * GIB,
             14 * GIB,
             main_user,
@@ -236,7 +236,7 @@ impl Context {
             &self.guard,
             current
                 .get(&self.guard.unit)
-                .context("223candidate guard omitted")?,
+                .context("223 candidate guard omitted")?,
             GIB,
             768 << 20,
             "root",
@@ -245,7 +245,7 @@ impl Context {
             &self.issuer,
             current
                 .get(&self.issuer.unit)
-                .context("223candidate issuer omitted")?,
+                .context("223 candidate issuer omitted")?,
             GIB,
             768 << 20,
             "root",

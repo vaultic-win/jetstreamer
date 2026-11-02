@@ -126,14 +126,14 @@ pub(super) fn control(binding: &BoundFile, executable: &BoundFile) -> Result<()>
             .as_ref()
             .context("full-root worker qualification missing")?,
     )?;
-    bracket_proof::validate(
+    canonical_diagnosis::validate(
         runtime
-            .bracket_proof
+            .canonical_diagnosis
             .as_ref()
-            .context("full-root requires genuine prior bracket proof")?,
+            .context("continuous root requires the exact retained canonical diagnosis")?,
     )?;
     ensure!(
-        runtime.schema == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+        runtime.schema == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
             && runtime.mode == "full-root",
         "223 control runtime scope"
     );
@@ -462,14 +462,14 @@ pub(super) fn spawn(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
             .as_ref()
             .context("full-root worker qualification missing")?,
     )?;
-    bracket_proof::validate(
+    canonical_diagnosis::validate(
         runtime
-            .bracket_proof
+            .canonical_diagnosis
             .as_ref()
-            .context("full-root requires genuine prior bracket proof")?,
+            .context("continuous root requires the exact retained canonical diagnosis")?,
     )?;
     ensure!(
-        runtime.schema == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+        runtime.schema == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
             && runtime.mode == "full-root",
         "223 spawn runtime scope"
     );

@@ -49,20 +49,30 @@ pub(crate) fn planning_report(
         "native_input_qualified":false,"fresh_resource_admission_passed":false,
         "publication_authorized":false,"runtime_promotion_authorized":false,"r2_mutations":false})
 }
-#[derive(Default)]
-struct Progress {
-    initialized: bool,
-    bank586: bool,
-    bank587: bool,
-    parent432: bool,
-    vote: bool,
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum CausalStage {
+    #[default]
+    Bank586, Parent432, Bank587, Vote, VoteCompletion, Root, Complete,
 }
+#[derive(Clone, Copy, Debug)]
+enum CausalEvent { Bank586, Parent432, Bank587, Vote, VoteCompletion, Root }
+fn advance(stage: &mut CausalStage, event: CausalEvent) -> Result<(), String> {
+    let next = match (*stage, event) {
+        (CausalStage::Bank586, CausalEvent::Bank586) => CausalStage::Parent432,
+        (CausalStage::Parent432, CausalEvent::Parent432) => CausalStage::Bank587,
+        (CausalStage::Bank587, CausalEvent::Bank587) => CausalStage::Vote,
+        (CausalStage::Vote, CausalEvent::Vote) => CausalStage::VoteCompletion,
+        (CausalStage::VoteCompletion, CausalEvent::VoteCompletion) => CausalStage::Root,
+        (CausalStage::Root, CausalEvent::Root) => CausalStage::Complete,
+        _ => return Err("continuous root causal records are missing, duplicated or out of order".into()),
+    };
+    *stage = next;
+    Ok(())
+}
+#[derive(Default)]
+struct Progress { initialized: bool, causal: CausalStage }
 static PROGRESS: Mutex<Progress> = Mutex::new(Progress {
-    initialized: false,
-    bank586: false,
-    bank587: false,
-    parent432: false,
-    vote: false,
+    initialized: false, causal: CausalStage::Bank586,
 });
 pub(crate) fn digest(s: &str) -> Result<[u8; 32], String> {
     if s.len() != 64
@@ -313,14 +323,13 @@ pub(crate) fn checkpoint(cp: &h::HistoricalCheckpoint) -> Result<(), String> {
             };
             if !cp.slot_complete
                 || Hash::new_from_array(cp.bank_hash).to_string() != expected
-                || (cp.slot == 96_544_587 && !p.bank586)
             {
                 return Err("private full-root actual canonical Bank comparison failed".into());
             }
             if cp.slot == 96_544_586 {
-                p.bank586 = true;
+                advance(&mut p.causal, CausalEvent::Bank586)?;
             } else {
-                p.bank587 = true;
+                advance(&mut p.causal, CausalEvent::Bank587)?;
             }
             log::info!(
                 "epoch223 demotion real Bank verified slot={} bank_hash={expected}",
@@ -328,14 +337,15 @@ pub(crate) fn checkpoint(cp: &h::HistoricalCheckpoint) -> Result<(), String> {
             );
         }
         VOTE_SLOT => {
-            if !cp.slot_complete || !(p.bank586 && p.bank587 && p.parent432 && p.vote) {
+            if !cp.slot_complete || p.causal != CausalStage::VoteCompletion {
                 return Err(
                     "private full-root terminal lacks both real Banks and exact successful wires"
                         .into(),
                 );
             }
+            advance(&mut p.causal, CausalEvent::VoteCompletion)?;
             log::info!(
-                "epoch223 demotion causal bracket rechecked terminal={VOTE_SLOT} complete=true full_root_qualified=false publication_authorized=false"
+                "epoch223 demotion causal bracket verified in continuous replay terminal={VOTE_SLOT} complete=true full_root_qualified=false publication_authorized=false"
             );
         }
         END => {
@@ -344,8 +354,9 @@ pub(crate) fn checkpoint(cp: &h::HistoricalCheckpoint) -> Result<(), String> {
                 cp.slot_complete,
                 &Hash::new_from_array(cp.bank_hash).to_string(),
                 &Hash::new_from_array(cp.accounts_hash).to_string(),
-                p.bank586 && p.bank587 && p.parent432 && p.vote,
+                p.causal == CausalStage::Root,
             )?;
+            advance(&mut p.causal, CausalEvent::Root)?;
             log::info!(
                 "epoch223 demotion full root verified slot={END} complete=true accounts_hash={ROOT_ACCOUNTS} bank_hash={ROOT_BANK} publication_authorized=false"
             );
@@ -381,14 +392,14 @@ pub(crate) fn outcomes(
             return Err("private full-root exact wire must have canonical observed success and native success".into());
         }
         if entry.slot == VOTE_SLOT {
-            if entry.entry_index != 4 || !p.bank586 || !p.bank587 || !p.parent432 {
+            if entry.entry_index != 4 || p.causal != CausalStage::Vote {
                 return Err(
                     "private full-root Vote arrived without canonical predecessor evidence".into(),
                 );
             }
-            p.vote = true;
+            advance(&mut p.causal, CausalEvent::Vote)?;
         } else {
-            p.parent432 = true;
+            advance(&mut p.causal, CausalEvent::Parent432)?;
         }
         log::info!(
             "epoch223 demotion exact native wire success slot={} transaction_index={index}",
@@ -414,6 +425,23 @@ fn terminal_commitments(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn continuous_root_requires_ordered_actual_causal_records_and_vote_completion() {
+        let mut stage=CausalStage::Bank586;
+        for event in [CausalEvent::Bank586,CausalEvent::Parent432,CausalEvent::Bank587,
+                      CausalEvent::Vote,CausalEvent::VoteCompletion,CausalEvent::Root] {
+            for wrong in [CausalEvent::Bank586,CausalEvent::Parent432,CausalEvent::Bank587,
+                          CausalEvent::Vote,CausalEvent::VoteCompletion,CausalEvent::Root] {
+                if std::mem::discriminant(&wrong) != std::mem::discriminant(&event) {
+                    let mut unchanged=stage; assert!(advance(&mut unchanged,wrong).is_err());
+                    assert_eq!(unchanged,stage);
+                }
+            }
+            advance(&mut stage,event).unwrap();
+        }
+        assert_eq!(stage,CausalStage::Complete);
+        assert!(advance(&mut stage,CausalEvent::Root).is_err());
+    }
     #[test]
     fn full_root_plan_does_not_expand_bracket_or_admit_tail_cohort_or_resume() {
         let root = Path::new(

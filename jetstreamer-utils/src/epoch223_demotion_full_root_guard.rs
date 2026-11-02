@@ -181,7 +181,7 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
     let plan: GuardPlan = read_bound(binding)?;
     let value: Value = read_bound(&plan.runtime_plan)?;
     let native =
-        value["schema"] == "jetstreamer-epoch223-full-root-demotion-native-supervisor-plan-v1";
+        value["schema"] == "jetstreamer-epoch223-continuous-root-demotion-native-supervisor-plan-v2";
     let maximum_private;
     if native {
         let context = native_supervisor::guard_context(&plan.runtime_plan)?;
@@ -210,14 +210,14 @@ pub(super) fn run(binding: &BoundFile, executable: &BoundFile) -> Result<()> {
                 .as_ref()
                 .context("full-root worker qualification missing")?,
         )?;
-        bracket_proof::validate(
+        canonical_diagnosis::validate(
             runtime
-                .bracket_proof
+                .canonical_diagnosis
                 .as_ref()
-                .context("full-root prior bracket missing")?,
+                .context("continuous root canonical diagnosis missing")?,
         )?;
         ensure!(
-            runtime.schema == "jetstreamer-epoch223-full-root-demotion-runtime-plan-v3"
+            runtime.schema == "jetstreamer-epoch223-continuous-root-demotion-runtime-plan-v4"
                 && runtime.mode == "full-root"
                 && plan.run_root == runtime.plan.run_root
                 && plan.watched_runner.unit == runtime.plan.unit
