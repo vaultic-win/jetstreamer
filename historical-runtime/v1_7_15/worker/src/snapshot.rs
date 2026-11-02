@@ -1180,6 +1180,21 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn loads_and_verifies_epoch235_bootstrap() {
+        let path = std::env::var("JETSTREAMER_SNAPSHOT_101519444")
+            .expect("set JETSTREAMER_SNAPSHOT_101519444 to run this integration test");
+        let ledger =
+            std::env::var("JETSTREAMER_MAINNET_LEDGER").expect("set JETSTREAMER_MAINNET_LEDGER");
+        let state_dir = private_state_dir(None).unwrap();
+        let genesis = load_genesis(Path::new(&ledger), &state_dir).unwrap();
+        let builtins = crate::runtime::mainnet_additional_builtins();
+        let loaded = load_archive(Path::new(&path), &state_dir, &genesis, &builtins).unwrap();
+        assert_eq!(loaded.bank.slot(), 101_519_444);
+        assert!(loaded.bank.verify_snapshot_bank(true, false));
+    }
+
+    #[test]
+    #[ignore]
     fn loads_and_verifies_v1_7_15_boundary_snapshot() {
         let path = std::env::var("JETSTREAMER_SNAPSHOT_100655540")
             .expect("set JETSTREAMER_SNAPSHOT_100655540 to run this integration test");

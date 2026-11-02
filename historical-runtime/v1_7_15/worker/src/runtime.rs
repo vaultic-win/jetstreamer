@@ -2299,6 +2299,31 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn initializes_and_checkpoints_epoch235_bootstrap() {
+        let archive = std::env::var("JETSTREAMER_SNAPSHOT_101519444")
+            .expect("set JETSTREAMER_SNAPSHOT_101519444");
+        let ledger =
+            std::env::var("JETSTREAMER_MAINNET_LEDGER").expect("set JETSTREAMER_MAINNET_LEDGER");
+        let (mut state, initialized) = RuntimeState::initialize(
+            &ledger,
+            &jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+                archive_path: archive,
+            },
+            None,
+        )
+        .unwrap();
+        assert_eq!(initialized.slot, 101_519_444);
+        let checkpoint = state.freeze_checkpoint(101_519_444).unwrap();
+        assert_eq!(checkpoint.slot, 101_519_444);
+        assert!(checkpoint.slot_complete);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            "CmB38ALs6edig3rZfqUUVFkkZHFqgq33cxihUWt44X7Q"
+        );
+    }
+
+    #[test]
+    #[ignore]
     fn initializes_and_checkpoints_v1_7_15_boundary_snapshot() {
         let archive = std::env::var("JETSTREAMER_SNAPSHOT_100655540")
             .expect("set JETSTREAMER_SNAPSHOT_100655540");
