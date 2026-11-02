@@ -582,7 +582,7 @@ fn main() -> Result<()> {
             && args[4] == "--self-sha256",
         "usage: PLAN --plan-sha256 SHA --self-sha256 SHA"
     );
-    let self_sha = &args[5];
+    let self_sha = args[5].as_str();
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
         digest(self_sha)
