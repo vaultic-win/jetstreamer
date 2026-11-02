@@ -1,0 +1,11 @@
+# SOURCE ONLY: first activation must respect the exact accepted seed deadline.
+[Unit]
+Description=Persistent single coordinated Horizon observation cadence
+[Timer]
+OnBootSec=1800s
+OnUnitInactiveSec=1800s
+AccuracySec=1s
+RandomizedDelaySec=0
+Unit=horizon-observer-rollover-v1.service
+[Install]
+WantedBy=timers.target

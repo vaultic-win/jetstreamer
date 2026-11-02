@@ -1,0 +1,27 @@
+# SOURCE ONLY: bind actual hashes/paths; fresh admission and native proof required.
+[Unit]
+Description=One durable coordinated Horizon observer rollover
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Restart=no
+KillMode=control-group
+TimeoutStartSec=600
+TimeoutStopSec=30
+MemoryHigh=805306368
+MemoryMax=1073741824
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=128
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+PrivateNetwork=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectControlGroups=yes
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/snapshot-caches/observer-rollover-v1
+ExecStart=/var/lib/jetstreamer/horizon-observer-rollover-v1/jetstreamer-horizon-observer-rollover /var/lib/jetstreamer/horizon-observer-rollover-v1/plan.json --plan-sha256 ACTUAL_PLAN_SHA256 --self-sha256 ACTUAL_ROLLOVER_SHA256
