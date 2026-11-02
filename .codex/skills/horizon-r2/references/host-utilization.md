@@ -33,6 +33,30 @@ only access-time changes caused by reading. Preserve the source ownership/mode a
 then preserve the captured bytes as separate immutable observation evidence. Do not chmod the original,
 relax immutable authority readers or promote a captured observation into launch/stop authority.
 
+### Reconcile periodic guard invocations
+
+Include each live producer's protective guard service in the fleet census, including ordinary
+singleton guards. When the installed helper has no authenticated completed-guard rollover adapter,
+run reconciliation inside the intersection of all relevant completed guard windows. Authenticate
+each actual successful, inactive guard invocation, its no-trip receipt, unchanged producer/plan
+bindings and armed timer deadline. Keep every actor in the census and preserve failures; an
+unsupported guard name needs its real evidence, never a suffix-only normalization exemption.
+
+If the intersection is too short, the existing immutable contracts may permit advancing the
+safety checks once during that coordinated cycle. For manually startable `Type=oneshot` guards
+with `Restart=no`, no `RemainAfterExit`, and timers driven only by `OnUnitInactiveSec`, one
+`systemctl start GUARD_A GUARD_B` request can bring the unchanged checks together. An already
+running activation may be coalesced. Authenticate each actual completion and receipt; a successful
+start request alone proves neither protection nor synchronization. Honor any genuine safety trip
+through the normal failure lifecycle. Preserve producer invocations, timer definitions and limits.
+
+Derive the usable window from the earliest actual armed next deadline after completion. Retain
+the qualified minimum window, timeout and stop margin, and execute the final preflight and fleet
+CLI consecutively in one bounded operator call: an intervening model/tool handoff can consume the
+window. This procedure grants no producer restart, timer stop/edit, unsupported rollover bypass
+or repeated replay observer. Routine replay/resource observations and status audits remain on the
+single 30-minute cadence.
+
 Match a new job's systemd lifetime to its terminal verifier. If that verifier requires
 `LoadState=loaded`, use its persistent service file; `systemd-run --wait` does not by itself
 retain a transient unit after completion. Preserve the actual running receipt and exact PID1
