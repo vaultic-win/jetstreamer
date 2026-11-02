@@ -12,7 +12,7 @@ use {
         fs::{self, File, Metadata, OpenOptions},
         io::{Read, Write},
         os::{
-            fd::AsRawFd,
+            fd::{AsRawFd, FromRawFd},
             unix::{
                 ffi::OsStrExt,
                 fs::{MetadataExt, OpenOptionsExt},
@@ -226,38 +226,76 @@ fn state_directory() -> Result<File> {
 }
 fn write_once(name: &str, value: &Value) -> Result<()> {
     let dir = state_directory()?;
-    // A crash during writing leaves only an uncommitted temporary member. The
-    // canonical receipt appears atomically, after its entire body is durable.
-    let temporary = format!(".{name}.{}-{}.tmp", std::process::id(), now()?);
-    let p = Path::new(STATE).join(&temporary);
-    let mut f = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o400)
-        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
-        .open(&p)?;
-    let mut bytes = serde_json::to_vec_pretty(value)?;
-    bytes.push(b'\n');
-    f.write_all(&bytes)?;
-    f.sync_all()?;
-    let a = CString::new(temporary)?;
-    let b = CString::new(name)?;
+    write_atomic_receipt(&dir, name, value)
+}
+fn child_name(name: &str) -> Result<CString> {
+    ensure!(
+        Path::new(name).components().count() == 1
+            && matches!(
+                Path::new(name).components().next(),
+                Some(std::path::Component::Normal(_))
+            ),
+        "mutation child must be one normal path component"
+    );
+    Ok(CString::new(name)?)
+}
+fn rename_child(source: &File, old: &str, destination: &File, new: &str) -> Result<()> {
+    let old = child_name(old)?;
+    let new = child_name(new)?;
     let rc = unsafe {
         libc::renameat2(
-            dir.as_raw_fd(),
-            a.as_ptr(),
-            dir.as_raw_fd(),
-            b.as_ptr(),
+            source.as_raw_fd(),
+            old.as_ptr(),
+            destination.as_raw_fd(),
+            new.as_ptr(),
             libc::RENAME_NOREPLACE,
         )
     };
     ensure!(
         rc == 0,
-        "receipt no-clobber commit failed: {}",
+        "no-clobber child rename failed: {}",
+        std::io::Error::last_os_error()
+    );
+    source.sync_all()?;
+    destination.sync_all()?;
+    Ok(())
+}
+fn unlink_child(dir: &File, name: &str) -> Result<()> {
+    let name = child_name(name)?;
+    let rc = unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), 0) };
+    ensure!(
+        rc == 0,
+        "exact child unlink failed: {}",
         std::io::Error::last_os_error()
     );
     dir.sync_all()?;
     Ok(())
+}
+fn write_atomic_receipt(dir: &File, name: &str, value: &Value) -> Result<()> {
+    child_name(name)?;
+    // A crash during writing leaves only an uncommitted temporary member. The
+    // canonical receipt appears atomically, after its entire body is durable.
+    let temporary = format!(".{name}.{}-{}.tmp", std::process::id(), now()?);
+    let temporary_name = child_name(&temporary)?;
+    let fd = unsafe {
+        libc::openat(
+            dir.as_raw_fd(),
+            temporary_name.as_ptr(),
+            libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+            0o400,
+        )
+    };
+    ensure!(
+        fd >= 0,
+        "receipt temporary create failed: {}",
+        std::io::Error::last_os_error()
+    );
+    let mut f = unsafe { File::from_raw_fd(fd) };
+    let mut bytes = serde_json::to_vec_pretty(value)?;
+    bytes.push(b'\n');
+    f.write_all(&bytes)?;
+    f.sync_all()?;
+    rename_child(dir, &temporary, dir, name)
 }
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
@@ -467,29 +505,35 @@ fn scan_staged(root: &Path, jobs: &str) -> Result<()> {
             scan_staged(&p, jobs)?;
             continue;
         }
-        // Enabled unit symlinks can stage an automatic relaunch even when inert.
-        if m.file_type().is_symlink() {
-            let link = fs::read_link(&p)?;
-            let name = link.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            ensure!(
-                ![UNIT, GUARD, TIMER].contains(&name),
-                "old actor remains enabled/linked"
-            );
-            continue;
-        }
-        if !m.is_file() || m.len() > LIMIT {
-            continue;
-        }
-        let bytes = fs::read(&p)?;
-        if !bytes.windows(OLD.len()).any(|w| w == OLD.as_bytes()) {
-            continue;
-        }
         let name = p
             .file_name()
             .and_then(|s| s.to_str())
             .context("unit name")?;
+        let original_entry =
+            root == Path::new("/run/systemd/system") && [UNIT, GUARD, TIMER].contains(&name);
+        // Enabled unit symlinks can stage an automatic relaunch even when inert.
+        // Other symlinks must be inspected, including bounded external targets;
+        // a name-only allowlist must never silently skip their recipe body.
+        if m.file_type().is_symlink() {
+            let link = fs::read_link(&p)?;
+            let linked_name = link.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            ensure!(
+                original_entry || ![UNIT, GUARD, TIMER].contains(&linked_name),
+                "old actor remains enabled/linked"
+            );
+        } else {
+            ensure!(
+                m.is_file(),
+                "uninspected non-regular staged recipe: {}",
+                p.display()
+            );
+        }
+        let bytes = staged_body(&p)?;
+        if !recipe_reference(&bytes) {
+            continue;
+        }
         ensure!(
-            root == Path::new("/run/systemd/system") && [UNIT, GUARD, TIMER].contains(&name),
+            original_entry,
             "foreign staged unit references old generation: {}",
             p.display()
         );
@@ -499,6 +543,75 @@ fn scan_staged(root: &Path, jobs: &str) -> Result<()> {
         );
     }
     Ok(())
+}
+fn recipe_reference(bytes: &[u8]) -> bool {
+    [OLD, UNIT, GUARD, TIMER].iter().any(|needle| {
+        bytes
+            .windows(needle.len())
+            .any(|window| window == needle.as_bytes())
+    })
+}
+fn staged_body(path: &Path) -> Result<Vec<u8>> {
+    let mut target = path.to_path_buf();
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..8 {
+        ensure!(seen.insert(target.clone()), "cyclic staged recipe symlink");
+        let m = fs::symlink_metadata(&target)?;
+        if m.file_type().is_symlink() {
+            let link = fs::read_link(&target)?;
+            target = if link.is_absolute() {
+                link
+            } else {
+                target.parent().context("symlink parent")?.join(link)
+            };
+            continue;
+        }
+        if target == Path::new("/dev/null")
+            && m.mode() & libc::S_IFMT == libc::S_IFCHR
+            && m.rdev() == libc::makedev(1, 3)
+            && m.uid() == 0
+        {
+            // A positively identified systemd mask has no executable recipe.
+            return Ok(Vec::new());
+        }
+        ensure!(
+            m.is_file() && m.len() <= LIMIT,
+            "uninspected oversized/non-regular staged recipe"
+        );
+        let mut f = open_read(&target)?;
+        let before = f.metadata()?;
+        let mut bytes = Vec::new();
+        (&mut f).take(LIMIT + 1).read_to_end(&mut bytes)?;
+        let after = f.metadata()?;
+        ensure!(
+            bytes.len() as u64 == before.len()
+                && bytes.len() as u64 <= LIMIT
+                && identity(&before) == identity(&after)
+                && before.ctime() == after.ctime()
+                && before.ctime_nsec() == after.ctime_nsec(),
+            "staged recipe changed while reading"
+        );
+        return Ok(bytes);
+    }
+    anyhow::bail!("staged recipe symlink chain exceeds bound")
+}
+fn maps_reference(bytes: &[u8], device: u64, inode: u64) -> Result<bool> {
+    let text = std::str::from_utf8(bytes).context("non-UTF8 maps evidence")?;
+    for line in text.lines() {
+        let fields: Vec<_> = line.split_whitespace().take(5).collect();
+        ensure!(fields.len() == 5, "uninspected malformed maps row");
+        let (major, minor) = fields[3].split_once(':').context("malformed maps device")?;
+        let major = u64::from_str_radix(major, 16)?;
+        let minor = u64::from_str_radix(minor, 16)?;
+        let mapped_inode: u64 = fields[4].parse()?;
+        if major == u64::from(libc::major(device))
+            && minor == u64::from(libc::minor(device))
+            && mapped_inode == inode
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 fn references() -> Result<()> {
     let mut found = Vec::new();
@@ -518,9 +631,11 @@ fn references() -> Result<()> {
         for name in ["cmdline", "maps"] {
             match fs::read(proc.join(name)) {
                 Ok(bytes) => {
-                    if [OLD.as_bytes(), quarantine().as_os_str().as_bytes()]
-                        .iter()
-                        .any(|p| bytes.windows(p.len()).any(|w| w == *p))
+                    if (name == "maps"
+                        && maps_reference(&bytes, expected().device, expected().inode)?)
+                        || [OLD.as_bytes(), quarantine().as_os_str().as_bytes()]
+                            .iter()
+                            .any(|p| bytes.windows(p.len()).any(|w| w == *p))
                     {
                         found.push(format!("pid {pid} {name}"));
                     }
@@ -664,24 +779,7 @@ fn rename_exact() -> Result<()> {
         .open(parent)?;
     let b = state_directory()?;
     file_identity(&src, true)?;
-    let source_name = CString::new("epoch-237.jet")?;
-    let dest_name = CString::new("epoch-237.partial.quarantine")?;
-    let rc = unsafe {
-        libc::renameat2(
-            a.as_raw_fd(),
-            source_name.as_ptr(),
-            b.as_raw_fd(),
-            dest_name.as_ptr(),
-            libc::RENAME_NOREPLACE,
-        )
-    };
-    ensure!(
-        rc == 0,
-        "exact no-clobber quarantine rename failed: {}",
-        std::io::Error::last_os_error()
-    );
-    a.sync_all()?;
-    b.sync_all()?;
+    rename_child(&a, "epoch-237.jet", &b, "epoch-237.partial.quarantine")?;
     file_identity(&dst, false)?;
     ensure!(absent(&src)?, "source reappeared after quarantine");
     Ok(())
@@ -830,14 +928,7 @@ fn run(plan: &Plan, plan_sha: &str, self_sha: &str, check: bool) -> Result<Value
         ensure!(absent(&source())?, "original namespace reappeared");
         file_identity(&quarantine(), false)?;
         // Only the fixed child of a root-private pinned directory can be unlinked.
-        let name = CString::new("epoch-237.partial.quarantine")?;
-        let rc = unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), 0) };
-        ensure!(
-            rc == 0,
-            "quarantine unlink failed: {}",
-            std::io::Error::last_os_error()
-        );
-        dir.sync_all()?;
+        unlink_child(&dir, "epoch-237.partial.quarantine")?;
     } else {
         ensure!(
             !has_source,
@@ -1034,5 +1125,154 @@ mod tests {
                 validate_lifecycle(state.0, state.1, state.2, state.3, state.4, state.5).is_err()
             );
         }
+    }
+    #[test]
+    fn maps_bind_alias_with_closed_fd_still_binds_original_device_and_inode() {
+        let alias = b"7f000000-7f010000 r--p 00000000 103:01 11311387 /mnt/unrelated-name.blob\n";
+        assert!(maps_reference(alias, expected().device, expected().inode).unwrap());
+        assert!(!maps_reference(alias, expected().device, expected().inode + 1).unwrap());
+        assert!(!maps_reference(alias, expected().device + 1, expected().inode).unwrap());
+        assert!(
+            maps_reference(b"malformed maps row\n", expected().device, expected().inode).is_err()
+        );
+    }
+    #[test]
+    fn timer_actor_references_do_not_need_a_private_path() {
+        let timer = format!("[Timer]\nOnActiveSec=1\nUnit={UNIT}\n");
+        assert!(recipe_reference(timer.as_bytes()));
+        assert!(recipe_reference(
+            format!("ExecStart=/usr/bin/systemctl start {UNIT}\n").as_bytes()
+        ));
+        assert!(!recipe_reference(b"[Timer]\nUnit=unrelated.service\n"));
+    }
+    #[test]
+    fn external_symlinks_and_oversized_recipes_are_never_silently_skipped() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let external = tempfile::tempdir()?;
+        fs::write(
+            external.path().join("foreign.timer"),
+            format!("[Timer]\nUnit={UNIT}\n"),
+        )?;
+        std::os::unix::fs::symlink(
+            external.path().join("foreign.timer"),
+            dir.path().join("alias.timer"),
+        )?;
+        assert!(recipe_reference(&staged_body(
+            &dir.path().join("alias.timer")
+        )?));
+        assert!(scan_staged(dir.path(), "").is_err());
+        fs::remove_file(dir.path().join("alias.timer"))?;
+        fs::write(
+            dir.path().join("foreign.timer"),
+            format!("[Timer]\nUnit={UNIT}\n"),
+        )?;
+        assert!(scan_staged(dir.path(), "").is_err());
+        fs::remove_file(dir.path().join("foreign.timer"))?;
+        let oversized = File::create(dir.path().join("huge.service"))?;
+        oversized.set_len(LIMIT + 1)?;
+        assert!(staged_body(&dir.path().join("huge.service")).is_err());
+        assert!(scan_staged(dir.path(), "").is_err());
+        Ok(())
+    }
+    fn fixture_dirs(root: &Path) -> Result<(File, File)> {
+        Ok((
+            File::open(root.join("original"))?,
+            File::open(root.join("private"))?,
+        ))
+    }
+    fn fixture_state(root: &Path) -> Result<()> {
+        validate_lifecycle(
+            !absent(&root.join("original/epoch-237.jet"))?,
+            !absent(&root.join("private/partial"))?,
+            !absent(&root.join("private/intent.json"))?,
+            !absent(&root.join("private/custody.json"))?,
+            !absent(&root.join("private/unlink-intent.json"))?,
+            !absent(&root.join("private/completion.json"))?,
+        )
+    }
+    fn advance_fixture(root: &Path, last_step: u8) -> Result<()> {
+        fixture_state(root)?;
+        let (original, private) = fixture_dirs(root)?;
+        let record = json!({"fixture":"closed diagnostic", "body_sha256":digest(b"partial bytes".as_slice())?});
+        if last_step >= 1 && absent(&root.join("private/intent.json"))? {
+            write_atomic_receipt(&private, "intent.json", &record)?;
+        }
+        if last_step >= 2 && !absent(&root.join("original/epoch-237.jet"))? {
+            rename_child(&original, "epoch-237.jet", &private, "partial")?;
+        }
+        if last_step >= 3 && absent(&root.join("private/custody.json"))? {
+            let bytes = fs::read(root.join("private/partial"))?;
+            ensure!(
+                digest(bytes.as_slice())? == record["body_sha256"].as_str().unwrap(),
+                "fixture body changed"
+            );
+            write_atomic_receipt(&private, "custody.json", &record)?;
+        }
+        if last_step >= 4 && absent(&root.join("private/unlink-intent.json"))? {
+            write_atomic_receipt(&private, "unlink-intent.json", &record)?;
+        }
+        if last_step >= 5 && !absent(&root.join("private/partial"))? {
+            unlink_child(&private, "partial")?;
+        }
+        if last_step >= 6 && absent(&root.join("private/completion.json"))? {
+            write_atomic_receipt(&private, "completion.json", &record)?;
+        }
+        fixture_state(root)
+    }
+    #[test]
+    fn real_filesystem_recovers_after_each_fsynced_rename_unlink_boundary() -> Result<()> {
+        for boundary in 0..=6 {
+            let root = tempfile::tempdir()?;
+            fs::create_dir(root.path().join("original"))?;
+            fs::create_dir(root.path().join("private"))?;
+            fs::write(root.path().join("original/epoch-237.jet"), b"partial bytes")?;
+            fs::write(root.path().join("original/neighbor"), b"preserved neighbor")?;
+            let inode = fs::metadata(root.path().join("original/epoch-237.jet"))?.ino();
+            advance_fixture(root.path(), boundary)?;
+            // All descriptors from the first invocation are dropped. Recovery
+            // reopens actual directories and reconciles their persisted files.
+            if (2..5).contains(&boundary) {
+                assert_eq!(
+                    fs::metadata(root.path().join("private/partial"))?.ino(),
+                    inode
+                );
+            }
+            advance_fixture(root.path(), 6)?;
+            advance_fixture(root.path(), 6)?; // completed retry never redeletes
+            assert!(absent(&root.path().join("original/epoch-237.jet"))?);
+            assert!(absent(&root.path().join("private/partial"))?);
+            assert_eq!(
+                fs::read(root.path().join("original/neighbor"))?,
+                b"preserved neighbor"
+            );
+            assert!(root.path().join("private/completion.json").is_file());
+        }
+        Ok(())
+    }
+    #[test]
+    fn real_no_clobber_rename_and_receipts_preserve_foreign_members() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        fs::create_dir(root.path().join("original"))?;
+        fs::create_dir(root.path().join("private"))?;
+        fs::write(root.path().join("original/epoch-237.jet"), b"partial bytes")?;
+        fs::write(
+            root.path().join("private/partial"),
+            b"foreign retained bytes",
+        )?;
+        let (original, private) = fixture_dirs(root.path())?;
+        assert!(rename_child(&original, "epoch-237.jet", &private, "partial").is_err());
+        assert_eq!(
+            fs::read(root.path().join("private/partial"))?,
+            b"foreign retained bytes"
+        );
+        write_atomic_receipt(&private, "intent.json", &json!({"original":true}))?;
+        assert!(write_atomic_receipt(&private, "intent.json", &json!({"foreign":true})).is_err());
+        assert_eq!(
+            serde_json::from_slice::<Value>(&fs::read(root.path().join("private/intent.json"))?)?,
+            json!({"original":true})
+        );
+        assert!(child_name("../neighbor").is_err());
+        assert!(child_name(".").is_err());
+        Ok(())
     }
 }

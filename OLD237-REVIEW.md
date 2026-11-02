@@ -1,6 +1,6 @@
 # Exact old epoch 237 partial retirement: source-only handoff
 
-Status: source and tests prepared; **no build, test, payload hash, live census,
+Status: source formatted and tests prepared; **no build, test, payload hash, live census,
 R2 operation, archive mutation, service action, or deletion was executed**.
 
 Baseline: `cad23e44786c4c6db464bb65f6c173b6551a7bec`.
@@ -150,3 +150,25 @@ Uncommitted temporary receipt files never become canonical evidence.
 This packet grants no runtime mutation by itself. The existing campaign policy
 already authorizes qualified failed-output retirement; all listed native gates
 remain mandatory and belong to Main.
+
+## Independent review successor
+
+The source successor closes two gaps identified in independent review. Maps
+inspection now parses each kernel row's major/minor device and inode, so a bind
+alias mapping with its descriptor closed still blocks retirement. An unreadable
+or malformed maps row fails closed. Staged-recipe inspection looks for original
+actor unit names as well as the old pathname, catching a foreign timer's
+`Unit=horizon-qualify-237-general-target1-v1.service`. External recipe symlinks
+are followed through at most eight inspected links; cyclic, dangling,
+oversized/non-regular targets fail closed. A positively identified root-owned
+`/dev/null` mask is understood as a mask. Only the exact direct inert originals
+under `/run/systemd/system` may retain their inspected recipes; enabling/alias
+links elsewhere do not receive that exception.
+
+The selected-bin suite now contains 14 tests. New negative fixtures cover alias
+maps identity, actor-only timer recipes, external symlinks, oversized recipes
+and no-clobber collisions. Temporary-filesystem fixtures exercise the same
+atomic receipt, no-clobber rename and single-child unlink primitives as
+production, close and reopen directories at every durable boundary, resume to
+completion twice and preserve a neighboring sentinel file. These are real
+filesystem test bodies prepared in source, **not tests already executed**.
