@@ -376,3 +376,7 @@ path = "src/native210_prepare_bin.rs"
 [[bin]]
 name = "jetstreamer-native227-v1625-prepare"
 path = "src/native227_v1625_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-retire-terminal-compact-index"
+path = "src/horizon_retire_terminal_compact_index_bin.rs"
