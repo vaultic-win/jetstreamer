@@ -1234,6 +1234,9 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- For new copy or build phases whose guard is armed after activation, require a tested native
+  pre-start gate tied to the actual invocation before useful work can begin. A fixed delay alone
+  is insufficient. Read [the build guard procedure](references/host-utilization.md#gate-copy-and-build-starts-on-actual-guard-proof).
 - When an unprivileged build or verifier recursively accounts its current execution directory,
   keep root-only status and custody metadata outside that directory. Place it in an explicitly
   ledger-backed private leaf, retain its private ownership and modes, and include that leaf in the
