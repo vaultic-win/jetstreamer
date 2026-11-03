@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::{fmt, io, pin::Pin};
 use tokio::io::{AsyncRead, AsyncSeek, BufReader, ReadBuf, SeekFrom};
 
+use crate::SharedError;
 use crate::archive;
 use crate::node_reader::Len;
 
@@ -201,42 +202,107 @@ impl Len for RipgetEpochReader {
     }
 }
 
-/// Checks the configured archive backend to determine whether an epoch CAR exists.
+/// Checks whether an epoch CAR exists. Any failure, including throttling, reads as `false`;
+/// [`check_epoch_exists`] tells the two apart.
 pub async fn epoch_exists(epoch: u64, client: &Client) -> bool {
     epoch_exists_at(epoch, client, archive::car_location()).await
 }
 
 async fn epoch_exists_at(epoch: u64, client: &Client, location: &archive::Location) -> bool {
+    check_epoch_exists_at(epoch, client, location)
+        .await
+        .unwrap_or(false)
+}
+
+/// Checks whether an epoch CAR exists. `Ok(false)` means the archive reports it missing;
+/// throttling (HTTP 429), server and network errors return `Err`.
+pub async fn check_epoch_exists(epoch: u64, client: &Client) -> Result<bool, SharedError> {
+    check_epoch_exists_at(epoch, client, archive::car_location()).await
+}
+
+pub(crate) async fn check_epoch_exists_at(
+    epoch: u64,
+    client: &Client,
+    location: &archive::Location,
+) -> Result<bool, SharedError> {
     let path = format!("{epoch}/epoch-{epoch}.car");
 
     if location.is_http() {
-        let url = location
-            .url()
-            .join(&path)
-            .unwrap_or_else(|err| panic!("invalid CAR URL for epoch {epoch}: {err}"));
-        let response = client.head(url).send().await;
-        return response
-            .map(|res| res.status().is_success())
-            .unwrap_or(false);
+        let url = location.url().join(&path)?;
+        let response = client.head(url.clone()).send().await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(true);
+        }
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Ok(false);
+        }
+        return Err(format!("HTTP {status} checking {url}").into());
     }
 
     #[cfg(feature = "s3-backend")]
     if let Some(cfg) = location.as_s3() {
         let key = cfg.key_for(&path);
-        return cfg
+        return match cfg
             .client
             .head_object()
             .bucket(cfg.bucket.as_ref())
-            .key(key)
+            .key(&key)
             .send()
             .await
-            .is_ok();
+        {
+            Ok(_) => Ok(true),
+            // Without s3:ListBucket a missing key answers 403 instead of 404.
+            Err(err)
+                if err.as_service_error().is_some_and(|e| e.is_not_found())
+                    || err.raw_response().map(|r| r.status().as_u16()) == Some(403) =>
+            {
+                Ok(false)
+            }
+            Err(err) => Err(format!("S3 error checking {key}: {err}").into()),
+        };
     }
 
     panic!(
         "unsupported archive backend for CAR location {}",
         location.url()
     );
+}
+
+/// Finds the newest epoch at or below `start` whose CAR exists. A failed check is retried with
+/// backoff, then returned as an error; it never counts as a missing epoch.
+pub(crate) async fn latest_epoch_at(
+    start: u64,
+    client: &Client,
+    location: &archive::Location,
+    retry_base: std::time::Duration,
+) -> Result<u64, SharedError> {
+    const ATTEMPTS: u32 = 5;
+    let mut epoch = start;
+    loop {
+        let mut attempt = 0;
+        let exists = loop {
+            match check_epoch_exists_at(epoch, client, location).await {
+                Ok(exists) => break exists,
+                Err(err) if attempt + 1 >= ATTEMPTS => return Err(err),
+                Err(err) => {
+                    let delay = retry_base.saturating_mul(1 << attempt);
+                    log::warn!(
+                        target: crate::LOG_MODULE,
+                        "checking epoch {epoch} failed ({err}); retrying in {delay:?}"
+                    );
+                    tokio::time::sleep(delay).await;
+                    attempt += 1;
+                }
+            }
+        };
+        if exists {
+            return Ok(epoch);
+        }
+        epoch = epoch
+            .checked_sub(1)
+            .ok_or_else(|| format!("no Old Faithful epoch found at or below epoch {start}"))?;
+    }
 }
 
 /// Fetches an epoch’s CAR file from the configured archive backend as a buffered, seekable stream.

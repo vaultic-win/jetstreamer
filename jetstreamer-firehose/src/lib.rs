@@ -38,8 +38,11 @@
 //!   applied when the S3 backend is active.
 //! - `JETSTREAMER_NETWORK` (default `mainnet`): suffix appended to cache namespaces and index
 //!   filenames so you can swap between clusters without purging local state.
-//! - `JETSTREAMER_SPAWN_PENDING` (default `24`): maximum not-yet-green threads in flight
-//!   during the health-gated thread ramp; `1` reproduces a strict one-at-a-time ramp.
+//! - `JETSTREAMER_TURBO` (default `false`): when truthy, runs at full speed instead of the
+//!   polite default. See [`pace`].
+//! - `JETSTREAMER_SPAWN_PENDING` (default `4`, `24` in turbo mode): maximum not-yet-green
+//!   threads in flight during the health-gated thread ramp; `1` reproduces a strict
+//!   one-at-a-time ramp.
 //! - `JETSTREAMER_SPAWN_GRACE_SECS` (default `30`): how long the launch gate waits for
 //!   sluggish (never stalled) threads before spawning anyway; `0` disables launch gating.
 //! - `JETSTREAMER_RECYCLE_PCT` (default `50`): connection-recycle threshold as a percent of
@@ -190,6 +193,8 @@ pub mod network;
 pub mod node;
 /// Reader utilities for decoding Old Faithful CAR node streams.
 pub mod node_reader;
+/// Request pacing profiles: polite by default, turbo for full speed.
+pub mod pace;
 /// Reward decoding primitives and helpers.
 pub mod rewards;
 /// Utilities for working with subset nodes.
