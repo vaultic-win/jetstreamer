@@ -1,0 +1,17 @@
+{
+  "epoch": 223,
+  "role": "generation-pinned bootstrap for the bounded epoch-224 v1.6.25 comparison diagnostic",
+  "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/96767522/snapshot-96767522-3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7.tar.zst#1632093412056045",
+  "slot": 96767522,
+  "accounts_hash": "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7",
+  "generation": "1632093412056045",
+  "size": 9705551147,
+  "crc32c_base64": "woMSaA==",
+  "md5_base64": "vVpo0VoKsPfVgsQaYG6n/g==",
+  "diagnostic_scope": {
+    "target_epoch": 224,
+    "first_entry_slot": 96767523,
+    "max_slot_exclusive": 96767527,
+    "archive_publication_authorized": false
+  }
+}

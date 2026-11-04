@@ -1,0 +1,18 @@
+# Not installable until actual sealed guard-plan path/digest replace the tokens.
+[Unit]
+Description=Horizon native 228 actual MainPID protective guard
+
+[Service]
+Type=oneshot
+User=root
+Restart=no
+TimeoutStartSec=120
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateNetwork=yes
+NoNewPrivileges=yes
+MemoryMax=1G
+TasksMax=256
+CPUQuota=100%
+ReadWritePaths=/var/lib/jetstreamer/horizon-native228-guard-receipts-v1
+ExecStart=/var/lib/jetstreamer/horizon-228-native-main-guard-b7da8d62-v1/jetstreamer-horizon-standalone-guard ACTUAL_SEALED_GUARD_PLAN_PATH --plan-sha256 ACTUAL_SEALED_GUARD_PLAN_SHA256 --self-sha256 b7da8d629d6e2500a0533c71cf05916e52b6ff136bb75b9a3bad74a72947f67b

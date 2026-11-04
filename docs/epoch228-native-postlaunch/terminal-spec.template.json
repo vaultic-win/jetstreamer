@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-native228-terminal-capture-spec-v1",
+  "running_origin": {
+    "path": "/var/lib/jetstreamer/horizon-228-native-capture-actual-v1/intent.json",
+    "sha256": null
+  },
+  "journal": { "path": null, "sha256": null },
+  "observer": { "path": null, "sha256": null },
+  "fleet": { "path": null, "sha256": null },
+  "output": null
+}

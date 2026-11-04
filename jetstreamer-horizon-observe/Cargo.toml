@@ -1,0 +1,160 @@
+[package]
+name = "jetstreamer-horizon-observe"
+description = "Read-only invocation-bound Horizon replay resource sampler"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+
+[features]
+# Diagnostic CPU allocation released by the exact reserve-stopped epoch 225.
+# Cannot run while that producer or another fleet claim is live.
+ram-snapshot-eight-core-stopped225 = []
+# Isolated selected-profile v1.6.25 snapshot tests; no entry replay or publication.
+epoch225-shrink-snapshot-tests = []
+# Exact private epoch 223 tail snapshot tests; separate inputs and fleet contract.
+epoch223-tail-snapshot-tests = []
+# Separate exact cold snapshot; cannot borrow the tail's input/anchor contract.
+epoch223-cold-snapshot-tests = []
+# Exact cold input qualification of the entry-bounded fee/load candidate.
+epoch223-warmup-snapshot-tests = ["epoch223-cold-snapshot-tests"]
+epoch223-v1620-native-input = ["epoch223-cold-snapshot-tests"]
+epoch223-v1620-native-input-release = ["epoch223-v1620-native-input"]
+# Dormant private same-input RAM comparison; no ordinary replay or publication.
+epoch203-ram-resource-supervisor = []
+epoch203-ram-shrink-candidate = ["epoch203-ram-resource-supervisor"]
+
+[[bin]]
+name = "jetstreamer-prefix203-completion-dispatch"
+path = "src/prefix203_completion_dispatch.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-status-estimate"
+path = "src/status_estimate.rs"
+
+[[bin]]
+name = "jetstreamer-bootstrap227-cache-retire"
+path = "src/bootstrap227_cache_retire_bin.rs"
+
+[[bin]]
+name = "jetstreamer-terminal205-cache-retire"
+path = "src/terminal205_cache_retire_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-tail-exact-evidence"
+path = "src/epoch223_tail_exact_evidence.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-bootstrap-estimate"
+path = "src/epoch223_bootstrap_estimate.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-verify-pair"
+path = "src/verify_pair.rs"
+
+[[bin]]
+name = "jetstreamer-epoch220-import-estimate"
+path = "src/epoch220_import_estimate.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-routine-cycle"
+path = "src/routine_cycle.rs"
+
+[[bin]]
+name = "jetstreamer-epoch157-incident"
+path = "src/incident157.rs"
+
+[[bin]]
+name = "jetstreamer-epoch223-incident"
+path = "src/incident223.rs"
+
+[[bin]]
+name = "jetstreamer-epoch220-prefix-evidence"
+path = "src/incident220.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-ram-snapshot-test"
+path = "src/ram_snapshot_test.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-resource-plan"
+path = "src/epoch203_ram_resource_plan.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-storage-probe"
+path = "src/epoch203_ram_storage_probe.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-retain"
+path = "src/ram_artifact_retain.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-retire-scratch"
+path = "src/ram_scratch_retire_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-lifecycle-qualify"
+path = "src/ram_lifecycle_qualify_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-launch-attest"
+path = "src/ram_launch_attest_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-dev-cache-check"
+path = "src/dev_cache_check_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch141-native-admit"
+path = "src/native141_admit_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch136-input-capability"
+path = "src/epoch136_inputs_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-stopped-scratch-check"
+path = "src/stopped203_check_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-stopped-scratch-retire"
+path = "src/stopped203_retire_bin.rs"
+
+[[bin]]
+name = "jetstreamer-epoch203-ram-resource"
+path = "src/epoch203_ram_resource.rs"
+required-features = ["epoch203-ram-resource-supervisor"]
+
+[[bin]]
+name = "jetstreamer-publication144-track"
+path = "src/publication144_track_bin.rs"
+
+[[bin]]
+name = "jetstreamer-publication144-calibrate"
+path = "src/publication144_calibrate_bin.rs"
+
+[[bin]]
+name = "jetstreamer-publication144-deliver"
+path = "src/publication144_deliver_bin.rs"
+
+[[bin]]
+name = "jetstreamer-publication144-progress"
+path = "src/publication144_progress_bin.rs"
+
+[[bin]]
+name = "jetstreamer-append-cohort191-wrapper"
+path = "src/append_cohort191_wrapper.rs"
+
+[dependencies]
+anyhow.workspace = true
+libc.workspace = true
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true, features = ["std"] }
+sha2.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,44 @@
+{
+  "candidate": "solana-v1.6.25",
+  "status": "private-full-span-qualification-only-unqualified",
+  "feature": "epoch225-v1-6-25-qualification",
+  "upstream": {"tag": "v1.6.25", "commit": "7de8a55b54d3e11058b82f9483bb405d143b455c"},
+  "admission": {
+    "target_epoch": 225,
+    "bootstrap_snapshot_slot": 97199617,
+    "first_entry_slot": 97199618,
+    "output_slot_start": 97200000,
+    "canonical_target_end_slot": 97631999,
+    "terminal_root_slot": 98063464,
+    "max_slot_exclusive": 98063465,
+    "verification_tail_epoch": 226,
+    "verification_tail_private": true,
+    "ordinary_replay_allowed": false,
+    "root_checkpoint_cohort_allowed": false,
+    "inherited_lease_allowed": false,
+    "recovery_allowed": false,
+    "canonical_sidecar_allowed": false,
+    "private_root_namespace": "/home/ubuntu/.jetstreamer-private/qualification-225-v1625-*",
+    "ledger_child": "ledger",
+    "output_child": "output/epoch-225.jet",
+    "scratch_child": "scratch"
+  },
+  "checkpoint_source": {
+    "path": "/var/lib/jetstreamer/horizon-contiguous-224-227-cached-602556d-v1/preflight-220-232-target4.json",
+    "sha256": "f25f3cbe90e74ba977622bf572be0da8e2ae063514a741cbdb670276879aff5e",
+    "meaning": "Retained generation-bound canonical snapshot metadata, not runtime execution qualification"
+  },
+  "checkpoints": [
+    {"slot": 97199617, "accounts_hash": "HE57JmgvEeZjBKN8cfTLrmyCbUnptJ9PWjUdTzgxSSdi", "generation": 1632314379282380},
+    {"slot": 97631459, "accounts_hash": "EXCmpk8xjtzsow8EH56CQJzQncMgiF6D1s9DJ3pw9q8d", "generation": 1632545325132907},
+    {"slot": 98063464, "accounts_hash": "4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR", "generation": 1632781197930817}
+  ],
+  "bounded_predecessor": {
+    "target_slot": 97202500,
+    "worker_end_exclusive": 97202600,
+    "previous_terminal_root": 97631459,
+    "uncovered_epoch225_slots_after_previous_root": 540,
+    "full_checkpoint_qualification_passed": false
+  },
+  "publication_gate": "No promotion or publication. Commit/push reviewed source and tests, seal and attest an exact package, prove its private no-replay capability, pass fresh resource admission and invocation-bound guards, reproduce every canonical root through98063464, then independently reread the complete private artifact. Separately review epoch225-only registry/artifact admission; all full/plugin/R2 gates remain mandatory. Epoch226 suffix stays private and sidecar-free."
+}

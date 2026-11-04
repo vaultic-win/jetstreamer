@@ -4,7 +4,7 @@
 //! - **Title row**: clickable time ranges (`5m`–`12h` show a trailing window, `all` spans the
 //!   entire run and compresses as it grows; number keys `1`–`7` also select), with the run's
 //!   epoch and slot range right-aligned.
-//! - **TPS graph** over the selected range. TPS is a 5s rolling window sampled at 250ms. The
+//! - **TPS graph** over the selected range. TPS is a 5s rolling window sampled at 250 ms. The
 //!   y-axis reads `0 / current / peak`, with the current value drawn as a floating marker
 //!   that rides at the line's height.
 //! - **Progress gauge**: full-width bar with slots done/total, ETA, and elapsed.
@@ -68,9 +68,9 @@ const RENDER_INTERVAL: Duration = Duration::from_millis(250);
 const HEAL_INTERVAL: Duration = Duration::from_secs(30);
 const SAMPLE_INTERVAL: Duration = Duration::from_millis(250);
 /// TPS is measured over a trailing window rather than per-sample deltas: block arrival is
-/// bursty, so instantaneous 250ms rates whipsaw between 0 and multi-million.
+/// bursty, so instantaneous 250 ms rates whipsaw between 0 and multi-million.
 const TPS_WINDOW: Duration = Duration::from_secs(5);
-/// Per-thread TPS keeps a coarser cadence: at 250ms a healthy thread often has zero whole
+/// Per-thread TPS keeps a coarser cadence: at 250 ms a healthy thread often has zero whole
 /// blocks in the window, which would floor `min` to 0 and make avg/max jitter.
 const THREAD_TPS_INTERVAL: Duration = Duration::from_secs(1);
 const LOG_BUFFER_CAP: usize = 2000;

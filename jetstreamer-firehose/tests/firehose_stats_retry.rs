@@ -174,6 +174,7 @@ async fn assert_stats_retry(range: Range<u64>, reverse: bool, failure: FailurePo
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "requires live Old Faithful network access"]
 async fn stats_retry_does_not_replay_completed_slot() {
     assert_stats_retry(
         345_600_000..345_600_004,
@@ -185,6 +186,7 @@ async fn stats_retry_does_not_replay_completed_slot() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "requires live Old Faithful network access"]
 async fn stats_retry_finishes_before_range_completion() {
     assert_stats_retry(
         345_600_000..345_600_002,
@@ -196,6 +198,7 @@ async fn stats_retry_finishes_before_range_completion() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "requires live Old Faithful network access"]
 async fn stats_retry_preserves_skipped_slot_counts() {
     // Slots 378864396..400 are absent from this archive.
     assert_stats_retry(
@@ -208,6 +211,7 @@ async fn stats_retry_preserves_skipped_slot_counts() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "requires live Old Faithful network access"]
 async fn stats_retry_finishes_after_final_reverse_epoch() {
     assert_stats_retry(
         345_599_998..345_600_002,

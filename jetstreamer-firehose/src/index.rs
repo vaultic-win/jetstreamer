@@ -9,10 +9,11 @@
 //! Records are ordered by slot, starting at the epoch's first slot; skipped slots are encoded
 //! as an all-zero record. This is the primary index used for slot lookups.
 //!
-//! When the slot-ranges file is missing (e.g. an older mirror), the loader falls back to the
-//! legacy compactindex pair (`slot-to-cid` + `cid-to-offset-and-size`). Those indexes are
-//! deprecated upstream and will eventually stop being generated. The fallback derives the same
-//! byte-range semantics as the slot-ranges index, so lookups behave identically on both paths.
+//! When the slot-ranges file is missing (e.g. an older mirror), or remains rate-limited or
+//! unavailable after the bounded retry policy, the loader falls back to the legacy compactindex
+//! pair (`slot-to-cid` + `cid-to-offset-and-size`). Those indexes are deprecated upstream and will
+//! eventually stop being generated. The fallback derives the same byte-range semantics as the
+//! slot-ranges index, so lookups behave identically on both paths.
 //!
 //! ## Environment variables
 //!
@@ -224,13 +225,45 @@ pub async fn slot_to_offset(slot: u64) -> Result<u64, SlotOffsetIndexError> {
     slot_to_range(slot).await.map(|(offset, _)| offset)
 }
 
-/// Returns the first *present* slot strictly after `after` and at most `up_to_inclusive`,
-/// or `None` when none exists or the answer is unknown (legacy-index epochs). See
-/// [`SlotOffsetIndex::next_present_slot`].
+/// Returns the first *present* slot at or after `from_inclusive` and at most
+/// `up_to_inclusive`, or `None` when none exists or the answer is unknown
+/// (legacy-index epochs). See [`SlotOffsetIndex::first_present_slot_at_or_after`].
+pub async fn first_present_slot_at_or_after(
+    from_inclusive: u64,
+    up_to_inclusive: u64,
+) -> Option<u64> {
+    SLOT_OFFSET_INDEX
+        .first_present_slot_at_or_after(from_inclusive, up_to_inclusive)
+        .await
+}
+
+/// Returns the first *present* slot strictly after `after` and at most
+/// `up_to_inclusive`, or `None` when none exists or the answer is unknown
+/// (legacy-index epochs). See [`SlotOffsetIndex::next_present_slot`].
 pub async fn next_present_slot(after: u64, up_to_inclusive: u64) -> Option<u64> {
     SLOT_OFFSET_INDEX
         .next_present_slot(after, up_to_inclusive)
         .await
+}
+
+/// Returns the nearest *present* slot in `[floor, before)`, scanning downward from
+/// `before - 1` over at most 64 slots (leader-skip runs are short; anything longer
+/// falls back). `None` when the window holds no present slot or the index cannot
+/// answer — callers then seek `before` directly, accepting the old behaviour.
+pub async fn prev_present_slot(floor: u64, before: u64) -> Option<u64> {
+    let mut slot = before.checked_sub(1)?;
+    for _ in 0..64 {
+        if slot < floor {
+            return None;
+        }
+        match slot_to_range(slot).await {
+            Ok(_) => return Some(slot),
+            Err(SlotOffsetIndexError::SlotNotFound(..)) => {}
+            Err(_) => return None,
+        }
+        slot = slot.checked_sub(1)?;
+    }
+    None
 }
 
 /// Looks up the byte range `(offset, length)` covering all of `slot`'s data within its Old
@@ -266,6 +299,17 @@ impl EpochEntry {
             indexes: OnceCell::new(),
         }
     }
+}
+
+fn slot_ranges_error_allows_legacy_fallback(error: &SlotOffsetIndexError) -> bool {
+    matches!(
+        error,
+        SlotOffsetIndexError::EpochIndexFileNotFound(_)
+            | SlotOffsetIndexError::HttpStatusError(
+                _,
+                StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
+            )
+    )
 }
 
 impl SlotOffsetIndex {
@@ -323,11 +367,11 @@ impl SlotOffsetIndex {
         if !self.force_legacy {
             match self.load_slot_ranges_index(epoch).await {
                 Ok(index) => return Ok(EpochIndexes::SlotRanges(index)),
-                Err(SlotOffsetIndexError::EpochIndexFileNotFound(url)) => {
+                Err(err) if slot_ranges_error_allows_legacy_fallback(&err) => {
                     warn!(
                         target: LOG_MODULE,
-                        "slot-ranges index not found at {url}; falling back to legacy compact \
-                         indexes (deprecated upstream)"
+                        "slot-ranges index unavailable after its bounded fetch policy ({err}); \
+                         falling back to legacy compact indexes (deprecated upstream)"
                     );
                 }
                 Err(err) => return Err(err),
@@ -440,13 +484,16 @@ impl SlotOffsetIndex {
         Ok(range)
     }
 
-    /// Returns the first *present* slot strictly after `after` and at most `up_to_inclusive`,
-    /// or `None` when no such slot exists **or the answer is unknown** (legacy compactindex
-    /// epochs cannot answer this without per-slot network lookups). Used to distinguish a
-    /// genuine end-of-epoch from a prematurely closed HTTP stream, and by the end-of-run
-    /// coverage audit; both treat `None` as "nothing provably missing".
-    pub async fn next_present_slot(&self, after: u64, up_to_inclusive: u64) -> Option<u64> {
-        let mut probe = after.saturating_add(1);
+    /// Returns the first *present* slot at or after `from_inclusive` and at most
+    /// `up_to_inclusive`, or `None` when no such slot exists **or the answer is unknown**
+    /// (legacy compactindex epochs cannot answer this without per-slot network lookups).
+    /// Used to distinguish a genuine end-of-epoch from a prematurely closed HTTP stream.
+    pub async fn first_present_slot_at_or_after(
+        &self,
+        from_inclusive: u64,
+        up_to_inclusive: u64,
+    ) -> Option<u64> {
+        let mut probe = from_inclusive;
         while probe <= up_to_inclusive {
             let epoch = slot_to_epoch(probe);
             let (_, epoch_end_inclusive) = epoch_to_slot_range(epoch);
@@ -466,10 +513,8 @@ impl SlotOffsetIndex {
             match indexes.as_ref() {
                 EpochIndexes::SlotRanges(index) => {
                     let scan_end = up_to_inclusive.min(epoch_end_inclusive);
-                    for slot in probe..=scan_end {
-                        if index.lookup_range(slot).is_ok() {
-                            return Some(slot);
-                        }
+                    if let Some(slot) = index.first_present_slot_at_or_after(probe, scan_end) {
+                        return Some(slot);
                     }
                 }
                 // Legacy epochs cannot be scanned cheaply; report "unknown".
@@ -478,6 +523,14 @@ impl SlotOffsetIndex {
             probe = epoch_end_inclusive.saturating_add(1);
         }
         None
+    }
+
+    /// Returns the first *present* slot strictly after `after` and at most
+    /// `up_to_inclusive`. See [`Self::first_present_slot_at_or_after`].
+    pub async fn next_present_slot(&self, after: u64, up_to_inclusive: u64) -> Option<u64> {
+        let from_inclusive = after.checked_add(1)?;
+        self.first_present_slot_at_or_after(from_inclusive, up_to_inclusive)
+            .await
     }
 
     fn remote_for_path(&self, path: &str) -> Result<RemoteObject, SlotOffsetIndexError> {
@@ -583,6 +636,19 @@ impl SlotRangesIndex {
             ));
         }
         Ok((offset, length as u64))
+    }
+
+    fn first_present_slot_at_or_after(
+        &self,
+        from_inclusive: u64,
+        up_to_inclusive: u64,
+    ) -> Option<u64> {
+        let scan_start = from_inclusive.max(*self.slot_range.start());
+        let scan_end = up_to_inclusive.min(*self.slot_range.end());
+        if scan_start > scan_end {
+            return None;
+        }
+        (scan_start..=scan_end).find(|slot| self.lookup_range(*slot).is_ok())
     }
 }
 
@@ -1912,6 +1978,20 @@ mod tests {
     }
 
     #[test]
+    fn test_first_present_slot_scan_is_inclusive_at_zero() {
+        let index = SlotRangesIndex::from_file(
+            synthetic_ranges_file(&[(59, 100), (0, 0), (159, 250)]),
+            0..=2,
+        )
+        .expect("valid index");
+
+        assert_eq!(index.first_present_slot_at_or_after(0, 2), Some(0));
+        assert_eq!(index.first_present_slot_at_or_after(1, 2), Some(2));
+        assert_eq!(index.first_present_slot_at_or_after(1, 1), None);
+        assert_eq!(index.first_present_slot_at_or_after(3, 4), None);
+    }
+
+    #[test]
     fn test_slot_ranges_rejects_wrong_size() {
         let file = synthetic_ranges_file(&[(59, 100), (159, 250)]);
         assert!(matches!(
@@ -1920,8 +2000,31 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn test_legacy_fallback_accepts_only_missing_or_exhausted_transient_statuses() {
+        let url = Url::parse("https://example.com/195/epoch-195-slot-ranges.raw").unwrap();
+
+        assert!(slot_ranges_error_allows_legacy_fallback(
+            &SlotOffsetIndexError::EpochIndexFileNotFound(url.clone())
+        ));
+        assert!(slot_ranges_error_allows_legacy_fallback(
+            &SlotOffsetIndexError::HttpStatusError(url.clone(), StatusCode::TOO_MANY_REQUESTS,)
+        ));
+        assert!(slot_ranges_error_allows_legacy_fallback(
+            &SlotOffsetIndexError::HttpStatusError(url.clone(), StatusCode::SERVICE_UNAVAILABLE,)
+        ));
+
+        assert!(!slot_ranges_error_allows_legacy_fallback(
+            &SlotOffsetIndexError::HttpStatusError(url.clone(), StatusCode::FORBIDDEN)
+        ));
+        assert!(!slot_ranges_error_allows_legacy_fallback(
+            &SlotOffsetIndexError::IndexFormatError(url, "corrupt index".into())
+        ));
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     #[serial_test::serial]
+    #[ignore = "requires live Old Faithful network access"]
     async fn test_epoch_800_hydration_time() {
         init_logger();
         SLOT_OFFSET_RESULT_CACHE.clear();
@@ -2013,6 +2116,7 @@ mod tests {
     /// legacy fallback path derives byte ranges identical to the slot-ranges index.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     #[serial_test::serial]
+    #[ignore = "requires live Old Faithful network access"]
     async fn test_epoch_800_legacy_matches_slot_ranges() {
         init_logger();
         SLOT_OFFSET_RESULT_CACHE.clear();

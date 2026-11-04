@@ -1,0 +1,73 @@
+[package]
+name = "jetstreamer-historical-worker-v1-6-20"
+version = "0.1.0"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+publish = false
+build = "build.rs"
+
+[features]
+# Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
+# SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
+poh-force-soft = ["sha2-fast/force-soft"]
+# Dedicated diagnostic build used to compare true singleton execution with
+# the ordinary conflict-wave path. The worker still requires historical trace
+# output at runtime and remains an explicitly unqualified candidate.
+diagnostic-singleton = []
+# Isolated read-only snapshot bank metadata example; never ordinary replay.
+snapshot-hard-fork-metadata = ["solana-runtime/snapshot-hard-fork-metadata"]
+# Private epoch 223 prefix using the original runtime and capped storage shrink
+# debt. No native transaction, fee, hash or account-loading semantics change.
+epoch223-prefix-qualification = []
+# Independently sealed sixteen-slot cold comparison, never a long replay.
+epoch223-prefix-warmup-diagnostic = ["epoch223-prefix-qualification"]
+# Independently admitted epoch 227 singleton; same storage-only debt cap, with
+# exact cold snapshot and full epoch bounds. Never substitutes for epoch 223.
+epoch227-capped-qualification = []
+# Separately sealed sixteen-slot cold comparison, never a full epoch.
+epoch227-capped-warmup-diagnostic = ["epoch227-capped-qualification"]
+# Exact epoch 228 input plus its279-slot canonical checkpoint tail in 229.
+epoch228-capped-qualification = []
+
+[[example]]
+name = "snapshot_hard_forks"
+path = "examples/snapshot_hard_forks.rs"
+required-features = ["snapshot-hard-fork-metadata"]
+
+[dependencies]
+bincode = "=1.3.1"
+bzip2 = "=0.3.3"
+cfg-if = "=1.0.0"
+cpufeatures = "=0.2.1"
+jetstreamer-historical-protocol = { path = "../protocol" }
+# Preserve the newest libc known to compile under this historical toolchain;
+# sha2-fast's CPU dispatcher otherwise lets a fresh resolver select a crate
+# whose manifest requires the Rust 2021 edition.
+libc = "=0.2.155"
+num_cpus = "=1.13.0"
+num-derive = "=0.3.2"
+proc-macro2 = "=1.0.24"
+quote = "=1.0.6"
+rand = "=0.7.3"
+rand_chacha = "=0.2.2"
+rayon = "=1.5.0"
+serde = "=1.0.125"
+sha2 = "=0.8.2"
+sha2-fast = { package = "sha2", version = "=0.9.9", features = ["compress"] }
+syn = "=1.0.67"
+thiserror = "=1.0.21"
+solana-runtime = { path = "../vendor/solana-runtime-1.6.20", version = "=1.6.20" }
+solana-bpf-loader-program = { path = "../vendor/solana-bpf-loader-program-1.6.20", version = "=1.6.20" }
+solana-config-program = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }
+solana-merkle-tree = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }
+solana-rayon-threadlimit = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }
+solana-sdk = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }
+solana-stake-program = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }
+solana-vote-program = { git = "https://github.com/solana-labs/solana.git", rev = "77bdb45d4af61fc687161ec06cc0178ff79726d5", version = "=1.6.20" }
+tar = "=0.4.28"
+tempfile = "=3.1.0"
+zstd = "=0.5.3"
+
+[dev-dependencies]
+bs58 = "=0.3.1"
+serde_json = "=1.0.59"

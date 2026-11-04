@@ -1,0 +1,86 @@
+[package]
+name = "jetstreamer-historical-worker-v1-4-25"
+version = "0.1.0"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+publish = false
+build = "build.rs"
+
+[features]
+# Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
+# SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
+poh-force-soft = ["sha2-fast/force-soft"]
+# Match the pinned AccountsBackgroundService debt cap in a separately qualified
+# worker; existing uncapped workers and default builds remain unchanged.
+capped-shrink-candidate = []
+# Read-only fixed-input serialized clock inspection; no native restoration or replay.
+epoch140-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
+# Separate exact-input observation; reuses only the read-only typed layout helper.
+epoch144-snapshot-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
+# Read-only clock inspection of the original failed cohort's exact bootstrap.
+epoch140-original-bootstrap-clock-diagnostic = ["serde_json", "solana-runtime/epoch140-snapshot-clock-diagnostic"]
+epoch141-boundary-consumer-diagnostic = ["serde_json"]
+# Closed cold-bootstrap diagnostic. Stops in the worker after freezing 60912004;
+# it cannot finish an ordinary epoch or promote a runtime route.
+epoch141-freeze-component-diagnostic = ["serde_json"]
+# Separate bounded follow-up: execute the formerly failing 60912005 vote and
+# freeze 60912005, while retaining the same cold bootstrap and private authority.
+epoch141-vote-prefix-diagnostic = ["epoch141-freeze-component-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch141-boundary-consumer"
+path = "src/epoch141_boundary_consumer_bin.rs"
+required-features = ["epoch141-boundary-consumer-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch140-original-bootstrap-clock"
+path = "src/snapshot_clock_original140_bin.rs"
+required-features = ["epoch140-original-bootstrap-clock-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch140-snapshot-clock"
+path = "src/snapshot_clock_bin.rs"
+required-features = ["epoch140-snapshot-clock-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch144-snapshot-clock"
+path = "src/snapshot_clock144_bin.rs"
+required-features = ["epoch144-snapshot-clock-diagnostic"]
+
+[dependencies]
+bincode = "=1.3.1"
+bzip2 = "=0.3.3"
+cfg-if = "=1.0.0"
+cpufeatures = "=0.2.1"
+jetstreamer-historical-protocol = { path = "../protocol" }
+# Preserve the newest libc known to compile under this historical toolchain;
+# sha2-fast's CPU dispatcher otherwise lets a fresh resolver select a crate
+# whose manifest requires the Rust 2021 edition.
+libc = "=0.2.155"
+num_cpus = "=1.13.0"
+num-derive = "=0.3.2"
+proc-macro2 = "=1.0.24"
+quote = "=1.0.6"
+rand = "=0.7.3"
+rand_chacha = "=0.2.2"
+rayon = "=1.4.1"
+serde = "=1.0.112"
+serde_json = { version = "=1.0.59", optional = true }
+sha2 = "=0.8.2"
+sha2-fast = { package = "sha2", version = "=0.9.9", features = ["compress"] }
+syn = "=1.0.48"
+thiserror = "=1.0.20"
+solana-runtime = { path = "../vendor/solana-runtime-1.4.25", version = "=1.4.25" }
+solana-bpf-loader-program = { path = "../vendor/solana-bpf-loader-program-1.4.25", version = "=1.4.25" }
+solana-config-program = { git = "https://github.com/solana-labs/solana.git", rev = "893cc7647248a3536fb6e6d0b5e51c71446b862d", version = "=1.4.25" }
+solana-merkle-tree = { git = "https://github.com/solana-labs/solana.git", rev = "893cc7647248a3536fb6e6d0b5e51c71446b862d", version = "=1.4.25" }
+solana-rayon-threadlimit = { git = "https://github.com/solana-labs/solana.git", rev = "893cc7647248a3536fb6e6d0b5e51c71446b862d", version = "=1.4.25" }
+solana-sdk = { git = "https://github.com/solana-labs/solana.git", rev = "893cc7647248a3536fb6e6d0b5e51c71446b862d", version = "=1.4.25" }
+solana-stake-program = { git = "https://github.com/solana-labs/solana.git", rev = "893cc7647248a3536fb6e6d0b5e51c71446b862d", version = "=1.4.25" }
+solana-vote-program = { git = "https://github.com/solana-labs/solana.git", rev = "893cc7647248a3536fb6e6d0b5e51c71446b862d", version = "=1.4.25" }
+tar = "=0.4.29"
+tempfile = "=3.1.0"
+zstd = "=0.5.3"
+
+[dev-dependencies]
+bs58 = "=0.3.1"

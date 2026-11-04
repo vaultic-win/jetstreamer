@@ -1,0 +1,39 @@
+{
+  "available_bytes": 5464289640448,
+  "bounded_measurement": false,
+  "guard_invocation_id": "57e368f2972446e39aa9826267188a19",
+  "guard_sha256": "eca429932ffe9afe71aecba815ab301db46bdddbaf24b4c44af8c88bb74a6194",
+  "maximum_worker_vmas": 3500000,
+  "minimum_free_bytes": 5153080892870,
+  "plan": "/usr/local/lib/jetstreamer/horizon-epoch140-native-restore-guard-20261020-v2/plan.json",
+  "plan_sha256": "0af74eaefb763d058348b3ec25452df71a4daa1d92862766aa212f7a29822019",
+  "producer": {
+    "active": "active",
+    "cgroup": "/system.slice/horizon-qualify-140-native-restore-20261020-v1.service",
+    "delegated": false,
+    "invocation_id": "f60601a711554b8c826de9c40a67756c",
+    "kill_mode": "control-group",
+    "load_state": "loaded",
+    "pid": 2284112,
+    "restart_policy": "no",
+    "restarts": 0,
+    "result": "success",
+    "sub": "running"
+  },
+  "producer_invocation_id": "f60601a711554b8c826de9c40a67756c",
+  "r2_mutations": false,
+  "recorded_unix_seconds": 1792534842,
+  "remote_mutations": false,
+  "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+  "scratch_deleted": false,
+  "target_handoff": null,
+  "target_handoff_error": null,
+  "trip_reason": null,
+  "worker_observation_error": null,
+  "workers": [
+    [
+      2284169,
+      380210
+    ]
+  ]
+}

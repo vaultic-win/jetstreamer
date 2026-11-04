@@ -1,0 +1,10 @@
+{
+  "epoch": 228,
+  "phase": "private-cold-snapshot-verification",
+  "unit": "horizon-native-input-228-capped-1bfa8d51-v1.service",
+  "invocation_id": null,
+  "expected_exec_start": null,
+  "evidence": [
+    { "path": "/var/lib/jetstreamer/horizon-228-native-capture-actual-v1/intent.json", "sha256": null }
+  ]
+}
