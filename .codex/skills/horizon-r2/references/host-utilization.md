@@ -33,12 +33,86 @@ only access-time changes caused by reading. Preserve the source ownership/mode a
 then preserve the captured bytes as separate immutable observation evidence. Do not chmod the original,
 relax immutable authority readers or promote a captured observation into launch/stop authority.
 
+### Gate copy and build starts on actual guard proof
+
+For a new copy or build whose guard must be bound after systemd assigns its invocation, make
+useful work conditional on proof of the first genuine timer-driven guard success. A pre-start
+sleep only provides setup time; it cannot authorize work when setup is delayed or interrupted.
+Use a tested native pre-start check for a Root-sealed token beneath the actual `${INVOCATION_ID}`.
+Publish that token only after the exact guard exits zero with no trip while the matching actor
+remains in `activating/start-pre`, with zero restarts and `MainPID=0`. Bind the guard, actor,
+admission and original journal evidence. Keep the guard active through the real operation.
+
+Finish static review, directory setup, prerequisite sealing and the token-publication recipe before
+activating the actor. Prewrite and check the bounded dynamic sequence that obtains the real actor
+IID, binds and arms the guard, authenticates its genuine completion, and Rust-seals the matching
+token. Run those dependent steps together without intervening model turns. Record the actual
+deadline and fail closed if the sequence cannot finish within it; a later guard success cannot
+repair an expired attempt. A different setup interval requires a distinct reviewed admission and
+unit, retaining the original failure and every token/identity gate.
+
+For namespace proof, wait for the known stable pre-start step and recheck the actor IID and
+ControlPID around the read. A short prerequisite can finish between `systemctl show` and a
+`/proc/PID/mountinfo` read. Retry that metadata capture only within the original setup deadline
+and while the same actor remains in start-pre; never substitute another process or restart it.
+
+Keep guard receipts separate from readable admission tokens. The existing reserve guard requires
+its Root-owned receipt directory to be `0700`; token ancestors traversed by an Ubuntu process
+need Root ownership and readable, non-writable access for that process. Check actual owners,
+modes, mount access and absent token paths before activation. Preserve source and prior targets.
+
+Qualify native invocation expansion with metadata-only controls: a missing token must prevent
+the work marker, the matching invocation's sealed token must allow it, and a new invocation must
+fail while the old token remains. Reject environment overrides and symlink tokens. Apply the gate
+to both cache copies and compilation. If setup fails, preserve the original outcome and use a
+separately admitted attempt; never rearm the compiler or count a later guard fire as proof that
+protection preceded work. This procedure does not require restarting a healthy existing producer
+or changing the single 30-minute replay observation cadence.
+
+### Reconcile periodic guard invocations
+
+Include each live producer's protective guard service in the fleet census, including ordinary
+singleton guards. When the installed helper has no authenticated completed-guard rollover adapter,
+run reconciliation inside the intersection of all relevant completed guard windows. Authenticate
+each actual successful, inactive guard invocation, its no-trip receipt, unchanged producer/plan
+bindings and armed timer deadline. Keep every actor in the census and preserve failures; an
+unsupported guard name needs its real evidence, never a suffix-only normalization exemption.
+
+If the intersection is too short, the existing immutable contracts may permit advancing the
+safety checks once during that coordinated cycle. For manually startable `Type=oneshot` guards
+with `Restart=no`, no `RemainAfterExit`, and timers driven only by `OnUnitInactiveSec`, one
+`systemctl start GUARD_A GUARD_B` request can bring the unchanged checks together. An already
+running activation may be coalesced. Authenticate each actual completion and receipt; a successful
+start request alone proves neither protection nor synchronization. Honor any genuine safety trip
+through the normal failure lifecycle. Preserve producer invocations, timer definitions and limits.
+
+Derive the usable window from the earliest actual armed next deadline after completion. Retain
+the qualified minimum window, timeout and stop margin, and execute the final preflight and fleet
+CLI consecutively in one bounded operator call: an intervening model/tool handoff can consume the
+window. This procedure grants no producer restart, timer stop/edit, unsupported rollover bypass
+or repeated replay observer. Routine replay/resource observations and status audits remain on the
+single 30-minute cadence.
+
 Match a new job's systemd lifetime to its terminal verifier. If that verifier requires
 `LoadState=loaded`, use its persistent service file; `systemd-run --wait` does not by itself
 retain a transient unit after completion. Preserve the actual running receipt and exact PID1
 start/completion journal. If systemd collects a completed unit, retain the real `not-found`
 state and qualify recovery from those original proofs before promoting its result. Recreating
 an idle unit does not restore the historical invocation or prove its execution.
+
+Before an expected completion, check the deployed observer's terminal behavior. A live-only
+primary role can reject a completed or collected producer and suppress the entire next sample.
+Prepare an existing supported terminal-tolerant telemetry route without restarting healthy work.
+If that route uses fallible diagnostic observations, preserve the original invocation, complete
+unit census, memory and growth reservations until genuine terminal evidence establishes closure.
+An unavailable diagnostic or missing primary row does not establish completion or free capacity.
+Keep active work's status current through a compatible publisher or the authorized status-only
+fallback; never rewrite an observer receipt or invent a diagnostic claim to satisfy a consumer.
+If fleet accounting cannot consume that role, retain an explicit qualified capacity supplement
+and do not use an incomplete lane count to authorize admission. Bind the actual terminal journal,
+committed publication receipt and downstream owner before handing off delivery. Check the exact
+producer's post-commit cleanup before adding a separate cleaner; credit only actual closed-owner
+resource evidence, preserving archives, inputs and receipts.
 
 Choose the desired lane count from memory alone, targeting 90% of total host memory used. Estimate
 the marginal lane RSS from this century's observations, subtract measured non-lane usage once, and

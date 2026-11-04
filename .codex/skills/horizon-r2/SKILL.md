@@ -296,6 +296,18 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- Before arming a coordinated observer, check that epoch ranges do not overlap across `replays`
+  and `diagnostic_replays`. Keep a replacement in `replays`; retain its failed predecessor in the
+  fleet and repair backlog instead of adding a duplicate observer row. Preserve earlier configs
+  and failure receipts when correcting a rejected configuration.
+- For a bounded qualification transaction, validate the complete operator wrapper and its parameter
+  shapes, paths and bindings against the sealed contract before opening the original clock. Run
+  already reviewed dependent stages from the independent before-counter through gated worker
+  launch consecutively in one retained process; do not consume the remaining readiness budget with
+  intervening model turns. Abort the sequence on any failed gate, preserve the actual result and
+  resume only through the applicable recovery path. Keep all native checks, genuine waits, source
+  and accounting proofs, deadline checks and publication gates; sequencing grants no retry,
+  deadline extension or permission to reset the original clock.
 - Make long operations and control transitions observable in private stdout/stderr logs. Emit
   timestamped phase start, substantive progress, completion and failure records with the epoch,
   operation, elapsed time and last substantive progress time. For bounded waits, include the exact
@@ -1239,6 +1251,9 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- For new copy or build phases whose guard is armed after activation, require a tested native
+  pre-start gate tied to the actual invocation before useful work can begin. A fixed delay alone
+  is insufficient. Read [the build guard procedure](references/host-utilization.md#gate-copy-and-build-starts-on-actual-guard-proof).
 - When an unprivileged build or verifier recursively accounts its current execution directory,
   keep root-only status and custody metadata outside that directory. Place it in an explicitly
   ledger-backed private leaf, retain its private ownership and modes, and include that leaf in the
