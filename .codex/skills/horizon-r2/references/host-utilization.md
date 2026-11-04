@@ -67,6 +67,19 @@ Publish that token only after the exact guard exits zero with no trip while the 
 remains in `activating/start-pre`, with zero restarts and `MainPID=0`. Bind the guard, actor,
 admission and original journal evidence. Keep the guard active through the real operation.
 
+Finish static review, directory setup, prerequisite sealing and the token-publication recipe before
+activating the actor. Prewrite and check the bounded dynamic sequence that obtains the real actor
+IID, binds and arms the guard, authenticates its genuine completion, and Rust-seals the matching
+token. Run those dependent steps together without intervening model turns. Record the actual
+deadline and fail closed if the sequence cannot finish within it; a later guard success cannot
+repair an expired attempt. A different setup interval requires a distinct reviewed admission and
+unit, retaining the original failure and every token/identity gate.
+
+For namespace proof, wait for the known stable pre-start step and recheck the actor IID and
+ControlPID around the read. A short prerequisite can finish between `systemctl show` and a
+`/proc/PID/mountinfo` read. Retry that metadata capture only within the original setup deadline
+and while the same actor remains in start-pre; never substitute another process or restart it.
+
 Keep guard receipts separate from readable admission tokens. The existing reserve guard requires
 its Root-owned receipt directory to be `0700`; token ancestors traversed by an Ubuntu process
 need Root ownership and readable, non-writable access for that process. Check actual owners,
