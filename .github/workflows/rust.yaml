@@ -11,7 +11,7 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
+  RUSTC_WRAPPER: "${{ github.workspace }}/.github/scripts/rustc-cache.sh"
   OPENSSL_NO_VENDOR: "1"
 
 jobs:
@@ -35,7 +35,13 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: cargo check (${{ matrix.name }})
-        run: cargo check --workspace ${{ matrix.flags }}
+        run: cargo check --locked --workspace ${{ matrix.flags }}
+      - name: Check independent library consumer
+        if: matrix.name == 'default'
+        run: .github/scripts/check-consumer.sh
+      - name: Verify firehose package
+        if: matrix.name == 'default'
+        run: cargo package --locked -p jetstreamer-firehose
 
   cargo-test:
     name: cargo test
@@ -62,7 +68,7 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: cargo test (${{ matrix.name }})
-        run: cargo test --workspace ${{ matrix.flags }}
+        run: cargo test --locked --workspace ${{ matrix.flags }}
 
   cargo-fmt:
     name: cargo fmt
@@ -79,7 +85,7 @@ jobs:
       - name: Install cargo-fmt
         run: rustup component add rustfmt
       - name: cargo fmt
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
 
   cargo-doc:
     name: cargo doc
@@ -94,7 +100,7 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: cargo doc
-        run: cargo doc
+        run: cargo doc --locked --workspace --no-deps
 
   cargo-clippy:
     name: cargo clippy
@@ -118,7 +124,7 @@ jobs:
       - name: Install cargo-clippy
         run: rustup component add clippy
       - name: cargo clippy (${{ matrix.name }})
-        run: cargo clippy --workspace ${{ matrix.flags }}
+        run: cargo clippy --locked --workspace ${{ matrix.flags }}
 
   cargo-fix:
     name: cargo fix
@@ -135,7 +141,7 @@ jobs:
       - name: cargo fix --workspace
         run: |
           # Run cargo fix on the project
-          cargo fix --workspace
+          cargo fix --locked --workspace
 
           # Check for local git changes
           if ! git diff --exit-code; then
