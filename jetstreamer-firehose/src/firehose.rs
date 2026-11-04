@@ -1,16 +1,21 @@
+#[cfg(feature = "geyser")]
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dashmap::{DashMap, DashSet};
 use futures_util::future::BoxFuture;
+#[cfg(feature = "geyser")]
 use reqwest::{Client, Url};
 use solana_accounts_db::stake_rewards::StakeRewardInfo;
 use solana_address::Address;
+#[cfg(feature = "geyser")]
 use solana_geyser_plugin_manager::{
     block_metadata_notifier_interface::BlockMetadataNotifier,
     geyser_plugin_service::GeyserPluginServiceError,
 };
 use solana_hash::Hash;
+#[cfg(feature = "geyser")]
 use solana_ledger::entry_notifier_interface::EntryNotifier;
 use solana_reward_info::RewardType;
+#[cfg(feature = "geyser")]
 use solana_rpc::{
     optimistically_confirmed_bank_tracker::SlotNotification,
     transaction_notifier_interface::TransactionNotifier,
@@ -20,15 +25,15 @@ use solana_sdk_ids::vote::id as vote_program_id;
 use solana_transaction::versioned::VersionedTransaction;
 use std::{
     fmt::Display,
-    future::Future,
     io,
     ops::Range,
-    path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
 };
+#[cfg(feature = "geyser")]
+use std::{future::Future, path::PathBuf};
 use thiserror::Error;
 use tokio::{
     sync::{
@@ -590,8 +595,10 @@ pub enum FirehoseError {
     /// Failure while reading the Old Faithful CAR header.
     ReadHeader(SharedError),
     /// Error emitted by the Solana Geyser plugin service.
+    #[cfg(feature = "geyser")]
     GeyserPluginService(GeyserPluginServiceError),
     /// Transaction notifier could not be acquired from the Geyser service.
+    #[cfg(feature = "geyser")]
     FailedToGetTransactionNotifier,
     /// Failure while reading data until the next block boundary.
     ReadUntilBlockError(SharedError),
@@ -640,11 +647,13 @@ impl Display for FirehoseError {
             FirehoseError::ReadHeader(error) => {
                 write!(f, "Error reading header: {}", error)
             }
+            #[cfg(feature = "geyser")]
             FirehoseError::GeyserPluginService(geyser_plugin_service_error) => write!(
                 f,
                 "Error initializing geyser plugin service: {}",
                 geyser_plugin_service_error
             ),
+            #[cfg(feature = "geyser")]
             FirehoseError::FailedToGetTransactionNotifier => write!(
                 f,
                 "Failed to get transaction notifier from GeyserPluginService"
@@ -709,6 +718,7 @@ impl From<reqwest::Error> for FirehoseError {
     }
 }
 
+#[cfg(feature = "geyser")]
 impl From<GeyserPluginServiceError> for FirehoseError {
     fn from(e: GeyserPluginServiceError) -> Self {
         FirehoseError::GeyserPluginService(e)
@@ -1198,17 +1208,51 @@ mod rewards_decode_tests {
                 pubkey,
                 lamports: -800_000_000,
                 post_balance: 4_200_000_000,
-                reward_type: solana_storage_proto::convert::generated::RewardType::VatDebit as i32,
+                // VATDebit is 6 on the protobuf wire, independent of the runtime enum.
+                reward_type: 6,
                 commission: String::new(),
                 commission_bps: String::new(),
             }],
-            num_partitions: None,
+            num_partitions: Some(solana_storage_proto::convert::generated::NumPartitions {
+                num_partitions: 2,
+            }),
         };
         let bytes = prost_014::Message::encode_to_vec(&proto);
         let decoded = decode_rewards_from_bytes(0, &bytes).expect("decode proto rewards");
-        let (_, reward) = &decoded.rewards.keyed_rewards[0];
+        assert_eq!(decoded.rewards.keyed_rewards.len(), 1);
+        assert_eq!(decoded.rewards.num_partitions, Some(2));
+        let (address, reward) = &decoded.rewards.keyed_rewards[0];
+        assert_eq!(*address, vote_program_id());
         assert_eq!(reward.reward_type, RewardType::VATDebit);
         assert_eq!(reward.lamports, -800_000_000);
+        assert_eq!(reward.post_balance, 4_200_000_000);
+        assert_eq!(reward.commission_bps, None);
+        assert!(!decoded.commission_rate_in_basis_points);
+
+        let handler_rewards = decoded.to_handler_rewards();
+        let (address, reward) = &handler_rewards[0];
+        assert_eq!(*address, vote_program_id());
+        assert_eq!(reward.reward_type, RewardType::VATDebit);
+        assert_eq!(reward.lamports, -800_000_000);
+        assert_eq!(reward.post_balance, 4_200_000_000);
+    }
+
+    #[test]
+    fn rejects_unknown_protobuf_reward_types() {
+        for reward_type in [0, 7, i32::MAX] {
+            let proto = solana_storage_proto::convert::generated::Rewards {
+                rewards: vec![solana_storage_proto::convert::generated::Reward {
+                    pubkey: vote_program_id().to_string(),
+                    reward_type,
+                    ..Default::default()
+                }],
+                num_partitions: None,
+            };
+            let bytes = prost_014::Message::encode_to_vec(&proto);
+            let error = decode_rewards_from_bytes(0, &bytes)
+                .expect_err("unknown reward types must not silently decode");
+            assert!(error.to_string().contains("unsupported reward type"));
+        }
     }
 
     #[test]
@@ -2889,13 +2933,14 @@ where
     Ok(())
 }
 
-#[allow(clippy::result_large_err)]
 /// Builds a Geyser-backed firehose and returns a slot notification stream.
 ///
-/// This helper is used by [`firehose`] when Geyser plugins need to be stood up in-process
-/// rather than relying solely on remote streams. The provided `slot_range` is treated as a
+/// Requires the `geyser` feature. Loads Agave Geyser plugins in-process and replays archived
+/// blocks through their notifier interfaces. The provided `slot_range` is treated as a
 /// half-open interval `[start, end)`, and the thread will restart from the last processed
 /// slot on recoverable errors to maintain coverage.
+#[cfg(feature = "geyser")]
+#[allow(clippy::result_large_err)]
 pub fn firehose_geyser(
     rt: Arc<tokio::runtime::Runtime>,
     slot_range: Range<u64>,
@@ -3021,6 +3066,7 @@ pub fn firehose_geyser(
     Ok(confirmed_bank_receiver)
 }
 
+#[cfg(feature = "geyser")]
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::result_large_err)]
 async fn firehose_geyser_thread(

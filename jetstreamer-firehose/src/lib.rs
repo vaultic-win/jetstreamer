@@ -18,6 +18,12 @@
 //! - Rich data models for blocks, entries, rewards, and transactions.
 //! - Epoch helpers for reasoning about slot ranges and availability windows.
 //!
+//! # External Geyser plugins
+//! Loading an external Agave plugin through `firehose_geyser` requires the optional
+//! `geyser` feature and the root-level RocksDB patches documented in the
+//! [crate README](https://github.com/vaultic-win/jetstreamer/tree/main/jetstreamer-firehose#external-geyser-plugins).
+//! Default streaming and Jetstreamer plugins do not require those patches.
+//!
 //! # Configuration
 //! Several environment variables influence how the firehose locates and caches data:
 //! - `JETSTREAMER_HTTP_BASE_URL` (default `https://files.old-faithful.net`): base URL or

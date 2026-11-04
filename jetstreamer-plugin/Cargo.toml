@@ -3,6 +3,7 @@ name = "jetstreamer-plugin"
 description = "Support crate for Jetstreamer containing plugin framework abstractions and utilities"
 keywords.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true
