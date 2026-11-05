@@ -1234,6 +1234,13 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- Before starting `jetstreamer-horizon-verify-pair`, create both its private state directory and
+  its `receipts/` child as Root-owned `0700` directories. The runner validates these existing
+  directories; it does not create them. Run the exact sealed runner, plan and hashes with
+  `--check-only` under the final service identity, capabilities and mounts before useful work,
+  preferably as that service's `ExecStartPre`. This checks executable bindings, the canonical
+  checksum and archive identity without hashing the archive body, running verifier commands or
+  creating a verification receipt. Preserve failed attempts and logs when correcting setup.
 - For new copy or build phases whose guard is armed after activation, require a tested native
   pre-start gate tied to the actual invocation before useful work can begin. A fixed delay alone
   is insufficient. Read [the build guard procedure](references/host-utilization.md#gate-copy-and-build-starts-on-actual-guard-proof).
@@ -1288,6 +1295,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   read root-owned sealed evidence beneath the private root, retain only that capability (including
   the effective or ambient set as required by the unit), keep the target mount read-only except for
   exact receipt directories, and prove the read path in an equivalently sandboxed transient unit.
+  Use an actual read-only open or the qualified tool's metadata-only preflight for that proof.
+  A shell access predicate can disagree with a successful kernel open under restricted
+  capabilities; diagnose that discrepancy without widening archive permissions or dropping
+  the tool's integrity checks.
   Do not relax private-directory permissions to work around the sandbox.
   A root launcher that validates private evidence and then drops to an unprivileged scanner needs
   CAP_SETGID and CAP_SETUID effective at the drop point in addition to any traversal capability.
