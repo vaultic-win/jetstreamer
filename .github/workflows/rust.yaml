@@ -100,6 +100,9 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: cargo doc
+        env:
+          # Documentation does not need the large embedded ClickHouse executable.
+          DOCS_RS: "1"
         run: cargo doc --locked --workspace --no-deps
 
   cargo-clippy:
