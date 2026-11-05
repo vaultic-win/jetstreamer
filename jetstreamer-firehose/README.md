@@ -6,6 +6,39 @@ plugin or the Jetstreamer plugin runner.
 Based on the demo provided by the Old Faithful project in
 https://github.com/rpcpool/yellowstone-faithful/tree/main/geyser-plugin-runner
 
+## External Geyser plugins
+
+Normal streaming and Jetstreamer's built-in plugins work with default features and
+need no Cargo patches. The external Agave plugin loader, `firehose_geyser`, and the
+`jetstreamer-firehose` binary require the optional `geyser` feature. Existing users
+of these two entry points must enable that feature when upgrading.
+
+From this repository, run an external Geyser plugin with:
+
+```sh
+cargo run --release -p jetstreamer-firehose --features geyser -- 800 /path/to/plugin.json
+```
+
+The loader uses Agave 4.3.2's unstable internal APIs and plugin ABI. Build external
+plugins against the same release. Agave's ledger crate requires methods that are
+absent from crates.io RocksDB 0.24, so this workspace pins Anza's RocksDB fork.
+Cargo ignores a dependency's `[patch]` table. To enable the loader in another
+project, add the feature and both patches to that project's workspace root:
+
+```toml
+[dependencies]
+jetstreamer-firehose = { version = "0.9.0", features = ["geyser"] }
+
+[patch.crates-io]
+librocksdb-sys = { git = "https://github.com/anza-xyz/rust-rocksdb", rev = "4dba80dfe9434e595a971f5b2985ff9ba4fb31e7" }
+rocksdb = { git = "https://github.com/anza-xyz/rust-rocksdb", rev = "4dba80dfe9434e595a971f5b2985ff9ba4fb31e7" }
+```
+
+The top-level `jetstreamer` crate forwards its `geyser` feature to this crate.
+`--all-features` also enables the loader and therefore requires these patches.
+Default library consumers and default package verification do not build the ledger
+or RocksDB. Rust 1.97.1 or newer is required in either configuration.
+
 ## Configuration
 
 ### Environment variables

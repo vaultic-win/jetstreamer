@@ -54,6 +54,11 @@ Geyser plugin locally, streamed over the internet from the Old Faithful archive.
 
 ## Quick Start
 
+Rust 1.97.1 or newer is required. Normal streaming, built-in plugins, and the runner
+build with the default features. Loading an external Agave Geyser plugin requires
+the optional `geyser` feature and the RocksDB setup described in the
+[firehose README](jetstreamer-firehose/README.md#external-geyser-plugins).
+
 To get an idea of what Jetstreamer is capable of, you can try out the demo CLI that runs
 Jetstreamer Runner with the Program Tracking plugin enabled. The built-in plugins are
 `program-tracking`, `instruction-tracking`, and `pubkey-stats`; pass `--with-plugin <name>` to

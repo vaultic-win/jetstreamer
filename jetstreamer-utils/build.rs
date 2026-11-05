@@ -4,6 +4,9 @@ use std::process::Command;
 use std::{env, fs};
 
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
+
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let embed_clickhouse_rs = Path::new(&out_dir).join("embed_clickhouse.rs");
 

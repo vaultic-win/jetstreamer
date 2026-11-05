@@ -3,6 +3,7 @@ name = "jetstreamer-utils"
 description = "Support crate for Jetstreamer containing utility functions, types, and ClickHouse integration"
 keywords.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true

@@ -3,6 +3,7 @@ name = "jetstreamer-firehose"
 description = "Support crate for Jetstreamer containing firehose ingestion engine and core abstractions"
 keywords.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -12,6 +13,13 @@ documentation.workspace = true
 
 [features]
 default = []
+geyser = [
+    "dep:crossbeam-channel",
+    "dep:solana-entry",
+    "dep:solana-geyser-plugin-manager",
+    "dep:solana-ledger",
+    "dep:solana-rpc",
+]
 verify-transaction-signatures = []
 s3-backend = [
     "aws-credential-types",
@@ -23,25 +31,26 @@ s3-backend = [
 [[bin]]
 name = "jetstreamer-firehose"
 path = "src/main.rs"
+required-features = ["geyser"]
 
 [dependencies]
-crossbeam-channel.workspace = true
+crossbeam-channel = { workspace = true, optional = true }
 serial_test.workspace = true
-solana-rpc.workspace = true
+solana-rpc = { workspace = true, optional = true }
 solana-runtime.workspace = true
 solana-hash.workspace = true
-solana-geyser-plugin-manager.workspace = true
+solana-geyser-plugin-manager = { workspace = true, optional = true }
 solana-storage-proto.workspace = true
 solana-address.workspace = true
 solana-transaction.workspace = true
 solana-message.workspace = true
 solana-transaction-status.workspace = true
-solana-ledger.workspace = true
+solana-ledger = { workspace = true, optional = true }
 solana-signature.workspace = true
 solana-sdk-ids.workspace = true
 solana-accounts-db.workspace = true
 prost_014.workspace = true
-solana-entry.workspace = true
+solana-entry = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["json", "stream"] }
 tokio.workspace = true
 futures-util.workspace = true

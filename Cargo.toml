@@ -3,6 +3,7 @@ members = ["jetstreamer-firehose", "jetstreamer-plugin", "jetstreamer-utils"]
 
 [workspace.package]
 edition = "2024"
+rust-version = "1.97.1"
 version = "0.9.0"
 authors = ["sam0x17", "anza-team"]
 license = "MIT OR Apache-2.0"
@@ -15,6 +16,7 @@ name = "jetstreamer"
 description = "High-throughput Solana transaction ledger streaming and plugin framework suitable for research and backfilling"
 keywords.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 version.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -23,6 +25,7 @@ documentation.workspace = true
 
 [features]
 default = []
+geyser = ["jetstreamer-firehose/geyser"]
 s3-backend = ["jetstreamer-firehose/s3-backend"]
 verify-transaction-signatures = ["jetstreamer-firehose/verify-transaction-signatures"]
 
@@ -42,7 +45,7 @@ anyhow = { version = "1", default-features = false }
 base64 = "0.23"
 bincode = "1"
 serial_test = "4"
-wincode = "0.5"
+wincode = "0.6"
 bs58 = { version = "0", default-features = false }
 cbor = "0"
 cid = "0"
@@ -59,27 +62,28 @@ prost_014 = { package = "prost", version = "0.14" }
 protobuf-src = "1"
 serde = { version = "1", default-features = false }
 serde_cbor = "0"
-agave-geyser-plugin-interface = "4"
+agave-geyser-plugin-interface = { version = "=4.3.2", features = ["agave-unstable-api"] }
 solana-address = "2"
 solana-hash = "4"
-solana-blake3-hasher = "=3.1.0"
-solana-epoch-rewards-hasher = "=3.1.0"
-solana-keccak-hasher = "=3.1.0"
+solana-blake3-hasher = "3"
+solana-epoch-rewards-hasher = "3"
+solana-keccak-hasher = "3"
 solana-logger = "3"
 solana-signature = { version = "3", default-features = false }
-solana-accounts-db = "4"
-solana-entry = "4"
-solana-ledger = "4"
-solana-geyser-plugin-manager = { version = "4", features = ["agave-unstable-api"] }
-solana-rpc = "4"
-solana-runtime = "4"
-solana-storage-proto = "4"
+# Agave's internal APIs and Geyser ABI must stay on the same tested release.
+solana-accounts-db = { version = "=4.3.2", features = ["agave-unstable-api"] }
+solana-entry = { version = "=4.3.2", features = ["agave-unstable-api"] }
+solana-ledger = { version = "=4.3.2", features = ["agave-unstable-api"] }
+solana-geyser-plugin-manager = { version = "=4.3.2", features = ["agave-unstable-api"] }
+solana-rpc = { version = "=4.3.2", features = ["agave-unstable-api"] }
+solana-runtime = { version = "=4.3.2", features = ["agave-unstable-api"] }
+solana-storage-proto = { version = "=4.3.2", features = ["agave-unstable-api"] }
 solana-message = { version = "4", features = ["wincode"] }
 solana-transaction = { version = "4", features = ["wincode"] }
-solana-transaction-status = "4"
+solana-transaction-status = { version = "=4.3.2", features = ["agave-unstable-api"] }
 solana-sdk-ids = "3"
-solana-reward-info = "6"
-solana-sysvar = "=4.1.0"
+solana-reward-info = "7"
+solana-sysvar = "4"
 sha2 = "0.11"
 tonic = { version = "0", default-features = false }
 tonic-build = "0"
@@ -124,6 +128,13 @@ solana-keccak-hasher.workspace = true
 [dev-dependencies]
 clickhouse.workspace = true
 
+# Live replay tests verify hundreds of thousands of signatures with all features.
+# Optimize the crypto dependency while retaining test-time correctness checks.
+[profile.test.package.solana-ed25519]
+opt-level = 3
+debug-assertions = true
+overflow-checks = true
+
 [profile.release]
 lto = true
 codegen-units = 1
@@ -132,3 +143,10 @@ opt-level = 3
 [profile.release.package."*"]
 opt-level = 3
 codegen-units = 1
+
+# Only the optional `geyser` loader needs Agave's patched ledger/RocksDB stack.
+# Cargo does not propagate these patches to consumers; see the firehose README
+# before enabling `geyser` outside this workspace.
+[patch.crates-io]
+librocksdb-sys = { git = "https://github.com/anza-xyz/rust-rocksdb", rev = "4dba80dfe9434e595a971f5b2985ff9ba4fb31e7" }
+rocksdb = { git = "https://github.com/anza-xyz/rust-rocksdb", rev = "4dba80dfe9434e595a971f5b2985ff9ba4fb31e7" }
