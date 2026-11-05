@@ -1,3 +1,6 @@
+// The S3-enabled firehose future exceeds rustc's default layout query depth.
+#![recursion_limit = "256"]
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use cid::Cid;
 use futures_util::FutureExt;
@@ -83,7 +86,7 @@ fn reward_payload(slot: u64) -> Option<Vec<u8>> {
         .into(),
     ];
     Some(if slot % 6 < 3 {
-        prost_014::Message::encode_to_vec(&Rewards::from(rewards))
+        prost::Message::encode_to_vec(&Rewards::from(rewards))
     } else {
         bincode::serialize(&rewards).unwrap()
     })

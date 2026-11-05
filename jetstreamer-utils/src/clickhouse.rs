@@ -87,6 +87,16 @@ pub type ClickhouseProcessFuture = Pin<Box<dyn Future<Output = Result<(), ()>> +
 /// Tuple containing the readiness channel and process future returned by [`start`].
 pub type ClickhouseStartResult = (mpsc::Receiver<()>, ClickhouseProcessFuture);
 
+async fn write_executable(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = File::create(path).await?;
+    file.write_all(bytes).await?;
+    // Tokio can return from write_all while the last blocking write is still
+    // running. Finish it and close every writer before Linux opens the executable.
+    file.flush().await?;
+    drop(file.into_std().await);
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+}
+
 /// Launches the bundled ClickHouse client binary and forwards STDIO.
 pub async fn start_client() -> Result<(), Box<dyn std::error::Error>> {
     let clickhouse_path = NamedTempFile::with_suffix("-clickhouse")
@@ -95,15 +105,9 @@ pub async fn start_client() -> Result<(), Box<dyn std::error::Error>> {
         .keep()
         .unwrap();
     log::info!("Writing ClickHouse binary to: {:?}", clickhouse_path);
-    File::create(&clickhouse_path)
-        .await
-        .unwrap()
-        .write_all(CLICKHOUSE_BINARY)
+    write_executable(&clickhouse_path, CLICKHOUSE_BINARY)
         .await
         .unwrap();
-    // executable permission for Unix
-    #[cfg(unix)]
-    std::fs::set_permissions(&clickhouse_path, std::fs::Permissions::from_mode(0o755)).unwrap();
     log::info!("ClickHouse binary written and permissions set.");
 
     let bin_dir = Path::new("./bin");
@@ -137,15 +141,9 @@ pub async fn start() -> Result<ClickhouseStartResult, ClickhouseError> {
         .keep()
         .unwrap();
     log::info!("Writing ClickHouse binary to: {:?}", clickhouse_path);
-    File::create(&clickhouse_path)
-        .await
-        .unwrap()
-        .write_all(CLICKHOUSE_BINARY)
+    write_executable(&clickhouse_path, CLICKHOUSE_BINARY)
         .await
         .unwrap();
-    // executable permission for Unix
-    #[cfg(unix)]
-    std::fs::set_permissions(&clickhouse_path, std::fs::Permissions::from_mode(0o755)).unwrap();
     log::info!("ClickHouse binary written and permissions set.");
 
     // Create a channel to signal when ClickHouse is ready
@@ -330,4 +328,27 @@ pub fn stop_sync() {
         .build()
         .unwrap()
         .block_on(stop());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_executable;
+    use tokio::process::Command;
+
+    #[tokio::test]
+    async fn materialized_executable_can_run_immediately() {
+        let directory = tempfile::tempdir().unwrap();
+        let executable = directory.path().join("materialized-script");
+        let mut script = b"#!/bin/sh\n".to_vec();
+        // Exceed Tokio's default file buffer so the final write is asynchronous.
+        for _ in 0..131_072 {
+            script.extend_from_slice(b"#0123456789abcdef\n");
+        }
+        script.extend_from_slice(b"printf 'finished-writing\n'\n");
+
+        write_executable(&executable, &script).await.unwrap();
+        let output = Command::new(&executable).output().await.unwrap();
+        assert!(output.status.success(), "{:?}", output);
+        assert_eq!(output.stdout, b"finished-writing\n");
+    }
 }

@@ -54,7 +54,7 @@ Geyser plugin locally, streamed over the internet from the Old Faithful archive.
 
 ## Quick Start
 
-Rust 1.97.1 or newer is required. Normal streaming, built-in plugins, and the runner
+Rust 1.98.1 or newer is required. Normal streaming, built-in plugins, and the runner
 build with the default features. Loading an external Agave Geyser plugin requires
 the optional `geyser` feature and the RocksDB setup described in the
 [firehose README](jetstreamer-firehose/README.md#external-geyser-plugins).
