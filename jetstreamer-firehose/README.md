@@ -88,11 +88,11 @@ The threaded firehose actively manages its HTTP connection fleet to cope with CD
 - **Exponential restart backoff**: failed threads wait 2s → 120s by default and 1s → 32s in
   turbo mode (reset on progress) before reconnecting, so throttling events decay instead of
   amplifying into reconnect storms.
-- **Connection recycling** (♻️): threads running persistently below the fleet's demonstrated
+- **Connection recycling** (🧊): threads running persistently below the fleet's demonstrated
   rate reconnect cleanly (no backoff, no error counting) to shed throughput-clamped
   connections. Sweeps run every 2 min by default and every 15 s in turbo mode, and rotation is
   capped per sweep so a uniform clamp is probed gradually.
-- **Work stealing** (🥷): a thread that finishes its slot range messages the least-progressed
+- **Work stealing** (🐾): a thread that finishes its slot range messages the least-progressed
   thread's steal inbox to request half of its remaining work; the victim answers at a
   quiescent point (between block batches) and computes the split from its own authoritative
   position, so handovers can never race in-flight emission. This keeps every connection busy
