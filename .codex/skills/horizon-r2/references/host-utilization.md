@@ -57,6 +57,12 @@ window. This procedure grants no producer restart, timer stop/edit, unsupported 
 or repeated replay observer. Routine replay/resource observations and status audits remain on the
 single 30-minute cadence.
 
+Compare set-valued native properties such as `RestrictAddressFamilies` as exact sets; systemd
+may reorder them. Preserve the raw response and reject duplicate or unexpected members. Capture
+long JSON reports with `journalctl --all --output=json`: the default JSON output can replace a
+long `MESSAGE` with `null`. Recover the same invocation's complete record before treating a report
+as missing or retrying useful work.
+
 ### Gate copy and build starts on actual guard proof
 
 For a new copy or build whose guard must be bound after systemd assigns its invocation, make
