@@ -113,6 +113,11 @@ selecting a receipt near the next guard fire is not a usable admission window.
   receipts. A new wire phase requires reader support and parser coverage before publication.
   ETA is `sampled_at_utc + estimated_remaining_millis`, so republishing a newer sample must use
   a newly calculated estimate, not restart an old countdown.
+- Publish `sampled_at_utc` as whole-second UTC: `YYYY-MM-DDTHH:MM:SSZ`. The deployed Rust
+  publisher rejects fractional seconds and UTC offset spellings even though the dashboard accepts
+  them. Use this canonical form in operator fallback publications too, so a later native publisher
+  can accept the existing report. Preserve higher-resolution timing in private evidence; keep
+  elapsed time and ETA in integer milliseconds.
 - Refresh at the existing coordinated 30-minute cadence and handle authenticated failure,
   completion and phase-handoff events promptly. Do not create another routine polling loop or
   restart healthy producers to improve the display.
