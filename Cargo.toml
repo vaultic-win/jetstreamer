@@ -128,6 +128,13 @@ solana-keccak-hasher.workspace = true
 [dev-dependencies]
 clickhouse.workspace = true
 
+# Live replay tests verify hundreds of thousands of signatures with all features.
+# Optimize the crypto dependency while retaining test-time correctness checks.
+[profile.test.package.solana-ed25519]
+opt-level = 3
+debug-assertions = true
+overflow-checks = true
+
 [profile.release]
 lto = true
 codegen-units = 1
