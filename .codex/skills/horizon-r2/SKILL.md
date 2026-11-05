@@ -34,12 +34,24 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   shell business logic when the behavior can be owned by a reviewed Rust binary. Keep archive
   parsing, hashing and integrity decisions, publication gates, R2 access, and local retirement in
   Rust.
+- Before replacing a shared helper, derive its required Cargo features from the last accepted
+  helper's actual artifact proof plus the new routes. Retained diagnostics still require their
+  generation features when no lanes are active. Preserve that exact union, test it, and verify the
+  production artifact's actual feature list and rustc flags; a matching source commit or a passing
+  different configuration is insufficient. In this campaign, retained history requires both
+  `native210-small` and `native227-small` alongside the enabled integration routes.
 - Existing reviewed and sealed Python or shell components may continue when they are already bound
   into an active or prepared workflow and replacing them would invalidate durable evidence,
   require restarting healthy work, or add migration risk. Do not stop, restart, or mutate a healthy
   producer merely to change implementation language. Replace these components with reviewed Rust
   implementations at the earliest safe opportunity, but do not let language migration delay,
   block, or destabilize the active Horizon campaign.
+- A known stale status JSON is a reversible metadata correction. Prefer the qualified Rust
+  publisher, but when missing repair-owner support or a production build blocks it, an existing
+  authenticated S3 client may perform the narrowly scoped conditional correction in
+  [the status-only fallback](references/dashboard-status.md#status-only-fallback).
+  This grants no archive, sidecar, verification or replay authority and does not permit a new
+  non-Rust background controller.
 - When materially extending an existing non-Rust component, prefer replacing that behavior with a
   tested, immutable Rust tool and migrate only through the normal sealing and capability gates. If
   an urgent safety repair must remain in the existing language, keep it narrowly scoped, preserve
@@ -68,6 +80,23 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   history view. Read [references/dashboard-status.md](references/dashboard-status.md) before
   changing an ETA model, handling a dropped/failed lane, or retiring stale status metadata.
   A plausible old countdown is not an acceptable substitute for a current, evidence-backed estimate.
+- **Correct a known stale ETA immediately.** When available evidence shows an active epoch's
+  estimate is wrong, overdue or bound to an old phase/owner, replace its R2 status in the same
+  work cycle with a fresh timestamp and a reasonable current best guess through verified sidecar
+  creation. Do this before returning to lengthy repairs, builds or admissions; do not wait for the
+  next routine poll, replay restart or archive qualification. Use a planning estimate when measured
+  progress is insufficient, including remaining repair/build/qualification time and all delivery
+  stages. Bind the actual active repair/task owner, even with zero replay lanes; never reuse a dead
+  producer's identity. Keep status publishing usable independently of production build gates.
+  This is a required event-driven exception to the routine 30-minute status-update cadence,
+  not an optional action for the next poll. The correction is complete only after authenticated
+  readback confirms the replacement in R2; a local edit, incident note or promised fix is insufficient.
+  Treat an observed missed arrival, failed attempt, newly discovered blocker or changed delivery
+  plan as a trigger to reassess the published ETA immediately. Before answering a user that an ETA
+  is stale or resuming the blocked epoch's work, publish and read back the corrected estimate.
+  If that fails, state the exact publication failure and keep the correction as the next action;
+  do not describe the old countdown as current or the correction as completed.
+  Follow [the immediate correction procedure](references/dashboard-status.md#correct-known-stale-estimates-immediately).
 - Always provide a definite numeric ETA for active work, including active repair. Do not propose
   hiding its countdown or displaying "ETA unavailable" as the solution to a failed estimate.
   Repair the estimate model and owner binding; include explicit recovery and delivery allowances
@@ -78,7 +107,8 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   until its canonical `.sha256` sidecar is committed. Internal labels such as "private" or
   "diagnostic" must never hide active work from the dashboard. Label the real phase and bind its
   live producer or current repair/task owner; a queued plan alone is not active work. Keep these objects out
-  of `HORIZON_DIR`; build them in private state and publish them with reviewed Rust tooling. The
+  of `HORIZON_DIR`; build them in private state and prefer the reviewed Rust publisher, with the
+  narrow status-only fallback available for immediate corrections. The
   object is operational metadata, never an archive, verification receipt, lease, or publication
   gate.
 - Use this JSON shape. The four numeric fields are mandatory JSON integers, never `null`, strings,
@@ -113,17 +143,28 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   required boundary verification, upload, whole-object readback, source revalidation, and sidecar
   commit. Use `0` only when the sidecar is already committed and the status object is awaiting its
   final verified deletion.
-- Update every in-flight epoch's status exactly once per normal 30-minute replay observation, from
+- Refresh every in-flight epoch's status at each normal 30-minute replay observation, from
   the same identity-stable sample and ETA model. Do not add a second polling loop. Require the bound
   controller/producer invocation IDs and restart counts to remain stable across the sample; a
   failed or identity-changing sample publishes no replacement. For a legacy multi-epoch replay,
   publish a status object for every still-uncommitted epoch claimed by that replay, even when a
   later member has not begun and its current size is `0`.
+  This scheduled refresh is not a limit on event-driven corrections: a known stale estimate must
+  be corrected immediately under the rule above, including after a refresh in the same interval.
   Handle positively observed failure, dropout, phase handoff and sidecar-completion events promptly
   without adding a routine polling loop. Update a genuinely active downstream phase with a supported,
   evidence-bound publisher; do not keep labeling it replay or delete it just because replay ended.
   Confirmed inactive work must have its misleading status removed through the separate inactive-status
   lifecycle below, rather than retaining a countdown until an archive eventually completes.
+- In that same 30-minute cycle, audit **every R2 status object in the entire assigned epoch range**,
+  including reports omitted from the current active-lane list. Use authenticated R2 inventory and
+  read the current JSON; local publication receipts alone do not establish what the dashboard sees.
+  Reconcile each report with the complete fleet, current owner, phase, sample and sidecar state.
+  Refresh every active report with a newly calculated estimate and authenticated readback; retire
+  stale reports through the qualified completion or inactive-status lifecycle. Follow
+  [the range-wide audit procedure](references/dashboard-status.md#range-wide-audit-every-30-minutes).
+  Finish this status-maintenance step before lengthy repair, admission or build work. A remaining
+  stale report is an open operational incident, not a successfully maintained status cycle.
 - Status objects are the sole routine R2 mutation exception: later 30-minute samples may replace
   only the matching `epoch-N.epoch-status.json`, preferably with an ETag/version precondition so an
   older writer cannot replace a newer sample. Verify the exact uploaded bytes through authenticated
@@ -151,9 +192,11 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   ```
 
   This status command intentionally needs no public-origin environment setting. A failed observer
-  binding publishes nothing. Do not substitute a hand-written `put-object` command when publication
-  or authenticated readback fails. Run it with the identity that can traverse and write the configured
-  private receipt directory; validate that access before the first remote mutation. The reviewed
+  binding publishes nothing from that model. Do not use an S3 command to bypass a failed ownership,
+  identity, conditional-write or readback check. Missing repair-owner functionality instead uses the
+  separately validated status-only fallback. Run with the identity that can traverse and write the configured
+  private receipt directory; validate that access before the first remote mutation. Never bypass a
+  failed ownership, identity, ETag or readback check through the fallback. The reviewed
   publisher treats an existing byte-for-byte identical status payload with the same sample timestamp
   as an idempotent receipt-recovery retry: it performs no `PutObject`, repeats authenticated readback,
   and durably writes the missing receipt. It must continue to reject the same timestamp with different
@@ -170,13 +213,15 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   stable live identities and sufficient slot rates, and fsync a private no-clobber estimate receipt.
   Pass only the resulting integer millisecond values to the matching status publications. A missing
   rate, identity change, stale timestamp, model mismatch, or estimator failure publishes no
-  replacement status object for the affected range; never substitute hand arithmetic after that
-  fail-closed result. When one observed range lacks rates but another remains healthy, a reviewed
+  replacement from that rejected model. Never bypass ownership or identity checks; promptly use
+  a reviewed planning/repair estimate with the actual current owner for affected active epochs.
+  An estimator failure does not authorize leaving a known stale countdown unchanged.
+  When one observed range lacks rates but another remains healthy, a reviewed
   schema-v3 partial model may estimate only the healthy range with the same previously validated
   legacy formula. It must bind the complete observer range census, all current invocation IDs, the
   root-owned owner-only estimate directory, prior estimate receipts that reproduce the formula, and
-  the exact coordinated observer receipt. Leave every excluded range's status objects unchanged;
-  never weaken the census or relabel a post-replay range as rate-bearing merely to refresh it.
+  the exact coordinated observer receipt. Correct excluded active ranges through the planning/repair
+  status path; never weaken the census or relabel post-replay work as rate-bearing to refresh it.
 - Once a legacy producer advances into a later epoch while its controller still withholds every
   archive until whole-cohort import, stop using the pairwise legacy formula: a completed replay is
   not yet a sidecar. Use the reviewed schema-v4 cohort-gated model instead. Bind the current epoch's
@@ -184,8 +229,9 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   exposed before the shared import gate, and give each epoch an evidence-backed downstream
   allowance for import, verification, upload, readback, and its position in sidecar commit order.
   Require the per-epoch replay-offset and downstream-allowance maps to cover the modeled range
-  exactly. If that model is unavailable or its evidence is incomplete, leave the affected status
-  objects unchanged rather than publishing the old pairwise ETA.
+  exactly. If that model is unavailable or its evidence is incomplete, promptly publish a reviewed
+  planning estimate that includes the whole cohort gate, queue and delivery allowances; never
+  reuse the old pairwise ETA or leave a known stale countdown unchanged.
 - There are two authorized status-deletion lifecycles: verified archive completion, and positively
   confirmed inactive/orphaned work. Both apply only to the exact `epoch-N.epoch-status.json` key;
   neither authorizes an archive, sidecar, receipt, prefix, or bulk deletion.
@@ -212,6 +258,14 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   publication receipt, select the greatest canonical sample timestamp, compute its SHA-256 itself,
   and bind the resulting exact path and digest into the deletion receipt. Do not discover the
   latest receipt with a shell glob or mtime.
+
+  Bind cleanup watchers to a qualified helper that accepts every phase and receipt schema their
+  publisher can emit, including `readback` with the `upload-readback` pipeline binding. Recheck
+  this compatibility when changing the publisher; support for `status-delete` alone is insufficient.
+  If an older cleanup helper rejects the latest receipt, stop that epoch's failing retry and use
+  an already-qualified compatible helper with the same ready-pair, ownership and conditional-delete
+  gates. Retain the failure evidence and require authenticated absence plus a durable deletion
+  receipt. Do not relabel a completed phase or rewrite its publication receipt to satisfy the old helper.
 
   The command must revalidate the durable whole-object archive receipt and authenticated archive/
   sidecar pair before and after deletion, require the current status bytes and ETag to match the
@@ -242,12 +296,27 @@ not stall otherwise admissible ordinary campaign work.
 
 ### Campaign fleet reconciliation
 
+- Before arming a coordinated observer, check that epoch ranges do not overlap across `replays`
+  and `diagnostic_replays`. Keep a replacement in `replays`; retain its failed predecessor in the
+  fleet and repair backlog instead of adding a duplicate observer row. Preserve earlier configs
+  and failure receipts when correcting a rejected configuration.
+- For a bounded qualification transaction, validate the complete operator wrapper and its parameter
+  shapes, paths and bindings against the sealed contract before opening the original clock. Run
+  already reviewed dependent stages from the independent before-counter through gated worker
+  launch consecutively in one retained process; do not consume the remaining readiness budget with
+  intervening model turns. Abort the sequence on any failed gate, preserve the actual result and
+  resume only through the applicable recovery path. Keep all native checks, genuine waits, source
+  and accounting proofs, deadline checks and publication gates; sequencing grants no retry,
+  deadline extension or permission to reset the original clock.
 - Delegate epoch-specific diagnosis and repair to dedicated sub-agents. The main agent owns the
   campaign loop, complete fleet ledger, shared observation cadence, capacity assessment, admission
   coordination and user reporting. Keep the loop work-conserving while repair agents investigate;
   do not let one difficult epoch monopolize the main agent or stall independent admissible work.
   Follow [the repair coordination guidance](references/host-utilization.md#delegate-epoch-specific-repairs)
   when assigning work or admitting a repair experiment.
+  Use the `collaboration` namespace directly for internal agent messages and waits. Never send
+  internal coordination, placeholders or resolved/no-action notices through user-input tools;
+  those tools create questions for the human, even when their text says no response is needed.
 - Maintain one authoritative fleet ledger for the complete assigned campaign, not merely a list of
   the ranges that happened to appear in the latest live-resource observer config. Reconcile it in
   the same 30-minute control cycle as the coordinated replay/resource observation and status-object
@@ -289,11 +358,14 @@ not stall otherwise admissible ordinary campaign work.
   test, queued retry or new invocation alone does not close it.
 - Authenticated-read every in-range `epoch-N.epoch-status.json` that exists and compare its epoch,
   sample timestamp, controller/producer binding from the local publication receipt when available,
-  and corresponding live claim. Report its freshness separately from its ETA. If no matching live
-  invocation exists, classify the object as stale/orphaned operational metadata, exclude that epoch
-  from the active list, and never present its remaining-milliseconds value or projected finish time
-  as current. Check for a replacement live invocation, downstream delivery stage or authenticated
-  handoff before declaring work inactive. When inactivity and ownership are positively established,
+  and corresponding live claim or actual active repair/task owner. Report its freshness separately
+  from its ETA. A missing replay invocation alone does not make an epoch inactive or its report
+  orphaned: first check replacement work, downstream delivery, active operator/sub-agent repair and
+  authenticated handoffs. If work remains active, immediately correct a stale owner, phase or ETA
+  through the status procedure above; do not hide it from the active list or delete its report.
+  Never present a superseded owner's remaining time as current. Classify the report as inactive or
+  orphaned only after positively excluding all active owners and handoffs.
+  When inactivity and ownership are positively established,
   perform the conditional inactive-status cleanup promptly; a missing ready pair must not keep a
   dead job visible on the dashboard. Uncertain ownership or a transient failed probe is not deletion
   authority. Status cleanup never authorizes restarting a replay or declaring the epoch complete.
@@ -460,6 +532,17 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 ## Produce and verify
 
 - Use the repository's sealed historical replay/controller path and automatic slot-range runtime selection. Do not invent a compatibility override.
+- Before releasing a prelaunch gate, require a worker-ready journal event or durable receipt emitted
+  after metadata, source and prerequisite validation, bound to the live PID/start ticks, invocation
+  ID and admission hash. Capture the final successful guard sample after readiness and publish the
+  gate within its freshness bound. An active PID and an absent gate do not prove readiness. If the
+  worker cannot reach the barrier by its deadline, stop only that scope and preserve its failure
+  evidence and genuine map state; never overwrite its one-shot gate or initialize absent worker
+  facts for a retry.
+- Before launching epoch 225 prefix extraction, read
+  [references/epoch225-extraction.md](references/epoch225-extraction.md) for its exact actor,
+  guard, timer and initial status handoff requirements. Prepare the full launch sequence before
+  starting its bounded waiter.
 - Before cold-replaying an epoch with a retained verified prefix, read
   [references/checkpoint-continuation.md](references/checkpoint-continuation.md). Prefer a qualified
   checkpoint continuation when its complete validation-to-sidecar path is faster and freshly
@@ -480,7 +563,9 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 - Before starting a recurring status timer, initialize its last-observed state to the replay's
   authoritative launch time and validate the monitor once manually. A timer that exists without
   this state is not monitoring the replay; diagnose monitor failures without restarting a healthy
-  producer. After any `systemctl daemon-reload` while monotonic monitor timers are active, re-observe
+  producer. First respect each live producer's identity contract: epoch 225 extraction's raw actor
+  snapshot forbids global `daemon-reload` throughout its live lifetime. After a permitted
+  `systemctl daemon-reload` while monotonic monitor timers are active, re-observe
   every timer's next deadline: systemd can move a pending `OnActiveSec` deadline relative to the
   reload. If that delays an already-due check, run only the oneshot monitor immediately and confirm
   that `OnUnitActiveSec` has re-anchored the next interval; never restart the producer to repair its
@@ -1163,6 +1248,25 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   original pathname. Prove the absolute projected inode, read-only mount, unchanged host original,
   and intended payload UID/capabilities in an equivalent sandbox before policy preflight. Keep all
   ordinary full/plugin/boundary, no-consumer and authenticated R2 retirement gates intact.
+
+- For new copy or build phases whose guard is armed after activation, require a tested native
+  pre-start gate tied to the actual invocation before useful work can begin. A fixed delay alone
+  is insufficient. Read [the build guard procedure](references/host-utilization.md#gate-copy-and-build-starts-on-actual-guard-proof).
+- When an unprivileged build or verifier recursively accounts its current execution directory,
+  keep root-only status and custody metadata outside that directory. Place it in an explicitly
+  ledger-backed private leaf, retain its private ownership and modes, and include that leaf in the
+  complete retained allocation and required sandbox bindings before freezing the phase. Do not add
+  an unreadable descendant after preflight: the next growth scan will fail before useful work.
+  Exercise the actual current-directory scan under the phase identity before launch; validating
+  only the frozen-ledger constructors does not prove this access path.
+- Check generated launch arguments against the host's per-argument and total argument/environment
+  limits before invoking `systemd-run`. For the reviewed append-only `BindReadOnlyPaths` and
+  `NoExecPaths` transport, preserve the sealed logical argv and split only those assignments at whole
+  tokens into nonempty ordered chunks of at most 60,000 UTF-8 bytes including prefix and NUL.
+  Preserve optional-path and bind syntax exactly, record original and actual argv hashes and ordered
+  token equivalence in charged execution metadata, and retain the normal effective-property,
+  mount and kernel-limit checks. Apply the transport to both preflights and the build launch;
+  never truncate paths, broaden mounts or infer equivalent semantics for other properties.
 - Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
   exhausted by Tokio's core runtime threads. `retire-local` performs its archive
   proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
@@ -1230,7 +1334,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   replay/resource observations; do not manually poll inside that window without a user request.
   Use that same identity-stable observation to refresh every claimed epoch's
   `epoch-N.epoch-status.json` and to reconcile the authoritative campaign fleet ledger; do not poll
-  separately for the table, active list, or R2 metadata. After arming
+  separately for the table, active list, or R2 metadata. This interval does not delay correction
+  of an already-known stale ETA: conditionally replace that exact status object immediately using
+  available evidence and verify it through authenticated readback, without starting another routine
+  replay/resource poll or resetting the scheduled audit clock. After arming
   a persistent timer or watcher, do not poll it in short empty loops or emit repeated no-change
   status turns. Let it run unattended and inspect it once the cadence interval has elapsed or its
   scheduled event should have completed. A user request for a status update always authorizes one
