@@ -149,6 +149,9 @@ jobs:
       # Keep test artifacts within the standard hosted runner's disk and memory limits.
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
+      # This profile produces a library larger than sccache can package in its ZIP cache.
+      # Compile it directly while retaining the complete test configuration.
+      RUSTC_WRAPPER: ${{ matrix.name != 'utils-epoch223-v1620-root-prefix' && 'sccache' || '' }}
     strategy:
       fail-fast: false
       matrix: *rust-feature-matrix
