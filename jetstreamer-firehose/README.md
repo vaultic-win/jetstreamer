@@ -19,8 +19,8 @@ From this repository, run an external Geyser plugin with:
 cargo run --release -p jetstreamer-firehose --features geyser -- 800 /path/to/plugin.json
 ```
 
-The loader uses Agave 4.3.2's unstable internal APIs and plugin ABI. Build external
-plugins against the same release. Agave's ledger crate requires methods that are
+The loader uses Agave 4.4.0's unstable internal APIs and Geyser interface 5.0.0.
+Build external plugins against that interface version. Agave's ledger crate requires methods that are
 absent from crates.io RocksDB 0.24, so this workspace pins Anza's RocksDB fork.
 Cargo ignores a dependency's `[patch]` table. To enable the loader in another
 project, add the feature and both patches to that project's workspace root:
@@ -37,7 +37,7 @@ rocksdb = { git = "https://github.com/anza-xyz/rust-rocksdb", rev = "4dba80dfe94
 The top-level `jetstreamer` crate forwards its `geyser` feature to this crate.
 `--all-features` also enables the loader and therefore requires these patches.
 Default library consumers and default package verification do not build the ledger
-or RocksDB. Rust 1.97.1 or newer is required in either configuration.
+or RocksDB. Rust 1.98.1 or newer is required in either configuration.
 
 ## Configuration
 

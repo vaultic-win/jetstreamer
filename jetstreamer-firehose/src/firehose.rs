@@ -986,7 +986,7 @@ fn decode_rewards_from_frame(
 fn decode_rewards_from_bytes(slot: u64, bytes: &[u8]) -> Result<DecodedRewards, SharedError> {
     let epoch = slot_to_epoch(slot);
     let proto_attempt: Result<solana_storage_proto::convert::generated::Rewards, _> =
-        prost_014::Message::decode(bytes);
+        prost::Message::decode(bytes);
     match proto_attempt {
         Ok(proto) => {
             let rewards = convert_proto_rewards(&proto).map_err(|err| {
@@ -1050,7 +1050,7 @@ fn decode_transaction_status_meta(
 
     let bin_err_for_proto = bincode_err.clone();
     let proto: solana_storage_proto::convert::generated::TransactionStatusMeta =
-        prost_014::Message::decode(metadata_bytes).map_err(|err| {
+        prost::Message::decode(metadata_bytes).map_err(|err| {
             // If we already tried bincode, surface both failures for easier debugging.
             if let Some(ref bin_err) = bin_err_for_proto {
                 Box::new(std::io::Error::other(format!(
@@ -1081,6 +1081,7 @@ mod metadata_decode_tests {
     use super::{decode_transaction_status_meta, decode_transaction_status_meta_from_frame};
     use solana_message::v0::LoadedAddresses;
     use solana_storage_proto::StoredTransactionStatusMeta;
+    use solana_transaction::{InstructionError, TransactionError};
     use solana_transaction_status::TransactionStatusMeta;
 
     fn sample_meta() -> TransactionStatusMeta {
@@ -1125,9 +1126,47 @@ mod metadata_decode_tests {
         let meta = sample_meta();
         let generated: solana_storage_proto::convert::generated::TransactionStatusMeta =
             meta.clone().into();
-        let bytes = prost_014::Message::encode_to_vec(&generated);
+        let bytes = prost::Message::encode_to_vec(&generated);
         let decoded = decode_transaction_status_meta(157 * 432000, &bytes).expect("decode");
         assert_eq!(decoded, meta);
+    }
+
+    #[test]
+    fn decodes_protobuf_transaction_bailout() {
+        let mut expected = sample_meta();
+        let mut generated: solana_storage_proto::convert::generated::TransactionStatusMeta =
+            expected.clone().into();
+        // TransactionError::BailOut uses wire tag 39. Keep the fixture independent
+        // of the SDK serializer so an unsupported or changed tag fails here.
+        generated.err = Some(solana_storage_proto::convert::generated::TransactionError {
+            err: vec![39, 0, 0, 0],
+        });
+        expected.status = Err(TransactionError::BailOut);
+
+        let bytes = prost::Message::encode_to_vec(&generated);
+        let decoded = decode_transaction_status_meta(157 * 432000, &bytes).expect("decode BailOut");
+        assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn decodes_protobuf_instruction_bailout() {
+        let mut expected = sample_meta();
+        let mut generated: solana_storage_proto::convert::generated::TransactionStatusMeta =
+            expected.clone().into();
+        // InstructionError uses transaction tag 8, followed by the instruction
+        // index and the nested BailOut tag 54.
+        generated.err = Some(solana_storage_proto::convert::generated::TransactionError {
+            err: vec![8, 0, 0, 0, 7, 54, 0, 0, 0],
+        });
+        expected.status = Err(TransactionError::InstructionError(
+            7,
+            InstructionError::BailOut,
+        ));
+
+        let bytes = prost::Message::encode_to_vec(&generated);
+        let decoded = decode_transaction_status_meta(157 * 432000, &bytes)
+            .expect("decode instruction BailOut");
+        assert_eq!(decoded, expected);
     }
 
     #[test]
@@ -1135,7 +1174,7 @@ mod metadata_decode_tests {
         let meta = sample_meta();
         let generated: solana_storage_proto::convert::generated::TransactionStatusMeta =
             meta.clone().into();
-        let bytes = prost_014::Message::encode_to_vec(&generated);
+        let bytes = prost::Message::encode_to_vec(&generated);
         // Epoch 100 should try bincode first; if those bytes are proto, we must fall back.
         let decoded = decode_transaction_status_meta(100 * 432000, &bytes).expect("decode");
         assert_eq!(decoded, meta);
@@ -1193,7 +1232,7 @@ mod rewards_decode_tests {
                 num_partitions: 2,
             }),
         };
-        let bytes = prost_014::Message::encode_to_vec(&proto);
+        let bytes = prost::Message::encode_to_vec(&proto);
         let decoded = decode_rewards_from_bytes(0, &bytes).expect("decode proto rewards");
         assert_eq!(decoded.rewards.keyed_rewards.len(), 1);
         assert_eq!(decoded.rewards.num_partitions, Some(2));
@@ -1217,7 +1256,7 @@ mod rewards_decode_tests {
                 num_partitions: 2,
             }),
         };
-        let bytes = prost_014::Message::encode_to_vec(&proto);
+        let bytes = prost::Message::encode_to_vec(&proto);
         let decoded = decode_rewards_from_bytes(0, &bytes).expect("decode proto rewards");
         assert_eq!(decoded.rewards.keyed_rewards.len(), 1);
         assert_eq!(decoded.rewards.num_partitions, Some(2));
@@ -1248,7 +1287,7 @@ mod rewards_decode_tests {
                 }],
                 num_partitions: None,
             };
-            let bytes = prost_014::Message::encode_to_vec(&proto);
+            let bytes = prost::Message::encode_to_vec(&proto);
             let error = decode_rewards_from_bytes(0, &bytes)
                 .expect_err("unknown reward types must not silently decode");
             assert!(error.to_string().contains("unsupported reward type"));

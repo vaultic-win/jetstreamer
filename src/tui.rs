@@ -239,8 +239,8 @@ struct RateSampler {
     /// NIC receive rate in bytes/sec across non-loopback interfaces.
     wire_bytes_per_sec: f64,
     thread_tps: Option<ThreadTpsAggregate>,
-    system: sysinfo::System,
-    networks: sysinfo::Networks,
+    system: Option<sysinfo::System>,
+    networks: Option<sysinfo::Networks>,
 }
 
 impl RateSampler {
@@ -258,8 +258,12 @@ impl RateSampler {
             bytes_per_sec: 0.0,
             wire_bytes_per_sec: 0.0,
             thread_tps: None,
-            system: sysinfo::System::new(),
-            networks: sysinfo::Networks::new_with_refreshed_list(),
+            system: sysinfo::System::new()
+                .inspect_err(|err| log::warn!("TUI CPU and memory metrics unavailable: {err}"))
+                .ok(),
+            networks: sysinfo::Networks::new_with_refreshed_list()
+                .inspect_err(|err| log::warn!("TUI network metrics unavailable: {err}"))
+                .ok(),
         }
     }
 
@@ -310,26 +314,37 @@ impl RateSampler {
     }
 
     fn sample_system(&mut self, secs: f64) {
-        self.system.refresh_cpu_usage();
-        self.system.refresh_memory();
-        self.cpu_history.push(self.system.global_cpu_usage() as f64);
-        let total_mem = self.system.total_memory();
-        let mem_pct = if total_mem > 0 {
-            self.system.used_memory() as f64 / total_mem as f64 * 100.0
+        if let Some(system) = &mut self.system {
+            system.refresh_cpu_usage();
+            system.refresh_memory();
+            self.cpu_history.push(system.global_cpu_usage() as f64);
+            let total_mem = system.total_memory();
+            let mem_pct = if total_mem > 0 {
+                system.used_memory() as f64 / total_mem as f64 * 100.0
+            } else {
+                0.0
+            };
+            self.mem_history.push(mem_pct);
+        }
+        if let Some(networks) = &mut self.networks {
+            // `received()` reports bytes since the previous refresh: a per-interval delta.
+            networks.refresh(true);
+            let received: u64 = networks
+                .iter()
+                .filter(|(name, _)| !name.as_encoded_bytes().starts_with(b"lo"))
+                .map(|(_, data)| data.received())
+                .sum();
+            self.wire_bytes_per_sec = received as f64 / secs;
+            self.net_history.push(self.wire_bytes_per_sec);
+        }
+    }
+
+    fn wire_rate_label(&self) -> String {
+        if self.networks.is_some() {
+            human_bits_per_sec(self.wire_bytes_per_sec)
         } else {
-            0.0
-        };
-        self.mem_history.push(mem_pct);
-        // `received()` reports bytes since the previous refresh — a per-interval delta.
-        self.networks.refresh(true);
-        let received: u64 = self
-            .networks
-            .iter()
-            .filter(|(name, _)| !name.starts_with("lo"))
-            .map(|(_, data)| data.received())
-            .sum();
-        self.wire_bytes_per_sec = received as f64 / secs;
-        self.net_history.push(self.wire_bytes_per_sec);
+            "n/a".into()
+        }
     }
 
     /// Computes avg/min/max TPS across threads that have processed any transactions.
@@ -1025,8 +1040,14 @@ fn draw_system_chart(
         .map(|&(x, v)| (x, (v / net_full_scale * 100.0).min(100.0)))
         .collect();
 
-    let cpu_now = sampler.cpu_history.last().copied().unwrap_or(0.0);
-    let mem_now = sampler.mem_history.last().copied().unwrap_or(0.0);
+    let cpu_now = sampler
+        .cpu_history
+        .last()
+        .map_or_else(|| "n/a".into(), |value| format!("{value:.0}%"));
+    let mem_now = sampler
+        .mem_history
+        .last()
+        .map_or_else(|| "n/a".into(), |value| format!("{value:.0}%"));
     let datasets = vec![
         Dataset::default()
             .marker(symbols::Marker::Braille)
@@ -1048,18 +1069,22 @@ fn draw_system_chart(
     // built-in legend hides itself when it decides the area is too small.
     let title = Line::from(vec![
         Span::raw(" System "),
-        Span::styled(format!("cpu {cpu_now:.0}%"), Style::default().fg(AURORA)),
+        Span::styled(format!("cpu {cpu_now}"), Style::default().fg(AURORA)),
         Span::raw(" | "),
         Span::styled(
-            format!("mem {mem_now:.0}%"),
+            format!("mem {mem_now}"),
             Style::default().fg(Color::LightBlue),
         ),
         Span::raw(" | "),
         Span::styled(
-            format!("net {}", human_bits_per_sec(sampler.wire_bytes_per_sec)),
+            format!("net {}", sampler.wire_rate_label()),
             Style::default().fg(Color::Green),
         ),
-        Span::raw(format!(" (100% = {}) ", human_bits_per_sec(net_full_scale))),
+        Span::raw(if sampler.networks.is_some() {
+            format!(" (100% = {}) ", human_bits_per_sec(net_full_scale))
+        } else {
+            " ".into()
+        }),
     ]);
     let chart = Chart::new(datasets)
         .block(Block::default().borders(Borders::ALL).title(title))
@@ -1114,7 +1139,7 @@ fn draw_stats(frame: &mut ratatui::Frame, area: Rect, sampler: &RateSampler) {
         stat("timeouts", human_count(thread_activity::timeout_count())),
         stat("steals", human_count(thread_activity::steal_count())),
         stat("db retries", human_count(metrics::db_retry_count())),
-        stat("wire rate", human_bits_per_sec(sampler.wire_bytes_per_sec)),
+        stat("wire rate", sampler.wire_rate_label()),
         stat("data rate", human_bits_per_sec(sampler.bytes_per_sec)),
         stat("data total", human_bytes(total_bytes as f64)),
     ];
@@ -1239,5 +1264,39 @@ fn human_duration(secs: f64) -> String {
         format!("{minutes}m{seconds:02}s")
     } else {
         format!("{seconds}s")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+
+    #[test]
+    fn unavailable_system_metrics_do_not_record_zero_samples() {
+        let mut sampler = RateSampler {
+            system: None,
+            networks: None,
+            ..RateSampler::new()
+        };
+        sampler.sample_system(1.0);
+        assert!(sampler.cpu_history.is_empty());
+        assert!(sampler.mem_history.is_empty());
+        assert!(sampler.net_history.is_empty());
+        assert_eq!(sampler.wire_rate_label(), "n/a");
+
+        let mut terminal = Terminal::new(TestBackend::new(100, 10)).unwrap();
+        terminal
+            .draw(|frame| draw_system_chart(frame, frame.area(), &sampler, DEFAULT_RANGE))
+            .unwrap();
+        let rendered: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(rendered.contains("cpu n/a | mem n/a | net n/a"));
+        assert!(!rendered.contains("100% ="));
     }
 }
