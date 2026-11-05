@@ -327,6 +327,21 @@ the normal work-conserving backfill path rather than waiting for another status 
   not a reason to wait for the next routine poll. Recompute fresh admission and backfill promptly up
   to the proven operating point. The 30-minute cadence limits routine sampling; it does not require
   an avoidable 30-minute idle slot after an authenticated completion event.
+- Apply the same replacement policy after a failure or an admission/compatibility block requiring
+  repair. Preserve and track that epoch, then assess other disjoint missing epochs across the full
+  assigned range and promptly admit an eligible replacement. A repair must not monopolize an
+  otherwise usable replay lane. Continue the failed epoch's repair alongside replacement replay;
+  keep its current owner, next action and ETA accurate. If all replacements are blocked, record
+  their individual gates and prioritize the shortest independent qualification that opens a lane.
+  Use the latest accepted resource sample and an authenticated phase event where supported;
+  preserve all admission, integrity and guard requirements without another routine polling loop.
+- Actively resolve reservations that block otherwise usable lanes. A failed or terminal owner's
+  reservation is a cleanup or accounting-repair task, not a reason to wait indefinitely. In the
+  current cycle, either execute its qualified release or advance the smallest missing release
+  proof, with a named owner and recorded result. Preserve raw history and required artifacts;
+  release only the allowance whose continuing obligation has ended. An unchanged reservation
+  and a repeated next-action description do not count as progress. When a release attempt fails,
+  diagnose it immediately and continue independent staging or admission work.
 - Do not start a producer until its exact invocation can be guarded. If invocation IDs exist only
   after launch, start the dormant controller under observation, immediately bind and prove its
   reserve/VMA guard, and do not leave it unattended before the first real sandboxed guard fire.
@@ -369,6 +384,32 @@ gate. On systemd255, `systemctl list-jobs --output=json` can still emit text. Us
 `Manager.ListJobs` D-Bus adapter where that occurs; validate its signature, return nesting, job and
 unit identities, and preserve the existing queued-entry denials. Never treat a parse failure as an
 empty queue or bypass the census to unblock admission.
+
+## Reclaim disk at each control cycle
+
+Audit reclaimable disk space during every existing 30-minute control cycle, even with ample free
+space, and after a relevant completion, failure or retirement. Use the same capacity observation;
+do not add a polling loop. Keep a ranked list of large retained directories and refresh the parts
+that changed with bounded metadata scans so cleanup itself does not disrupt replay. Keep each
+actionable candidate assigned a next action between audits; advance qualified cleanup without waiting
+for disk pressure or the next scheduled check-in. Revisit the list before admitting work
+that adds disk growth, when disk blocks admission, and when an offload or other relevant stage
+completes; use accepted evidence and event receipts without resetting the routine observation clock.
+
+Check obsolete build caches, duplicate reproducible inputs, old scratch generations and terminal
+diagnostic outputs against the existing reclamation and retirement rules. Prove each exact target
+is obsolete and unreferenced by live processes or staged launches, preserve required evidence and
+reproduction inputs, and reclaim eligible space in that cycle. Preserve healthy replay, useful
+resumable state, checkpoints, receipts and complete archives awaiting verification or publication.
+Use qualified R2 holding when an artifact still needs durable retention; do not treat age alone as
+deletion authority or remove another project's files without establishing ownership and eligibility.
+
+Record each candidate's physical bytes, decision and blocking evidence, plus actual filesystem free
+space before and after completed cleanup. Keep measured retired bytes separate from the free-space
+delta while live jobs allocate or files share extents. Planned offloads and earlier retirements are
+not newly reclaimed capacity. When a reference or qualification gate prevents cleanup, advance its
+concrete next action and continue independent admissible work. Recompute admission after successful
+reclamation and promptly use any capacity that permits another lane.
 
 ### Prove protective guard cadence
 
@@ -415,11 +456,11 @@ short-job scheduling must not silently skip it or indefinitely starve older admi
 healthy legacy cohorts and cross-host ownership, stay within the assigned publication range, and
 keep the epoch-301 verification tail private.
 
-Known failures are a priority repair backlog, not candidates to drop from consideration when a
-shorter new singleton becomes available. Advance safe diagnosis or qualified recovery before
-additional discretionary cold admissions. When a specific repair is blocked, keep its evidence,
-next unblocking action and last substantive progress in the fleet's durable repair record while
-independent work continues. Neither reclaiming failed scratch nor deleting stale dashboard status
+Known failures remain a priority repair backlog when a replacement singleton starts. Preserve the
+failed attempt and advance safe diagnosis or qualified recovery alongside replacement replay;
+repair priority does not mean leaving an eligible lane idle until that repair finishes. Keep each
+repair's evidence, current owner, next unblocking action and last substantive progress in the
+fleet's durable record. Neither reclaiming failed scratch nor deleting stale dashboard status
 closes the repair incident; reconcile it until qualified recovery reaches a verified ready pair.
 
 ## Delegate epoch-specific repairs
@@ -429,6 +470,13 @@ they share the same repair and artifacts; avoid duplicate agents changing the sa
 The main agent continues the fleet loop, assesses the memory-selected lane target, stages and
 admits independent work, maintains the authoritative repair backlog, and reports progress.
 Repair delegation must not turn missing compatibility evidence into an idle-host policy.
+
+Assign that owner and start the next safe diagnostic or repair action in the failure cycle.
+A backlog entry, status ETA or completed agent alone is not an active repair job. At each existing
+audit, record the running job or the latest substantive repair result and its next executable
+step. If work is blocked, record the exact dependency and advance independent repair work; when
+agent slots are full, keep a named queue owner and dispatch the highest-priority item as a slot
+opens. Keep replacement replay and failed-epoch repair moving together.
 
 Give each repair agent the exact failed invocation, immutable inputs and receipts, remaining
 integrity gates, scope of authorized changes, and ownership of files or an isolated worktree.

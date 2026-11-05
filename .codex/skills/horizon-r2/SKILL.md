@@ -404,13 +404,30 @@ not stall otherwise admissible ordinary campaign work.
   least 1,800 seconds after the preceding routine sample.
   Use that reference's measured-budget and time-to-sidecar policies to qualify capacity estimates
   and choose among admissible candidates; numerical epoch order alone is not a throughput policy.
-- Every host's control loop must explicitly answer **"Can I fit another disjoint lane now?"** at
-  each existing 30-minute observation, user-requested status check, and authenticated completion,
-  failure, or admission/guard-handoff event. Use the same fresh evidence, not a second polling loop.
-  Record the next candidate, live/proven lane counts, current resource arithmetic, eligibility,
-  exact limiting gate, and executable next action in the fleet's existing next-action/evidence
-  entries or a hash-bound capacity-decision receipt. Recompute from current invocation-bound claims;
-  do not carry terminal owners' growth reservations forward without justification.
+- When an epoch fails or its admission is blocked by a repair, preserve its failed attempt and
+  promptly backfill the available replay lane with another eligible, disjoint missing epoch.
+  Do not reserve idle capacity for the blocked epoch or wait for its repair to finish. Check the
+  full assigned range, not just epochs that already have status objects. Keep the failed epoch
+  in the repair backlog with a current owner and ETA, and advance its repair alongside other
+  replay work. Use fresh admission and the existing event-driven handoff; do not add routine polls
+  or weaken guards. If no replacement qualifies, record each candidate's specific blocker and
+  advance the shortest independent path to a running replacement rather than spending all idle
+  capacity on the original repair.
+- At every existing **30-minute check-in**, explicitly assess: **"Are we making maximum useful
+  use of the current compute, disk, and memory resources? Can more lanes be running? Can we
+  offload something to R2 to free capacity?"** Include CPU and I/O contention, available RAM,
+  protected disk growth and floors, eligible cold artifacts, and the next disjoint replay
+  candidate. Use that same fresh observation; do not add another polling loop.
+  Repeat the lane-capacity decision on a user-requested status check or authenticated completion,
+  failure, or admission/guard-handoff event. Record the desired, live, and proven lane counts,
+  current resource arithmetic, candidate eligibility, exact limiting gate, eligible R2 offload
+  candidate (or why none qualifies), and executable next action in the fleet's existing
+  next-action/evidence entries or a hash-bound capacity-decision receipt. Recompute from current
+  invocation-bound claims; do not carry terminal owners' growth reservations forward without
+  justification. When more work fits, take the next authorized admission or qualified offload
+  action in the same cycle. When qualification blocks an idle lane, actively repair that gate;
+  do not treat unused capacity as an acceptable steady state. Use the existing
+  [R2 holding rules](references/r2-holding.md) for offloading and preserve healthy work.
   If a qualified candidate fits, admit it in the same cycle and continue filling the proven operating
   point. If the missing bound is resource qualification, start the smallest freshly admissible bounded
   experiment instead of merely reporting idle capacity. Scaling beyond the proven point remains one
@@ -419,6 +436,16 @@ not stall otherwise admissible ordinary campaign work.
   participating host within its own assigned range; never infer another host's capacity from local
   observations. Optimize verified R2 sidecars per day, preserve every safety/integrity gate, and add
   no extra autonomous routine polls.
+- Include a **disk reclamation audit in every 30-minute check-in**, even when free space is above
+  the safety floor. Look for obsolete build caches, unreferenced scratch generations and terminal
+  outputs eligible under the existing retirement rules; remove qualified candidates in the same
+  cycle and use R2 holding for artifacts that must be retained. Record the largest candidates,
+  retention reasons or blockers, actual reclaimed bytes and filesystem free space before and after,
+  then reassess whether another lane fits. Treat increasing usable disk space as continuing capacity
+  work even while space is plentiful: advance qualified cleanup between check-ins, and revisit
+  candidates before a disk-growing admission and on relevant completion, failure,
+  offload or disk-blocked admission events, using accepted evidence without adding a polling loop.
+  Follow [the disk reclamation guidance](references/host-utilization.md#reclaim-disk-at-each-control-cycle).
 - Select the desired active lane count from **memory utilization alone**, targeting **90% of
   system memory** as the user requested. Use observed aggregate lane RSS and actual host usage,
   including non-lane usage once; the 1.5× RSS reservation is a scheduling allowance, not a second
@@ -1234,6 +1261,13 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- Before starting `jetstreamer-horizon-verify-pair`, create both its private state directory and
+  its `receipts/` child as Root-owned `0700` directories. The runner validates these existing
+  directories; it does not create them. Run the exact sealed runner, plan and hashes with
+  `--check-only` under the final service identity, capabilities and mounts before useful work,
+  preferably as that service's `ExecStartPre`. This checks executable bindings, the canonical
+  checksum and archive identity without hashing the archive body, running verifier commands or
+  creating a verification receipt. Preserve failed attempts and logs when correcting setup.
 - Finish guard and controller setup before starting a timed qualification worker. A guard
   capability command may require its receipt directory to exist already. Pre-create the exact
   directories, verify custody and sandbox write/fsync/read access, and check the sealed controller
@@ -1267,6 +1301,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   token equivalence in charged execution metadata, and retain the normal effective-property,
   mount and kernel-limit checks. Apply the transport to both preflights and the build launch;
   never truncate paths, broaden mounts or infer equivalent semantics for other properties.
+
+- During autonomous campaign work, use question cards only for an actual unresolved question.
+  Never use them for acknowledgements, keepalives, withdrawn questions or routine confirmations.
+  Continue already authorized work and use the established progress-update cadence.
 - Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
   exhausted by Tokio's core runtime threads. `retire-local` performs its archive
   proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
@@ -1303,6 +1341,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   read root-owned sealed evidence beneath the private root, retain only that capability (including
   the effective or ambient set as required by the unit), keep the target mount read-only except for
   exact receipt directories, and prove the read path in an equivalently sandboxed transient unit.
+  Use an actual read-only open or the qualified tool's metadata-only preflight for that proof.
+  A shell access predicate can disagree with a successful kernel open under restricted
+  capabilities; diagnose that discrepancy without widening archive permissions or dropping
+  the tool's integrity checks.
   Do not relax private-directory permissions to work around the sandbox.
   A root launcher that validates private evidence and then drops to an unprivileged scanner needs
   CAP_SETGID and CAP_SETUID effective at the drop point in addition to any traversal capability.
@@ -1311,6 +1353,11 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   end-to-end sandbox proof that observes the unprivileged output owner before arming production.
   For a long `Type=oneshot` verifier use `TimeoutStartSec=` as its execution bound;
   `RuntimeMaxSec=` is ignored for oneshot units.
+- For the Vaultic Horizon campaign, work on `account-updates` in
+  `vaultic-win/jetstreamer` so participating agents share the same source history. Fetch and
+  fast-forward that branch before new Git changes, preserving local edits; reconcile divergence
+  without discarding another agent's commits. Do not continue development on a PR head branch
+  after merging it. Keep sealed deployment copies immutable and qualify new deployments separately.
 - Use SSH URLs for Git network operations. Select a currently loaded keychain agent socket for the
   active login session by verifying it with `ssh-add -l`; never hard-code an ephemeral socket path
   from an earlier session. Check the inherited environment for required service credentials before
