@@ -27,6 +27,21 @@ struct Spec {
     current: Current,
     request: cached145::Request,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeSpec {
+    schema: String,
+    program: Bound,
+}
+fn native_spec(value: Value, image: &Bound) -> Result<()> {
+    let spec: NativeSpec = serde_json::from_value(value)?;
+    ensure!(
+        spec.schema == "cached145-completed-parent-census-native-capability-spec-v1"
+            && spec.program == *image,
+        "exact native capability spec/program"
+    );
+    Ok(())
+}
 fn native(image: &Bound, iid: &str) -> Result<Value> {
     let out=Command::new("/usr/bin/systemctl").arg("--system")
         .args(["show",UNIT,"--no-pager","--property=Id,InvocationID,MainPID,ControlPID,NRestarts,Restart,ActiveState,SubState,MemoryAccounting,MemoryMax,MemorySwapMax,Job"])
@@ -128,17 +143,14 @@ fn run() -> Result<()> {
         path: a[1].clone().into(),
         sha256: a[3].clone(),
     };
-    let spec: Spec = serde_json::from_value(fsutil::immutable(&sb)?)?;
-    ensure!(
-        spec.schema == "cached145-completed-parent-census-spec-v1",
-        "exact census spec schema"
-    );
+    let spec_value = fsutil::immutable(&sb)?;
     let iid = env::var("INVOCATION_ID")?;
     ensure!(fsutil::hex(&iid, 32), "invocation absent");
     let before = native(&image, &iid)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let output = Path::new(&a[7]);
     let value = if a[0] == "native-capability" {
+        native_spec(spec_value, &image)?;
         ensure!(
             output
                 == Path::new(
@@ -152,6 +164,11 @@ fn run() -> Result<()> {
             "native_before":before,"native_after":after,"spec":sb,"memory_credit_bytes":0,"DATA_credit_bytes":0,
             "replay_launch_authorized":false,"r2_mutations":false})
     } else {
+        let spec: Spec = serde_json::from_value(spec_value)?;
+        ensure!(
+            spec.schema == "cached145-completed-parent-census-spec-v1",
+            "exact census spec schema"
+        );
         let mut c = cached145::capture(
             &spec.request,
             &spec.current,
@@ -183,5 +200,47 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("completed145 parent census rejected: {e:#}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn image() -> Bound {
+        Bound {
+            path: IMAGE.into(),
+            sha256: "a".repeat(64),
+        }
+    }
+    fn plan() -> Value {
+        json!({"schema":"cached145-completed-parent-census-native-capability-spec-v1","program":image()})
+    }
+    #[test]
+    fn native_capability_needs_only_its_actual_program() {
+        assert!(native_spec(plan(), &image()).is_ok());
+    }
+    #[test]
+    fn changed_program_path_or_hash_cannot_qualify() {
+        for key in ["path", "sha256"] {
+            let mut v = plan();
+            v["program"][key] = json!("foreign");
+            assert!(native_spec(v, &image()).is_err());
+        }
+    }
+    #[test]
+    fn capture_schema_or_extra_authority_is_not_native_capability() {
+        let mut v = plan();
+        v["schema"] = json!("cached145-completed-parent-census-spec-v1");
+        assert!(native_spec(v, &image()).is_err());
+        let mut v = plan();
+        v["memory_credit_bytes"] = json!(192u64 << 30);
+        assert!(native_spec(v, &image()).is_err());
+    }
+    #[test]
+    fn native_capability_plan_cannot_supply_a_capture_request() {
+        assert!(serde_json::from_value::<Spec>(plan()).is_err());
+        let mut v = plan();
+        v["request"] = json!({});
+        assert!(native_spec(v, &image()).is_err());
     }
 }
