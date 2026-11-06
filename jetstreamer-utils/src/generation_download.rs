@@ -6,7 +6,7 @@ use {
     anyhow::{Context, Result, ensure},
     base64::{Engine, engine::general_purpose::STANDARD},
     epoch141_ledger_common::{
-        bound_file, drop_cli_identity, identity, observe_gcloud_object, sha,
+        bound_file, drop_cli_identity, identity, observe_gcloud_object_using_config, sha,
         validate_object_metadata, write_receipt,
     },
     md5::Md5,
@@ -33,7 +33,16 @@ use {
 
 const SLACK: u64 = 64 * 1024 * 1024;
 const GCLOUD: &str = "/usr/lib/google-cloud-sdk/bin/gcloud";
-const CLOUD_CONFIG: &str = "/home/sol/.config/gcloud";
+const CLOUD_CONFIG: &str = if EPOCH == 163 {
+    "/home/sol/.jetstreamer-private/epoch163-direct-parent-20261104-v1/gcloud"
+} else {
+    "/home/sol/.config/gcloud"
+};
+const EPOCH163_FLOOR: u64 = 4_700_000_000_000;
+
+fn observe_gcloud_object(object: &epoch141_ledger_common::ObjectSpec) -> Result<Vec<u8>> {
+    observe_gcloud_object_using_config(object, CLOUD_CONFIG)
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -95,6 +104,34 @@ fn validate_metadata_receipt(metadata: &Value) -> Result<()> {
 }
 
 fn validate_admission_receipt(admission: &Value, now: u64) -> Result<()> {
+    if EPOCH == 163 {
+        // This new compressed-input path consumes a Root capacity booking.
+        // The actor still checks the bound files, actual filesystem and guard
+        // before transfer; the booking claims no native/replay admission.
+        ensure!(
+            admission["schema"] == "jetstreamer-epoch163-snapshot-download-capacity-booking-v1"
+                && admission["epoch"] == 163
+                && admission["download_only"] == true
+                && admission["native_restore_authorized"] == false
+                && admission["replay_launch_authorized"] == false
+                && admission["publication_authorized"] == false
+                && admission["remote_mutations"] == false
+                && admission["r2_mutations"] == false
+                && admission["uri"] == URI
+                && admission["generation"] == GENERATION
+                && admission["external_pool_bytes"] == 6_442_450_944u64
+                && admission["download_memory_max_bytes"] == 536_870_912u64
+                && admission["protected_existing_floor_bytes"]
+                    .as_u64()
+                    .is_some_and(|n| n >= EPOCH163_FLOOR)
+                && admission["candidate_incremental_peak_bytes"] == SIZE + SLACK
+                && admission["recorded_unix_seconds"]
+                    .as_u64()
+                    .is_some_and(|n| n <= now && now - n <= 1800),
+            "wrong, stale or broadened epoch163 compressed-download capacity booking"
+        );
+        return Ok(());
+    }
     ensure!(
         admission["admitted"] == true,
         "admission receipt did not pass"
@@ -141,6 +178,12 @@ fn validate_plan(plan: &Plan, executable: &Path, executable_sha256: &str) -> Res
         ensure!(
             plan.minimum_free_bytes >= 4_740_696_923_590,
             "144 transfer stop floor dropped older growth protection"
+        );
+    }
+    if EPOCH == 163 {
+        ensure!(
+            plan.minimum_free_bytes >= EPOCH163_FLOOR && plan.maximum_runtime_seconds <= 7200,
+            "epoch163 protected floor or transfer time bound differs"
         );
     }
     for p in [
@@ -670,6 +713,47 @@ mod tests {
     #[test]
     fn admission_authority_is_profile_specific_and144_is_fresh_download_only() {
         let legacy = json!({"schema":"jetstreamer-historical-performance-admission-receipt-v1","admitted":true});
+        if EPOCH == 163 {
+            assert!(validate_admission_receipt(&legacy, 10000).is_err());
+            let good = json!({"schema":"jetstreamer-epoch163-snapshot-download-capacity-booking-v1",
+                "epoch":163,"download_only":true,"native_restore_authorized":false,
+                "replay_launch_authorized":false,"publication_authorized":false,
+                "remote_mutations":false,"r2_mutations":false,"uri":URI,"generation":GENERATION,
+                "external_pool_bytes":6442450944u64,"download_memory_max_bytes":536870912u64,
+                "protected_existing_floor_bytes":EPOCH163_FLOOR,
+                "candidate_incremental_peak_bytes":SIZE+SLACK,"recorded_unix_seconds":9000});
+            validate_admission_receipt(&good, 10000).unwrap();
+            for (key, value) in [
+                ("epoch", json!(144)),
+                ("generation", json!("1634787272998263")),
+                ("uri", json!("gs://other/object#1")),
+                ("download_only", json!(false)),
+                ("native_restore_authorized", json!(true)),
+                ("replay_launch_authorized", json!(true)),
+                ("publication_authorized", json!(true)),
+                ("remote_mutations", json!(true)),
+                ("r2_mutations", json!(true)),
+                ("external_pool_bytes", json!(1)),
+                ("download_memory_max_bytes", json!(1)),
+                ("protected_existing_floor_bytes", json!(EPOCH163_FLOOR - 1)),
+                ("candidate_incremental_peak_bytes", json!(SIZE)),
+                ("recorded_unix_seconds", json!(10001)),
+                ("recorded_unix_seconds", json!(1)),
+            ] {
+                let mut bad = good.clone();
+                bad[key] = value;
+                assert!(validate_admission_receipt(&bad, 10000).is_err(), "{key}");
+            }
+            for key in good.as_object().unwrap().keys() {
+                let mut bad = good.clone();
+                bad.as_object_mut().unwrap().remove(key);
+                assert!(
+                    validate_admission_receipt(&bad, 10000).is_err(),
+                    "missing {key}"
+                );
+            }
+            return;
+        }
         if EPOCH != 144 {
             validate_admission_receipt(&legacy, 10000).unwrap();
             return;
@@ -777,6 +861,16 @@ mod tests {
                 schemas
                     .iter()
                     .all(|s| s.starts_with("jetstreamer-epoch144-snapshot-"))
+            );
+        } else if EPOCH == 163 {
+            assert_eq!(GENERATION, "1634787272998262");
+            assert_eq!(SIZE, 1_901_405_026);
+            assert_eq!(CRC, "bpbuVg==");
+            assert_eq!(MD5, "GIvvcL0yXKjY2dumxRsJrg==");
+            assert!(
+                schemas
+                    .iter()
+                    .all(|s| s.starts_with("jetstreamer-epoch163-snapshot-"))
             );
         } else {
             assert_eq!(EPOCH, 141);

@@ -234,6 +234,13 @@ pub(super) fn observe_gcloud() -> Result<Vec<u8>> {
 }
 
 pub(super) fn observe_gcloud_object(object: &ObjectSpec) -> Result<Vec<u8>> {
+    observe_gcloud_object_using_config(object, "/home/sol/.config/gcloud")
+}
+
+pub(super) fn observe_gcloud_object_using_config(
+    object: &ObjectSpec,
+    cloud_config: &str,
+) -> Result<Vec<u8>> {
     let mut command = Command::new("/usr/lib/google-cloud-sdk/bin/gcloud");
     command
         .args([
@@ -250,7 +257,7 @@ pub(super) fn observe_gcloud_object(object: &ObjectSpec) -> Result<Vec<u8>> {
         .env("PATH", "/usr/bin:/bin")
         .env("HOME", "/home/sol")
         .env("LANG", "C.UTF-8")
-        .env("CLOUDSDK_CONFIG", "/home/sol/.config/gcloud")
+        .env("CLOUDSDK_CONFIG", cloud_config)
         .env("CLOUDSDK_CORE_DISABLE_PROMPTS", "1")
         .env("CLOUDSDK_CORE_DISABLE_FILE_LOGGING", "1")
         .stdin(Stdio::null())

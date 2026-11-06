@@ -4,7 +4,8 @@ mod epoch141_ledger_common;
 use {
     anyhow::{Context, Result, ensure},
     epoch141_ledger_common::{
-        bound_file, observe_gcloud_object, sha, validate_object_metadata, write_receipt,
+        bound_file, observe_gcloud_object_using_config, sha, validate_object_metadata,
+        write_receipt,
     },
     profile::{EPOCH, METADATA_PLAN_SCHEMA, METADATA_SCHEMA, OBJECT},
     serde::Deserialize,
@@ -15,6 +16,12 @@ use {
         path::{Path, PathBuf},
         time::{SystemTime, UNIX_EPOCH},
     },
+};
+
+const CLOUD_CONFIG: &str = if EPOCH == 163 {
+    "/home/sol/.jetstreamer-private/epoch163-direct-parent-20261104-v1/gcloud"
+} else {
+    "/home/sol/.config/gcloud"
 };
 
 #[derive(Deserialize)]
@@ -68,7 +75,7 @@ fn run() -> Result<()> {
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
         "invalid invocation ID"
     );
-    let metadata = observe_gcloud_object(&OBJECT)?;
+    let metadata = observe_gcloud_object_using_config(&OBJECT, CLOUD_CONFIG)?;
     let value: Value = serde_json::from_slice(&metadata)?;
     validate_object_metadata(&value, &OBJECT)?;
     bound_file(gcloud, &plan.gcloud_sha256, 16 * 1024 * 1024, false)?;
@@ -78,7 +85,7 @@ fn run() -> Result<()> {
             "schema":METADATA_SCHEMA,"epoch":EPOCH,
             "recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
             "invocation_id":invocation,"plan_sha256":values["--plan-sha256"],"self_sha256":values["--self-sha256"],
-            "gcloud_sha256":plan.gcloud_sha256,"effective_cloudsdk_config":"/home/sol/.config/gcloud",
+            "gcloud_sha256":plan.gcloud_sha256,"effective_cloudsdk_config":CLOUD_CONFIG,
         "cli_uid_enforced_before_exec":1001,"cli_gid_enforced_before_exec":1003,
             "metadata":value,"raw_metadata_sha256":sha(&metadata),
             "download_performed":false,"compressed_input_verified":false,"source_completeness_proven":false,
