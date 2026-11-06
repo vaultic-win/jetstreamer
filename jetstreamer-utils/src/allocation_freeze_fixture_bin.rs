@@ -17,10 +17,10 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const WRITER: &str = "horizon-qualify-allocation-fixture-writer925-v1.service";
-const WORK: &str = "/home/ubuntu/.jetstreamer-private/allocation-freeze-fixture925-v1";
+const WRITER: &str = "horizon-qualify-allocation-fixture-writer929-v1.service";
+const WORK: &str = "/home/ubuntu/.jetstreamer-private/allocation-freeze-fixture929-v1";
 const CG: &str =
-    "/sys/fs/cgroup/system.slice/horizon-qualify-allocation-fixture-writer925-v1.service";
+    "/sys/fs/cgroup/system.slice/horizon-qualify-allocation-fixture-writer929-v1.service";
 const DATA_LEN: u64 = 8 << 20;
 const FLOOR: u64 = 1_772_980_057_109;
 
@@ -29,17 +29,23 @@ const FLOOR: u64 = 1_772_980_057_109;
 enum Mode {
     Normal,
     Kill,
+    WrongInvocation,
+    WrongCgroup,
+    MissingRescue,
 }
 impl Mode {
     fn name(self) -> &'static str {
         match self {
             Self::Normal => "normal",
             Self::Kill => "kill",
+            Self::WrongInvocation => "wrong-invocation",
+            Self::WrongCgroup => "wrong-cgroup",
+            Self::MissingRescue => "missing-rescue",
         }
     }
     fn role(self, role: &str) -> String {
         format!(
-            "horizon-allocation-fixture925-{}-{role}-v1.service",
+            "horizon-allocation-fixture929-{}-{role}-v1.service",
             self.name()
         )
     }
@@ -48,11 +54,18 @@ impl Mode {
     }
     fn state(self) -> PathBuf {
         format!(
-            "/var/lib/jetstreamer/horizon-allocation-fixture925-{}-state-v1",
+            "/var/lib/jetstreamer/horizon-allocation-fixture929-{}-state-v1",
             self.name()
         )
         .into()
     }
+}
+fn require_freezing_case(mode: Mode) -> Result<()> {
+    ensure!(
+        matches!(mode, Mode::Normal | Mode::Kill),
+        "negative fixture unexpectedly passed its rejection gate; freezing prohibited"
+    );
+    Ok(())
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -688,6 +701,9 @@ fn drive(s: &Spec, plan: &str, spec_path: &str, self_sha: &str) -> Result<()> {
         "--fixture-only".into(),
     ];
     let rescue = timer(s.mode, &expected)?;
+    // Native rejection controls must fail at their specific earlier gate.
+    // Even a regression accepting a bad binding cannot freeze in those modes.
+    require_freezing_case(s.mode)?;
     let mut freeze = Frozen::new(&s.writer)?;
     ensure!(!freeze.frozen()?, "fixture already frozen");
     let lease = Lease {
@@ -888,6 +904,24 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn negative_controls_cannot_reach_a_freeze_write() {
+        for mode in [
+            Mode::WrongInvocation,
+            Mode::WrongCgroup,
+            Mode::MissingRescue,
+        ] {
+            assert!(require_freezing_case(mode).is_err());
+            assert_ne!(mode.state(), Mode::Normal.state());
+            assert_ne!(mode.state(), Mode::Kill.state());
+            assert!(
+                mode.role("driver")
+                    .starts_with("horizon-allocation-fixture929-")
+            );
+        }
+        require_freezing_case(Mode::Normal).unwrap();
+        require_freezing_case(Mode::Kill).unwrap();
+    }
     fn spec() -> Spec {
         Spec {
             schema: "horizon-allocation-freezer-fixture-plan-v1".into(),
@@ -911,7 +945,7 @@ mod tests {
         validate(&s).unwrap();
         for unit in [
             "horizon-qualify-236-general-shrink-debt-budget506-e3f15eb2-v1.service",
-            "horizon-qualify-allocation-fixture-writer925-v2.service",
+            "horizon-qualify-allocation-fixture-writer929-v2.service",
             "",
         ] {
             s.writer.unit = unit.into();

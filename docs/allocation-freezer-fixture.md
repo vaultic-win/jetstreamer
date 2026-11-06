@@ -29,3 +29,13 @@ execution, and negative controls. Pure tests alone do not establish freezer or
 recovery support. FIEMAP in this fixture covers one fixed data file; it does not
 qualify traversal of a live replay tree, external-writer closure, host memory
 accounting or a resource reservation reduction. Those remain separate work.
+
+The current source uses a fresh generation929 namespace; existing sealed925
+artifacts and their original files remain unchanged. Three rejection modes
+exercise a wrong writer invocation, a wrong cgroup inode and a missing rescue
+timer against a real disposable writer. Each must fail at its specific binding
+or rescue gate while the same writer continues advancing. Even an earlier gate
+regression cannot freeze in a rejection mode: a final mode guard permits only
+`normal` and `kill` to construct the freezer. These are additional native
+qualification controls, not proof of handling a genuinely recreated cgroup,
+partial freeze or a deactivating original owner.
