@@ -14,6 +14,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+mod source_links;
 
 pub const UNIT: &str = "horizon-qualify-145-cached-b2a09f57de39c384.service";
 pub const IID: &str = "15ddd220e2144aaa8d7418f73f60768f";
@@ -366,7 +367,7 @@ fn native(name: &str) -> Result<Value> {
 fn endpoint() -> Result<Endpoint> {
     let sources = bindings();
     for binding in &sources {
-        f::bytes(binding, 128 << 20, false)?;
+        source_links::bytes(binding)?;
     }
     let native = FAMILY
         .iter()
@@ -444,7 +445,7 @@ pub fn capture(
         "completed145 native closure changed"
     );
     for b in &p.source_bindings {
-        f::bytes(b, 128 << 20, false)?;
+        source_links::bytes(b)?;
     }
     Ok(Census {
         schema: "cached145-completed-parent-current-census-v2".into(),
