@@ -3,9 +3,41 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
 
+#[path = "build_support/clickhouse_input.rs"]
+mod clickhouse_input;
+
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let embed_clickhouse_rs = Path::new(&out_dir).join("embed_clickhouse.rs");
+
+    for name in [
+        "JETSTREAMER_CLICKHOUSE_BINARY",
+        "JETSTREAMER_CLICKHOUSE_SHA256",
+        "DOCS_RS",
+    ] {
+        println!("cargo:rerun-if-env-changed={name}");
+    }
+    let explicit = clickhouse_input::selected_input(
+        env::var_os("JETSTREAMER_CLICKHOUSE_BINARY"),
+        env::var_os("JETSTREAMER_CLICKHOUSE_SHA256"),
+    )
+    .unwrap_or_else(|error| panic!("Invalid explicit ClickHouse build input: {error}"));
+    if let Some((path, digest)) = explicit {
+        clickhouse_input::verify(&path, &digest)
+            .unwrap_or_else(|error| panic!("Invalid explicit ClickHouse build input: {error}"));
+        let path = path.to_str().expect("ClickHouse input path must be UTF-8");
+        println!("cargo:rerun-if-changed={path}");
+        println!("cargo:warning=Embedding pinned offline ClickHouse input, SHA-256 {digest}");
+        fs::write(
+            &embed_clickhouse_rs,
+            format!(
+                "/// ClickHouse binary from a verified immutable offline input.\n\
+             pub const CLICKHOUSE_BINARY: &[u8] = include_bytes!({path:?});\n"
+            ),
+        )
+        .unwrap();
+        return;
+    }
 
     if env::var("DOCS_RS").is_ok() {
         println!("cargo:warning=Skipping ClickHouse download while building on docs.rs");
