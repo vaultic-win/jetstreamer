@@ -24,7 +24,11 @@ guarded worker execution, or record the action attempted and its specific failed
 Disk pressure triggers qualified cleanup and juggling through this host's already authorized
 R2 holding prefix; it does not lower the memory-selected lane target. Reuse the recorded prefix
 authorization and execute the [holding lifecycle](references/r2-holding.md) when needed, accounting
-for restore space and time. Preserve healthy work and every admission/integrity gate. Delete
+for restore space and time. First retire completed, unneeded local data; next park eligible closed
+artifacts; checkpoint and stop a selected live job only through its qualified restore path. A disk
+blocker requires an attempted reclamation/offload transition or concrete recovery qualification
+work in the same cycle, with the result recorded. Preserve healthy work and every admission/integrity
+gate. Delete
 completed epochs' unnecessary local files promptly under
 [mandatory local cleanup](#mandatory-local-cleanup-after-completion), including `~/horizon` and
 Horizon-owned directories under `~/workspace`; leave unrelated projects alone.

@@ -1,12 +1,15 @@
 # Host-specific R2 scratch / cold holding
 
-Use this only after explicit user permission for an R2 scratch/holding area. This is cold object
-storage for eligible closed files, not live POSIX scratch and not a publication destination.
+Use the host's recorded R2 scratch/holding authorization; request permission only when no mapping
+exists or a real ownership conflict remains. `dev-samjohnson` already has `node_02/` authorized.
+This is cold object storage for eligible closed files, not live POSIX scratch and not a publication
+destination.
 
 ## Name and authority
 
-- Ask the user for the unique directory/prefix name for this host before the first write. Use the
-  user-provided name; do not choose a hostname-derived default. Validate it as a nonempty relative
+- Check the durable host/prefix mapping first and reuse existing authorization across sessions.
+  Only for an unmapped host, ask the user for its unique directory/prefix name before the first
+  write. Use the user-provided name; do not choose a hostname-derived default. Validate it as a nonempty relative
   key prefix with no traversal or ambiguous components, and keep every holding key beneath it.
   Record the host/prefix mapping. If it conflicts with another host's ownership or existing keys,
   resolve the conflict with the user rather than silently sharing or broadening the prefix.
@@ -133,6 +136,11 @@ not let waiting for the user's prefix name block independent useful campaign wor
 When disk blocks a candidate, select the eligible offload set and execute its next qualified
 transition in that same capacity cycle. Record actual bytes reclaimed, retained custody evidence,
 restore overlap and the candidate this unlocks; a proposed upload creates no local headroom.
+Prefer retiring completed, unnecessary local data before paying for holding, and parking closed
+artifacts before disrupting a live job. For each offload set, include its complete restore set,
+transfer/restore time and peak local overlap; verify that the resulting admission still protects
+every live owner's floor. If no set qualifies, advance the specific missing transport or recovery
+stage rather than reporting disk pressure alone as the reason to leave lanes idle.
 Reuse this host's recorded prefix authorization without asking again. Keep the memory-selected
 lane target while resolving disk pressure, and preserve live unsupported jobs until their real
 checkpoint/restore path is qualified.

@@ -28,10 +28,12 @@ When executing lanes are below target, the main agent owns the path to the next 
    immutable live guard still includes a dead owner's reservation, qualify the required consumer
    and guard handoff; do not weaken the live guard or keep repeating its floor as the final answer.
 4. When disk is the limiting resource, use the host's already authorized R2 scratch prefix through
-   [the holding lifecycle](r2-holding.md): checkpoint/stop selected work, upload and authenticate
-   readback, retire eligible local copies, then restore/resume as capacity permits. Account for
-   restore overlap and the century safety floor. Keep the memory-selected target. Missing safe
-   checkpoint, offload or recovery support is implementation work to advance, rather than a reason
+   [the holding lifecycle](r2-holding.md). Reclaim completed, unneeded local data first; then park
+   eligible closed artifacts with authenticated readback before retiring their exact local copies.
+   If those measures are insufficient, use qualified checkpoint/stop/offload/restore/resume for
+   selected work. Account for restore overlap, transfer time and the century safety floor, and
+   identify which candidate the reclaimed bytes will admit. Keep the memory-selected target. Missing
+   safe checkpoint, offload or recovery support is implementation work to advance, rather than a reason
    to accept an indefinitely reduced lane count. Preserve healthy unsupported jobs while qualifying
    that support on isolated work.
    Record an actual park/retire/restore action and its result, or the precise failed gate and the
