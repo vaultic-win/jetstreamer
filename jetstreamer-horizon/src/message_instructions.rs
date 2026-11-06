@@ -465,7 +465,7 @@ mod tests {
         arena.push(9, &[], &[4]).unwrap();
         assert_eq!(arena.len(), 1);
         assert_eq!(arena.data_len(), 1);
-        assert_eq!(arena.get(0).unwrap().accounts, &[]);
+        assert!(arena.get(0).unwrap().accounts.is_empty());
         assert_eq!(arena.get(0).unwrap().data, &[4]);
     }
 
