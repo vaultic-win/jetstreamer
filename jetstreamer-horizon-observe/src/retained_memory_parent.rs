@@ -95,7 +95,7 @@ fn directory(file: &File, magic: i64) -> Result<Identity> {
         "cannot identify retained RAM filesystem"
     );
     ensure!(
-        unsafe { stat.assume_init() }.f_type as i64 == magic,
+        unsafe { stat.assume_init() }.f_type == magic,
         "retained RAM filesystem type changed"
     );
     identity(file)
@@ -154,6 +154,13 @@ fn bytes(mut file: File, maximum: u64) -> Result<Vec<u8>> {
     );
     Ok(data)
 }
+fn unchanged_path(path: &str, dir: bool, expected: &Identity) -> Result<()> {
+    ensure!(
+        identity(&anchored(path, dir)?)? == *expected,
+        "retained input path identity changed"
+    );
+    Ok(())
+}
 fn fixed(path: &str, expected: &str, immutable: bool) -> Result<String> {
     let file = anchored(path, false)?;
     let m = file.metadata()?;
@@ -167,9 +174,10 @@ fn fixed(path: &str, expected: &str, immutable: bool) -> Result<String> {
     );
     let data = bytes(file, 1 << 20)?;
     ensure!(
-        sha256(&data) == expected && identity(&anchored(path, false)?)? == id,
-        "retained contract digest/identity changed"
+        sha256(&data) == expected,
+        "retained contract digest changed"
     );
+    unchanged_path(path, false, &id)?;
     Ok(expected.into())
 }
 fn text(path: &str, maximum: u64) -> Result<String> {
@@ -178,11 +186,18 @@ fn text(path: &str, maximum: u64) -> Result<String> {
 fn manager() -> Result<BTreeMap<String, String>> {
     // One bounded lookup, with no discovery retry, PID census, reload or signal
     // to a retained actor. timeout can terminate only its own systemctl child.
-    let mut command = Command::new("/usr/bin/timeout").args(["--signal=KILL", "2s", "/usr/bin/systemctl",
+    manager_output(Command::new("/usr/bin/timeout").args(["--signal=KILL", "2s", "/usr/bin/systemctl",
         "--no-pager", "--no-ask-password", "show", UNIT,
-        "--property=Id,LoadState,ActiveState,SubState,InvocationID,ControlGroup,Delegate,MemoryMax,MemorySwapMax,DropInPaths,Job,FragmentPath"])
-        .stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null())
-        .spawn().context("retained parent manager read failed")?;
+        "--property=Id,LoadState,ActiveState,SubState,InvocationID,ControlGroup,Delegate,MemoryMax,MemorySwapMax,DropInPaths,Job,FragmentPath"]))
+}
+// Production calls this runner only through the fixed manager() command above.
+// The ignored test module supplies disposable non-systemctl command fixtures.
+fn manager_output(command: &mut Command) -> Result<BTreeMap<String, String>> {
+    let mut command = command
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .context("retained parent manager read failed")?;
     let mut stdout = command
         .stdout
         .take()
@@ -249,12 +264,15 @@ pub(super) fn capture() -> Result<Snapshot> {
     );
     ensure!(
         identity(&parent)? == parent_id
-            && identity(&anchored(PARENT, true)?)? == parent_id
             && identity(&outer)? == outer_id
-            && identity(&anchored(OUTER, true)?)? == outer_id
-            && identity(&inner)? == inner_id
-            && identity(&anchored(INNER, true)?)? == inner_id
-            && manager()? == manager_before,
+            && identity(&inner)? == inner_id,
+        "retained owner/cgroup/mount identity changed during read"
+    );
+    unchanged_path(PARENT, true, &parent_id)?;
+    unchanged_path(OUTER, true, &outer_id)?;
+    unchanged_path(INNER, true, &inner_id)?;
+    ensure!(
+        manager()? == manager_before,
         "retained owner/cgroup/mount identity changed during read"
     );
     Ok(Snapshot {

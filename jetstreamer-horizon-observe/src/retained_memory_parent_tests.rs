@@ -257,3 +257,6 @@ fn oversized_raw_endpoint_is_unavailable_with_zero_credit() {
     assert_eq!(v["status"], "unavailable");
     no_authority(&v);
 }
+
+#[path = "retained_memory_parent_native_tests.rs"]
+mod native;
