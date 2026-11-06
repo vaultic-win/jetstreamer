@@ -51,6 +51,24 @@ epoch225-v1-6-25-diagnostic = []
 epoch225-v1-6-25-qualification = []
 
 [[bin]]
+name = "jetstreamer-epoch163-native-input"
+path = "src/bin/epoch163-native-input/source/native.rs"
+required-features = ["epoch163-first-output128-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch163-native-input-finalize"
+path = "src/bin/epoch163-native-input/source/finalize.rs"
+required-features = ["epoch163-first-output128-diagnostic"]
+
+# Explicit kernel control; requires the private root-owned namespace fixture.
+# Keep it out of ordinary `cargo test`, even when the diagnostic feature is on.
+[[test]]
+name = "epoch163-native-readonly-namespace-control"
+path = "src/bin/epoch163-native-input/namespace_control.rs"
+required-features = ["epoch163-first-output128-diagnostic"]
+test = false
+
+[[bin]]
 name = "jetstreamer-epoch203-native-restore-probe"
 path = "src/bin/jetstreamer-epoch203-native-restore-probe.rs"
 required-features = ["epoch203-native-restore-diagnostic"]
