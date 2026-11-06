@@ -63,6 +63,13 @@ long JSON reports with `journalctl --all --output=json`: the default JSON output
 long `MESSAGE` with `null`. Recover the same invocation's complete record before treating a report
 as missing or retrying useful work.
 
+`systemctl show` can omit an empty complex array such as `ExecStartPre`, even with
+`--all`. Do not infer an empty property from missing text. When a required service
+property is omitted, obtain the exact typed D-Bus property from that service's
+escaped unit object and validate its type and empty-array value before representing
+it as empty. Reject missing, malformed, unknown or nonempty evidence, and preserve
+the actual query and all existing native identity and pre-start checks.
+
 ### Gate copy and build starts on actual guard proof
 
 For a new copy or build whose guard must be bound after systemd assigns its invocation, make
