@@ -26,11 +26,23 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test",
                 "5276276827aab0ccc809d123ebc8bf78cc7bfc36e6def550566059e70a8d4842",
             ),
+            210 if self.unit == "archive-210-v1616-native-input-small-v2.service" => (
+                "archive-210-v1616-native-input-small-v2.service",
+                "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2/scratch",
+                "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
+                "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
+            ),
             210 => (
                 "archive-210-v1616-native-input-actual-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1/scratch",
                 "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
                 "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
+            ),
+            227 if self.unit == "horizon-native-input-227-v1625-small-v2.service" => (
+                "horizon-native-input-227-v1625-small-v2.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2/scratch",
+                "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
+                "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef",
             ),
             227 if self.unit == "horizon-native-input-227-v1625-7a831420-v1.service" => (
                 "horizon-native-input-227-v1625-7a831420-v1.service",
@@ -326,6 +338,50 @@ mod tests {
                     .is_err(),
                 "{field}"
             );
+        }
+    }
+    #[test]
+    fn small_native_generations_preserve_closed_original_tuples() {
+        for (epoch, unit, old_unit, root, executable, sha) in [
+            (
+                210,
+                "archive-210-v1616-native-input-small-v2.service",
+                "archive-210-v1616-native-input-actual-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-small-v2/scratch",
+                "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
+                "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
+            ),
+            (
+                227,
+                "horizon-native-input-227-v1625-small-v2.service",
+                "horizon-native-input-227-v1625-7a831420-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2/scratch",
+                "/var/lib/jetstreamer/horizon-227-v1625-qualification-tests-df338451-v1/test-runner",
+                "df3384519a64629e99aafadee46833ad2889a9c60c3255ac939bd444965578ef",
+            ),
+        ] {
+            let good = serde_json::json!({"epoch":epoch,"unit":unit,"expected_invocation_id":"a".repeat(32),
+                "main_pid":42,"scratch_path":root,"executable":executable,"executable_sha256":sha});
+            serde_json::from_value::<NativeConfig>(good.clone())
+                .unwrap()
+                .validate()
+                .unwrap();
+            for (field, value) in [
+                ("unit", serde_json::json!(old_unit)),
+                ("scratch_path", serde_json::json!("/different/scratch")),
+                ("executable_sha256", serde_json::json!("a".repeat(64))),
+                ("main_pid", serde_json::json!(1)),
+            ] {
+                let mut bad = good.clone();
+                bad[field] = value;
+                assert!(
+                    serde_json::from_value::<NativeConfig>(bad)
+                        .unwrap()
+                        .validate()
+                        .is_err(),
+                    "{field}"
+                );
+            }
         }
     }
     #[test]

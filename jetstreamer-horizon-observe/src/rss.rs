@@ -110,6 +110,38 @@ pub(crate) struct Report {
     census_stable: bool,
     error: Option<String>,
 }
+impl Report {
+    #[cfg(test)]
+    pub(super) fn test_process(pid: u32, start_ticks: u64) -> Self {
+        Self {
+            aggregate_rss_bytes: Some(0),
+            processes: vec![Process {
+                pid,
+                start_ticks,
+                rss_bytes: 0,
+                rss_high_water_bytes: 0,
+            }],
+            census_stable: true,
+            error: None,
+        }
+    }
+    // Reuse this sample's existing census; never create a second process poll.
+    pub(super) fn stable_process_start_ticks(&self, pid: u64) -> Result<u64> {
+        ensure!(
+            self.census_stable && self.error.is_none(),
+            "RSS census is not stable"
+        );
+        let mut matching = self.processes.iter().filter(|p| u64::from(p.pid) == pid);
+        let process = matching
+            .next()
+            .context("producer is absent from RSS census")?;
+        ensure!(
+            pid > 0 && process.start_ticks > 0 && matching.next().is_none(),
+            "RSS producer identity is ambiguous or zero"
+        );
+        Ok(process.start_ticks)
+    }
+}
 #[derive(Debug)]
 struct CensusChurn(&'static str);
 impl fmt::Display for CensusChurn {
@@ -354,7 +386,7 @@ pub(crate) fn host_resident() -> Value {
         let kernel = kernel_bytes(&fs::read_to_string("/proc/meminfo")?)?;
         Ok(serde_json::json!({"status":"observed","rss":report,
             "kernel_components_bytes":kernel,"scope":"entire visible cgroup hierarchy",
-            "accounting_basis":"process RSS plus Slab, KernelStack, PageTables, Percpu; unmapped file cache excluded",
+            "accounting_basis":"process RSS plus Slab,KernelStack,PageTables,Percpu; unmapped file cache excluded",
             "shared_pages_may_be_counted_per_process":true,"admission_authorized":false}))
     })
 }
@@ -394,6 +426,30 @@ fn kernel_bytes(text: &str) -> Result<BTreeMap<String, u64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sampled_process_binding_requires_unique_positive_identity_and_stable_census() {
+        let mut report = Report::test_process(42, 123);
+        assert_eq!(report.stable_process_start_ticks(42).unwrap(), 123);
+        assert!(report.stable_process_start_ticks(43).is_err());
+        report.processes.push(report.processes[0].clone());
+        assert!(report.stable_process_start_ticks(42).is_err());
+        report.processes.pop();
+        report.census_stable = false;
+        assert!(report.stable_process_start_ticks(42).is_err());
+        report.census_stable = true;
+        report.error = Some("failed capture".into());
+        assert!(report.stable_process_start_ticks(42).is_err());
+        assert!(
+            Report::test_process(42, 0)
+                .stable_process_start_ticks(42)
+                .is_err()
+        );
+        assert!(
+            Report::test_process(0, 123)
+                .stable_process_start_ticks(0)
+                .is_err()
+        );
+    }
     fn fixture_process(proc_root: &Path, pid: u32, start: u64) {
         let root = proc_root.join(pid.to_string());
         fs::create_dir_all(&root).unwrap();

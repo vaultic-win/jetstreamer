@@ -28,6 +28,9 @@ const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2"
 mod append_log;
 mod host_pressure;
 mod native_input_diagnostic;
+mod prefix_output204205;
+mod private_archive223;
+mod retained_memory_parent;
 mod rss;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
@@ -101,12 +104,15 @@ struct Config {
     #[serde(default)]
     native_input_diagnostics: Vec<native_input_diagnostic::NativeConfig>,
     // A separate, tightly scoped private benchmark is not a publication claim.
-    // Its predecessor namespace must not collide with the primary epoch 203.
+    // Its predecessor namespace must not collide with the primary epoch203.
     #[serde(default)]
     epoch203_ram_auxiliary: Option<RamAuxiliaryConfig>,
     // Telemetry only, sampled inside this same cadence. Never changes admission.
     #[serde(default)]
     host_global_pressure: bool,
+    // Fixed retained parent telemetry only, never admission or replay credit.
+    #[serde(default)]
+    retained_prefix205_ram: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +137,8 @@ struct ReplayConfig {
     worker_executable_basename: String,
     #[serde(default)]
     append_log: Option<append_log::Config>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    private_archive223: Option<private_archive223::Binding>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -231,11 +239,15 @@ struct WorkerObservation {
     executable_beneath_bound_scratch: bool,
     vmas: u64,
     matching_workers: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    private_archive_parent: Option<private_archive223::Proof>,
 }
 
 #[derive(Debug, Serialize)]
 struct ReplayObservation {
     range: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output_file: Option<prefix_output204205::Report>,
     controller_before: UnitObservation,
     producer_before: UnitObservation,
     worker_before: WorkerObservation,
@@ -335,6 +347,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     native_input_diagnostic::validate(&config)?;
     validate_ram_auxiliary(&config)?;
+    retained_memory_parent::validate_config(&config)?;
     Ok((config, sha256(&bytes)))
 }
 
@@ -372,7 +385,7 @@ fn validate_ram_auxiliary(config: &Config) -> Result<()> {
     };
     let replay = &auxiliary.replay;
     // Preserve the ordinary/diagnostic validator unchanged. Only this explicit
-    // role may share epoch 203, never a controller, invocation or mutable tree.
+    // role may share epoch203, never a controller, invocation or mutable tree.
     validate_replay_configs(&[], std::slice::from_ref(replay))?;
     ensure!(
         replay.range == "203-203"
@@ -455,9 +468,14 @@ fn validate_replay_configs(
     replays: &[ReplayConfig],
     diagnostic_replays: &[ReplayConfig],
 ) -> Result<()> {
+    ensure!(
+        replays.iter().all(|r| r.private_archive223.is_none()),
+        "private archive parent telemetry is diagnostic only"
+    );
     let mut ranges = std::collections::BTreeSet::new();
     let mut intervals = Vec::new();
     for replay in replays.iter().chain(diagnostic_replays) {
+        private_archive223::validate(replay)?;
         ensure!(!replay.range.is_empty(), "replay range is empty");
         ensure!(
             ranges.insert(&replay.range),
@@ -1279,6 +1297,7 @@ fn observe_worker(scratch: &Path, executable_basename: &str) -> Result<WorkerObs
         executable,
         vmas: maps.lines().count() as u64,
         matching_workers: 1,
+        private_archive_parent: None,
     })
 }
 
@@ -1460,8 +1479,11 @@ fn stable_worker(before: &WorkerObservation, after: &WorkerObservation) -> bool 
         && before.executable == after.executable
         && before.matching_workers == 1
         && after.matching_workers == 1
-        && before.executable_beneath_bound_scratch
-        && after.executable_beneath_bound_scratch
+        && ((before.executable_beneath_bound_scratch
+            && after.executable_beneath_bound_scratch
+            && before.private_archive_parent.is_none()
+            && after.private_archive_parent.is_none())
+            || private_archive223::stable(before, after))
 }
 
 fn decimal_after(message: &str, prefix: &str) -> Option<u64> {
@@ -1683,9 +1705,15 @@ fn observe_replay_for_role(
         &replay.expected_producer_invocation_id,
         role,
     )?;
-    let worker_before = observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?;
+    let worker_before = if replay.private_archive223.is_some() {
+        private_archive223::observe(replay, &producer_before)?
+    } else {
+        observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?
+    };
+    let output_before = prefix_output204205::begin(replay);
     let scratch_pass_1 = scan_scratch(&replay.scratch_path)?;
     let scratch_pass_2 = scan_scratch(&replay.scratch_path)?;
+    let output_after = prefix_output204205::second(&output_before);
     let controller_after = observe_unit_for_role(
         &replay.controller_unit,
         &replay.expected_controller_invocation_id,
@@ -1696,7 +1724,11 @@ fn observe_replay_for_role(
         &replay.expected_producer_invocation_id,
         role,
     )?;
-    let worker_after = observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?;
+    let worker_after = if replay.private_archive223.is_some() {
+        private_archive223::observe(replay, &producer_after)?
+    } else {
+        observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?
+    };
     let producer_cgroup_counter_delta = counter_deltas(
         &producer_before.cgroup.counters,
         &producer_after.cgroup.counters,
@@ -1734,10 +1766,18 @@ fn observe_replay_for_role(
         "{} invocation or worker changed during observation",
         replay.range
     );
+    let output_file = prefix_output204205::finish(
+        output_before,
+        output_after,
+        (&controller_before, &producer_before),
+        (&controller_after, &producer_after),
+        invocation_binding_stable,
+    );
     let within_sample_physical_delta_bytes =
         i128::from(scratch_pass_2.physical_bytes) - i128::from(scratch_pass_1.physical_bytes);
     Ok(ReplayObservation {
         range: replay.range.clone(),
+        output_file,
         controller_before,
         producer_before,
         worker_before,
@@ -1819,6 +1859,7 @@ fn run(config: Config) -> Result<()> {
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     native_input_diagnostic::validate(&config)?;
     validate_ram_auxiliary(&config)?;
+    retained_memory_parent::validate_config(&config)?;
     let (previous_bytes, previous_value, previous_timestamp, previous_unix) =
         previous_sample(&config.previous_sample)?;
     let started_unix = now_unix()?;
@@ -1844,6 +1885,9 @@ fn run(config: Config) -> Result<()> {
 
     let available_before = filesystem_available_bytes(&config.filesystem_path)?;
     let (memory_total_kib, memory_available_before_kib) = host_memory()?;
+    let retained_ram_before = config
+        .retained_prefix205_ram
+        .then(retained_memory_parent::capture);
     let host_resident_before = rss::host_resident();
     let host_pressure_before = config
         .host_global_pressure
@@ -1932,6 +1976,8 @@ fn run(config: Config) -> Result<()> {
     }
     let available_after = filesystem_available_bytes(&config.filesystem_path)?;
     let (_, memory_available_after_kib) = host_memory()?;
+    let retained_ram = retained_ram_before
+        .map(|before| retained_memory_parent::report(before, retained_memory_parent::capture()));
     let host_resident_after = rss::host_resident();
     let host_pressure = host_pressure_before.map(|before| {
         host_pressure::report(
@@ -1973,6 +2019,7 @@ fn run(config: Config) -> Result<()> {
             "conservative_available_kib": memory_available_before_kib.min(memory_available_after_kib),
         },
         "host_global_pressure": host_pressure,
+        "retained_prefix205_ram": retained_ram,
         "host_resident_memory": {"before":host_resident_before,"after":host_resident_after},
         "vm_max_map_count": vm_max_map_count()?,
         "replays": observations,
@@ -2334,6 +2381,7 @@ mod tests {
             scratch_path: "/private/diagnostic/scratch".into(),
             worker_executable_basename: "historical-worker".into(),
             append_log: None,
+            private_archive223: None,
         }
     }
 
@@ -2360,6 +2408,7 @@ mod tests {
             diagnostic_replays: vec![primary],
             native_input_diagnostics: vec![],
             host_global_pressure: false,
+            retained_prefix205_ram: false,
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
                 supervisor_profile: "jetstreamer-private-epoch203-ram-bounded-runner-plan-v1"
@@ -2843,6 +2892,7 @@ mod tests {
             scratch_path: PathBuf::from("/scratch"),
             worker_executable_basename: "worker".to_owned(),
             append_log: None,
+            private_archive223: None,
         };
         let producer_before = UnitObservation {
             unit: "producer.service".to_owned(),
@@ -2873,6 +2923,7 @@ mod tests {
             executable_beneath_bound_scratch: true,
             vmas: 120,
             matching_workers: 1,
+            private_archive_parent: None,
         };
         let useful_work = ProgressWindow {
             append_log_evidence: None,
