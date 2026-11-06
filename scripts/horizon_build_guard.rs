@@ -1,4 +1,5 @@
-//! Standalone compiler/copy guard; use pinned rustc --edition=2021, without Cargo dependencies.
+//! Standalone compiler/copy and fixed scan203 retirement guard.
+//! Use pinned rustc --edition=2021, without Cargo dependencies.
 //!
 //! This is deliberately separate from the historical-worker guard. Executable names
 //! beneath a Cargo target directory carry no replay-worker meaning here. Admission,
@@ -52,6 +53,9 @@ const HASHER: &str = "/usr/lib/cargo/bin/coreutils/sha256sum";
 // asking an untrusted hasher to authenticate itself.
 const HASHER_SHA256: &str = "27a7d8f6a005702618e92c88f20b829d38247ad3369e0c35b1ff219d15194bd1";
 const PROPERTIES: &str = "Id,InvocationID,Type,LoadState,ActiveState,SubState,Result,MainPID,ControlPID,NRestarts,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,TimeoutStartUSec,RuntimeMaxUSec";
+const SCAN203_RETIREMENT_UNIT: &str = "horizon-scan203-retirement-v1.service";
+const SCAN203_STATE: &str = "/var/lib/jetstreamer/horizon-scan203-retirement-v1";
+const SCAN203_GUARD_STATE: &str = "/var/lib/jetstreamer/horizon-scan203-retirement-guard-v1";
 
 macro_rules! require {
     ($condition:expr, $message:expr) => {
@@ -224,8 +228,8 @@ fn parse(args: &[String]) -> Result<Config> {
     let iid = get("--expected-invocation-id")?.to_string();
     let self_sha = get("--self-sha256")?.to_string();
     require!(
-        purpose_unit(&unit),
-        "unit is outside compiler/copy stop namespace"
+        purpose_unit(&unit) || unit == SCAN203_RETIREMENT_UNIT,
+        "unit is outside compiler/copy or fixed scan203 stop namespace"
     );
     require!(
         hex_id(&iid, 32) && hex_id(&self_sha, 64),
@@ -274,6 +278,20 @@ fn parse(args: &[String]) -> Result<Config> {
         config.swap < (1_u64 << 60) && config.run_usec <= 86_400_000_000,
         "unbounded swap/runtime policy"
     );
+    if config.unit == SCAN203_RETIREMENT_UNIT {
+        require!(
+            config.root == Path::new(SCAN203_STATE)
+                && config.receipt == Path::new(SCAN203_GUARD_STATE)
+                && config.uid == 0
+                && config.cap == 64 * 1024 * 1024
+                && config.memory == 4 * 1024 * 1024 * 1024
+                && config.swap == 0
+                && config.tasks == 512
+                && config.cpu == 2_000_000
+                && config.run_usec == 7_200_000_000,
+            "fixed scan203 retirement guard profile mismatch"
+        );
+    }
     Ok(config)
 }
 
@@ -1372,6 +1390,40 @@ mod tests {
         for bad in ["0", "-1", "infinity", "01", "18446744073709551616"] {
             assert!(parse(&replace(args(), "--minimum-free-bytes", bad)).is_err());
         }
+    }
+    #[test]
+    fn scan203_retirement_requires_its_exact_state_and_resource_profile() {
+        let mut a = args();
+        for (key, value) in [
+            ("--unit", SCAN203_RETIREMENT_UNIT),
+            ("--root", SCAN203_STATE),
+            ("--root-uid", "0"),
+            ("--receipt-directory", SCAN203_GUARD_STATE),
+            ("--maximum-root-bytes", "67108864"),
+            ("--expected-memory-max-bytes", "4294967296"),
+            ("--expected-tasks-max", "512"),
+            ("--expected-max-run-usec", "7200000000"),
+        ] {
+            a = replace(a, key, value);
+        }
+        assert!(parse(&a).is_ok());
+        for (key, value) in [
+            ("--unit", "horizon-scan204-retirement-v1.service"),
+            ("--unit", "horizon-scan203-retirement-v2.service"),
+            ("--root", "/var/lib/jetstreamer/other-state"),
+            ("--root-uid", "1000"),
+            ("--receipt-directory", "/var/lib/jetstreamer/other-guard"),
+            ("--maximum-root-bytes", "67108865"),
+            ("--expected-memory-max-bytes", "4294967297"),
+            ("--expected-memory-swap-max-bytes", "1"),
+            ("--expected-tasks-max", "513"),
+            ("--expected-cpu-quota-usec", "2000001"),
+            ("--expected-max-run-usec", "7200000001"),
+        ] {
+            assert!(parse(&replace(a.clone(), key, value)).is_err(), "{key}");
+        }
+        // Ordinary build profiles keep their existing independent namespace.
+        assert!(parse(&args()).is_ok());
     }
     #[test]
     fn unsafe_or_overlapping_paths_are_denied() {
