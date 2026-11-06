@@ -1,6 +1,6 @@
 ---
 name: horizon-r2
-description: Generate, verify, upload, and safely retire Horizon epoch archives using Cloudflare R2 as the durable inventory. Use when filling missing Horizon epochs, syncing verified .jet archives to R2, or resuming a specified epoch range.
+description: Generate, verify, upload, and safely retire Horizon epoch archives using Cloudflare R2 as the durable inventory. Use when filling missing Horizon epochs, syncing verified .jet archives to R2, cleaning obsolete local Horizon files, or resuming a specified epoch range.
 ---
 
 # Horizon R2
@@ -25,7 +25,7 @@ bucket. The bucket-level setting covers both existing and future objects. If the
 control-plane credential cannot inspect or enable that origin, preserve all objects and report the
 permission blocker without holding up the authenticated archive campaign.
 
-Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before optional local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
+Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
 
 ## Rust-first implementation policy
 
@@ -72,7 +72,7 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   `0077`. Keep private state directories explicitly `0700` and private writable receipts `0600`;
   scope the setting to this sealer or its invoking metadata service.
 
-For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Optional local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
+For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
 
 ### In-flight epoch status objects
 
@@ -1186,6 +1186,33 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   success, or matching final hashes alone do not authorize runtime-route promotion, canonical
   sidecars, publication, or R2 upload.
 
+## Mandatory local cleanup after completion
+
+An epoch is not operationally finished until its unnecessary local files have been deleted.
+After full/current-plugin verification, authenticated upload and whole-object readback, and the
+matching canonical R2 sidecar commit, retire local files as soon as their last local dependency
+ends. Apply the existing boundary, receipt, shared mutation-lock and no-consumer gates to archive
+retirement; remote pair presence alone is insufficient. Use the qualified Rust retirement tools.
+
+Cleanup covers `HORIZON_DIR` (normally `~/horizon`), private epoch output and replay scratch,
+restored snapshots and caches, diagnostic copies, superseded build trees, temporary deployments,
+and Horizon-only worktrees/directories under `~/workspace`. Do not retain obsolete trees merely
+because disk space is plentiful or because they document historical work. Keep compact completion,
+verification and provenance receipts outside deletion trees while they remain necessary; delete
+those too when no recovery, audit, lineage or active workflow still needs them. Preserve shared
+tools and inputs only while an identified unfinished epoch or active/staged workflow needs them.
+
+At completion, enumerate exact cleanup targets, verify no live process, open descriptor, map,
+controller, timer, staged launch, neighboring boundary check or recovery plan still needs them,
+and remove qualified targets in the same work cycle. Record any retained target's concrete
+dependency and clean it promptly when that dependency ends. Preserve unuploaded, unverified and
+resumable work. Remove a disposable Git worktree through Git after preserving any needed source
+changes/commits; do not delete unrelated projects or infer ownership from an epoch-like name alone.
+For a user-requested host-wide Horizon cleanup, inventory Horizon-owned paths across prior ranges
+as well as the current campaign; that request does not authorize cleanup of other projects or R2.
+Record removed paths and actual reclaimed space in one compact cleanup receipt, rather than
+creating a new per-target directory hierarchy.
+
 ## Deliver
 
 Build once with `cargo build --release -p jetstreamer-r2 -p jetstreamer-r2-progressive`. Store receipts outside the public archive directory, normally at `$HOME/.jetstreamer-private/r2-receipts`.
@@ -1375,6 +1402,9 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   fast-forward that branch before new Git changes, preserving local edits; reconcile divergence
   without discarding another agent's commits. Do not continue development on a PR head branch
   after merging it. Keep sealed deployment copies immutable and qualify new deployments separately.
+  After changing tracked campaign code, documentation or this skill, run the relevant checks,
+  commit with the repository's configured Git identity and push to `origin/account-updates` in
+  the same work cycle. Verify the remote branch contains the commit before reporting it pushed.
 - Use SSH URLs for Git network operations. Select a currently loaded keychain agent socket for the
   active login session by verifying it with `ssh-add -l`; never hard-code an ephemeral socket path
   from an earlier session. Check the inherited environment for required service credentials before
