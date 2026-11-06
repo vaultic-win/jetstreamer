@@ -380,3 +380,7 @@ path = "src/native210_prepare_bin.rs"
 [[bin]]
 name = "jetstreamer-native227-v1625-prepare"
 path = "src/native227_v1625_prepare_bin.rs"
+
+[[bin]]
+name = "jetstreamer-allocation-tree-fixture"
+path = "src/allocation_tree_fixture_bin.rs"
