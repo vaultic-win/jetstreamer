@@ -370,6 +370,10 @@ libc.workspace = true
 sha2.workspace = true
 
 [[bin]]
+name = "jetstreamer-allocation-freeze-fixture"
+path = "src/allocation_freeze_fixture_bin.rs"
+
+[[bin]]
 name = "jetstreamer-native210-prepare"
 path = "src/native210_prepare_bin.rs"
 
