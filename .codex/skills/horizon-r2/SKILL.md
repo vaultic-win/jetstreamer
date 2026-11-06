@@ -421,6 +421,14 @@ not stall otherwise admissible ordinary campaign work.
   least 1,800 seconds after the preceding routine sample.
   Use that reference's measured-budget and time-to-sidecar policies to qualify capacity estimates
   and choose among admissible candidates; numerical epoch order alone is not a throughput policy.
+- **Keep replay lanes executing without waiting for user reminders.** At the start of each campaign
+  work cycle, compare actual executing replay lanes with the accepted memory-selected target and
+  proven operating point. On a host that can support several lanes, zero or one executing replay
+  lane is an operational incident to resolve. Prioritize actual backfill and the shortest missing
+  admission, reservation-release or checkpoint/offload step before discretionary work on one epoch.
+  Metadata preparation, builds, controllers, delivery jobs and parked jobs do not fill replay lanes.
+  Follow [the idle-lane recovery procedure](references/host-utilization.md#recover-idle-replay-lanes)
+  until admitted workers are actually executing; preserve all safety and integrity gates.
 - When an epoch fails or its admission is blocked by a repair, preserve its failed attempt and
   promptly backfill the available replay lane with another eligible, disjoint missing epoch.
   Do not reserve idle capacity for the blocked epoch or wait for its repair to finish. Check the

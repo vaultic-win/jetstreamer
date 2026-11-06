@@ -4,6 +4,46 @@ Use this guidance whenever choosing replay concurrency, resuming a host, replaci
 lane, or deciding whether the machine can safely do more work. The user's concurrency policy targets
 90% system-memory utilization; measure verified upload throughput as the useful outcome as well.
 
+## Recover idle replay lanes
+
+Keep several replay lanes executing whenever the memory-selected target and qualified work permit.
+Assess this at the start of each campaign work cycle, after a lane completes or fails, and after
+cleanup or offload makes room. Use the accepted coordinated sample and authenticated events;
+retain the single 30-minute resource-observation cadence. Do not wait for the user to ask why the
+host is idle. Compare four distinct counts: desired, actually executing, admitted but waiting, and
+proven. Derive the desired count from the existing RSS policy; dividing RAM by a worker's hard
+`MemoryMax` is not the memory-utilization target. Check the accepted capacity receipt before
+answering a capacity question and label any unqualified estimate explicitly.
+
+When executing lanes are below target, the main agent owns the path to the next actual replay:
+
+1. Check disjoint missing epochs across the full assigned range. Fill available proven capacity
+   through fresh admission; expand beyond it by one guarded experiment under the existing policy.
+2. If no candidate qualifies, identify each candidate's exact gate and execute the shortest safe
+   step that opens a lane in the same cycle. Delegate independent epoch repair while the main agent
+   advances admission and backfill. A backlog entry or an unchanged next-action description is
+   insufficient. Record the attempted action, its result and the remaining critical dependency.
+3. Treat obsolete reservations as active accounting repairs. Authenticate terminal owners and
+   qualify release of ended obligations while retaining raw history and required artifacts. If an
+   immutable live guard still includes a dead owner's reservation, qualify the required consumer
+   and guard handoff; do not weaken the live guard or keep repeating its floor as the final answer.
+4. When disk is the limiting resource, use the host's already authorized R2 scratch prefix through
+   [the holding lifecycle](r2-holding.md): checkpoint/stop selected work, upload and authenticate
+   readback, retire eligible local copies, then restore/resume as capacity permits. Account for
+   restore overlap and the century safety floor. Keep the memory-selected target. Missing safe
+   checkpoint, offload or recovery support is implementation work to advance, rather than a reason
+   to accept an indefinitely reduced lane count. Preserve healthy unsupported jobs while qualifying
+   that support on isolated work.
+
+Required status correction and safety work remain immediate. Beyond those obligations, prioritize
+opening replay lanes over discretionary optimization, repetitive metadata preparation or further
+polish on one delivery job. Keep delivery moving alongside replay. A zero-lane interval is not a
+healthy waiting state merely because an exporter, controller, watcher or repair agent is running.
+Do not claim recovery from a prepared source packet, passing tests, a seal or a queued service:
+verify the real worker identity, genuine guard and useful replay execution. Report replay lanes
+separately from input preparation, export, verification, upload and parked work, with the sample
+time, target, shortfall, concrete blocker and action taken to close it.
+
 ## Establish the operating point
 
 Inventory exact live producer/controller invocation IDs, zero-restart state, managed epoch claims,
