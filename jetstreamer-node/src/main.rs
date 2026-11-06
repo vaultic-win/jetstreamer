@@ -1,7 +1,32 @@
+#[cfg(all(
+    feature = "epoch163-first-output128-diagnostic",
+    any(
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification",
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch223-v1-6-20-prefix-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification"
+    )
+))]
+compile_error!("epoch163 first-output128 diagnostic requires an exclusive build");
+
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
 mod epoch141_original_entry;
+mod epoch163_first_output128;
 mod epoch207_singleton;
 mod epoch223_qualification;
 mod epoch224_qualification;
@@ -14696,6 +14721,14 @@ fn qualification_expectations(
         }
     }
 
+    if epoch163_first_output128::selected(plan) {
+        // This separately compiled private diagnostic records its first output
+        // without claiming a canonical terminal checkpoint or segment manifest.
+        // The ordinary qualification gates below remain unchanged.
+        epoch163_first_output128::checkpoint_scope(&expected, plan)?;
+        expected.retain(|slot, _| *slot == plan.bootstrap_slot);
+        return Ok(expected);
+    }
     expected.retain(|slot, _| (plan.bootstrap_slot..=plan.end_inclusive).contains(slot));
     if !expected.contains_key(&plan.end_inclusive) {
         return Err(format!(
@@ -19357,6 +19390,12 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    if epoch163_first_output128::enabled()
+        && let Err(error) = epoch163_first_output128::entrypoint(&probe_args)
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if epoch223_qualification::private_build_enabled()
         && let Err(error) = epoch223_qualification::validate_entrypoint(&probe_args)
     {
@@ -20014,6 +20053,28 @@ async fn main() {
             exit(2);
         }
     };
+    if epoch163_first_output128::enabled()
+        && let Err(error) = epoch163_first_output128::admit_launch(
+            start_epoch,
+            end_epoch,
+            qualification,
+            root_checkpoint_cohort,
+            recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease
+                || range_info.is_some()
+                || env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+            &dest_dir,
+            horizon_output.as_deref(),
+            replay_scratch.as_deref(),
+            snapshot_archive_override.as_deref(),
+            epoch_hashes.as_deref(),
+        )
+    {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if let Err(error) = epoch141_original_entry::configure(
         epoch141_original_cli,
         start_epoch,
@@ -21796,6 +21857,17 @@ async fn main() {
                     info!(
                         "root-checkpoint cohort retained validated epoch {epoch} privately; publication remains closed"
                     );
+                } else if let Some(plan) = qualification
+                    && epoch163_first_output128::selected(plan)
+                {
+                    if let Err(err) = epoch163_first_output128::write_private_outcome(
+                        plan,
+                        &horizon_output,
+                        &result,
+                    ) {
+                        eprintln!("error: {err}");
+                        exit(1);
+                    }
                 } else if let Some(plan) = qualification
                     && result.historical_evidence.is_some()
                 {

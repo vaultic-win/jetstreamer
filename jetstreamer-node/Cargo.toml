@@ -10,6 +10,8 @@ keywords.workspace = true
 
 [features]
 default = []
+# Exact private first-output slot163 diagnostic; no canonical terminal claim.
+epoch163-first-output128-diagnostic = []
 # Exact private 207cohort through its own final slot; never ordinary support.
 epoch207-singleton-qualification = []
 # Exact private singleton 209–212 profiles with their own canonical final root.
