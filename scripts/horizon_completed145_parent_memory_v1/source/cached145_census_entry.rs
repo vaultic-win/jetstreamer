@@ -18,14 +18,14 @@ use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
-const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-census-tools-20261106-v1/cached145-census";
+const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-census-tools-20261106-v2/cached145-census";
 const UNIT: &str = "horizon-completed145-parent-memory-census-20261106-v1.service";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
     schema: String,
     current: Current,
-    request: cached145::Request,
+    request: cached145::CaptureRequest,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -154,7 +154,7 @@ fn run() -> Result<()> {
         ensure!(
             output
                 == Path::new(
-                    "/var/lib/jetstreamer/horizon-completed145-parent-memory-bootstrap-20261106-v1/native-capability.json"
+                    "/var/lib/jetstreamer/horizon-completed145-parent-memory-bootstrap-20261106-v2/native-capability.json"
                 ),
             "native capability output namespace"
         );
@@ -166,7 +166,7 @@ fn run() -> Result<()> {
     } else {
         let spec: Spec = serde_json::from_value(spec_value)?;
         ensure!(
-            spec.schema == "cached145-completed-parent-census-spec-v1",
+            spec.schema == "cached145-completed-parent-census-spec-v2",
             "exact census spec schema"
         );
         let mut c = cached145::capture(
@@ -181,7 +181,7 @@ fn run() -> Result<()> {
         let after = native(&image, &iid)?;
         ensure!(before == after, "actual census actor changed");
         c.actor_native_after = after;
-        let dir = Path::new("/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v1")
+        let dir = Path::new("/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v2")
             .join(&spec.current.observer.sha256);
         ensure!(
             output == dir.join("census.json"),
@@ -229,9 +229,14 @@ mod tests {
     }
     #[test]
     fn capture_schema_or_extra_authority_is_not_native_capability() {
-        let mut v = plan();
-        v["schema"] = json!("cached145-completed-parent-census-spec-v1");
-        assert!(native_spec(v, &image()).is_err());
+        for schema in [
+            "cached145-completed-parent-census-spec-v1",
+            "cached145-completed-parent-census-spec-v2",
+        ] {
+            let mut v = plan();
+            v["schema"] = json!(schema);
+            assert!(native_spec(v, &image()).is_err());
+        }
         let mut v = plan();
         v["memory_credit_bytes"] = json!(192u64 << 30);
         assert!(native_spec(v, &image()).is_err());

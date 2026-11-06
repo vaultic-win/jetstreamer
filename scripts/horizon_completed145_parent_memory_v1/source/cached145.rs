@@ -63,6 +63,44 @@ pub struct Request {
     pub registration_seal: Bound,
     pub census: Bound,
 }
+/// Inputs known before capture. The output digest belongs only to `Request`,
+/// which is constructed after the immutable census has been written and hashed.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CaptureRequest {
+    pub schema: String,
+    pub registration: Bound,
+    pub registration_seal: Bound,
+    pub census_path: PathBuf,
+}
+impl Request {
+    pub fn capture_request(&self) -> CaptureRequest {
+        CaptureRequest {
+            schema: "cached145-completed-parent-capture-request-v2".into(),
+            registration: self.registration.clone(),
+            registration_seal: self.registration_seal.clone(),
+            census_path: self.census.path.clone(),
+        }
+    }
+}
+fn capture_scope(r: &CaptureRequest, current: &Current) -> Result<()> {
+    let output = Path::new("/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v2")
+        .join(&current.observer.sha256)
+        .join("census.json");
+    ensure!(
+        r.schema == "cached145-completed-parent-capture-request-v2" && r.census_path == output,
+        "completed145 capture schema/output namespace differs"
+    );
+    Ok(())
+}
+fn matching_capture_request(c: &CaptureRequest, r: &Request, current: &Current) -> Result<()> {
+    capture_scope(c, current)?;
+    ensure!(
+        *c == r.capture_request(),
+        "completed145 census registration/seal/output crossed"
+    );
+    Ok(())
+}
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Policy {
@@ -94,7 +132,7 @@ pub struct Endpoint {
 pub struct Census {
     pub schema: String,
     pub current: Current,
-    pub request: Request,
+    pub request: CaptureRequest,
     pub program: Bound,
     pub actor_invocation_id: String,
     pub actor_native_before: Value,
@@ -139,8 +177,10 @@ fn policy(r: &Request) -> Result<Policy> {
         r.schema == "cached145-completed-parent-only-memory-request-v1",
         "completed145 explicit request required"
     );
-    let dir = r
-        .registration
+    registration_policy(&r.registration, &r.registration_seal)
+}
+fn registration_policy(registration: &Bound, registration_seal: &Bound) -> Result<Policy> {
+    let dir = registration
         .path
         .parent()
         .context("completed145 registration parent")?;
@@ -150,18 +190,14 @@ fn policy(r: &Request) -> Result<Policy> {
                 .file_name()
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.starts_with("horizon-completed145-parent-memory-registration-"))
-            && r.registration
+            && registration
                 .path
                 .file_name()
                 .is_some_and(|s| s == "registration.json"),
         "completed145 registration namespace"
     );
-    crate::sealed_member(
-        &f::immutable(&r.registration_seal)?,
-        &r.registration,
-        "0444",
-    )?;
-    let p: Policy = serde_json::from_value(f::immutable(&r.registration)?)?;
+    crate::sealed_member(&f::immutable(registration_seal)?, registration, "0444")?;
+    let p: Policy = serde_json::from_value(f::immutable(registration)?)?;
     policy_shape(&p)?;
     crate::qualified(&p.census_program, "completed145-parent-only-memory-census")?;
     let review = f::immutable(&p.source_scope_review)?;
@@ -384,7 +420,7 @@ fn current_inputs(current: &Current) -> Result<()> {
 /// Independent read-only census API; call only from a self/native-qualified
 /// receipt writer. Actor proof is checked again at selection, never user JSON.
 pub fn capture(
-    r: &Request,
+    r: &CaptureRequest,
     current: &Current,
     actor: &Bound,
     iid: &str,
@@ -392,7 +428,8 @@ pub fn capture(
     actor_after: &Value,
     now: u64,
 ) -> Result<Census> {
-    let p = policy(r)?;
+    capture_scope(r, current)?;
+    let p = registration_policy(&r.registration, &r.registration_seal)?;
     ensure!(
         *actor == p.census_program.program && f::hex(iid, 32) && actor_before == actor_after,
         "completed145 independent census actor crossed"
@@ -410,7 +447,7 @@ pub fn capture(
         f::bytes(b, 128 << 20, false)?;
     }
     Ok(Census {
-        schema: "cached145-completed-parent-current-census-v1".into(),
+        schema: "cached145-completed-parent-current-census-v2".into(),
         current: current.clone(),
         request: r.clone(),
         program: actor.clone(),
@@ -521,20 +558,10 @@ pub(crate) fn apply(
     let p = policy(r)?;
     let c: Census = serde_json::from_value(f::immutable(&r.census)?)?;
     f::fresh(c.recorded_unix_seconds, now, 300)?;
-    let root = Path::new("/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v1")
-        .join(&current.observer.sha256);
+    matching_capture_request(&c.request, r, current)?;
     ensure!(
-        r.census.path.parent() == Some(root.as_path())
-            && r.census
-                .path
-                .file_name()
-                .is_some_and(|s| s == "census.json"),
-        "completed145 census output namespace differs"
-    );
-    ensure!(
-        c.schema == "cached145-completed-parent-current-census-v1"
+        c.schema == "cached145-completed-parent-current-census-v2"
             && c.current == *current
-            && json!(c.request) == json!(r)
             && c.program == p.census_program.program
             && c.actor_native_before == c.actor_native_after
             && c.archive_body_reads == 0

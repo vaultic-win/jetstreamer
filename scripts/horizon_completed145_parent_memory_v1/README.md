@@ -31,11 +31,24 @@ census compares the string-valued systemd PID with a precomputed string;
 replacing it with a JSON number changes the check. Registered current census
 and selection remain separate pending gates. These checks release no reservation.
 
+The v1 registered capture contract was subsequently found to embed the census
+output's own SHA-256 in its request, so it could not be executed. Its successful
+unit and build checks did not prove a usable registered capture or memory release.
+The v2 source separates `CaptureRequest` (registration, seal and output path)
+from the post-capture `Request`, which binds the actual output digest. The v2
+census schema and output namespace reject the old cyclic receipt. Selection still
+hashes the complete immutable census and checks every registration, seal, current
+tuple, output path, actor, closure, freshness and retained obligation. New tests
+serialize a census before constructing its digest-bound selection request and
+reject crossed input identities. All v2 artifact and native qualification remains
+pending until its actual evidence exists; the v1 library digest above identifies
+historical QA only.
+
 Native capability uses its own normally sealed bootstrap spec with schema
 `cached145-completed-parent-census-native-capability-spec-v1` and an exact
 `program` binding. It establishes native identity before registration is
 qualified. Capture still requires the complete
-`cached145-completed-parent-census-spec-v1` request, registration and current
+`cached145-completed-parent-census-spec-v2` capture request, registration and current
 tuple; neither spec can impersonate the other stage.
 
 The opaque DATA library was rebuilt against the new parent and passed all

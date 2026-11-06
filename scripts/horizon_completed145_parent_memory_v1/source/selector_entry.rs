@@ -17,7 +17,7 @@ use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
-const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-selector-tools-20261106-v1/parent-memory";
+const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-selector-tools-20261106-v2/parent-memory";
 const UNIT: &str = "horizon-original199-parent-memory-select-20261104-v1.service";
 fn native(iid: &str) -> Result<Value> {
     let out=Command::new("/usr/bin/systemctl").arg("--system").env_remove("DBUS_SYSTEM_BUS_ADDRESS").env_remove("DBUS_SESSION_BUS_ADDRESS").env_remove("SYSTEMD_BUS_ADDRESS").env_remove("SYSTEMD_HOST").args(["show",UNIT,"--no-pager","--property=Id,InvocationID,MainPID,ControlPID,NRestarts,Restart,ActiveState,SubState,MemoryAccounting,MemoryMax,MemorySwapMax,Job"]).output()?;

@@ -1,4 +1,120 @@
 use super::*;
+fn capture_fixture() -> (Current, CaptureRequest) {
+    let legacy: crate::model::Request =
+        serde_json::from_str(include_str!("../../fixtures/legacy-parent-request.json")).unwrap();
+    let current = legacy.current;
+    let request = CaptureRequest {
+        schema: "cached145-completed-parent-capture-request-v2".into(),
+        registration: Bound {
+            path: "/test/registration.json".into(),
+            sha256: "a".repeat(64),
+        },
+        registration_seal: Bound {
+            path: "/test/seal.json".into(),
+            sha256: "b".repeat(64),
+        },
+        census_path: Path::new("/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v2")
+            .join(&current.observer.sha256)
+            .join("census.json"),
+    };
+    (current, request)
+}
+#[test]
+fn census_can_be_serialized_then_hashed_then_bound_without_a_self_digest() {
+    let (current, capture) = capture_fixture();
+    capture_scope(&capture, &current).unwrap();
+    let endpoint = Endpoint {
+        native: native_fixture(),
+        inspected_processes: 17,
+        process_references: vec![],
+        remaining_cgroup_members: vec![],
+        source_bindings: bindings(),
+    };
+    // Serialization fixture only: selection still independently checks the native actor.
+    let census = Census {
+        schema: "cached145-completed-parent-current-census-v2".into(),
+        current: current.clone(),
+        request: capture.clone(),
+        program: Bound {
+            path: "/test/census".into(),
+            sha256: "c".repeat(64),
+        },
+        actor_invocation_id: "d".repeat(32),
+        actor_native_before: Value::Null,
+        actor_native_after: Value::Null,
+        recorded_unix_seconds: 100,
+        before: endpoint.clone(),
+        after: endpoint,
+        archive_body_reads: 0,
+        mutations: 0,
+    };
+    let raw = serde_json::to_vec(&census).unwrap();
+    let request = Request {
+        schema: "cached145-completed-parent-only-memory-request-v1".into(),
+        registration: capture.registration.clone(),
+        registration_seal: capture.registration_seal.clone(),
+        census: Bound {
+            path: capture.census_path.clone(),
+            sha256: f::sha(&raw),
+        },
+    };
+    let stored: Census = serde_json::from_slice(&raw).unwrap();
+    matching_capture_request(&stored.request, &request, &current).unwrap();
+    assert_eq!(serde_json::to_vec(&stored).unwrap(), raw);
+    assert_eq!(request.census.sha256, f::sha(&raw));
+    assert!(json!(stored.request).get("census").is_none());
+    // Changing the eventual output digest cannot change any pre-capture bytes.
+    let mut different_digest = request.clone();
+    different_digest.census.sha256 = "e".repeat(64);
+    assert_eq!(different_digest.capture_request(), capture);
+}
+#[test]
+fn capture_projection_keeps_exact_registration_seal_and_output_identity() {
+    let (current, capture) = capture_fixture();
+    let request = Request {
+        schema: "cached145-completed-parent-only-memory-request-v1".into(),
+        registration: capture.registration.clone(),
+        registration_seal: capture.registration_seal.clone(),
+        census: Bound {
+            path: capture.census_path.clone(),
+            sha256: "c".repeat(64),
+        },
+    };
+    for key in ["registration", "registration_seal", "census_path"] {
+        let mut changed = json!(capture);
+        if key == "census_path" {
+            changed[key] = json!("/other/census.json");
+        } else {
+            changed[key]["sha256"] = json!("d".repeat(64));
+        }
+        let changed: CaptureRequest = serde_json::from_value(changed).unwrap();
+        assert!(
+            matching_capture_request(&changed, &request, &current).is_err(),
+            "{key}"
+        );
+    }
+}
+#[test]
+fn capture_rejects_legacy_schema_output_namespace_and_embedded_output_digest() {
+    let (current, capture) = capture_fixture();
+    for schema in [
+        "cached145-completed-parent-only-memory-request-v1",
+        "foreign",
+    ] {
+        let mut changed = capture.clone();
+        changed.schema = schema.into();
+        assert!(capture_scope(&changed, &current).is_err());
+    }
+    let mut changed = capture.clone();
+    changed.census_path =
+        PathBuf::from("/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v1")
+            .join(&current.observer.sha256)
+            .join("census.json");
+    assert!(capture_scope(&changed, &current).is_err());
+    let mut changed = json!(capture);
+    changed["census"] = json!({"path":"/census.json","sha256":"a".repeat(64)});
+    assert!(serde_json::from_value::<CaptureRequest>(changed).is_err());
+}
 fn fixture() -> Value {
     serde_json::from_str(include_str!("../../fixtures/cached145-closure.json")).unwrap()
 }
