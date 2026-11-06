@@ -86,6 +86,7 @@ mod resource_audit;
 mod resource_verify;
 mod status_inactive;
 mod status_inspect;
+mod status_fallback_complete;
 mod transport_probe;
 mod upload_progress;
 
@@ -3593,6 +3594,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-delete-inactive") {
         return status_inactive::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("status-delete-fallback-complete") {
+        return status_fallback_complete::run().await;
     }
     if env::args().nth(1).as_deref() == Some("private-resource-audit-verify") {
         return resource_verify::run();
