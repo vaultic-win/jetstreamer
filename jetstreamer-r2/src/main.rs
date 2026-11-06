@@ -84,9 +84,10 @@ mod reserve_scratch;
 mod reserve_stop;
 mod resource_audit;
 mod resource_verify;
+mod scan203_retention;
+mod status_fallback_complete;
 mod status_inactive;
 mod status_inspect;
-mod status_fallback_complete;
 mod transport_probe;
 mod upload_progress;
 
@@ -796,6 +797,16 @@ fn read_local_archive(directory: &Path, epoch: u64) -> Result<LocalArchive> {
 }
 
 fn hash_and_etag(path: &Path, expected: FileIdentity, part_size: u64) -> Result<LocalProof> {
+    hash_and_etag_observed(path, expected, part_size, |_| {})
+}
+
+// Observational progress comes from the existing read loop, without extra I/O.
+fn hash_and_etag_observed(
+    path: &Path,
+    expected: FileIdentity,
+    part_size: u64,
+    mut progress: impl FnMut(u64),
+) -> Result<LocalProof> {
     let mut file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
@@ -822,6 +833,7 @@ fn hash_and_etag(path: &Path, expected: FileIdentity, part_size: u64) -> Result<
             md5.update(&buffer[..take]);
             part_sha256.update(&buffer[..take]);
             part_remaining -= take as u64;
+            progress(expected.length - remaining + this_part - part_remaining);
         }
         part_digests.push(md5.finalize().to_vec());
         part_sha256_digests.push(part_sha256.finalize().to_vec());
@@ -3035,14 +3047,29 @@ fn validate_local_retirement_proof(
     receipt: &Receipt,
 ) -> Result<()> {
     ensure!(
+        local.sidecar == canonical_sidecar(receipt),
+        "local checksum sidecar differs from the R2 receipt"
+    );
+    validate_retirement_body_proof(local.epoch, local.length, &local.sha256_hex, proof, receipt)
+}
+
+// Shared byte-integrity predicate. A verification replica has no local readiness
+// sidecar; it must not fabricate one or pass a fictional LocalArchive pair.
+fn validate_retirement_body_proof(
+    epoch: u64,
+    length: u64,
+    sha256: &str,
+    proof: &LocalProof,
+    receipt: &Receipt,
+) -> Result<()> {
+    ensure!(
         receipt.remote_sha256_readback || receipt.r2_composite_sha256.is_some(),
         "R2 receipt lacks a durable whole-object SHA-256 proof"
     );
     ensure!(
-        local.epoch == receipt.epoch
-            && local.length == receipt.archive_length
-            && local.sha256_hex == receipt.archive_sha256
-            && local.sidecar == canonical_sidecar(receipt),
+        epoch == receipt.epoch
+            && length == receipt.archive_length
+            && sha256 == receipt.archive_sha256,
         "local archive pair differs from the R2 receipt"
     );
     ensure!(
@@ -3058,7 +3085,7 @@ fn validate_local_retirement_proof(
             composite_checksum_matches(
                 expected,
                 &proof.composite_sha256,
-                local.length.div_ceil(receipt.multipart_part_size),
+                length.div_ceil(receipt.multipart_part_size),
             ),
             "local archive composite SHA-256 differs from the R2 receipt"
         );
@@ -3735,6 +3762,12 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("reserve-retire-scratch") {
         return reserve_scratch::run();
+    }
+    if env::args().nth(1).as_deref() == Some("inspect-scan203-retention") {
+        return scan203_retention::run();
+    }
+    if env::args().nth(1).as_deref() == Some("retire-scan203") {
+        return scan203_retention::retirement::run().await;
     }
     let config = parse_args()?;
     ensure!(

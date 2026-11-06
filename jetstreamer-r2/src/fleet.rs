@@ -4,6 +4,10 @@ use serde_json::json;
 use std::{collections::BTreeMap, process::Command as ProcessCommand};
 
 const SCHEMA: &str = "jetstreamer-horizon-campaign-fleet-v1";
+/// Reuse the accepted Ubuntu delivery lock without changing its path or policy.
+pub(super) fn scan203_mutation_lock() -> Result<File> {
+    singleton209_delivery::lock()
+}
 const PRIVATE_225_READER: &str = "/var/lib/jetstreamer/horizon-qualification225-reader-b261913-v1/jetstreamer-qualification-verify";
 mod assembly144;
 mod assembly144_admission;

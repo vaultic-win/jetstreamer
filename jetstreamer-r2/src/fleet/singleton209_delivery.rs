@@ -384,7 +384,7 @@ fn full_span(log: &Path) -> Result<()> {
     );
     Ok(())
 }
-fn lock() -> Result<File> {
+pub(super) fn lock() -> Result<File> {
     let path = Path::new(LOCK);
     let file = OpenOptions::new()
         .read(true)
