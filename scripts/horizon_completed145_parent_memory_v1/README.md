@@ -84,3 +84,8 @@ all 51 previous test names remain. These library checks do not qualify an old
 census image or its opaque dependents. Rebuild, test and seal the census, DATA
 library, selectors, eligibility, guard and shared helper against the repaired
 library, then obtain a genuine fresh complete accounting tuple before admission.
+
+The census client now uses a distinct v3 executable and native-bootstrap
+namespace. Its four tests and actual native capability passed against the
+repaired library; the previous failed registered capture remains preserved.
+The capture request, census schema and observer-keyed output protocol remain v2.

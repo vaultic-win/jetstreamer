@@ -18,7 +18,7 @@ use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
-const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-census-tools-20261106-v2/cached145-census";
+const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-census-tools-20261106-v3/cached145-census";
 const UNIT: &str = "horizon-completed145-parent-memory-census-20261106-v1.service";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -154,7 +154,7 @@ fn run() -> Result<()> {
         ensure!(
             output
                 == Path::new(
-                    "/var/lib/jetstreamer/horizon-completed145-parent-memory-bootstrap-20261106-v2/native-capability.json"
+                    "/var/lib/jetstreamer/horizon-completed145-parent-memory-bootstrap-20261106-v3/native-capability.json"
                 ),
             "native capability output namespace"
         );
