@@ -30,7 +30,7 @@ recovery support. FIEMAP in this fixture covers one fixed data file; it does not
 qualify traversal of a live replay tree, external-writer closure, host memory
 accounting or a resource reservation reduction. Those remain separate work.
 
-The current source uses a fresh generation929 namespace; existing sealed925
+Generation929 used a fresh namespace; existing sealed925
 artifacts and their original files remain unchanged. Three rejection modes
 exercise a wrong writer invocation, a wrong cgroup inode and a missing rescue
 timer against a real disposable writer. Each must fail at its specific binding
@@ -39,3 +39,24 @@ regression cannot freeze in a rejection mode: a final mode guard permits only
 `normal` and `kill` to construct the freezer. These are additional native
 qualification controls, not proof of handling a genuinely recreated cgroup,
 partial freeze or a deactivating original owner.
+
+Generation930 gives each genuine writer invocation its own no-clobber directory
+under the fixed fixture root. A controlled stop and fresh invocation can therefore
+exercise a genuinely recreated cgroup while preserving the original generation.
+The bounded writer has 32 CPU-only threads to make a pending freeze observable;
+its SIGTERM handler records a signal-safe flag and allows 20 seconds of fixture
+shutdown. The external service must retain a longer stop timeout for this case.
+
+The `pending-kill` driver requires an actual pending transition, records it and
+kills itself before waiting for freeze completion. Rescue cancels the original
+request even when `frozen=0`. Failure to observe a pending transition is an
+unqualified control, never a passing partial-freeze test. The `deactivating`
+driver requests stop of only the fixed writer, authenticates the original
+shutdown identity, then freezes and kills itself. Rescue accepts that same
+original PID/IID/cgroup during its narrowly supported shutdown states. An already
+terminal original with an absent cgroup produces a nonacting closure receipt;
+a replaced invocation or extant replacement cgroup cannot use that path.
+
+These source routes still need their actual native controls before qualification.
+They remain confined to disposable fixture generations and grant zero live freeze,
+resource credit, replay, publication or retirement authority.

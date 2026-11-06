@@ -9,7 +9,7 @@ use std::{
     io::{Read, Write},
     os::{
         fd::AsRawFd,
-        unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+        unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
     },
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -17,10 +17,10 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const WRITER: &str = "horizon-qualify-allocation-fixture-writer929-v1.service";
-const WORK: &str = "/home/ubuntu/.jetstreamer-private/allocation-freeze-fixture929-v1";
+const WRITER: &str = "horizon-qualify-allocation-fixture-writer930-v1.service";
+const WORK: &str = "/home/ubuntu/.jetstreamer-private/allocation-freeze-fixture930-v1";
 const CG: &str =
-    "/sys/fs/cgroup/system.slice/horizon-qualify-allocation-fixture-writer929-v1.service";
+    "/sys/fs/cgroup/system.slice/horizon-qualify-allocation-fixture-writer930-v1.service";
 const DATA_LEN: u64 = 8 << 20;
 const FLOOR: u64 = 1_772_980_057_109;
 
@@ -32,6 +32,9 @@ enum Mode {
     WrongInvocation,
     WrongCgroup,
     MissingRescue,
+    ReusedCgroup,
+    PendingKill,
+    Deactivating,
 }
 impl Mode {
     fn name(self) -> &'static str {
@@ -41,11 +44,14 @@ impl Mode {
             Self::WrongInvocation => "wrong-invocation",
             Self::WrongCgroup => "wrong-cgroup",
             Self::MissingRescue => "missing-rescue",
+            Self::ReusedCgroup => "reused-cgroup",
+            Self::PendingKill => "pending-kill",
+            Self::Deactivating => "deactivating",
         }
     }
     fn role(self, role: &str) -> String {
         format!(
-            "horizon-allocation-fixture929-{}-{role}-v1.service",
+            "horizon-allocation-fixture930-{}-{role}-v1.service",
             self.name()
         )
     }
@@ -54,7 +60,7 @@ impl Mode {
     }
     fn state(self) -> PathBuf {
         format!(
-            "/var/lib/jetstreamer/horizon-allocation-fixture929-{}-state-v1",
+            "/var/lib/jetstreamer/horizon-allocation-fixture930-{}-state-v1",
             self.name()
         )
         .into()
@@ -62,7 +68,10 @@ impl Mode {
 }
 fn require_freezing_case(mode: Mode) -> Result<()> {
     ensure!(
-        matches!(mode, Mode::Normal | Mode::Kill),
+        matches!(
+            mode,
+            Mode::Normal | Mode::Kill | Mode::PendingKill | Mode::Deactivating
+        ),
         "negative fixture unexpectedly passed its rejection gate; freezing prohibited"
     );
     Ok(())
@@ -76,6 +85,10 @@ struct Writer {
     start_ticks: u64,
     cgroup_device: u64,
     cgroup_inode: u64,
+}
+fn work_directory(iid: &str) -> Result<PathBuf> {
+    ensure!(hex(iid, 32), "invalid fixture generation directory");
+    Ok(Path::new(WORK).join(iid))
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -258,15 +271,27 @@ fn show(unit: &str) -> Result<BTreeMap<String, String>> {
         &[
             "show",
             unit,
-            "--property=Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,ControlGroup,Job,MemoryMax,MemorySwapMax",
+            "--property=Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,ControlGroup,Job,MemoryMax,MemorySwapMax,Result",
         ],
     )?)
 }
 fn validate_manager(w: &Writer, d: &BTreeMap<String, String>) -> Result<()> {
+    validate_manager_identity(w, d)?;
+    for (key, value) in [
+        ("ActiveState", "active"),
+        ("SubState", "running"),
+        ("Job", ""),
+    ] {
+        ensure!(
+            d.get(key).is_some_and(|v| v == value),
+            "fixture manager mismatch:{key}"
+        );
+    }
+    Ok(())
+}
+fn validate_manager_identity(w: &Writer, d: &BTreeMap<String, String>) -> Result<()> {
     for (k, v) in [
         ("Id", w.unit.clone()),
-        ("ActiveState", "active".into()),
-        ("SubState", "running".into()),
         ("InvocationID", w.invocation_id.clone()),
         ("MainPID", w.pid.to_string()),
         ("ControlPID", "0".into()),
@@ -275,7 +300,6 @@ fn validate_manager(w: &Writer, d: &BTreeMap<String, String>) -> Result<()> {
             "ControlGroup",
             CG.strip_prefix("/sys/fs/cgroup").unwrap().into(),
         ),
-        ("Job", "".into()),
         ("MemoryMax", "536870912".into()),
         ("MemorySwapMax", "0".into()),
     ] {
@@ -283,8 +307,59 @@ fn validate_manager(w: &Writer, d: &BTreeMap<String, String>) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+enum RescueOwner {
+    Running,
+    Deactivating,
+    Terminal,
+}
+fn rescue_owner(w: &Writer, d: &BTreeMap<String, String>) -> Result<RescueOwner> {
+    if d.get("ActiveState").is_some_and(|v| v == "inactive") {
+        for (key, value) in [
+            ("Id", WRITER),
+            ("SubState", "dead"),
+            ("MainPID", "0"),
+            ("ControlPID", "0"),
+            ("NRestarts", "0"),
+            ("Job", ""),
+            ("ControlGroup", ""),
+            ("MemoryMax", "536870912"),
+            ("MemorySwapMax", "0"),
+            ("Result", "success"),
+        ] {
+            ensure!(
+                d.get(key).is_some_and(|v| v == value),
+                "terminal fixture mismatch:{key}"
+            );
+        }
+        ensure!(
+            d.get("InvocationID")
+                .is_some_and(|v| v.is_empty() || v == &w.invocation_id),
+            "terminal fixture invocation replaced"
+        );
+        return Ok(RescueOwner::Terminal);
+    }
+    validate_manager_identity(w, d)?;
+    if d.get("ActiveState").is_some_and(|v| v == "active") {
+        validate_manager(w, d)?;
+        return Ok(RescueOwner::Running);
+    }
+    ensure!(
+        d.get("ActiveState").is_some_and(|v| v == "deactivating")
+            && d.get("SubState")
+                .is_some_and(|v| ["stop-sigterm", "stop-sigkill"].contains(&v.as_str()))
+            && d.get("Job")
+                .and_then(|v| v.parse::<u64>().ok())
+                .is_some_and(|v| v > 0),
+        "unqualified fixture shutdown state"
+    );
+    Ok(RescueOwner::Deactivating)
+}
 fn verify_writer(w: &Writer) -> Result<()> {
     validate_manager(w, &show(WRITER)?)?;
+    verify_writer_process(w)
+}
+fn verify_writer_process(w: &Writer) -> Result<()> {
     ensure!(ticks(w.pid)? == w.start_ticks, "fixture PID replaced");
     ensure!(
         fs::read_to_string(format!("/proc/{}/cgroup", w.pid))?
@@ -304,8 +379,10 @@ fn verify_writer(w: &Writer) -> Result<()> {
             && Path::new(CG).canonicalize()? == Path::new(CG),
         "fixture cgroup replaced"
     );
-    let ready: serde_json::Value =
-        serde_json::from_slice(&read_small(&Path::new(WORK).join("ready.json"), 1000)?)?;
+    let ready: serde_json::Value = serde_json::from_slice(&read_small(
+        &work_directory(&w.invocation_id)?.join("ready.json"),
+        1000,
+    )?)?;
     ensure!(
         ready["pid"] == w.pid
             && ready["start_ticks"] == w.start_ticks
@@ -494,7 +571,8 @@ impl Frozen {
     }
     fn file(&self, name: &str, write: bool) -> Result<File> {
         ensure!(
-            ["cgroup.freeze", "cgroup.events"].contains(&name),
+            ["cgroup.freeze", "cgroup.events", "cpu.stat"].contains(&name)
+                && (!write || name == "cgroup.freeze"),
             "unknown cgroup interface"
         );
         let name = std::ffi::CString::new(name)?;
@@ -533,12 +611,60 @@ impl Frozen {
         Ok(rows[0] == "1")
     }
     fn set(&mut self, freeze: bool) -> Result<()> {
+        self.request(freeze)?;
+        self.wait(freeze)
+    }
+    fn request(&mut self, freeze: bool) -> Result<()> {
         // Set the RAII obligation before a freeze write can succeed.
         if freeze {
             self.active = true;
         }
         self.file("cgroup.freeze", true)?
             .write_all(if freeze { b"1" } else { b"0" })?;
+        Ok(())
+    }
+    fn requested(&self) -> Result<bool> {
+        let mut value = String::new();
+        self.file("cgroup.freeze", false)?
+            .take(4097)
+            .read_to_string(&mut value)?;
+        ensure!(
+            value.len() <= 4096 && ["0", "1"].contains(&value.trim()),
+            "invalid freeze request"
+        );
+        Ok(value.trim() == "1")
+    }
+    fn recent_throttle(&self) -> Result<()> {
+        let read = || -> Result<u64> {
+            let mut text = String::new();
+            self.file("cpu.stat", false)?
+                .take(4097)
+                .read_to_string(&mut text)?;
+            ensure!(text.len() <= 4096, "fixture cpu.stat bound");
+            let mut found = None;
+            for line in text.lines() {
+                let fields: Vec<_> = line.split_whitespace().collect();
+                ensure!(fields.len() == 2, "invalid cpu.stat row");
+                let value: u64 = fields[1].parse()?;
+                if fields[0] == "nr_throttled" {
+                    ensure!(found.replace(value).is_none(), "duplicate throttle counter");
+                }
+            }
+            found.context("missing throttle counter")
+        };
+        let first = read()?;
+        let end = Instant::now() + Duration::from_secs(1);
+        loop {
+            let value = read()?;
+            ensure!(value >= first, "fixture throttle counter reset");
+            if value > first {
+                return Ok(());
+            }
+            ensure!(Instant::now() < end, "fixture throttle witness expired");
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+    fn wait(&mut self, freeze: bool) -> Result<()> {
         let end = Instant::now() + Duration::from_secs(2);
         loop {
             if self.frozen()? == freeze {
@@ -616,8 +742,8 @@ fn extent_bytes(extents: &[Extent], size: u64) -> Result<u64> {
     }
     Ok(bytes)
 }
-fn allocation_fixture() -> Result<u64> {
-    let path = Path::new(WORK).join("data");
+fn allocation_fixture(w: &Writer) -> Result<u64> {
+    let path = work_directory(&w.invocation_id)?.join("data");
     ensure!(path.canonicalize()? == path, "fixture file alias");
     let f = OpenOptions::new()
         .read(true)
@@ -667,15 +793,15 @@ fn allocation_fixture() -> Result<u64> {
     ensure!(bytes == DATA_LEN, "fixture allocation incomplete");
     Ok(bytes)
 }
-fn counter() -> Result<u64> {
-    let b = read_small(&Path::new(WORK).join("counter"), 1000)?;
+fn counter(w: &Writer) -> Result<u64> {
+    let b = read_small(&work_directory(&w.invocation_id)?.join("counter"), 1000)?;
     ensure!(b.len() == 8, "counter size");
     Ok(u64::from_le_bytes(b.try_into().unwrap()))
 }
-fn resumed(before: u64) -> Result<u64> {
+fn resumed(w: &Writer, before: u64) -> Result<u64> {
     let end = Instant::now() + Duration::from_secs(2);
     loop {
-        let n = counter()?;
+        let n = counter(w)?;
         if n > before {
             return Ok(n);
         }
@@ -718,25 +844,62 @@ fn drive(s: &Spec, plan: &str, spec_path: &str, self_sha: &str) -> Result<()> {
     };
     save(&s.mode.state(), "freeze-intent.json", &lease)?;
     log("freeze-intent-durable-rescue-armed");
+    if s.mode == Mode::Deactivating {
+        command("/usr/bin/systemctl", &["stop", "--no-block", WRITER])?;
+        let end = Instant::now() + Duration::from_secs(1);
+        loop {
+            if rescue_owner(&s.writer, &show(WRITER)?)? == RescueOwner::Deactivating {
+                break;
+            }
+            ensure!(Instant::now() < end, "fixture did not enter shutdown");
+            thread::sleep(Duration::from_millis(5));
+        }
+        verify_writer_process(&s.writer)?;
+    }
+    if s.mode == Mode::PendingKill {
+        freeze.recent_throttle()?;
+        freeze.request(true)?;
+        let pending = !freeze.frozen()?;
+        save(
+            &s.mode.state(),
+            "pending-freeze.json",
+            &json!({"writer":s.writer,"requested":freeze.requested()?,"pending_observed":pending}),
+        )?;
+        ensure!(
+            pending,
+            "pending freeze not observed; control is unqualified"
+        );
+        log("deliberate-fixture-driver-SIGKILL-before-freeze-completion");
+        ensure!(unsafe { libc::raise(libc::SIGKILL) } == 0, "raise SIGKILL");
+        bail!("SIGKILL unexpectedly returned");
+    }
     freeze.set(true)?;
-    verify_writer(&s.writer)?;
+    if s.mode == Mode::Deactivating {
+        ensure!(
+            rescue_owner(&s.writer, &show(WRITER)?)? == RescueOwner::Deactivating,
+            "shutdown identity changed before freeze"
+        );
+        verify_writer_process(&s.writer)?;
+    } else {
+        verify_writer(&s.writer)?;
+    }
     log("fixture-frozen");
-    if s.mode == Mode::Kill {
+    if matches!(s.mode, Mode::Kill | Mode::Deactivating) {
         log("deliberate-fixture-driver-SIGKILL");
         ensure!(unsafe { libc::raise(libc::SIGKILL) } == 0, "raise SIGKILL");
         bail!("SIGKILL unexpectedly returned");
     }
-    let before = counter()?;
+    let before = counter(&s.writer)?;
     thread::sleep(Duration::from_millis(200));
     ensure!(
-        counter()? == before && freeze.frozen()?,
+        counter(&s.writer)? == before && freeze.frozen()?,
         "writer advanced during frozen capture"
     );
-    let bytes = allocation_fixture()?;
+    let bytes = allocation_fixture(&s.writer)?;
     verify_writer(&s.writer)?;
     ensure!(freeze.frozen()?, "freeze changed before capture complete");
     freeze.set(false)?;
-    let after = resumed(before)?;
+    let after = resumed(&s.writer, before)?;
     verify_writer(&s.writer)?;
     save(
         &s.mode.state(),
@@ -749,7 +912,6 @@ fn drive(s: &Spec, plan: &str, spec_path: &str, self_sha: &str) -> Result<()> {
 fn rescue(s: &Spec, plan: &str) -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "rescue requires Root");
     own_role(&s.mode.role("rescue"))?;
-    verify_writer(&s.writer)?;
     let lease: Lease =
         serde_json::from_slice(&read_small(&s.mode.state().join("freeze-intent.json"), 0)?)?;
     ensure!(
@@ -763,20 +925,75 @@ fn rescue(s: &Spec, plan: &str) -> Result<()> {
             && lease.driver_start_ticks > 0,
         "foreign freeze lease"
     );
-    let mut freeze = Frozen::new(&s.writer)?;
-    let was = freeze.frozen()?;
-    let before = counter()?;
-    if was {
-        freeze.active = true;
-        log("independent-rescue-thaw");
-        freeze.set(false)?;
+    if rescue_owner(&s.writer, &show(WRITER)?)? == RescueOwner::Terminal {
+        ensure!(
+            !Path::new(CG).try_exists()?,
+            "terminal original cgroup still present/reused"
+        );
+        save(
+            &s.mode.state(),
+            "rescue-completion.json",
+            &json!({
+                "schema":"horizon-allocation-fixture-rescue-completion-v1", "plan_sha256":plan,
+                "writer":s.writer,"owner_before":RescueOwner::Terminal,"already_closed":true,
+                "thaw_zero_written":false,"thawed":true,"live_replay_or_admission_authorized":false
+            }),
+        )?;
+        return Ok(());
     }
-    let after = resumed(before)?;
-    verify_writer(&s.writer)?;
+    let mut freeze = Frozen::new(&s.writer)?;
+    verify_writer_process(&s.writer)?;
+    let owner_before = rescue_owner(&s.writer, &show(WRITER)?)?;
+    ensure!(
+        owner_before != RescueOwner::Terminal,
+        "original fixture already ended"
+    );
+    let was = freeze.frozen()?;
+    let requested = freeze.requested()?;
+    let before = counter(&s.writer)?;
+    // A durable original lease owns cancellation even when frozen=0: the
+    // kernel may still be processing a requested freeze. Always write zero.
+    freeze.active = true;
+    log("independent-rescue-cancel-original-freeze");
+    freeze.request(false)?;
+    if let Err(error) = freeze.wait(false) {
+        if rescue_owner(&s.writer, &show(WRITER)?)? != RescueOwner::Terminal
+            || Path::new(CG).try_exists()?
+        {
+            return Err(error);
+        }
+        freeze.active = false;
+    }
+    let after = if owner_before == RescueOwner::Running {
+        let after = resumed(&s.writer, before)?;
+        verify_writer(&s.writer)?;
+        after
+    } else {
+        let owner_after = rescue_owner(&s.writer, &show(WRITER)?)?;
+        ensure!(
+            matches!(
+                owner_after,
+                RescueOwner::Deactivating | RescueOwner::Terminal
+            ),
+            "fixture shutdown was replaced or cancelled"
+        );
+        counter(&s.writer)?
+    };
+    let thawed = match freeze.frozen() {
+        Ok(frozen) => !frozen,
+        Err(error) => {
+            if rescue_owner(&s.writer, &show(WRITER)?)? != RescueOwner::Terminal
+                || Path::new(CG).try_exists()?
+            {
+                return Err(error);
+            }
+            true
+        }
+    };
     save(
         &s.mode.state(),
         "rescue-completion.json",
-        &json!({"schema":"horizon-allocation-fixture-rescue-completion-v1","plan_sha256":plan,"writer":s.writer,"was_frozen":was,"counter_before":before,"counter_after":after,"thawed":!freeze.frozen()?,"live_replay_or_admission_authorized":false}),
+        &json!({"schema":"horizon-allocation-fixture-rescue-completion-v1","plan_sha256":plan,"writer":s.writer,"owner_before":owner_before,"was_requested":requested,"was_frozen":was,"counter_before":before,"counter_after":after,"thaw_zero_written":true,"thawed":thawed,"live_replay_or_admission_authorized":false}),
     )?;
     log("independent-rescue-complete");
     Ok(())
@@ -787,12 +1004,17 @@ fn writer() -> Result<()> {
         "fixture writer requires Ubuntu UID1000"
     );
     let iid = own_role(WRITER)?;
-    let root = Path::new(WORK);
-    let m = fs::symlink_metadata(root)?;
+    let base = Path::new(WORK);
+    let m = fs::symlink_metadata(base)?;
     ensure!(
-        root.canonicalize()? == root && m.is_dir() && m.uid() == 1000 && m.mode() & 0o777 == 0o700,
+        base.canonicalize()? == base && m.is_dir() && m.uid() == 1000 && m.mode() & 0o777 == 0o700,
         "unsafe fixture root"
     );
+    let root = work_directory(&iid)?;
+    // A new real invocation has its own no-clobber data generation. This lets
+    // native tests recreate the cgroup without overwriting the original input.
+    fs::DirBuilder::new().mode(0o700).create(&root)?;
+    File::open(base)?.sync_all()?;
     let mut fsinfo: libc::statvfs = unsafe { std::mem::zeroed() };
     let c = std::ffi::CString::new(WORK)?;
     ensure!(
@@ -825,6 +1047,27 @@ fn writer() -> Result<()> {
     };
     ensure!(map != libc::MAP_FAILED, "fixture mmap");
     fs::write(root.join("counter"), 0u64.to_le_bytes())?;
+    let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
+    action.sa_sigaction = fixture_term as *const () as usize;
+    action.sa_flags = libc::SA_RESTART;
+    ensure!(
+        unsafe { libc::sigemptyset(&mut action.sa_mask) } == 0
+            && unsafe { libc::sigaction(libc::SIGTERM, &action, std::ptr::null_mut()) } == 0,
+        "fixture SIGTERM handler"
+    );
+    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut busy = Vec::new();
+    for _ in 0..32 {
+        let done = done.clone();
+        busy.push(thread::spawn(move || {
+            let mut value = 1u64;
+            while !done.load(std::sync::atomic::Ordering::Relaxed) {
+                for _ in 0..1000 {
+                    value = std::hint::black_box(value.wrapping_mul(3).wrapping_add(1));
+                }
+            }
+        }));
+    }
     let mut ready = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -832,11 +1075,18 @@ fn writer() -> Result<()> {
         .open(root.join("ready.json"))?;
     ready.write_all(&serde_json::to_vec(&json!({"unit":WRITER,"invocation_id":iid,"pid":std::process::id(),"start_ticks":ticks(std::process::id())?}))?)?;
     ready.sync_all()?;
-    File::open(root)?.sync_all()?;
+    File::open(&root)?.sync_all()?;
     log("fixture-writer-ready");
     let deadline = Instant::now() + Duration::from_secs(150);
+    let mut stopping = None;
     let mut n = 0u64;
     while Instant::now() < deadline {
+        if FIXTURE_TERM.load(std::sync::atomic::Ordering::Relaxed) {
+            let since = stopping.get_or_insert_with(Instant::now);
+            if since.elapsed() >= Duration::from_secs(20) {
+                break;
+            }
+        }
         n += 1;
         unsafe { (map as *mut u8).write_volatile(n as u8) };
         let mut c = OpenOptions::new()
@@ -850,12 +1100,22 @@ fn writer() -> Result<()> {
         fs::rename(root.join("counter-next"), root.join("counter"))?;
         thread::sleep(Duration::from_millis(20));
     }
+    done.store(true, std::sync::atomic::Ordering::Relaxed);
+    for handle in busy {
+        handle
+            .join()
+            .map_err(|_| anyhow::anyhow!("fixture busy thread panicked"))?;
+    }
     ensure!(
         unsafe { libc::munmap(map, DATA_LEN as usize) } == 0,
         "fixture munmap"
     );
     log("fixture-writer-bound-complete");
     Ok(())
+}
+static FIXTURE_TERM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+extern "C" fn fixture_term(_: libc::c_int) {
+    FIXTURE_TERM.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 fn main() -> Result<()> {
     let a: Vec<String> = std::env::args().skip(1).collect();
@@ -910,17 +1170,20 @@ mod tests {
             Mode::WrongInvocation,
             Mode::WrongCgroup,
             Mode::MissingRescue,
+            Mode::ReusedCgroup,
         ] {
             assert!(require_freezing_case(mode).is_err());
             assert_ne!(mode.state(), Mode::Normal.state());
             assert_ne!(mode.state(), Mode::Kill.state());
             assert!(
                 mode.role("driver")
-                    .starts_with("horizon-allocation-fixture929-")
+                    .starts_with("horizon-allocation-fixture930-")
             );
         }
         require_freezing_case(Mode::Normal).unwrap();
         require_freezing_case(Mode::Kill).unwrap();
+        require_freezing_case(Mode::PendingKill).unwrap();
+        require_freezing_case(Mode::Deactivating).unwrap();
     }
     fn spec() -> Spec {
         Spec {
@@ -939,13 +1202,80 @@ mod tests {
             replay_or_admission_authorized: false,
         }
     }
+    fn manager_for(w: &Writer) -> BTreeMap<String, String> {
+        parse_scalars(&format!("Id={WRITER}\nActiveState=active\nSubState=running\nInvocationID={}\nMainPID={}\nControlPID=0\nNRestarts=0\nControlGroup={}\nJob=\nMemoryMax=536870912\nMemorySwapMax=0\nResult=success\n",w.invocation_id,w.pid,CG.strip_prefix("/sys/fs/cgroup").unwrap())).unwrap()
+    }
+    #[test]
+    fn rescue_authenticates_original_shutdown_without_relaxing_reuse_checks() {
+        let w = spec().writer;
+        let mut d = manager_for(&w);
+        assert_eq!(rescue_owner(&w, &d).unwrap(), RescueOwner::Running);
+        d.insert("ActiveState".into(), "deactivating".into());
+        d.insert("SubState".into(), "stop-sigterm".into());
+        d.insert("Job".into(), "42".into());
+        assert!(validate_manager(&w, &d).is_err());
+        assert_eq!(rescue_owner(&w, &d).unwrap(), RescueOwner::Deactivating);
+        for (key, value) in [
+            ("InvocationID", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+            ("MainPID", "3"),
+            ("ControlPID", "9"),
+            ("NRestarts", "1"),
+            ("Job", ""),
+            ("SubState", "stop-post"),
+            ("ControlGroup", "/other"),
+            ("MemorySwapMax", "1"),
+        ] {
+            let mut bad = d.clone();
+            bad.insert(key.into(), value.into());
+            assert!(rescue_owner(&w, &bad).is_err(), "{key}");
+        }
+    }
+    #[test]
+    fn terminal_original_is_nonacting_and_rejects_replacement_or_pending_jobs() {
+        let w = spec().writer;
+        let mut d = manager_for(&w);
+        for (k, v) in [
+            ("ActiveState", "inactive"),
+            ("SubState", "dead"),
+            ("MainPID", "0"),
+            ("ControlGroup", ""),
+            ("InvocationID", ""),
+        ] {
+            d.insert(k.into(), v.into());
+        }
+        assert_eq!(rescue_owner(&w, &d).unwrap(), RescueOwner::Terminal);
+        for (key, value) in [
+            ("InvocationID", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+            ("MainPID", "3"),
+            ("Job", "4"),
+            ("Result", "signal"),
+            ("ControlGroup", "/reused"),
+            ("NRestarts", "1"),
+            ("MemoryMax", "1"),
+        ] {
+            let mut bad = d.clone();
+            bad.insert(key.into(), value.into());
+            assert!(rescue_owner(&w, &bad).is_err(), "{key}");
+        }
+    }
+    #[test]
+    fn real_invocations_get_separate_closed_fixture_paths() {
+        let a = work_directory(&"a".repeat(32)).unwrap();
+        let b = work_directory(&"b".repeat(32)).unwrap();
+        assert_ne!(a, b);
+        assert!(a.starts_with(WORK));
+        assert!(b.starts_with(WORK));
+        for invalid in ["../other", WRITER, "", &"0".repeat(32)] {
+            assert!(work_directory(invalid).is_err());
+        }
+    }
     #[test]
     fn only_disposable_writer_can_qualify() {
         let mut s = spec();
         validate(&s).unwrap();
         for unit in [
             "horizon-qualify-236-general-shrink-debt-budget506-e3f15eb2-v1.service",
-            "horizon-qualify-allocation-fixture-writer929-v2.service",
+            "horizon-qualify-allocation-fixture-writer930-v2.service",
             "",
         ] {
             s.writer.unit = unit.into();
