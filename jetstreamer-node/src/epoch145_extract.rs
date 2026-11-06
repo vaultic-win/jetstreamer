@@ -17,7 +17,7 @@ use crate::{
 use anyhow::{Result, ensure};
 use jetstreamer_horizon::archive::{
     ArchiveProvenance, ArchiveReader, ArchiveWriterConfig, BootstrapStateKind, ChainMismatchPolicy,
-    SemanticDigest, reencode_archive_prefix,
+    SemanticDigest, encode_archive_provenance, reencode_archive_prefix,
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -69,6 +69,9 @@ pub struct ExtractionEvidence {
     pub output_slot_start: u64,
     pub output_slot_count: u64,
     pub output_semantic_sha256: String,
+    /// Commitment derived from authenticated source provenance before output exists.
+    /// This is verifier input, never runtime qualification or publication authority.
+    pub expected_output_provenance_sha256: String,
     pub retained_verification_tail_slots: u64,
     pub source_must_be_retained: bool,
     pub independent_output_reread_passed: bool,
@@ -110,6 +113,31 @@ pub fn validate_scope(m: &HistoricalSegmentManifest, worker: [u8; 32]) -> Result
     );
     Ok(())
 }
+/// Derive a strict full-verifier commitment from authenticated source provenance.
+/// The caller must authenticate the source/manifest first. This function does
+/// no I/O and does not qualify a runtime or authorize extraction/publication.
+pub fn canonical_prefix_provenance(
+    source: ArchiveProvenance,
+) -> Result<(ArchiveProvenance, String)> {
+    let mut prefix = match source {
+        ArchiveProvenance::V2(value) => value,
+        _ => anyhow::bail!("145 source lost V2 provenance"),
+    };
+    ensure!(
+        prefix.base.bootstrap_state_kind == BootstrapStateKind::SnapshotArchive
+            && prefix.base.runtime_admission
+                == jetstreamer_horizon::archive::RuntimeAdmission::Candidate
+            && prefix.base.requested_slot_start == FIRST_SLOT
+            && prefix.base.requested_slot_count == FOCUSED_SLOTS
+            && prefix.worker_executable_sha256 == PINNED_WORKER_SHA256,
+        "145 expected provenance does not bind the complete candidate source"
+    );
+    prefix.base.requested_slot_count = CANONICAL_SLOTS;
+    let prefix = ArchiveProvenance::V2(prefix);
+    let sha256 = format!("{:x}", Sha256::digest(encode_archive_provenance(&prefix)?));
+    Ok((prefix, sha256))
+}
+
 fn immutable(path: &Path) -> Result<fs::Metadata> {
     ensure!(
         path.is_absolute() && path.canonicalize()? == path,
@@ -260,17 +288,11 @@ impl PinnedSource {
         } else {
             None
         };
-        let mut expected = match ArchiveReader::open(self.source_reader()?)?.provenance()? {
-            Some(ArchiveProvenance::V2(p)) => p,
-            _ => anyhow::bail!("145 source lost V2 provenance"),
-        };
-        ensure!(
-            expected.base.bootstrap_state_kind == BootstrapStateKind::SnapshotArchive
-                && expected.base.requested_slot_start == FIRST_SLOT
-                && expected.base.requested_slot_count == FOCUSED_SLOTS,
-            "145 source is not the complete cold-snapshot range"
-        );
-        expected.base.requested_slot_count = CANONICAL_SLOTS;
+        let source_provenance = ArchiveReader::open(self.source_reader()?)?
+            .provenance()?
+            .ok_or_else(|| anyhow::anyhow!("145 source lost V2 provenance"))?;
+        let (expected, expected_output_provenance_sha256) =
+            canonical_prefix_provenance(source_provenance)?;
         let mut temporary = if original_output.is_none() {
             Some(tempfile::NamedTempFile::new_in(root)?)
         } else {
@@ -329,7 +351,7 @@ impl PinnedSource {
             "145 output does not cover exactly one complete epoch"
         );
         ensure!(
-            reader.provenance()? == Some(ArchiveProvenance::V2(expected)),
+            reader.provenance()? == Some(expected),
             "145 output provenance changed"
         );
         let mut semantic = SemanticDigest::new();
@@ -385,6 +407,7 @@ impl PinnedSource {
             output_slot_start: FIRST_SLOT,
             output_slot_count: CANONICAL_SLOTS,
             output_semantic_sha256: sha256_hex_string(&stats.output_semantic_sha256),
+            expected_output_provenance_sha256,
             retained_verification_tail_slots: 71,
             source_must_be_retained: true,
             independent_output_reread_passed: true,
@@ -453,6 +476,22 @@ mod tests {
             },
             worker_executable_sha256: PINNED_WORKER_SHA256,
         });
+        // Compute the expectation before an output exists, from the source value.
+        let (source_derived_prefix, source_derived_prefix_sha256) =
+            canonical_prefix_provenance(provenance.clone()).unwrap();
+        assert_ne!(
+            source_derived_prefix_sha256,
+            format!(
+                "{:x}",
+                Sha256::digest(encode_archive_provenance(&provenance).unwrap())
+            )
+        );
+        let mut promoted = provenance.clone();
+        let ArchiveProvenance::V2(ref mut value) = promoted else {
+            unreachable!()
+        };
+        value.base.runtime_admission = RuntimeAdmission::Verified;
+        assert!(canonical_prefix_provenance(promoted).is_err());
         let config = ArchiveWriterConfig {
             compression: Compression::None,
             ..Default::default()
@@ -553,6 +592,13 @@ mod tests {
         assert_eq!(
             reader.provenance().unwrap(),
             Some(ArchiveProvenance::V2(expected))
+        );
+        assert_eq!(reader.provenance().unwrap(), Some(source_derived_prefix));
+        let actual_encoded =
+            encode_archive_provenance(&reader.provenance().unwrap().unwrap()).unwrap();
+        assert_eq!(
+            format!("{:x}", Sha256::digest(actual_encoded)),
+            source_derived_prefix_sha256
         );
         let mut selected_source = SemanticDigest::new();
         ArchiveReader::open(std::io::Cursor::new(&source))
