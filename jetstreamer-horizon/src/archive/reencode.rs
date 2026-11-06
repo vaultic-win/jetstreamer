@@ -175,22 +175,80 @@ impl SemanticDigest {
         }
     }
 
-    fn record_update(&mut self, tag: u8, slot: u64, update: &AccountUpdateView<'_>) {
-        self.record_event(tag, |writer| {
-            slot.encode_ext(writer, None)?;
-            update.pubkey.encode_ext(writer, None)?;
-            update.lamports.encode_ext(writer, None)?;
-            update.owner.encode_ext(writer, None)?;
-            update.executable.encode_ext(writer, None)?;
-            update.rent_epoch.encode_ext(writer, None)?;
-            update.write_version.encode_ext(writer, None)?;
-            (update.data.len() as u64).encode_ext(writer, None)?;
-            let written = lencode::io::Write::write(writer, update.data)?;
-            if written != update.data.len() {
-                return Err(lencode::io::Error::WriterOutOfSpace);
+    /// The event digest is independent of each stream's preceding events.
+    /// Hash an unchanged event once, then append it to both ordered streams.
+    /// Epoch range changes and parent repairs still use separate event hashes.
+    fn record_shared_event(
+        &mut self,
+        other: &mut Self,
+        tag: u8,
+        encode: impl FnOnce(&mut SemanticHashWriter<'_>) -> lencode::Result<()>,
+    ) {
+        if self.error.is_some() {
+            other.record_event(tag, encode);
+            return;
+        }
+        if other.error.is_some() {
+            self.record_event(tag, encode);
+            return;
+        }
+        let mut event = Sha256::new();
+        event.update(SEMANTIC_EVENT_DOMAIN);
+        event.update([tag]);
+        let result = encode(&mut SemanticHashWriter(&mut event));
+        match result {
+            Ok(()) => {
+                let digest = event.finalize();
+                for stream in [self, other] {
+                    stream.hasher.update([tag]);
+                    stream.hasher.update(digest);
+                    stream.event_count += 1;
+                }
             }
-            Ok(())
+            Err(error) => {
+                // Both streams failed to encode the same event. Preserve the
+                // original error in the source, whose finish is checked first.
+                // Neither stream may return a successful digest afterward.
+                self.error = Some(error);
+                other.error = Some(lencode::io::Error::InvalidData);
+            }
+        }
+    }
+
+    fn encode_update(
+        writer: &mut SemanticHashWriter<'_>,
+        slot: u64,
+        update: &AccountUpdateView<'_>,
+    ) -> lencode::Result<()> {
+        slot.encode_ext(writer, None)?;
+        update.pubkey.encode_ext(writer, None)?;
+        update.lamports.encode_ext(writer, None)?;
+        update.owner.encode_ext(writer, None)?;
+        update.executable.encode_ext(writer, None)?;
+        update.rent_epoch.encode_ext(writer, None)?;
+        update.write_version.encode_ext(writer, None)?;
+        (update.data.len() as u64).encode_ext(writer, None)?;
+        let written = lencode::io::Write::write(writer, update.data)?;
+        if written != update.data.len() {
+            return Err(lencode::io::Error::WriterOutOfSpace);
+        }
+        Ok(())
+    }
+
+    fn record_shared_update(
+        &mut self,
+        other: &mut Self,
+        tag: u8,
+        slot: u64,
+        update: &AccountUpdateView<'_>,
+    ) {
+        self.record_shared_event(other, tag, |writer| {
+            Self::encode_update(writer, slot, update)
         });
+    }
+
+    fn record_update(&mut self, tag: u8, slot: u64, update: &AccountUpdateView<'_>) {
+        self.record_event(tag, |writer| Self::encode_update(writer, slot, update));
     }
 
     /// Finalizes the digest, returning a stored encoding error if one of the
@@ -816,8 +874,12 @@ impl<W: Write> SlotVisitor for ReencodeVisitor<'_, W> {
         if self.error.is_some() {
             return;
         }
-        self.source_digest.on_pre_account_update(slot, update);
-        self.output_digest.on_pre_account_update(slot, update);
+        self.source_digest.record_shared_update(
+            &mut self.output_digest,
+            EVENT_PRE_UPDATE,
+            slot,
+            update,
+        );
         let result = self.writer.write_reencoded_pre_update(update);
         self.record(result);
     }
@@ -826,8 +888,16 @@ impl<W: Write> SlotVisitor for ReencodeVisitor<'_, W> {
         if self.error.is_some() {
             return;
         }
-        self.source_digest.on_transaction(slot, tx_index, tx);
-        self.output_digest.on_transaction(slot, tx_index, tx);
+        self.source_digest.record_shared_event(
+            &mut self.output_digest,
+            EVENT_TRANSACTION,
+            |writer| {
+                slot.encode_ext(writer, None)?;
+                tx_index.encode_ext(writer, None)?;
+                tx.encode_ext(writer, None)?;
+                Ok(())
+            },
+        );
         if self.repair.is_some() && !self.repair_applied {
             self.first_block_signatures
                 .push(tx.signatures.as_slice().to_vec());
@@ -840,8 +910,12 @@ impl<W: Write> SlotVisitor for ReencodeVisitor<'_, W> {
         if self.error.is_some() {
             return;
         }
-        self.source_digest.on_post_account_update(slot, update);
-        self.output_digest.on_post_account_update(slot, update);
+        self.source_digest.record_shared_update(
+            &mut self.output_digest,
+            EVENT_POST_UPDATE,
+            slot,
+            update,
+        );
         let result = self.writer.write_reencoded_post_update(update);
         self.record(result);
     }
@@ -936,6 +1010,115 @@ mod tests {
     use crate::block_metas::BlockMeta;
 
     use super::*;
+
+    #[test]
+    fn shared_events_preserve_separate_streams_after_epoch_range_change() {
+        let mut source = SemanticDigest::new();
+        let mut output = SemanticDigest::new();
+        let mut expected_source = SemanticDigest::new();
+        let mut expected_output = SemanticDigest::new();
+        let mut epoch = EpochMeta::new_boxed();
+        epoch.epoch = 145;
+        epoch.start_slot = 62640000;
+        epoch.slot_count = 432071;
+        source.on_epoch(&epoch);
+        expected_source.on_epoch(&epoch);
+        epoch.slot_count = 432000;
+        output.on_epoch(&epoch);
+        expected_output.on_epoch(&epoch);
+        for (i, length) in [0, 1, 32, 65, 4096, 1 << 20].into_iter().enumerate() {
+            let data = vec![i as u8; length];
+            let update = AccountUpdateView {
+                pubkey: Address::new_from_array([1; 32]),
+                lamports: i as u64,
+                owner: Address::new_from_array([2; 32]),
+                executable: false,
+                rent_epoch: u64::MAX,
+                write_version: 9_007_199_254_740_993 + i as u64,
+                data: &data,
+            };
+            let slot = 62640000 + i as u64;
+            source.record_shared_update(&mut output, EVENT_PRE_UPDATE, slot, &update);
+            expected_source.on_pre_account_update(slot, &update);
+            expected_output.on_pre_account_update(slot, &update);
+            source.record_shared_update(&mut output, EVENT_POST_UPDATE, slot, &update);
+            expected_source.on_post_account_update(slot, &update);
+            expected_output.on_post_account_update(slot, &update);
+        }
+        let source = source.finish().unwrap();
+        let output = output.finish().unwrap();
+        assert_eq!(source, expected_source.finish().unwrap());
+        assert_eq!(output, expected_output.finish().unwrap());
+        assert_ne!(source, output);
+    }
+
+    #[test]
+    fn unchanged_event_is_encoded_once_for_both_ordered_streams() {
+        let calls = std::cell::Cell::new(0);
+        let mut left = SemanticDigest::new();
+        let mut right = SemanticDigest::new();
+        left.record_shared_event(&mut right, EVENT_SLOT_BLOCK, |writer| {
+            calls.set(calls.get() + 1);
+            42u64.encode_ext(writer, None)?;
+            Ok(())
+        });
+        assert_eq!(calls.get(), 1);
+        assert_eq!(left.event_count, 1);
+        assert_eq!(right.event_count, 1);
+        assert_eq!(left.finish().unwrap(), right.finish().unwrap());
+    }
+
+    #[test]
+    fn shared_encoding_failure_cannot_return_either_partial_digest() {
+        let mut left = SemanticDigest::new();
+        let mut right = SemanticDigest::new();
+        left.record_shared_event(&mut right, EVENT_TRANSACTION, |writer| {
+            42u64.encode_ext(writer, None)?;
+            Err(lencode::io::Error::WriterOutOfSpace)
+        });
+        assert_eq!(left.event_count, 0);
+        assert_eq!(right.event_count, 0);
+        assert!(matches!(
+            left.finish(),
+            Err(lencode::io::Error::WriterOutOfSpace)
+        ));
+        assert!(right.finish().is_err());
+    }
+
+    #[test]
+    fn prior_error_does_not_suppress_the_other_stream_or_retry_failed_encoding() {
+        for failed_left in [true, false] {
+            let mut left = SemanticDigest::new();
+            let mut right = SemanticDigest::new();
+            if failed_left {
+                left.error = Some(lencode::io::Error::IncorrectLength);
+            } else {
+                right.error = Some(lencode::io::Error::IncorrectLength);
+            }
+            let mut expected = SemanticDigest::new();
+            expected.on_slot_start(42, SlotKind::Block);
+            left.record_shared_event(&mut right, EVENT_SLOT_BLOCK, |writer| {
+                42u64.encode_ext(writer, None)?;
+                Ok(())
+            });
+            let (failed, healthy) = if failed_left {
+                (left, right)
+            } else {
+                (right, left)
+            };
+            assert!(failed.finish().is_err());
+            assert_eq!(healthy.finish().unwrap(), expected.finish().unwrap());
+        }
+        let mut left = SemanticDigest::new();
+        let mut right = SemanticDigest::new();
+        left.error = Some(lencode::io::Error::IncorrectLength);
+        right.error = Some(lencode::io::Error::InvalidData);
+        left.record_shared_event(&mut right, EVENT_SLOT_BLOCK, |_| {
+            panic!("failed streams must not encode")
+        });
+        assert!(left.finish().is_err());
+        assert!(right.finish().is_err());
+    }
 
     #[test]
     fn prefix_visitor_rejects_slot_gaps_and_cross_bucket_link_changes() {
