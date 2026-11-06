@@ -290,6 +290,12 @@ The user must provide the unique directory/prefix name for this host before any 
 never invent it from the hostname or reuse another host's prefix. Read
 [references/r2-holding.md](references/r2-holding.md) before parking, restoring, or retiring a local
 copy. Authenticated access is sufficient; no public URL or anonymous verification is required.
+Once this host's prefix is authorized and recorded, reuse that authorization without asking again.
+When local disk blocks the memory-selected lane target, actively juggle eligible closed artifacts
+or qualified stopped jobs through this holding area in the same capacity cycle. Record the exact
+offload set, bytes recoverable, restore overlap and next admission; an unused scratch prefix or a
+plan to offload does not count as freed space. If the lifecycle is not yet qualified, advance its
+smallest safe qualification step while admitting independent work that already fits.
 This permission does not authorize overwriting or deleting R2 objects, changing bucket access,
 or weakening canonical archive/sidecar and local-retirement gates. A missing scratch name must
 not stall otherwise admissible ordinary campaign work.

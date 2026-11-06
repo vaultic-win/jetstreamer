@@ -34,6 +34,9 @@ When executing lanes are below target, the main agent owns the path to the next 
    checkpoint, offload or recovery support is implementation work to advance, rather than a reason
    to accept an indefinitely reduced lane count. Preserve healthy unsupported jobs while qualifying
    that support on isolated work.
+   Record an actual park/retire/restore action and its result, or the precise failed gate and the
+   qualification action taken. Reuse the recorded host-prefix authorization. Do not reduce the
+   desired count because local disk is full or count proposed offloads as reclaimed capacity.
 
 Required status correction and safety work remain immediate. Beyond those obligations, prioritize
 opening replay lanes over discretionary optimization, repetitive metadata preparation or further
