@@ -47,6 +47,14 @@ verify the real worker identity, genuine guard and useful replay execution. Repo
 separately from input preparation, export, verification, upload and parked work, with the sample
 time, target, shortfall, concrete blocker and action taken to close it.
 
+Carry unresolved lane shortfalls into the next work cycle as the main agent's immediate task.
+Check the last attempt's result and execute its next dependency rather than recreating an already
+qualified tool, repeating a source-only handoff or waiting for the next observation. Use existing
+evidence and specific job completions between routine observations. If a prerequisite genuinely
+requires a newer coordinated sample, prepare the executable continuation for that sample and
+advance independent candidates meanwhile. Preserve the single observation cadence. Report a
+shortfall as unresolved until useful guarded replay is observed; paperwork alone cannot close it.
+
 ## Establish the operating point
 
 Inventory exact live producer/controller invocation IDs, zero-restart state, managed epoch claims,

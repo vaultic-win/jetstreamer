@@ -5,6 +5,24 @@ description: Generate, verify, upload, and safely retire Horizon epoch archives 
 
 # Horizon R2
 
+## Campaign operating priority
+
+Keep several replay lanes executing whenever qualified capacity permits. Assess the shortfall
+against the memory-selected target at the start of every work cycle and at the existing
+30-minute check-in; do not wait for a user reminder. After immediate safety and status corrections,
+take the next executable backfill action before discretionary repairs or optimization. A source
+packet, build, exporter or scheduled reassessment does not fill an idle replay lane. Follow
+[idle-lane recovery](references/host-utilization.md#recover-idle-replay-lanes) through actual
+guarded worker execution, or record the action attempted and its specific failed gate.
+
+Disk pressure triggers qualified cleanup and juggling through this host's already authorized
+R2 holding prefix; it does not lower the memory-selected lane target. Reuse the recorded prefix
+authorization and execute the [holding lifecycle](references/r2-holding.md) when needed, accounting
+for restore space and time. Preserve healthy work and every admission/integrity gate. Delete
+completed epochs' unnecessary local files promptly under
+[mandatory local cleanup](#mandatory-local-cleanup-after-completion), including `~/horizon` and
+Horizon-owned directories under `~/workspace`; leave unrelated projects alone.
+
 Treat R2 as durable storage. Never call `DeleteObject` or `DeleteObjects` except for the exact
 `epoch-N.epoch-status.json` lifecycle defined below. Never overwrite or delete a `.jet` or
 `.sha256` object as ordinary campaign work. Aborting an incomplete multipart upload is allowed.

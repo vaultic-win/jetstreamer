@@ -129,3 +129,10 @@ cycle and permitted handoff/status events, include reclaimable space and restora
 mandatory next-lane fit decision. Offloading does not replace CPU, memory, I/O, VMA, compatibility,
 century-floor or guard qualification. Do not create a separate holding-area polling loop, and do
 not let waiting for the user's prefix name block independent useful campaign work.
+
+When disk blocks a candidate, select the eligible offload set and execute its next qualified
+transition in that same capacity cycle. Record actual bytes reclaimed, retained custody evidence,
+restore overlap and the candidate this unlocks; a proposed upload creates no local headroom.
+Reuse this host's recorded prefix authorization without asking again. Keep the memory-selected
+lane target while resolving disk pressure, and preserve live unsupported jobs until their real
+checkpoint/restore path is qualified.
