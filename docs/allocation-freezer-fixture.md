@@ -57,6 +57,17 @@ original PID/IID/cgroup during its narrowly supported shutdown states. An alread
 terminal original with an absent cgroup produces a nonacting closure receipt;
 a replaced invocation or extant replacement cgroup cannot use that path.
 
-These source routes still need their actual native controls before qualification.
-They remain confined to disposable fixture generations and grant zero live freeze,
-resource credit, replay, publication or retirement authority.
+Generation930's sealed native transaction passed the wrong-invocation,
+wrong-inode, missing-rescue, normal, killed-driver and genuine cgroup-recreation
+controls. A separately admitted writer invocation also passed rescue during the
+original owner's deactivation and then stopped successfully. Original generation
+data, PID1/payload journals and no-clobber receipts were retained.
+
+The stricter pending control remains unqualified: the driver observed
+`requested=1, frozen=0` and was killed, but rescue observed `frozen=1`. Successful
+thaw and resumed progress do not prove cancellation while the transition was
+still pending. The failed assertion and its original outputs remain preserved;
+the separate deactivation result does not supersede that failure.
+
+These results remain confined to disposable fixture generations and grant zero
+live freeze, resource credit, replay, publication or retirement authority.
