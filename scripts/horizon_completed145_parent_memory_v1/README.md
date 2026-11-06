@@ -65,3 +65,22 @@ handoff and does not change that plan, token or invocation. A successor must
 bind a genuinely qualified current view in a new immutable plan and fresh
 admission. Preserve the original source and exporter output through their normal
 verification, delivery and retirement gates.
+
+The first actual v2 registered census rejected the four installed unit paths
+because they are symlinks into normally sealed unit packages. The full current
+reader and original199 census succeeded; completed145 selection and DATA did
+not run. Preserve that failure and the installed links.
+
+`cached145/source_links.rs` authenticates only these four exact links. It binds
+each logical path and original digest to its exact immutable target and pinned
+deployment seal, checks root ownership and link count, and rechecks link and
+directory identity after reading. Every other source retains the ordinary
+no-follow reader. The repair changes neither installed unit files nor their
+logical source bindings, native states, guards or retained obligations.
+
+The repaired library passed strict production/test Clippy, actual builds,
+55 ordinary tests and one explicitly executed read-only installed-link fixture;
+all 51 previous test names remain. These library checks do not qualify an old
+census image or its opaque dependents. Rebuild, test and seal the census, DATA
+library, selectors, eligibility, guard and shared helper against the repaired
+library, then obtain a genuine fresh complete accounting tuple before admission.
