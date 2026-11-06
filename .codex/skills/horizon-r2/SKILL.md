@@ -7,6 +7,12 @@ description: Generate, verify, upload, and safely retire Horizon epoch archives 
 
 ## Campaign operating priority
 
+Keep one controlling conversation per host and assigned campaign. Before booking resources or
+starting shared builds, admissions, launches or status writers, check the recorded owner and any
+known live controller. Resolve overlapping ownership through an explicit handoff before those
+mutations; preserve healthy workers and completed evidence. Independent, disjoint source work may
+continue. An attached terminal client alone does not establish a second campaign controller.
+
 Keep several replay lanes executing whenever qualified capacity permits. Assess the shortfall
 against the memory-selected target at the start of every work cycle and at the existing
 30-minute check-in; do not wait for a user reminder. After immediate safety and status corrections,
