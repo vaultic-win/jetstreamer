@@ -1058,6 +1058,186 @@ mod tests {
     }
 
     #[test]
+    fn epoch234_signed_transaction_298_preserves_all_sixty_seven_instructions() {
+        use base64::Engine;
+        use bincode::Options;
+        use sha2::{Digest, Sha256};
+
+        run_big_stack(|| {
+            let raw = include_bytes!("../tests/fixtures/epoch234-slot101249927-tx298.bin");
+            let rpc_bytes = include_bytes!("../tests/fixtures/epoch234-getTransaction.json");
+            let block_bytes = include_bytes!("../tests/fixtures/epoch234-getBlock-signatures.json");
+            assert_eq!(
+                format!("{:x}", Sha256::digest(raw)),
+                "056658fd4f6f8172bae030599afa0335f0a05ab49ea5236b1d98d5fac0809d05"
+            );
+            assert_eq!(
+                format!("{:x}", Sha256::digest(rpc_bytes)),
+                "7f5cbd7a11dbe22ad0a7f3ca799f35f0d23fef29aa76ed732f288c0379243c28"
+            );
+            assert_eq!(
+                format!("{:x}", Sha256::digest(block_bytes)),
+                "f7c29a0ee8811128afe103b9f0e67f1b668b76d9103ae51ef868767e89ef6a54"
+            );
+            let rpc: serde_json::Value = serde_json::from_slice(rpc_bytes).unwrap();
+            let block: serde_json::Value = serde_json::from_slice(block_bytes).unwrap();
+            assert!(rpc.get("error").is_none() && block.get("error").is_none());
+            assert_eq!(rpc["result"]["slot"], 101_249_927);
+            assert_eq!(rpc["result"]["transaction"][1], "base64");
+            assert_eq!(
+                base64::engine::general_purpose::STANDARD.encode(raw),
+                rpc["result"]["transaction"][0].as_str().unwrap()
+            );
+            let signature = "5vsu4HtoCUafoiHmeJSPPEBnXCtCs3Saff9hSsbTGQCQ6DS3teP4i3PWQpcs5MyytginSBAttfmVLtSG1fJKvpNb";
+            let signatures = block["result"]["signatures"].as_array().unwrap();
+            assert_eq!(signatures.len(), 547);
+            assert_eq!(signatures[298], signature);
+            assert_eq!(
+                signatures
+                    .iter()
+                    .filter(|value| **value == signature)
+                    .count(),
+                1
+            );
+
+            let tx: VersionedTransaction = bincode::DefaultOptions::new()
+                .with_fixint_encoding()
+                .reject_trailing_bytes()
+                .deserialize(raw)
+                .unwrap();
+            let independently_parsed =
+                jetstreamer_firehose::transaction::parse_versioned_transaction_from_slice(raw)
+                    .unwrap();
+            assert_eq!(tx, independently_parsed);
+            assert_eq!(bincode::serialize(&tx).unwrap(), raw.as_slice());
+            tx.sanitize().unwrap();
+            tx.verify_and_hash_message().unwrap();
+            assert_eq!(tx.signatures.len(), 1);
+            assert_eq!(tx.signatures[0].to_string(), signature);
+            assert!(matches!(
+                tx.message,
+                solana_message::VersionedMessage::Legacy(_)
+            ));
+            assert_eq!(raw.len(), 1_203);
+            assert!(raw.len() <= crate::limits::MAX_TX_INSTRUCTION_BYTES);
+            assert_eq!(tx.message.instructions().len(), 67);
+            assert!(tx.message.instructions().len() <= crate::limits::MAX_TX_INSTRUCTIONS);
+            let arena_bytes: usize = tx
+                .message
+                .instructions()
+                .iter()
+                .map(|ix| {
+                    assert_eq!(
+                        (ix.program_id_index, ix.accounts.len(), ix.data.len()),
+                        (2, 3, 9)
+                    );
+                    ix.accounts.len() + ix.data.len()
+                })
+                .sum();
+            assert_eq!(arena_bytes, 804);
+
+            // The original failure reported the first overflowing append (65),
+            // not the total instruction count. The signed message contains 67.
+            let m = &rpc["result"]["meta"];
+            assert!(m["err"].is_null());
+            assert_eq!(m["status"], serde_json::json!({"Ok": null}));
+            assert_eq!(m["innerInstructions"], serde_json::json!([]));
+            assert_eq!(m["rewards"], serde_json::json!([]));
+            assert_eq!(
+                m["loadedAddresses"],
+                serde_json::json!({"readonly": [], "writable": []})
+            );
+            for absent in ["returnData", "computeUnitsConsumed", "costUnits"] {
+                assert!(m.get(absent).is_none());
+            }
+            let balances = |key: &str| -> Vec<TbUpstream> {
+                m[key]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| {
+                        // This historical RPC schema predates both fields.
+                        // Empty upstream strings preserve absent addresses in
+                        // the converter; no current owner/program is inferred.
+                        assert!(v.get("owner").is_none());
+                        assert!(v.get("programId").is_none());
+                        TbUpstream {
+                            account_index: v["accountIndex"].as_u64().unwrap().try_into().unwrap(),
+                            mint: v["mint"].as_str().unwrap().to_owned(),
+                            ui_token_amount: serde_json::from_value(v["uiTokenAmount"].clone())
+                                .unwrap(),
+                            owner: String::new(),
+                            program_id: String::new(),
+                        }
+                    })
+                    .collect()
+            };
+            let meta = TransactionStatusMeta {
+                status: Ok(()),
+                fee: m["fee"].as_u64().unwrap(),
+                pre_balances: serde_json::from_value(m["preBalances"].clone()).unwrap(),
+                post_balances: serde_json::from_value(m["postBalances"].clone()).unwrap(),
+                inner_instructions: Some(vec![]),
+                log_messages: Some(serde_json::from_value(m["logMessages"].clone()).unwrap()),
+                pre_token_balances: Some(balances("preTokenBalances")),
+                post_token_balances: Some(balances("postTokenBalances")),
+                rewards: Some(vec![]),
+                ..TransactionStatusMeta::default()
+            };
+            assert_eq!(meta.fee, 5_000);
+            assert_eq!(meta.log_messages.as_ref().unwrap().len(), 165);
+            let mut destination = Transaction::new_boxed();
+            let mut decoded = Transaction::new_boxed();
+            for _ in 0..2 {
+                destination.message.force_v0_mut();
+                populate_transaction(&mut destination, &tx, &meta).unwrap();
+                assert_eq!(result_from_status(&destination.status).unwrap(), Ok(()));
+                assert_eq!(destination.signatures.as_slice(), tx.signatures.as_slice());
+                let VersionedMessage::Legacy(message) = &destination.message else {
+                    panic!("legacy fixture changed variant")
+                };
+                assert_eq!(message.instructions.len(), 67);
+                assert_eq!(message.instructions.data_len(), 804);
+                for (actual, expected) in message.instructions.iter().zip(tx.message.instructions())
+                {
+                    assert_eq!(actual.program_id_index, expected.program_id_index);
+                    assert_eq!(actual.accounts, expected.accounts.as_slice());
+                    assert_eq!(actual.data, expected.data.as_slice());
+                }
+                let mut encoded = vec![0; 65_536];
+                let written = destination
+                    .encode_ext(&mut lencode::io::Cursor::new(&mut encoded[..]), None)
+                    .unwrap();
+                decoded
+                    .decode_into(&mut lencode::io::Cursor::new(&encoded[..written]), None)
+                    .unwrap();
+                assert_eq!(decoded.message, destination.message);
+                assert_eq!(decoded.signatures, destination.signatures);
+                assert_eq!(result_from_status(&decoded.status).unwrap(), meta.status);
+                let mut reencoded = vec![0; 65_536];
+                let rewritten = decoded
+                    .encode_ext(&mut lencode::io::Cursor::new(&mut reencoded[..]), None)
+                    .unwrap();
+                assert_eq!(&encoded[..written], &reencoded[..rewritten]);
+            }
+            let mut trailing = raw.to_vec();
+            trailing.push(0);
+            assert!(
+                bincode::DefaultOptions::new()
+                    .with_fixint_encoding()
+                    .reject_trailing_bytes()
+                    .deserialize::<VersionedTransaction>(&trailing)
+                    .is_err()
+            );
+            let mut altered = tx.clone();
+            if let solana_message::VersionedMessage::Legacy(message) = &mut altered.message {
+                message.instructions[0].data[0] ^= 1;
+            }
+            assert!(altered.verify_and_hash_message().is_err());
+        });
+    }
+
+    #[test]
     fn epoch234_sixty_five_instruction_message_converts_without_losing_failed_status() {
         // Shape regression for slot 101,249,927 transaction 298. This is a
         // packet-sized synthetic message, not a substitute for a separately

@@ -1,12 +1,19 @@
 # Epoch 234 top-level instruction arena repair
 
-This is unqualified source. Rustfmt and `git diff --check` pass. No compiler,
-tests, replay or service was run for this change. Separate native test admission
-and immutable deployment gates remain required.
+The arena repair passed 256 Horizon library tests, Horizon example/benchmark
+compilation, Firehose all-target compilation, and 111 Firehose library tests.
+One Horizon timing benchmark and nineteen Firehose live-network tests were
+ignored. The signed historical fixture regression passed signature verification,
+strict independent packet decoding, canonical reserialization, all 67 instruction
+contents, legacy metadata conversion and full archive round-trip. Immutable
+runtime and replay qualification remain open.
 
 The original epoch 234 invocation `42cd9e2dba644e3093f5479da3a3c917` exited after
-the recorder could not convert transaction 298 at slot 101249927: its 65
-top-level instructions exceeded the 64-element inline message representation.
+the recorder could not convert transaction 298 at slot 101249927: its 65th
+top-level instruction exceeded the 64-element inline message representation.
+The finalized signed transaction actually contains 67 instructions in a
+1,203-byte packet, with 804 combined instruction account/data bytes. The error
+reported the first overflowing append, rather than the full instruction count.
 The exact failure evidence remains in
 `/var/lib/jetstreamer/horizon234-failure909-status-event-v1`. This is an archive
 representation failure; it does not establish a Bank/checkpoint mismatch.
@@ -38,14 +45,18 @@ an over-reporting safe reader. The conversion regression exercises a
 packet-sized synthetic 65-instruction failed transaction through
 Legacy/V0/Legacy reuse and preserves its original status/signatures/instruction
 contents. It is explicitly not an authenticated fixture of the historical
-transaction.
+transaction. A separate signed historical fixture now preserves the actual
+packet and both finalized RPC responses; its regression verifies signatures,
+slot/order provenance, exact metadata and full conversion/codec round-trip. See
+`jetstreamer-horizon/tests/fixtures/README.md` for the immutable acquisition and
+the distinction between message authentication and replay qualification.
 
 Under a separately admitted native source/test profile, run formatting and the
 new arena/conversion tests first, then the complete `jetstreamer-horizon` library
 suite and compilation of its examples/benches. Compile/test the affected node,
 firehose and current-plugin consumers before selecting production binaries.
-Exact failing-transaction fixture acquisition/qualification, normal recorder
-coverage, production source/artifact provenance, required feature unions,
+The exact failing-transaction fixture is acquired and its regression passes.
+Normal recorder coverage, production source/artifact provenance, required feature unions,
 immutable sealing, capability probes and fresh replay admission remain open.
 Do not replace a live binary or claim the failed replay can resume its Bank
 cursor. Preserve its evidence and coordinate any scratch retirement separately.

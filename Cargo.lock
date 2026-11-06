@@ -4806,6 +4806,7 @@ version = "0.9.0"
 dependencies = [
  "agave-geyser-plugin-interface",
  "ahash 0.8.12",
+ "base64 0.23.1",
  "bincode",
  "criterion",
  "env_logger",
