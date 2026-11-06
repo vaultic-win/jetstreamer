@@ -364,6 +364,10 @@ impl HorizonPluginRunner {
 }
 
 #[cfg(test)]
+#[path = "horizon_signed234_tests.rs"]
+mod signed234_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use jetstreamer_horizon::archive::{BlockNotification, EntryRecord};
