@@ -1202,6 +1202,15 @@ verification and provenance receipts outside deletion trees while they remain ne
 those too when no recovery, audit, lineage or active workflow still needs them. Preserve shared
 tools and inputs only while an identified unfinished epoch or active/staged workflow needs them.
 
+Check indirect consumers before deleting old evidence: current fleet, Frame and admission readers
+can reopen a completed epoch's metadata through sealed plans or compiled bindings. Retain required
+bytes at their original paths until those consumers are qualified to use another immutable location.
+A compact backup preserves evidence but does not satisfy a reader that still opens the old path.
+Treat a build cache as shared input while retained libraries or prepared builds need its exact
+dependency graph. Compare artifact and transitive dependency hashes; matching filenames do not prove
+equivalence. Preserve the required dependency closure or rebuild and requalify its consumers before
+removing it, then promptly delete the obsolete copies.
+
 At completion, enumerate exact cleanup targets, verify no live process, open descriptor, map,
 controller, timer, staged launch, neighboring boundary check or recovery plan still needs them,
 and remove qualified targets in the same work cycle. Record any retained target's concrete
