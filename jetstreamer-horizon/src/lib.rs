@@ -6,6 +6,7 @@ pub mod dedupe;
 pub mod entries;
 pub mod epochs;
 pub mod limits;
+pub mod message_instructions;
 pub mod pubkey_prime;
 pub mod transactions;
 pub mod zero_vec;

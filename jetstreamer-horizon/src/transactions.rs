@@ -21,9 +21,10 @@ use crate::account_updates::{AccountUpdateView, AccountUpdates};
 use crate::limits::{
     MAX_CUSTOM_ERROR_LEN, MAX_IX_ACCOUNTS, MAX_IX_DATA_LEN, MAX_RETURN_DATA_LEN,
     MAX_TX_ACCOUNT_UPDATE_DATA, MAX_TX_ACCOUNT_UPDATES, MAX_TX_ACCOUNTS, MAX_TX_ADDR_LOOKUPS,
-    MAX_TX_INNER_IX, MAX_TX_INSTRUCTIONS, MAX_TX_LOG_DATA, MAX_TX_LOG_MSGS, MAX_TX_REWARDS,
-    MAX_TX_SIGS, MAX_TX_TOKEN_BALANCES,
+    MAX_TX_INNER_IX, MAX_TX_LOG_DATA, MAX_TX_LOG_MSGS, MAX_TX_REWARDS, MAX_TX_SIGS,
+    MAX_TX_TOKEN_BALANCES,
 };
+use crate::message_instructions::MessageInstructions;
 use crate::zero_vec::{ZeroAlloc, ZeroVec, assert_zero_alloc};
 
 // --- Message types ---
@@ -113,7 +114,7 @@ pub struct LegacyMessage {
     pub header: MessageHeader,
     pub account_keys: ZeroVec<MAX_TX_ACCOUNTS, Address>,
     pub recent_blockhash: Hash,
-    pub instructions: ZeroVec<MAX_TX_INSTRUCTIONS, CompiledInstruction>,
+    pub instructions: MessageInstructions,
 }
 
 impl LegacyMessage {
@@ -124,16 +125,11 @@ impl LegacyMessage {
         self.header = MessageHeader::default();
         self.account_keys.clear();
         self.recent_blockhash = Hash::default();
-        // Drop each instruction in-place (keeps the ZeroVec allocation).
-        for ix in self.instructions.iter_mut() {
-            ix.clear();
-        }
         self.instructions.clear();
     }
 
     /// Decodes the wire form into `self` without stack-allocating the
-    /// ~680 KiB struct. Each field is decoded directly into the existing
-    /// allocation via [`ZeroVec::decode_into`].
+    /// message. Instruction descriptors and payloads reuse their arena.
     pub fn decode_into<R: Read>(
         &mut self,
         reader: &mut R,
@@ -142,12 +138,7 @@ impl LegacyMessage {
         self.header = MessageHeader::decode_ext(reader, ctx.as_deref_mut())?;
         self.account_keys.decode_into(reader, ctx.as_deref_mut())?;
         self.recent_blockhash = Hash::decode_ext(reader, ctx.as_deref_mut())?;
-        // SAFETY: `CompiledInstruction` is a composition of `u8` plus two
-        // `ZeroVec<_, u8>` fields; every field accepts the all-zero bit
-        // pattern as a valid default state.
-        unsafe {
-            decode_zerovec_in_place(&mut self.instructions, reader, ctx)?;
-        }
+        self.instructions.decode_into(reader, ctx)?;
         Ok(())
     }
 }
@@ -158,7 +149,7 @@ pub struct V0Message {
     pub header: MessageHeader,
     pub account_keys: ZeroVec<MAX_TX_ACCOUNTS, Address>,
     pub recent_blockhash: Hash,
-    pub instructions: ZeroVec<MAX_TX_INSTRUCTIONS, CompiledInstruction>,
+    pub instructions: MessageInstructions,
     pub address_table_lookups: ZeroVec<MAX_TX_ADDR_LOOKUPS, MessageAddressTableLookup>,
 }
 
@@ -170,16 +161,12 @@ impl V0Message {
         self.header = MessageHeader::default();
         self.account_keys.clear();
         self.recent_blockhash = Hash::default();
-        for ix in self.instructions.iter_mut() {
-            ix.clear();
-        }
         self.instructions.clear();
         self.address_table_lookups.clear();
     }
 
     /// Decodes the wire form into `self` without stack-allocating the
-    /// ~750 KiB struct. Each field is decoded directly into the existing
-    /// allocation via [`ZeroVec::decode_into`].
+    /// message. Instruction descriptors and payloads reuse their arena.
     pub fn decode_into<R: Read>(
         &mut self,
         reader: &mut R,
@@ -188,13 +175,10 @@ impl V0Message {
         self.header = MessageHeader::decode_ext(reader, ctx.as_deref_mut())?;
         self.account_keys.decode_into(reader, ctx.as_deref_mut())?;
         self.recent_blockhash = Hash::decode_ext(reader, ctx.as_deref_mut())?;
-        // SAFETY: both `CompiledInstruction` and `MessageAddressTableLookup`
-        // accept the all-zero bit pattern as a valid default (every field is
-        // either a scalar default, `Address::default()` = zero bytes, or a
-        // `ZeroVec<_, u8>` whose empty state is `len = 0` over an uninit
-        // buffer).
+        self.instructions.decode_into(reader, ctx.as_deref_mut())?;
+        // SAFETY: MessageAddressTableLookup accepts the all-zero bit pattern
+        // as a valid default: Address is zero bytes and each ZeroVec is empty.
         unsafe {
-            decode_zerovec_in_place(&mut self.instructions, reader, ctx.as_deref_mut())?;
             decode_zerovec_in_place(&mut self.address_table_lookups, reader, ctx)?;
         }
         Ok(())
@@ -282,7 +266,7 @@ impl VersionedMessage {
     }
 
     /// Decodes the wire form into `self` without stack-allocating the
-    /// ~750 KiB struct.
+    /// message.
     ///
     /// If the incoming discriminant matches the currently-active variant,
     /// decodes straight into that variant's payload in place. Otherwise,
@@ -1057,7 +1041,7 @@ const _: fn() = || {
     assert_zero_alloc::<MessageHeader>();
     assert_zero_alloc::<ZeroVec<MAX_TX_ACCOUNTS, Address>>();
     assert_zero_alloc::<Hash>();
-    assert_zero_alloc::<ZeroVec<MAX_TX_INSTRUCTIONS, CompiledInstruction>>();
+    assert_zero_alloc::<MessageInstructions>();
 
     // `V0Message` fields (superset of LegacyMessage)
     assert_zero_alloc::<ZeroVec<MAX_TX_ADDR_LOOKUPS, MessageAddressTableLookup>>();
@@ -1210,7 +1194,13 @@ mod tests {
             ix.program_id_index = 0;
             ix.accounts.extend_from_slice(&[0u8, 1]);
             ix.data.extend_from_slice(b"test");
-            msg.instructions.push(ix);
+            msg.instructions
+                .push(
+                    ix.program_id_index,
+                    ix.accounts.as_slice(),
+                    ix.data.as_slice(),
+                )
+                .unwrap();
 
             let mut buf = vec![0u8; 4096];
             let mut cursor = lencode::io::Cursor::new(&mut buf[..]);

@@ -325,7 +325,13 @@ fn copy_legacy(dst: &mut LegacyMessage, src: &solana_message::legacy::Message) {
     for ix in &src.instructions {
         let mut ours = CompiledInstruction::default();
         copy_instruction(&mut ours, ix);
-        dst.instructions.push(ours);
+        dst.instructions
+            .push(
+                ours.program_id_index,
+                ours.accounts.as_slice(),
+                ours.data.as_slice(),
+            )
+            .expect("packet-bounded top-level instruction");
     }
 }
 
@@ -343,7 +349,13 @@ fn copy_v0(dst: &mut V0Message, src: &solana_message::v0::Message) {
     for ix in &src.instructions {
         let mut ours = CompiledInstruction::default();
         copy_instruction(&mut ours, ix);
-        dst.instructions.push(ours);
+        dst.instructions
+            .push(
+                ours.program_id_index,
+                ours.accounts.as_slice(),
+                ours.data.as_slice(),
+            )
+            .expect("packet-bounded top-level instruction");
     }
     for lookup in &src.address_table_lookups {
         let mut ours = MessageAddressTableLookup {

@@ -34,11 +34,12 @@ pub const MAX_IX_DATA_LEN: usize = solana_transaction_context::MAX_INSTRUCTION_D
 /// instruction, so flattening their status metadata can exceed the modern
 /// per-trace limit. Mainnet slot 40,176,160, for example, contains 800 inner
 /// records split across 20 top-level groups. The product below admits a full
-/// trace for every top-level instruction accepted by this archive format.
-/// `ZeroVec` capacity is not serialized, so increasing it preserves existing
-/// Horizon wire bytes.
-pub const MAX_TX_INNER_IX: usize =
-    MAX_TX_INSTRUCTIONS * solana_transaction_context::MAX_INSTRUCTION_TRACE_LENGTH;
+/// trace for each of the 64 top-level instructions supported by the original
+/// inline representation. Keep this existing inner-trace capacity independent
+/// of the top-level message arena: accepting packet-bounded messages
+/// must not multiply the large inner-instruction buffer.
+/// `ZeroVec` capacity is not serialized.
+pub const MAX_TX_INNER_IX: usize = 64 * solana_transaction_context::MAX_INSTRUCTION_TRACE_LENGTH;
 
 /// Max number of address-table lookups in a v0 message. Upper-bounded by
 /// the account-lock limit since each lookup contributes loaded keys.
@@ -66,17 +67,21 @@ pub const MAX_TX_ACCOUNT_UPDATE_DATA: usize = 128 * 1024 * 1024;
 /// Max return-data payload. Mirrors [`solana_cpi::MAX_RETURN_DATA`].
 pub const MAX_RETURN_DATA_LEN: usize = solana_cpi::MAX_RETURN_DATA;
 
-/// Max number of top-level instructions in a transaction message.
-/// Practical: matches the execution-trace depth limit, which bounds every
-/// transaction that *executes*. Known gap: the packet alone would allow
-/// ~366 minimal (3-byte) instructions in a committed-but-failed spam
-/// transaction. Instructions are stored inline (~10.5 KiB per slot, twice —
-/// once per message variant), so raising this multiplies the in-memory
-/// `Transaction` size and the variant-swap memset cost; if a preflight
-/// scan of a target epoch ever reports a transaction above this cap, the
-/// fix is to restructure instructions as a flat arena (like
-/// [`crate::transactions::LogMessages`]), not to bump this constant.
-pub const MAX_TX_INSTRUCTIONS: usize = 64;
+/// Maximum combined account-index and data bytes in a transaction's top-level
+/// instructions. A Solana transaction packet is at most 1,232 bytes (the IPv6
+/// minimum MTU minus network headers); instruction payloads are a subset of it.
+/// Message headers, keys, signatures and per-instruction framing only reduce
+/// the actual space available. This is an arena bound, not a new packet format.
+pub const MAX_TX_INSTRUCTION_BYTES: usize = 1_232;
+
+/// Max number of top-level instructions retained from a transaction message.
+/// Even an empty compiled instruction occupies three packet bytes: program ID
+/// index and the two compact-vector lengths. Dividing the complete packet size
+/// by three is a conservative bound that also covers committed failed messages
+/// with more than 64 instructions (epoch 234 slot 101,249,927 has 65).
+/// [`crate::message_instructions::MessageInstructions`] stores descriptors and
+/// shared bytes rather than multiplying a full instruction buffer by this cap.
+pub const MAX_TX_INSTRUCTIONS: usize = MAX_TX_INSTRUCTION_BYTES / 3;
 
 /// Max number of signatures in a transaction. Practical: the message header
 /// field is u8 but packet size caps this far lower.

@@ -39,9 +39,9 @@ use solana_transaction_status::{
 
 use crate::limits::{
     MAX_IX_ACCOUNTS, MAX_IX_DATA_LEN, MAX_RETURN_DATA_LEN, MAX_TX_ACCOUNTS, MAX_TX_ADDR_LOOKUPS,
-    MAX_TX_INNER_IX, MAX_TX_INSTRUCTIONS, MAX_TX_LOG_MSGS, MAX_TX_REWARDS, MAX_TX_SIGS,
-    MAX_TX_TOKEN_BALANCES,
+    MAX_TX_INNER_IX, MAX_TX_LOG_MSGS, MAX_TX_REWARDS, MAX_TX_SIGS, MAX_TX_TOKEN_BALANCES,
 };
+use crate::message_instructions::MessageInstructions;
 use crate::transactions::{
     CompiledInstruction, InnerInstruction, LegacyMessage, OptionalInnerInstructions, Reward,
     RewardType, TokenAmount, Transaction, TransactionStatus, TransactionTokenBalance, V0Message,
@@ -503,7 +503,7 @@ fn populate_compiled_instruction(
 
 fn populate_message_common(
     account_keys: &mut ZeroVec<MAX_TX_ACCOUNTS, Address>,
-    instructions: &mut ZeroVec<MAX_TX_INSTRUCTIONS, CompiledInstruction>,
+    instructions: &mut MessageInstructions,
     src_keys: &[solana_pubkey::Pubkey],
     src_instructions: &[solana_message::compiled_instruction::CompiledInstruction],
 ) -> Result<(), ConvertError> {
@@ -512,8 +512,13 @@ fn populate_message_common(
         account_keys.push(address_from_pubkey(key));
     }
     for ix in src_instructions {
-        let slot = push_in_place(instructions, "message.instructions")?;
-        populate_compiled_instruction(slot, ix)?;
+        instructions
+            .push(ix.program_id_index, &ix.accounts, &ix.data)
+            .map_err(|error| ConvertError::CapacityExceeded {
+                field: error.field,
+                len: error.len,
+                max: error.max,
+            })?;
     }
     Ok(())
 }
@@ -741,6 +746,7 @@ pub fn populate_transaction(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lencode::Encode;
     use solana_account_decoder_client_types::token::UiTokenAmount;
     use solana_hash::Hash;
     use solana_message::compiled_instruction::CompiledInstruction as UpstreamIx;
@@ -1048,6 +1054,105 @@ mod tests {
                 inner.as_slice().last().unwrap().instruction.data.as_slice(),
                 &[39]
             );
+        });
+    }
+
+    #[test]
+    fn epoch234_sixty_five_instruction_message_converts_without_losing_failed_status() {
+        // Shape regression for slot 101,249,927 transaction 298. This is a
+        // packet-sized synthetic message, not a substitute for a separately
+        // authenticated fixture of that historical transaction.
+        run_big_stack(|| {
+            let instructions: Vec<_> = (0..65)
+                .map(|i| UpstreamIx {
+                    program_id_index: 1,
+                    accounts: vec![0],
+                    data: vec![i as u8],
+                })
+                .collect();
+            let legacy = solana_message::legacy::Message {
+                header: MessageHeader {
+                    num_required_signatures: 1,
+                    num_readonly_signed_accounts: 0,
+                    num_readonly_unsigned_accounts: 1,
+                },
+                account_keys: vec![pk(1), pk(2)],
+                recent_blockhash: Hash::new_from_array([7; 32]),
+                instructions: instructions.clone(),
+            };
+            let version_zero = v0::Message {
+                header: legacy.header,
+                account_keys: legacy.account_keys.clone(),
+                recent_blockhash: legacy.recent_blockhash,
+                instructions,
+                address_table_lookups: vec![],
+            };
+            let meta = TransactionStatusMeta {
+                status: Err(TransactionError::InsufficientFundsForFee),
+                ..TransactionStatusMeta::default()
+            };
+            let mut destination = Transaction::new_boxed();
+            let mut decoded_message = VersionedMessage::default();
+            for message in [
+                solana_message::VersionedMessage::Legacy(legacy.clone()),
+                solana_message::VersionedMessage::V0(version_zero),
+                solana_message::VersionedMessage::Legacy(legacy),
+            ] {
+                let tx = VersionedTransaction {
+                    signatures: vec![Signature::from([8; 64])],
+                    message,
+                };
+                assert!(bincode::serialized_size(&tx).unwrap() <= 1_232);
+                populate_transaction(&mut destination, &tx, &meta).unwrap();
+                assert_eq!(
+                    result_from_status(&destination.status).unwrap(),
+                    meta.status
+                );
+                assert_eq!(destination.signatures.as_slice(), tx.signatures.as_slice());
+                let actual = match &destination.message {
+                    VersionedMessage::Legacy(message) => &message.instructions,
+                    VersionedMessage::V0(message) => &message.instructions,
+                };
+                assert_eq!(actual.len(), 65);
+                for (actual, expected) in actual.iter().zip(tx.message.instructions()) {
+                    assert_eq!(actual.program_id_index, expected.program_id_index);
+                    assert_eq!(actual.accounts, expected.accounts.as_slice());
+                    assert_eq!(actual.data, expected.data.as_slice());
+                }
+                let mut bytes = vec![0u8; 4096];
+                let written = destination
+                    .message
+                    .encode_ext(&mut lencode::io::Cursor::new(&mut bytes[..]), None)
+                    .unwrap();
+                decoded_message
+                    .decode_into(&mut lencode::io::Cursor::new(&bytes[..written]), None)
+                    .unwrap();
+                assert_eq!(decoded_message, destination.message);
+            }
+            let mut too_large =
+                solana_message::VersionedMessage::Legacy(solana_message::legacy::Message {
+                    instructions: vec![UpstreamIx {
+                        program_id_index: 0,
+                        accounts: vec![],
+                        data: vec![0; crate::limits::MAX_TX_INSTRUCTION_BYTES + 1],
+                    }],
+                    ..solana_message::legacy::Message::default()
+                });
+            assert!(matches!(
+                populate_message(&mut decoded_message, &too_large),
+                Err(ConvertError::CapacityExceeded {
+                    field: "message.instructions.bytes",
+                    ..
+                })
+            ));
+            if let solana_message::VersionedMessage::Legacy(message) = &mut too_large {
+                message.instructions.clear();
+            }
+            populate_message(&mut decoded_message, &too_large).unwrap();
+            match decoded_message {
+                VersionedMessage::Legacy(message) => assert!(message.instructions.is_empty()),
+                _ => panic!("expected reusable legacy message"),
+            }
         });
     }
 

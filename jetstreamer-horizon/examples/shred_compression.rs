@@ -217,11 +217,13 @@ fn to_sol_hash(h: impl AsRef<[u8]>) -> solana_hash::Hash {
     solana_hash::Hash::new_from_array(<[u8; 32]>::try_from(h.as_ref()).expect("hash is 32 bytes"))
 }
 
-fn to_instruction(ix: &htx::CompiledInstruction) -> CompiledInstruction {
+fn to_instruction(
+    ix: jetstreamer_horizon::message_instructions::InstructionView<'_>,
+) -> CompiledInstruction {
     CompiledInstruction {
         program_id_index: ix.program_id_index,
-        accounts: ix.accounts.as_slice().to_vec(),
-        data: ix.data.as_slice().to_vec(),
+        accounts: ix.accounts.to_vec(),
+        data: ix.data.to_vec(),
     }
 }
 
@@ -529,12 +531,12 @@ impl SlotVisitor for Collector {
                 htx::VersionedMessage::Legacy(m) => (
                     m.account_keys.as_slice(),
                     m.recent_blockhash,
-                    m.instructions.as_slice(),
+                    &m.instructions,
                 ),
                 htx::VersionedMessage::V0(m) => (
                     m.account_keys.as_slice(),
                     m.recent_blockhash,
-                    m.instructions.as_slice(),
+                    &m.instructions,
                 ),
             };
             msgs.push(DumpMsg {
@@ -547,8 +549,8 @@ impl SlotVisitor for Collector {
                     .iter()
                     .map(|ix| DumpIx {
                         program_id_index: ix.program_id_index,
-                        accounts: ix.accounts.as_slice().to_vec(),
-                        data: ix.data.as_slice().to_vec(),
+                        accounts: ix.accounts.to_vec(),
+                        data: ix.data.to_vec(),
                     })
                     .collect(),
             });
