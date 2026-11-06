@@ -4,8 +4,7 @@ use super::*;
 pub(super) const PHASE: &str = "cohort191-delivery";
 pub(super) const UNIT: &str = "horizon-cohort191-delivery-queue-20261023-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1";
-const PROGRAM: &str =
-    "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2";
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Binding {
@@ -178,7 +177,7 @@ fn rows<'a>(v: &'a Value, name: &str) -> Result<&'a Vec<Value>> {
         .as_array()
         .with_context(|| format!("191 queue {name}"))
 }
-fn read_head() -> Result<(Bound, Value)> {
+pub(super) fn read_head() -> Result<(Bound, Value)> {
     let path = Path::new(ROOT).join("state.json");
     let bytes = read_stable_bounded(&path, 4 << 20, "191 queue current head")?;
     let b = Bound {
@@ -212,7 +211,7 @@ fn eligible_snapshot(rows: &[(Bound, Value)], cutoff: u64) -> Result<Option<&(Bo
     }
     Ok(latest)
 }
-fn selected_state(anchor: &Bound, cutoff: u64) -> Result<(Bound, Value, Bound, Value)> {
+pub(super) fn selected_state(anchor: &Bound, cutoff: u64) -> Result<(Bound, Value, Bound, Value)> {
     let (head_bound, head) = read_head()?;
     let history = Path::new(ROOT).join("history");
     if !history.try_exists()? {
@@ -476,7 +475,11 @@ fn child(
         "sync"
     };
     ensure!(
-        admission.path == Path::new(ROOT).join(format!("admissions/epoch-{epoch}-{kind}.json"))
+        (admission.path == Path::new(ROOT).join(format!("admissions/epoch-{epoch}-{kind}.json"))
+            || (epoch == 191
+                && kind == "full"
+                && admission.path == Path::new(ROOT).join("recovery-full191-v1/admission.json")
+                && a["recovery"].is_object()))
             && a["schema"] == "jetstreamer-cohort191-delivery-queue-admission-v2"
             && a["queue_invocation_id"] == manager_iid
             && same_bound(&a["queue_plan"], plan)?
@@ -500,7 +503,14 @@ fn child(
                 && p.public_batch
                     .as_ref()
                     .is_some_and(|s| same_bound(&d["public_batch"], s).unwrap_or(false))
-                && l["schema"] == "jetstreamer-cohort191-verification-dispatch-launch-v1"
+                && (l["schema"] == "jetstreamer-cohort191-verification-dispatch-launch-v1"
+                    || (epoch == 191
+                        && kind == "full"
+                        && l["schema"] == "jetstreamer-cohort191-verification-recovery-launch-v1"
+                        && l["failure"]["sha256"]
+                            == "410644c73b496d4659deedc8c26d9767bec81f3833a53680b6cc674f2d5c4e6e"
+                        && l["wrapper_launch"]["sha256"]
+                            == "8224b860dc820590e8a78ef4ffa1ab57f9a564a5d17f465f63e14d6b7b4dffa7"))
                 && l["epoch"] == epoch
                 && l["stage"] == kind
                 && l["native_owner"]["Id"] == c.unit
@@ -521,6 +531,7 @@ fn child(
                 && a["observer"] == s["observer"]
                 && a["routine_completion"] == s["routine_completion"]
                 && a["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && a["os_claim_transfer"] == s["os_claim_transfer"]
                 && a["observer"].is_object()
                 && a["routine_completion"].is_object()
                 && a["other_pending_os_growth_bytes"].is_u64()
@@ -528,6 +539,7 @@ fn child(
                 && l["observer"] == s["observer"]
                 && l["routine_completion"] == s["routine_completion"]
                 && l["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && l["os_claim_transfer"] == s["os_claim_transfer"]
                 && s["source_revalidation_policy"]
                     == serde_json::to_value(
                         p.source_revalidation_policy
@@ -556,6 +568,7 @@ fn child(
                 && before["observer"] == s["observer"]
                 && before["routine_completion"] == s["routine_completion"]
                 && before["other_pending_os_growth_bytes"] == s["other_pending_os_growth_bytes"]
+                && before["os_claim_transfer"] == s["os_claim_transfer"]
                 && before["resource_admission"].is_object(),
             "191 sync prelaunch resources differ from admitted native step"
         );

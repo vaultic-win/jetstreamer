@@ -149,6 +149,9 @@ jobs:
       # Keep test artifacts within the standard hosted runner's disk and memory limits.
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
+      # Several configurations produce libraries larger than sccache's ZIP cache supports.
+      # Compile tests directly while retaining every configuration and test command.
+      RUSTC_WRAPPER: ""
     strategy:
       fail-fast: false
       matrix: *rust-feature-matrix
@@ -214,7 +217,7 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: cargo doc
-        run: cargo doc
+        run: cargo doc --no-deps
 
   cargo-clippy:
     name: cargo clippy (${{ matrix.name }})

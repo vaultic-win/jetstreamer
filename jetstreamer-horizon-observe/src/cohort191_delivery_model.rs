@@ -513,10 +513,15 @@ pub fn validate_terminal_transition(v: &serde_json::Value, cutoff: u64) -> Resul
         "191 producer remains active/replaced/ambiguous"
     );
     let c = &v["controller_lifecycle"];
+    let file_backed = c["kind"] == "collected-file-backed-controller";
     ensure!(
         matches!(
             c["kind"].as_str(),
-            Some("retained-natural-terminal-controller" | "collected-natural-terminal-controller")
+            Some(
+                "retained-natural-terminal-controller"
+                    | "collected-natural-terminal-controller"
+                    | "collected-file-backed-controller"
+            )
         ) && c["unit"]["Id"] == CTRL
             && c["unit"]["MainPID"] == "0"
             && c["unit"]["NRestarts"] == "0"
@@ -527,10 +532,16 @@ pub fn validate_terminal_transition(v: &serde_json::Value, cutoff: u64) -> Resul
         "191 import controller is not proven naturally terminal"
     );
     ensure!(
-        (c["unit"]["LoadState"] == "loaded"
-            && c["unit"]["InvocationID"] == CID
+        (file_backed
+            && c["unit"]["LoadState"] == "loaded"
+            && c["unit"]["InvocationID"] == ""
             && c["unit"]["Result"] == "success"
-            && c["unit"]["ExecMainStatus"] == "0")
+            && c["unit"]["ExecMainStatus"] == "0"
+            && matches!(c["unit"]["ExecMainCode"].as_str(), Some("0" | "")))
+            || (c["unit"]["LoadState"] == "loaded"
+                && c["unit"]["InvocationID"] == CID
+                && c["unit"]["Result"] == "success"
+                && c["unit"]["ExecMainStatus"] == "0")
             || (c["kind"] == "collected-natural-terminal-controller"
                 && c["unit"]["LoadState"] == "not-found"
                 && c["unit"]["InvocationID"] == ""),
@@ -549,27 +560,31 @@ pub fn validate_terminal_transition(v: &serde_json::Value, cutoff: u64) -> Resul
         );
     }
     let controller_end = ended(&c["events"]["terminal"], CTRL, CID, limit)?;
-    ensure!(
-        controller_end >= producer_end
-            && c["events"]["all_public"]["_SYSTEMD_UNIT"] == CTRL
-            && c["events"]["all_public"]["_SYSTEMD_INVOCATION_ID"] == CID
-            && c["events"]["all_public"]["_UID"] == "0"
-            && c["events"]["all_public"]["MESSAGE"] == "all sealed cohorts 191-194 are public",
-        "191 controller/import completion lacks original provenance"
-    );
-    let public_time = c["events"]["all_public"]["__REALTIME_TIMESTAMP"]
-        .as_str()
-        .context("191 controller public clock")?
-        .parse::<u64>()?;
-    ensure!(
-        public_time >= producer_end
-            && public_time <= controller_end
-            && c["events"]["all_public"]["_PID"]
-                .as_str()
-                .and_then(|s| s.parse::<u64>().ok())
-                .is_some_and(|p| p > 1),
-        "191 natural controller public message clock/PID differs"
-    );
+    if file_backed {
+        validate_file_backed_controller(c, producer_end, controller_end)?;
+    } else {
+        ensure!(
+            controller_end >= producer_end
+                && c["events"]["all_public"]["_SYSTEMD_UNIT"] == CTRL
+                && c["events"]["all_public"]["_SYSTEMD_INVOCATION_ID"] == CID
+                && c["events"]["all_public"]["_UID"] == "0"
+                && c["events"]["all_public"]["MESSAGE"] == "all sealed cohorts 191-194 are public",
+            "191 controller/import completion lacks original provenance"
+        );
+        let public_time = c["events"]["all_public"]["__REALTIME_TIMESTAMP"]
+            .as_str()
+            .context("191 controller public clock")?
+            .parse::<u64>()?;
+        ensure!(
+            public_time >= producer_end
+                && public_time <= controller_end
+                && c["events"]["all_public"]["_PID"]
+                    .as_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .is_some_and(|p| p > 1),
+            "191 natural controller public message clock/PID differs"
+        );
+    }
     let import = &v["native_import"];
     ensure!(
         import["schema"] == "jetstreamer-cohort191-import-custody-v2"
@@ -614,6 +629,77 @@ pub fn validate_terminal_transition(v: &serde_json::Value, cutoff: u64) -> Resul
             "191 terminal imported archive scope/digest/length differs"
         );
     }
+    Ok(())
+}
+
+fn validate_file_backed_controller(
+    c: &serde_json::Value,
+    producer_end: u64,
+    controller_end: u64,
+) -> Result<()> {
+    ensure!(
+        c["schema"] == "jetstreamer-collected-file-backed-controller-v1"
+            && c["raw_cleared_properties_preserved"] == true
+            && c["synthesized_exit_snapshot"] == false
+            && c["events"].get("all_public").is_none()
+            && c["unit"]["SuccessExitStatus"] == ""
+            && c["prior_live"]["path"]
+                == "/var/lib/jetstreamer/horizon-cohort191-delivery-events-20261024-import-v1/event-20261024T031600Z.json"
+            && c["prior_live"]["sha256"]
+                == "d986ae11f06377cb742eb78f9412b1cd398683ec9604ede6e347bee0518dc588"
+            && c["producer_native_records"]["sha256"]
+                == "6b930ce0c0c162ae81e1f1d86edd7cb134cbd2370d1dc7b6e0f19cfef15afe8e"
+            && c["unit_file"]["sha256"]
+                == "e54bea94ad567b5cdfc3601103aa3bf3a93c5fa91ebebd50b6ec92def2c2fefb"
+            && c["script"]["sha256"]
+                == "62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e",
+        "191 file-backed lifecycle lost distinct actual custody/provenance"
+    );
+    for flag in [
+        "publication_authorized",
+        "launch_authorized",
+        "r2_mutations",
+    ] {
+        ensure!(c[flag] == false, "191 file-backed lifecycle grants {flag}");
+    }
+    ensure!(
+        c["resource_samples"] == 0 && controller_end >= producer_end,
+        "191 collected clock/resource scope differs"
+    );
+    let start = &c["events"]["manager_start"];
+    ensure!(
+        start["UNIT"] == "jetstreamer-epochs191-194-target5-controller-v2-r2.service"
+            && start["INVOCATION_ID"] == "c741f57764384e07a08484e6451f8f0c"
+            && start["_PID"] == "1"
+            && start["_UID"] == "0"
+            && matches!(
+                start["MESSAGE_ID"].as_str(),
+                Some("7d4958e842da4a758f6c1cdc7b36dcc5" | "39f53479d3a045ac8e11786248231fbf")
+            )
+            && start["__REALTIME_TIMESTAMP"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .is_some_and(|t| t > 0 && t <= producer_end),
+        "191 collected manager start is not actual original PID1 evidence"
+    );
+    let file = &c["file_completion"];
+    ensure!(
+        file["kind"] == "native-file-backed-stdout"
+            && file["path"]
+                == "/var/lib/jetstreamer-root-sweep-epochs191-194-target5-20261016-v2/controller.log"
+            && file["terminal_line"] == "all sealed cohorts 191-194 are public"
+            && file["occurrences"] == 1
+            && file["fabricated_journal_fields"] == false
+            && file.get("_PID").is_none()
+            && file.get("__REALTIME_TIMESTAMP").is_none()
+            && file["length"]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n <= 2 << 20)
+            && file["sha256"].as_str().is_some_and(|s| s.len() == 64
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
+        "191 file completion is missing, ambiguous or fabricated as journal evidence"
+    );
     Ok(())
 }
 
@@ -723,6 +809,37 @@ mod native_terminal_tests {
         let public = json!({"path":"/native/public","sha256":"b".repeat(64)});
         let lifecycle = json!({"kind":"retained-natural-terminal-controller","unit":snapshot(ctrl,cid),"events":{"terminal":end(ctrl,cid,"8000000"),"all_public":{"_SYSTEMD_UNIT":ctrl,"_SYSTEMD_INVOCATION_ID":cid,"_UID":"0","_PID":"123","MESSAGE":"all sealed cohorts 191-194 are public","__REALTIME_TIMESTAMP":"7000000"}}});
         json!({"schema":"jetstreamer-cohort191-terminal-transition-v1","first_epoch":191,"last_epoch":194,"recorded_unix_seconds":9,"resource_samples":0,"publication_authorized":false,"replay_launch_authorized":false,"archive_readiness_claimed":false,"r2_mutations":false,"source_batch":source,"public_batch":public,"native_events":fixture(),"producer":snapshot(unit,iid),"producer_terminal":end(unit,iid,"6000000"),"controller_lifecycle":lifecycle,"native_import":{"schema":"jetstreamer-cohort191-import-custody-v2","source_batch":source,"public_batch":public,"controller_lifecycle":lifecycle,"materialized_epochs":[191,192,193,194],"native_import_attestation":{"epochs":[191,192,193,194],"receipt":public["path"],"receipt_sha256":public["sha256"]},"public_members":(191..=194).map(|e|json!({"epoch":e,"archive_sha256":"c".repeat(64),"committed_archive":{"length":e-190}})).collect::<Vec<_>>()}})
+    }
+    #[test]
+    fn collected_file_backed_proof_preserves_cleared_raw_state_without_fake_journal() {
+        let c = json!({"kind":"collected-file-backed-controller","schema":"jetstreamer-collected-file-backed-controller-v1",
+            "raw_cleared_properties_preserved":true,"synthesized_exit_snapshot":false,
+            "unit":{"SuccessExitStatus":""},"prior_live":{"path":"/var/lib/jetstreamer/horizon-cohort191-delivery-events-20261024-import-v1/event-20261024T031600Z.json","sha256":"d986ae11f06377cb742eb78f9412b1cd398683ec9604ede6e347bee0518dc588"},
+            "producer_native_records":{"sha256":"6b930ce0c0c162ae81e1f1d86edd7cb134cbd2370d1dc7b6e0f19cfef15afe8e"},
+            "unit_file":{"sha256":"e54bea94ad567b5cdfc3601103aa3bf3a93c5fa91ebebd50b6ec92def2c2fefb"},
+            "script":{"sha256":"62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e"},
+            "publication_authorized":false,"launch_authorized":false,"r2_mutations":false,"resource_samples":0,
+            "events":{"manager_start":{"UNIT":"jetstreamer-epochs191-194-target5-controller-v2-r2.service","INVOCATION_ID":"c741f57764384e07a08484e6451f8f0c","_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","__REALTIME_TIMESTAMP":"1"}},
+            "file_completion":{"kind":"native-file-backed-stdout","path":"/var/lib/jetstreamer-root-sweep-epochs191-194-target5-20261016-v2/controller.log","terminal_line":"all sealed cohorts 191-194 are public","occurrences":1,"fabricated_journal_fields":false,"length":100,"sha256":"a".repeat(64)}});
+        validate_file_backed_controller(&c, 2, 3).unwrap();
+        for (pointer, value) in [
+            ("/synthesized_exit_snapshot", json!(true)),
+            ("/prior_live/sha256", json!("b".repeat(64))),
+            ("/file_completion/occurrences", json!(2)),
+            ("/file_completion/fabricated_journal_fields", json!(true)),
+            ("/events/manager_start/INVOCATION_ID", json!("b".repeat(32))),
+            ("/publication_authorized", json!(true)),
+        ] {
+            let mut bad = c.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                validate_file_backed_controller(&bad, 2, 3).is_err(),
+                "{pointer}"
+            );
+        }
+        let mut bad = c;
+        bad["file_completion"]["__REALTIME_TIMESTAMP"] = json!("2");
+        assert!(validate_file_backed_controller(&bad, 2, 3).is_err());
     }
     #[test]
     fn first_transition_needs_no_future_observer_but_requires_real_natural_end_and_import() {

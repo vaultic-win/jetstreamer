@@ -33,6 +33,36 @@ only access-time changes caused by reading. Preserve the source ownership/mode a
 then preserve the captured bytes as separate immutable observation evidence. Do not chmod the original,
 relax immutable authority readers or promote a captured observation into launch/stop authority.
 
+### Reconcile periodic guard invocations
+
+Include each live producer's protective guard service in the fleet census, including ordinary
+singleton guards. When the installed helper has no authenticated completed-guard rollover adapter,
+run reconciliation inside the intersection of all relevant completed guard windows. Authenticate
+each actual successful, inactive guard invocation, its no-trip receipt, unchanged producer/plan
+bindings and armed timer deadline. Keep every actor in the census and preserve failures; an
+unsupported guard name needs its real evidence, never a suffix-only normalization exemption.
+
+If the intersection is too short, the existing immutable contracts may permit advancing the
+safety checks once during that coordinated cycle. For manually startable `Type=oneshot` guards
+with `Restart=no`, no `RemainAfterExit`, and timers driven only by `OnUnitInactiveSec`, one
+`systemctl start GUARD_A GUARD_B` request can bring the unchanged checks together. An already
+running activation may be coalesced. Authenticate each actual completion and receipt; a successful
+start request alone proves neither protection nor synchronization. Honor any genuine safety trip
+through the normal failure lifecycle. Preserve producer invocations, timer definitions and limits.
+
+Derive the usable window from the earliest actual armed next deadline after completion. Retain
+the qualified minimum window, timeout and stop margin, and execute the final preflight and fleet
+CLI consecutively in one bounded operator call: an intervening model/tool handoff can consume the
+window. This procedure grants no producer restart, timer stop/edit, unsupported rollover bypass
+or repeated replay observer. Routine replay/resource observations and status audits remain on the
+single 30-minute cadence.
+
+Compare set-valued native properties such as `RestrictAddressFamilies` as exact sets; systemd
+may reorder them. Preserve the raw response and reject duplicate or unexpected members. Capture
+long JSON reports with `journalctl --all --output=json`: the default JSON output can replace a
+long `MESSAGE` with `null`. Recover the same invocation's complete record before treating a report
+as missing or retrying useful work.
+
 ### Gate copy and build starts on actual guard proof
 
 For a new copy or build whose guard must be bound after systemd assigns its invocation, make
@@ -68,30 +98,6 @@ to both cache copies and compilation. If setup fails, preserve the original outc
 separately admitted attempt; never rearm the compiler or count a later guard fire as proof that
 protection preceded work. This procedure does not require restarting a healthy existing producer
 or changing the single 30-minute replay observation cadence.
-
-### Reconcile periodic guard invocations
-
-Include each live producer's protective guard service in the fleet census, including ordinary
-singleton guards. When the installed helper has no authenticated completed-guard rollover adapter,
-run reconciliation inside the intersection of all relevant completed guard windows. Authenticate
-each actual successful, inactive guard invocation, its no-trip receipt, unchanged producer/plan
-bindings and armed timer deadline. Keep every actor in the census and preserve failures; an
-unsupported guard name needs its real evidence, never a suffix-only normalization exemption.
-
-If the intersection is too short, the existing immutable contracts may permit advancing the
-safety checks once during that coordinated cycle. For manually startable `Type=oneshot` guards
-with `Restart=no`, no `RemainAfterExit`, and timers driven only by `OnUnitInactiveSec`, one
-`systemctl start GUARD_A GUARD_B` request can bring the unchanged checks together. An already
-running activation may be coalesced. Authenticate each actual completion and receipt; a successful
-start request alone proves neither protection nor synchronization. Honor any genuine safety trip
-through the normal failure lifecycle. Preserve producer invocations, timer definitions and limits.
-
-Derive the usable window from the earliest actual armed next deadline after completion. Retain
-the qualified minimum window, timeout and stop margin, and execute the final preflight and fleet
-CLI consecutively in one bounded operator call: an intervening model/tool handoff can consume the
-window. This procedure grants no producer restart, timer stop/edit, unsupported rollover bypass
-or repeated replay observer. Routine replay/resource observations and status audits remain on the
-single 30-minute cadence.
 
 Match a new job's systemd lifetime to its terminal verifier. If that verifier requires
 `LoadState=loaded`, use its persistent service file; `systemd-run --wait` does not by itself
@@ -327,6 +333,21 @@ the normal work-conserving backfill path rather than waiting for another status 
   not a reason to wait for the next routine poll. Recompute fresh admission and backfill promptly up
   to the proven operating point. The 30-minute cadence limits routine sampling; it does not require
   an avoidable 30-minute idle slot after an authenticated completion event.
+- Apply the same replacement policy after a failure or an admission/compatibility block requiring
+  repair. Preserve and track that epoch, then assess other disjoint missing epochs across the full
+  assigned range and promptly admit an eligible replacement. A repair must not monopolize an
+  otherwise usable replay lane. Continue the failed epoch's repair alongside replacement replay;
+  keep its current owner, next action and ETA accurate. If all replacements are blocked, record
+  their individual gates and prioritize the shortest independent qualification that opens a lane.
+  Use the latest accepted resource sample and an authenticated phase event where supported;
+  preserve all admission, integrity and guard requirements without another routine polling loop.
+- Actively resolve reservations that block otherwise usable lanes. A failed or terminal owner's
+  reservation is a cleanup or accounting-repair task, not a reason to wait indefinitely. In the
+  current cycle, either execute its qualified release or advance the smallest missing release
+  proof, with a named owner and recorded result. Preserve raw history and required artifacts;
+  release only the allowance whose continuing obligation has ended. An unchanged reservation
+  and a repeated next-action description do not count as progress. When a release attempt fails,
+  diagnose it immediately and continue independent staging or admission work.
 - Do not start a producer until its exact invocation can be guarded. If invocation IDs exist only
   after launch, start the dormant controller under observation, immediately bind and prove its
   reserve/VMA guard, and do not leave it unattended before the first real sandboxed guard fire.
@@ -340,6 +361,11 @@ the normal work-conserving backfill path rather than waiting for another status 
 - Overlap independent full verification, plugin verification, authenticated R2 upload, and remote
   readback with replay. Keep their receipt gates independent, and account for their measured I/O,
   CPU, and memory pressure when admitting another replay lane.
+  Before the real verifier launch, prepare every directory required by its sealed wrapper,
+  including nested receipt directories, with the exact owner and private modes. Run the wrapper's
+  non-executing preflight in the actual sandbox. Creating only the state root can pass dispatcher
+  preparation and still fail before the first archive hash. Preserve that failed invocation;
+  reconcile a qualified replacement into the queue without restarting a healthy verifier.
   A completed private assembly releases its producer claim even while its independent scan is
   being prepared. Record the real terminal event and the pending delivery action; count only an
   actually launched scanner as active. Admit that scan against the current producer census and
@@ -358,6 +384,38 @@ latest accepted resource sample. Preserve that sample's original clock, bind the
 clean terminal proof and the new live command/invocation, and retain the complete fleet history.
 The event clock is not a new resource observation or launch permission. Clear an event selector
 when constructing the next normal-cycle plan, while retaining its evidence and owner history.
+
+Validate native queue-census framing on the actual systemd version before using it as an admission
+gate. On systemd255, `systemctl list-jobs --output=json` can still emit text. Use the reviewed typed
+`Manager.ListJobs` D-Bus adapter where that occurs; validate its signature, return nesting, job and
+unit identities, and preserve the existing queued-entry denials. Never treat a parse failure as an
+empty queue or bypass the census to unblock admission.
+
+## Reclaim disk at each control cycle
+
+Audit reclaimable disk space during every existing 30-minute control cycle, even with ample free
+space, and after a relevant completion, failure or retirement. Use the same capacity observation;
+do not add a polling loop. Keep a ranked list of large retained directories and refresh the parts
+that changed with bounded metadata scans so cleanup itself does not disrupt replay. Keep each
+actionable candidate assigned a next action between audits; advance qualified cleanup without waiting
+for disk pressure or the next scheduled check-in. Revisit the list before admitting work
+that adds disk growth, when disk blocks admission, and when an offload or other relevant stage
+completes; use accepted evidence and event receipts without resetting the routine observation clock.
+
+Check obsolete build caches, duplicate reproducible inputs, old scratch generations and terminal
+diagnostic outputs against the existing reclamation and retirement rules. Prove each exact target
+is obsolete and unreferenced by live processes or staged launches, preserve required evidence and
+reproduction inputs, and reclaim eligible space in that cycle. Preserve healthy replay, useful
+resumable state, checkpoints, receipts and complete archives awaiting verification or publication.
+Use qualified R2 holding when an artifact still needs durable retention; do not treat age alone as
+deletion authority or remove another project's files without establishing ownership and eligibility.
+
+Record each candidate's physical bytes, decision and blocking evidence, plus actual filesystem free
+space before and after completed cleanup. Keep measured retired bytes separate from the free-space
+delta while live jobs allocate or files share extents. Planned offloads and earlier retirements are
+not newly reclaimed capacity. When a reference or qualification gate prevents cleanup, advance its
+concrete next action and continue independent admissible work. Recompute admission after successful
+reclamation and promptly use any capacity that permits another lane.
 
 ### Prove protective guard cadence
 
@@ -404,11 +462,11 @@ short-job scheduling must not silently skip it or indefinitely starve older admi
 healthy legacy cohorts and cross-host ownership, stay within the assigned publication range, and
 keep the epoch-301 verification tail private.
 
-Known failures are a priority repair backlog, not candidates to drop from consideration when a
-shorter new singleton becomes available. Advance safe diagnosis or qualified recovery before
-additional discretionary cold admissions. When a specific repair is blocked, keep its evidence,
-next unblocking action and last substantive progress in the fleet's durable repair record while
-independent work continues. Neither reclaiming failed scratch nor deleting stale dashboard status
+Known failures remain a priority repair backlog when a replacement singleton starts. Preserve the
+failed attempt and advance safe diagnosis or qualified recovery alongside replacement replay;
+repair priority does not mean leaving an eligible lane idle until that repair finishes. Keep each
+repair's evidence, current owner, next unblocking action and last substantive progress in the
+fleet's durable record. Neither reclaiming failed scratch nor deleting stale dashboard status
 closes the repair incident; reconcile it until qualified recovery reaches a verified ready pair.
 
 ## Delegate epoch-specific repairs
@@ -418,6 +476,13 @@ they share the same repair and artifacts; avoid duplicate agents changing the sa
 The main agent continues the fleet loop, assesses the memory-selected lane target, stages and
 admits independent work, maintains the authoritative repair backlog, and reports progress.
 Repair delegation must not turn missing compatibility evidence into an idle-host policy.
+
+Assign that owner and start the next safe diagnostic or repair action in the failure cycle.
+A backlog entry, status ETA or completed agent alone is not an active repair job. At each existing
+audit, record the running job or the latest substantive repair result and its next executable
+step. If work is blocked, record the exact dependency and advance independent repair work; when
+agent slots are full, keep a named queue owner and dispatch the highest-priority item as a slot
+opens. Keep replacement replay and failed-epoch repair moving together.
 
 Give each repair agent the exact failed invocation, immutable inputs and receipts, remaining
 integrity gates, scope of authorized changes, and ownership of files or an isolated worktree.
@@ -437,6 +502,26 @@ capability, resource, checkpoint, verification and publication gate.
 When agent slots are full, retain a prioritized repair queue with a named next action and keep
 the fleet loop moving. Do not silently drop failed epochs or replace the campaign objective with
 the easiest repair. Close an incident only on the usual verified ready-pair evidence.
+
+### Avoid wasted native qualification windows
+
+Before granting a timed native lease, check that the latest creation deadline leaves time for
+handoff, pre-creation input readback and setup, using observed preparation timings with a margin.
+The worker's runtime allowance does not cover work done before it exists. Recheck the clock
+immediately before provisioning. If the creation window expires, preserve the unused admission
+and start from a fresh accepted frame; never extend a live deadline.
+
+For retained manual qualification scripts, run reusable blocks in isolated scopes with explicit
+inputs and outputs. Exercise the remaining pure lookups together against saved actual artifacts;
+separate document checks can miss a variable overwritten by another block. Keep saved observations
+distinct from the fresh process, descriptor, clock and guard evidence required at launch.
+
+Validate actual systemd values using their documented representation, including canonical mount
+options such as `:rbind`, while retaining exact roots and option checks. Obtain log-file identity
+from actual descriptors when the queried API has no file-path property. Apply the exact launcher's
+lock and worker-census contract: an ordinary paused launcher may have no historical worker, while
+a native gate may require same-PID lock ownership. Preserve separate positive-worker capability
+requirements; do not invent an extra census predicate at a boundary where it cannot hold.
 
 ## Scale beyond the proven point
 

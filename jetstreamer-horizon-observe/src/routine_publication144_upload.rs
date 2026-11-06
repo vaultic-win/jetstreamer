@@ -9,8 +9,11 @@ const ROOT: &str = "/var/lib/jetstreamer/horizon-epoch144-progress-20261022-v1";
 const LENGTH: u64 = 109177480876;
 const DIGEST: &str = "153d3e5e5b7cbdc31bb4229315786000b84442a75b3b83cf4a50184b20b84a33";
 const ACTIVE_UPLOAD: &str = "Track exact 144 nonqueued upload/readback using authenticated child progress and original publisher clock; preserve canonical and private assembly. Capture terminal event promptly; ready requires authenticated matching sidecar, not service success.";
+const LEGACY_ACTIVE_UPLOAD: &str = "Track exact144 nonqueued upload/readback using authenticated child progress and original publisher clock;preserve canonical and private assembly. Capture terminal event promptly;ready requires authenticated matching sidecar,not service success.";
 const SUCCESS_UPLOAD: &str = "Exact 144 upload worker is terminal-success; reconcile authenticated ready pair and owned-status cleanup receipts immediately. Preserve canonical/private artifacts until ordinary boundary retirement gates pass.";
+const LEGACY_SUCCESS_UPLOAD: &str = "Exact144 upload worker is terminal-success;reconcile authenticated ready pair and owned-status cleanup receipts immediately. Preserve canonical/private artifacts until ordinary boundary retirement gates pass.";
 const FAILED_UPLOAD: &str = "Exact 144 upload worker is positively terminal unsuccessful; capture terminal evidence, remove owned stale status through qualified inactive lifecycle, and repair idempotently from preserved canonical/staged artifacts. Keep repair open; never overwrite R2 or retry over occupied attempt state.";
+const LEGACY_FAILED_UPLOAD: &str = "Exact144 upload worker is positively terminal unsuccessful;capture terminal evidence,remove owned stale status through qualified inactive lifecycle,and repair idempotently from preserved canonical/staged artifacts. Keep repair open;never overwrite R2 or retry over occupied attempt state.";
 fn id(v: &Value) -> bool {
     v.as_str().is_some_and(|s| {
         s.len() == 32
@@ -190,21 +193,39 @@ pub(super) fn retained(s: &Profile, f: &Value, origin: &Value) -> Result<Option<
     if !rows.iter().any(|r| r["unit"] == UPLOAD) {
         return retained_gate_from(f, origin, &s.launch);
     }
+    retained_upload(f, origin, &s.launch, s.upload.as_ref().unwrap(), &claim)
+}
+fn retained_upload(
+    f: &Value,
+    origin: &Value,
+    launch: &Bound,
+    upload: &Bound,
+    claim: &Value,
+) -> Result<Option<(Value, Value)>> {
+    let rows = f["pipeline_claims"].as_array().context("upload history")?;
     let g = &f["gates"]["144"];
     ensure!(
         rows.iter().filter(|r| r["unit"] == UPLOAD).count() == 1
-            && rows.contains(&claim)
+            && rows.contains(claim)
             && rows.contains(origin)
             && g["evidence"]
                 .as_array()
-                .is_some_and(|a| a.contains(&serde_json::to_value(&s.launch).unwrap())
-                    && a.contains(&serde_json::to_value(s.upload.as_ref().unwrap()).unwrap()))
+                .is_some_and(|a| a.contains(&serde_json::to_value(launch).unwrap())
+                    && a.contains(&serde_json::to_value(upload).unwrap()))
             && matches!(
                 (g["state"].as_str(), g["next_action"].as_str()),
                 (
                     Some("post-replay-pipeline"),
-                    Some(ACTIVE_UPLOAD | SUCCESS_UPLOAD)
-                ) | (Some("failed-needs-repair"), Some(FAILED_UPLOAD))
+                    Some(
+                        ACTIVE_UPLOAD
+                            | SUCCESS_UPLOAD
+                            | LEGACY_ACTIVE_UPLOAD
+                            | LEGACY_SUCCESS_UPLOAD
+                    )
+                ) | (
+                    Some("failed-needs-repair"),
+                    Some(FAILED_UPLOAD | LEGACY_FAILED_UPLOAD)
+                )
             ),
         "upload history/gate changed"
     );
@@ -482,6 +503,74 @@ pub(super) fn validate_completed(p: &Plan, c: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn genuine_retained() -> (Value, Value, Value, Bound, Bound) {
+        let f: Value =
+            serde_json::from_str(include_str!("fixtures/retained144-1146.json")).unwrap();
+        let p: Plan =
+            serde_json::from_str(include_str!("fixtures/missed-cadence-plan.json")).unwrap();
+        let s = p.publication144.unwrap();
+        let rows = f["pipeline_claims"].as_array().unwrap();
+        let claim = rows.iter().find(|r| r["unit"] == UPLOAD).unwrap().clone();
+        let origin = rows.iter().find(|r| r["unit"] == UNIT).unwrap().clone();
+        (f, claim, origin, s.launch, s.upload.unwrap())
+    }
+    #[test]
+    fn genuine_1146_upload_history_keeps_exact_legacy_success_text() {
+        let (f, claim, origin, launch, upload) = genuine_retained();
+        let before = f.clone();
+        let result = retained_upload(&f, &origin, &launch, &upload, &claim)
+            .unwrap()
+            .unwrap();
+        assert_eq!(result.0, "post-replay-pipeline");
+        assert_eq!(result.1, LEGACY_SUCCESS_UPLOAD);
+        assert_eq!(f, before);
+        for (pointer, value) in [
+            ("/gates/144/state", json!("remote-ready")),
+            ("/gates/144/evidence", json!([])),
+            ("/pipeline_claims/3/invocation_id", json!("0".repeat(32))),
+            ("/pipeline_claims/3/evidence", json!([])),
+            (
+                "/gates/144/next_action",
+                json!(LEGACY_SUCCESS_UPLOAD.replace(";reconcile", ";  reconcile")),
+            ),
+        ] {
+            let mut bad = f.clone();
+            *bad.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                retained_upload(&bad, &origin, &launch, &upload, &claim).is_err(),
+                "{pointer}"
+            );
+        }
+    }
+    #[test]
+    fn only_exact_upload_aliases_match_their_original_states() {
+        let (f, claim, origin, launch, upload) = genuine_retained();
+        for (state, action) in [
+            ("post-replay-pipeline", ACTIVE_UPLOAD),
+            ("post-replay-pipeline", SUCCESS_UPLOAD),
+            ("post-replay-pipeline", LEGACY_ACTIVE_UPLOAD),
+            ("post-replay-pipeline", LEGACY_SUCCESS_UPLOAD),
+            ("failed-needs-repair", FAILED_UPLOAD),
+            ("failed-needs-repair", LEGACY_FAILED_UPLOAD),
+        ] {
+            let mut row = f.clone();
+            row["gates"]["144"]["state"] = json!(state);
+            row["gates"]["144"]["next_action"] = json!(action);
+            assert_eq!(
+                retained_upload(&row, &origin, &launch, &upload, &claim)
+                    .unwrap()
+                    .unwrap()
+                    .1,
+                action
+            );
+            row["gates"]["144"]["state"] = json!(if state == "failed-needs-repair" {
+                "post-replay-pipeline"
+            } else {
+                "failed-needs-repair"
+            });
+            assert!(retained_upload(&row, &origin, &launch, &upload, &claim).is_err());
+        }
+    }
     #[test]
     fn upload_lineage_rejects_changed_origin_plan_lock_client_and_authority() {
         let root = "/var/lib/jetstreamer/horizon-epoch144-delivery-test";

@@ -62,6 +62,7 @@ pub fn archive_batch_publication_in_progress(
 #[derive(Debug)]
 pub(crate) struct ArchiveDestinationWriterLock {
     _directory: File,
+    owner_pid: u32,
     destination_device: u64,
     destination_inode: u64,
 }
@@ -72,18 +73,63 @@ impl ArchiveDestinationWriterLock {
     }
 }
 
+impl Drop for ArchiveDestinationWriterLock {
+    fn drop(&mut self) {
+        // A fork duplicate shares the open-file description and can outlive
+        // this guard until exec closes its CLOEXEC descriptor. Close alone
+        // would retain our lock in that child after our mutation window ends.
+        // Only the acquiring process may unlock: a fork child's inherited
+        // guard must never release its still-running parent's writer lock.
+        if std::process::id() != self.owner_pid {
+            return;
+        }
+        loop {
+            // SAFETY: the guard still owns a live directory descriptor.
+            if unsafe { libc::flock(self._directory.as_raw_fd(), libc::LOCK_UN) } == 0 {
+                break;
+            }
+            if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+                // File drop remains the fallback release; destructors must
+                // not panic while unwinding an earlier publication failure.
+                break;
+            }
+        }
+    }
+}
+
 pub(crate) fn acquire_archive_destination_writer_lock(
     destination_directory: &Path,
 ) -> io::Result<ArchiveDestinationWriterLock> {
+    let components = destination_directory
+        .components()
+        .filter(|component| {
+            !matches!(
+                component,
+                std::path::Component::RootDir | std::path::Component::CurDir
+            )
+        })
+        .collect::<Vec<_>>();
+    // Linux O_PATH pins traversal directories without requiring read access.
+    // Search permission is sufficient for supervisor-owned 0711 ancestors.
+    // The destination itself must remain O_RDONLY: O_PATH cannot hold flock.
+    #[cfg(target_os = "linux")]
+    let ancestor_access = libc::O_PATH;
+    #[cfg(not(target_os = "linux"))]
+    let ancestor_access = libc::O_RDONLY;
+    let initial_access = if components.is_empty() {
+        libc::O_RDONLY // The destination is / or . itself.
+    } else {
+        ancestor_access
+    };
     let mut directory = OpenOptions::new()
         .read(true)
-        .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .custom_flags(initial_access | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
         .open(if destination_directory.is_absolute() {
             Path::new("/")
         } else {
             Path::new(".")
         })?;
-    for component in destination_directory.components() {
+    for (index, component) in components.iter().enumerate() {
         let name = match component {
             std::path::Component::RootDir | std::path::Component::CurDir => continue,
             std::path::Component::Normal(name) => name,
@@ -103,13 +149,18 @@ pub(crate) fn acquire_archive_destination_writer_lock(
                 "archive destination component contains NUL",
             )
         })?;
+        let access = if index + 1 == components.len() {
+            libc::O_RDONLY
+        } else {
+            ancestor_access
+        };
         // SAFETY: directory is a live directory descriptor, name is a
         // NUL-terminated path component, and the returned descriptor is owned.
         let fd = unsafe {
             libc::openat(
                 directory.as_raw_fd(),
                 name.as_ptr(),
-                libc::O_RDONLY | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW,
+                access | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW,
             )
         };
         if fd < 0 {
@@ -146,7 +197,8 @@ pub(crate) fn acquire_archive_destination_writer_lock(
 
     // SAFETY: flock has no memory-safety preconditions and `directory` is a
     // live descriptor. The inode-scoped lock works across bind-mount aliases
-    // and is released automatically when the descriptor closes or we crash.
+    // and is explicitly released by the owning guard. Descriptor close also
+    // releases it when no inherited references survive a process exit.
     if unsafe { libc::flock(directory.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
         let error = io::Error::last_os_error();
         return Err(io::Error::new(
@@ -162,6 +214,12 @@ pub(crate) fn acquire_archive_destination_writer_lock(
         ));
     }
 
+    let writer_lock = ArchiveDestinationWriterLock {
+        _directory: directory,
+        owner_pid: std::process::id(),
+        destination_device: directory_metadata.dev(),
+        destination_inode: directory_metadata.ino(),
+    };
     let rebound_directory = fs::symlink_metadata(destination_directory)?;
     if !rebound_directory.file_type().is_dir()
         || rebound_directory.dev() != directory_metadata.dev()
@@ -175,11 +233,7 @@ pub(crate) fn acquire_archive_destination_writer_lock(
             "archive destination changed after acquiring writer lock",
         ));
     }
-    Ok(ArchiveDestinationWriterLock {
-        _directory: directory,
-        destination_device: directory_metadata.dev(),
-        destination_inode: directory_metadata.ino(),
-    })
+    Ok(writer_lock)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -722,6 +776,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn writer_lock_owner_drop_releases_while_a_shared_descriptor_survives() {
+        let directory = tempfile::TempDir::new().unwrap();
+        let owner = acquire_archive_destination_writer_lock(directory.path()).unwrap();
+        // dup and fork retain the same kernel open-file description. Keeping
+        // this duplicate live deterministically models the pre-exec window.
+        let inherited = owner._directory.try_clone().unwrap();
+        assert_eq!(
+            acquire_archive_destination_writer_lock(directory.path())
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
+        drop(owner);
+        let successor = acquire_archive_destination_writer_lock(directory.path()).unwrap();
+        // Closing the previous owner's duplicate must not unlock a different
+        // open-file description acquired by a genuine successor writer.
+        drop(inherited);
+        assert_eq!(
+            acquire_archive_destination_writer_lock(directory.path())
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
+        drop(successor);
+        acquire_archive_destination_writer_lock(directory.path()).unwrap();
+    }
+
+    #[test]
     fn checksum_line_is_lowercase_coreutils_format() {
         let line = archive_checksum_line(&[0xab; 32], OsStr::new("epoch-7.jet")).unwrap();
         assert_eq!(line, format!("{}  epoch-7.jet\n", "ab".repeat(32)));
@@ -784,16 +866,164 @@ mod tests {
         let real = root.path().join("real");
         let alias = root.path().join("alias");
         fs::create_dir(&real).unwrap();
+        fs::create_dir(real.join("ledger")).unwrap();
         std::os::unix::fs::symlink(&real, &alias).unwrap();
 
-        let error = acquire_archive_destination_writer_lock(&alias).unwrap_err();
+        // Reject both a final symlink and a symlink used as an ancestor.
+        for destination in [&alias, &alias.join("ledger")] {
+            let error = acquire_archive_destination_writer_lock(destination).unwrap_err();
+            assert!(
+                matches!(
+                    error.raw_os_error(),
+                    Some(libc::ELOOP) | Some(libc::ENOTDIR)
+                ),
+                "{error}"
+            );
+        }
+    }
 
-        assert!(
-            matches!(
-                error.raw_os_error(),
-                Some(libc::ELOOP) | Some(libc::ENOTDIR)
+    #[test]
+    fn destination_writer_lock_binds_inode_across_lexical_aliases() {
+        let directory = tempfile::TempDir::new().unwrap();
+        let metadata = fs::metadata(directory.path()).unwrap();
+        let lock = acquire_archive_destination_writer_lock(directory.path()).unwrap();
+        assert!(lock.binds_destination(metadata.dev(), metadata.ino()));
+        assert!(!lock.binds_destination(metadata.dev(), metadata.ino().wrapping_add(1)));
+        let alias = directory.path().join(".");
+        assert_eq!(
+            acquire_archive_destination_writer_lock(&alias)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
+        drop(lock);
+        acquire_archive_destination_writer_lock(&alias).unwrap();
+        assert!(acquire_archive_destination_writer_lock(&directory.path().join("..")).is_err());
+    }
+
+    #[test]
+    fn destination_writer_lock_handles_root_destination() {
+        let metadata = fs::metadata("/").unwrap();
+        match acquire_archive_destination_writer_lock(Path::new("/")) {
+            Ok(lock) => assert!(lock.binds_destination(metadata.dev(), metadata.ino())),
+            // A concurrent writer may already hold the inode lock. Other errors,
+            // including EBADF from attempting flock on O_PATH, are regressions.
+            Err(error) => assert_eq!(error.kind(), io::ErrorKind::WouldBlock),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn destination_writer_lock_traverses_search_only_ancestors() {
+        const CHILD: &str = "JETSTREAMER_ARCHIVE_LOCK_SEARCH_ONLY_TEST";
+        if let Some(parent) = std::env::var_os(CHILD) {
+            // Drop credentials only in this separately exec'd, single-test
+            // process. The parallel parent test process retains its identity.
+            if unsafe { libc::geteuid() } == 0 {
+                // SAFETY: these credential calls take no Rust pointers except
+                // the permitted null group list, and affect only this child.
+                unsafe {
+                    assert_eq!(libc::setgroups(0, std::ptr::null()), 0);
+                    assert_eq!(libc::setresgid(65534, 65534, 65534), 0);
+                    assert_eq!(libc::setresuid(65534, 65534, 65534), 0);
+                }
+            }
+            assert_ne!(
+                unsafe { libc::geteuid() },
+                0,
+                "permission regression must run non-root"
+            );
+            let parent = PathBuf::from(parent);
+            assert_eq!(
+                fs::read_dir(&parent).unwrap_err().kind(),
+                io::ErrorKind::PermissionDenied
+            );
+            let ledger = parent.join("ledger");
+            let lock = acquire_archive_destination_writer_lock(&ledger).unwrap();
+            let metadata = fs::metadata(&ledger).unwrap();
+            assert!(lock.binds_destination(metadata.dev(), metadata.ino()));
+            assert_eq!(
+                acquire_archive_destination_writer_lock(Path::new("."))
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::WouldBlock
+            );
+            drop(lock);
+            // O_PATH must not be used for the final directory: final read
+            // permission and a genuine flock-capable descriptor are required.
+            fs::set_permissions(&ledger, fs::Permissions::from_mode(0o100)).unwrap();
+            let error = acquire_archive_destination_writer_lock(&ledger).unwrap_err();
+            fs::set_permissions(&ledger, fs::Permissions::from_mode(0o700)).unwrap();
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            acquire_archive_destination_writer_lock(Path::new(".")).unwrap();
+            fs::write(
+                ledger.join("child-completed"),
+                b"non-root traversal checked",
+            )
+            .unwrap();
+            return;
+        }
+
+        let root = tempfile::Builder::new()
+            .prefix("archive-lock-search-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let parent = root.path().join("supervisor");
+        let ledger = parent.join("ledger");
+        fs::create_dir(&parent).unwrap();
+        fs::create_dir(&ledger).unwrap();
+        let root_run = unsafe { libc::geteuid() } == 0;
+        if root_run {
+            let name = std::ffi::CString::new(ledger.as_os_str().as_bytes()).unwrap();
+            // SAFETY: name is a live NUL-terminated temporary fixture path.
+            assert_eq!(unsafe { libc::chown(name.as_ptr(), 65534, 65534) }, 0);
+        }
+        fs::set_permissions(&ledger, fs::Permissions::from_mode(0o700)).unwrap();
+        // Root reproduces root:root 0711 ancestors and a different ledger
+        // owner. Non-root removes its own read bit to exercise the same denial.
+        let parent_mode = if root_run { 0o711 } else { 0o111 };
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o711)).unwrap();
+        fs::set_permissions(&parent, fs::Permissions::from_mode(parent_mode)).unwrap();
+        let before = fs::metadata(&parent).unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "archive_checksum::tests::destination_writer_lock_traverses_search_only_ancestors",
+                "--nocapture",
+            ])
+            .env(CHILD, &parent)
+            .current_dir(&ledger)
+            .output();
+        let after = fs::metadata(&parent).unwrap();
+        // Restore only the temporary fixture after the child exits, including
+        // its failure case, so TempDir cleanup does not leak test directories.
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            (
+                before.dev(),
+                before.ino(),
+                before.mode(),
+                before.uid(),
+                before.gid()
             ),
-            "{error}"
+            (
+                after.dev(),
+                after.ino(),
+                after.mode(),
+                after.uid(),
+                after.gid()
+            )
+        );
+        let output = output.unwrap();
+        assert!(
+            output.status.success(),
+            "child failed: {}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            fs::read(ledger.join("child-completed")).unwrap(),
+            b"non-root traversal checked"
         );
     }
 

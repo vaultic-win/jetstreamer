@@ -1,5 +1,73 @@
 use super::*;
 
+fn large_campaign_fleet_fixture() -> Vec<u8> {
+    let mut value = json!({"schema":"jetstreamer-horizon-campaign-fleet-v1",
+        "first_epoch":101,"last_epoch":200,"unit_census":{},"epochs":[],"active":[],"padding":""});
+    let overhead = serde_json::to_vec(&value).unwrap().len();
+    value["padding"] = json!("x".repeat(1_578_015 - overhead));
+    let bytes = serde_json::to_vec(&value).unwrap();
+    assert_eq!(bytes.len(), 1_578_015);
+    bytes
+}
+
+#[test]
+fn complete_fleet_above_one_mib_is_accepted_only_with_campaign_policy() {
+    let path =
+        Path::new("/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-fixture.json");
+    let bytes = large_campaign_fleet_fixture();
+    let sha = hex_lower(&Sha256::digest(&bytes));
+    let limit = fleet_evidence_limit(path).unwrap();
+    let value = evidence_payload(&bytes, &sha, limit, path).unwrap();
+    fleet_evidence_shape(&value).unwrap();
+    assert!(value["padding"].as_str().unwrap().len() > 1 << 20);
+    let error = evidence_payload(&bytes, &sha, 1 << 20, path)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains(&format!("path={}", path.display())));
+    assert!(error.contains("actual_bytes=1578015"));
+    assert!(error.contains("allowed_bytes=1048576"));
+}
+
+#[test]
+fn fleet_large_bound_cannot_select_other_receipts_or_namespaces() {
+    for path in [
+        "/var/lib/jetstreamer/receipt.json",
+        "/tmp/fleet.json",
+        "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/nested/fleet.json",
+        "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/../fleet.json",
+        "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet.txt",
+    ] {
+        assert!(fleet_evidence_limit(Path::new(path)).is_err(), "{path}");
+    }
+}
+
+#[test]
+fn complete_fleet_reader_stays_bounded_and_digest_bound() {
+    let path =
+        Path::new("/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-fixture.json");
+    let limit = fleet_evidence_limit(path).unwrap();
+    let excessive = vec![b' '; limit as usize + 1];
+    let sha = hex_lower(&Sha256::digest(&excessive));
+    let error = evidence_payload(&excessive, &sha, limit, path)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("actual_bytes=16777217"));
+    assert!(error.contains("allowed_bytes=16777216"));
+    let bytes = large_campaign_fleet_fixture();
+    assert!(evidence_payload(&bytes, &"0".repeat(64), limit, path).is_err());
+}
+
+#[test]
+fn large_allowance_never_promotes_foreign_fleet_schema_or_epoch_range() {
+    for value in [
+        json!({"schema":"ordinary-receipt-v2","first_epoch":101,"last_epoch":200}),
+        json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":201,"last_epoch":300}),
+        json!({"schema":"jetstreamer-horizon-campaign-fleet-v1","first_epoch":"101","last_epoch":200}),
+    ] {
+        assert!(fleet_evidence_shape(&value).is_err());
+    }
+}
+
 fn approved_mapping() -> Mapping {
     Mapping {
         schema: "jetstreamer-horizon-host-holding-prefix-v2".into(),

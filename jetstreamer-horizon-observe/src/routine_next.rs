@@ -44,7 +44,8 @@ pub(super) fn completion_bindings(p: &Plan, pb: &Bound, c: &Value) -> Result<()>
                 || public198::promoted(p, c)?
                 || repair183_fleet_recovery::completed_plan(p, c)?
                 || repair185_fleet_recovery::completed_plan(p, c)?
-                || cohort191_gate_recovery::completed(p, c)?),
+                || cohort191_gate_recovery::completed(p, c)?
+                || cohort191_native_recovery::completed(p, c)?),
         "completion does not bind exact current cycle"
     );
     for flag in [
@@ -123,7 +124,8 @@ pub(super) fn derive_next(
                 && ((p.epoch198_delivery.is_none() && p.observer_config.path == legacy_config)
                     || p.observer_config.path == prepared_config
                     || terminal141::matches(p)
-                    || provisional141::candidate(p)),
+                    || provisional141::candidate(p)
+                    || missed_cadence::active(p)?),
             "101 observer/config is outside its exact manual or prepared namespace"
         );
         (
@@ -186,6 +188,9 @@ pub(super) fn derive_next(
     next_config["output"] = json!(next_observer);
     let observer_sha = sha(&encoded(&next_config)?);
     let mut next: Plan = serde_json::from_value(serde_json::to_value(p)?)?;
+    next.missed_cadence = None;
+    cohort191_native_recovery::successor(p, c, &mut next)?;
+    next.cohort191_raw0546 = None;
     next.sample_target_utc = next_time;
     next.delayed_schedule_utc = None;
     next.observer = serde_json::from_value(next_config["output"].clone())?;
@@ -226,7 +231,7 @@ pub(super) fn derive_next(
     Ok((next, next_config, observer_package, cycle_package))
 }
 
-fn validate_folded_scope(p: &Plan, fleet_plan: &Value) -> Result<()> {
+pub(super) fn validate_folded_scope(p: &Plan, fleet_plan: &Value) -> Result<()> {
     if let Some(scope) = &p.scope_101_200 {
         let tracked = fleet_plan["tracked_units"]
             .as_array()
@@ -246,7 +251,13 @@ pub(super) fn encoded(value: &Value) -> Result<Vec<u8>> {
     b.push(b'\n');
     Ok(b)
 }
-fn seal_plan(stage: &Path, source: &str, destination: &Path, name: &str, digest: &str) -> Value {
+pub(super) fn seal_plan(
+    stage: &Path,
+    source: &str,
+    destination: &Path,
+    name: &str,
+    digest: &str,
+) -> Value {
     json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
         "members":[{"source":stage.join(source),"name":name,"sha256":digest,"mode":256}]})
 }

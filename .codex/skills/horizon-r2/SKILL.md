@@ -1,6 +1,6 @@
 ---
 name: horizon-r2
-description: Generate, verify, upload, and safely retire Horizon epoch archives using Cloudflare R2 as the durable inventory. Use when filling missing Horizon epochs, syncing verified .jet archives to R2, or resuming a specified epoch range.
+description: Generate, verify, upload, and safely retire Horizon epoch archives using Cloudflare R2 as the durable inventory. Use when filling missing Horizon epochs, syncing verified .jet archives to R2, cleaning obsolete local Horizon files, or resuming a specified epoch range.
 ---
 
 # Horizon R2
@@ -25,7 +25,7 @@ bucket. The bucket-level setting covers both existing and future objects. If the
 control-plane credential cannot inspect or enable that origin, preserve all objects and report the
 permission blocker without holding up the authenticated archive campaign.
 
-Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before optional local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
+Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
 
 ## Rust-first implementation policy
 
@@ -72,7 +72,7 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   `0077`. Keep private state directories explicitly `0700` and private writable receipts `0600`;
   scope the setting to this sealer or its invoking metadata service.
 
-For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Optional local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
+For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust binary to discover newly completed local pairs and invoke the Rust uploader serially. Do not run two progressive uploaders over overlapping ranges. The coordinator never implements remote integrity checks or unlinks files itself. Upload requires digest-matching full-verification and current-plugin receipts. Local retirement additionally requires both adjacent-boundary receipts. This separation lets disjoint servers publish complete archives so a retired neighbor can be restored from R2 to close a cross-host boundary without circularly weakening retirement. The orchestrator requires the exact approved binary and verifier-script SHA-256 values, accepts explicit comma-separated binary- and script-hash allowlists during a pinned verifier transition, honors every `--defer-epochs` range for retirement, and then delegates remote verification plus optional local retirement to the Rust uploader. Retain `scripts/sync_horizon_r2_progressive.py` only for an already-sealed workflow when replacing it in place would invalidate evidence or destabilize active work; do not select it for a new deployment.
 
 ### In-flight epoch status objects
 
@@ -421,13 +421,30 @@ not stall otherwise admissible ordinary campaign work.
   least 1,800 seconds after the preceding routine sample.
   Use that reference's measured-budget and time-to-sidecar policies to qualify capacity estimates
   and choose among admissible candidates; numerical epoch order alone is not a throughput policy.
-- Every host's control loop must explicitly answer **"Can I fit another disjoint lane now?"** at
-  each existing 30-minute observation, user-requested status check, and authenticated completion,
-  failure, or admission/guard-handoff event. Use the same fresh evidence, not a second polling loop.
-  Record the next candidate, live/proven lane counts, current resource arithmetic, eligibility,
-  exact limiting gate, and executable next action in the fleet's existing next-action/evidence
-  entries or a hash-bound capacity-decision receipt. Recompute from current invocation-bound claims;
-  do not carry terminal owners' growth reservations forward without justification.
+- When an epoch fails or its admission is blocked by a repair, preserve its failed attempt and
+  promptly backfill the available replay lane with another eligible, disjoint missing epoch.
+  Do not reserve idle capacity for the blocked epoch or wait for its repair to finish. Check the
+  full assigned range, not just epochs that already have status objects. Keep the failed epoch
+  in the repair backlog with a current owner and ETA, and advance its repair alongside other
+  replay work. Use fresh admission and the existing event-driven handoff; do not add routine polls
+  or weaken guards. If no replacement qualifies, record each candidate's specific blocker and
+  advance the shortest independent path to a running replacement rather than spending all idle
+  capacity on the original repair.
+- At every existing **30-minute check-in**, explicitly assess: **"Are we making maximum useful
+  use of the current compute, disk, and memory resources? Can more lanes be running? Can we
+  offload something to R2 to free capacity?"** Include CPU and I/O contention, available RAM,
+  protected disk growth and floors, eligible cold artifacts, and the next disjoint replay
+  candidate. Use that same fresh observation; do not add another polling loop.
+  Repeat the lane-capacity decision on a user-requested status check or authenticated completion,
+  failure, or admission/guard-handoff event. Record the desired, live, and proven lane counts,
+  current resource arithmetic, candidate eligibility, exact limiting gate, eligible R2 offload
+  candidate (or why none qualifies), and executable next action in the fleet's existing
+  next-action/evidence entries or a hash-bound capacity-decision receipt. Recompute from current
+  invocation-bound claims; do not carry terminal owners' growth reservations forward without
+  justification. When more work fits, take the next authorized admission or qualified offload
+  action in the same cycle. When qualification blocks an idle lane, actively repair that gate;
+  do not treat unused capacity as an acceptable steady state. Use the existing
+  [R2 holding rules](references/r2-holding.md) for offloading and preserve healthy work.
   If a qualified candidate fits, admit it in the same cycle and continue filling the proven operating
   point. If the missing bound is resource qualification, start the smallest freshly admissible bounded
   experiment instead of merely reporting idle capacity. Scaling beyond the proven point remains one
@@ -436,6 +453,16 @@ not stall otherwise admissible ordinary campaign work.
   participating host within its own assigned range; never infer another host's capacity from local
   observations. Optimize verified R2 sidecars per day, preserve every safety/integrity gate, and add
   no extra autonomous routine polls.
+- Include a **disk reclamation audit in every 30-minute check-in**, even when free space is above
+  the safety floor. Look for obsolete build caches, unreferenced scratch generations and terminal
+  outputs eligible under the existing retirement rules; remove qualified candidates in the same
+  cycle and use R2 holding for artifacts that must be retained. Record the largest candidates,
+  retention reasons or blockers, actual reclaimed bytes and filesystem free space before and after,
+  then reassess whether another lane fits. Treat increasing usable disk space as continuing capacity
+  work even while space is plentiful: advance qualified cleanup between check-ins, and revisit
+  candidates before a disk-growing admission and on relevant completion, failure,
+  offload or disk-blocked admission events, using accepted evidence without adding a polling loop.
+  Follow [the disk reclamation guidance](references/host-utilization.md#reclaim-disk-at-each-control-cycle).
 - Select the desired active lane count from **memory utilization alone**, targeting **90% of
   system memory** as the user requested. Use observed aggregate lane RSS and actual host usage,
   including non-lane usage once; the 1.5× RSS reservation is a scheduling allowance, not a second
@@ -1159,6 +1186,33 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   success, or matching final hashes alone do not authorize runtime-route promotion, canonical
   sidecars, publication, or R2 upload.
 
+## Mandatory local cleanup after completion
+
+An epoch is not operationally finished until its unnecessary local files have been deleted.
+After full/current-plugin verification, authenticated upload and whole-object readback, and the
+matching canonical R2 sidecar commit, retire local files as soon as their last local dependency
+ends. Apply the existing boundary, receipt, shared mutation-lock and no-consumer gates to archive
+retirement; remote pair presence alone is insufficient. Use the qualified Rust retirement tools.
+
+Cleanup covers `HORIZON_DIR` (normally `~/horizon`), private epoch output and replay scratch,
+restored snapshots and caches, diagnostic copies, superseded build trees, temporary deployments,
+and Horizon-only worktrees/directories under `~/workspace`. Do not retain obsolete trees merely
+because disk space is plentiful or because they document historical work. Keep compact completion,
+verification and provenance receipts outside deletion trees while they remain necessary; delete
+those too when no recovery, audit, lineage or active workflow still needs them. Preserve shared
+tools and inputs only while an identified unfinished epoch or active/staged workflow needs them.
+
+At completion, enumerate exact cleanup targets, verify no live process, open descriptor, map,
+controller, timer, staged launch, neighboring boundary check or recovery plan still needs them,
+and remove qualified targets in the same work cycle. Record any retained target's concrete
+dependency and clean it promptly when that dependency ends. Preserve unuploaded, unverified and
+resumable work. Remove a disposable Git worktree through Git after preserving any needed source
+changes/commits; do not delete unrelated projects or infer ownership from an epoch-like name alone.
+For a user-requested host-wide Horizon cleanup, inventory Horizon-owned paths across prior ranges
+as well as the current campaign; that request does not authorize cleanup of other projects or R2.
+Record removed paths and actual reclaimed space in one compact cleanup receipt, rather than
+creating a new per-target directory hierarchy.
+
 ## Deliver
 
 Build once with `cargo build --release -p jetstreamer-r2 -p jetstreamer-r2-progressive`. Store receipts outside the public archive directory, normally at `$HOME/.jetstreamer-private/r2-receipts`.
@@ -1251,6 +1305,28 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
 
 ## Operate safely
 
+- Before starting `jetstreamer-horizon-verify-pair`, create both its private state directory and
+  its `receipts/` child as Root-owned `0700` directories. The runner validates these existing
+  directories; it does not create them. Run the exact sealed runner, plan and hashes with
+  `--check-only` under the final service identity, capabilities and mounts before useful work,
+  preferably as that service's `ExecStartPre`. This checks executable bindings, the canonical
+  checksum and archive identity without hashing the archive body, running verifier commands or
+  creating a verification receipt. Preserve failed attempts and logs when correcting setup.
+- Finish guard and controller setup before starting a timed qualification worker. A guard
+  capability command may require its receipt directory to exist already. Pre-create the exact
+  directories, verify custody and sandbox write/fsync/read access, and check the sealed controller
+  script's readability and syntax through its intended privileged reader. Capture complete native
+  command arrays and effective properties; when retaining a completed setup control for that
+  capture, explicitly stop and drain it before the worker starts.
+- Before bounded local retirement, check the helper's effective UID against the existing shared
+  mutation-lock owner and verify receipt access as that UID. Preserve both lock identities and
+  private receipt permissions. When needed, seal byte-identical, non-sensitive receipt copies in
+  a readable, immutable same-host bundle. If the helper requires its lock inside the original
+  receipt directory, expose only the copied receipt through a private read-only file bind at its
+  original pathname. Prove the absolute projected inode, read-only mount, unchanged host original,
+  and intended payload UID/capabilities in an equivalent sandbox before policy preflight. Keep all
+  ordinary full/plugin/boundary, no-consumer and authenticated R2 retirement gates intact.
+
 - For new copy or build phases whose guard is armed after activation, require a tested native
   pre-start gate tied to the actual invocation before useful work can begin. A fixed delay alone
   is insufficient. Read [the build guard procedure](references/host-utilization.md#gate-copy-and-build-starts-on-actual-guard-proof).
@@ -1269,6 +1345,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   token equivalence in charged execution metadata, and retain the normal effective-property,
   mount and kernel-limit checks. Apply the transport to both preflights and the build launch;
   never truncate paths, broaden mounts or infer equivalent semantics for other properties.
+
+- During autonomous campaign work, use question cards only for an actual unresolved question.
+  Never use them for acknowledgements, keepalives, withdrawn questions or routine confirmations.
+  Continue already authorized work and use the established progress-update cadence.
 - Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
   exhausted by Tokio's core runtime threads. `retire-local` performs its archive
   proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
@@ -1305,6 +1385,10 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   read root-owned sealed evidence beneath the private root, retain only that capability (including
   the effective or ambient set as required by the unit), keep the target mount read-only except for
   exact receipt directories, and prove the read path in an equivalently sandboxed transient unit.
+  Use an actual read-only open or the qualified tool's metadata-only preflight for that proof.
+  A shell access predicate can disagree with a successful kernel open under restricted
+  capabilities; diagnose that discrepancy without widening archive permissions or dropping
+  the tool's integrity checks.
   Do not relax private-directory permissions to work around the sandbox.
   A root launcher that validates private evidence and then drops to an unprivileged scanner needs
   CAP_SETGID and CAP_SETUID effective at the drop point in addition to any traversal capability.
@@ -1313,6 +1397,14 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   end-to-end sandbox proof that observes the unprivileged output owner before arming production.
   For a long `Type=oneshot` verifier use `TimeoutStartSec=` as its execution bound;
   `RuntimeMaxSec=` is ignored for oneshot units.
+- For the Vaultic Horizon campaign, work on `account-updates` in
+  `vaultic-win/jetstreamer` so participating agents share the same source history. Fetch and
+  fast-forward that branch before new Git changes, preserving local edits; reconcile divergence
+  without discarding another agent's commits. Do not continue development on a PR head branch
+  after merging it. Keep sealed deployment copies immutable and qualify new deployments separately.
+  After changing tracked campaign code, documentation or this skill, run the relevant checks,
+  commit with the repository's configured Git identity and push to `origin/account-updates` in
+  the same work cycle. Verify the remote branch contains the commit before reporting it pushed.
 - Use SSH URLs for Git network operations. Select a currently loaded keychain agent socket for the
   active login session by verifying it with `ssh-add -l`; never hard-code an ephemeral socket path
   from an earlier session. Check the inherited environment for required service credentials before

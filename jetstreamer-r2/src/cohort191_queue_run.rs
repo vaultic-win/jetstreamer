@@ -2,6 +2,8 @@
 //! observations; a queued slot never contains an invented child or future hash.
 use super::*;
 use crate::cohort191_delivery::{self as custody, Bound};
+#[path = "cohort191_queue_recovery.rs"]
+mod recovery;
 use serde_json::json;
 use std::{
     collections::BTreeSet,
@@ -11,8 +13,7 @@ use std::{
 };
 const UNIT: &str = "horizon-cohort191-delivery-queue-20261023-v1.service";
 const ROOT: &str = "/var/lib/jetstreamer/horizon-cohort191-delivery-queue-20261023-v1";
-const PROGRAM: &str =
-    "/usr/local/lib/jetstreamer/horizon-cohort191-delivery-tools-20261023-v1/jetstreamer-r2";
+const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-cohort191-collected-recovery-tools-20261024-v2/jetstreamer-r2";
 const RECEIPTS: &str = "/home/sol/.jetstreamer-private/r2-receipts";
 // Confirmed fixed deployment contract; never accept an admission-supplied envfile.
 const ENVFILE: &str = "/etc/jetstreamer/horizon-r2.env";
@@ -465,19 +466,29 @@ fn resource_fields(s: &Value) -> Result<(Bound, Bound, u64)> {
         number(s, "other_pending_os_growth_bytes")?,
     ))
 }
-fn resource_admission(s: &Value, a: &Value) -> Result<Value> {
+fn resource_bindings(s: &Value, a: &Value) -> Result<()> {
     for key in [
         "observer",
         "routine_completion",
         "other_pending_os_growth_bytes",
+        "os_claim_transfer",
     ] {
         ensure!(
             a[key] == s[key],
             "191 sync intake/resource plan binding differs:{key}"
         );
     }
+    Ok(())
+}
+fn resource_admission(s: &Value, a: &Value) -> Result<Value> {
+    resource_bindings(s, a)?;
     let (observer, completion, other) = resource_fields(s)?;
-    crate::cohort191_dispatch::check_resources(&observer, &completion, other)
+    let transfer = if s["os_claim_transfer"].is_null() {
+        None
+    } else {
+        Some(binding(&s["os_claim_transfer"])?)
+    };
+    crate::cohort191_dispatch::check_resources(&observer, &completion, other, transfer.as_ref())
 }
 fn validate_sync(s: &Value, plan: &Bound, iid: &str, row: &Value) -> Result<()> {
     resource_fields(s)?;
@@ -547,7 +558,7 @@ fn launch_sync(
     let resources = resource_admission(&s, a)?;
     fleet::persist(
         &out.join("prelaunch-resources.json"),
-        &json!({"schema":"jetstreamer-cohort191-sync-prelaunch-resources-v1","sync_plan":sb,"admission":ab,"observer":s["observer"],"routine_completion":s["routine_completion"],"other_pending_os_growth_bytes":s["other_pending_os_growth_bytes"],"resource_admission":resources,"recorded_unix_millis":now_ms()?}),
+        &json!({"schema":"jetstreamer-cohort191-sync-prelaunch-resources-v1","sync_plan":sb,"admission":ab,"observer":s["observer"],"routine_completion":s["routine_completion"],"other_pending_os_growth_bytes":s["other_pending_os_growth_bytes"],"os_claim_transfer":s["os_claim_transfer"],"resource_admission":resources,"recorded_unix_millis":now_ms()?}),
     )?;
     command(
         "/usr/bin/systemd-run",
@@ -749,7 +760,7 @@ pub(super) fn sync_verified() -> Result<()> {
     let exec = normal_sync_argv(epoch);
     fleet::persist(
         &sync_dir(epoch).join("launch.json"),
-        &json!({"schema":"jetstreamer-cohort191-sync-launch-v2","epoch":epoch,"queue_plan":qp,"queue_invocation_id":iid,"sync_plan":sb,"admission":admission,"native_owner":u,"process_identity":{"pid":pid,"start_ticks":start},"program":program,"exec_argv":exec,"source_batch":s["source_batch"],"public_batch":s["public_batch"],"source_revalidation_policy":s["source_revalidation_policy"],"full_receipt":s["full_receipt"],"plugin_receipt":s["plugin_receipt"],"observer":s["observer"],"routine_completion":s["routine_completion"],"other_pending_os_growth_bytes":s["other_pending_os_growth_bytes"],"resource_admission":resources,"prelaunch_resources":bound_path(&sync_dir(epoch).join("prelaunch-resources.json"),1<<20,0)?,"recorded_unix_millis":now_ms()?}),
+        &json!({"schema":"jetstreamer-cohort191-sync-launch-v2","epoch":epoch,"queue_plan":qp,"queue_invocation_id":iid,"sync_plan":sb,"admission":admission,"native_owner":u,"process_identity":{"pid":pid,"start_ticks":start},"program":program,"exec_argv":exec,"source_batch":s["source_batch"],"public_batch":s["public_batch"],"source_revalidation_policy":s["source_revalidation_policy"],"full_receipt":s["full_receipt"],"plugin_receipt":s["plugin_receipt"],"observer":s["observer"],"routine_completion":s["routine_completion"],"other_pending_os_growth_bytes":s["other_pending_os_growth_bytes"],"os_claim_transfer":s["os_claim_transfer"],"resource_admission":resources,"prelaunch_resources":bound_path(&sync_dir(epoch).join("prelaunch-resources.json"),1<<20,0)?,"recorded_unix_millis":now_ms()?}),
     )?;
     // All native gates and fresh resource identities were rechecked above;
     // only the fsynced authenticated launch publication separates them from exec.
@@ -1039,16 +1050,20 @@ pub(super) fn run() -> Result<()> {
             && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "191 queue lease unsafe/busy"
     );
-    ensure!(
-        !Path::new(ROOT).join("state.json").try_exists()?
-            && fs::read_dir(Path::new(ROOT).join("history"))?
-                .next()
-                .is_none()
-            && fs::read_dir(Path::new(ROOT).join("intents"))?
-                .next()
-                .is_none(),
-        "191 queue already has custody/history; manual reconciliation required, never retry"
-    );
+    if p.get("recovery_full191").is_some() {
+        recovery::validate(&p)?;
+    } else {
+        ensure!(
+            !Path::new(ROOT).join("state.json").try_exists()?
+                && fs::read_dir(Path::new(ROOT).join("history"))?
+                    .next()
+                    .is_none()
+                && fs::read_dir(Path::new(ROOT).join("intents"))?
+                    .next()
+                    .is_none(),
+            "191 queue already has custody/history; manual reconciliation required, never retry"
+        );
+    }
     let iid = env::var("INVOCATION_ID")?;
     let u = manager(UNIT)?;
     let expected = format!(
@@ -1086,6 +1101,9 @@ pub(super) fn run() -> Result<()> {
     let pid = u64::from(std::process::id());
     let start = ticks(pid)?;
     let mut state = json!({"schema":"jetstreamer-cohort191-delivery-queue-state-v2","revision":0,"plan":plan,"unit":UNIT,"invocation_id":iid,"manager_pid":pid,"manager_start_ticks":start,"updated_unix_millis":0,"status":"managing","epochs":p["imported_members"].as_array().context("191 imported rows")?.iter().map(|r|json!({"epoch":r["epoch"],"archive_sha256":r["archive_sha256"],"archive_length":r["archive_length"],"stage":"queued-full","task_owner":null})).collect::<Vec<_>>()});
+    if p.get("recovery_full191").is_some() {
+        state = recovery::state(&p, &plan, &iid, pid, start)?;
+    }
     process(&json!({"pid":pid,"start_ticks":start,"unit":UNIT,"program":program}))?;
     persist(&mut state)?;
     if let Err(e) = execute(&mut state, &plan, &a[6]) {
@@ -1100,6 +1118,19 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sync_resource_policy_cannot_be_dropped_or_injected() {
+        let legacy = json!({"observer":{"path":"/observer","sha256":"a".repeat(64)},"routine_completion":{"path":"/completion","sha256":"b".repeat(64)},"other_pending_os_growth_bytes":23_505_223_680_u64});
+        resource_bindings(&legacy, &legacy).unwrap();
+        let mut transferred = legacy.clone();
+        transferred["os_claim_transfer"] = json!({"path":"/transfer","sha256":"c".repeat(64)});
+        resource_bindings(&transferred, &transferred).unwrap();
+        assert!(resource_bindings(&transferred, &legacy).is_err());
+        assert!(resource_bindings(&legacy, &transferred).is_err());
+        let mut changed = transferred.clone();
+        changed["os_claim_transfer"]["sha256"] = json!("d".repeat(64));
+        assert!(resource_bindings(&transferred, &changed).is_err());
+    }
     fn state(stages: &[&str]) -> Value {
         json!({"epochs":stages.iter().enumerate().map(|(i,s)|json!({"epoch":191+i,"stage":s,"task_owner":null})).collect::<Vec<_>>()})
     }

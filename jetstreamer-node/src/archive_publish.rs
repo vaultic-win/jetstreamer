@@ -336,19 +336,37 @@ impl BoundDirectory {
 
     fn bind_absolute_nofollow(path: &Path, policy: DirectoryPolicy) -> Result<Self, String> {
         require_canonical_absolute_path(path, "directory")?;
+        // Traverse search-only supervisor ancestors without requiring their
+        // read permission. Keep the final descriptor readable for sync_all,
+        // flock and existing publication operations.
+        #[cfg(target_os = "linux")]
+        let ancestor_access = libc::O_PATH;
+        #[cfg(not(target_os = "linux"))]
+        let ancestor_access = libc::O_RDONLY;
+        let mut components = path.components().skip(1).peekable();
+        let initial_access = if components.peek().is_some() {
+            ancestor_access
+        } else {
+            libc::O_RDONLY
+        };
         let mut file = OpenOptions::new()
             .read(true)
-            .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .custom_flags(initial_access | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
             .open("/")
             .map_err(|error| format!("failed to open filesystem root: {error}"))?;
-        for component in path.components().skip(1) {
+        while let Some(component) = components.next() {
             let std::path::Component::Normal(name) = component else {
                 return Err(format!(
                     "directory path has a non-canonical component: {}",
                     path.display()
                 ));
             };
-            file = openat_directory(file.as_raw_fd(), name).map_err(|error| {
+            let access = if components.peek().is_some() {
+                ancestor_access
+            } else {
+                libc::O_RDONLY
+            };
+            file = openat_directory_with_access(file.as_raw_fd(), name, access).map_err(|error| {
                 format!(
                     "failed to open directory component {:?} without following links in {}: {error}",
                     name,
@@ -5646,6 +5664,14 @@ fn fstatat_identity(directory_fd: RawFd, name: &OsStr) -> io::Result<Option<File
 }
 
 fn openat_directory(directory_fd: RawFd, name: &OsStr) -> io::Result<File> {
+    openat_directory_with_access(directory_fd, name, libc::O_RDONLY)
+}
+
+fn openat_directory_with_access(
+    directory_fd: RawFd,
+    name: &OsStr,
+    access: libc::c_int,
+) -> io::Result<File> {
     let name = os_str_cstring(name)?;
     // SAFETY: directory_fd is live and name is a NUL-terminated basename. The
     // returned descriptor is uniquely owned.
@@ -5653,7 +5679,7 @@ fn openat_directory(directory_fd: RawFd, name: &OsStr) -> io::Result<File> {
         libc::openat(
             directory_fd,
             name.as_ptr(),
-            libc::O_RDONLY | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW,
+            access | libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW,
         )
     };
     if fd < 0 {
@@ -5897,6 +5923,142 @@ fn cleanup_unused_recovery_directory(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn batch_recovery_traverses_search_only_supervisor_ancestors() {
+        const CHILD: &str = "JETSTREAMER_BATCH_RECOVERY_SEARCH_ONLY_TEST";
+        if let Some(parent) = std::env::var_os(CHILD) {
+            if unsafe { libc::geteuid() } == 0 {
+                // SAFETY: only this separately exec'd single-test child drops
+                // credentials; the parallel parent test process is unchanged.
+                unsafe {
+                    assert_eq!(libc::setgroups(0, std::ptr::null()), 0);
+                    assert_eq!(libc::setresgid(65534, 65534, 65534), 0);
+                    assert_eq!(libc::setresuid(65534, 65534, 65534), 0);
+                }
+            }
+            assert_ne!(unsafe { libc::geteuid() }, 0);
+            let parent = PathBuf::from(parent);
+            assert_eq!(
+                fs::read_dir(&parent).unwrap_err().kind(),
+                io::ErrorKind::PermissionDenied
+            );
+            let destination = parent.join("output");
+            let metadata = fs::metadata(&destination).unwrap();
+            let expected = ArchiveBatchDestinationIdentity {
+                device: metadata.dev(),
+                inode: metadata.ino(),
+            };
+            let lock = acquire_archive_destination_writer_lock(&destination).unwrap();
+            assert!(lock.binds_destination(expected.device, expected.inode));
+            drop(lock);
+            // Exercise the actual startup recovery path, after its independent
+            // writer-lock walk and before it decides the marker is absent.
+            assert!(matches!(
+                recover_archive_publication_batch(&destination, expected).unwrap(),
+                ArchiveBatchRecovery::None
+            ));
+            let bound = BoundDirectory::bind_absolute_nofollow(
+                &destination,
+                DirectoryPolicy::SharedDestination,
+            )
+            .unwrap();
+            // A final O_PATH descriptor would fail fsync with EBADF.
+            bound.sync().unwrap();
+            // The original per-component no-symlink rule must still apply.
+            let child_directory = destination.join("child");
+            fs::create_dir(&child_directory).unwrap();
+            fs::set_permissions(&child_directory, fs::Permissions::from_mode(0o700)).unwrap();
+            std::os::unix::fs::symlink("child", destination.join("alias")).unwrap();
+            assert!(
+                BoundDirectory::bind_absolute_nofollow(
+                    &destination.join("alias"),
+                    DirectoryPolicy::SharedDestination,
+                )
+                .is_err()
+            );
+            // Final-directory read permission is still mandatory.
+            fs::set_permissions(&child_directory, fs::Permissions::from_mode(0o100)).unwrap();
+            let denied = BoundDirectory::bind_absolute_nofollow(
+                &child_directory,
+                DirectoryPolicy::SharedDestination,
+            )
+            .is_err();
+            fs::set_permissions(&child_directory, fs::Permissions::from_mode(0o700)).unwrap();
+            assert!(denied);
+            fs::write(
+                destination.join("child-completed"),
+                b"real recovery checked",
+            )
+            .unwrap();
+            return;
+        }
+
+        let root = tempfile::Builder::new()
+            .prefix("batch-recovery-search-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let parent = root.path().join("supervisor");
+        let destination = parent.join("output");
+        fs::create_dir(&parent).unwrap();
+        fs::create_dir(&destination).unwrap();
+        let root_run = unsafe { libc::geteuid() } == 0;
+        if root_run {
+            let name = CString::new(destination.as_os_str().as_bytes()).unwrap();
+            // SAFETY: name identifies only the newly created temporary fixture.
+            assert_eq!(unsafe { libc::chown(name.as_ptr(), 65534, 65534) }, 0);
+        }
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o711)).unwrap();
+        // A non-root run removes its own read bit. A root run reproduces
+        // genuinely different root-owned 0711 and unprivileged-owned 0700.
+        fs::set_permissions(
+            &parent,
+            fs::Permissions::from_mode(if root_run { 0o711 } else { 0o111 }),
+        )
+        .unwrap();
+        let before = fs::metadata(&parent).unwrap();
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "archive_publish::tests::batch_recovery_traverses_search_only_supervisor_ancestors",
+                "--nocapture",
+            ])
+            .env(CHILD, &parent)
+            .current_dir(&destination)
+            .output();
+        let after = fs::metadata(&parent).unwrap();
+        // Restore only the temporary fixture for cleanup, even on failure.
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            (
+                before.dev(),
+                before.ino(),
+                before.mode(),
+                before.uid(),
+                before.gid()
+            ),
+            (
+                after.dev(),
+                after.ino(),
+                after.mode(),
+                after.uid(),
+                after.gid()
+            )
+        );
+        let output = output.unwrap();
+        assert!(
+            output.status.success(),
+            "child failed: {}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            fs::read(destination.join("child-completed")).unwrap(),
+            b"real recovery checked"
+        );
+    }
 
     const BATCH_MANIFEST_FINGERPRINT: [u8; 32] = [0x5a; 32];
 

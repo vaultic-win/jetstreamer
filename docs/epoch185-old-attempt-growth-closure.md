@@ -94,3 +94,24 @@ No closure or proposal starts epoch-185 repair. Once an actual repair, qualifica
 or replay is admitted, it needs a current real owner and a numeric sidecar ETA with
 recovery and delivery allowances. Until then the failed epoch remains in the repair
 backlog, with no stale terminal producer countdown.
+
+## Optional retirement after logical closure
+
+The default `holding-retire185` plan still requires both original epoch 185 and 141
+claims retained. An optional `closed_growth_disposition` binding selects a
+separately reviewed capacity schema for retirement after old epoch 185 has already
+closed. It authenticates the same fixed closure/intent through the typed reader,
+requires the explicit original epoch 185 row already 0 with disposition delta 0, and
+preserves the original epoch 141 whole-root 512 GiB cap/binding. This preserves
+that original cap, with no incremental 512 GiB allocation on top of retained bytes
+or a new remaining-growth calculation.
+
+The opt-in projection binding is part of the durable retirement intent, so its
+frontiers cannot be mixed with the default pre-closure retirement transaction.
+All existing source identity, no-consumer, native fleet, authenticated remote
+custody, full local hash, no-clobber quarantine and unlink gates remain required.
+It neither changes a guard nor releases another reservation, and it grants no
+physical credit before the actual unlink. Source/scratch/input preservation in
+the growth closure remains unchanged: close while the original inode exists,
+then separately check and authorize the opt-in retirement. The completion records
+censused retired physical bytes but does not fabricate an observed free-space delta.

@@ -47,6 +47,13 @@ appears, promptly prepare the initial event, reconcile its fleet plan and publis
 status reports for both claimed epochs. The initial event and status window is 300 seconds from
 the immutable launch capture; unrelated diagnosis or builds must not consume that window.
 
+Before launch, qualify fleet handling of the guard's normal invocation rollover across the
+entire observation bracket. A 30-second periodic guard can change identity during a 60-second
+census. Its endpoints need authenticated rollover support; adding its name to the tracked-unit
+list alone is insufficient. If enrollment rejects that rollover, preserve the healthy producer
+and guard, repair the scoped fleet integration, and maintain status through the fallback below.
+Never stop protection or remove the guard from the census to obtain an accepted sample.
+
 If the window is missed, leave healthy extraction running. Never backdate or extend the launch,
 event or observer timestamp. When supported by the existing helper, register the real launch at
 the next normal post-launch observation with a normal fleet plan, exact tracked units and no

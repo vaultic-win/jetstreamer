@@ -230,6 +230,27 @@ fn validate_run_owner(p: &Plan, intent: &Value, review: &Value, state_bytes: &[u
 }
 
 fn preserved(p: &Plan) -> Result<Value> {
+    preserved_with_disposition(p, false, "jetstreamer-reserve-bootstrap-restart-review-v1")
+}
+
+// Only the exact epoch 185 caller authenticates a completed partial retirement.
+// The default profile continues to require the original local archive.
+pub(crate) fn preserved185(value: Value, archive_retired: bool) -> Result<Value> {
+    let p: Plan = serde_json::from_value(value)?;
+    validate_scope(&p)?;
+    ensure!(p.epoch == 185, "foreign epoch in retained-work adapter");
+    preserved_with_disposition(
+        &p,
+        archive_retired,
+        "jetstreamer-epoch185-scratch-source-review-v2",
+    )
+}
+
+fn preserved_with_disposition(
+    p: &Plan,
+    archive_retired: bool,
+    review_schema: &str,
+) -> Result<Value> {
     let state_path = p.run_directory.join("cohort-state.json");
     let state_bytes = read_stable_bounded(&state_path, 65536, "cohort state")?;
     let state: Value = serde_json::from_slice(&state_bytes)?;
@@ -280,7 +301,11 @@ fn preserved(p: &Plan) -> Result<Value> {
         );
         if *directory == archive_dir {
             ensure!(
-                members == vec![archive_dir.join(format!("epoch-{}.jet", p.epoch))],
+                if archive_retired {
+                    members.is_empty()
+                } else {
+                    members == vec![archive_dir.join(format!("epoch-{}.jet", p.epoch))]
+                },
                 "not one partial singleton archive"
             );
         }
@@ -364,7 +389,7 @@ fn preserved(p: &Plan) -> Result<Value> {
             && build["build"]["exit_code"] == 0
             && build["tests"]["failed"] == 0
             && build["tests"]["passed"].as_u64().is_some_and(|n| n > 0)
-            && review["schema"] == "jetstreamer-reserve-bootstrap-restart-review-v1"
+            && review["schema"] == review_schema
             && review["epoch"] == p.epoch
             && review["node_sha256"] == p.node.sha256
             && review["run_uid"] == p.run_uid
