@@ -1,12 +1,15 @@
 {
   "schema": "native128-root-template-config-v2-original-reader-before",
-  "output_directory": "/usr/local/lib/jetstreamer/horizon-visible-native163128-current2330-plan-20261107-v1",
+  "output_directory": "/usr/local/lib/jetstreamer/horizon-visible-native163128-current0000-plan-20261108-v2",
   "previous_phase_ledger": {
     "path": "/home/sol/.jetstreamer-private/epoch163-native-input-qa-20261106-v7/RESOURCE_PHASES_R24_NATIVE163_QA_DATA_BOOKED.json",
     "sha256": "0d95b4cfe5cde644d3b9105c32116598a8a7a449c14b9003f48e380bf6ad96da"
   },
   "extra_QA6_closure": null,
-  "issuer_program": null,
+  "issuer_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v15/jetstreamer-r2",
+    "sha256": "12e8215725aa9b20c57907967f041f90326d17e293ce428a8962c8a1688fb4e5"
+  },
   "worker_image_path": "/usr/local/lib/jetstreamer/deploy-epoch163-singleton-20261104-v1/jetstreamer-historical-worker-v1-5-6",
   "ledger_directory": "/home/sol/.jetstreamer-private/visible-native163128-20261107-v1/ledger",
   "scratch_directory": "/home/sol/.jetstreamer-private/visible-native163128-20261107-v1/scratch",
@@ -34,25 +37,8 @@
     "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/ROOT1800_ADDITIONAL4GiB_COMBINED_FIRST_LANE_QA_DATA_BOOKING.json",
     "sha256": "b52ef2d4f33f7b2ecabecaf953430783df654d77b3b15b2fc3b5fa31b8fbf804"
   },
-  "staging_directory": "/home/sol/.jetstreamer-private/visible-native163128-current2330-plan-staging-20261107-v1",
-  "expected_current": {
-    "observer": {
-      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T233022Z-postcompletion154-v1.json",
-      "sha256": "23e32ae0a185d59b3552636702ef5f2733e40bf79fd5d652bdec8110a85289ab"
-    },
-    "fleet": {
-      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T233022Z-witness-terminal145-v1.json",
-      "sha256": "2b9eec5dae0f88e54e853ff822929f447383d8818c2d11b5c2c7fd63669caef1"
-    },
-    "fleet_plan": {
-      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current2330-fleet-plan-20261107-v1/fleet-plan.json",
-      "sha256": "0720f3cbb0f7c5dfc61e7eb2549419aad110a40888c6a85d7c87608aa19c0d26"
-    },
-    "frame": {
-      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T233022-witness-terminal145-chain128-v5.json",
-      "sha256": "095d092ae84b05aab2416c4d61fd7a710d62f62c48f2a11339d5e8e901088252"
-    }
-  },
+  "staging_directory": "/home/sol/.jetstreamer-private/visible-native163128-current0000-plan-staging-20261108-v2",
+  "expected_current": null,
   "expected_memory_program": {
     "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-parent-memory-selector-tools-20261107-v4/parent-memory",
     "sha256": "4b65f8504f8b058fa83b6f5d6654ac948d502d7d0a00861d6d3d56505b822cc2"

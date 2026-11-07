@@ -154,6 +154,9 @@ def main():
     memory_floor=max(MEM_FLOOR,c['minimum_available_memory_bytes'])
     require(minimum_existing >= (80*GIB)+(256<<20), 'actual complete typed existing memory total required')
     require(60<=c['maximum_runtime_seconds']<=7200, 'finite native restore deadline')
+    # Pure source/metadata preflight runs before staging and before any actor clock.
+    from pure_native_preflight import validate_config
+    validate_config(c)
     # Root must already have prepared ledger/genesis, scratch host leaf and state.
     for name in ['ledger_directory','scratch_directory','state_directory']:
         p=Path(c[name]); s=p.lstat()
@@ -216,6 +219,8 @@ def main():
         'TemporaryFileSystem=/tmp:ro /var/tmp:ro '+str(scratch)+':rw,nosuid,nodev,exec,size=40G,nr_inodes=131072,mode=0700']
     issuer_properties=common+['MemoryMax=2G','CPUQuota=100%','RemainAfterExit=yes','RuntimeMaxSec=95s',
         'ReadWritePaths='+str(state),'TemporaryFileSystem=/tmp:ro /var/tmp:ro']
+    from pure_native_preflight import validate_actor_properties
+    validate_actor_properties(plan,actor_properties,['TMPDIR='+str(scratch),'TMP='+str(scratch),'TEMP='+str(scratch)])
     def service_argv(unit, props, argv, environment=()):
         return ['/usr/bin/systemd-run','--unit='+unit,'--quiet']+['--property='+p for p in props]+['--setenv='+e for e in environment]+argv
     write('actor-argv.json',{'unit':ACTOR,'argv':service_argv(ACTOR,actor_properties,actor_argv,
