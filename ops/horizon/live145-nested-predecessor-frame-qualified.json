@@ -1,0 +1,89 @@
+{
+  "schema": "horizon-live145-nested-predecessor-frame-qualified-publication-v1",
+  "library": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-library-tools-20261107-v1/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+    "sha256": "664a54f1a362c7d806f7f207414cb05bb9eec694f8421cca9c96fc7bb73ca604"
+  },
+  "library_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-library-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "163d66a22b1018c0122bc24682b38d8b26b91db60f35396a25339aeb39609d10"
+  },
+  "library_artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-library-tools-20261107-v1/artifact-proof.json",
+    "sha256": "72ca4ff61582f6a0a4f0c96c45abbbc2e0febdd9ceec48d5d7aa973879f41e54"
+  },
+  "CLI": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-cli-tools-20261107-v1/jetstreamer-horizon-frame",
+    "sha256": "454ca6069a17ab9d917f59324a9c318dddb8c31203f5a753cb8070ee3efefec5"
+  },
+  "CLI_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-cli-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "9e0e5e27fef5f3ec4b24e1faca1669f9472f74d0a3c89472c4d415a760217b94"
+  },
+  "CLI_artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-cli-tools-20261107-v1/artifact-proof.json",
+    "sha256": "a920e23650508f3283c352b43aca81ff93343e037fa747102eafc8690a960cad"
+  },
+  "library_ordinary_passed": 456,
+  "library_ignored": 3,
+  "CLI_ordinary_passed": 52,
+  "CLI_ignored": 1,
+  "full_CLI_consumer_regressions_passed": true,
+  "all17_scopes_drained": {
+    "path": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/ROOT_ALL17_SCOPES_DRAINED_EXTRA_QA6GiB_CLOSED.json",
+    "sha256": "c4172f6fc2b865b9c3e53a45c9291fb43ebe040787e57a17e886007ff45cad84"
+  },
+  "normal_external_pool_bytes": 6442450944,
+  "extra_QA_memory_bytes": 0,
+  "complete_DATA_bytes": 5097237647154,
+  "actual_current_Frame_capability_and_capture_pending": true,
+  "no_new_reader_replay_or_release_credit": true,
+  "problem": "The outer Frame validator accepted the genuine b692 predecessor, while the nested cached145 predicate rejected it during real capability validation.",
+  "result": "Register that exact proven predecessor in the nested predicate and exercise the complete CLI validator with genuine0728 metadata, a distinct current image, and unknown-image/native-damage rejection.",
+  "source_members": [
+    {
+      "path": "scripts/horizon_live145_nested_predecessor_frame_v1/source/library/src/cached145_frame.rs",
+      "sha256": "0676da3ce4d890245bdb9491f13d055e42aff278fa5a7730c8f3e58b776cb442",
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/library/src/cached145_frame.rs",
+        "sha256": "0676da3ce4d890245bdb9491f13d055e42aff278fa5a7730c8f3e58b776cb442"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/cached145_frame.rs",
+        "sha256": "383df6b22470b232a74aca2c3298260775d847652b46f7a8a0f5efd876a07b7b"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_nested_predecessor_frame_v1/source/cli/src/main.rs",
+      "sha256": "d395ed750e9de95a7926c695572600aa713b95d76649727c2b5705dba69b04bf",
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/cli/src/main.rs",
+        "sha256": "d395ed750e9de95a7926c695572600aa713b95d76649727c2b5705dba69b04bf"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/cli/src/main.rs",
+        "sha256": "6f77de0bf48896ad88561debcd557fd7a8630add2c795150623e16825221a3cf"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_nested_predecessor_frame_v1/source/cli/src/genuine0728_complete_validator_tests.rs",
+      "sha256": "744494e4086b42eee4f7036e11d47ba06cc7dfe52d2427e99b6a6b5962bb0b7f",
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/cli/src/genuine0728_complete_validator_tests.rs",
+        "sha256": "744494e4086b42eee4f7036e11d47ba06cc7dfe52d2427e99b6a6b5962bb0b7f"
+      },
+      "predecessor": null
+    }
+  ],
+  "integration_patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_live145_nested_predecessor_frame_v1/integration.patch",
+    "sha256": "04018faa0ca345e375a944726102373b17a7f939a208803f151c0933022f66ae"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/ROOT_INTEGRATED_NESTED_PREDECESSOR_SOURCE_FREEZE_V1.json",
+    "sha256": "075872dd198d77b1c3d6d9507d6774ce282fa707830aa41b73a9354208474d78"
+  },
+  "executing_replay_lanes": 0,
+  "desired_memory_selected_lanes": 5,
+  "next_action": "Use separately qualified1258guard73 for genuinefleet and currentCLI454 capability/capture. Then register that real captured CLI in the final sharedreader helper and complete typed memory/DATA/admission."
+}
