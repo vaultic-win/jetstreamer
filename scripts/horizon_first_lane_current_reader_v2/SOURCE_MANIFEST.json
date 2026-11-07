@@ -336,8 +336,13 @@
       "sha256": "bfeb6d9b3fa69159d725c5c1d0b67bd1d5209f9ea02a593d10afc6ac344ceb71"
     }
   ],
-  "full_reader_recovered": false,
+  "full_reader_recovered": true,
   "replay_launch_authorized": false,
   "helper13_qualification_passed": true,
-  "operational_helper13_reader_pending": true
+  "operational_helper13_reader_pending": false,
+  "memory_and_DATA_selection_pending": true,
+  "actual_full_reader_result": {
+    "path": "scripts/horizon_first_lane_current_reader_v2/qualification/HELPER13-ACTUAL2200-FULL-READER-AND-CENSUS-RESULT.json",
+    "sha256": "c70192bda69cfa459a4a1eec8420c47505000954eb689b37188386ba70e5d6ae"
+  }
 }

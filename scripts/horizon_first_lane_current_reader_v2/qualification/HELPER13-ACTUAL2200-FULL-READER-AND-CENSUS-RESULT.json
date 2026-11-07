@@ -1,0 +1,56 @@
+{
+  "schema": "horizon-current-reader-v13-original-operational-result-v1",
+  "actual_full_reader": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/proof.json",
+    "sha256": "218c7de8c153da927663427fadd0f644c31114f17f6cce3ce3dd8c059b34f38b"
+  },
+  "actual_full_reader_invocation_id": "16e7b049381943598447418d7595c49b",
+  "original_outer": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2200/ROOT_FAILED4_READER2200_ORIGINAL_OUTER.json",
+    "sha256": "fd05765c936ed3b582cd80d72bba7238eae013e8693ea02ab963c7d72eaacf91"
+  },
+  "original_outputs": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/captured141-selection-before.json",
+      "sha256": "4342563b6a7ddefa273034060b9eb768ca0279546f48120cd91474af32c68735"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/captured141-selection.json",
+      "sha256": "99aac954948f6ecc011615b0805aaff3b711762ffecff68ef35d2f9f7d5bdebb"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/proof.json",
+      "sha256": "218c7de8c153da927663427fadd0f644c31114f17f6cce3ce3dd8c059b34f38b"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/raw-accounting-before.json",
+      "sha256": "9b4e36da2e0063c8c9f0925ddc7ffadc3bbea2ffaf4a99586fadcc9231b0cf3e"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/raw-accounting.json",
+      "sha256": "4dbf7b95e4bf12ad112e38f5b3d54a30802a172bb619ccfa1111f43bbe3cf773"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/raw-builder-after.json",
+      "sha256": "36868745fe4ba4366934d94ad173dad8d767eb5e9d67dab803fe589feca67c62"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/d5362d2b7daa9af15414d808fc383d6631a4224f55c490c0203a80066c4285fd/raw-builder-before.json",
+      "sha256": "f6652e2671f518533b91c4fee28c5e1646b5b0fde7a1d25cbe7ad084ba01f9a5"
+    }
+  ],
+  "all_seven_outputs_readonly": true,
+  "original_reader_full_success": true,
+  "original_census_failed_invocation_id": "41994cf3521042698db897f20142663b",
+  "original_census_failure": "original199 raw193GiB/768GiB context or no-credit lineage changed",
+  "preserved_original_result": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2200/ROOT_SUCCESSFUL2200_READER_AND_ORIGINAL_CENSUS_FAILURE_PRESERVED.json",
+    "sha256": "9b6db946b4d7b31659df5539852e286eadc0946e973fc0886c10625226aebde9"
+  },
+  "memory_selection_completed": false,
+  "DATA_selection_completed": false,
+  "native_started": false,
+  "actual_replay_lanes": 0,
+  "target": 5,
+  "resource_credit_bytes": 0
+}
