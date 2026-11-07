@@ -591,6 +591,12 @@ inputs and outputs. Exercise the remaining pure lookups together against saved a
 separate document checks can miss a variable overwritten by another block. Keep saved observations
 distinct from the fresh process, descriptor, clock and guard evidence required at launch.
 
+Retarget a control cycle through explicit current fields in authenticated predecessor plans.
+Preserve historical paths, unit identities and digest bytes; never replace timestamp substrings
+throughout a source packet. Before launch, compare retained policy with the accepted predecessor
+and authenticate every evidence binding. Before QA, verify each actual recipe selects the newly
+compiled test image and distinct scope; passing an older test image does not qualify the successor.
+
 Validate actual systemd values using their documented representation, including canonical mount
 options such as `:rbind`, while retaining exact roots and option checks. Obtain log-file identity
 from actual descriptors when the queried API has no file-path property. Apply the exact launcher's
