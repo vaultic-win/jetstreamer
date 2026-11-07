@@ -255,7 +255,19 @@ fn input_links_allowed(
             && path.parent() == Some(Path::new("/usr/lib/cargo/bin/coreutils"))
             && matches!(
                 path.file_name().and_then(|s| s.to_str()),
-                Some("cat" | "stat" | "sha256sum" | "install" | "sleep" | "test" | "id" | "printf")
+                Some(
+                    "cat"
+                        | "stat"
+                        | "sha256sum"
+                        | "install"
+                        | "sleep"
+                        | "test"
+                        | "id"
+                        | "printf"
+                        | "readlink"
+                        | "dirname"
+                        | "uname"
+                )
             ))
 }
 fn artifact(i: &Input) -> Result<Vec<u8>> {
@@ -1395,19 +1407,32 @@ mod system_executable_link_tests {
     use super::*;
     #[test]
     fn only_exact_readonly_root_coreutils_provenance_accepts_multiple_links() {
-        let path = Path::new("/usr/lib/cargo/bin/coreutils/cat");
-        assert!(input_links_allowed(&InputKind::Executable, path, 0, 0, 116));
-        for (kind, declared, actual, links) in [
-            (InputKind::Json, 0, 0, 116),
-            (InputKind::Script, 0, 0, 116),
-            (InputKind::Executable, 1000, 0, 116),
-            (InputKind::Executable, 0, 1000, 116),
-            (InputKind::Executable, 0, 0, 0),
+        for name in [
+            "cat", "stat", "sha256sum", "install", "sleep", "test", "id", "printf", "readlink",
+            "dirname", "uname",
         ] {
-            assert!(!input_links_allowed(&kind, path, declared, actual, links));
+            let path = Path::new("/usr/lib/cargo/bin/coreutils").join(name);
+            assert!(input_links_allowed(
+                &InputKind::Executable,
+                &path,
+                0,
+                0,
+                116
+            ));
+            for (kind, declared, actual, links) in [
+                (InputKind::Json, 0, 0, 116),
+                (InputKind::Script, 0, 0, 116),
+                (InputKind::Executable, 1000, 0, 116),
+                (InputKind::Executable, 0, 1000, 116),
+                (InputKind::Executable, 0, 0, 0),
+            ] {
+                assert!(!input_links_allowed(&kind, &path, declared, actual, links));
+            }
         }
         for path in [
             "/usr/lib/cargo/bin/coreutils/sibling.index",
+            "/usr/lib/cargo/bin/coreutils/rm",
+            "/usr/lib/cargo/bin/coreutils/nested/readlink",
             "/usr/lib/cargo/bin/coreutils-other/cat",
             "/var/lib/jetstreamer/cat",
             "/home/ubuntu/cat",
