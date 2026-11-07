@@ -151,6 +151,15 @@ impl fmt::Display for CensusChurn {
 }
 impl std::error::Error for CensusChurn {}
 
+#[derive(Debug)]
+struct MissingResidentField(&'static str);
+impl fmt::Display for MissingResidentField {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} missing", self.0)
+    }
+}
+impl std::error::Error for MissingResidentField {}
+
 fn members(root: &Path) -> Result<BTreeSet<u32>> {
     let mut pending = vec![root.to_path_buf()];
     let mut pids = BTreeSet::new();
@@ -243,13 +252,43 @@ fn status(text: &str, pid: u32) -> Result<(u64, u64)> {
             _ => {}
         }
     }
-    let rss = rss.context("VmRSS missing")?;
-    let high = high.context("VmHWM missing")?;
+    ensure!(found_pid && found_tgid, "incomplete RSS process identity");
+    let rss = rss.ok_or(MissingResidentField("VmRSS"))?;
+    let high = high.ok_or(MissingResidentField("VmHWM"))?;
     ensure!(
         found_pid && found_tgid && high >= rss,
         "incomplete/inconsistent RSS process status"
     );
     Ok((rss, high))
+}
+
+fn process_status(root: &Path, pid: u32, start: u64, host_census: bool) -> Result<(u64, u64)> {
+    let text = fs::read_to_string(root.join("status"))
+        .with_context(|| format!("RSS process {pid} status"))?;
+    match status(&text, pid) {
+        Err(error) if host_census && error.downcast_ref::<MissingResidentField>().is_some() => {
+            // An exiting userspace process can still be in cgroup.procs after
+            // releasing its address space. Never substitute zero or omit it:
+            // positively identify exit/reuse, then discard this entire census.
+            let stat = fs::read_to_string(root.join("stat"))
+                .with_context(|| format!("RSS process {pid} missing-resident identity"))?;
+            let state = stat
+                .rsplit_once(')')
+                .context("RSS stat comm")?
+                .1
+                .split_whitespace()
+                .next()
+                .context("RSS process state")?;
+            if start_ticks(&stat, pid)? != start || matches!(state, "Z" | "X" | "x") {
+                return Err(CensusChurn(
+                    "RSS process exited or changed identity during status capture",
+                )
+                .into());
+            }
+            Err(error)
+        }
+        result => result,
+    }
 }
 fn checked_capture(cgroup: &Path, group: &Path, proc_root: &Path) -> Result<Report> {
     capture_processes(cgroup, group, proc_root, false)
@@ -283,7 +322,7 @@ fn capture_processes(
         let (rss, high) = if allow_kernel && kernel {
             (0, 0)
         } else {
-            status(&read("status")?, *pid)?
+            process_status(&root, *pid, start, allow_kernel)?
         };
         let membership = read("cgroup")?;
         let current = membership
@@ -498,6 +537,95 @@ mod tests {
                 .unwrap()
                 .contains("RSS process 8 stat")
         );
+    }
+
+    #[test]
+    fn exited_process_without_resident_fields_restarts_entire_host_census() {
+        let temp = tempfile::tempdir().unwrap();
+        let cg = temp.path().join("cg");
+        let proc_root = temp.path().join("proc");
+        fs::create_dir_all(&cg).unwrap();
+        fs::write(cg.join("cgroup.procs"), "7\n8\n").unwrap();
+        fixture_process(&proc_root, 7, 10);
+        fixture_process(&proc_root, 8, 11);
+        let root = proc_root.join("8");
+        let stat = fs::read_to_string(root.join("stat")).unwrap();
+        fs::write(root.join("stat"), stat.replacen(") S ", ") Z ", 1)).unwrap();
+        fs::write(root.join("status"), "Pid: 8\nTgid: 8\n").unwrap();
+        let mut calls = 0;
+        let result = host_resident_attempts(|| {
+            calls += 1;
+            if calls == 2 {
+                fixture_process(&proc_root, 8, 12);
+            }
+            let rss = capture_processes(&cg, Path::new("/"), &proc_root, true)?;
+            Ok(serde_json::json!({"status":"observed", "rss":rss}))
+        });
+        assert_eq!(calls, 2);
+        assert_eq!(result["rss"]["aggregate_rss_bytes"], 204800);
+        assert_eq!(result["rss"]["processes"][1]["start_ticks"], 12);
+        assert!(
+            result["discarded_attempt_errors"][0]
+                .as_str()
+                .unwrap()
+                .contains("process exited")
+        );
+    }
+
+    #[test]
+    fn missing_resident_fields_require_positive_exit_or_reuse_and_never_zero_rss() {
+        let temp = tempfile::tempdir().unwrap();
+        fixture_process(temp.path(), 7, 10);
+        let root = temp.path().join("7");
+        fs::write(root.join("status"), "Pid: 7\nTgid: 7\n").unwrap();
+        let result = host_resident_attempts(|| {
+            process_status(&root, 7, 10, true)?;
+            unreachable!()
+        });
+        assert_eq!(result["census_attempts"], 1);
+        assert_eq!(result["status"], "unavailable");
+        assert!(result.get("rss").is_none());
+        assert!(
+            process_status(&root, 7, 9, true)
+                .unwrap_err()
+                .downcast_ref::<CensusChurn>()
+                .is_some()
+        );
+        let stat = fs::read_to_string(root.join("stat")).unwrap();
+        for state in ["Z", "X", "x"] {
+            fs::write(
+                root.join("stat"),
+                stat.replacen(") S ", &format!(") {state} "), 1),
+            )
+            .unwrap();
+            let result = host_resident_attempts(|| {
+                process_status(&root, 7, 10, true)?;
+                unreachable!()
+            });
+            assert!(result["census_attempts"].as_u64().unwrap() > 1);
+            assert_eq!(result["status"], "unavailable");
+            assert!(result.get("rss").is_none());
+            assert!(
+                process_status(&root, 7, 10, false)
+                    .unwrap_err()
+                    .downcast_ref::<MissingResidentField>()
+                    .is_some()
+            );
+        }
+        // A malformed identity or value is not an exiting-process exemption.
+        for text in [
+            "Pid: 7\n",
+            "Pid: 8\nTgid: 8\n",
+            "Pid: 7\nTgid: 7\nVmRSS: 1 MB\n",
+        ] {
+            fs::write(root.join("status"), text).unwrap();
+            assert!(
+                process_status(&root, 7, 10, true)
+                    .unwrap_err()
+                    .downcast_ref::<CensusChurn>()
+                    .is_none()
+            );
+        }
     }
 
     #[test]
