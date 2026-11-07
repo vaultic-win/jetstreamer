@@ -251,7 +251,7 @@
     "actual0458_fleet_reconciliation": "passed",
     "actual0458_Frame_capability": "rejected missing immediate predecessor image registration; original preserved"
   },
-  "predecessor_registration_status": "Library passed strict production/test Clippy, both builds and all432 ordinary tests with2 ignored preserved; sealed. Helper successor relink is running; CLI relink and next-sample native Frame/full accounting gates remain pending.",
+  "predecessor_registration_status": "Library432 ordinary, helper2733 ordinary/112 ignored preserved, CLI50 ordinary and1 actual native custody case passed. All22 original QA actors genuinely drained; all three production packages normally sealed. Fresh current native fleet/Frame/full accounting remain pending.",
   "goal101_200_complete": false,
   "source_formatting": "The exact qualified source includes rustfmt normalization of retained library modules.",
   "patch_applicability_validation": {
@@ -259,5 +259,25 @@
     "files": 46,
     "passed": true
   },
-  "patch_context_lines": 0
+  "patch_context_lines": 0,
+  "prior_CLI_qualification_caveat": "The earlier0458 CLI used the older explicit --extern library despite a new -L path. Original failure remains preserved. Successor recipes were corrected before execution; all four successor CLI compiler phases now explicitly bind the new qualified edd3b653 library.",
+  "successor_qualification": {
+    "library": {
+      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/artifact-proof.json",
+      "sha256": "f571ecf0908da7daa58f062c0455f3319e5dace8a37bc8622b102177b3555bad"
+    },
+    "helper": {
+      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/helper-work/artifact-proof.json",
+      "sha256": "0ef91ec3efca22c029858bb33f1c13f5f6fb1f9f25c2bc7c7a017b9e2364e514"
+    },
+    "CLI": {
+      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/artifact-proof.json",
+      "sha256": "ec87c7b1d58fa371478a12c5b79278a4363344c62752747400bb872fcf23b421"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/ROOT_ADDITIONAL8GiB_QA_PHASE_CLOSED_AFTER_ALL22_DRAINS.json",
+      "sha256": "30045043b943129c4f94c672334222230c2d3f9fb1293291e850f2147ff08bf9"
+    },
+    "no_native_Frame_or_replay_admission_claim": true
+  }
 }
