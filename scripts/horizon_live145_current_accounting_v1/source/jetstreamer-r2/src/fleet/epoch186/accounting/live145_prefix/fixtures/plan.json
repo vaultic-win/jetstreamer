@@ -1,0 +1,89 @@
+{
+  "actor_cpu_quota_micros": 8000000,
+  "actor_memory_bytes": 85899345920,
+  "actor_unit": "horizon-extract145-prefix-shared72h-20261107-v8g1.service",
+  "admission_bridge": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-admission-bridge-tools-20261106-v6/epoch145-admission-bridge",
+    "sha256": "c17a5cba4133e728bba67452f8e367247a9ac6d0654705730cad96402a65a5f1"
+  },
+  "admission_bridge_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-admission-bridge-tools-20261106-v6/deployment-seal-receipt.json",
+    "sha256": "78d07c79aef3e4168573bca7a5355bba0d31a392dd63eff8c35c94cfb478f649"
+  },
+  "data_policy": {
+    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0728-20261107-v1/policy.json",
+    "sha256": "5cec79f4f70a6b0c9d405bc9abfe9cb50e89135410ee72268d7c04b9e4866f15"
+  },
+  "data_policy_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0728-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "04ab03ecd95247859ee0c5c50055b6ccd6536b9f2d0e0e09bdce14f2bcb238e9"
+  },
+  "entry_deadline": 1794037695,
+  "execution_deadline": 1794296895,
+  "external_pool_bytes": 6442450944,
+  "generation": "shared72h-20261107-v8g1",
+  "guard_cpu_quota_micros": 1000000,
+  "guard_memory_bytes": 268435456,
+  "guard_unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+  "issued_at": 1794037455,
+  "manifest": {
+    "path": "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet.segment.json",
+    "sha256": "a101b885c5d60a13b8567d3968acd0e5177ec4f04669b91333cb9b3c5ca4b96a"
+  },
+  "manifest_identity": {
+    "bytes": 1809,
+    "ctime_ns": 1793948042282301980,
+    "device": 64512,
+    "gid": 0,
+    "inode": 100214429,
+    "mode": 33024,
+    "mtime_ns": 1793921166756994046,
+    "uid": 0
+  },
+  "memory_request": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-v8g1-parent199-only-request-20261107-v1/request.json",
+    "sha256": "05e58c86b2ca6d90d0c9bcf7ad61b4071d7cfd0e93653f7b5ca795a9d1302aea"
+  },
+  "minimum_available_memory_bytes": 642177138688,
+  "minimum_free_bytes": 5074152197938,
+  "output_directory_identity": {
+    "device": 64512,
+    "inode": 93850201
+  },
+  "output_maximum_bytes": 171798691840,
+  "output_root": "/home/sol/.jetstreamer-private/epoch145-prefix-extract-shared72h-20261107-v8g1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract",
+    "sha256": "b416b7c932ef781c8d0f863b63b803379dd58cb1affe99dced6a61830a95ad76"
+  },
+  "program_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/deployment-seal-receipt.json",
+    "sha256": "74ca02fdfc3e0bb97b6567ed295c3053b399ae948ad67cff62ae56ee06e90e17"
+  },
+  "schema": "horizon-epoch145-private-prefix-extractor-plan-v1",
+  "source": {
+    "path": "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet",
+    "sha256": "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353"
+  },
+  "source_identity": {
+    "bytes": 105633748687,
+    "ctime_ns": 1793948042282301980,
+    "device": 64512,
+    "gid": 0,
+    "inode": 100214450,
+    "mode": 33024,
+    "mtime_ns": 1793920387242239342,
+    "uid": 0
+  },
+  "state_directory_identity": {
+    "device": 64512,
+    "inode": 93850202
+  },
+  "state_root": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1",
+  "tasks_max": 512,
+  "terminal": {
+    "path": "/home/sol/.jetstreamer-private/cached145-postreplay-handoff-20261105-v1/ROOT_ACTUAL145_CLEAN_TERMINAL_AND_VERIFIED_SEGMENT.json",
+    "sha256": "8fe99753332d62254da147dcf1324bf4834a78d595d55c853228ce3fb469cd9d"
+  },
+  "timer_unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer"
+}

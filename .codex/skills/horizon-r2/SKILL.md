@@ -25,6 +25,9 @@ next disjoint candidates ready while existing lanes run so completion can trigge
 An observation, skill edit or pushed commit does not resolve an operational lane shortfall.
 Carry the last attempted action and its result across handoffs; resume its next executable
 dependency rather than repeatedly reassessing the same idle capacity.
+When a prerequisite finishes, immediately advance the dependent admission or launch step using
+its completion evidence. The 30-minute observation interval limits routine polling; it is not a
+waiting period for lane recovery or qualified cleanup/offload/restore transitions.
 
 Assess reclaimable local bytes and eligible R2 offloads as part of every next-lane fit decision.
 Disk pressure triggers qualified cleanup and juggling through this host's already authorized
