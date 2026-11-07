@@ -7,6 +7,8 @@ lane, or deciding whether the machine can safely do more work. The user's concur
 ## Recover idle replay lanes
 
 Keep several replay lanes executing whenever the memory-selected target and qualified work permit.
+Aim for at least three when that target and fresh admissions permit, then continue toward the
+memory-selected target; three is neither a substitute target nor permission to bypass a gate.
 Assess this at the start of each campaign work cycle, after a lane completes or fails, and after
 cleanup or offload makes room. Use the accepted coordinated sample and authenticated events;
 retain the single 30-minute resource-observation cadence. Do not wait for the user to ask why the
@@ -19,6 +21,8 @@ When executing lanes are below target, the main agent owns the path to the next 
 
 1. Check disjoint missing epochs across the full assigned range. Fill available proven capacity
    through fresh admission; expand beyond it by one guarded experiment under the existing policy.
+   Prepare replacement candidates while current lanes run, including input, compatibility and
+   accounting prerequisites; obtain fresh admission at launch rather than reusing stale approval.
 2. If no candidate qualifies, identify each candidate's exact gate and execute the shortest safe
    step that opens a lane in the same cycle. Delegate independent epoch repair while the main agent
    advances admission and backfill. A backlog entry or an unchanged next-action description is
@@ -39,6 +43,11 @@ When executing lanes are below target, the main agent owns the path to the next 
    Record an actual park/retire/restore action and its result, or the precise failed gate and the
    qualification action taken. Reuse the recorded host-prefix authorization. Do not reduce the
    desired count because local disk is full or count proposed offloads as reclaimed capacity.
+
+At every next-lane fit decision, assess eligible cleanup and offload sets alongside local disk
+claims, even before disk is exhausted. If disk is not the failed gate, advance the actual accounting,
+input or admission dependency; extra free space alone does not resolve it. Skill maintenance and
+Git publication do not replace this operational action or close the recorded lane shortfall.
 
 Required status correction and safety work remain immediate. Beyond those obligations, prioritize
 opening replay lanes over discretionary optimization, repetitive metadata preparation or further

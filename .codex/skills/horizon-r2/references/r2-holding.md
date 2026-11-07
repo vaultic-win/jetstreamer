@@ -132,6 +132,9 @@ cycle and permitted handoff/status events, include reclaimable space and restora
 mandatory next-lane fit decision. Offloading does not replace CPU, memory, I/O, VMA, compatibility,
 century-floor or guard qualification. Do not create a separate holding-area polling loop, and do
 not let waiting for the user's prefix name block independent useful campaign work.
+Assess eligible holding sets before the local disk fills so a qualified transfer can be prepared
+while useful work continues. Preserve local restore capacity; remote scratch capacity is not a
+reason to admit a job whose required local working set still cannot fit.
 
 When disk blocks a candidate, select the eligible offload set and execute its next qualified
 transition in that same capacity cycle. Record actual bytes reclaimed, retained custody evidence,

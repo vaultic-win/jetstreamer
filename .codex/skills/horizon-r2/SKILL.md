@@ -13,23 +13,27 @@ known live controller. Resolve overlapping ownership through an explicit handoff
 mutations; preserve healthy workers and completed evidence. Independent, disjoint source work may
 continue. An attached terminal client alone does not establish a second campaign controller.
 
-Keep several replay lanes executing whenever qualified capacity permits. Assess the shortfall
+Keep several replay lanes executing whenever qualified capacity permits; aim for at least three
+when the memory-selected target and fresh admissions allow, and continue toward that target.
+Assess the shortfall
 against the memory-selected target at the start of every work cycle and at the existing
 30-minute check-in; do not wait for a user reminder. After immediate safety and status corrections,
 take the next executable backfill action before discretionary repairs or optimization. A source
 packet, build, exporter or scheduled reassessment does not fill an idle replay lane. Follow
 [idle-lane recovery](references/host-utilization.md#recover-idle-replay-lanes) through actual
-guarded worker execution, or record the action attempted and its specific failed gate.
+guarded worker execution, or record the action attempted and its specific failed gate. Keep the
+next disjoint candidates ready while existing lanes run so completion can trigger replacement.
+An observation, skill edit or pushed commit does not resolve an operational lane shortfall.
 
+Assess reclaimable local bytes and eligible R2 offloads as part of every next-lane fit decision.
 Disk pressure triggers qualified cleanup and juggling through this host's already authorized
-R2 holding prefix; it does not lower the memory-selected lane target. Reuse the recorded prefix
+R2 scratch/holding prefix; it does not lower the memory-selected lane target. Reuse the recorded prefix
 authorization and execute the [holding lifecycle](references/r2-holding.md) when needed, accounting
 for restore space and time. First retire completed, unneeded local data; next park eligible closed
 artifacts; checkpoint and stop a selected live job only through its qualified restore path. A disk
 blocker requires an attempted reclamation/offload transition or concrete recovery qualification
 work in the same cycle, with the result recorded. Preserve healthy work and every admission/integrity
-gate. Delete
-completed epochs' unnecessary local files promptly under
+gate. Delete completed epochs' unnecessary local files promptly under
 [mandatory local cleanup](#mandatory-local-cleanup-after-completion), including `~/horizon` and
 Horizon-owned directories under `~/workspace`; leave unrelated projects alone.
 
