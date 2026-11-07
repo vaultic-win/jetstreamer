@@ -382,6 +382,10 @@ name = "jetstreamer-allocation-freeze-fixture"
 path = "src/allocation_freeze_fixture_bin.rs"
 
 [[bin]]
+name = "jetstreamer-anon-exclusivity-fixture"
+path = "src/anon_exclusivity_fixture_bin.rs"
+
+[[bin]]
 name = "jetstreamer-memory-page-fixture"
 path = "src/memory_page_fixture_bin.rs"
 
