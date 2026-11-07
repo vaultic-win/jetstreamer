@@ -15,8 +15,7 @@ continue. An attached terminal client alone does not establish a second campaign
 
 Keep several replay lanes executing whenever qualified capacity permits; aim for at least three
 when the memory-selected target and fresh admissions allow, and continue toward that target.
-Assess the shortfall
-against the memory-selected target at the start of every work cycle and at the existing
+Assess the shortfall against the memory-selected target at the start of every work cycle and at the existing
 30-minute check-in; do not wait for a user reminder. After immediate safety and status corrections,
 take the next executable backfill action before discretionary repairs or optimization. A source
 packet, build, exporter or scheduled reassessment does not fill an idle replay lane. Follow
@@ -24,6 +23,8 @@ packet, build, exporter or scheduled reassessment does not fill an idle replay l
 guarded worker execution, or record the action attempted and its specific failed gate. Keep the
 next disjoint candidates ready while existing lanes run so completion can trigger replacement.
 An observation, skill edit or pushed commit does not resolve an operational lane shortfall.
+Carry the last attempted action and its result across handoffs; resume its next executable
+dependency rather than repeatedly reassessing the same idle capacity.
 
 Assess reclaimable local bytes and eligible R2 offloads as part of every next-lane fit decision.
 Disk pressure triggers qualified cleanup and juggling through this host's already authorized
@@ -32,7 +33,10 @@ authorization and execute the [holding lifecycle](references/r2-holding.md) when
 for restore space and time. First retire completed, unneeded local data; next park eligible closed
 artifacts; checkpoint and stop a selected live job only through its qualified restore path. A disk
 blocker requires an attempted reclamation/offload transition or concrete recovery qualification
-work in the same cycle, with the result recorded. Preserve healthy work and every admission/integrity
+work in the same cycle, with the result recorded. Rotate closed inputs for later epochs through
+holding while retaining or restoring the next runnable epochs' working sets. Count capacity only
+after verified offload and actual local retirement; reserve restore staging and transfer time in
+the next admission. Preserve healthy work and every admission/integrity
 gate. Delete completed epochs' unnecessary local files promptly under
 [mandatory local cleanup](#mandatory-local-cleanup-after-completion), including `~/horizon` and
 Horizon-owned directories under `~/workspace`; leave unrelated projects alone.
@@ -72,6 +76,11 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   production artifact's actual feature list and rustc flags; a matching source commit or a passing
   different configuration is insufficient. In this campaign, retained history requires both
   `native210-small` and `native227-small` alongside the enabled integration routes.
+- When relinking a Frame CLI or its consumers, test the immediate accepted predecessor with a
+  different successor image through the complete outer validator. The same-image shortcut can
+  conceal a missing predecessor registration. Bind the predecessor's genuine native acceptance,
+  exact archive of its metadata, and normal deployment seal; retain rejection of unknown images
+  and changed native envelopes. An older registered fixture or a leaf allowlist test is insufficient.
 - Existing reviewed and sealed Python or shell components may continue when they are already bound
   into an active or prepared workflow and replacing them would invalidate durable evidence,
   require restarting healthy work, or add migration risk. Do not stop, restart, or mutate a healthy
