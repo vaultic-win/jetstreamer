@@ -1,3 +1,4 @@
+include!("completed_current_check.rs");
 use super::*;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 enum RecipeRole {
@@ -21,6 +22,7 @@ enum JsonType {
     PublicationV2,
     PreflightV4,
     PriorIndexPlan,
+    PriorSourceReview,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -51,6 +53,8 @@ pub(super) struct Operation {
     plan_path: PathBuf,
     digest_transport: PathBuf,
     check_only: bool,
+    #[serde(default)]
+    retirement_preflight: bool,
     // Exact actual argv, with literal `env` at --plan-sha256 (no hash cycle).
     argv: Vec<String>,
     // All native sandbox sets use semantic comparison, never order normalization
@@ -157,6 +161,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             ]
             .contains(&o.unit.as_str())
                 && o.check_only == o.unit.contains("check-only")
+                && !(o.check_only && o.retirement_preflight)
                 && direct_installed_path(&o.installed, &o.unit)
                 && o.recipe.uid == 0
                 && o.binary.uid == 0
@@ -183,6 +188,8 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
         ];
         if o.check_only {
             argv.push("--check-only".into());
+        } else if o.retirement_preflight {
+            argv.push("--retirement-preflight".into());
         }
         ensure!(
             o.argv == argv,
@@ -193,6 +200,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
             "invalid readonly path binding"
         );
     }
+    peer_shape(p)?;
     Ok(())
 }
 fn complete_fixed_registry(installed: &BTreeSet<PathBuf>) -> bool {
@@ -305,11 +313,14 @@ fn artifact(i: &Input) -> Result<Vec<u8>> {
                             == "sha256:3f0e03105ba1e6b166091d3519e1aea1f432d81e51044c3a35f49fb3e8991970",
                     "foreign preflight input"
                 ),
+                JsonType::PriorSourceReview => prior_source_review(&v, &i.binding)?,
                 JsonType::PriorIndexPlan => {
                     let old: Plan = serde_json::from_value(v)?;
                     validate_plan(&old)?;
                     ensure!(
-                        old.current_operation.is_none() && old.typed_recipes.is_empty(),
+                        old.current_operation.is_none()
+                            && old.completed_check.is_none()
+                            && old.typed_recipes.is_empty(),
                         "historical plan references new operation"
                     );
                 }
@@ -317,6 +328,15 @@ fn artifact(i: &Input) -> Result<Vec<u8>> {
         }
     }
     Ok(prefix)
+}
+fn prior_source_review(v: &Value, binding: &Evidence) -> Result<()> {
+    ensure!(
+        binding.uid == 0
+            && binding.sha256 == "fe0c12e3d61c3e4f2878703179e27e9a76077606c7b33d883542f2acbcdadf00"
+            && v["schema"] == "horizon235237-imported-index-consumer-review923-v1",
+        "not the exact reviewed prior923 source metadata"
+    );
+    Ok(())
 }
 fn installed_bytes(installed: &Path, original: &Evidence) -> Result<Vec<u8>> {
     let m = fs::symlink_metadata(installed)?;
@@ -493,6 +513,17 @@ pub(super) fn staged(p: &Plan, path: &Path, bytes: &[u8], jobs: &str) -> Result<
             return Ok(true);
         }
     }
+    if p.completed_check.is_some() && path.file_name().and_then(|s| s.to_str()) == Some(CHECK_UNIT)
+    {
+        let proof =
+            completed_current_check(p, jobs)?.context("missing validated check predecessor")?;
+        ensure!(
+            proof["installed"] == path.to_string_lossy().as_ref()
+                && proof["recipe_sha256"] == hash(bytes),
+            "predecessor alias or recipe changed"
+        );
+        return Ok(true);
+    }
     // Enabled aliases/dependencies remain blockers even when original recipe is
     // correctly terminal. An exact original direct installation is not enablement.
     if recipe_reference(bytes, p)
@@ -536,13 +567,28 @@ pub(super) fn indirect_reference(bytes: &[u8], p: &Plan) -> bool {
                 .map(|i| &i.binding.path)
         })
         .any(|path| path_reference(bytes, path.as_os_str().as_bytes()))
+        || p.completed_check
+            .as_ref()
+            .is_some_and(|c| path_reference(bytes, c.plan.path.as_os_str().as_bytes()))
 }
 pub(super) fn indirect_inodes(p: &Plan) -> Result<BTreeSet<(u64, u64)>> {
-    p.typed_recipes
+    let mut paths: Vec<&Path> = p
+        .typed_recipes
         .iter()
-        .flat_map(|r| r.inputs.iter().filter(|i| consumer_input(i)))
-        .map(|i| {
-            let m = fs::metadata(&i.binding.path)?;
+        .flat_map(|r| {
+            r.inputs
+                .iter()
+                .filter(|i| consumer_input(i))
+                .map(|i| i.binding.path.as_path())
+        })
+        .collect();
+    if let Some(c) = &p.completed_check {
+        paths.push(&c.plan.path);
+    }
+    paths
+        .into_iter()
+        .map(|p| {
+            let m = fs::metadata(p)?;
             Ok((m.dev(), m.ino()))
         })
         .collect()
@@ -595,13 +641,11 @@ fn parse_commands(bytes: &[u8]) -> Result<Vec<(String, Vec<String>, bool)>> {
         v["type"] == "a(sasbttttuii)",
         "wrong native command array type"
     );
-    let data = v["data"]
+    // busctl emits the property array directly in data; the entries are the
+    // ten-field command structs, including zero entries for empty hooks.
+    let rows = v["data"]
         .as_array()
-        .context("missing command property data")?;
-    ensure!(data.len() == 1, "ambiguous command property values");
-    let rows = data[0]
-        .as_array()
-        .context("command property is not an array")?;
+        .context("missing native command property array")?;
     let mut out = Vec::new();
     for row in rows {
         let fields = row.as_array().context("command row not a struct")?;
@@ -1084,6 +1128,7 @@ mod tests {
             plan_path: "/var/lib/jetstreamer/operation/plan.json".into(),
             digest_transport: "/var/lib/jetstreamer/operation/digest.env".into(),
             check_only: true,
+            retirement_preflight: false,
             argv: vec![
                 bin.path.display().to_string(),
                 "--plan".into(),
@@ -1170,7 +1215,7 @@ mod command_tests {
             0,
             0
         ]);
-        let v = json!({"type":"a(sasbttttuii)","data":[[row.clone()]]});
+        let v = json!({"type":"a(sasbttttuii)","data":[row.clone()]});
         let commands = parse_commands(&serde_json::to_vec(&v).unwrap()).unwrap();
         assert_eq!(commands.len(), 1);
         assert_eq!(
@@ -1178,7 +1223,7 @@ mod command_tests {
             vec!["/sealed/tool", "--plan", "/sealed/plan.json"]
         );
         assert!(!commands[0].2);
-        let two = json!({"type":"a(sasbttttuii)","data":[[row.clone(),row]]});
+        let two = json!({"type":"a(sasbttttuii)","data":[row.clone(),row]});
         assert_eq!(
             parse_commands(&serde_json::to_vec(&two).unwrap())
                 .unwrap()
@@ -1186,7 +1231,11 @@ mod command_tests {
             2
         );
         assert!(parse_commands(br#"{"type":"as","data":[[]]}"#).is_err());
-        assert!(parse_commands(br#"{"type":"a(sasbttttuii)","data":[]}"#).is_err());
+        assert!(
+            parse_commands(br#"{"type":"a(sasbttttuii)","data":[]}"#)
+                .unwrap()
+                .is_empty()
+        );
         assert!(
             parse_commands(
                 &serde_json::to_vec(&json!({"type":"a(sasbttttuii)","data":[[["tool",[],false]]]}))
@@ -1268,5 +1317,54 @@ mod coverage_tests {
             missing.remove(Path::new(p));
             assert!(!complete_fixed_registry(&missing));
         }
+    }
+}
+
+#[cfg(test)]
+mod actual_native_shape_tests {
+    use super::*;
+    #[test]
+    fn genuine_busctl_command_arrays_are_direct_rows_and_empty_hooks_not_nested_variants() {
+        let raw = include_bytes!("fixtures/actual-native-exec-start.json");
+        let commands = parse_commands(raw).unwrap();
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].0, commands[0].1[0]);
+        assert_eq!(commands[0].1.last().unwrap(), "--check-only");
+        assert!(!commands[0].2);
+        assert!(
+            parse_commands(include_bytes!(
+                "fixtures/actual-native-empty-condition.json"
+            ))
+            .unwrap()
+            .is_empty()
+        );
+        let actual: Value = serde_json::from_slice(raw).unwrap();
+        let nested = json!({"type":actual["type"],"data":[actual["data"]]});
+        assert!(parse_commands(&serde_json::to_vec(&nested).unwrap()).is_err());
+    }
+    #[test]
+    fn exact_prior923_review_is_typed_provenance_with_no_consumer_exemption() {
+        let bytes = include_bytes!("fixtures/prior923-source-review.json");
+        let v: Value = serde_json::from_slice(bytes).unwrap();
+        let binding = Evidence {
+            path: "/var/lib/jetstreamer/review.json".into(),
+            sha256: hash(bytes),
+            uid: 0,
+        };
+        prior_source_review(&v, &binding).unwrap();
+        let input = Input {
+            binding: binding.clone(),
+            kind: InputKind::Json,
+            json_type: Some(JsonType::PriorSourceReview),
+            children: Vec::new(),
+        };
+        assert!(!consumer_input(&input));
+        let mut wrong = binding.clone();
+        wrong.uid = 1000;
+        assert!(prior_source_review(&v, &wrong).is_err());
+        let mut wrong = binding;
+        wrong.sha256 = "a".repeat(64);
+        assert!(prior_source_review(&v, &wrong).is_err());
+        assert!(prior_source_review(&json!({"schema":"unknown"}), &input.binding).is_err());
     }
 }

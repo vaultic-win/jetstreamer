@@ -66,6 +66,7 @@ pub(super) fn plan() -> Plan {
         inert_recipes: vec![],
         typed_recipes: vec![],
         current_operation: None,
+        completed_check: None,
         local_index_retirement_authorized: true,
         archive_deletion_authorized: false,
         remote_mutations: false,

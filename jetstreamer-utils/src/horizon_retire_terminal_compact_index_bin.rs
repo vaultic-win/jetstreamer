@@ -160,6 +160,8 @@ struct Plan {
     typed_recipes: Vec<typed::Recipe>,
     #[serde(default)]
     current_operation: Option<typed::Operation>,
+    #[serde(default)]
+    completed_check: Option<typed::CompletedCurrentCheck>,
     local_index_retirement_authorized: bool,
     archive_deletion_authorized: bool,
     remote_mutations: bool,
@@ -718,13 +720,14 @@ fn terminal(p: &Plan) -> Result<Value> {
         states.push(json!({"state":state,"show_stderr":std::str::from_utf8(&out.stderr)?}));
     }
     let typed_states = typed::historical(p, &jobs)?;
+    let completed_check = typed::completed_current_check(p, &jobs)?;
     for root in UNIT_ROOTS {
         if !absent(Path::new(root))? {
             scan_staged(Path::new(root), p, &jobs)?;
         }
     }
     Ok(
-        json!({"actual_terminal_actors":states,"queued_jobs":jobs,"staged_recipe_roots":UNIT_ROOTS,"typed_recipe_states":typed_states}),
+        json!({"actual_terminal_actors":states,"queued_jobs":jobs,"staged_recipe_roots":UNIT_ROOTS,"typed_recipe_states":typed_states,"completed_current_check":completed_check}),
     )
 }
 fn path_reference(bytes: &[u8], needle: &[u8]) -> bool {
@@ -1290,8 +1293,9 @@ fn main() -> Result<()> {
             && a[0] == "--plan"
             && a[2] == "--plan-sha256"
             && a[4] == "--self-sha256"
-            && (a.len() == 6 || a[6] == "--check-only"),
-        "usage: --plan PATH --plan-sha256 HEX --self-sha256 HEX [--check-only]"
+            && (a.len() == 6
+                || ["--check-only", "--retirement-preflight"].contains(&a[6].as_str())),
+        "usage: --plan PATH --plan-sha256 HEX --self-sha256 HEX [--check-only|--retirement-preflight]"
     );
     ensure!(
         (valid_sha(&a[3]) || a[3] == "env") && valid_sha(&a[5]),
