@@ -1,0 +1,68 @@
+{
+  "schema": "horizon-authenticated-parent-context-source-overlay-v3",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/source/lib.rs",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/parent-memory/source/lib.rs",
+      "sha256": "714b000e3221b17b94db1ee80a65d301d3bb05ad31103310655e2a562ad1db9e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/source/context_inputs.rs",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/parent-memory/source/context_inputs.rs",
+      "sha256": "6203cbf1960edecc13bc34fe16a9eb895cbe3878c3da6bbcb1c8bf54f041475a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/source/validate.rs",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/parent-memory/source/validate.rs",
+      "sha256": "2fc4d065f334acdeb8b7590a04712f9d183e57c59ed8d7c599041fb35406fc73"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/source/actual2200_raw_context_tests.rs",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/parent-memory/source/actual2200_raw_context_tests.rs",
+      "sha256": "9e5ff3bb1d44a9b33e1bfc5ca64ad3025e08854fb6790885fcc7cf1632f5092f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA-raw-context-v3/candidate/source/lib.rs",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/parent-DATA/source/lib.rs",
+      "sha256": "06f1e1cb4ee07bdf629e502e71c541bbc66c522c16691b8e3173b290b40f6ee6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA-raw-context-v3/candidate/source/terminal_legacy_memory.rs",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/parent-DATA/source/terminal_legacy_memory.rs",
+      "sha256": "6ef9cea751d19876cec0eb3d828207ffdd9260271360d9fa19a9c3e927e47d7c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/EXACT4_SOURCE_AND_COMPILER_FREEZE_R2.json",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/qualification/parent-memory-EXACT4_SOURCE_AND_COMPILER_FREEZE_R2.json",
+      "sha256": "46f3c0ca57734bd6e04aec537fd5f0c7863b471ccd797be1a3ab6d09fd10a9c9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/qualification/parent-memory-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "174c54cbcec52a1649bfc8a71304ee8300759068e4fed182836775403447f84e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory-raw-context-v3/ACTUAL_TEST_CENSUS.json",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/qualification/parent-memory-ACTUAL_TEST_CENSUS.json",
+      "sha256": "cf33415b14cea6938498251d7285ad9c55ae22db7d0a9d1134a18c23d6762b5c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA-raw-context-v3/EXACT4_SOURCE_AND_COMPILER_FREEZE_R2.json",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/qualification/parent-DATA-EXACT4_SOURCE_AND_COMPILER_FREEZE_R2.json",
+      "sha256": "fde5a5a162194154cd7133623631b1953c431b649dd28411054361c8bb900759"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA-raw-context-v3/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/qualification/parent-DATA-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "a82ea9e5946ca372b47b9c362fc3d3da209916e2719786325f1ae6283348d28b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA-raw-context-v3/ACTUAL_TEST_CENSUS.json",
+      "repository": "scripts/horizon_parent_memory_current_context_v3/qualification/parent-DATA-ACTUAL_TEST_CENSUS.json",
+      "sha256": "264b112d1708bc8644efbbe6cb04a9c30fc391d180872d27cead2afef9d29599"
+    }
+  ],
+  "library_and_static_native_tests_passed": true,
+  "operational_census_and_selectors_still_pending": true,
+  "replay_launch_authorized": false
+}
