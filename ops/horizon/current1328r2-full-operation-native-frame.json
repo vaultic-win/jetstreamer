@@ -1,0 +1,39 @@
+{
+  "schema": "horizon-current1328r2-full-operation-native-frame-progress-v1",
+  "dispatcher_qualification": {
+    "path": "/home/sol/.jetstreamer-private/native1328r2-full-operation-workflow-source-20261107-v1/ROOT_GUARD1328R2_ALL81_DRAINS_NORMAL_SEAL_ACCEPTED.json",
+    "sha256": "ea2c629b60b404eeec1fa5b92f75782c0169dbbb48e56551480e0923c12e51c4"
+  },
+  "actual_frame_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/native1328r2-full-operation-workflow-source-20261107-v1/runtime/ROOT_ACTUAL1328_NATIVE_FRAME_READER_CONTRACT_ACCEPTED.json",
+    "sha256": "65ec7c664240db07c23ea55c8421d4e812108a9a5bb2570dcb5c63548d8f6b1f"
+  },
+  "actual_frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T132809-cached145-original-terminal-reload-native-r2-v1.json",
+    "sha256": "35821dfc3ff1deaf404df7fc92af55d352178c2f5ee8d8b17112e2d7a3cc792b"
+  },
+  "original1328_timeout_preserved": {
+    "path": "/home/sol/.jetstreamer-private/native1328-dual-guard-workflow-source-20261107-v1/runtime/ROOT1328_ORIGINAL_FLEET_TIMEOUT_AND_DRAIN_ACCEPTED.json",
+    "sha256": "41c65e19c329c46ce3e9549db961b66c92896dcb87b82a62bc7299442a21fe54"
+  },
+  "actual_fleet_original_IID": "0188b8289f374ec8b2f06f247678f9de",
+  "actual_fleet_duration_seconds": 42,
+  "actual_frame_capability_IID": "62ab88337a894bbe93d89a7d2c992058",
+  "actual_frame_capture_IID": "f943458d0d2143439c2e7d1c28e3c8ea",
+  "metadata_execution_start_seconds": 300,
+  "metadata_stop_seconds": 5,
+  "ordinary_tests_passed": 81,
+  "original7_QA_scopes_drained": true,
+  "extra_QA_memory_bytes": 0,
+  "normal_pool_bytes": 6442450944,
+  "complete_DATA_bytes": 5097237647154,
+  "epoch185_status_timeout_event_authenticated_readback": {
+    "path": "/home/sol/.jetstreamer-private/actual1328-observer-root-acceptance-20261107-v1/status-event185-timeout-result.json",
+    "sha256": "60c7a89ae581eeb31e807f204dca64d596bce40ed1171e0cd3c13ffc0e725ecb"
+  },
+  "producer_and_guard_unchanged": true,
+  "replay_lanes_executing": 0,
+  "memory_selected_target": 5,
+  "reader_registration_and_full_current_reader_memory_DATA_pending": true,
+  "no_replay_or_release_credit": true
+}
