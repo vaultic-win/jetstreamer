@@ -1,0 +1,194 @@
+{
+  "schema": "horizon-live145-Frame-census-and-original-guard-qualified-publication-v1",
+  "purpose": "Authenticate the exact live145 exporter and protective guard/timer while preserving raw captures and full retained validation, then permit fresh native fleet/Frame capture under a distinct metadata guard.",
+  "source_members": [
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/lib.rs",
+      "sha256": "9d2f9e77102309680c50668dc4a6f697a25b7b81473d178a80d3a9d2afc3778f",
+      "bytes": 151566,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/lib.rs",
+        "sha256": "9d2f9e77102309680c50668dc4a6f697a25b7b81473d178a80d3a9d2afc3778f"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library/src/lib.rs",
+        "sha256": "e64805524ec43c923f6dfa7375bcb7442eb2ece45c8d1fef76d6629e5d66fdf5"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_predecessor_registration_tests.rs",
+      "sha256": "8cad6393232b6056f0d2b36fc4c79b473af98ecd03124bc57c6afbc626051937",
+      "bytes": 1000,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_predecessor_registration_tests.rs",
+        "sha256": "8cad6393232b6056f0d2b36fc4c79b473af98ecd03124bc57c6afbc626051937"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame.rs",
+      "sha256": "a0b4d0e23162c49bf5bffbaf581878261b2e32626042c001e52be6d99ac7edcb",
+      "bytes": 9156,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame.rs",
+        "sha256": "a0b4d0e23162c49bf5bffbaf581878261b2e32626042c001e52be6d99ac7edcb"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/cli/src/main.rs",
+      "sha256": "6f77de0bf48896ad88561debcd557fd7a8630add2c795150623e16825221a3cf",
+      "bytes": 44453,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/cli/src/main.rs",
+        "sha256": "6f77de0bf48896ad88561debcd557fd7a8630add2c795150623e16825221a3cf"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli/src/main.rs",
+        "sha256": "616bcaa8f903bef5e4688972038726f8181902eb3c0aad896d56a0a809713519"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/native.rs",
+      "sha256": "4889594d4950d3bd43e93acdb7036e86e77fe9411c1e90ebe67d62594c89c64c",
+      "bytes": 13962,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/native.rs",
+        "sha256": "4889594d4950d3bd43e93acdb7036e86e77fe9411c1e90ebe67d62594c89c64c"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/capture.rs",
+      "sha256": "884d6fcfa37e075d49abdd5d7a6bc684a4f9f79f6facb0d93a827e5154b975c2",
+      "bytes": 27726,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/capture.rs",
+        "sha256": "884d6fcfa37e075d49abdd5d7a6bc684a4f9f79f6facb0d93a827e5154b975c2"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/io.rs",
+      "sha256": "6ed97e46f4cd14f911efd022932c25e2653269854a7185a3c7fd1fd43065ab88",
+      "bytes": 5290,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/io.rs",
+        "sha256": "6ed97e46f4cd14f911efd022932c25e2653269854a7185a3c7fd1fd43065ab88"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/model.rs",
+      "sha256": "5113e7678c064ff7fcd832a3c85cd26ba6d7706b96216950f1641e00ff209ccd",
+      "bytes": 4610,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/model.rs",
+        "sha256": "5113e7678c064ff7fcd832a3c85cd26ba6d7706b96216950f1641e00ff209ccd"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/recorded-rollover-fixture.json",
+      "sha256": "1780966594bf7bc9e3637f6f52dbba47e36a696ad8b166a3d962dfb84dfc0744",
+      "bytes": 41043,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/recorded-rollover-fixture.json",
+        "sha256": "1780966594bf7bc9e3637f6f52dbba47e36a696ad8b166a3d962dfb84dfc0744"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/custody.rs",
+      "sha256": "e638f46a943e4df1afafd4717eb673de114397729be4e0f46df2578c76ef8b88",
+      "bytes": 9387,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/custody.rs",
+        "sha256": "e638f46a943e4df1afafd4717eb673de114397729be4e0f46df2578c76ef8b88"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_frame_census_v1/source/operational1058-source/guard-src/main.rs",
+      "sha256": "f5ed28e8c437f0a4e7dbc04deae231ea9d81eb96fe2270e62f0c6812ff69987f",
+      "bytes": 45910,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/operational1058-source/guard-src/main.rs",
+        "sha256": "f5ed28e8c437f0a4e7dbc04deae231ea9d81eb96fe2270e62f0c6812ff69987f"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/guard-src/main.rs",
+        "sha256": "7c021e2ea06a6ed2f78cc65381348c1ec5fa3e9b051253ac52a115c1392ec950"
+      }
+    }
+  ],
+  "patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_live145_frame_census_v1/integration.patch",
+    "sha256": "e9a3c492b548f9d0b8065b14e7f357200eeb04c6fa53935b29c822ce1c090700"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_INTEGRATED_FRAME_SOURCE_FREEZE_V3.json",
+    "sha256": "9c26c579231aa395720f3a1db253bcaada2ec203824dd8ed26de3904cbd08aee"
+  },
+  "qualified_Frame": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_FRAME_LIBRARY_CLI_QUALIFIED_SEALED_AND_NEXT_NATIVE_GATES.json",
+    "sha256": "5f6050c79d2df6d2037f5edf23e65a2f20e508704f401b56324c4193d329cbd2"
+  },
+  "library": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-census-frame-library-tools-20261107-v1/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+    "sha256": "576326cfe192cdf7674f75f017f836e5795b435c662b5aad91f0b28ad038d1ee"
+  },
+  "library_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-census-frame-library-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "ed9b8ca7cd03b83264ffe50fa22354fac8406b10d25c876886bb0945effc04a1"
+  },
+  "CLI": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-census-frame-cli-tools-20261107-v1/jetstreamer-horizon-frame",
+    "sha256": "7d4888bf5c5b3559c9d2c49846675ebdd8b09e699d1a681b6d388704e48a0a49"
+  },
+  "CLI_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-census-frame-cli-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "ea94e8d2450267afaedd2a11cc9e1872bd8e5e6d749614462422f5a537597aa3"
+  },
+  "library_ordinary_passed": 456,
+  "library_ignored": 3,
+  "CLI_ordinary_passed": 50,
+  "CLI_ignored": 1,
+  "original_library434_names_preserved": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_LIBRARY_COMPILED_TEST_CENSUS_CONSERVATION.json",
+    "sha256": "d6858b9f01c1f9649a03daf1bb7adbc89abb0e217afbe0b719efb82227efdc4a"
+  },
+  "original_CLI51_names_preserved": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_CLI_ALL51_ORIGINAL_NAMES_ACCEPTED_FROM_ACTUAL_EXECUTIONS.json",
+    "sha256": "dd4a8f477bd20804a2c82d0d4e754342a9108fae7bb2d70a06b858ba0a6339de"
+  },
+  "actual_native_cases": 2,
+  "native_live145_rollover": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library-native-rollover-ORIGINAL_EXECUTION.json",
+    "sha256": "df1343277239c7d542387891b180d00d03b9bf408cee2bd2da91ad5bb1d903f7"
+  },
+  "original20_QA_scopes_drained": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_FRAME_ALL20_SCOPES_DRAINED_QA_PHASE_CLOSED.json",
+    "sha256": "82c4dd0aa56a7c35c9a80f911deeeb874bbc17613e9ac3bd08a0e7de54304858"
+  },
+  "original3_failures_preserved": true,
+  "metadata_guard": {
+    "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_GUARD67_ALL_ORIGINALS_DRAINED_NORMAL_SEAL_ACCEPTED.json",
+    "sha256": "224deb8515daaffecd25cf9e5cdf50dafd4204694e2a9451171dce8807bc175e"
+  },
+  "guard_ordinary_passed": 67,
+  "all61original_guard_names_preserved": true,
+  "all7guard_scopes_drained": true,
+  "normal_external_pool_bytes": 6442450944,
+  "extra_QA_memory_bytes": 0,
+  "complete_conservative_DATA_bytes_retained": 5085426487090,
+  "remaining_gates": [
+    "Genuine fresh native fleet and Frame capability/capture with current guard",
+    "Exact new CLI/library registration and qualified full reader adapter in successor shared helper",
+    "Current complete typed memory/DATA tuple and fitting positive185 or native16348 admission",
+    "Actual finite positive executor and original30second release; full epoch boundary/runtime route independent"
+  ],
+  "no_new_full_native_tuple_or_replay_admission_claim": true,
+  "replay_lanes_recovered": 0,
+  "goal_active_and_incomplete": true
+}
