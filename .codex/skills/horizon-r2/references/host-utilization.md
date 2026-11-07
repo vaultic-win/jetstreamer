@@ -49,6 +49,10 @@ When executing lanes are below target, the main agent owns the path to the next 
    actual retirement against all live floors and growth claims. If one candidate still cannot
    fit, advance another disjoint candidate while resolving that deficit; do not stall the entire
    backfill queue behind one oversized epoch.
+   Compare a rotating schedule with keeping every future epoch's inputs resident. Use the
+   [phase-by-phase rotation budget](r2-holding.md#rotation-budget) to identify the largest safe
+   concurrent working set and begin the next qualified transfer before those inputs are needed.
+   Keep actual reservations until their release is proven; planned parking cannot lower a live floor.
 
 At every next-lane fit decision, assess eligible cleanup and offload sets alongside local disk
 claims, even before disk is exhausted. If disk is not the failed gate, advance the actual accounting,

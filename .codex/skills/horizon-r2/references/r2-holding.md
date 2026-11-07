@@ -57,6 +57,27 @@ destination.
   publication before a job can consume it. Account for full restoration space and time in admission;
   parked bytes are not immediately available local inputs.
 
+## Rotation budget
+
+Use holding to schedule several lanes even when the whole campaign's retained data cannot fit
+locally at once. For each proposed park, retirement, restore and launch phase, record:
+
+- the exact concurrently resident jobs and inputs, their remaining local growth, protected floors,
+  and the restore staging/overlap that must fit before any later retirement;
+- the closed artifact set to park, verified reclaimable bytes, custody evidence and the candidate
+  lane those bytes enable;
+- upload, complete authenticated readback and restore time, the input-ready deadline, and the next
+  qualified transition with its observed result.
+
+Choose among safe schedules by useful concurrent replay and verified delivery throughput. Prepare
+the next inputs while current lanes run when the measured I/O and local overlap permit it; schedule
+their restore early enough to replace a finishing lane. Distinguish remotely parked future inputs
+from files that must remain resident. A reservation changes only through its qualified accounting
+release after actual retirement; retain all live growth claims and immutable guard floors until then.
+If every safe schedule still misses the memory-selected target, record the exact limiting phase
+and advance its missing transport, restore or admission qualification. Carry this executable
+rotation state across handoffs instead of treating the entire retained corpus as permanently local.
+
 ## Idempotent stopped-job offload and resume
 
 The user authorizes this lifecycle for campaign jobs: **checkpoint and stop → upload and verify →

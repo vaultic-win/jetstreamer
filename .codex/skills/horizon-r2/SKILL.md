@@ -43,7 +43,10 @@ blocker requires an attempted reclamation/offload transition or concrete recover
 work in the same cycle, with the result recorded. Rotate closed inputs for later epochs through
 holding while retaining or restoring the next runnable epochs' working sets. Record the concrete
 rotation budget and resume its next transition across handoffs; the scratch prefix must be usable
-in scheduling, rather than merely mentioned as an option. Count capacity only
+in scheduling, rather than merely mentioned as an option. Plan concurrent resident working sets
+and rotate later epochs' closed inputs through R2; the whole campaign's retained data need not
+fit locally at once. Apply the phase-by-phase [rotation budget](references/r2-holding.md#rotation-budget)
+before accepting a disk-based lane shortfall. Count capacity only
 after verified offload and actual local retirement; reserve restore staging and transfer time in
 the next admission. Preserve healthy work and every admission/integrity
 gate. Delete completed epochs' unnecessary local files promptly under
