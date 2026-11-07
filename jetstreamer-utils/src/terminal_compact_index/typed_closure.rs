@@ -237,6 +237,27 @@ fn graph_walk(
     done.insert(path.to_path_buf());
     Ok(())
 }
+// Root-owned packaged coreutils are hard links to one read-only ELF on this
+// host. They are provenance inputs, never retirement targets. Keep every cache,
+// JSON, script and deployment-member single-link gate unchanged.
+fn input_links_allowed(
+    kind: &InputKind,
+    path: &Path,
+    declared_uid: u32,
+    actual_uid: u32,
+    links: u64,
+) -> bool {
+    links == 1
+        || (links > 1
+            && *kind == InputKind::Executable
+            && declared_uid == 0
+            && actual_uid == 0
+            && path.parent() == Some(Path::new("/usr/lib/cargo/bin/coreutils"))
+            && matches!(
+                path.file_name().and_then(|s| s.to_str()),
+                Some("cat" | "stat" | "sha256sum" | "install" | "sleep" | "test" | "id" | "printf")
+            ))
+}
 fn artifact(i: &Input) -> Result<Vec<u8>> {
     ensure!(safe_input(i), "unsafe transitive input");
     let path = &i.binding.path;
@@ -251,7 +272,7 @@ fn artifact(i: &Input) -> Result<Vec<u8>> {
     ensure!(
         first.is_file()
             && first.uid() == i.binding.uid
-            && first.nlink() == 1
+            && input_links_allowed(&i.kind, path, i.binding.uid, first.uid(), first.nlink())
             && first.mode() & 0o022 == 0
             && first.len() <= limit,
         "transitive custody/size changed"
@@ -1366,5 +1387,77 @@ mod actual_native_shape_tests {
         wrong.sha256 = "a".repeat(64);
         assert!(prior_source_review(&v, &wrong).is_err());
         assert!(prior_source_review(&json!({"schema":"unknown"}), &input.binding).is_err());
+    }
+}
+
+#[cfg(test)]
+mod system_executable_link_tests {
+    use super::*;
+    #[test]
+    fn only_exact_readonly_root_coreutils_provenance_accepts_multiple_links() {
+        let path = Path::new("/usr/lib/cargo/bin/coreutils/cat");
+        assert!(input_links_allowed(&InputKind::Executable, path, 0, 0, 116));
+        for (kind, declared, actual, links) in [
+            (InputKind::Json, 0, 0, 116),
+            (InputKind::Script, 0, 0, 116),
+            (InputKind::Executable, 1000, 0, 116),
+            (InputKind::Executable, 0, 1000, 116),
+            (InputKind::Executable, 0, 0, 0),
+        ] {
+            assert!(!input_links_allowed(&kind, path, declared, actual, links));
+        }
+        for path in [
+            "/usr/lib/cargo/bin/coreutils/sibling.index",
+            "/usr/lib/cargo/bin/coreutils-other/cat",
+            "/var/lib/jetstreamer/cat",
+            "/home/ubuntu/cat",
+        ] {
+            assert!(!input_links_allowed(
+                &InputKind::Executable,
+                Path::new(path),
+                0,
+                0,
+                116
+            ));
+        }
+        assert!(input_links_allowed(
+            &InputKind::Script,
+            Path::new("/var/lib/one.sh"),
+            1000,
+            1000,
+            1
+        ));
+    }
+    #[test]
+    fn actual_packaged_cat_is_hash_checked_while_arbitrary_executable_aliases_reject() {
+        let path = Path::new("/usr/bin/cat").canonicalize().unwrap();
+        let m = fs::metadata(&path).unwrap();
+        assert!(m.uid() == 0 && m.nlink() > 1);
+        let input = Input {
+            binding: Evidence {
+                path: path.clone(),
+                sha256: hash(&fs::read(&path).unwrap()),
+                uid: 0,
+            },
+            kind: InputKind::Executable,
+            json_type: None,
+            children: Vec::new(),
+        };
+        assert_eq!(artifact(&input).unwrap(), b"\x7fELF");
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("test-elf");
+        fs::write(&p, b"\x7fELF tiny fixture").unwrap();
+        fs::hard_link(&p, tmp.path().join("alias")).unwrap();
+        let other = Input {
+            binding: Evidence {
+                path: p.clone(),
+                sha256: hash(&fs::read(&p).unwrap()),
+                uid: fs::metadata(&p).unwrap().uid(),
+            },
+            kind: InputKind::Executable,
+            json_type: None,
+            children: Vec::new(),
+        };
+        assert!(artifact(&other).is_err());
     }
 }
