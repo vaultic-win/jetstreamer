@@ -1,0 +1,57 @@
+{
+  "schema": "horizon-exact-qualified-Frame-reader-consumer-registration-v2",
+  "patch_sha256": "7fd42e0d576a5bb472504d8bfd5adf86d1339a7772bdac22d3360f25ce45ff88",
+  "files": [
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "before_sha256": "5819420b7d5b286287f5b936e56a85f8310d29aa28db1d09152aa8e579427b15",
+      "after_sha256": "0e4ee45cff85971df1909774ba370db2855129d88ef3ce16d68167b00ef86c83"
+    },
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/sealed_alias0558_capture_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "869275f1a20ece0ddb16b7f3f8e5b2ab3ec98ceb7ea2fb4c0e9a8bb98aed38c8"
+    },
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/acceptance.json",
+      "before_sha256": null,
+      "after_sha256": "7c8ef323801619d3c11d4abe5346a3fba7623f628c764e81902202795ad2e654"
+    },
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/cli-proof.json",
+      "before_sha256": null,
+      "after_sha256": "ec87c7b1d58fa371478a12c5b79278a4363344c62752747400bb872fcf23b421"
+    },
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/cli-seal.json",
+      "before_sha256": null,
+      "after_sha256": "13f6b975ad3d2927696fc681ef4debb1d7ea94ec844ebb499d1069e19beea2c4"
+    },
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/library-proof.json",
+      "before_sha256": null,
+      "after_sha256": "f571ecf0908da7daa58f062c0455f3319e5dace8a37bc8622b102177b3555bad"
+    },
+    {
+      "path": "helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/reader-spec.json",
+      "before_sha256": null,
+      "after_sha256": "4b15aeecded3822595c80ad8cae41c2c435edb3648f85cd29a601cd7043a72be"
+    }
+  ],
+  "zero_fuzz_apply_and_all_preimage_successor_hashes_verified": true,
+  "qualified_capture_SHA256": "b692189704ed9001c016b1931ec6e54210104d36a5fbf787dfdd9d2505ae75eb",
+  "linked_library_reused_SHA256": "edd3b6531376444f2bbc30b8c858cd1ec9770ef832bb4d7d4eafc64b4a31fa0b",
+  "qualification_status": "Successor production Clippy passed. Test Clippy and test build running. Expected2737 ordinary tests, preserving all2733 baseline names and exact112 ignored names; full ordinary/release/native qualification remains pending.",
+  "four_regressions": "Genuine0558 native capture/QA/seal provenance; all transitive registration and historical dispatch; actual full Frame reader adapter/source loaders and linked consumer; rejection of foreign images/context/markers,owners,clocks,crossed sources,native census,promises and authority.",
+  "scope": "One exact additional typed-bridge capture pin. All27 externs,both native features,every previous pin,source loader,envelope,resource,admission and publication gate retained. No library or CLI rebuild.",
+  "original_full_reader_failure": {
+    "unit": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "IID": "e51bbaca10f34dfdac9a90ca25005b4c",
+    "sample": "2026-11-07T05:58:09Z",
+    "error": "recovered resource frame has foreign scope, owners, or capture artifact",
+    "terminal_and_drained": true,
+    "no_same_sample_retry": true
+  },
+  "first_unqualified_test_draft_naming_failure_preserved": true,
+  "goal101_200_complete": false
+}

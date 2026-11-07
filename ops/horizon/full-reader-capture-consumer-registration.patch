@@ -1,0 +1,1035 @@
+--- a/helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs
+@@ -187,0 +188,4 @@
++// Qualified sealed-alias predecessor CLI; actual0558 capture and normal seal
++// are preserved by the registration regressions. No first-entry authority.
++const SEALED_ALIAS_PREDECESSOR_FRAME_CAPTURE_SHA: Option<&str> =
++    Some("b692189704ed9001c016b1931ec6e54210104d36a5fbf787dfdd9d2505ae75eb");
+@@ -193,0 +198 @@
++        || typed_bridge_capture_with_pin(frame, SEALED_ALIAS_PREDECESSOR_FRAME_CAPTURE_SHA)
+@@ -1143,0 +1149,4 @@
++
++#[cfg(test)]
++#[path = "sealed_alias0558_capture_tests.rs"]
++mod sealed_alias0558_capture_tests;
+--- /dev/null
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/sealed_alias0558_capture_tests.rs
+@@ -0,0 +1,276 @@
++//! Semantic read-only regressions against original0558 metadata, at its original clock.
++//! No current resource observation, native start, output, admission, or credit.
++use super::*;
++use serde::Deserialize;
++
++fn fixture(raw: &[u8], expected: &str) -> Value {
++    assert_eq!(format!("{:x}", sha2::Sha256::digest(raw)), expected);
++    serde_json::from_slice(raw).unwrap()
++}
++fn acceptance() -> Value {
++    fixture(
++        include_bytes!("sealed-alias0558-fixtures/acceptance.json"),
++        "7c8ef323801619d3c11d4abe5346a3fba7623f628c764e81902202795ad2e654",
++    )
++}
++#[derive(Deserialize)]
++struct Sources {
++    observer: BoundFile,
++    fleet: BoundFile,
++    fleet_plan: BoundFile,
++    completion: BoundFile,
++    resource_parent: BoundFile,
++    phase_events: Vec<EventBinding>,
++    reader191: BoundFile,
++    transfer191: BoundFile,
++    correction191: BoundFile,
++    closed185: BoundFile,
++    standing: BoundFile,
++    guards: Vec<GuardSpec>,
++}
++struct Actual {
++    sources: Sources,
++    values: std::collections::BTreeMap<&'static str, Value>,
++    events: Vec<Value>,
++    frame_index: usize,
++    original_time: u64,
++}
++impl Actual {
++    fn load() -> Self {
++        let raw = fixture(
++            include_bytes!("sealed-alias0558-fixtures/reader-spec.json"),
++            "4b15aeecded3822595c80ad8cae41c2c435edb3648f85cd29a601cd7043a72be",
++        );
++        let sources: Sources = serde_json::from_value(raw["resource_accounting"].clone()).unwrap();
++        let mut values = std::collections::BTreeMap::new();
++        for (key, bound) in [
++            ("observer", &sources.observer),
++            ("fleet", &sources.fleet),
++            ("fleet_plan", &sources.fleet_plan),
++            ("completion", &sources.completion),
++            ("parent", &sources.resource_parent),
++            ("reader", &sources.reader191),
++            ("transfer", &sources.transfer191),
++            ("correction", &sources.correction191),
++            ("closed185", &sources.closed185),
++            ("standing", &sources.standing),
++        ] {
++            values.insert(key, accounting::protected_generated(bound).unwrap());
++        }
++        // Use production custody dispatch for every actual historical event.
++        let events: Vec<Value> = sources
++            .phase_events
++            .iter()
++            .map(|e| accounting::phase_event_source(&e.source).unwrap())
++            .collect();
++        let selected: Vec<usize> = sources
++            .phase_events
++            .iter()
++            .enumerate()
++            .filter(|(_, e)| e.schema == contract::SCHEMA)
++            .map(|(i, _)| i)
++            .collect();
++        assert_eq!(selected.len(), 1);
++        let frame_index = selected[0];
++        let accepted = acceptance();
++        assert_eq!(
++            binding(&sources.phase_events[frame_index].source),
++            accepted["frame"]
++        );
++        assert_eq!(
++            events[frame_index]["self_sha256"],
++            SEALED_ALIAS_PREDECESSOR_FRAME_CAPTURE_SHA.unwrap()
++        );
++        let original_time = events[frame_index]["recorded_unix_seconds"]
++            .as_u64()
++            .unwrap();
++        Self {
++            sources,
++            values,
++            events,
++            frame_index,
++            original_time,
++        }
++    }
++    fn frame(&self) -> &Value {
++        &self.events[self.frame_index]
++    }
++    fn frame_mut(&mut self) -> &mut Value {
++        &mut self.events[self.frame_index]
++    }
++    fn check(&self) -> Result<bool> {
++        let s = &self.sources;
++        let spec = accounting::SpecView {
++            observer: &s.observer,
++            fleet: &s.fleet,
++            fleet_plan: &s.fleet_plan,
++            completion: &s.completion,
++            resource_parent: &s.resource_parent,
++            phase_events: &s.phase_events,
++            reader191: &s.reader191,
++            transfer191: &s.transfer191,
++            correction191: &s.correction191,
++            closed185: &s.closed185,
++            guards: &s.guards,
++            allow_retained144_terminal: true,
++        };
++        let b = accounting::BundleView {
++            observer: &self.values["observer"],
++            fleet: &self.values["fleet"],
++            fleet_plan: &self.values["fleet_plan"],
++            completion: &self.values["completion"],
++            parent: &self.values["parent"],
++            events: &self.events,
++            reader: &self.values["reader"],
++            transfer: &self.values["transfer"],
++            correction: &self.values["correction"],
++            closed185: &self.values["closed185"],
++            standing: &self.values["standing"],
++        };
++        // Executes the actual reader's adapter, every source loader, typed-bridge
++        // consumer contract. The outer basis also performs unrelated live assembly
++        // observations, so it is deliberately outside this static regression.
++        accepted(&spec, &b, self.original_time)
++    }
++}
++#[test]
++fn actual0558_writer_and_image_have_genuine_native_success_and_normal_seal() {
++    let a = acceptance();
++    let cli = fixture(
++        include_bytes!("sealed-alias0558-fixtures/cli-proof.json"),
++        "ec87c7b1d58fa371478a12c5b79278a4363344c62752747400bb872fcf23b421",
++    );
++    let seal = fixture(
++        include_bytes!("sealed-alias0558-fixtures/cli-seal.json"),
++        "13f6b975ad3d2927696fc681ef4debb1d7ea94ec844ebb499d1069e19beea2c4",
++    );
++    let library = fixture(
++        include_bytes!("sealed-alias0558-fixtures/library-proof.json"),
++        "f571ecf0908da7daa58f062c0455f3319e5dace8a37bc8622b102177b3555bad",
++    );
++    let pin = SEALED_ALIAS_PREDECESSOR_FRAME_CAPTURE_SHA.unwrap();
++    assert_eq!(
++        a["actual_completed_writer"]["InvocationID"],
++        "367b149f1acc4dcf81a18c8f90008f71"
++    );
++    for (key, value) in [
++        ("Result", "success"),
++        ("ExecMainStatus", "0"),
++        ("MainPID", "0"),
++        ("ControlPID", "0"),
++        ("NRestarts", "0"),
++    ] {
++        assert_eq!(a["actual_completed_writer"][key], value);
++    }
++    assert_eq!(
++        a["frame"]["sha256"],
++        "becedbaf4cacec8fbee0d121a2474aebc6a6a2bf51ac27c73706e72f5cff32c6"
++    );
++    assert_eq!(cli["artifact"]["sha256"], pin);
++    assert_eq!(cli["ordinary_tests_passed"], 50);
++    assert_eq!(cli["native_saved_custody_actual_cases_passed"], 1);
++    assert_eq!(library["ordinary_tests_passed"], 432);
++    assert_eq!(
++        library["production_artifact"]["sha256"],
++        "edd3b6531376444f2bbc30b8c858cd1ec9770ef832bb4d7d4eafc64b4a31fa0b"
++    );
++    assert_eq!(
++        seal["members"]
++            .as_array()
++            .unwrap()
++            .iter()
++            .filter(|m| m["name"] == "jetstreamer-horizon-frame" && m["sha256"] == pin)
++            .count(),
++        1
++    );
++    assert_eq!(a["memory_credit_bytes"], 0);
++    assert_eq!(a["DATA_credit_bytes"], 0);
++    assert_eq!(a["replay_admission_authorized"], false);
++}
++#[test]
++fn exact0558_image_reaches_all_shared_registration_gates_and_preserves_old_dispatch() {
++    let actual = Actual::load();
++    let frame = actual.frame();
++    assert!(typed_bridge_capture(frame));
++    assert!(qualified_retry0005_capture(frame));
++    assert!(qualified_cached145_capture(frame));
++    assert!(!ordinary199_capture(frame));
++    assert!(!canonical_v5_capture(frame));
++    assert!(!retained199_v2_capture(frame));
++    for pin in [
++        TYPED_FLEET_BRIDGE_FRAME_CAPTURE_SHA,
++        TERMINAL145_ANCESTRY_FRAME_CAPTURE_SHA,
++        CLOSED145_FAMILY_FRAME_CAPTURE_SHA,
++        CLOSED145_INACTIVE_TIMER_RELOAD_CAPTURE_SHA,
++        ACCEPTED0428_REFRESH_FRAME_CAPTURE_SHA,
++    ] {
++        assert!(typed_bridge_capture(&json!({"self_sha256":pin.unwrap(),
++            "epoch199_terminal_context":retained199_v2_selector()})));
++    }
++    assert!(!typed_bridge_capture_with_pin(frame, None));
++    assert!(!typed_bridge_capture(&json!({"self_sha256":"f".repeat(64),
++        "epoch199_terminal_context":retained199_v2_selector()})));
++}
++#[test]
++fn original0558_complete_reader_frame_adapter_passes_full_typed_consumer_at_original_clock() {
++    let actual = Actual::load();
++    let before = serde_json::to_value((&actual.events, &actual.values)).unwrap();
++    assert!(actual.check().unwrap());
++    assert_eq!(
++        before,
++        serde_json::to_value((&actual.events, &actual.values)).unwrap()
++    );
++}
++#[test]
++fn complete0558_reader_rejects_unknown_image_policy_scope_binding_and_consumer_damage() {
++    let mut actual = Actual::load();
++    for (key, value) in [
++        ("self_sha256", json!("f".repeat(64))),
++        ("epoch199_terminal_context", Value::Null),
++        (
++            "epoch199_http500_capture_registration",
++            json!({"foreign":true}),
++        ),
++        (
++            "epoch199_http500_recovery_enrollment",
++            json!({"foreign":true}),
++        ),
++        ("epoch199_promises", Value::Null),
++        ("native_census_after", json!({"foreign":true})),
++        ("publication_authorized", json!(true)),
++    ] {
++        let original = actual.frame().get(key).cloned();
++        actual.frame_mut()[key] = value;
++        assert!(actual.check().is_err(), "{key}");
++        match original {
++            Some(value) => actual.frame_mut()[key] = value,
++            None => {
++                actual.frame_mut().as_object_mut().unwrap().remove(key);
++            }
++        }
++    }
++    let i = actual.frame_index;
++    let original_clock = actual.sources.phase_events[i].clock_pointer.clone();
++    actual.sources.phase_events[i].clock_pointer = "/foreign".into();
++    assert!(actual.check().is_err());
++    actual.sources.phase_events[i].clock_pointer = original_clock;
++    assert!(actual.sources.phase_events[i].owners.is_empty());
++    actual.sources.phase_events[i].owners.push(
++        serde_json::from_value(json!({
++            "manager_pointer":"/foreign", "rss_pointer":null, "launch":null,
++            "role":"delivery", "first_epoch":101, "last_epoch":200
++        }))
++        .unwrap(),
++    );
++    assert!(actual.check().is_err());
++    actual.sources.phase_events[i].owners.clear();
++    let original = actual.frame()["bindings"]["observer"].clone();
++    actual.frame_mut()["bindings"]["observer"]["sha256"] = json!("f".repeat(64));
++    assert!(actual.check().is_err());
++    actual.frame_mut()["bindings"]["observer"] = original;
++    let original = actual.values["fleet_plan"]["epoch199_terminal_context"].clone();
++    actual.values.get_mut("fleet_plan").unwrap()["epoch199_terminal_context"] = Value::Null;
++    assert!(actual.check().is_err());
++    actual.values.get_mut("fleet_plan").unwrap()["epoch199_terminal_context"] = original;
++    actual.check().unwrap();
++}
+--- /dev/null
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/acceptance.json
+@@ -0,0 +1,61 @@
++{
++  "DATA_credit_bytes": 0,
++  "accepted_selector": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0558-source/runtime/accepted-frame-selector.json",
++    "sha256": "a5184cbe4fa644c3c8c4d8303c115bb021e42d6c744be72964023aae9fb866bf"
++  },
++  "actual2058_predecessor": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0528-source/runtime/ROOT_ACTUAL0528_NATIVE_FRAME_READER_CONTRACT_ACCEPTED.json",
++    "sha256": "6fb35f7ddf0135924c381f3ef2994619df2258209178563ef967115e49a862c8"
++  },
++  "actual_completed_writer": {
++    "ActiveState": "active",
++    "ControlPID": "0",
++    "ExecMainStatus": "0",
++    "Id": "horizon-retained145-terminal-Frame-current0558-closedfamily-capture-20261107-v1.service",
++    "InvocationID": "367b149f1acc4dcf81a18c8f90008f71",
++    "Job": "",
++    "LoadState": "loaded",
++    "MainPID": "0",
++    "NRestarts": "0",
++    "Result": "success",
++    "SubState": "exited"
++  },
++  "fleet": {
++    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T055809Z-cached145-loaded-terminal-reload-v1.json",
++    "sha256": "2eb616bc15efa2ebb2e653b501a3adb5f0a5522f2f84d9daf5eadbc11d74bbd5"
++  },
++  "fleet_plan": {
++    "path": "/usr/local/lib/jetstreamer/horizon-postreplay145-current0558-fleet-plan-20261107-v1/fleet-plan.json",
++    "sha256": "84ac3b8e50c945b6f3c7092dd597e71c69ac1d8f4f6e420a597653bd48317a1f"
++  },
++  "frame": {
++    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T055809-cached145-original-terminal-reload-native-v1.json",
++    "sha256": "becedbaf4cacec8fbee0d121a2474aebc6a6a2bf51ac27c73706e72f5cff32c6"
++  },
++  "full_current_reader_memory_DATA_pending": true,
++  "memory_credit_bytes": 0,
++  "observer": {
++    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T055809Z-postcompletion154-v1.json",
++    "sha256": "2443bfc5cf69e8a4f5610f6e2bb67442498b45edd095a023076ec8fb952f6865"
++  },
++  "original_guard_owned_PID1_journal": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0558-source/runtime/frame0558-capture-PID1.json",
++    "sha256": "1f2a370af46a28bd8ba52359a445f4491329fff06d733e43503f9dc05d090608"
++  },
++  "plan": {
++    "path": "/usr/local/lib/jetstreamer/horizon-retained145-terminal-Frame-current0558-plan-20261107-v1/plan.json",
++    "sha256": "9bf717a4ac2a988255b68800d2e8610735e5e6b4cc0d23a9abcb072075664362"
++  },
++  "qualified0558_guard": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0558-source/guard-work/ROOT_GUARD61_ALL_ORIGINALS_DRAINED_NORMAL_SEAL_ACCEPTED.json",
++    "sha256": "21d54ad64d84b29f0ab40f63f7e734fc7396c2e2e3c2c58513352f61e87c5e0a"
++  },
++  "qualified2730_helper": {
++    "path": "/usr/local/lib/jetstreamer/horizon-sealed-alias-predecessor-shared-helper-tools-20261107-v2/artifact-proof.json",
++    "sha256": "0ef91ec3efca22c029858bb33f1c13f5f6fb1f9f25c2bc7c7a017b9e2364e514"
++  },
++  "reader_not_run_in_this_recovery": true,
++  "replay_admission_authorized": false,
++  "schema": "horizon-native0558-Frame-accepted-reader-accounting-pending-v1"
++}
+--- /dev/null
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/cli-proof.json
+@@ -0,0 +1,107 @@
++{
++  "schema": "horizon-sealed-alias-predecessor-frame-cli-qualified-v2",
++  "source_freeze": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/SOURCE_FREEZE_R1.json",
++    "sha256": "66445be467a4d384ddfb608569345b95d2c0e2996a63e98d01c62f09c27d455a"
++  },
++  "artifact": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/jetstreamer-horizon-frame",
++    "sha256": "b692189704ed9001c016b1931ec6e54210104d36a5fbf787dfdd9d2505ae75eb"
++  },
++  "ordinary_tests_passed": 50,
++  "ignored_count_unchanged": 1,
++  "native_saved_custody_actual_case": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/native-custody-r2-ORIGINAL_EXECUTION.json",
++    "sha256": "af06d3da75cc63d795407f2100733771736ea1e50173ba51372ceb809d13a186"
++  },
++  "native_saved_custody_actual_cases_passed": 1,
++  "actual_features": [
++    "native210-small",
++    "native227-small"
++  ],
++  "library_features": [
++    "native210-small",
++    "native227-small"
++  ],
++  "actual_externs": {
++    "horizon_original199_parent_memory": {
++      "path": "/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1/libhorizon_original199_parent_memory.rlib",
++      "sha256": "6afc3b074d58ee52df07420d8aeb532b6c46d9636d45bbd71ac2b9c02a00cc84"
++    },
++    "jetstreamer_typed_memory": {
++      "path": "/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2/libjetstreamer_typed_memory.rlib",
++      "sha256": "c77f97ab2e3f0d43a054d15b05de15fc470d489ec12913dbfb96c858eca8d9dc"
++    },
++    "serde": {
++      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
++      "sha256": "31b420026268199b24ea59f87b189a922a61897cd076bd85ef1912cce3508465"
++    },
++    "serde_json": {
++      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
++      "sha256": "04e761334e7390efe487adb436a1f0a7d1adcf832a6deff44c05a19cbd1b0772"
++    },
++    "sha2": {
++      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
++      "sha256": "4ee42ce093bbcf289d29b68351f6751f68426938f471fd233aeb7b216d1e1521"
++    },
++    "libc": {
++      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
++      "sha256": "1ad98e33569cd95079056b4f21b70832b3d209a3ab6cb9b3cf86e5c26c5c141e"
++    },
++    "anyhow": {
++      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
++      "sha256": "69d8dea7b0eb33c8977833b75a41a0ee8521773be7b51da31a1366c45cc73dda"
++    },
++    "horizon_recovered_resource_frame_recovery199": {
++      "path": "/usr/local/lib/jetstreamer/horizon-sealed-alias-predecessor-frame-library-tools-20261107-v2/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
++      "sha256": "edd3b6531376444f2bbc30b8c858cd1ec9770ef832bb4d7d4eafc64b4a31fa0b"
++    }
++  },
++  "all8_original_PID1_and_drains": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/ALL8_ORIGINAL_PID1_AND_DRAINS.json",
++    "sha256": "1a10a103329ecdd56885e0daa5a0020f5129d6a7cd8b9962b36b2f1cbdb011e9"
++  },
++  "compiler_and_test_executions": [
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/clippy-prod-ORIGINAL_EXECUTION.json",
++      "sha256": "34c76a2a453e1dd5e6c00ba8ccab8b30796957b6e327d95faa9428994b4cdea5"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/clippy-tests-ORIGINAL_EXECUTION.json",
++      "sha256": "d73667a115cf43874872ecf9ebaec13366cbdfb1f6ab644631175d1f28d75660"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/test-build-ORIGINAL_EXECUTION.json",
++      "sha256": "ff71aade7dfc1d570ee68a104a6be3cf14ce5724c812971e7f8cd55dbb1ee67f"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/release-ORIGINAL_EXECUTION.json",
++      "sha256": "d95b49876db32f8242603b80c94811815e5d6b2eb721121833afe77251276aee"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/census-all-ORIGINAL_EXECUTION.json",
++      "sha256": "cae394482ee7846e053ca523ee7330359ee38ea4d131cec19b9616d8ee05fe3c"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/census-ignored-ORIGINAL_EXECUTION.json",
++      "sha256": "fccdfb58c51ee0107691bff7c271d893a665a51b9ea8f73a33004346adc7fa8d"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/all-ordinary-ORIGINAL_EXECUTION.json",
++      "sha256": "30b7fca0b85696badebbacc0b413f333c8d986c49f9db1354842d27bfac121ba"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/native-custody-r2-ORIGINAL_EXECUTION.json",
++      "sha256": "af06d3da75cc63d795407f2100733771736ea1e50173ba51372ceb809d13a186"
++    }
++  ],
++  "test_normal_seal": {
++    "path": "/usr/local/lib/jetstreamer/horizon-sealed-alias-predecessor-frame-cli-tests-20261107-v2/deployment-seal-receipt.json",
++    "sha256": "5c3ee757c6f87f4331360502482dd6466a166a78b6ceefdd40ff09d55576e9d3"
++  },
++  "preexecution_original_recipe_and_binding_correction": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/CLI_RECIPE_ORIGINAL_PREEXECUTION_ALIAS_BINDING_CORRECTION.json",
++    "sha256": "2d6f23e10528913f49cfb10829c98ea948e13d463be50103a8b1f027301e9b6d"
++  },
++  "resource_observation_or_native_Frame_or_replay_authorized": false
++}
+--- /dev/null
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/cli-seal.json
+@@ -0,0 +1,27 @@
++{
++  "schema": "jetstreamer-sealed-deployment-receipt-v1",
++  "plan_sha256": "2faf464de7ea00f194702a1e4c08fe5d1e45fdc07b0d37e5f2a8323a14e19100",
++  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
++  "destination": "/usr/local/lib/jetstreamer/horizon-sealed-alias-predecessor-frame-cli-tools-20261107-v2",
++  "members": [
++    {
++      "source": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/jetstreamer-horizon-frame",
++      "name": "jetstreamer-horizon-frame",
++      "sha256": "b692189704ed9001c016b1931ec6e54210104d36a5fbf787dfdd9d2505ae75eb",
++      "bytes": 9419336,
++      "mode": "0555"
++    },
++    {
++      "source": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/cli-work/artifact-proof.json",
++      "name": "artifact-proof.json",
++      "sha256": "ec87c7b1d58fa371478a12c5b79278a4363344c62752747400bb872fcf23b421",
++      "bytes": 6012,
++      "mode": "0444"
++    }
++  ],
++  "created_unix_seconds": 1794030556,
++  "publication_authorized": false,
++  "replay_launch_authorized": false,
++  "remote_mutations": false,
++  "r2_mutations": false
++}
+--- /dev/null
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/library-proof.json
+@@ -0,0 +1,66 @@
++{
++  "schema": "horizon-historical-census-gap-and-qualified-e070-predecessor-library-v2",
++  "source_freeze": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/SOURCE_FREEZE_R1.json",
++    "sha256": "66445be467a4d384ddfb608569345b95d2c0e2996a63e98d01c62f09c27d455a"
++  },
++  "production_artifact": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
++    "sha256": "edd3b6531376444f2bbc30b8c858cd1ec9770ef832bb4d7d4eafc64b4a31fa0b"
++  },
++  "actual_features": [
++    "native210-small",
++    "native227-small"
++  ],
++  "ordinary_tests_passed": 432,
++  "ignored_count_unchanged": 2,
++  "previous426_names_preserved": true,
++  "all_prior429_names_preserved": true,
++  "new_predecessor_regressions": [
++    "cached145_frame::tests::full_outer_sealed_alias_prior_accepts_successor_and_rejects_unknown_or_changed_native_envelope: test",
++    "qualified_sealed_alias_frame_tests::actual_sealed_alias_predecessor_has_native_success_and_exact_normal_seal: test",
++    "qualified_sealed_alias_frame_tests::immediate_sealed_alias_frame_accepts_a_distinct_successor_and_keeps_unknown_images_closed: test"
++  ],
++  "all15_intermediate16_link_bounds_preserved": true,
++  "native_Frame_or_replay_or_R2_archive_authorized": false,
++  "all_ordinary_stdout": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/all-ordinary.log",
++    "sha256": "7a4688f5d5874b840e091ff66135c7ea32927bc5a686d97b3cf4fe468c6d5f5a"
++  },
++  "all_names_stdout": {
++    "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/census-all.log",
++    "sha256": "1ab7919578dab8281aaa9129cbe1401589b6612354e2a1fbbaa04b30f9be9328"
++  },
++  "all7_original_PID1_and_drains": [
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/clippy_prod-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "1732a13e8d4e33945475cf2ca9eea9ef48c391e269206bab24b381bbb1e4bca3"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/clippy_tests-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "46d15b57a1a465375c504b5a94bff2a5132d6610dd63f61bce34d23556fb0cbd"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/test_build-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "118511c92b2e82a35a21d7e36d4e5ab8d4a588a3f8b16df762365c3b699d2133"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/release-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "6cbce67a50e9197dff4508aaed202bb3e3a15db89f0a79c087f847e8798d19b5"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/census-all-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "fb6688703c08d32e95d68ac49d039e61ef9e6fb8d929cccb98c52ae0aba151c6"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/census-ignored-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "a8152445925da8e06187b1939db3f9887bb10022c6b7cf54e25e8cb6c6686e83"
++    },
++    {
++      "path": "/home/sol/.jetstreamer-private/historical-census-gap-predecessor-20261107-v2/library-work/all-ordinary-ORIGINAL_PID1_AND_DRAIN.json",
++      "sha256": "88365bf1567f82865341e84af805be482981612cc7a711ec98c3a90e32c35ef0"
++    }
++  ],
++  "qualified_immediate_predecessor_sha256": "e0707f6f9eaa21ff2ac92bc496921b6997c402897027327f42ad968934d4e5a2",
++  "unknown_image_gate_preserved": true
++}
+--- /dev/null
++++ b/helper-source/jetstreamer-r2/src/fleet/epoch186/sealed-alias0558-fixtures/reader-spec.json
+@@ -0,0 +1,466 @@
++{
++  "captured141_memory_retirement": {
++    "current": {
++      "fleet": {
++        "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T055809Z-cached145-loaded-terminal-reload-v1.json",
++        "sha256": "2eb616bc15efa2ebb2e653b501a3adb5f0a5522f2f84d9daf5eadbc11d74bbd5"
++      },
++      "fleet_plan": {
++        "path": "/usr/local/lib/jetstreamer/horizon-postreplay145-current0558-fleet-plan-20261107-v1/fleet-plan.json",
++        "sha256": "84ac3b8e50c945b6f3c7092dd597e71c69ac1d8f4f6e420a597653bd48317a1f"
++      },
++      "frame": {
++        "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T055809-cached145-original-terminal-reload-native-v1.json",
++        "sha256": "becedbaf4cacec8fbee0d121a2474aebc6a6a2bf51ac27c73706e72f5cff32c6"
++      },
++      "observer": {
++        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T055809Z-postcompletion154-v1.json",
++        "sha256": "2443bfc5cf69e8a4f5610f6e2bb67442498b45edd095a023076ec8fb952f6865"
++      }
++    },
++    "opt_in": {
++      "registration": {
++        "path": "/usr/local/lib/jetstreamer/horizon-captured141-memory-retirement-registration-20261101-v1/registration.json",
++        "sha256": "5987c3cac56168d2da5248e6a2a415da4983ada746b669d950f6a0db9309362e"
++      },
++      "seal": {
++        "path": "/usr/local/lib/jetstreamer/horizon-captured141-memory-retirement-registration-20261101-v1/deployment-seal-receipt.json",
++        "sha256": "f3067fc82babcd612fa44e6e5aea2c884dcfbf601cbfbdbf288108cce99c487c"
++      }
++    }
++  },
++  "external_booking": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0558-source/runtime/FAILED4_READER_ACTUAL0558_EXTERNAL_BOOKING.json",
++    "sha256": "72afafe0efeea03989398200ab18d56ba44839d0047d25fd5a6518b4dc21830f"
++  },
++  "output_directory": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/2443bfc5cf69e8a4f5610f6e2bb67442498b45edd095a023076ec8fb952f6865",
++  "prior_memory": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch136-suffix-accounting-projections-20261027-v1/prior-memory.json",
++    "sha256": "7b6e9a72fe89964d94ba22afe2a5320ed9ae401d2a624eaa01be9a57c772568a"
++  },
++  "resource_accounting": {
++    "closed185": {
++      "path": "/var/lib/jetstreamer/horizon-old185-attempt-growth-closure-20261024-v1/closure.json",
++      "sha256": "7a57f946c5e6cb08bc9a99e8a6b76a6ed33fffb013a673715924192a327d0553"
++    },
++    "completion": {
++      "path": "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261029T082000Z-cohort152-delivery-terminal191-repair141-suffix136-20261028-v1/completion.json",
++      "sha256": "0a7a345426d52918cd02a7bbe387361a83a706972aa6b7f024e717a6efac32f4"
++    },
++    "correction191": {
++      "path": "/var/lib/jetstreamer/horizon-DATA-growth-closures-v1/c5bf2df3f569845d8694231a7d2ece86e74e62e9ee88c47677734c45aeacefb6-ea93199ed2fa470d99de248c2a10b246-accounting-correction-v1/correction.json",
++      "sha256": "78deb8cd152a904f5b2891c87261a150821df4dd043c24b8f12b1614624c9d79"
++    },
++    "epoch137_input_pool": null,
++    "fleet": {
++      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T055809Z-cached145-loaded-terminal-reload-v1.json",
++      "sha256": "2eb616bc15efa2ebb2e653b501a3adb5f0a5522f2f84d9daf5eadbc11d74bbd5"
++    },
++    "fleet_plan": {
++      "path": "/usr/local/lib/jetstreamer/horizon-postreplay145-current0558-fleet-plan-20261107-v1/fleet-plan.json",
++      "sha256": "84ac3b8e50c945b6f3c7092dd597e71c69ac1d8f4f6e420a597653bd48317a1f"
++    },
++    "floor": {
++      "path": "/usr/local/lib/jetstreamer/horizon-input136-immutable-accounting-evidence-20261027-v1/century-floor.json",
++      "sha256": "39673f485b44ffb5c2053e2a553819da0bd0be30dcfc3cb8990553dd4de0f682"
++    },
++    "guards": [
++      {
++        "binary": {
++          "path": "/usr/local/lib/jetstreamer/adaptive-reserve-epochs152-153-20261014-v1/guard-adaptive-replay-reserve.py",
++          "sha256": "b62e58f5be764935a679408e1fcc446a9768170109a6639c87fd01571b9f2b62"
++        },
++        "command_sha256": "5b206334dcfd2427f11b6657f542d4db7392fd1e889c4e6e733e6b0603badbbd",
++        "kind": "adaptive-controller",
++        "plan": null,
++        "sample": null,
++        "stop_completion": "/var/lib/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1/completion.json",
++        "stop_intent": "/var/lib/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1/intent.json",
++        "timer": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
++        "unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service"
++      },
++      {
++        "binary": {
++          "path": "/usr/local/lib/jetstreamer/horizon-epoch199-backfill-controller-guard-20261102-v1/guard_adaptive_replay_reserve.py",
++          "sha256": "b62e58f5be764935a679408e1fcc446a9768170109a6639c87fd01571b9f2b62"
++        },
++        "command_sha256": "155ab8743149c390e9bef6a57ab24b777e5b98c883e1e27b44c68d5241c6695a",
++        "kind": "epoch199-append",
++        "plan": {
++          "path": "/home/sol/.jetstreamer-private/epoch199-backfill-current-preparation-20261102-v1/ACTUAL2258_R2_ENROLLMENT.json",
++          "sha256": "a2313858851adecca3ff2e144cb61d342cf6757c2dd1249ba0ab88f9770f6b80"
++        },
++        "sample": null,
++        "stop_completion": "/var/lib/jetstreamer/epoch199-backfill-20261102-v1/guard/reserve-stop-completion.json",
++        "stop_intent": "/var/lib/jetstreamer/epoch199-backfill-20261102-v1/guard/reserve-stop-intent.json",
++        "timer": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
++        "unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
++      }
++    ],
++    "metadata159_native_pool": {
++      "main_booking": {
++        "path": "/usr/local/lib/jetstreamer/horizon-metadata159-main-admission-20261102T0439Z-v1/decision.json",
++        "sha256": "9a1fa938b1f5273310d7e78c9833b739846d4122eeab5553ccd41479a79dda11"
++      },
++      "owner": {
++        "path": "/var/lib/jetstreamer/horizon-epoch159-metadata-successor-owner-5249fe78e56a44d68a51c98030d9d39b-v1/owner-start.receipt.json",
++        "sha256": "6bf79daba15a64a044d8a95a536bc788988dc706932b4f06224b2628add297cf"
++      }
++    },
++    "observer": {
++      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T055809Z-postcompletion154-v1.json",
++      "sha256": "2443bfc5cf69e8a4f5610f6e2bb67442498b45edd095a023076ec8fb952f6865"
++    },
++    "original141_growth_closure": {
++      "path": "/var/lib/jetstreamer/horizon-original141-growth-closure-20261028-v1/closure.json",
++      "sha256": "17bd5937730f27df5c9966e32843167a76d7438bab914c5267068e7260f44416"
++    },
++    "phase_events": [
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-epoch141-repair-owner-capture-v2",
++        "source": {
++          "path": "/var/lib/jetstreamer/horizon-epoch141-active-repair-20261024-v1/launch.json",
++          "sha256": "2f935c8dd8cbc6a6bac58fef84dae9f53b8b7cc8e58c3c4e68fc68bfd8a9fc23"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-horizon-recovered-resource-frame-v1",
++        "source": {
++          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T055809-cached145-original-terminal-reload-native-v1.json",
++          "sha256": "becedbaf4cacec8fbee0d121a2474aebc6a6a2bf51ac27c73706e72f5cff32c6"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-horizon-completed155156-guard-declaration-plan-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-native154-completed155156-guard-declaration-20261029-v1/plan.json",
++          "sha256": "f37cee2ff0268b1ffed8e2bc442ea913197a3c3e3e7abc77547eb87b1f6ce92a"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-horizon-campaign-fleet-v1",
++        "source": {
++          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T124809Z-cached145-retained-original-policy-C4-v1.json",
++          "sha256": "8c57200ead8b49e464c5aed40098643034b6abde536da33bbbb1fb27fc70a134"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "horizon-cohort183-native-verification-launch-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-current183-accounting-owners002315-20261030-v2/full-launch.json",
++          "sha256": "df5231becab356419ee4e2735f71aa4b20da8d79c3fc1571b9b617c49f9b52fd"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "horizon-cohort183-native-verification-launch-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-current183-accounting-owners002315-20261030-v2/plugin-launch.json",
++          "sha256": "4d839b1e4a60d0762dd50bcc040f7bb06813cc44a7e3fcecfe869da7f3c12539"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "horizon-cohort183-native-verification-launch-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-184-full-launch.json",
++          "sha256": "f9fe50f3fc3c2994a013726f65abe5438b587e00c8e54caae79357f19c18d98a"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "horizon-cohort183-native-verification-launch-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-184-plugin-launch.json",
++          "sha256": "e9dac5395508acba69b7b3f1edcb1bf9cb5a326b920ff3187804f58af27b2b97"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [
++          {
++            "first_epoch": 183,
++            "last_epoch": 183,
++            "launch": {
++              "invocation_id": "/new_unit/InvocationID",
++              "pid": "/new_unit/MainPID",
++              "unit": "/new_unit/Id"
++            },
++            "manager_pointer": null,
++            "role": "delivery",
++            "rss_pointer": null
++          }
++        ],
++        "schema": "horizon-cohort183-sole-uploader-successor-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-183-uploader-handoff.json",
++          "sha256": "41e427a1be15669aad1505f102cb6ec10fbf503aa619fb9670d38afb41b6251e"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-epoch154-assembly-only-started-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-154-assembly-started.json",
++          "sha256": "547818a7fe8d93464096dfafe6807f5f2932aeb82e45725743e170a156dd6947"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-epoch154-assembly-only-receipt-v1",
++        "source": {
++          "path": "/usr/local/lib/jetstreamer/horizon-epoch154-assembly-terminal-evidence-20261030-v1/assembly-receipt.json",
++          "sha256": "6906ba72af312369b307d542f322aff2592da5ecf6d56da5583ff68bb9a1451e"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-private154-scan-launch-metadata-event-v1",
++        "source": {
++          "path": "/var/lib/jetstreamer/horizon-private154-scan-owner-events-20261030-v1/launch.json",
++          "sha256": "0c9a3116f9443ba12de8a9c3cf5b30617e4c12174bffe4c3f119f6b03b2a680d"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-private154-full-success-terminal-event-v1",
++        "source": {
++          "path": "/var/lib/jetstreamer/horizon-private154-full-terminal-events-20261030-v1/terminal.json",
++          "sha256": "5fca943c81beb15618c15f262212ff7031717abecfd611b2ce9a4e3a525ccacc"
++        }
++      },
++      {
++        "clock_pointer": "/recorded_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-private154-plugin-success-terminal-event-v1",
++        "source": {
++          "path": "/var/lib/jetstreamer/horizon-private154-plugin-terminal-events-20261030-v1/terminal.json",
++          "sha256": "d6fbf7dc1c132d271a8f69fe77aa689f08428354bac1297a2de4962023f67b01"
++        }
++      },
++      {
++        "clock_pointer": "/captured_unix_seconds",
++        "owners": [],
++        "schema": "jetstreamer-epoch145-cached-held-capture-v1",
++        "source": {
++          "path": "/var/lib/jetstreamer/epoch145-cached-b2a09f57de39c384/receipts/capture.json",
++          "sha256": "401a71da189371aa4546a8bb0da817990d386eb0c45ea637e8b4658f5bbdb46b"
++        }
++      }
++    ],
++    "reader191": {
++      "path": "/usr/local/lib/jetstreamer/horizon-original191-growth-projection-evidence-20261024-v1/projection.json",
++      "sha256": "56304c05fc4833e50f0d635c3224b412bbbffb0ad48b05a02534720d8bb79d79"
++    },
++    "resource_parent": {
++      "path": "/usr/local/lib/jetstreamer/horizon-cadence-20261029T082000Z-native-parent-v1/frame-acceptance.json",
++      "sha256": "82a4bb9b8d6c49cea140b6c65ec8f6705e1dba8c1bcc574b6d5e3b68a37eea67"
++    },
++    "retained_cached145_guard": {
++      "guard": {
++        "binary": {
++          "path": "/usr/local/lib/jetstreamer/horizon-native154-retained-stop-guard-tools-20261029-v3/jetstreamer-horizon-standalone-guard",
++          "sha256": "65e818ad93b0066ac5fb4213d31c1899a4f5c1b255c1e1cd84b9a6652ddfc229"
++        },
++        "command_sha256": "962759dd1d0898dc92e4b93d44fdd5d0e6945e03b6e3ce1c9f0cb902f513d127",
++        "kind": "cached145-continuous",
++        "plan": {
++          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-guard-plan-20261101-v1/plan.json",
++          "sha256": "952428636744031320a10354f6b5e526abeb54af7b4cc3694eaf511cfbce2ccf"
++        },
++        "sample": null,
++        "stop_completion": "/var/lib/jetstreamer/epoch145-cached-b2a09f57de39c384/receipts/stop-completion.json",
++        "stop_intent": "/var/lib/jetstreamer/epoch145-cached-b2a09f57de39c384/receipts/stop-intent.json",
++        "timer": "horizon-qualify-145-cached-b2a09f57de39c384-guard.timer",
++        "unit": "horizon-qualify-145-cached-b2a09f57de39c384-guard.service"
++      },
++      "terminal": {
++        "path": "/home/sol/.jetstreamer-private/cached145-postreplay-handoff-20261105-v1/ROOT_ACTUAL145_CLEAN_TERMINAL_AND_VERIFIED_SEGMENT.json",
++        "sha256": "8fe99753332d62254da147dcf1324bf4834a78d595d55c853228ce3fb469cd9d"
++      }
++    },
++    "retained_suffix136": {
++      "inactive": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-terminal-qualified-evidence-20261027-v1/inactive-completion.json",
++        "sha256": "29306dedf36cac1041effe97ad0e7dc995d6eebd293bfae52dd87bf9c4e39fd7"
++      },
++      "terminal": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-terminal-qualified-evidence-20261027-v1/terminal.json",
++        "sha256": "f6dde0dc28b075c2fe7d9810d56ad3affd068339d9cc977b52cb856f05c9a1ec"
++      }
++    },
++    "retained_suffix136_growth_closure": {
++      "receipt": {
++        "path": "/var/lib/jetstreamer/horizon-epoch136-retained-growth-closures-v2/failed-attempt-v1.json",
++        "sha256": "bfe267e067d8124172391dc9835defb7cd0b97d6dd1018969f91f3e9e627a3fe"
++      },
++      "spec": {
++        "path": "/usr/local/lib/jetstreamer/horizon-retained136-v1-growth-spec-20261027-v7/spec.json",
++        "sha256": "5388450e8a0431ec14415eaa685980672aa1cae6b811bcc8e4fb8e54c5608e4c"
++      }
++    },
++    "retained_suffix136_v2": {
++      "inactive": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v2-terminal-qualified-evidence-20261027-v1/inactive-completion.json",
++        "sha256": "4d07d735fe85034439c157175754d0df25be015f39d0ec4d6f3f8335c8c3e4d3"
++      },
++      "terminal": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v2-terminal-qualified-evidence-20261027-v1/terminal.json",
++        "sha256": "73b1c6ff8813f862e99aa9ab8eef2435fc4e701985991486e331d75df4aad7eb"
++      }
++    },
++    "retained_suffix136_v2_growth_closure": {
++      "receipt": {
++        "path": "/var/lib/jetstreamer/horizon-epoch136-retained-v2-growth-closures-v1/failed-attempt-v2.json",
++        "sha256": "7cd2531bba9e554c06eae90d96b3d1dda3a306db8298f38fca423c263836c98f"
++      },
++      "spec": {
++        "path": "/usr/local/lib/jetstreamer/horizon-retained136-v2-growth-spec-20261027-v7/spec.json",
++        "sha256": "57fe7894a94a8121ec5f3f24674ea97919075ccc5dfe86d0d9b95b6b8f2bcf9b"
++      }
++    },
++    "retained_suffix136_v3": {
++      "inactive": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v3-terminal-qualified-evidence-20261027-v1/inactive-completion.json",
++        "sha256": "4cedaab6ba1f717fde91c8a2c6aaec98b165cd9cd7e4b81d5314d6a79d4c449a"
++      },
++      "owner": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v3-terminal-qualified-evidence-20261027-v1/owner.json",
++        "sha256": "38f50028a11201c3b0ded3bc4568240965b71b618315f88d52d2f2483c6b03ba"
++      },
++      "terminal": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v3-terminal-qualified-evidence-20261027-v1/terminal.json",
++        "sha256": "147d45e11706c32a223573a9182a18e8eccc546941a9bc6e600c5d2dc1254bb6"
++      }
++    },
++    "retained_suffix136_v3_growth_closure": {
++      "receipt": {
++        "path": "/var/lib/jetstreamer/horizon-epoch136-retained-v3-growth-closures-v1/failed-attempt-v3.json",
++        "sha256": "75773aa6a84776ec2f4324c59d14787a500c138cbb4ff56beba3a47cfc72cc94"
++      },
++      "spec": {
++        "path": "/usr/local/lib/jetstreamer/horizon-retained136-v3-growth-spec-20261027-v7/spec.json",
++        "sha256": "6d845e696ac9a84063adec7e0031e58ab6c45da8bf90c10112cf4016170e4ff6"
++      }
++    },
++    "retained_suffix136_v4": {
++      "inactive": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v4-terminal-qualified-evidence-20261027-v1/inactive-completion.json",
++        "sha256": "2857364abaab81ad60c8a262567b4be89db08e16f9af7fb6303a0f37c60eb193"
++      },
++      "owner": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v4-terminal-qualified-evidence-20261027-v1/owner.json",
++        "sha256": "836f04bee7e05ffe1c753dd4ad0d3bae8061fa50cf1088b8085790d848f9fad1"
++      },
++      "terminal": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v4-terminal-qualified-evidence-20261027-v1/terminal.json",
++        "sha256": "103159c8cd747da29ac1096f9248fe6f4d982f41d53da320e6ff5cae795ebbfd"
++      }
++    },
++    "retained_suffix136_v5": {
++      "inactive": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v5-terminal-qualified-evidence-20261027-v1/inactive-completion.json",
++        "sha256": "679656c4e0ab4e7e92890015ccb4ae520cc6ccaa66f8c1f169fb2ee0a838ef62"
++      },
++      "owner": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v5-terminal-qualified-evidence-20261027-v1/owner.json",
++        "sha256": "830782fd44b9930f1943fc7a58c1c187d0877c7715030880a289e8c89797bdbe"
++      },
++      "terminal": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v5-terminal-qualified-evidence-20261027-v1/terminal.json",
++        "sha256": "f2edf98fd2b398c7c1125803a000090c59b0394126831e953336525730503ea9"
++      }
++    },
++    "retained_suffix136_v7": {
++      "inactive": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v7-terminal-qualified-evidence-20261027-v1/inactive-completion.json",
++        "sha256": "db5fa796634b2c1ff08140225a7dbe57c172cddc5d53e6ba9ca0e68c276f9a4c"
++      },
++      "owner": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v7-terminal-qualified-evidence-20261027-v1/owner.json",
++        "sha256": "7dffd027c4b96c01c02455737c763b9e1916ed8b8552fc4abc614d3d673dacfc"
++      },
++      "terminal": {
++        "path": "/usr/local/lib/jetstreamer/horizon136-suffix-v7-terminal-qualified-evidence-20261027-v1/terminal.json",
++        "sha256": "15fe7137f52bd82020f119d33672d0f08b475c483e94b517443752f969009881"
++      }
++    },
++    "retained_suffix136_v7_growth_closure": {
++      "receipt": {
++        "path": "/var/lib/jetstreamer/horizon-epoch136-retained-v7-growth-closures-v2/failed-attempt-v7.json",
++        "sha256": "0c45aa2efdec397402f11580a684d7c517eab1128e74c395086c611f3be3ba48"
++      },
++      "spec": {
++        "path": "/usr/local/lib/jetstreamer/horizon-retained136-v7-growth-spec-20261027-v2/spec.json",
++        "sha256": "a408170828b95c0ed400cba92eeea085a095488ef68fc8d67d600636d137a9c2"
++      }
++    },
++    "retained_suffix136_v8": {
++      "inactive": {
++        "path": "/var/lib/jetstreamer/horizon-epoch136-suffix-lifecycle-events-v2/horizon-qualify-136-hourly-suffix-reproduction-20261027-v8.service/c0c214c5b7c440449298bdb90d3f3bd3/terminal/inactive-completion.json",
++        "sha256": "e29e129e38e9ca9aa22f139b68dbe3bbd97f2004ffc1568768e5fc58c87304e9"
++      },
++      "owner": {
++        "path": "/var/lib/jetstreamer/horizon-epoch136-suffix-lifecycle-events-v2/horizon-qualify-136-hourly-suffix-reproduction-20261027-v8.service/c0c214c5b7c440449298bdb90d3f3bd3/initial/owner.json",
++        "sha256": "b328e688b44a2f9e90cd7915891ccd5f67eb251a2af64f0b6f03969ccadc9ff2"
++      },
++      "terminal": {
++        "path": "/var/lib/jetstreamer/epoch136-hourly-suffix-reproduction-20261027-v8/terminal.json",
++        "sha256": "daa6faa562be5fd74e1714be6ef9443415cd9414c3a479a84845e9e9d0ab8b3a"
++      }
++    },
++    "retained_trial186": {
++      "failure": {
++        "path": "/usr/local/lib/jetstreamer/horizon186-terminal-raw-evidence-20261027-v1/failure.json",
++        "sha256": "1257164aa38d447787f99a6c7044abdef2fccf36a6ef770abff7948d9f440e9f"
++      },
++      "stop": {
++        "path": "/usr/local/lib/jetstreamer/horizon186-terminal-raw-evidence-20261027-v1/bounded-trial-stop.json",
++        "sha256": "8ef1175b6a7d9c8970659cea59ab4566125bf2b246d3e064337825e145cf1e42"
++      }
++    },
++    "schema": "jetstreamer-current-protected-data-accounting-spec-v1",
++    "standing": {
++      "path": "/var/lib/jetstreamer/horizon-cohort193-data-admission-20261024-v1/admission.json",
++      "sha256": "a39f443500980b7647875f8f4435d1115ed69a5dc8ffe1af344e94b5d6d59ef6"
++    },
++    "terminal152153_growth_closure": {
++      "path": "/var/lib/jetstreamer/horizon-terminal152153-growth-closure-20261101-v1/closure.json",
++      "sha256": "6a27ae24b145913c26c990bac39298d29da6815adea96a3004a68d4bcd0e0cfb"
++    },
++    "terminal155156_growth_closure": {
++      "path": "/var/lib/jetstreamer/horizon-terminal155156-growth-closure-20261029-v1/closure.json",
++      "sha256": "f4ca21d29d65afc69c9aa26b8f97b08f35ee89a2612c51bf392c607c0f64914e"
++    },
++    "transfer191": {
++      "path": "/var/lib/jetstreamer/horizon-original191-growth-transfer-20261024-v1/transfer.json",
++      "sha256": "b69371cc502b2f0637610be4e57286806f2b3bc2f2dc7fdc85986d9edef5626f"
++    }
++  },
++  "retention_plan": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch136-hourly-charge-trace-retry-0005-plan-20261102-v3/plan.json",
++    "sha256": "2a7046f0eb59c6ce8ae3a03d073ed5fe555c66a0c477164d8e92f5014591f5cd"
++  },
++  "schema": "failed4-current-complete-accounting-reader-spec-v1",
++  "terminal_legacy_memory_closure": {
++    "path": "/usr/local/lib/jetstreamer/horizon-terminal-legacy-memory-closure-20261030-v1/closure.json",
++    "sha256": "3f9f1063d55a0075a8f85af80818ae45c28d2f854e19a1edc641f00719bf4ca9"
++  }
++}
