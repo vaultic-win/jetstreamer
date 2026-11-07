@@ -1,0 +1,187 @@
+{
+  "schema": "horizon-original199-witness-reader-source-and-actual-component-checks-v1",
+  "files": [
+    {
+      "file": "core/ordinary199.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/core-v2/source/ordinary199.rs",
+      "sha256": "9f414c5e999260bbbbfa3ed9f5dc560e1b6167ff90ae6f537705fafa857ebc8e"
+    },
+    {
+      "file": "core/ordinary199_tests.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/core-v2/source/ordinary199_tests.rs",
+      "sha256": "2213d392a9320382b4dcaec0290e86c8eeca73b99ebd37a771e61720ac845ffa"
+    },
+    {
+      "file": "core/terminal199_context.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/core-v2/source/terminal199_context.rs",
+      "sha256": "31d5d7cb24808902f1548d86ba9bcfd9acc1d06c0483a787261bc7bd283d23c3"
+    },
+    {
+      "file": "core/lib.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/core-v2/source/lib.rs",
+      "sha256": "f551c3b839fbbac05756c57a6ee5f76b1e88d4f67af0283f8371fc3437717757"
+    },
+    {
+      "file": "core/ordinary199-fixtures/budget.json",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/core-v2/source/ordinary199-fixtures/budget.json",
+      "sha256": "37a95232e6325606469784dda5b1cf3f8f8bda4b6b357ea6f6a5597bb30ef32f"
+    },
+    {
+      "file": "retained-frame/ordinary199.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/source/src/ordinary199.rs",
+      "sha256": "fef5d96d97f8a22ef34a6a32adddb08191b51274b326f86d9d19616b2773d588"
+    },
+    {
+      "file": "retained-frame/terminal199_context.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/source/src/terminal199_context.rs",
+      "sha256": "58b63104ecf888202ece7bfd9e1c40402679b4d1ff866aee6dc041c9d2e31255"
+    },
+    {
+      "file": "retained-frame/ordinary199_frame.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/source/src/ordinary199_frame.rs",
+      "sha256": "b421606b831f3dc0034a7b8a4a19f4ec5fe2a8ca803013ab89e28d08e7dfaf6c"
+    },
+    {
+      "file": "retained-frame/lib.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/source/src/lib.rs",
+      "sha256": "4c5e406daaf1d9c83ae2f0f301ab0c87b51dbef4daee497ca86ca67c6ec38a14"
+    },
+    {
+      "file": "retained-frame/cached145_input137_entry.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/source/src/cached145_input137_entry.rs",
+      "sha256": "db4bf2fc32d76e6ebddaf6ea386c643e925bdcca177eb58341c4992ee5322a20"
+    },
+    {
+      "file": "retained-frame/input137_entry_guard_rollover_tests.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/source/src/input137_entry_guard_rollover_tests.rs",
+      "sha256": "9488514ee9415d55a701e675fac82337a61cd7ed139bba1563a80a94e3fe6d70"
+    },
+    {
+      "file": "parent-memory/lib.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory/candidate/source/lib.rs",
+      "sha256": "b5cf77b300e554867e1458edff877b8f6ff4fab6a3c9910abd58bf2cf0401cce"
+    },
+    {
+      "file": "parent-memory/census_capture.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory/candidate/source/census_capture.rs",
+      "sha256": "f39b78778ee1a244f4d521e03de9ca48484f0f86e0fc0cd527f7ebdf5eeb5471"
+    },
+    {
+      "file": "parent-memory/context_inputs.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-memory/candidate/source/context_inputs.rs",
+      "sha256": "6b4cb1f0c2c99f562410a3fdd489f7e3646c2bf8eff56c728a63af7f38771bfd"
+    },
+    {
+      "file": "parent-data/lib.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA/source/source/lib.rs",
+      "sha256": "ec161ee060e20583f29fb51fc1e1b409bd52b4e624d27688a7c423112dd21c6a"
+    },
+    {
+      "file": "parent-data/selection_clock.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/parent-DATA/source/source/selection_clock.rs",
+      "sha256": "bf09baa15f28b9d67a6f6206e028c7d72cf2313e52884a12279b821326e7c850"
+    },
+    {
+      "file": "typed-frame/ordinary199.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/typed-frame/library/src/ordinary199.rs",
+      "sha256": "fef5d96d97f8a22ef34a6a32adddb08191b51274b326f86d9d19616b2773d588"
+    },
+    {
+      "file": "typed-frame/terminal199_context.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/typed-frame/library/src/terminal199_context.rs",
+      "sha256": "58b63104ecf888202ece7bfd9e1c40402679b4d1ff866aee6dc041c9d2e31255"
+    },
+    {
+      "file": "typed-frame/ordinary199_frame.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/typed-frame/library/src/ordinary199_frame.rs",
+      "sha256": "b421606b831f3dc0034a7b8a4a19f4ec5fe2a8ca803013ab89e28d08e7dfaf6c"
+    },
+    {
+      "file": "typed-frame/cached145_input137_entry.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/typed-frame/library/src/cached145_input137_entry.rs",
+      "sha256": "d3485e5dea19c253f8dc448a343e3f51a8f82bff755ac289cdb062a90b5889aa"
+    },
+    {
+      "file": "typed-frame/lib.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/typed-frame/library/src/lib.rs",
+      "sha256": "70c5452d2a76fd811e3381942974cd3f65f814534911f9d35b42c2784938684f"
+    },
+    {
+      "file": "typed-frame/input137_entry_guard_rollover_tests.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/typed-frame/library/src/input137_entry_guard_rollover_tests.rs",
+      "sha256": "fdb2205879c1905a5de3431efae123bede69763a6a4201a5d6c3b3288ce298b2"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet.rs",
+      "sha256": "03df9c33a190b796e75a74e4981e37ca84b3e2742a711f410062bc75d8fdce3d"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/cached145_entry.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cached145_entry.rs",
+      "sha256": "d96dc0c75a062b9e20174b64013af7f1f06c10e35b257f2360da6eb28018adef"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/terminal199_memory.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/terminal199_memory.rs",
+      "sha256": "3318e1899f31cc785a8f5e23f867beee4914a1e03c9c0b1fdbd93722f42d4890"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/epoch186/io_epoch199_append.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/io_epoch199_append.rs",
+      "sha256": "2f1714a2764471dd83898c657ab3ceca34cef9fc223611daed674dddc7673696"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/epoch186/io_current_census_composition.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/io_current_census_composition.rs",
+      "sha256": "307cdf692e41c864c387b5e7b16293eaa54ec4bfc177d0ec25525e3cdb32909e"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/epoch186/evidence_current199_growth.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/evidence_current199_growth.rs",
+      "sha256": "740d979e9cd1d278fb4166cae920668a1b6b57392d60a7d6c8a341ac812fc4a8"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/guard_continuity.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/guard_continuity.rs",
+      "sha256": "e29fe816c31783c4a78f0a111607c09ea151fc1544dc7eb3e89ba65bd77ac654"
+    },
+    {
+      "file": "helper-overlay/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "qualified_source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "sha256": "4e73cc93ce63f9583311a599be30b8fb79e51795a0ff13ba98dc5f5061274498"
+    }
+  ],
+  "qualified_component_results": {
+    "core": {
+      "strict_prod_test_clippy_and_both_builds": true,
+      "pure_tests": 5,
+      "actual_selected_production_proof_control": 1
+    },
+    "current_graph_witness": {
+      "ordinary": 15,
+      "actual_installed_context": 1
+    },
+    "retained_frame": {
+      "ordinary": 342,
+      "explicit_native_readonly": 1
+    },
+    "parent_memory": {
+      "ordinary": 57,
+      "explicit_installed_alias": 1
+    },
+    "parent_DATA": {
+      "ordinary": 66,
+      "explicit_native_readonly": 2
+    },
+    "typed_frame": {
+      "ordinary": 461,
+      "actual_selected_memory_readonly": 1,
+      "CHOWN_fixture_exact_profile_correction": true,
+      "current_live145_control_unavailable_after_original_exporter_failure": true
+    }
+  },
+  "complete_helper_and_current_native_accounting_qualification_pending": true,
+  "terminal145_successor_source_not_included": true,
+  "no_replay_admission_or_resource_credit": true
+}
