@@ -1,0 +1,326 @@
+{
+  "schema": "horizon-current-reader-v2-actual-source-overlay-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet.rs",
+      "sha256": "24f2ccd03eab58277ccb01fda09617c77e7d431c34bc6d8646015b5259e285ca"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/cached145_entry.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/cached145_entry.rs",
+      "sha256": "d96dc0c75a062b9e20174b64013af7f1f06c10e35b257f2360da6eb28018adef"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/terminal199_memory.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/terminal199_memory.rs",
+      "sha256": "3318e1899f31cc785a8f5e23f867beee4914a1e03c9c0b1fdbd93722f42d4890"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/io_epoch199_append.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/epoch186/io_epoch199_append.rs",
+      "sha256": "2f1714a2764471dd83898c657ab3ceca34cef9fc223611daed674dddc7673696"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "sha256": "9fb54ef71cda3696863ce04c0a9ea5e9911f1cc895af878ac6bfb070ceba6c85"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/io_current_census_composition.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/epoch186/io_current_census_composition.rs",
+      "sha256": "307cdf692e41c864c387b5e7b16293eaa54ec4bfc177d0ec25525e3cdb32909e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/evidence_current199_growth.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/epoch186/evidence_current199_growth.rs",
+      "sha256": "740d979e9cd1d278fb4166cae920668a1b6b57392d60a7d6c8a341ac812fc4a8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/guard_continuity.rs",
+      "repository": "scripts/horizon_original199_witness_reader_v1/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/guard_continuity.rs",
+      "sha256": "e29fe816c31783c4a78f0a111607c09ea151fc1544dc7eb3e89ba65bd77ac654"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/retained_observer_chain.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/retained_observer_chain.rs",
+      "sha256": "eff3506956b922db4a855cd636167935bff13fa5c4e3e155e384725db63238d5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+      "sha256": "3b8761abf1c3c4e08605616b2d173b53caf046aabb5298b7aec055c9f7357448"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/io.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/io.rs",
+      "sha256": "85ce9f0505164c7e909bc2f06020365a1c6c1273eff292f8019fe7b51a6e14e1"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/current_terminal145_image_registration_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/current_terminal145_image_registration_tests.rs",
+      "sha256": "d33865beea0c58cab0e61fa4bc2f96e6e6d6b6bee4475c0f350df8ce735aab96"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/current_terminal145_outer_adapter_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/current_terminal145_outer_adapter_tests.rs",
+      "sha256": "0a3685073d7d65b84e3d02013841be28694da1eebc4c0cb50dc326c5c32cef2d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/live145_genuine_capture_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/live145_genuine_capture_tests.rs",
+      "sha256": "93b6cf1972a7952225eca9f21595a6ec63c191e91afe7f9b3c4c49448138ad8c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/sealed_alias0558_capture_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/sealed_alias0558_capture_tests.rs",
+      "sha256": "7f327177c71d4ea6147c2eaa3cff13f223b52f155dab3c9ad8a43b653c1d4e8f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163.rs",
+      "sha256": "c1976c380bdd13a48072622a760e73bf62a73263f3162c85390a7d1789838e64"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
+      "sha256": "49abc4a879e5fe315cdfe350b17c7444ef682dd29ce0bb466883ed8ee7ac96d6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/enrollment.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/enrollment.rs",
+      "sha256": "1925b0da93688830fb78633d9be95e9cd25fa64de496bc47a5bd9695cf6ca2af"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/enrollment_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/enrollment_tests.rs",
+      "sha256": "97f908ef7d5a82955e235b2ba7cbe08b797a0f501c8143b2bb1976e3102f6dc2"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/current_metadata.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/current_metadata.rs",
+      "sha256": "b0e73f28070479119abf654acbba29cc4c3b5f431606db11222aea3c78a829be"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/completed145_guard_bindings.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/completed145_guard_bindings.rs",
+      "sha256": "fbff60db59823d5c966c8b97d5b7339a8ccc2b3d68991fadfaec4c5be83656a3"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/native_restore.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/native_restore.rs",
+      "sha256": "6de06b133f69b2962adbe9a27bfebc1a9557c084c7890c417235ed4877fbe0c5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/native_restore/held.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/native_restore/held.rs",
+      "sha256": "b76f726651073747a25047e060ea323f006d992cc3200c44a728fbd9aa1d3563"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/native_restore/provenance.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/native_restore/provenance.rs",
+      "sha256": "be6700f1d107c8860087eb5c26f897e28e7a061853ade688126bec0617f01e58"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/candidate_memory.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/candidate_memory.rs",
+      "sha256": "ef15947f6b4c72ecbfee445f289472891dc22b93084d5a3d9b9091384b053877"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128.rs",
+      "sha256": "b1f5c7be2332f5d62ce85305d328472fc5f7dd7817acc9821884b841bd686038",
+      "qualified_source_sha256": "042634ec1e665dcd937c887b07a5d7d572ccfe35e1dee0ed79dfa8529570caa1",
+      "repository_normalization": "remove extra blank line at EOF only; qualified original bytes remain preserved in source freeze"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/tests.rs",
+      "sha256": "b7b84272d1df1ed0c75e4b3614e320875eecc9b1230b24a48203116ddd426638"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/release128.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/release128.rs",
+      "sha256": "1bbd61ca9891d85aaff876027b80deb6d593982537103b8c0891c4b946fc8464"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/candidate_memory128.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/candidate_memory128.rs",
+      "sha256": "53910ea2f34c39f2c90c9053f3c843f759f69cb52423750c85e64218bfecdec7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/current_phase.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/current_phase.rs",
+      "sha256": "3dde79d0f3f534b5dc98a0246c1ea045e166d36296eeb1211b80ad1ef8b71750"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/qualified_profile.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/qualified_profile.rs",
+      "sha256": "d629793bafd8f0a639fe6e7714f5532904d906a2c96e4faea8f55a155a7fb000"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/native_capability.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/native_capability.rs",
+      "sha256": "09834f06d5f3cf8d0a8a09beaa22c92c9d893f0a5cb47c0bfb7348897fa3b6a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/enrollment128.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/enrollment128.rs",
+      "sha256": "f3ba0eb31944cc618f67d113a79e419a47d88e85e7a82ab820cc4a136dc72f4e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/first128/integration.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/direct163/first128/integration.rs",
+      "sha256": "c6ee3ed071f9312be464a7c7f4276d06ac59f3b155728053a501bb9d00c951e9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/custody.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/custody.rs",
+      "sha256": "e638f46a943e4df1afafd4717eb673de114397729be4e0f46df2578c76ef8b88"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/terminal_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/terminal_tests.rs",
+      "sha256": "66a09192bc4b69e958df1897bd701ff11419d64fe38c2a859bec8ae0d9426259"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/model.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/model.rs",
+      "sha256": "5113e7678c064ff7fcd832a3c85cd26ba6d7706b96216950f1641e00ff209ccd"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/tests.rs",
+      "sha256": "b9a3e72b7935cb30759107a2a19ca52d784251a503f93bf6a6795a068e6e864a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/native.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/native.rs",
+      "sha256": "a9e8b183cf8255b7f266355910b86684c42eb077bf13934a7b4972828e305319",
+      "qualified_source_sha256": "d53c1d59178bdf43b8f38661c1c59eafd23058d83bd7c2f9f2a9304043ae1977",
+      "repository_normalization": "remove extra blank line at EOF only; qualified original bytes remain preserved in source freeze"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/terminal.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/terminal.rs",
+      "sha256": "0b0cef7ed78428ae306f19c9ed68fe32e118cb2d72035b77e2a08bd33ac265ea"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/coordinator_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/coordinator_tests.rs",
+      "sha256": "5d6c72b5b00d598831e79b656cddba6a29341c0fd35a015bd3af6f68c9b634eb"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/cached145_observer_recovery.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/cached145_observer_recovery.rs",
+      "sha256": "97537e4856da82d390befe1bf029f988ac2e698a541493dde133bbf139671e01"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/lib.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/lib.rs",
+      "sha256": "4c29e65cec5700408e083d7c58fe6e955f25c219cfc2371d026905e42c7f0cc4"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/private154_downstream_history.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/private154_downstream_history.rs",
+      "sha256": "09962413cfbbf44478e7ef511f1a38a5dccfcad8505d8ad82d2adca0f9f9aeee"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/retained_fleet_bridge_view.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/retained_fleet_bridge_view.rs",
+      "sha256": "e758190b5955e63d2ec90f170274df1eee5cd4660e3cc59c506433e6b331cd42"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/retained_observer_chain.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/retained_observer_chain.rs",
+      "sha256": "46e2d440b9196ae5bde030034f6af12493bf4dae3cb001165bc2a7c5f69207b7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/retained_observer_chain_terminal_tests.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/retained_observer_chain_terminal_tests.rs",
+      "sha256": "0695bd7a057cd779639f740d747350223ba22298d658818d681eafe7480f4790"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/library/src/suffix154.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/typed-frame-overlay/src/suffix154.rs",
+      "sha256": "1ebcbd97e1617d8e128e9c68587484dfc232fdbbf59d10750f03bf12534f6daa"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/frame-cli-overlay/src/main.rs",
+      "sha256": "4377bb15498a8e57a89daefade4b62f36353c581dd7cffbabcfacde946f1a1a8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/original199-census/source/census_entry.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/original199-census/census_entry.rs",
+      "sha256": "657adcbdc6f9a99b6ef6bafc45f1c04afd0d3bbb2095ee16127a585607a6572e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/original199-census/source/fsutil.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/original199-census/fsutil.rs",
+      "sha256": "93f408cbb48794dec52cc229be3219038e212227cc520c015a6fad2aab32d8a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/completed145-census/source/cached145_census_entry.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/completed145-census/cached145_census_entry.rs",
+      "sha256": "1e57a5a3d3a6bbc0ca012dd68c4a9756a2899341588ae0282f632bcc8a2666f0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/completed145-census/source/fsutil.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/completed145-census/fsutil.rs",
+      "sha256": "93f408cbb48794dec52cc229be3219038e212227cc520c015a6fad2aab32d8a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/memory-selector/source/fsutil.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/memory-selector/fsutil.rs",
+      "sha256": "93f408cbb48794dec52cc229be3219038e212227cc520c015a6fad2aab32d8a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/memory-selector/source/reader_entry.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/memory-selector/reader_entry.rs",
+      "sha256": "ce265d046e2e50edcd6d7e4e986e7865a26df27c0046bc843ba1e3b63af65afd"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/DATA-selector/source/fsutil.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/DATA-selector/fsutil.rs",
+      "sha256": "93f408cbb48794dec52cc229be3219038e212227cc520c015a6fad2aab32d8a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/DATA-selector/source/main.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/DATA-selector/main.rs",
+      "sha256": "14a51b070e8fa8ec1faa4ecbdfceb50812b7f1df60ddbd01055cb20d139acea0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/DATA-selector/source/native.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/DATA-selector/native.rs",
+      "sha256": "40afea58beeadbbcbe6830ee350f3724b20576aa63e8fcf07f99b5a688baeae1"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/small-clients-v1/DATA-selector/source/selection_clock.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/clients/DATA-selector/selection_clock.rs",
+      "sha256": "b51dd684c4c499659df2619de637c11a7c4ddb08d0e49cdd1c65b4e310ae6f85"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/HELPER12-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/HELPER12-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "fc6155881eeb2459ebeb0dc9dd542d49a054ad280ae908018a5a5a9c94eba804"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/HELPER_EXACT4_COMPILER_RECIPES_AND_SOURCE_V12_WITH_NATIVE_CONTROL.json",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/HELPER_EXACT4_COMPILER_RECIPES_AND_SOURCE_V12_WITH_NATIVE_CONTROL.json",
+      "sha256": "2c9e9635d2a531a424d9f0abd33bc7a6ea59513b3e721ee4cd2cab28b9d0a249"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/CLI5-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/CLI5-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "f5899b4abf5483ea5d1084f37939b8416fd5b073bd1632a1cd2bb270d420b4c9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/CLI_EXACT4_CHAIN128_WITNESS_RECIPES_V5.json",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/CLI_EXACT4_CHAIN128_WITNESS_RECIPES_V5.json",
+      "sha256": "d846898ae46d5234b1b242b40f0e38dac3fd75d7b78301c7b167f6963c001390"
+    }
+  ],
+  "full_reader_recovered": false,
+  "replay_launch_authorized": false
+}

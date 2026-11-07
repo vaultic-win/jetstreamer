@@ -212,6 +212,22 @@ const SEALED_ALIAS_PREDECESSOR_FRAME_CAPTURE_SHA: Option<&str> =
 // Root may fill only after genuine new CLI capability/capture; fleet support alone grants no reader authority.
 const LIVE145_CENSUS_FRAME_CAPTURE_SHA: Option<&str> =
     Some("454ca6069a17ab9d917f59324a9c318dddb8c31203f5a753cb8070ee3efefec5");
+// Register only after the v3 image's genuine CLI capture and original drains.
+// Old image predicates keep their original raw-registry scope unchanged.
+const CURRENT_TERMINAL145_FRAME_CAPTURE_SHA: Option<&str> =
+    Some("70b82a16f8c5d71257305a0873440deccf8746f78b09fc33ee23f5c691e29fe4");
+fn current_terminal145_capture_with_pin(frame: &Value, pin: Option<&str>) -> bool {
+    let context = &frame["epoch199_terminal_context"];
+    let selected_context = *context == retained199_v2_selector()
+        || serde_json::from_value::<original199_input_witness_consumer::Bound>(context.clone())
+            .is_ok_and(|bound| original199_input_witness_consumer::is_selected_context(&bound));
+    pin.is_some_and(|sha| sha.len() == 64
+        && sha.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && frame["self_sha256"] == sha)
+        && selected_context
+        && frame["epoch199_http500_capture_registration"].is_null()
+        && frame["epoch199_http500_recovery_enrollment"].is_null()
+}
 fn typed_bridge_capture(frame: &Value) -> bool {
     typed_bridge_capture_with_pin(frame, TYPED_FLEET_BRIDGE_FRAME_CAPTURE_SHA)
         || typed_bridge_capture_with_pin(frame, TERMINAL145_ANCESTRY_FRAME_CAPTURE_SHA)
@@ -220,6 +236,7 @@ fn typed_bridge_capture(frame: &Value) -> bool {
         || typed_bridge_capture_with_pin(frame, ACCEPTED0428_REFRESH_FRAME_CAPTURE_SHA)
         || typed_bridge_capture_with_pin(frame, SEALED_ALIAS_PREDECESSOR_FRAME_CAPTURE_SHA)
         || typed_bridge_capture_with_pin(frame, LIVE145_CENSUS_FRAME_CAPTURE_SHA)
+        || current_terminal145_capture_with_pin(frame, CURRENT_TERMINAL145_FRAME_CAPTURE_SHA)
 }
 
 // Additive v2 route remains unregistered until exact Frame library/capture QA and normal seal.
@@ -454,7 +471,7 @@ pub(super) fn accepted(
         .as_ref()
         .and_then(|t| t["observation_bridge"].as_array())
     {
-        ensure!(rows.len() <= 16, "observation bridge too long");
+        ensure!(rows.len() <= 127, "observation bridge too long");
         for (index, row) in rows.iter().enumerate() {
             for member in ["observer", "fleet", "fleet_plan"] {
                 if row[member].is_null() {
@@ -1373,3 +1390,7 @@ mod cold185_capture_registration_tests {
 #[cfg(test)]
 #[path = "live145_genuine_capture_tests.rs"]
 mod live145_genuine_capture_tests;
+
+#[cfg(test)]
+#[path = "current_terminal145_image_registration_tests.rs"]
+mod current_terminal145_image_registration_tests;

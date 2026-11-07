@@ -90,6 +90,18 @@ pub(super) fn capture_http500_recovery199_terminal() -> Result<()> {
     recovery199::capture_terminal()
 }
 
+pub(super) async fn release_first163128() -> Result<()> {
+    direct163::first128::release().await
+}
+pub(super) async fn admit_first163128() -> Result<()> {
+    direct163::first128::run().await
+}
+pub(super) async fn enroll_first163128() -> Result<()> {
+    direct163::first128::enroll()
+}
+pub(super) async fn admit_native163() -> Result<()> {
+    direct163::native_restore::run().await
+}
 pub(super) async fn admit_direct163() -> Result<()> {
     direct163::admit().await
 }
@@ -1847,6 +1859,10 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if claim.unit == direct163::first128::PARENT128 {
+        ensure!(direct163::first128::launch_matches(claim, receipt), "first128 exact diagnostic enrollment");
+        return Ok(());
+    }
     if receipt["schema"] == cold185::enrollment::SCHEMA {
         return cold185::enrollment::validate_launch(claim, receipt);
     }
@@ -2578,7 +2594,7 @@ pub(super) fn utc_seconds(value: &str) -> Result<u64> {
 }
 
 fn observed_unit_name(name: &str) -> bool {
-    (name.ends_with(".service")
+    (name == direct163::first128::TIMER128 || name.ends_with(".service")
         || name == suffix154_admission::contract::GUARD_TIMER
         || name == "horizon-durable-prefix141-guard-20261030-v1.timer"
         || name == ordinary199::TIMER
@@ -2790,12 +2806,14 @@ pub(super) fn unit(name: &str) -> Result<Value> {
         || name == epoch137_input::epoch137_exact_contract::DOWNLOAD_UNIT
         || cached145::native_namespace(name)
         || ordinary199::FAMILY.contains(&name)
+        || direct163::first128::native_namespace(name)
+        || direct163::first128::completion_namespace(name)
     {
         "--property=Id,LoadState,Type,ActiveState,SubState,InvocationID,NRestarts,Result,ExecMainStatus,ExecStart,ControlGroup,MainPID,ExecMainStartTimestamp,ExecMainCode,ExecMainPID,ExecMainExitTimestamp,RemainAfterExit,ControlPID,Job,Restart,MemoryAccounting,MemoryMax,MemoryHigh,MemorySwapMax,CPUQuotaPerSecUSec,RuntimeMaxUSec,TasksMax,User,Group,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,KillMode,Delegate"
     } else {
         "--property=Id,LoadState,Type,ActiveState,SubState,InvocationID,NRestarts,Result,ExecMainStatus,ExecStart,ControlGroup,MainPID"
     };
-    let properties = if cached145::native_namespace(name) || name == ordinary199::TIMER {
+    let properties = if cached145::native_namespace(name) || name == ordinary199::TIMER || direct163::first128::native_namespace(name) {
         format!(
             "{properties},Triggers,TriggeredBy,Unit,TimersMonotonic,OnFailure,Conflicts,After,TimeoutStartUSec"
         )
@@ -2814,7 +2832,7 @@ pub(super) fn unit(name: &str) -> Result<Value> {
             .context("malformed systemctl property")?;
         if key == "TimersMonotonic"
             && ((name.ends_with("-guard.timer") && cached145::native_namespace(name))
-                || name == ordinary199::TIMER)
+                || name == ordinary199::TIMER || name == direct163::first128::TIMER128)
         {
             let base = cached145::timer_monotonic_base(value)
                 .context("invalid cached145 timer vector entry")?;
@@ -3762,6 +3780,8 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
+            } else if event["schema"] == "epoch163-first-output128-fleet-enrollment-v1" {
+                direct163::first128::validate_transition(&previous, &plan, &plan_value, &event, sample, started_seconds)?;
             } else if event["schema"] == "horizon-direct163-typed-enrollment-v1" {
                 direct163::validate_transition(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native209::SCHEMA {
@@ -4879,6 +4899,9 @@ pub(super) async fn run() -> Result<()> {
             || (cold185_claim
                 && current["ActiveState"] == "activating"
                 && current["SubState"] == "start-pre");
+        if is_active && claim.unit == direct163::first128::PARENT128 {
+            direct163::first128::allocation(&plan_value)?;
+        }
         if is_active && claim.unit == direct163::UNIT {
             let declaration = json!({"diagnostics":plan.diagnostics.iter().map(|d|json!({"epoch":d.epoch,"unit":d.unit,"launch_receipt":d.launch_receipt})).collect::<Vec<_>>()});
             direct163::allocation(&declaration)?;
@@ -5117,7 +5140,9 @@ pub(super) async fn run() -> Result<()> {
                     && claim.scratch_path.is_dir(),
                 "diagnostic scratch must be an exact canonical directory"
             );
-            let phase = if cold185_claim {
+            let phase = if claim.unit == direct163::first128::PARENT128 {
+                "first163128-private-diagnostic"
+            } else if cold185_claim {
                 cold185_route
                     .as_ref()
                     .context("cold185 phase route")?
