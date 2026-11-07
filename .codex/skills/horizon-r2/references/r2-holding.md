@@ -69,9 +69,18 @@ locally at once. For each proposed park, retirement, restore and launch phase, r
 - upload, complete authenticated readback and restore time, the input-ready deadline, and the next
   qualified transition with its observed result.
 
+Check local fit at every phase, including upload/readback before its source can be retired:
+`phase_free_bytes - existing_remaining_growth - candidate_incremental_peak - restore_overlap >= safety_floor`.
+Use non-overlapping byte terms: exclude already resident bytes from remaining growth and candidate
+peak, and charge restore staging only once. Derive phase free space from measured free space and
+that phase's allocations and retirements. Future reclamation belongs only to phases after the
+verified local retirement; it cannot fund the upload or restore that must precede it. Actual launch
+still requires fresh admission against observed free space and unchanged live reservations.
+
 Choose among safe schedules by useful concurrent replay and verified delivery throughput. Prepare
 the next inputs while current lanes run when the measured I/O and local overlap permit it; schedule
-their restore early enough to replace a finishing lane. Distinguish remotely parked future inputs
+their restore early enough to replace a finishing lane. Prioritize the transfer that unlocks the
+next admissible lane over bulk parking for distant epochs. Distinguish remotely parked future inputs
 from files that must remain resident. A reservation changes only through its qualified accounting
 release after actual retirement; retain all live growth claims and immutable guard floors until then.
 If every safe schedule still misses the memory-selected target, record the exact limiting phase

@@ -46,7 +46,9 @@ rotation budget and resume its next transition across handoffs; the scratch pref
 in scheduling, rather than merely mentioned as an option. Plan concurrent resident working sets
 and rotate later epochs' closed inputs through R2; the whole campaign's retained data need not
 fit locally at once. Apply the phase-by-phase [rotation budget](references/r2-holding.md#rotation-budget)
-before accepting a disk-based lane shortfall. Count capacity only
+before accepting a disk-based lane shortfall. Select the next transfer by the lane it unlocks and
+its input-ready deadline; do not let bulk parking of distant epochs delay a runnable replacement.
+Count capacity only
 after verified offload and actual local retirement; reserve restore staging and transfer time in
 the next admission. Preserve healthy work and every admission/integrity
 gate. Delete completed epochs' unnecessary local files promptly under
