@@ -1,0 +1,93 @@
+{
+  "actor_invocation_id": "f37b155136614e0183ba2e9adb8714ef",
+  "actor_memory_bytes": 85899345920,
+  "actor_unit": "horizon-extract145-prefix-shared72h-20261107-v8g1.service",
+  "actual_guarded_launch": {
+    "path": "/home/sol/.jetstreamer-private/delivery145-next-source-20261107-v1/native-v8-source/root-runtime/ROOT_ACTUAL_GUARD_BEFORE_SOURCE_AND_RUNNING_EXPORTER.json",
+    "sha256": "f440343b6b297ff467078ffda44f4241d62361869604af344d8842624f377ea2"
+  },
+  "actual_native_capability_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/delivery145-next-source-20261107-v1/native-v8-source/root-runtime/ROOT_ACTUAL_NATIVE_CAPABILITY_ACCEPTED.json",
+    "sha256": "c490e38fbd0fd4d6072f5a7e2a3316bb34477001ceab6dcacb178e09f210ac8e"
+  },
+  "all10_original_QA_actors_drained": true,
+  "canonical_publication_or_retirement_authorized": false,
+  "entry_window_seconds_maximum": 240,
+  "failed_partial_bytes_preserved": 41966206710,
+  "guard_memory_bytes": 268435456,
+  "metadata_status_authenticated_readback": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261107074626.json",
+    "sha256": "e805d29f3f9f38a886d90f0b566f2e858c67a164efd1c3944e3ca95286a13bff"
+  },
+  "normal_pool_bytes": 6442450944,
+  "normal_program_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/deployment-seal-receipt.json",
+    "sha256": "74ca02fdfc3e0bb97b6567ed295c3053b399ae948ad67cff62ae56ee06e90e17"
+  },
+  "original_execution_window_seconds_maximum": 259200,
+  "original_failed_attempt_unchanged": true,
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract",
+    "sha256": "b416b7c932ef781c8d0f863b63b803379dd58cb1affe99dced6a61830a95ad76"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/artifact-proof.json",
+    "sha256": "66c77c6cf1f7308858fe2834e4b612226acfb127bf8d1a3260147a63c65ffef3"
+  },
+  "qualified_core_tests": 63,
+  "qualified_retained_bridge_tests": 3,
+  "replay_lane": false,
+  "schema": "horizon-epoch145-private-exporter-v8-source-runtime-record-v1",
+  "source_body_opened_only_after_actual_guard": {
+    "path": "/home/sol/.jetstreamer-private/epoch145-prefix-extract-shared72h-20261107-v8g1-state/guard-before-source-read.json",
+    "sha256": "3410e0ea3c4fbbfe911185e893f9c79eb246a6cf419ecea7f567ac03ae79c53d"
+  },
+  "source_bytes_preserved": 105633748687,
+  "source_files": [
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/admission.rs",
+      "sha256": "514aed09f8a0702251009bcd47eab6d430481dc0d5c354789ff6637641af8071"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/admission_bridge.rs",
+      "sha256": "2b4e686849b958ad4c13f10fb4cf90026c291cab24508906baee8c766a1e39ce"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/archive_checksum.rs",
+      "sha256": "35036a3c8cc89035ba2d95b53b513560c938d95c23b97bacc152fece64d72431"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/bridge_client.rs",
+      "sha256": "de1839106f3a4e4556db5e4484977193c369b284abaaa0838d383887287b35f1"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/custody.rs",
+      "sha256": "1f63133773f19f2f3201287f9cd30c604dd1f333a734c5d8ac5a1a0bfdddb6b8"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/epoch145_extract.rs",
+      "sha256": "b66e97fa8a2bbaea2693c440544cd189f093277a6738b4c618d6972392228bb8"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/epoch145_stage_policy.rs",
+      "sha256": "68bd4e7f026cf93056ae99f3d6d59286be0996c5f263067f3d6f4ddbfd942330"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/main.rs",
+      "sha256": "5be3379d80edc7e407b56f01bbb3e3b819ed44ebb891e1d1652abbc854ed2ca4"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/model.rs",
+      "sha256": "5113e7678c064ff7fcd832a3c85cd26ba6d7706b96216950f1641e00ff209ccd"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/native.rs",
+      "sha256": "1cae11d30ecc1b168af5fdca05db930d11a0623108059ed0cb843eed7506fd0d"
+    },
+    {
+      "path": "scripts/horizon_epoch145_private_prefix_v8/segment_manifest.rs",
+      "sha256": "3d0efe54a8fb2ffb97ddc6f978e7bf2223de01ed453a952ba0fda4cb922332b8"
+    }
+  ],
+  "strict_production_and_test_clippy_passed": true
+}
