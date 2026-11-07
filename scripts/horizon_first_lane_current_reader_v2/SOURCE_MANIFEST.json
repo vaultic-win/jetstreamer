@@ -47,9 +47,9 @@
       "sha256": "eff3506956b922db4a855cd636167935bff13fa5c4e3e155e384725db63238d5"
     },
     {
-      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v13/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
       "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
-      "sha256": "3b8761abf1c3c4e08605616b2d173b53caf046aabb5298b7aec055c9f7357448"
+      "sha256": "deb0d14ebad15193654b075e8fbe0e103748cd4d897c7327c9170ec3a6e8033d"
     },
     {
       "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/io.rs",
@@ -82,9 +82,9 @@
       "sha256": "c1976c380bdd13a48072622a760e73bf62a73263f3162c85390a7d1789838e64"
     },
     {
-      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v13/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
       "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
-      "sha256": "49abc4a879e5fe315cdfe350b17c7444ef682dd29ce0bb466883ed8ee7ac96d6"
+      "sha256": "c08fcb9d7d5c002e5dacb4ac5b54a614d7de9babbc2c8a8868b80da6f4825c2b"
     },
     {
       "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v12/jetstreamer-r2/src/fleet/direct163/enrollment.rs",
@@ -319,8 +319,25 @@
       "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/CLI_EXACT4_CHAIN128_WITNESS_RECIPES_V5.json",
       "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/CLI_EXACT4_CHAIN128_WITNESS_RECIPES_V5.json",
       "sha256": "d846898ae46d5234b1b242b40f0e38dac3fd75d7b78301c7b167f6963c001390"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/helper-source-v13/jetstreamer-r2/src/fleet/terminal_legacy_memory.rs",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/helper-overlay/jetstreamer-r2/src/fleet/terminal_legacy_memory.rs",
+      "sha256": "37a01d1c7769112947321a7aadaff2237ec37cda5e384e2ec504bbd098e626d7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/HELPER13-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/HELPER13-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "fb6f325b7ce2c62164a30ad9dedb0b044a9974f32383d85bcf647cc317e06429"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/HELPER_EXACT4_COMPILER_RECIPES_AND_SOURCE_V13_WITH_NATIVE_CONTROL.json",
+      "repository": "scripts/horizon_first_lane_current_reader_v2/qualification/HELPER_EXACT4_COMPILER_RECIPES_AND_SOURCE_V13_WITH_NATIVE_CONTROL.json",
+      "sha256": "bfeb6d9b3fa69159d725c5c1d0b67bd1d5209f9ea02a593d10afc6ac344ceb71"
     }
   ],
   "full_reader_recovered": false,
-  "replay_launch_authorized": false
+  "replay_launch_authorized": false,
+  "helper13_qualification_passed": true,
+  "operational_helper13_reader_pending": true
 }

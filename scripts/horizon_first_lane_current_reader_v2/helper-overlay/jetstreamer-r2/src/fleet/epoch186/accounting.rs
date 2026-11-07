@@ -2243,8 +2243,8 @@ async fn protected_data_basis_inner(
         cold185_after.as_ref(),
         &cold185_discovery_after,
     )?;
-    let discovery_comparison_before = live145_prefix::comparison(&discovery_comparison_before, live145_before.as_ref())?;
-    let discovery_comparison_after = live145_prefix::comparison(&discovery_comparison_after, live145_after.as_ref())?;
+    let discovery_comparison_before = live145_prefix::discovery_view(&discovery_comparison_before, live145_before.as_ref())?;
+    let discovery_comparison_after = live145_prefix::discovery_view(&discovery_comparison_after, live145_after.as_ref())?;
     guard_continuity::components(&[
         ("owners", owners_before == observed_after),
         ("native_and_guards", guard_result.is_ok()),
@@ -4470,4 +4470,9 @@ mod native128_scoped_issuer_overlay_tests {
         assert!(helper_memory_bytes(issuer, &json!({"MemoryMax":"536870912"})).is_err());
         assert!(helper_memory_bytes("horizon-native-other.service", &json!({"MemoryMax":"2147483648"})).is_err());
     }
+}
+
+/// Reauthenticate the sole145 guard scope before an existing terminal-memory comparison.
+pub(in crate::fleet) fn terminal_memory_discovery_stable(report: &Value) -> Result<bool> {
+    live145_prefix::recorded_discovery_stable(report)
 }

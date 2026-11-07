@@ -641,6 +641,42 @@ pub(super) fn comparison(v: &Value, current: Option<&Value>) -> Result<Value> {
     }
     Ok(json!(result))
 }
+/// Discovery is telemetry, while this independent actor peer keeps the entire
+/// actor+guard reservation. Only its already authenticated guard may appear or
+/// disappear from a running-service discovery; every other row stays exact.
+pub(super) fn discovery_view(value: &Value, capture: Option<&Value>) -> Result<Value> {
+    let mut view = comparison(value,capture)?;
+    if capture.is_some() {
+        view.as_object_mut().context("live145 discovery comparison object")?.remove(GUARD);
+    }
+    Ok(view)
+}
+
+/// Reauthenticate the fixed original sources and current terminal/live phase.
+/// Captured JSON or an asserted equality flag cannot grant this narrow scope.
+pub(super) fn recorded_discovery_stable(report: &Value) -> Result<bool> {
+    let before = &report["workload_discovery_before"];
+    let after = &report["workload_discovery_after"];
+    if before == after { return Ok(true); }
+    let a = report.get("live145_prefix_export_before").filter(|v|!v.is_null())
+        .context("changed discovery needs original authenticated145 before capture")?;
+    let b = report.get("live145_prefix_export_after").filter(|v|!v.is_null())
+        .context("changed discovery needs original authenticated145 after capture")?;
+    stable(Some(a),Some(b))?;
+    let sources = a["peer"]["source_bindings"].as_array().context("actual145 original source bindings")?;
+    ensure!(sources.len()==7,"actual145 complete original source binding set required");
+    let selector = Selector {
+        plan:serde_json::from_value(sources[0].clone())?,
+        ready:serde_json::from_value(sources[1].clone())?,
+        admission:serde_json::from_value(sources[2].clone())?,
+        guard_before_source:serde_json::from_value(sources[3].clone())?,
+        terminal_retained:terminal::retained(a),
+    };
+    let fresh = actual(Some(&selector),custody::now()?)?.context("actual current145 source reauthentication")?;
+    stable(Some(b),Some(&fresh))?;
+    Ok(discovery_view(before,Some(a))? == discovery_view(after,Some(b))?)
+}
+
 /// Compose this exact authenticated actor's periodic comparison before the
 /// current coordinator gate. Raw native/report maps are never rewritten.
 pub(super) fn coordinator_basis(
