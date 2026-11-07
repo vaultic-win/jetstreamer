@@ -1,0 +1,73 @@
+{
+  "schema": "native128-root-template-config-v2-original-reader-before",
+  "output_directory": "/usr/local/lib/jetstreamer/horizon-visible-native163128-current2330-plan-20261107-v1",
+  "previous_phase_ledger": {
+    "path": "/home/sol/.jetstreamer-private/epoch163-native-input-qa-20261106-v7/RESOURCE_PHASES_R24_NATIVE163_QA_DATA_BOOKED.json",
+    "sha256": "0d95b4cfe5cde644d3b9105c32116598a8a7a449c14b9003f48e380bf6ad96da"
+  },
+  "extra_QA6_closure": null,
+  "issuer_program": null,
+  "worker_image_path": "/usr/local/lib/jetstreamer/deploy-epoch163-singleton-20261104-v1/jetstreamer-historical-worker-v1-5-6",
+  "ledger_directory": "/home/sol/.jetstreamer-private/visible-native163128-20261107-v1/ledger",
+  "scratch_directory": "/home/sol/.jetstreamer-private/visible-native163128-20261107-v1/scratch",
+  "state_directory": "/var/lib/jetstreamer/horizon-epoch163-native-input-20261106-v1",
+  "snapshot": "/home/sol/.jetstreamer-private/visible-input163-staging-20261107-v1/compressed/snapshot-70415741-2aSbRXHXZJgT4bdrY34gWizngFB527wavw6Ar9KadzUY.tar.zst",
+  "protected_existing_DATA_bytes": 5114649588372,
+  "minimum_available_memory_bytes": 790890381312,
+  "maximum_runtime_seconds": 7200,
+  "memory_receipt": null,
+  "memory_completion": null,
+  "data_receipt": null,
+  "data_completion": null,
+  "data_policy": null,
+  "data_policy_seal": null,
+  "resource_accounting_spec": null,
+  "download_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-visible-bootstrap163-download-plan-20261107-v1/plan.json",
+    "sha256": "b8c1d22d5421cf75fa01669cf92a606d53ae6e2f3752627ea2562be45293c41e"
+  },
+  "download_receipt": {
+    "path": "/var/lib/jetstreamer/horizon-visible-bootstrap163-20261107-v1/download.json",
+    "sha256": "d53218ba616a9a455cf977c98ec3dcf6be79495036f1907856c0b7e12f41c92b"
+  },
+  "current_DATA_booking": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/ROOT1800_ADDITIONAL4GiB_COMBINED_FIRST_LANE_QA_DATA_BOOKING.json",
+    "sha256": "b52ef2d4f33f7b2ecabecaf953430783df654d77b3b15b2fc3b5fa31b8fbf804"
+  },
+  "staging_directory": "/home/sol/.jetstreamer-private/visible-native163128-current2330-plan-staging-20261107-v1",
+  "expected_current": {
+    "observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T233022Z-postcompletion154-v1.json",
+      "sha256": "23e32ae0a185d59b3552636702ef5f2733e40bf79fd5d652bdec8110a85289ab"
+    },
+    "fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T233022Z-witness-terminal145-v1.json",
+      "sha256": "2b9eec5dae0f88e54e853ff822929f447383d8818c2d11b5c2c7fd63669caef1"
+    },
+    "fleet_plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current2330-fleet-plan-20261107-v1/fleet-plan.json",
+      "sha256": "0720f3cbb0f7c5dfc61e7eb2549419aad110a40888c6a85d7c87608aa19c0d26"
+    },
+    "frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T233022-witness-terminal145-chain128-v5.json",
+      "sha256": "095d092ae84b05aab2416c4d61fd7a710d62f62c48f2a11339d5e8e901088252"
+    }
+  },
+  "expected_memory_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-parent-memory-selector-tools-20261107-v4/parent-memory",
+    "sha256": "4b65f8504f8b058fa83b6f5d6654ac948d502d7d0a00861d6d3d56505b822cc2"
+  },
+  "expected_DATA_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/ended183-data",
+    "sha256": "85f374198bd5418bfa269faf01c9751b50f30a94a0cb0c0cc9a9b8b18133d243"
+  },
+  "first128_followon_source_only": {
+    "node": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-first163128-node-tools-20261107-v2/jetstreamer-node",
+      "sha256": "3172e25cd849ba8facbbfabdde400b077c846c627b1332cce6c43e39b1f6caaa"
+    },
+    "expected_guard_path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-first163128-guard-tools-20261107-v2/first163128-guard",
+    "qualified_guard_program": null,
+    "native_restore_is_not_first128_replay_admission": true
+  }
+}

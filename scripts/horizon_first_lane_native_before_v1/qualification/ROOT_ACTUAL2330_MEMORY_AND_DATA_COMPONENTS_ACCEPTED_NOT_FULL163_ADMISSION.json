@@ -1,0 +1,24 @@
+{
+  "actual_DATA_selection": {
+    "path": "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/23e32ae0a185d59b3552636702ef5f2733e40bf79fd5d652bdec8110a85289ab/selection.json",
+    "sha256": "382b9437d25090d93d16929a5f22b252612ddb14a14e7e5aec4ac6354c54b575"
+  },
+  "actual_memory_original_completion": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch163-selector2330-completion-20261107-v1/completion.json",
+    "sha256": "6c527bab77284c66779b33ecd0f62f37398b599b0620f9134669be2904d954e6"
+  },
+  "actual_memory_selection": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/23e32ae0a185d59b3552636702ef5f2733e40bf79fd5d652bdec8110a85289ab/select-1/selection.json",
+    "sha256": "2287b466397fa74aefe7159303accda74df82ebc445bbac6bf008bab8ac72f25"
+  },
+  "effective_DATA_bytes": 5074152197938,
+  "fresh_full163_admission_enrollment_input_and_guard_still_required": true,
+  "only_ended183_future_growth_selected": true,
+  "original199_all_DATA_preserved": true,
+  "original_PID1_and_drain": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2330/parent/ROOT_DATA2330_ORIGINAL_PID1_AND_DRAIN.json",
+    "sha256": "87af177b938e3e32fb90274d6bab799f9f80d6fdaba2bd7d2cbcf3a469558a74"
+  },
+  "physical_credit_bytes": 0,
+  "raw_DATA_bytes": 5155756576562
+}

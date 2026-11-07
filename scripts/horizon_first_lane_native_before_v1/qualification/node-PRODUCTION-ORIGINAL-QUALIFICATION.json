@@ -1,0 +1,662 @@
+{
+  "schema": "horizon-first128-witness-node-qualification-v1",
+  "program": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/work/node-release",
+    "sha256": "3172e25cd849ba8facbbfabdde400b077c846c627b1332cce6c43e39b1f6caaa"
+  },
+  "source_and_compiler_freeze": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/EXACT4_SOURCE_AND_COMPILER_FREEZE.json",
+    "sha256": "145f38475e8ee86a1bab3cc547c19bb2567cbf8c4c10f44657ca52fde8602485"
+  },
+  "exclusive_feature": "epoch163-first-output128-diagnostic",
+  "actual55_externs": {
+    "bincode": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libbincode-5dcb5dc55a3fed18.rlib",
+      "sha256": "8b031370e0efc2dfd9885298238ce2dec1aec92c38ed4df0e8c6a0cbaea4f667"
+    },
+    "ctrlc": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libctrlc-7df543e3b64722f1.rlib",
+      "sha256": "fc27787d7149c6fa654c5eddeca0f15512675585d39581a4f109b731790508a3"
+    },
+    "solana_logger": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_logger-a8e6da35c4e9b3d8.rlib",
+      "sha256": "967f3c92c6fc2a8985b49b9fdcc5008e0bee215555d89f551c5fb84f7090b2b6"
+    },
+    "xxhash_rust": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libxxhash_rust-0dc860a283782b88.rlib",
+      "sha256": "af11203dcae37477eb6a2570f404019e8aac9073748ef6fb27b10bfd89831309"
+    },
+    "thiserror": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libthiserror-c0b5c86dd1e640d4.rlib",
+      "sha256": "a70cfe060b9aa3d9681cef30ca1b2d78de769560adffedeffe827b79d5721dd3"
+    },
+    "solana_hash": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_hash-ae94f8d3ed27e8df.rlib",
+      "sha256": "49d6f047f2594b35f7bed91cef3ae64e4902179812eec61355f5118dc3a618b2"
+    },
+    "solana_address": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_address-ea19f99ac345fb40.rlib",
+      "sha256": "9af72795776f2ba2117d78c135c6d0a3f1905db5610183c19539d8bd6c1d5f3f"
+    },
+    "solana_svm": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_svm-ac3086897e310e2b.rlib",
+      "sha256": "71ba0916bd6dcf9577f38e21c4d9b10f1b326e08a8e4f4e9d5ef80ede70a4d9f"
+    },
+    "lencode": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/liblencode-eb21c74aa6a61647.rlib",
+      "sha256": "86adcbfd55ac58cffd8e6121611ce84ea7e62b67aaefcd8dd4c7a5d09a63e9f0"
+    },
+    "zstd": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libzstd-1fed47bd6a981708.rlib",
+      "sha256": "0ee61893caf68464ee26974a98f7dafdc24ea70d3774a4c1864909449bdbdba0"
+    },
+    "cid": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libcid-dc590e9d1c94254b.rlib",
+      "sha256": "f7a265f94fd5a16037e4d6f78747e96a22c2e0bf07c151f429820e5bd07546aa"
+    },
+    "serde_cbor": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_cbor-526b69a31f9d92f6.rlib",
+      "sha256": "1314ccaa7c6b54be516a41175395bdf4c4297cbebcbd7f49663c2b3c8f400cc3"
+    },
+    "solana_accounts_db": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_accounts_db-3a31f59fd37687ac.rlib",
+      "sha256": "e6fa95a011f82aaa1fdb19c25cbc26c7ab711957dd1d856e56f806f7d6e8f7ad"
+    },
+    "solana_message": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_message-16b6d05782a1b266.rlib",
+      "sha256": "b3c4761a7dacaea9321a44eeb609cd4cd2c8d65aa10741829b1d737104ac797f"
+    },
+    "solana_runtime_transaction": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_runtime_transaction-1025776ea8811720.rlib",
+      "sha256": "3258e1ea701fc5b99b6a97e1a6fd9100d98d4a20f10486f6967622224e8fd19c"
+    },
+    "jetstreamer_horizon": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libjetstreamer_horizon-f84a717c0e4172ac.rlib",
+      "sha256": "4a9963036b1d3629dbd6e5ad7665215543096912aeb14d664ecbd32cd0a07a60"
+    },
+    "serde": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde-9a73862527869ac6.rlib",
+      "sha256": "b05d8d87b1576d7dfa44ed55563564fe2b5805cf7ff56a495f4db17798838f9a"
+    },
+    "bs58": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libbs58-f7c6527273b04476.rlib",
+      "sha256": "64f0267dc489fcc4fde2655e06d23bcdeb429e1386a2bb3df82d7d85f1deed21"
+    },
+    "solana_signature": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_signature-6ccfc902fd607370.rlib",
+      "sha256": "3bc1f42d236565871e0081c6595aaaf37618ab9ef404c98c994910f1edc8b3d5"
+    },
+    "md5": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libmd5-81c5b3a0bb6e34d1.rlib",
+      "sha256": "27517b27ce5de9f30b5d075b18bd401e73df4f044e1cb2c9f64a0e51f630f415"
+    },
+    "solana_runtime": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_runtime-f5da2aa84143f7c4.rlib",
+      "sha256": "ef9b35a680b964fa774c76d30664f7e9c55bb6ed4a6f2b6e90f944a9f0d40f87"
+    },
+    "solana_svm_timings": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_svm_timings-381cd1a318c81e76.rlib",
+      "sha256": "4f18e1e729fe57fc903df1d9bda6f54f9cc8e9ca59719eb313b07afb04840978"
+    },
+    "serde_json": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+      "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+    },
+    "solana_clock": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_clock-90bb9ebed48f4b59.rlib",
+      "sha256": "d7aee5757918989cfa52cf3a81adf0bed09230cc29a01d705f21b52b437a7ad0"
+    },
+    "tokio": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libtokio-e20ba8132f514f03.rlib",
+      "sha256": "482d35429ffc995607c9ea1c572bf85d6ae37cbbd0060260237b6b5e110fd388"
+    },
+    "tempfile": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libtempfile-ad9c5b59c98a11b9.rlib",
+      "sha256": "68e7792767eea8b74101610d10c436a8c956aeac92c39ab7077fa7a68b2d89d2"
+    },
+    "crossbeam_channel": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libcrossbeam_channel-6f6be313f8a0d2af.rlib",
+      "sha256": "9c356a8415344320604ced1ab34845337afdd0889376dc4f3e8b1fe62db64519"
+    },
+    "sha2": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+      "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+    },
+    "dashmap": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libdashmap-027f97d2fc7f1f1b.rlib",
+      "sha256": "dc06aa9ec3e6d00825f08fc72d728004bccd849b08b103ec757f612da4850cf2"
+    },
+    "libc": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/liblibc-d1cd53ebf31d5a07.rlib",
+      "sha256": "83290ab78bf6c8066c9e10ffa2fb0244b65f8c24d993ce0eb384db8420a80373"
+    },
+    "log": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/liblog-b195f67aadaf5e29.rlib",
+      "sha256": "42905894ded9a912cc38898ddb89bddcba43b662b7bbc38f634f27136b363c34"
+    },
+    "solana_pubkey": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_pubkey-fbcc27f738c46bba.rlib",
+      "sha256": "7c0481195a96bc137e0d5c80a9a54fae4dc3978d644407829e0446703b026bec"
+    },
+    "base64": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+      "sha256": "e5b685c1a1b11ab4d3ba0494d659fe2f1e181a1925a9850ed445c37ecb3845f9"
+    },
+    "solana_transaction_status": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_transaction_status-9ff59bc47c2b7863.rlib",
+      "sha256": "c18ac8fbcca3290accf2f6fc0dc27bd485cb394c383087dccfbe11775cdfc918"
+    },
+    "solana_rpc": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_rpc-4efaba4dd668c115.rlib",
+      "sha256": "378f99c4f0be0a1a77ba83db3469e0ecea04c35f6f85184f5dee0e8d17a2abaa"
+    },
+    "ripget": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libripget-b0e926d38669f28a.rlib",
+      "sha256": "6da5dd4d3b85f72fe81cb31527b07431b2e3b3d0a74fb31ce76fe3990888b8e4"
+    },
+    "rayon": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/librayon-77f108be57f8ba58.rlib",
+      "sha256": "91e41987721c716786a0444602d5152897f90d275de5151a9663e3a7fc9aa981"
+    },
+    "anyhow": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-2af1260810877443.rlib",
+      "sha256": "f43dfca3eba1c4fe0ba4e7a3026e92f8888258bd8ff55b9ad5dd3a8ebd4fde30"
+    },
+    "reqwest": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libreqwest-980f63a565de9a50.rlib",
+      "sha256": "8798eaf5b32f5644c1d2ae81bd30703c923ecaf9197f90f0a95c12b51e0023f0"
+    },
+    "jetstreamer_firehose": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libjetstreamer_firehose-824d45535bb32dd6.rlib",
+      "sha256": "1889833d8a58acab0f61ec2c12b38260d254ada0007533b1ff0997b21a999aac"
+    },
+    "tikv_jemallocator": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libtikv_jemallocator-09cf9daa5cb786a6.rlib",
+      "sha256": "43955aca1121e6cf12e4d9a362ce56c4eb7302b197faa9abe161aa28473c294a"
+    },
+    "jetstreamer_historical_protocol": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libjetstreamer_historical_protocol_current-6981d2f778d550fa.rlib",
+      "sha256": "3be0e894758e94098c388336204b35a622cf2cd3fbeb9b3f96b943147887163b"
+    },
+    "jetstreamer_node": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libjetstreamer_node-504565aa79a675ba.rlib",
+      "sha256": "3dd8404879ec5b7f20a20a6d65c1a2f6ab7933b4222bdf952d2c744fa5cfa917"
+    },
+    "env_logger": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libenv_logger-1a2c91bef57df17a.rlib",
+      "sha256": "17214cd6bafe0e24758bdf3d6e4fef971df8d74b2c6b2fbf752be2fb81052754"
+    },
+    "solana_reward_info": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_reward_info-e3a201feace22beb.rlib",
+      "sha256": "725efa67811ed7a8e9d1f55797b87c684f7e758897e9ff2d2b9e8f518f1e3d83"
+    },
+    "solana_genesis_utils": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_genesis_utils-8154a9e9bf4a1f61.rlib",
+      "sha256": "92ddc5988102ee26fb06d4f608db6e159a2ddaf76ff3c2cea53956ce3e33e65c"
+    },
+    "crc": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libcrc-4c8a62f2d765df1e.rlib",
+      "sha256": "ab88ccbfcb99c31f31744855b2582ea3be4df48f48899e8c9007c1c962ae2c4a"
+    },
+    "solana_ledger": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_ledger-7cf6e8adee6a8f99.rlib",
+      "sha256": "3ab88fad2d0675a2b3da8749ca89724da21ce548641b8da5da404dad36b7984c"
+    },
+    "tar": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libtar-fe050ef1cda08823.rlib",
+      "sha256": "fc3732b1b3e32cd90e32a8b36634f4ac467896bc7415c51a64631abb8dc3f87d"
+    },
+    "solana_geyser_plugin_manager": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_geyser_plugin_manager-26591fc5c4aa158c.rlib",
+      "sha256": "ef34fae10d9440388903f0808ec54da962bca917a2dd6c8cdf3ed28440d81f9f"
+    },
+    "agave_snapshots": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libagave_snapshots-78e4df6edd21a2f9.rlib",
+      "sha256": "d0d4db36eb837c08020bba918e86c1884bab944cbbc5ecea0cc142993cb50ca5"
+    },
+    "solana_transaction": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_transaction-d6350f59667c0148.rlib",
+      "sha256": "4e94349cf20c143b3aaa0fb0d5906997028d92571a7183307462e2799215e353"
+    },
+    "solana_entry": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_entry-664e960c77bdbb8f.rlib",
+      "sha256": "6ec8b6589d07010a6c601d5e79c0fd2c46c0f70cedde6affd25538a11e16074d"
+    },
+    "solana_account": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_account-b7ccad30fec939c4.rlib",
+      "sha256": "3c665bec4c1eaf778b6a881ca97672bdff50b96e689bd9b5d43dd8aacac7da46"
+    },
+    "solana_unified_scheduler_pool": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsolana_unified_scheduler_pool-7e091023f186d67c.rlib",
+      "sha256": "a4bb5cf32616ba79dfcf195d20205aa5c4232198ff883e63e1978a5de187f9ea"
+    }
+  },
+  "ordinary_count": 354,
+  "ignored_count": 4,
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": true,
+  "originals": [
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "e165854f9c3527b94dfcefc7d6775a9aeb6e9c75129999712816ea9c0df6394d"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-clippy-production-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "SYSLOG_IDENTIFIER": "systemd",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_RUNTIME_SCOPE": "system",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093469537415",
+        "UNIT": "horizon-first-lane-witness-first163128-node-clippy-production-20261107-v2.service",
+        "TID": "1",
+        "_HOSTNAME": "dev-samjohnson",
+        "CODE_FUNC": "unit_log_success",
+        "_COMM": "systemd",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-clippy-production-20261107-v2.service: Deactivated successfully.",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_UID": "0",
+        "CODE_LINE": "6013",
+        "PRIORITY": "6",
+        "_GID": "0",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_TRANSPORT": "journal",
+        "_PID": "1",
+        "__SEQNUM": "57177677",
+        "__REALTIME_TIMESTAMP": "1794093469537435",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=368764d;b=763ea84ca81f4dddad364b1ea2ba36dd;m=238231eb764;t=65fb7eff2149b;x=c3ebf1851cd43228",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "CODE_FILE": "src/core/unit.c",
+        "INVOCATION_ID": "b4bb79a5ca19468495c6a915e109b7e8",
+        "SYSLOG_FACILITY": "3",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "__MONOTONIC_TIMESTAMP": "2440130639716",
+        "_EXE": "/usr/lib/systemd/systemd"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "e8372cfbc0268748162ad90963d0e00b806dfacec0c0c632aaad86b0fb40012d"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-clippy-tests-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "PRIORITY": "6",
+        "CODE_FUNC": "unit_log_success",
+        "CODE_FILE": "src/core/unit.c",
+        "_UID": "0",
+        "SYSLOG_FACILITY": "3",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "_GID": "0",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "__SEQNUM": "57177681",
+        "_COMM": "systemd",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-clippy-tests-20261107-v2.service: Deactivated successfully.",
+        "__MONOTONIC_TIMESTAMP": "2440135878319",
+        "_TRANSPORT": "journal",
+        "CODE_LINE": "6013",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "_SYSTEMD_SLICE": "-.slice",
+        "TID": "1",
+        "UNIT": "horizon-first-lane-witness-first163128-node-clippy-tests-20261107-v2.service",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "_PID": "1",
+        "_RUNTIME_SCOPE": "system",
+        "INVOCATION_ID": "1e3e607bee2e4c0392d78ad26bc4c86b",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093474775970",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_HOSTNAME": "dev-samjohnson",
+        "__REALTIME_TIMESTAMP": "1794093474776039",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=3687651;b=763ea84ca81f4dddad364b1ea2ba36dd;m=238236ea6af;t=65fb7f04203e7;x=47448ca791ed4e36"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/tests-build-ORIGINAL-EXECUTION.json",
+        "sha256": "c9eb849c85da3d2052fb9ca0e9290a182ae2a83644ea6600a2d9dc693847bab7"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-tests-build-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=368768a;b=763ea84ca81f4dddad364b1ea2ba36dd;m=23826ff1e52;t=65fb7f3d27b8a;x=eeab56dacc7bafef",
+        "_PID": "1",
+        "__SEQNUM": "57177738",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "UNIT": "horizon-first-lane-witness-first163128-node-tests-build-20261107-v2.service",
+        "__MONOTONIC_TIMESTAMP": "2440195677778",
+        "CODE_LINE": "6013",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-tests-build-20261107-v2.service: Deactivated successfully.",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "SYSLOG_FACILITY": "3",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "_HOSTNAME": "dev-samjohnson",
+        "_RUNTIME_SCOPE": "system",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093534575468",
+        "_UID": "0",
+        "_GID": "0",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_COMM": "systemd",
+        "INVOCATION_ID": "04fe269f540d4aed9fcd77611bbd7253",
+        "_TRANSPORT": "journal",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "__REALTIME_TIMESTAMP": "1794093534575498",
+        "PRIORITY": "6",
+        "TID": "1",
+        "CODE_FILE": "src/core/unit.c",
+        "CODE_FUNC": "unit_log_success"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/release-ORIGINAL-EXECUTION.json",
+        "sha256": "4a7454712e23e3242a5d514c1491fe9a787b2c9fc618ab6de7be3df8de6ee8ba"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-release-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "CODE_FUNC": "unit_log_success",
+        "__REALTIME_TIMESTAMP": "1794093636170366",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_COMM": "systemd",
+        "CODE_LINE": "6013",
+        "__MONOTONIC_TIMESTAMP": "2440297272646",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "CODE_FILE": "src/core/unit.c",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-release-20261107-v2.service: Deactivated successfully.",
+        "_RUNTIME_SCOPE": "system",
+        "TID": "1",
+        "_GID": "0",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_HOSTNAME": "dev-samjohnson",
+        "__SEQNUM": "57177841",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36876f1;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2382d0d5546;t=65fb7f9e0b27e;x=51cf62fcecb46af0",
+        "_TRANSPORT": "journal",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_SYSTEMD_UNIT": "init.scope",
+        "INVOCATION_ID": "43dd0eb3beea4f8894c5978215bf763f",
+        "PRIORITY": "6",
+        "_UID": "0",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_PID": "1",
+        "UNIT": "horizon-first-lane-witness-first163128-node-release-20261107-v2.service",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "SYSLOG_FACILITY": "3",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093636170345"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/R2-all-names-ORIGINAL-EXECUTION.json",
+        "sha256": "1d990fc470a08129e24c15339795f1a529e191b5b7c45a5785acf7c9160ce701"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-all-names-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "UNIT": "horizon-first-lane-witness-first163128-node-all-names-20261107-v2.service",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "_SYSTEMD_UNIT": "init.scope",
+        "__SEQNUM": "57177945",
+        "PRIORITY": "6",
+        "_UID": "0",
+        "INVOCATION_ID": "ee002fcb51174317ae2cb9a4bd760e87",
+        "CODE_FILE": "src/core/unit.c",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "_HOSTNAME": "dev-samjohnson",
+        "__REALTIME_TIMESTAMP": "1794093783947324",
+        "_COMM": "systemd",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "__MONOTONIC_TIMESTAMP": "2440445049604",
+        "_PID": "1",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_SYSTEMD_SLICE": "-.slice",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-all-names-20261107-v2.service: Deactivated successfully.",
+        "CODE_FUNC": "unit_log_success",
+        "SYSLOG_FACILITY": "3",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=3687759;b=763ea84ca81f4dddad364b1ea2ba36dd;m=23835dc3b04;t=65fb802af983c;x=31b4606577c443e3",
+        "_GID": "0",
+        "_TRANSPORT": "journal",
+        "TID": "1",
+        "_RUNTIME_SCOPE": "system",
+        "CODE_LINE": "6013",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093783947315",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/R2-ignored-names-ORIGINAL-EXECUTION.json",
+        "sha256": "9502e18b0d378fb8fe77dbaf16ce0e458fdd51b1bb4ba8316079aa6db1b0c80f"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-ignored-names-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "__REALTIME_TIMESTAMP": "1794093784010776",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "TID": "1",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_UID": "0",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_RUNTIME_SCOPE": "system",
+        "_GID": "0",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_TRANSPORT": "journal",
+        "CODE_LINE": "6013",
+        "__SEQNUM": "57177948",
+        "__MONOTONIC_TIMESTAMP": "2440445113056",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=368775c;b=763ea84ca81f4dddad364b1ea2ba36dd;m=23835dd32e0;t=65fb802b09018;x=2d6ba1aeb3044b9d",
+        "_COMM": "systemd",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_SYSTEMD_SLICE": "-.slice",
+        "INVOCATION_ID": "d37a725f08994820b4dd7e72a92f1679",
+        "CODE_FILE": "src/core/unit.c",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "SYSLOG_FACILITY": "3",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_HOSTNAME": "dev-samjohnson",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093784010768",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "PRIORITY": "6",
+        "UNIT": "horizon-first-lane-witness-first163128-node-ignored-names-20261107-v2.service",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-ignored-names-20261107-v2.service: Deactivated successfully.",
+        "_PID": "1",
+        "CODE_FUNC": "unit_log_success"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/R2-first128-five-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "3ec4e023fb8a6d3e6a9122b226f2b59473943d4da83b0335e57adc8366c11cae"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-first128-five-tests-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "CODE_FUNC": "unit_log_success",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "_RUNTIME_SCOPE": "system",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_COMM": "systemd",
+        "_TRANSPORT": "journal",
+        "_HOSTNAME": "dev-samjohnson",
+        "__MONOTONIC_TIMESTAMP": "2440445165108",
+        "PRIORITY": "6",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=368775f;b=763ea84ca81f4dddad364b1ea2ba36dd;m=23835ddfe34;t=65fb802b15b6c;x=1481241bb2598b51",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "_UID": "0",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-first128-five-tests-20261107-v2.service: Deactivated successfully.",
+        "_PID": "1",
+        "TID": "1",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "CODE_LINE": "6013",
+        "CODE_FILE": "src/core/unit.c",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093784062820",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "INVOCATION_ID": "a63e688ac5f24e75b9b4fd3bcbe236bc",
+        "_SYSTEMD_UNIT": "init.scope",
+        "UNIT": "horizon-first-lane-witness-first163128-node-first128-five-tests-20261107-v2.service",
+        "__REALTIME_TIMESTAMP": "1794093784062828",
+        "SYSLOG_FACILITY": "3",
+        "__SEQNUM": "57177951",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_GID": "0"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/first128-node-guard-witness-v2/node/R2-all-ordinary-ORIGINAL-EXECUTION.json",
+        "sha256": "f15a96082c70b7dc656294501982890aa7fb3a47d7c647809ecab1086a38f0de"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-witness-first163128-node-all-ordinary-20261107-v2.service"
+      },
+      "original_PID1_success": {
+        "SYSLOG_IDENTIFIER": "systemd",
+        "PRIORITY": "6",
+        "CODE_FUNC": "unit_log_success",
+        "__REALTIME_TIMESTAMP": "1794093793614045",
+        "_COMM": "systemd",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_PID": "1",
+        "TID": "1",
+        "CODE_LINE": "6013",
+        "UNIT": "horizon-first-lane-witness-first163128-node-all-ordinary-20261107-v2.service",
+        "_UID": "0",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=3687765;b=763ea84ca81f4dddad364b1ea2ba36dd;m=238366fbba5;t=65fb8034318dd;x=8ef8362ced6cc3e9",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "_SYSTEMD_SLICE": "-.slice",
+        "CODE_FILE": "src/core/unit.c",
+        "__SEQNUM": "57177957",
+        "_TRANSPORT": "journal",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "__MONOTONIC_TIMESTAMP": "2440454716325",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_RUNTIME_SCOPE": "system",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794093793614012",
+        "_HOSTNAME": "dev-samjohnson",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "MESSAGE": "horizon-first-lane-witness-first163128-node-all-ordinary-20261107-v2.service: Deactivated successfully.",
+        "SYSLOG_FACILITY": "3",
+        "_GID": "0",
+        "INVOCATION_ID": "3ad8d60f5d7a404fbfd587494550e315"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    }
+  ],
+  "only_qualified_program_path_and_DATA_bindings_changed": true,
+  "original150s_hold_and180s_admission_preserved": true,
+  "actual_native_held_capability_pending": true,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0
+}
