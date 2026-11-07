@@ -14,7 +14,7 @@ use std::{
 };
 use storage::Bound;
 const ROOT: &str =
-    "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r4";
+    "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Role {
@@ -52,6 +52,10 @@ fn template(raw: &str, floor: u64, envelope: bool) -> Result<Value> {
     }
     Ok(v)
 }
+fn output_path(tuple_sha: &str) -> Result<PathBuf> {
+    ensure!(storage::hex(tuple_sha, 64), "exact tuple digest namespace");
+    Ok(Path::new(ROOT).join(format!("generated-v15-plan-{tuple_sha}")))
+}
 fn materialize(request_binding: &Bound, self_image: &Bound) -> Result<Value> {
     let s: Request = serde_json::from_value(storage::json(request_binding)?)?;
     ensure!(
@@ -59,7 +63,7 @@ fn materialize(request_binding: &Bound, self_image: &Bound) -> Result<Value> {
         "exact metadata plan request"
     );
     ensure!(
-        s.output_directory == Path::new(ROOT).join("generated-v15-plan")
+        s.output_directory == output_path(&s.complete_tuple.sha256)?
             && !s.output_directory.try_exists()?,
         "exact fresh output directory"
     );
@@ -298,5 +302,34 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("metadata185 plan: {e:#}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod output_tests {
+    use super::*;
+    #[test]
+    fn different_full_tuples_get_disjoint_retry_stable_private_output_paths() {
+        let a = output_path(&"a".repeat(64)).unwrap();
+        let b = output_path(&"b".repeat(64)).unwrap();
+        assert_eq!(a, output_path(&"a".repeat(64)).unwrap());
+        assert_ne!(a, b);
+        assert_eq!(a.parent(), Some(Path::new(ROOT)));
+        for invalid in ["../escape".into(), "A".repeat(64), "a".repeat(63)] {
+            assert!(output_path(&invalid).is_err());
+        }
+    }
+    #[test]
+    fn real_packet_members_cannot_overwrite_or_escape() {
+        let root =
+            std::env::temp_dir().join(format!("offline185-packet-control-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let original = json!({"authority":false,"original":true});
+        let bound = storage::save(&root, "original.json", &original).unwrap();
+        let before = std::fs::read(&bound.path).unwrap();
+        assert!(storage::save(&root, "original.json", &json!({"authority":true})).is_err());
+        assert_eq!(std::fs::read(&bound.path).unwrap(), before);
+        assert!(storage::save(&root, "../escape.json", &original).is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
