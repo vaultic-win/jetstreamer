@@ -331,11 +331,41 @@ fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
         .read(true)
         .custom_flags(O_NOFOLLOW | O_CLOEXEC)
         .open(path)
-        .map_err(io)?;
+        .map_err(|e| format!("metadata open {}: {e}", path.display()))?;
     let mut out = Vec::new();
     f.take(limit + 1).read_to_end(&mut out).map_err(io)?;
     require!(out.len() as u64 <= limit, "metadata output too large");
     Ok(out)
+}
+fn pid_membership(path: &Path) -> Result<Option<Vec<u8>>> {
+    let f = match OpenOptions::new()
+        .read(true)
+        .custom_flags(O_NOFOLLOW | O_CLOEXEC)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("PID membership open {}: {error}", path.display())),
+    };
+    let mut bytes = Vec::new();
+    f.take(4097).read_to_end(&mut bytes).map_err(io)?;
+    require!(bytes.len() <= 4096, "PID membership output too large");
+    Ok(Some(bytes))
+}
+const STARTUP_PID_GONE: &str = "transient pre-start PID disappeared";
+fn startup_membership_retry(
+    config: &Config,
+    before: &Owner,
+    after: &Owner,
+    error: &str,
+    retries: u64,
+    deadline: Instant,
+) -> Result<bool> {
+    Ok(error == STARTUP_PID_GONE
+        && before.get("ActiveState")? == "activating"
+        && before.get("SubState")? == "start-pre"
+        && before.num("MainPID")? == 0
+        && startup_retry(config, before, after, retries, deadline)?)
 }
 fn native(program: &str, args: &[&str]) -> Result<String> {
     let mut child = Command::new(program)
@@ -526,7 +556,7 @@ fn startup_transition(config: &Config, before: &Owner, after: &Owner) -> Result<
                 owner.num("MainPID")?,
                 owner.num("ControlPID")?,
             ) {
-                ("activating", "start-pre", 0, control) if control > 0 => Some(0),
+                ("activating", "start-pre", 0, _) => Some(0),
                 ("activating", "start", main, 0) if main > 0 => Some(1),
                 ("active", "running", main, 0) if main > 0 => Some(2),
                 _ => None,
@@ -601,10 +631,27 @@ fn kernel_limits(config: &Config, current: &Owner) -> Result<()> {
         u128::from(quota) * 1_000_000 == u128::from(config.cpu) * u128::from(period),
         "kernel CPU quota mismatch"
     );
+    if current.get("ActiveState")? == "activating"
+        && current.get("SubState")? == "start-pre"
+        && current.num("MainPID")? == 0
+        && current.num("ControlPID")? == 0
+    {
+        return Err(STARTUP_PID_GONE.into());
+    }
     for key in ["MainPID", "ControlPID"] {
         let pid = current.num(key)?;
         if pid != 0 {
-            let actual = read_bounded(&PathBuf::from(format!("/proc/{pid}/cgroup")), 4096)?;
+            let actual = pid_membership(&PathBuf::from(format!("/proc/{pid}/cgroup")))?;
+            let actual = match actual {
+                Some(bytes) => bytes,
+                None if current.get("ActiveState")? == "activating"
+                    && current.get("SubState")? == "start-pre"
+                    && current.num("MainPID")? == 0 =>
+                {
+                    return Err(STARTUP_PID_GONE.into())
+                }
+                None => return Err(format!("non-startup actor PID disappeared:{pid}")),
+            };
             require!(
                 actual == format!("0::{cg}\n").as_bytes(),
                 "actor PID escaped bound cgroup"
@@ -1161,7 +1208,18 @@ fn run(config: Config) -> Result<()> {
                 Instant::now() < deadline,
                 "shared observation budget exhausted"
             );
-            kernel_limits(&config, &current)?;
+            if let Err(error) = kernel_limits(&config, &current) {
+                let after = owner(&config.unit)?;
+                if startup_membership_retry(&config, &current, &after, &error, retries, deadline)? {
+                    current = after;
+                    retries += 1;
+                    continue;
+                }
+                return Err(format!(
+                    "{error}; native before={:?}; after={:?}",
+                    current.values, after.values
+                ));
+            }
             require!(
                 ["active", "activating"].contains(&current.get("ActiveState")?),
                 "actor is not running"
@@ -1199,14 +1257,26 @@ fn run(config: Config) -> Result<()> {
                 if trip_reason(free, a.bytes.max(b.bytes), &config).is_none()
                     && startup_retry(&config, &current, &after, retries, deadline)?
                 {
-                    kernel_limits(&config, &after)?;
                     current = after;
                     retries += 1;
                     continue;
                 }
-                return Err("actor identity/PIDs/state/policy changed across observation".into());
+                return Err(format!("actor identity/PIDs/state/policy changed across observation; before={:?}; after={:?}", current.values, after.values));
             }
-            kernel_limits(&config, &after)?;
+            if let Err(error) = kernel_limits(&config, &after) {
+                let next = owner(&config.unit)?;
+                if trip_reason(free, a.bytes.max(b.bytes), &config).is_none()
+                    && startup_membership_retry(&config, &after, &next, &error, retries, deadline)?
+                {
+                    current = next;
+                    retries += 1;
+                    continue;
+                }
+                return Err(format!(
+                    "{error}; native before={:?}; after={:?}",
+                    after.values, next.values
+                ));
+            }
             require!(
                 Instant::now() < deadline,
                 "shared observation budget exhausted"
@@ -1533,6 +1603,58 @@ mod tests {
             !startup_transition(&c, &pre, &startup_owner(&c, "deactivating", "stop", 103, 0))
                 .unwrap()
         );
+    }
+    #[test]
+    fn disappearing_prestart_pid_requires_a_new_native_startup_owner() {
+        let c = parse(&args()).unwrap();
+        let pre = startup_owner(&c, "activating", "start-pre", 0, 101);
+        let gap = startup_owner(&c, "activating", "start-pre", 0, 0);
+        let running = startup_owner(&c, "active", "running", 103, 0);
+        let end = Instant::now() + Duration::from_secs(1);
+        assert!(startup_membership_retry(&c, &pre, &gap, STARTUP_PID_GONE, 0, end).unwrap());
+        assert!(startup_membership_retry(&c, &gap, &running, STARTUP_PID_GONE, 1, end).unwrap());
+        for error in [
+            "Permission denied",
+            "actor PID escaped bound cgroup",
+            "unexpected actor cgroup",
+            "No such file or directory (os error 2)",
+        ] {
+            assert!(!startup_membership_retry(&c, &pre, &running, error, 0, end).unwrap());
+        }
+        assert!(!startup_membership_retry(&c, &pre, &pre, STARTUP_PID_GONE, 0, end).unwrap());
+        assert!(
+            !startup_membership_retry(&c, &running, &running, STARTUP_PID_GONE, 0, end).unwrap()
+        );
+        assert!(!startup_membership_retry(&c, &pre, &running, STARTUP_PID_GONE, 2, end).unwrap());
+        assert!(!startup_membership_retry(
+            &c,
+            &pre,
+            &running,
+            STARTUP_PID_GONE,
+            0,
+            Instant::now() - Duration::from_secs(1)
+        )
+        .unwrap());
+        let mut changed = running.clone();
+        changed.values.insert(
+            "InvocationID".into(),
+            "22222222222222222222222222222222".into(),
+        );
+        assert!(!startup_membership_retry(&c, &pre, &changed, STARTUP_PID_GONE, 0, end).unwrap());
+    }
+    #[test]
+    fn pid_membership_distinguishes_disappearance_from_unsafe_or_oversized_input() {
+        let t = Temp::new();
+        assert_eq!(pid_membership(&t.0.join("gone")).unwrap(), None);
+        fs::write(t.0.join("group"), b"0::/fixture\n").unwrap();
+        assert_eq!(
+            pid_membership(&t.0.join("group")).unwrap(),
+            Some(b"0::/fixture\n".to_vec())
+        );
+        std::os::unix::fs::symlink(t.0.join("group"), t.0.join("alias")).unwrap();
+        assert!(pid_membership(&t.0.join("alias")).is_err());
+        fs::write(t.0.join("large"), vec![0; 4097]).unwrap();
+        assert!(pid_membership(&t.0.join("large")).is_err());
     }
     #[test]
     fn startup_retry_does_not_normalize_changed_owner_or_policy() {
