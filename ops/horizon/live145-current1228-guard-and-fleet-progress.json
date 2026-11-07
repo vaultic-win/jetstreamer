@@ -1,0 +1,62 @@
+{
+  "schema": "horizon-current1228-guard-and-genuine-fleet-progress-publication-v1",
+  "source": {
+    "path": "/home/sol/.jetstreamer-private/native1228-live145-frame-workflow-source-20261107-v1/guard-src/main.rs",
+    "sha256": "dc26db4cb801542bd353cb783f64e9c108c14ca4348f40b9b944f387f5a4ed25"
+  },
+  "production": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current1228-bound-guard-window-tools-20261107-v1/horizon-current1228-guard-window",
+    "sha256": "cc13266db6ae43b3778e2fe3d7d3936e51835f7114c0a5e8771cc8db08ca6375"
+  },
+  "ordinary_tests_passed": 71,
+  "all61_original_names_preserved": true,
+  "all67_predecessor_names_preserved": true,
+  "all69_predecessor_names_preserved": true,
+  "all70_predecessor_names_preserved": true,
+  "all7_original_actors_drained": true,
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current1228-bound-guard-window-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "2b087f59e3e49c367063ccae9b63c66d2a853c8ad45c26bc99088920c4c10d57"
+  },
+  "actual_artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current1228-bound-guard-window-tools-20261107-v1/artifact-proof.json",
+    "sha256": "48d177cc47ec99577142cc4ee5e1f9d2d2a497e8dd1861dab7635f12328aadf5"
+  },
+  "no_replay_authority": true,
+  "published_source": {
+    "path": "scripts/horizon_current1228_metadata_guard_v1/main.rs",
+    "sha256": "dc26db4cb801542bd353cb783f64e9c108c14ca4348f40b9b944f387f5a4ed25"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/native1228-live145-frame-workflow-source-20261107-v1/ROOT_GUARD1228_ACTUAL_HELPER_BOUND_SOURCE_FREEZE.json",
+    "sha256": "3b89fa066013fc4f725a8acbb14d219d0820286a4393be0e76a7cbffa7a33127"
+  },
+  "qualified_helper": {
+    "path": "/home/sol/.jetstreamer-private/live145-production-census-helper-qualification-20261107-v1/ROOT_PRODUCTION_CENSUS_HELPER_QUALIFIED_SEALED_AND_NEXT_NATIVE_GATES.json",
+    "sha256": "bcee6c605192054774a4c6046ae8330433ed885424b7f44c3e4d067cc36da3a4"
+  },
+  "genuine_current_fleet_success": {
+    "path": "/home/sol/.jetstreamer-private/native1228-live145-frame-workflow-source-20261107-v1/runtime/FLEET1228_ACTUAL_ORIGINAL_SUCCESS_ACCEPTED.json",
+    "sha256": "2ed93769f0b33df532a6302aa2f38fea6c53f9fdef4ad0e11000ffba79823613"
+  },
+  "genuine_current_fleet_original_outer": {
+    "path": "/home/sol/.jetstreamer-private/native1228-live145-frame-workflow-source-20261107-v1/runtime/ROOT_FLEET1228_GUARDED_OUTER_EXECUTION.json",
+    "sha256": "d70d5252f8a1a9b5ba0bf20abdec5128b05de937032067b1326ced7ec9dd88ec"
+  },
+  "original_Frame_capability_failure": {
+    "path": "/home/sol/.jetstreamer-private/native1228-live145-frame-workflow-source-20261107-v1/runtime/ROOT1228_ORIGINAL_FRAME_CAPABILITY_PRIOR_CAPTURE_FAILURE_AND_DRAIN.json",
+    "sha256": "a683977ab3a880cc69f8bf9afddc0aa7e20ced42ac377bf59b56257ad875e1bc"
+  },
+  "frame_capture_not_launched": true,
+  "full_reader_not_run": true,
+  "next_source_only_repair": {
+    "path": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-source-20261107-v1/SOURCE_FREEZE_NOT_BUILT_OR_TESTED.json",
+    "sha256": "c014bfbfe5030a2a9e07d1dccbe149155d48b768b89ccc99ea437a2080aefafa"
+  },
+  "normal_external_pool_bytes": 6442450944,
+  "extra_QA_memory_bytes": 0,
+  "complete_DATA_bytes": 5095090163506,
+  "executing_replay_lanes": 0,
+  "desired_memory_selected_lanes": 5,
+  "no_replay_or_release_credit": true
+}
