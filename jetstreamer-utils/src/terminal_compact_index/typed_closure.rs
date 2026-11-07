@@ -15,8 +15,10 @@ include!("fixed_recipes.rs");
 enum InputKind {
     Executable,
     Script,
+    SharedGcloudMetadataScript,
     Json,
 }
+include!("shared_gcloud_metadata.rs");
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 enum JsonType {
     CanonicalR2Receipt,
@@ -134,6 +136,7 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                     .all(|p| paths.contains(p) && p != &i.binding.path)),
             "incomplete/aliased readset graph"
         );
+        validate_shared_gcloud_metadata(r)?;
         // Cycles cannot be declared as proof of a finite complete readset.
         let mut done = BTreeSet::new();
         for node in &r.inputs {
@@ -326,7 +329,7 @@ fn artifact(i: &Input) -> Result<Vec<u8>> {
             prefix == b"\x7fELF",
             "non-ELF executable needs a typed script readset"
         ),
-        InputKind::Script => {
+        InputKind::Script | InputKind::SharedGcloudMetadataScript => {
             std::str::from_utf8(&prefix)?;
         }
         InputKind::Json => {
