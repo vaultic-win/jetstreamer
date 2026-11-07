@@ -316,13 +316,13 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
 
 ### Host-specific R2 scratch / holding area
 
-When the user explicitly permits host-specific R2 scratch, use a separate key prefix in the
-configured bucket for safe cold offloading, not a FUSE replacement for live replay storage.
-The user must provide the unique directory/prefix name for this host before any scratch upload;
-never invent it from the hostname or reuse another host's prefix. Read
+Check this host's durable scratch/holding mapping first. Reuse its recorded authorization across
+sessions without asking again; require a user-provided unique prefix only when no mapping exists
+or an actual ownership conflict needs resolution. Never invent a prefix from the hostname or
+reuse another host's prefix. Use that separate prefix in the configured bucket for safe cold
+offloading, not a FUSE replacement for live replay storage. Read
 [references/r2-holding.md](references/r2-holding.md) before parking, restoring, or retiring a local
 copy. Authenticated access is sufficient; no public URL or anonymous verification is required.
-Once this host's prefix is authorized and recorded, reuse that authorization without asking again.
 When local disk blocks the memory-selected lane target, actively juggle eligible closed artifacts
 or qualified stopped jobs through this holding area in the same capacity cycle. Record the exact
 offload set, bytes recoverable, restore overlap and next admission; an unused scratch prefix or a

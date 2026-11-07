@@ -30,6 +30,10 @@ destination.
   or retained-prefix artifacts that can be restored safely. Prefer ordinary verified eviction and
   generation-pinned redownload when that is simpler than paying to retain a reproducible cache.
   Measure recoverable local bytes before assuming this will unlock another lane.
+- Plan a rotation around the next runnable epochs: retain their local working sets, park eligible
+  closed inputs for later epochs, and restore those inputs when their turn approaches. Charge
+  upload/readback and restore staging against peak local overlap; an upload alone frees no bytes.
+  After qualified local retirement, apply the normal fresh admission to the lane it makes room for.
 - Never evict open or mmap-backed AccountsDb/ledger files, live replay scratch, active/staged inputs,
   resumable state without a qualified checkpoint/restore path, or required immutable deployment
   members. A generic R2 FUSE mount does not preserve the latency and filesystem behavior required
