@@ -1,0 +1,217 @@
+{
+  "schema": "horizon-epoch185-positive-current-reader-integration-source-v1",
+  "purpose": "Combine current complete reader with epoch185 native enrollment and byte-identical normal-sealed readable underlying proofs so the genuine guarded positive replay can qualify.",
+  "source_root": "/home/sol/.jetstreamer-private/epoch185-positive-current-reader-integration-source-20261107-v1/candidate-source",
+  "source_files": [
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cached145_entry.rs",
+      "sha256": "d71138112d309db6ce5f48cc83c9769c7fde4df2f8a30039138f07f98c966094",
+      "bytes": 19951,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cached145_entry.rs",
+        "sha256": "3cc093aa73adecaf678b5d452221692fe6bb8195a15aaea7f6dde70a34863aac"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/captured141_memory_retirement/evidence.rs",
+      "sha256": "e28296559c6ddcfcc444187ac5cd0b44c54b5113d2adae9c46bc996169a72285",
+      "bytes": 21042,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet/captured141_memory_retirement/evidence.rs",
+        "sha256": "df714f011ad6f24695c129b3493364b71568daa4b841acaa93235470887c65db"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/enrollment.rs",
+      "sha256": "de7ff2eef80b7d5e9d9d84333ddbe801cc282edeb369938852f12087a91a126a",
+      "bytes": 61642,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/lifecycle.rs",
+      "sha256": "189d082ce0440739bb3e9de12b64b38b0fa171934f39770652fbfd851c8d5150",
+      "bytes": 24618,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/native/retained.rs",
+      "sha256": "f0356f6181332fa600d4d4f0815d19fc30a41bd3b5ebc983ad15497639e6f8fa",
+      "bytes": 40242,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/native.rs",
+      "sha256": "27a9d81e3c54252b25e8dd25b0da95fcafab89b728561c149fd4d791a1cc4461",
+      "bytes": 47622,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/native_empty_hooks.rs",
+      "sha256": "1168e15cf9848eb8848bbcea29fa06d1a22f4b08cfc3acaf022cd1c9b3eff84e",
+      "bytes": 11804,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/readable_evidence.rs",
+      "sha256": "97019e731d2b9c3df3ae5ee6fa766f9f751ee671c54ef75fe1d6bff4aa80f7f1",
+      "bytes": 18668,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/task_status_bridge.rs",
+      "sha256": "05186d3850465871af7526dcbe7ca1ee4d683ab0262fcd76b86e22052f7b4353",
+      "bytes": 16213,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185.rs",
+      "sha256": "0d8399d97399d91bb99104fdb726be4bf094afc393a7b0f71588729f996e1208",
+      "bytes": 7383,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/cold185.rs",
+      "sha256": "a551b54d9c6dd24c716bbe6b267c6427a5ed32dab9984ac2a7398bcce53c4409",
+      "bytes": 44048,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/cold185_rollover.rs",
+      "sha256": "84e718699949ecec7999c1f720728afb33d7f00664d1f328be3d50ff6c733ae4",
+      "bytes": 32721,
+      "qualified_predecessor_source": null
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+      "sha256": "1a508bd8b1d1abbd947635c2be07f1d575147817f29e772897a1b6e7ff9374ce",
+      "bytes": 177886,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+        "sha256": "7298f1505984c96105905ccfe2fabcb27b74c8b71db641f2ca4e98bfdca972f3"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/epoch186/evidence.rs",
+      "sha256": "8c1febd4b0afcad419523baf9af7867f1c7b641ffc7bd4020f4265ddb803e6a1",
+      "bytes": 32727,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/evidence.rs",
+        "sha256": "bbb1cded2f57aecb217b14e0359ff831bbecb2542079b5c0408075ba04674f53"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "sha256": "029695a29d6a9561e46576f5b9af16c84e902912ae9891c18c503fbd8c32bce5",
+      "bytes": 57368,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+        "sha256": "0e4ee45cff85971df1909774ba370db2855129d88ef3ce16d68167b00ef86c83"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/failed4_current_accounting_reader.rs",
+      "sha256": "57f896774d4c78a830eca6aea901bc5e6c0581c582f1d045d41e1a164f9efbb0",
+      "bytes": 22864,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet/failed4_current_accounting_reader.rs",
+        "sha256": "537057bbb27bb96528de6a26f85048c125a40410cbbf396b72fd12245c9ff922"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet.rs",
+      "sha256": "24882740e50609e43d5fa6a08d9bd2e55ea0158315a0ffb4418598bce0782514",
+      "bytes": 353064,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/fleet.rs",
+        "sha256": "b167556ba81794f54c2c83e173d5def7b60579ae613ed5eb045ac02e70473c44"
+      }
+    },
+    {
+      "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/main.rs",
+      "sha256": "e886ddbb3f7c5e37d478884ec144b88b23f0eb221919c21086eb520814069643",
+      "bytes": 200880,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/helper-source/jetstreamer-r2/src/main.rs",
+        "sha256": "d383960be7cc6660046a1295d848954be5fc566e283adba05e98f1ac79a9abb6"
+      }
+    }
+  ],
+  "patch": {
+    "path": "scripts/horizon_epoch185_positive_reader_v1/integration.patch",
+    "sha256": "829a32ec3f9f85a569cd902c3afde1722981a1eed3bbfca847c507b306a65f41",
+    "format": "Zero-context unified diff against exact hash-bound predecessor sources; GNU patch -p1, or git apply --unidiff-zero."
+  },
+  "qualified_current_artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-full-reader-qualified-capture-shared-helper-tools-20261107-v2/artifact-proof.json",
+    "sha256": "e593c37bd7bbc1137e2d51c529a0178440ae5234cdbc0a26a521573d08ec190f"
+  },
+  "direct_extern_count": 28,
+  "current27_externs_preserved": true,
+  "features": [
+    "native210-small",
+    "native227-small"
+  ],
+  "runtime_promotion_or_replay_authorized": false,
+  "validation_status": "Strict production/test Clippy, test/release builds,2830 ordinary tests and1 read-only native metadata case passed. Genuine positive startup/reader/admission remain unqualified.",
+  "private_source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-reader-integration-source-20261107-v1/ROOT_SOURCE_V3_FULL_FREEZE.json",
+    "sha256": "dcedac2d29385ed5e88ce7baaa164afe6712f097274347bda0c4245ca3117264"
+  },
+  "preserved_failed_attempts": [
+    "qa-v1 initial disconnected call sites",
+    "qa-v2 remaining cmp_owned",
+    "qa-v3 strict test Clippy4GiB OOM"
+  ],
+  "remaining_native_gates": [
+    "real integrated reader and native sol-readable proof validation",
+    "final30second genuine bridge/guard/token timing inside distinct original600second setup",
+    "explicit accounting of live145 exporter and fresh complete positive admission"
+  ],
+  "campaign_status": {
+    "ready": 70,
+    "missing": 30,
+    "executing_replay_lanes": 0,
+    "desired_memory_selected_lanes": 5,
+    "latest_coordinated_sample_utc": "2026-11-07T08:28:09Z",
+    "all11_R2_statuses_authenticated_readback": "2026-11-07T08:34:19Z",
+    "sole_next_observer_utc": "2026-11-07T08:58:09Z"
+  },
+  "validated_at_utc": "2026-11-07T08:54:48.919390+00:00",
+  "production_binary": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-integrated-current-reader-tools-20261107-v1/jetstreamer-r2",
+    "sha256": "90b650505dbdf40daddfb005796625eb5eb080c19a0004086344000a19054d8e"
+  },
+  "artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-integrated-current-reader-tools-20261107-v1/artifact-proof.json",
+    "sha256": "e691a26079b95ff57bc678f905270e4994b76801a42550f6d4753042007bd226"
+  },
+  "normal_production_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-integrated-current-reader-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "e4f66db10aa121d14a9a51cb5df5600fca31717d763cc07a35d4e9dd2f19601e"
+  },
+  "actual_QA_and_next_native_gates": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-reader-integration-source-20261107-v1/ROOT_V4_COMPILED_QA_SEALED_AND_NEXT_NATIVE_GATES.json",
+    "sha256": "690017e42969dc402c36ac8f2bb10855cc4fa897a959c640671dcf27a0c1d299"
+  },
+  "temporary_additional_QA_memory_phase_closed": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-reader-integration-source-20261107-v1/ROOT_V4_ALL11_SCOPES_DRAINED_ADDITIONAL4GiB_QA_CLOSED.json",
+    "sha256": "1b53d032087506c3ec979541d6f6c205303fd732375ea0357f83f05063120806"
+  },
+  "compiled_name_conservation": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-reader-integration-source-20261107-v1/qa-v4/ROOT_COMPILED_BASELINE_NAME_CONSERVATION.json",
+    "sha256": "af350b6c9e8f410cbaac126419aa409488cc8065f824321184ebcaad43003aa1"
+  },
+  "test_counts": {
+    "ordinary_passed": 2830,
+    "ordinary_failed": 0,
+    "ignored_preserved": 113,
+    "current2737_ordinary_and112_ignored_names_preserved": true,
+    "old_cold185_names_preserved": true,
+    "read_only_installed_native_metadata_passed": 1
+  },
+  "all11_actual_QA_scopes_drained": true,
+  "all_old_MEMORY_DATA_and_live145_floors_retained": true,
+  "temporary_additional4GiB_QA_now_closed": true,
+  "source_build_seal_DATA4GiB_still_retained": true,
+  "native_positive_startup_or_replay_authorized": false
+}
