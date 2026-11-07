@@ -17,12 +17,12 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const WRITER: &str = "horizon-qualify-allocation-fixture-writer930-v1.service";
-const WORK: &str = "/home/ubuntu/.jetstreamer-private/allocation-freeze-fixture930-v1";
+const WRITER: &str = "horizon-qualify-allocation-fixture-writer944-v1.service";
+const WORK: &str = "/home/ubuntu/.jetstreamer-private/allocation-freeze-fixture944-v1";
 const CG: &str =
-    "/sys/fs/cgroup/system.slice/horizon-qualify-allocation-fixture-writer930-v1.service";
+    "/sys/fs/cgroup/system.slice/horizon-qualify-allocation-fixture-writer944-v1.service";
 const DATA_LEN: u64 = 8 << 20;
-const FLOOR: u64 = 1_772_980_057_109;
+const FLOOR: u64 = 1_773_047_165_973;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -35,6 +35,7 @@ enum Mode {
     ReusedCgroup,
     PendingKill,
     Deactivating,
+    IntentKill,
 }
 impl Mode {
     fn name(self) -> &'static str {
@@ -47,11 +48,12 @@ impl Mode {
             Self::ReusedCgroup => "reused-cgroup",
             Self::PendingKill => "pending-kill",
             Self::Deactivating => "deactivating",
+            Self::IntentKill => "intent-kill",
         }
     }
     fn role(self, role: &str) -> String {
         format!(
-            "horizon-allocation-fixture930-{}-{role}-v1.service",
+            "horizon-allocation-fixture944-{}-{role}-v1.service",
             self.name()
         )
     }
@@ -60,7 +62,7 @@ impl Mode {
     }
     fn state(self) -> PathBuf {
         format!(
-            "/var/lib/jetstreamer/horizon-allocation-fixture930-{}-state-v1",
+            "/var/lib/jetstreamer/horizon-allocation-fixture944-{}-state-v1",
             self.name()
         )
         .into()
@@ -70,7 +72,7 @@ fn require_freezing_case(mode: Mode) -> Result<()> {
     ensure!(
         matches!(
             mode,
-            Mode::Normal | Mode::Kill | Mode::PendingKill | Mode::Deactivating
+            Mode::Normal | Mode::Kill | Mode::PendingKill | Mode::Deactivating | Mode::IntentKill
         ),
         "negative fixture unexpectedly passed its rejection gate; freezing prohibited"
     );
@@ -111,6 +113,36 @@ struct Lease {
     driver_pid: u32,
     driver_start_ticks: u64,
     rescue_timer_iid: String,
+}
+fn validate_lease(s: &Spec, plan: &str, lease: &Lease) -> Result<()> {
+    ensure!(
+        lease.schema == "horizon-allocation-fixture-freeze-lease-v1"
+            && lease.plan_sha256 == plan
+            && lease.writer == s.writer
+            && lease.driver_unit == s.mode.role("driver")
+            && hex(&lease.driver_iid, 32)
+            && hex(&lease.rescue_timer_iid, 32)
+            && lease.driver_pid > 1
+            && lease.driver_start_ticks > 0,
+        "foreign freeze lease"
+    );
+    Ok(())
+}
+// This control covers death after durable intent but before the first request.
+// It deliberately makes no requested=1/frozen=0-at-cancel claim. Check its
+// expected observation only AFTER unconditional cancellation and thaw so a
+// failed control cannot prevent the independent rescue from doing its job.
+fn qualify_pre_request_observation(
+    mode: Mode,
+    requested: bool,
+    frozen: bool,
+    owner: RescueOwner,
+) -> Result<()> {
+    ensure!(
+        mode != Mode::IntentKill || (!requested && !frozen && owner == RescueOwner::Running),
+        "intent-kill did not observe the pre-request crash window"
+    );
+    Ok(())
 }
 fn now() -> Result<u64> {
     Ok(SystemTime::now()
@@ -844,6 +876,22 @@ fn drive(s: &Spec, plan: &str, spec_path: &str, self_sha: &str) -> Result<()> {
     };
     save(&s.mode.state(), "freeze-intent.json", &lease)?;
     log("freeze-intent-durable-rescue-armed");
+    // Arming and validating rescue performs manager calls. Reauthenticate the
+    // original writer after that work and before any controlled crash/freeze.
+    verify_writer(&s.writer)?;
+    if s.mode == Mode::IntentKill {
+        let requested = freeze.requested()?;
+        let frozen = freeze.frozen()?;
+        qualify_pre_request_observation(s.mode, requested, frozen, RescueOwner::Running)?;
+        save(
+            &s.mode.state(),
+            "pre-request-driver-death.json",
+            &json!({"schema":"horizon-allocation-fixture-pre-request-death-v1","plan_sha256":plan,"writer":s.writer,"driver_unit":lease.driver_unit,"driver_iid":lease.driver_iid,"driver_pid":lease.driver_pid,"driver_start_ticks":lease.driver_start_ticks,"requested":requested,"frozen":frozen,"freeze_one_written":false,"live_replay_or_admission_authorized":false}),
+        )?;
+        log("deliberate-fixture-driver-SIGKILL-after-intent-before-freeze-request");
+        ensure!(unsafe { libc::raise(libc::SIGKILL) } == 0, "raise SIGKILL");
+        bail!("SIGKILL unexpectedly returned");
+    }
     if s.mode == Mode::Deactivating {
         command("/usr/bin/systemctl", &["stop", "--no-block", WRITER])?;
         let end = Instant::now() + Duration::from_secs(1);
@@ -914,17 +962,7 @@ fn rescue(s: &Spec, plan: &str) -> Result<()> {
     own_role(&s.mode.role("rescue"))?;
     let lease: Lease =
         serde_json::from_slice(&read_small(&s.mode.state().join("freeze-intent.json"), 0)?)?;
-    ensure!(
-        lease.schema == "horizon-allocation-fixture-freeze-lease-v1"
-            && lease.plan_sha256 == plan
-            && lease.writer == s.writer
-            && lease.driver_unit == s.mode.role("driver")
-            && hex(&lease.driver_iid, 32)
-            && hex(&lease.rescue_timer_iid, 32)
-            && lease.driver_pid > 1
-            && lease.driver_start_ticks > 0,
-        "foreign freeze lease"
-    );
+    validate_lease(s, plan, &lease)?;
     if rescue_owner(&s.writer, &show(WRITER)?)? == RescueOwner::Terminal {
         ensure!(
             !Path::new(CG).try_exists()?,
@@ -939,6 +977,10 @@ fn rescue(s: &Spec, plan: &str) -> Result<()> {
                 "thaw_zero_written":false,"thawed":true,"live_replay_or_admission_authorized":false
             }),
         )?;
+        ensure!(
+            s.mode != Mode::IntentKill,
+            "intent-kill writer closed before independent pre-request cancellation"
+        );
         return Ok(());
     }
     let mut freeze = Frozen::new(&s.writer)?;
@@ -993,8 +1035,9 @@ fn rescue(s: &Spec, plan: &str) -> Result<()> {
     save(
         &s.mode.state(),
         "rescue-completion.json",
-        &json!({"schema":"horizon-allocation-fixture-rescue-completion-v1","plan_sha256":plan,"writer":s.writer,"owner_before":owner_before,"was_requested":requested,"was_frozen":was,"counter_before":before,"counter_after":after,"thaw_zero_written":true,"thawed":thawed,"live_replay_or_admission_authorized":false}),
+        &json!({"schema":"horizon-allocation-fixture-rescue-completion-v1","plan_sha256":plan,"writer":s.writer,"owner_before":owner_before,"was_requested":requested,"was_frozen":was,"counter_before":before,"counter_after":after,"thaw_zero_written":true,"thawed":thawed,"pre_request_control":s.mode==Mode::IntentKill,"pre_request_observation_qualified":s.mode==Mode::IntentKill&&!requested&&!was&&owner_before==RescueOwner::Running,"strict_pending_at_cancel_qualified":false,"live_replay_or_admission_authorized":false}),
     )?;
+    qualify_pre_request_observation(s.mode, requested, was, owner_before)?;
     log("independent-rescue-complete");
     Ok(())
 }
@@ -1177,13 +1220,14 @@ mod tests {
             assert_ne!(mode.state(), Mode::Kill.state());
             assert!(
                 mode.role("driver")
-                    .starts_with("horizon-allocation-fixture930-")
+                    .starts_with("horizon-allocation-fixture944-")
             );
         }
         require_freezing_case(Mode::Normal).unwrap();
         require_freezing_case(Mode::Kill).unwrap();
         require_freezing_case(Mode::PendingKill).unwrap();
         require_freezing_case(Mode::Deactivating).unwrap();
+        require_freezing_case(Mode::IntentKill).unwrap();
     }
     fn spec() -> Spec {
         Spec {
@@ -1412,5 +1456,93 @@ mod tests {
             .unwrap()
             .push(valid["data"][0].clone());
         assert!(validate_rescue_command(&multiple, &expected).is_err());
+    }
+    #[test]
+    fn pre_request_control_never_promotes_pending_or_completed_freeze_observations() {
+        qualify_pre_request_observation(Mode::IntentKill, false, false, RescueOwner::Running)
+            .unwrap();
+        for (requested, frozen) in [(false, true), (true, false), (true, true)] {
+            assert!(
+                qualify_pre_request_observation(
+                    Mode::IntentKill,
+                    requested,
+                    frozen,
+                    RescueOwner::Running
+                )
+                .is_err()
+            );
+        }
+        for owner in [RescueOwner::Deactivating, RescueOwner::Terminal] {
+            assert!(
+                qualify_pre_request_observation(Mode::IntentKill, false, false, owner).is_err()
+            );
+        }
+        // The old pending control is still a different experiment. Its rescue
+        // must not acquire a new frozen=0 requirement that could block thaw.
+        qualify_pre_request_observation(Mode::PendingKill, true, true, RescueOwner::Running)
+            .unwrap();
+    }
+    #[test]
+    fn pre_request_crash_has_distinct_fixed_paths_and_no_live_owner_authority() {
+        let mut s = spec();
+        s.mode = Mode::IntentKill;
+        validate(&s).unwrap();
+        assert_eq!(serde_json::to_value(s.mode).unwrap(), json!("intent-kill"));
+        assert_eq!(
+            s.mode.role("driver"),
+            "horizon-allocation-fixture944-intent-kill-driver-v1.service"
+        );
+        for mode in [
+            Mode::Normal,
+            Mode::Kill,
+            Mode::WrongInvocation,
+            Mode::WrongCgroup,
+            Mode::MissingRescue,
+            Mode::ReusedCgroup,
+            Mode::PendingKill,
+            Mode::Deactivating,
+        ] {
+            assert_ne!(s.mode.state(), mode.state());
+            assert_ne!(s.mode.role("driver"), mode.role("driver"));
+            assert_ne!(s.mode.timer(), mode.timer());
+        }
+        s.writer.unit =
+            "horizon-qualify-236-general-shrink-debt-budget506-e3f15eb2-v1.service".into();
+        assert!(validate(&s).is_err());
+    }
+    #[test]
+    fn pre_request_rescue_requires_the_exact_durable_original_lease() {
+        let mut s = spec();
+        s.mode = Mode::IntentKill;
+        let plan = "b".repeat(64);
+        let lease = Lease {
+            schema: "horizon-allocation-fixture-freeze-lease-v1".into(),
+            plan_sha256: plan.clone(),
+            writer: s.writer.clone(),
+            driver_unit: s.mode.role("driver"),
+            driver_iid: "c".repeat(32),
+            driver_pid: 3,
+            driver_start_ticks: 4,
+            rescue_timer_iid: "d".repeat(32),
+        };
+        validate_lease(&s, &plan, &lease).unwrap();
+        for (pointer, replacement) in [
+            ("/schema", json!("other")),
+            ("/plan_sha256", json!("e".repeat(64))),
+            ("/writer/invocation_id", json!("e".repeat(32))),
+            ("/writer/pid", json!(99)),
+            ("/writer/start_ticks", json!(99)),
+            ("/writer/cgroup_inode", json!(99)),
+            ("/driver_unit", json!(Mode::PendingKill.role("driver"))),
+            ("/driver_iid", json!("0".repeat(32))),
+            ("/driver_pid", json!(1)),
+            ("/driver_start_ticks", json!(0)),
+            ("/rescue_timer_iid", json!("0".repeat(32))),
+        ] {
+            let mut changed = serde_json::to_value(&lease).unwrap();
+            *changed.pointer_mut(pointer).unwrap() = replacement;
+            let changed: Lease = serde_json::from_value(changed).unwrap();
+            assert!(validate_lease(&s, &plan, &changed).is_err(), "{pointer}");
+        }
     }
 }
