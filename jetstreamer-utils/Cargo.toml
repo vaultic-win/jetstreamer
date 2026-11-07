@@ -392,3 +392,7 @@ path = "src/native227_v1625_prepare_bin.rs"
 [[bin]]
 name = "jetstreamer-allocation-tree-fixture"
 path = "src/allocation_tree_fixture_bin.rs"
+
+[[bin]]
+name = "jetstreamer-horizon-retire-terminal-compact-index"
+path = "src/horizon_retire_terminal_compact_index_bin.rs"
