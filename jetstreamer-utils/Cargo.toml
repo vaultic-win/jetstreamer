@@ -386,6 +386,10 @@ name = "jetstreamer-anon-exclusivity-fixture"
 path = "src/anon_exclusivity_fixture_bin.rs"
 
 [[bin]]
+name = "jetstreamer-anon-lazyfree-drain-fixture"
+path = "src/anon_lazyfree_drain_fixture_bin.rs"
+
+[[bin]]
 name = "jetstreamer-memory-page-fixture"
 path = "src/memory_page_fixture_bin.rs"
 
