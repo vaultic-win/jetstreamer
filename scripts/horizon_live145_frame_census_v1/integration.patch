@@ -1171,7 +1171,7 @@
 +}
 --- /dev/null
 +++ b/library/src/live145_frame/io.rs
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,123 @@
 +use super::*;
 +use serde::de::{MapAccess,SeqAccess,Visitor};
 +use std::{fmt,process::Command as ProcessCommand};
@@ -1295,7 +1295,6 @@
 +    );
 +    Ok(value)
 +}
-+
 --- /dev/null
 +++ b/library/src/live145_frame/model.rs
 @@ -0,0 +1,128 @@

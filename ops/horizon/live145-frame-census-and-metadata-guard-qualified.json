@@ -70,13 +70,14 @@
     },
     {
       "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/io.rs",
-      "sha256": "6ed97e46f4cd14f911efd022932c25e2653269854a7185a3c7fd1fd43065ab88",
-      "bytes": 5290,
+      "sha256": "1b35f14635090a3372e4a4c50d31ed95b537f2b008ae4ba123e03dd55e410017",
+      "bytes": 5289,
       "qualified_source": {
         "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/library/src/live145_frame/io.rs",
         "sha256": "6ed97e46f4cd14f911efd022932c25e2653269854a7185a3c7fd1fd43065ab88"
       },
-      "predecessor": null
+      "predecessor": null,
+      "publication_transform": "Remove one terminal blank line only; exact qualified-source hash remains separately bound."
     },
     {
       "path": "scripts/horizon_live145_frame_census_v1/source/library/src/live145_frame/model.rs",
@@ -124,7 +125,7 @@
   ],
   "patch": {
     "path": "/home/sol/workspace/jetstreamer/scripts/horizon_live145_frame_census_v1/integration.patch",
-    "sha256": "e9a3c492b548f9d0b8065b14e7f357200eeb04c6fa53935b29c822ce1c090700"
+    "sha256": "19fc09e5f75f0c18060566f24c80a14a28b69c9469c01b959a4aa45ed212d496"
   },
   "source_freeze": {
     "path": "/home/sol/.jetstreamer-private/native1058-live145-frame-qualification-20261107-v1/ROOT_INTEGRATED_FRAME_SOURCE_FREEZE_V3.json",
@@ -190,5 +191,6 @@
   ],
   "no_new_full_native_tuple_or_replay_admission_claim": true,
   "replay_lanes_recovered": 0,
-  "goal_active_and_incomplete": true
+  "goal_active_and_incomplete": true,
+  "publication_whitespace_normalization_only": true
 }

@@ -121,4 +121,3 @@ pub(super) fn properties(name: &str) -> Result<Value> {
     );
     Ok(value)
 }
-
